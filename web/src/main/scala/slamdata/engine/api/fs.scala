@@ -254,4 +254,27 @@ class FileSystemApi(fs: FSTable[Backend]) {
         } yield Ok("")
       ).fold(identity, identity)
   }
+
+  val basePath: Task[String] =
+    Task.delay((new File(Server.getClass.getProtectionDomain().getCodeSource().getLocation().toURI().getPath()))
+      .getParentFile()
+      .getPath())
+
+  def appService = corsService {
+    case GET -> AsPath(path) =>
+      // NB: http4s/http4s#265 should give us a simple way to handle this stuff.
+      basePath.flatMap { bp =>
+        val filePath = bp + path.toString
+        StaticFile.fromString(filePath).fold(
+          StaticFile.fromString(filePath + "/index.html").fold(
+            NotFound("Couldn’t find page " + path.toString))(
+            Task.now))(
+          Task.now)
+      }
+  }
+
+  def rootService = corsService {
+    case GET -> AsPath(path) =>
+      TemporaryRedirect(Uri(path = "/apps/slamdata" + path.toString))
+  }
 }
