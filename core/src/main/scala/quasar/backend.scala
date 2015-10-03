@@ -152,6 +152,7 @@ sealed trait Backend { self =>
 
   final def scanFrom(path: Path, offset: Long) = scan(path, offset, None)
 
+  /** Need a more precise name to indicate what we're counting. */
   def count(path: Path): PathTask[Long] = count0(path.asRelative)
 
   def count0(path: Path): PathTask[Long]
@@ -417,6 +418,8 @@ object Backend {
 /**
   Multi-mount backend that delegates each request to a single mount.
   Any request that references paths in more than one mount will fail.
+
+  TODO: This will become function Map[Dir, Backend ~> F] => (Backend ~> F)
 */
 final case class NestedBackend(sourceMounts: Map[DirNode, Backend]) extends Backend {
   import Backend._
