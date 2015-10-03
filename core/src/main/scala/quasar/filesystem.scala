@@ -6,13 +6,20 @@ import quasar.Backend.MoveSemantics
 
 import pathy._, Path._
 import scalaz._
+import scalaz.Tags.{Multiplication => Mult}
 
-final case class Natural private (run: Long) {
+final class Natural private (val run: Long) {
   def plus(other: Natural): Natural =
     new Natural(run + other.run)
 
+  def + (other: Natural): Natural =
+    plus(other)
+
   def times(other: Natural): Natural =
     new Natural(run * other.run)
+
+  def * (other: Natural): Natural =
+    times(other)
 }
 
 object Natural {
@@ -27,22 +34,26 @@ object Natural {
     new Natural(n.run)
 
   implicit val naturalAddition: Monoid[Natural] =
-    Monoid.instance(_ plus _, zero)
-
-  import Tags.{Multiplication => Mult}
+    Monoid.instance(_ + _, zero)
 
   implicit val naturalMultiplication: Monoid[Natural @@ Mult] =
     Monoid.instance(
-      (x, y) => Mult.wrap(Mult.unwrap(x) times Mult.unwrap(y)),
-      Mult.wrap(one))
+      (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
+      Mult(one))
 }
 
-final case class Positive private (run: Long) {
+final class Positive private (val run: Long) {
   def plus(other: Positive): Positive =
     new Positive(run + other.run)
 
+  def + (other: Positive): Positive =
+    plus(other)
+
   def times(other: Positive): Positive =
     new Positive(run * other.run)
+
+  def * (other: Positive): Positive =
+    times(other)
 }
 
 object Positive {
@@ -52,14 +63,12 @@ object Positive {
   val one: Positive = new Positive(1)
 
   implicit val positiveSemigroup: Semigroup[Positive] =
-    Semigroup.instance(_ plus _)
-
-  import Tags.{Multiplication => Mult}
+    Semigroup.instance(_ + _)
 
   implicit val positiveMultiplication: Monoid[Positive @@ Mult] =
     Monoid.instance(
-      (x, y) => Mult.wrap(Mult.unwrap(x) times Mult.unwrap(y)),
-      Mult.wrap(one))
+      (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
+      Mult(one))
 }
 
 sealed trait WriteFile[A]
