@@ -194,6 +194,8 @@ sealed trait Backend { self =>
   def append0(path: Path, values: Process[Task, Data]):
       Process[PathTask, WriteError]
 
+  // TODO: DIR
+
   def move(src: Path, dst: Path, semantics: MoveSemantics): PathTask[Unit] =
     move0(src.asRelative, dst.asRelative, semantics)
 

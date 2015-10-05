@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.RenderTree.ops._
 
-import scalaz._; import Liskov._; import Scalaz._
+import scalaz._, Liskov._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.effect._
 import simulacrum.{typeclass, op}
@@ -338,6 +338,15 @@ package object fp extends TreeInstances with ListMapInstances with ToCatchableOp
   val fromIO = new (IO ~> Task) {
     def apply[A](io: IO[A]): Task[A] = Task.delay(io.unsafePerformIO())
   }
+
+  /** `liftM` as a natural transformation
+    *
+    * TODO: PR to scalaz
+    */
+  def liftMT[F[_]: Monad, G[_[_], _]: MonadTrans]: F ~> G[F, ?] =
+    new (F ~> G[F, ?]) {
+      def apply[A](fa: F[A]) = fa.liftM[G]
+    }
 
   /** Wrapper around `IORef` to operate in `Task` */
   final class TaskRef[A](val ioRef: IORef[A]) {

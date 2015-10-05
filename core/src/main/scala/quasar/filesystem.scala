@@ -71,20 +71,7 @@ object Positive {
       Mult(one))
 }
 
-sealed trait WriteFile[A]
-
-object WriteFile {
-  // TODO: Need to support appending...maybe a write mode? Concat vs replace or similar?
-  final case class WriteHandle(run: Long) extends AnyVal
-
-  final case class Open(path: RelFile[Sandboxed]) extends WriteFile[WriteHandle]
-  final case class Write(h: WriteHandle, data: Vector[Data]) extends WriteFile[Unit]
-  final case class Close(h: WriteHandle) extends WriteFile[Unit]
-}
-
   // FILES
-
-  //final case class Scan(path: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]) extends FileSystemF[Process[PathErrT[ReadFile, ?], Data]]
 
   // TODO: This isn't used anywhere yet, necessary?
   //final case class Size(path: RelFile[Sandboxed]) extends FileSystemF[PathError \/ Natural]
