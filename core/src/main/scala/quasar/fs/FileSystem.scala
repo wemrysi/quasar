@@ -8,28 +8,50 @@ import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.std.option._
 import scalaz.syntax.applicative._
-import pathy.Path._
+import pathy.{Path => PPath}, PPath._
 
-/** TODO: Naming, not sure if this is the appropriate name... */
 sealed trait FileSystem[A]
 
 object FileSystem {
   sealed trait MoveSemantics {
     import MoveSemantics._
 
-    def fold[X](ovr: => X, fail: => X): X =
+    def fold[X](overwrite: => X, failIfExists: => X, failIfMissing: => X): X =
       this match {
-        case Overwrite0    => ovr
-        case FailIfExists0 => fail
+        case Overwrite0     => overwrite
+        case FailIfExists0  => failIfExists
+        case FailIfMissing0 => failIfMissing
       }
   }
 
+  /** NB: Certain write operations' consistency is affected by faithful support
+    *     of these semantics, thus their consistency/atomicity is as good as the
+    *     support of these semantics by the interpreter.
+    *
+    *     Currently, this allows us to implement all the write scenarios in terms
+    *     of append and move, however if this proves too difficult to support by
+    *     backends, we may want to relax the move semantics and instead add
+    *     additional primitive operations for the conditional write operations.
+    */
   object MoveSemantics {
     private case object Overwrite0 extends MoveSemantics
     private case object FailIfExists0 extends MoveSemantics
+    private case object FailIfMissing0 extends MoveSemantics
 
+    /** Indicates the move operation should overwrite anything at the
+      * destination, creating it if it doesn't exist.
+      */
     val Overwrite: MoveSemantics = Overwrite0
+
+    /** Indicates the move should (atomically, if possible) fail if the
+      * exists.
+      */
     val FailIfExists: MoveSemantics = FailIfExists0
+
+    /** Indicates the move should (atomically, if possible) fail unless
+      * the destination exists, overwriting it otherwise.
+      */
+    val FailIfMissing: MoveSemantics = FailIfMissing0
   }
 
   sealed trait MoveScenario {
@@ -94,12 +116,10 @@ object FileSystem {
       Plain compose \/.right
   }
 
-  // TODO: How can these fail? What makes sense to include as part of the domain and part of the impl?
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics) extends FileSystem[PathError2 \/ Unit]
   final case class Delete(path: RelPath[Sandboxed]) extends FileSystem[PathError2 \/ Unit]
   final case class ListContents(dir: RelDir[Sandboxed]) extends FileSystem[PathError2 \/ Set[Node]]
-  // TODO: What sort of parameters might be useful here, maybe as hints for where to create temp file?
-  case object TempFile extends FileSystem[RelFile[Sandboxed]]
+  final case class TempFile(nearTo: Option[RelFile[Sandboxed]]) extends FileSystem[PathError2 \/ RelFile[Sandboxed]]
 }
 
 object FileSystems {
@@ -113,24 +133,37 @@ final class FileSystems[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
   type F[A] = Free[S, A]
   type M[A] = PathErr2T[F, A]
 
+  /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
   def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], sem: MoveSemantics): M[Unit] =
     EitherT(lift(Move(MoveScenario.DirToDir(src, dst), sem)))
 
+  /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
   def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], sem: MoveSemantics): M[Unit] =
     EitherT(lift(Move(MoveScenario.FileToFile(src, dst), sem)))
 
+  /** Rename the `src` file in the same directory. */
+  def renameFile(src: RelFile[Sandboxed], name: String): M[RelFile[Sandboxed]] = {
+    val dst = PPath.renameFile(src, κ(FileName(name)))
+    moveFile(src, dst, MoveSemantics.Overwrite).as(dst)
+  }
+
+  /** Delete the given directory. */
   def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
     EitherT(lift(Delete(\/.left(dir))))
 
+  /** Delete the given file. */
   def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
     EitherT(lift(Delete(\/.right(file))))
 
+  /** The immediate children of the given directory. */
   def ls(dir: RelDir[Sandboxed]): M[Set[Node]] =
     EitherT(lift(ListContents(dir)))
 
+  /** The children of the root directory. */
   def ls: M[Set[Node]]=
     ls(currentDir[Sandboxed])
 
+  /** The children of the given directory and all of their descendants. */
   def lsAll(dir: RelDir[Sandboxed]): M[Set[Node]] = {
     type S[A] = StreamT[M, A]
 
@@ -143,6 +176,11 @@ final class FileSystems[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
     lsR(currentDir[Sandboxed]).foldLeft(Set.empty[Node])(_ + _)
   }
 
+  /** Returns whether the given file exists.
+    *
+    * TODO: This feels a bit sloppy w.r.t. equality, may want to normalize and
+    *       convert to strings for comparision.
+    */
   def fileExists(file: RelFile[Sandboxed]): M[Boolean] =
     parentDir(file).cata(
       // NB: When in rome, I guess.
@@ -150,8 +188,15 @@ final class FileSystems[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
       // Files _must_ have a parent dir and the type guarantees a file.
       scala.sys.error("impossible!"))
 
-  def tempFile: F[RelFile[Sandboxed]] =
-    lift(TempFile)
+  /** Returns the path to a new temporary file. */
+  def tempFile: M[RelFile[Sandboxed]] =
+    EitherT(lift(TempFile(None)))
+
+  /** Returns the path to a new temporary file "near" the specified file,
+    * if possible. Where "near" means as physically close to as possible.
+    */
+  def tempFileNear(file: RelFile[Sandboxed]): M[RelFile[Sandboxed]] =
+    EitherT(lift(TempFile(Some(file))))
 
   ////
 
