@@ -23,7 +23,7 @@ import quasar.Errors._
 import quasar.Evaluator._
 import quasar.Planner._
 import quasar.config._
-import quasar.fs._; import Path._
+import quasar.fs._, Path._
 
 import scalaz.{Tree => _, _}, Scalaz._
 import scalaz.concurrent._
@@ -366,7 +366,6 @@ object Backend {
     def message = "invalid limit: " + value + " (must be >= 1)"
   }
 
-  type PathErrT[F[_], A] = EitherT[F, PathError, A]
   type PathTask[X] = ETask[PathError, X]
   val liftP = new (Task ~> PathTask) {
     def apply[T](t: Task[T]): PathTask[T] = EitherT.right(t)
