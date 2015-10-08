@@ -15,140 +15,152 @@ sealed trait WriteFile[A]
 object WriteFile {
   final case class WriteHandle(run: Long) extends AnyVal
 
-  final case class Open(dst: RelFile[Sandboxed]) extends WriteFile[PathError2 \/ WriteHandle]
-  final case class Write(h: WriteHandle, data: Vector[Data]) extends WriteFile[Vector[WriteError]]
+  final case class Open(file: RelFile[Sandboxed]) extends WriteFile[WriteHandle]
+  final case class Write(h: WriteHandle, chunk: Vector[Data]) extends WriteFile[Vector[WriteError]]
   final case class Close(h: WriteHandle) extends WriteFile[Unit]
-}
 
-object WriteFiles {
-  implicit def apply[S[_]: Functor : (WriteFileF :<: ?[_])]: WriteFiles[S] =
-    new WriteFiles[S]
-}
+  final class Ops[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S) {
+    import PathError2._
+    import FileSystem.MoveSemantics
 
-final class WriteFiles[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S) {
-  import WriteFile._
-  import PathError2._
-  import FileSystem.MoveSemantics
+    type F[A]    = Free[S, A]
+    type M[A]    = PathErr2T[F, A]
+    type G[E, A] = EitherT[F, E, A]
 
-  type F[A]    = Free[S, A]
-  type M[A]    = PathErr2T[F, A]
-  type G[E, A] = EitherT[F, E, A]
+    /** Returns a write handle for the specified file which may be used to
+      * append data to the file it represents, creating it if necessary.
+      *
+      * Care must be taken to `close` the handle when it is no longer needed
+      * to avoid potential resource leaks.
+      */
+    def open(file: RelFile[Sandboxed]): F[WriteHandle] =
+      lift(Open(file))
 
-  /** Returns a channel that appends chunks of data to the given file, creating
-    * it if it doesn't exist. Any errors encountered while writing are emitted,
-    * all attempts are made to continue consuming input until the source is
-    * exhausted.
-    *
-    * TODO: Test that the `close` finalizer runs as expected, when the source ends.
-    */
-  def appendChannel(dst: RelFile[Sandboxed]): Channel[M, Vector[Data], Vector[WriteError]] = {
-    def append0(wh: WriteHandle): Vector[Data] => M[Vector[WriteError]] =
-      ds => lift(Write(wh, ds)).liftM[PathErr2T]
+    /** Write a chunk of data to the file represented by the write handle.
+      *
+      * Attempts to write as much of the chunk as possible, even if parts of
+      * it fail, any such failures will be returned in the output [[Vector]].
+      * An empty [[Vector]] means the entire chunk was written successfully.
+      */
+    def write(wh: WriteHandle, chunk: Vector[Data]): F[Vector[WriteError]] =
+      lift(Write(wh, chunk))
 
-    def close0(wh: WriteHandle): Process[M, Nothing] =
-      Process.eval_[M, Unit](lift(Close(wh)).liftM[PathErr2T])
+    /** Close the write handle, freeing any resources it was using. */
+    def close(wh: WriteHandle): F[Unit] =
+      lift(Close(wh))
 
-    Process.await(EitherT(lift(Open(dst))): M[WriteHandle])(wh =>
-      channel.lift(append0(wh)).onComplete(close0(wh)))
-  }
+    /** Returns a channel that appends chunks of data to the given file, creating
+      * it if it doesn't exist. Any errors encountered while writing are emitted,
+      * all attempts are made to continue consuming input until the source is
+      * exhausted.
+      */
+    def appendChannel(dst: RelFile[Sandboxed]): Channel[F, Vector[Data], Vector[WriteError]] = {
+      def writeChunk(wh: WriteHandle): Vector[Data] => F[Vector[WriteError]] =
+        write(wh, _)
 
-  /** Same as `append` but accepts chunked [[Data]]. */
-  def appendChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]]): Process[M, WriteError] =
-    src.translate[M](liftMT[F, PathErr2T])
-      .through(appendChannel(dst))
-      .flatMap(Process.emitAll(_))
+      Process.await(open(dst))(wh =>
+        channel.lift(writeChunk(wh)).onComplete(Process.eval_(close(wh))))
+    }
 
-  /** Appends data to the given file, creating it if it doesn't exist. May not
-    * write all values from `src` in the presence of errors, will emit a
-    * [[WriteError]] for each input value that failed to write.
-    */
-  def append(dst: RelFile[Sandboxed], src: Process[F, Data]): Process[M, WriteError] =
-    appendChunked(dst, src map (Vector(_)))
+    /** Same as `append` but accepts chunked [[Data]]. */
+    def appendChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]]): Process[F, WriteError] =
+      src through appendChannel(dst) flatMap Process.emitAll
 
-  /** Same as `save` but accepts chunked [[Data]]. */
-  def saveChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
-                 (implicit FS: FileSystems[S])
-                 : Process[M, WriteError] = {
+    /** Appends data to the given file, creating it if it doesn't exist. May not
+      * write all values from `src` in the presence of errors, will emit a
+      * [[WriteError]] for each input value that failed to write.
+      */
+    def append(dst: RelFile[Sandboxed], src: Process[F, Data]): Process[F, WriteError] =
+      appendChunked(dst, src map (Vector(_)))
 
-    saveChunked0(dst, src, MoveSemantics.Overwrite)
-  }
-
-  /** Write the data stream to the given path, replacing any existing contents,
-    * atomically. Any errors during writing will abort the entire operation
-    * leaving any existing values unaffected.
-    */
-  def save(dst: RelFile[Sandboxed], src: Process[F, Data])
-          (implicit FS: FileSystems[S])
-          : Process[M, WriteError] = {
-
-    saveChunked(dst, src map (Vector(_)))
-  }
-
-  /** Same as `create` but accepts chunked [[Data]]. */
-  def createChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+    /** Same as `save` but accepts chunked [[Data]]. */
+    def saveChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
                    (implicit FS: FileSystems[S])
                    : Process[M, WriteError] = {
 
-    def shouldNotExist: M[WriteError] =
-      MonadError[G, PathError2].raiseError(PathExistsError(dst))
+      saveChunked0(dst, src, MoveSemantics.Overwrite)
+    }
 
-    FS.fileExists(dst).liftM[Process].ifM(
-      shouldNotExist.liftM[Process],
-      saveChunked0(dst, src, MoveSemantics.FailIfExists))
-  }
-
-  /** Create the given file with the contents of `src`. Fails if already exists. */
-  def create(dst: RelFile[Sandboxed], src: Process[F, Data])
+    /** Write the data stream to the given path, replacing any existing contents,
+      * atomically. Any errors during writing will abort the entire operation
+      * leaving any existing values unaffected.
+      */
+    def save(dst: RelFile[Sandboxed], src: Process[F, Data])
             (implicit FS: FileSystems[S])
             : Process[M, WriteError] = {
 
-    createChunked(dst, src map (Vector(_)))
-  }
-
-  /** Same as `replace` but accepts chunked [[Data]]. */
-  def replaceChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
-                    (implicit FS: FileSystems[S])
-                    : Process[M, WriteError] = {
-
-    type G[E, A] = EitherT[F, E, A]
-
-    def shouldExist: M[WriteError] =
-      MonadError[G, PathError2].raiseError(PathMissingError(dst))
-
-    FS.fileExists(dst).liftM[Process].ifM(
-      saveChunked0(dst, src, MoveSemantics.FailIfMissing),
-      shouldExist.liftM[Process])
-  }
-
-  /** Replace the contents of the given file with `src`. Fails if the file
-    * doesn't exist.
-    */
-  def replace(dst: RelFile[Sandboxed], src: Process[F, Data])
-             (implicit FS: FileSystems[S])
-             : Process[M, WriteError] = {
-
-    replaceChunked(dst, src map (Vector(_)))
-  }
-
-  ////
-
-  private def saveChunked0(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]], sem: MoveSemantics)
-                          (implicit FS: FileSystems[S])
-                          : Process[M, WriteError] = {
-
-    def cleanupTmp(tmp: RelFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
-      Process.eval_[M, Unit](FS.deleteFile(tmp)).causedBy(Cause.Error(t))
-
-    FS.tempFileNear(dst).liftM[Process] flatMap { tmp =>
-      appendChunked(tmp, src).terminated.take(1)
-        .flatMap(_.cata(
-          werr => FS.deleteFile(tmp).as(werr).liftM[Process],
-          Process.eval_[M, Unit](FS.moveFile(tmp, dst, sem))))
-        .onFailure(cleanupTmp(tmp))
+      saveChunked(dst, src map (Vector(_)))
     }
+
+    /** Same as `create` but accepts chunked [[Data]]. */
+    def createChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+                     (implicit FS: FileSystems[S])
+                     : Process[M, WriteError] = {
+
+      def shouldNotExist: M[WriteError] =
+        MonadError[G, PathError2].raiseError(PathExistsError(dst))
+
+      FS.fileExists(dst).liftM[Process].ifM(
+        shouldNotExist.liftM[Process],
+        saveChunked0(dst, src, MoveSemantics.FailIfExists))
+    }
+
+    /** Create the given file with the contents of `src`. Fails if already exists. */
+    def create(dst: RelFile[Sandboxed], src: Process[F, Data])
+              (implicit FS: FileSystems[S])
+              : Process[M, WriteError] = {
+
+      createChunked(dst, src map (Vector(_)))
+    }
+
+    /** Same as `replace` but accepts chunked [[Data]]. */
+    def replaceChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+                      (implicit FS: FileSystems[S])
+                      : Process[M, WriteError] = {
+
+      def shouldExist: M[WriteError] =
+        MonadError[G, PathError2].raiseError(PathMissingError(dst))
+
+      FS.fileExists(dst).liftM[Process].ifM(
+        saveChunked0(dst, src, MoveSemantics.FailIfMissing),
+        shouldExist.liftM[Process])
+    }
+
+    /** Replace the contents of the given file with `src`. Fails if the file
+      * doesn't exist.
+      */
+    def replace(dst: RelFile[Sandboxed], src: Process[F, Data])
+               (implicit FS: FileSystems[S])
+               : Process[M, WriteError] = {
+
+      replaceChunked(dst, src map (Vector(_)))
+    }
+
+    ////
+
+    private def saveChunked0(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]], sem: MoveSemantics)
+                            (implicit FS: FileSystems[S])
+                            : Process[M, WriteError] = {
+
+      def cleanupTmp(tmp: RelFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
+        Process.eval_[M, Unit](FS.deleteFile(tmp)).causedBy(Cause.Error(t))
+
+      FS.tempFileNear(dst).liftM[Process] flatMap { tmp =>
+        appendChunked(tmp, src).terminated.take(1)
+          .translate[M](liftMT[F, PathErr2T])
+          .flatMap(_.cata(
+            werr => FS.deleteFile(tmp).as(werr).liftM[Process],
+            Process.eval_[M, Unit](FS.moveFile(tmp, dst, sem))))
+          .onFailure(cleanupTmp(tmp))
+      }
+    }
+
+    private def lift[A](wf: WriteFile[A]): F[A] =
+      Free.liftF(S1.inj(Coyoneda.lift(wf)))
   }
 
-  private def lift[A](wf: WriteFile[A]): F[A] =
-    Free.liftF(S1.inj(Coyoneda.lift(wf)))
+  object Ops {
+    implicit def apply[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S): Ops[S] =
+      new Ops[S]
+  }
 }
-
