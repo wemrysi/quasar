@@ -6,7 +6,6 @@ import quasar.fp._
 
 import scalaz._
 import scalaz.std.option._
-import scalaz.syntax.std.option._
 import scalaz.syntax.applicative._
 import pathy.{Path => PPath}, PPath._
 
@@ -119,87 +118,110 @@ object FileSystem {
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics) extends FileSystem[PathError2 \/ Unit]
   final case class Delete(path: RelPath[Sandboxed]) extends FileSystem[PathError2 \/ Unit]
   final case class ListContents(dir: RelDir[Sandboxed]) extends FileSystem[PathError2 \/ Set[Node]]
-  final case class TempFile(nearTo: Option[RelFile[Sandboxed]]) extends FileSystem[PathError2 \/ RelFile[Sandboxed]]
-}
+  final case class TempFile(nearTo: Option[RelFile[Sandboxed]]) extends FileSystem[RelFile[Sandboxed]]
 
-object FileSystems {
-  implicit def apply[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S): FileSystems[S] =
-    new FileSystems[S]
-}
+  final class Ops[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
+    type F[A] = Free[S, A]
+    type M[A] = PathErr2T[F, A]
 
-final class FileSystems[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
-  import FileSystem._
+    /** Request the given move scenario be applied to the file system, using the
+      * given semantics.
+      */
+    def move(scenario: MoveScenario, semantics: MoveSemantics): M[Unit] =
+      EitherT(lift(Move(scenario, semantics)))
 
-  type F[A] = Free[S, A]
-  type M[A] = PathErr2T[F, A]
+    /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
+    def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], sem: MoveSemantics): M[Unit] =
+      move(MoveScenario.DirToDir(src, dst), sem)
 
-  /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
-  def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], sem: MoveSemantics): M[Unit] =
-    EitherT(lift(Move(MoveScenario.DirToDir(src, dst), sem)))
+    /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
+    def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], sem: MoveSemantics): M[Unit] =
+      move(MoveScenario.FileToFile(src, dst), sem)
 
-  /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
-  def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], sem: MoveSemantics): M[Unit] =
-    EitherT(lift(Move(MoveScenario.FileToFile(src, dst), sem)))
+    /** Rename the `src` file in the same directory. */
+    def renameFile(src: RelFile[Sandboxed], name: String): M[RelFile[Sandboxed]] = {
+      val dst = PPath.renameFile(src, κ(FileName(name)))
+      moveFile(src, dst, MoveSemantics.Overwrite).as(dst)
+    }
 
-  /** Rename the `src` file in the same directory. */
-  def renameFile(src: RelFile[Sandboxed], name: String): M[RelFile[Sandboxed]] = {
-    val dst = PPath.renameFile(src, κ(FileName(name)))
-    moveFile(src, dst, MoveSemantics.Overwrite).as(dst)
+    /** Delete the given file system path, fails if the path does not exist. */
+    def delete(path: RelPath[Sandboxed]): M[Unit] =
+      EitherT(lift(Delete(path)))
+
+    /** Delete the given directory, fails if the directory does not exist. */
+    def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
+      delete(\/.left(dir))
+
+    /** Delete the given file, fails if the file does not exist. */
+    def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
+      delete(\/.right(file))
+
+    /** Returns immediate children of the given directory, fails if the
+      * directory does not exist.
+      */
+    def ls(dir: RelDir[Sandboxed]): M[Set[Node]] =
+      EitherT(lift(ListContents(dir)))
+
+    /** The children of the root directory. */
+    def ls: M[Set[Node]] =
+      ls(currentDir[Sandboxed])
+
+    /** Returns the children of the given directory and all of their
+      * descendants, fails if the directory does not exist.
+      */
+    def lsAll(dir: RelDir[Sandboxed]): M[Set[Node]] = {
+      type S[A] = StreamT[M, A]
+
+      def lsR(desc: RelDir[Sandboxed]): StreamT[M, Node] =
+        StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
+          .flatMap(_.path.fold(
+            d => lsR(desc </> d),
+            f => Node.File(desc </> f).point[S]))
+
+      lsR(currentDir[Sandboxed]).foldLeft(Set.empty[Node])(_ + _)
+    }
+
+    /** Returns whether the given file exists.
+      *
+      * TODO: This seems a bit sloppy w.r.t. equality, may want to normalize and
+      *       convert to strings for comparision. Or see about adding an Equal[_]
+      *       instance for pathy.Path intead of relying on Object#equals/hashCode.
+      */
+    def fileExists(file: RelFile[Sandboxed]): F[Boolean] = {
+      // TODO: Add fileParent[B, S](f: Path[B, File, S]): Path[B, Dir, S] to pathy
+      val parent =
+        parentDir(file) getOrElse scala.sys.error("impossible, files have parents!")
+
+      ls(parent)
+        .map(_ flatMap (_.file map (parent </> _)) contains file)
+        .getOrElse(false)
+    }
+
+    /** Returns the path to a new temporary file. When `nearTo` is specified,
+      * an attempt is made to return a tmp path that is as physically close to
+      * the given file as possible.
+      */
+    def tempFile(nearTo: Option[RelFile[Sandboxed]]): F[RelFile[Sandboxed]] =
+      lift(TempFile(nearTo))
+
+    /** Returns the path to a new temporary file. */
+    def anyTempFile: F[RelFile[Sandboxed]] =
+      tempFile(None)
+
+    /** Returns the path to a new temporary file as physically close to the
+      * specified file as possible.
+      */
+    def tempFileNear(file: RelFile[Sandboxed]): F[RelFile[Sandboxed]] =
+      tempFile(Some(file))
+
+    ////
+
+    private def lift[A](fs: FileSystem[A]): F[A] =
+      Free.liftF(S1.inj(Coyoneda.lift(fs)))
   }
 
-  /** Delete the given directory. */
-  def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
-    EitherT(lift(Delete(\/.left(dir))))
-
-  /** Delete the given file. */
-  def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
-    EitherT(lift(Delete(\/.right(file))))
-
-  /** The immediate children of the given directory. */
-  def ls(dir: RelDir[Sandboxed]): M[Set[Node]] =
-    EitherT(lift(ListContents(dir)))
-
-  /** The children of the root directory. */
-  def ls: M[Set[Node]]=
-    ls(currentDir[Sandboxed])
-
-  /** The children of the given directory and all of their descendants. */
-  def lsAll(dir: RelDir[Sandboxed]): M[Set[Node]] = {
-    type S[A] = StreamT[M, A]
-
-    def lsR(desc: RelDir[Sandboxed]): StreamT[M, Node] =
-      StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
-        .flatMap(_.path.fold(
-          d => lsR(desc </> d),
-          f => Node.File(desc </> f).point[S]))
-
-    lsR(currentDir[Sandboxed]).foldLeft(Set.empty[Node])(_ + _)
+  object Ops {
+    implicit def apply[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S): Ops[S] =
+      new Ops[S]
   }
-
-  /** Returns whether the given file exists.
-    *
-    * TODO: This feels a bit sloppy w.r.t. equality, may want to normalize and
-    *       convert to strings for comparision.
-    */
-  def fileExists(file: RelFile[Sandboxed]): M[Boolean] =
-    parentDir(file).cata(
-      // NB: When in rome, I guess.
-      dir => ls(dir) map (_ flatMap (_.file map (dir </> _)) contains file),
-      // Files _must_ have a parent dir and the type guarantees a file.
-      scala.sys.error("impossible!"))
-
-  /** Returns the path to a new temporary file. */
-  def tempFile: M[RelFile[Sandboxed]] =
-    EitherT(lift(TempFile(None)))
-
-  /** Returns the path to a new temporary file "near" the specified file,
-    * if possible. Where "near" means as physically close to as possible.
-    */
-  def tempFileNear(file: RelFile[Sandboxed]): M[RelFile[Sandboxed]] =
-    EitherT(lift(TempFile(Some(file))))
-
-  ////
-
-  private def lift[A](fs: FileSystem[A]): F[A] =
-    Free.liftF(S1.inj(Coyoneda.lift(fs)))
 }
