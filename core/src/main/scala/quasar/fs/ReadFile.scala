@@ -13,39 +13,72 @@ sealed trait ReadFile[A]
 object ReadFile {
   final case class ReadHandle(run: Long) extends AnyVal
 
-  final case class Open(path: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]) extends ReadFile[PathError2 \/ ReadHandle]
+  final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]) extends ReadFile[PathError2 \/ ReadHandle]
   final case class Read(h: ReadHandle) extends ReadFile[Vector[Data]]
   final case class Close(h: ReadHandle) extends ReadFile[Unit]
-}
 
-object ReadFiles {
-  implicit def apply[S[_]: Functor : (ReadFileF :<: ?[_])]: ReadFiles[S] =
-    new ReadFiles[S]
-}
+  final class Ops[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S) {
+    type F[A] = Free[S, A]
+    type M[A] = PathErr2T[F, A]
 
-final class ReadFiles[S[_]: Functor : (ReadFileF :<: ?[_])] {
-  import ReadFile._
+    /** Returns a read handle for the given file, positioned at the given offset,
+      * that may be used to read chunks of data from the file. An optional limit
+      * may be supplied to restrict the total amount of data able to be read using
+      * the handle.
+      *
+      * Care must be taken to `close` the returned handle in order to avoid
+      * potential resource leaks.
+      */
+    def open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): M[ReadHandle] =
+      EitherT(lift(Open(file, offset, limit)))
 
-  type F[A] = Free[S, A]
-  type M[A] = PathErr2T[F, A]
+    /** Read a chunk of data from the file represented by the given handle.
+      *
+      * An empty [[Vector]] signals that all data has been read.
+      */
+    def read(rh: ReadHandle): F[Vector[Data]] =
+      lift(Read(rh))
 
-  def scan(path: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] =
-    Process.await[M, ReadHandle, Data](EitherT(lift(Open(path, offset, limit))))(rh =>
-      Process.repeatEval[M, Vector[Data]](lift(Read(rh)).liftM[PathErr2T])
-        .flatMap(data => if (data.isEmpty) Process.halt else Process.emitAll(data))
-        .onComplete(Process.eval_[M, Unit](lift(Close(rh)).liftM[PathErr2T])))
+    /** Closes the given read handle, freeing any resources it was using. */
+    def close(rh: ReadHandle): F[Unit] =
+      lift(Close(rh))
 
-  def scanAll(path: RelFile[Sandboxed]): Process[M, Data] =
-    scan(path, Natural.zero, None)
+    /** Returns a process which produces data from the given file, beginning
+      * at the specified offset. An optional limit may be supplied to restrict
+      * the maximum amount of data read.
+      */
+    def scan(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] =
+      Process.await(open(file, offset, limit))(rh =>
+        Process.repeatEval[M, Vector[Data]](read(rh).liftM[PathErr2T])
+          .flatMap(data => if (data.isEmpty) Process.halt else Process.emitAll(data))
+          .onComplete(Process.eval_[M, Unit](close(rh).liftM[PathErr2T])))
 
-  def scanTo(path: RelFile[Sandboxed], limit: Positive): Process[M, Data] =
-    scan(path, Natural.zero, Some(limit))
+    /** Returns a process that produces all the data contained in the
+      * given file.
+      */
+    def scanAll(file: RelFile[Sandboxed]): Process[M, Data] =
+      scan(file, Natural.zero, None)
 
-  def scanFrom(path: RelFile[Sandboxed], offset: Natural): Process[M, Data] =
-    scan(path, offset, None)
+    /** Returns a process that produces at most `limit` items from the beginning
+      * of the given file.
+      */
+    def scanTo(file: RelFile[Sandboxed], limit: Positive): Process[M, Data] =
+      scan(file, Natural.zero, Some(limit))
 
-  ////
+    /** Returns a process that produces data from the given file, beginning
+      * at the specified offset.
+      */
+    def scanFrom(file: RelFile[Sandboxed], offset: Natural): Process[M, Data] =
+      scan(file, offset, None)
 
-  private def lift[A](rf: ReadFile[A]): F[A] =
-    Free.liftF(Inject[ReadFileF, S].inj(Coyoneda.lift(rf)))
+    ////
+
+    private def lift[A](rf: ReadFile[A]): F[A] =
+      Free.liftF(S1.inj(Coyoneda.lift(rf)))
+  }
+
+  object Ops {
+    implicit def apply[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S): Ops[S] =
+      new Ops[S]
+  }
 }
