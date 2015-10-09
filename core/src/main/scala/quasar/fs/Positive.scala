@@ -24,7 +24,15 @@ object Positive {
   def apply(n: Long): Option[Positive] =
     Some(n).filter(_ > 1).map(new Positive(_))
 
-  val one: Positive = new Positive(1)
+  val _1: Positive = new Positive(1)
+  val _2: Positive = new Positive(2)
+  val _3: Positive = new Positive(3)
+  val _4: Positive = new Positive(4)
+  val _5: Positive = new Positive(5)
+  val _6: Positive = new Positive(6)
+  val _7: Positive = new Positive(7)
+  val _8: Positive = new Positive(8)
+  val _9: Positive = new Positive(9)
 
   implicit val positiveSemigroup: Semigroup[Positive] =
     Semigroup.instance(_ + _)
@@ -32,5 +40,5 @@ object Positive {
   implicit val positiveMultiplication: Monoid[Positive @@ Mult] =
     Monoid.instance(
       (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
-      Mult(one))
+      Mult(_1))
 }

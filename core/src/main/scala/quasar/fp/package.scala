@@ -122,6 +122,23 @@ sealed trait ListMapInstances {
   }
 }
 
+trait EitherTInstances {
+  implicit def eitherTCatchable[F[_]: Catchable : Functor, E]: Catchable[EitherT[F, E, ?]] =
+    new Catchable[EitherT[F, E, ?]] {
+      def attempt[A](fa: EitherT[F, E, A]) =
+        EitherT[F, E, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)      => \/.right(\/.left(t))
+            case \/-(-\/(e)) => \/.left(e)
+            case \/-(\/-(a)) => \/.right(\/.right(a))
+          }
+        )
+
+      def fail[A](t: Throwable) =
+        EitherT[F, E, A](Catchable[F].fail(t))
+    }
+}
+
 trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
     import SKI._
@@ -268,7 +285,7 @@ trait SKI {
 }
 object SKI extends SKI
 
-package object fp extends TreeInstances with ListMapInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
+package object fp extends TreeInstances with ListMapInstances with EitherTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }

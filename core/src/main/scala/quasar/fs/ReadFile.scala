@@ -40,8 +40,10 @@ object ReadFile {
 
   final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive])
     extends ReadFile[ReadError \/ ReadHandle]
-  final case class Read(h: ReadHandle) extends ReadFile[ReadError \/ Vector[Data]]
-  final case class Close(h: ReadHandle) extends ReadFile[Unit]
+  final case class Read(h: ReadHandle)
+    extends ReadFile[ReadError \/ Vector[Data]]
+  final case class Close(h: ReadHandle)
+    extends ReadFile[Unit]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S) {
     import ReadError._
@@ -85,13 +87,13 @@ object ReadFile {
       * given file.
       */
     def scanAll(file: RelFile[Sandboxed]): Process[M, Data] =
-      scan(file, Natural.zero, None)
+      scan(file, Natural._0, None)
 
     /** Returns a process that produces at most `limit` items from the beginning
       * of the given file.
       */
     def scanTo(file: RelFile[Sandboxed], limit: Positive): Process[M, Data] =
-      scan(file, Natural.zero, Some(limit))
+      scan(file, Natural._0, Some(limit))
 
     /** Returns a process that produces data from the given file, beginning
       * at the specified offset.

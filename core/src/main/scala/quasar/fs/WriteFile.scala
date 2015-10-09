@@ -15,9 +15,12 @@ sealed trait WriteFile[A]
 object WriteFile {
   final case class WriteHandle(run: Long) extends AnyVal
 
-  final case class Open(file: RelFile[Sandboxed]) extends WriteFile[WriteHandle]
-  final case class Write(h: WriteHandle, chunk: Vector[Data]) extends WriteFile[Vector[WriteError]]
-  final case class Close(h: WriteHandle) extends WriteFile[Unit]
+  final case class Open(file: RelFile[Sandboxed])
+    extends WriteFile[WriteHandle]
+  final case class Write(h: WriteHandle, chunk: Vector[Data])
+    extends WriteFile[Vector[WriteError]]
+  final case class Close(h: WriteHandle)
+    extends WriteFile[Unit]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S) {
     import PathError2._
