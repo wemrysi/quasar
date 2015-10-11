@@ -3,6 +3,7 @@ package physical
 package mongodb
 
 import quasar.Predef._
+import quasar.fp._
 
 import scala.collection.JavaConverters._
 
@@ -19,17 +20,11 @@ final class MongoDb[A] private (protected val r: ReaderT[Task, MongoClient, A]) 
   def map[B](f: A => B): MongoDb[B] =
     new MongoDb(r map f)
 
-  def mapK[B](f: Task[A] => Task[B]): MongoDb[B] =
-    new MongoDb(r mapK f)
-
   def flatMap[B](f: A => MongoDb[B]): MongoDb[B] =
     new MongoDb(r flatMap (a => f(a).r))
 
-  def flatMapK[B](f: A => Task[B]): MongoDb[B] =
-    new MongoDb(r flatMapK f)
-
   def attempt: MongoDb[Throwable \/ A] =
-    mapK(_.attempt)
+    new MongoDb(r mapK (_.attempt))
 
   def run(c: MongoClient): Task[A] = r.run(c)
 }
@@ -37,29 +32,31 @@ final class MongoDb[A] private (protected val r: ReaderT[Task, MongoClient, A]) 
 object MongoDb {
 
   /** All discoverable collections on the server. */
-  def collections: MongoDb[Process[Task, Collection]] =
-    (databaseNames |@| getDatabase)((xs, f) => xs flatMap (n =>
-      iterableToProcess(f(n).listCollectionNames) map (Collection(n, _))))
+  def collections: Process[MongoDb, Collection] =
+    for {
+      name <- databaseNames
+      db   <- database(name).liftM[Process]
+      coll <- iterableToProcess(db.listCollectionNames)
+    } yield Collection(name, coll)
 
   /** Names of all discoverable databases on the server. */
-  def databaseNames: MongoDb[Process[Task, String]] = {
-    val names = MongoDb(c => iterableToProcess(c.listDatabaseNames))
+  def databaseNames: Process[MongoDb, String] =
+    client.liftM[Process]
+      .flatMap(c => iterableToProcess(c.listDatabaseNames))
+      .onFailure {
+        case t: MongoCommandException =>
+          credentials.liftM[Process]
+            .flatMap(ys => Process.emitAll(ys.map(_.getSource).distinct))
 
-    (names |@| credentials.mapK(Task.now))((xs, cs) => xs onFailure {
-      case t: MongoCommandException =>
-        cs.liftM[Process]
-          .flatMap(ys => Process.emitAll(ys.map(_.getSource).distinct))
-
-      case t =>
-        Process.fail(t)
-    })
-  }
+        case t =>
+          Process.fail(t)
+      }
 
   def dropCollection(c: Collection): MongoDb[Unit] =
-    collection(c) flatMapK (mc => mongoCbToTask(mc.drop).void)
+    collection(c) flatMap (mc => async(mc.drop).void)
 
   def dropDatabase(named: String): MongoDb[Unit] =
-    database(named) flatMapK (d => mongoCbToTask(d.drop).void)
+    database(named) flatMap (d => async(d.drop).void)
 
   def fail[A](t: Throwable): MongoDb[A] =
     new MongoDb(Kleisli(_ => Task.fail(t)))
@@ -72,8 +69,8 @@ object MongoDb {
   private[mongodb] def find(c: Collection): MongoDb[FindIterable[Document]] =
     collection(c) map (_.find)
 
-  private[mongodb] def mongoCbToTask[A](f: SingleResultCallback[A] => Unit): Task[A] =
-    Task.async(cb => f(new DisjunctionCallback(cb)))
+  private[mongodb] def async[A](f: SingleResultCallback[A] => Unit): MongoDb[A] =
+    liftTask(Task.async(cb => f(new DisjunctionCallback(cb))))
 
   implicit val mongoDbInstance: Monad[MongoDb] with Catchable[MongoDb] =
     new Monad[MongoDb] with Catchable[MongoDb] {
@@ -86,31 +83,34 @@ object MongoDb {
 
   ////
 
+  private def apply[A](f: MongoClient => A): MongoDb[A] =
+    lift(c => Task.delay(f(c)))
+
+  private def lift[A](f: MongoClient => Task[A]): MongoDb[A] =
+    new MongoDb(Kleisli(f))
+
+  private def client: MongoDb[MongoClient] =
+    MongoDb(ι)
+
   // TODO: Make a basic credential type in scala and expose this method.
-  private def credentials: MongoDb[List[MongoCredential]] =
+  private val credentials: MongoDb[List[MongoCredential]] =
     MongoDb(_.getSettings.getCredentialList.asScala.toList)
 
   private def collection(c: Collection): MongoDb[MongoCollection[Document]] =
     database(c.databaseName) map (_ getCollection c.collectionName)
 
   private def database(named: String): MongoDb[MongoDatabase] =
-    named.point[MongoDb] <*> getDatabase
+    MongoDb(_ getDatabase named)
 
-  private def getDatabase: MongoDb[String => MongoDatabase] =
-    MongoDb(c => name => c.getDatabase(name))
+  private def iterableToProcess[A](it: MongoIterable[A]): Process[MongoDb, A] = {
+    def go(c: AsyncBatchCursor[A]): Process[MongoDb, A] =
+      Process.eval(async(c.next))
+        .flatMap(r => Option(r).cata(
+          as => Process.emitAll(as.asScala.toVector) ++ go(c),
+          Process.halt))
 
-  private def apply[A](f: MongoClient => A): MongoDb[A] =
-    new MongoDb(Kleisli(c => Task.delay(f(c))))
-
-  private def iterableToProcess[A](it: MongoIterable[A]): Process[Task, A] = {
-    def go(c: AsyncBatchCursor[A]): Process[Task, A] =
-      Process.eval(mongoCbToTask(c.next)) flatMap { r =>
-        Option(r).cata(as => Process.emitAll(as.asScala.toVector) ++ go(c), Process.halt)
-      }
-
-    Process.eval(mongoCbToTask(it.batchCursor)) flatMap { cur =>
-      go(cur) onComplete Process.eval_(Task.delay(cur.close()))
-    }
+    Process.eval(async(it.batchCursor)) flatMap (cur =>
+      go(cur) onComplete Process.eval_(MongoDb(_ => cur.close())))
   }
 
   private final class DisjunctionCallback[A](f: Throwable \/ A => Unit)
