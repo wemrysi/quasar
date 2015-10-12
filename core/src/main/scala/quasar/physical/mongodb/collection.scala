@@ -24,6 +24,7 @@ import quasar.fs._, Path._
 import scala.util.parsing.combinator._
 
 import scalaz._, Scalaz._
+import pathy.Path._
 
 final case class Collection(databaseName: String, collectionName: String) {
   import Collection._
@@ -42,17 +43,18 @@ object Collection {
       PathError \/ A = {
     val abs = path.asAbsolute
     val segs = abs.dir.map(_.value) ++ abs.file.map(_.value).toList
-    segs match {
-      case Nil => \/-(clusterF)
+
+    (segs match {
+      case Nil => clusterF.right
       case first :: rest => for {
         db       <- DatabaseNameParser(first)
         collSegs <- rest.traverseU(CollectionSegmentParser(_))
         coll     =  collSegs.mkString(".")
         _        <- if (utf8length(db) + 1 + utf8length(coll) > 120)
-                      -\/(InvalidPathError("database/collection name too long (> 120 bytes): " + db + "." + coll))
-                    else \/-(())
+                      s"database/collection name too long (> 120 bytes): $db.$coll".left
+                    else ().right
       } yield if (collSegs.isEmpty) dbF(db) else collF(Collection(db, coll))
-    }
+    }) leftMap InvalidPathError
   }
 
   def fromPath(path: Path): PathError \/ Collection =
@@ -60,6 +62,25 @@ object Collection {
       -\/(PathTypeError(path, Some("has no segments"))),
       κ(-\/(InvalidPathError("path names a database, but no collection: " + path))),
       \/-(_)).join
+
+  // TODO: scala-pathy: flatten should be a OneAnd[IList, A]
+  def fromFile(f: RelFile[Sandboxed]): PathError2 \/ Collection = {
+    import PathError2._
+
+    flatten(None, None, None, Some(_), Some(_), f)
+      .unite.uncons(scala.sys.error("impossible"), (h, t) =>
+        t.toNel.cata(
+          ss => (for {
+              db   <- DatabaseNameParser(h)
+              segs <- ss.traverseU(CollectionSegmentParser(_))
+              coll =  segs.toList mkString "."
+              len  =  utf8length(db) + 1 + utf8length(coll)
+              _    <- if (len > 120)
+                        s"database/collection name too long ($len > 120 bytes): $db.$coll".left
+                      else ().right
+            } yield Collection(db, coll)) leftMap (InvalidPath(f.right, _)),
+          InvalidPath(f.right, "no database specified").left))
+  }
 
   private trait PathParser extends RegexParsers {
     override def skipWhitespace = false
@@ -94,13 +115,13 @@ object Collection {
 
     def char: Parser[String] = substitute(DatabaseNameEscapes) | "(?s).".r
 
-    def apply(input: String): PathError \/ String = parseAll(name, input) match {
+    def apply(input: String): String \/ String = parseAll(name, input) match {
+      case Success(name, _) if utf8length(name) > 64 =>
+        s"database name too long (> 64 bytes): $name".left
       case Success(name, _) =>
-        if (utf8length(name) > 64)
-          -\/(InvalidPathError("database name too long (> 64 bytes): " + name))
-        else \/-(name)
+        name.right
       case failure : NoSuccess =>
-        -\/(InvalidPathError("failed to parse ‘" + input + "’: " + failure.msg))
+        s"failed to parse ‘$input’: ${failure.msg}".left
     }
   }
 
@@ -126,10 +147,11 @@ object Collection {
 
     def char: Parser[String] = substitute(CollectionNameEscapes) | "(?s).".r
 
-    def apply(input: String): PathError \/ String = parseAll(seg, input) match {
-      case Success(seg, _) => \/-(seg)
+    def apply(input: String): String \/ String = parseAll(seg, input) match {
+      case Success(seg, _) =>
+        seg.right
       case failure : NoSuccess =>
-        -\/(InvalidPathError("failed to parse ‘" + input + "’: " + failure.msg))
+        s"failed to parse ‘$input’: ${failure.msg}".left
     }
   }
 

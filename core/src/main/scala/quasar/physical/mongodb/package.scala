@@ -18,6 +18,7 @@ package quasar.physical
 
 import quasar.namegen._
 import quasar.jscore
+import quasar.fs._
 
 import scalaz._
 
@@ -25,9 +26,10 @@ import org.bson.Document
 import com.mongodb.async.AsyncBatchCursor
 
 package object mongodb {
-  type BsonCursor   = AsyncBatchCursor[Document]
-  type ReadState    = (Long, Map[ReadHandle, BsonCursor])
-  type ReadMongo[A] = StateT[MongoDb, ReadState, A]
+  type BsonCursor          = AsyncBatchCursor[Document]
+  type ReadState           = (Long, Map[ReadFile.ReadHandle, BsonCursor])
+  type ReadStateT[F[_], A] = StateT[F, ReadState, A]
+  type ReadMongo[A]        = ReadStateT[MongoDb, A]
 
   final case class NameGen(nameGen: Int)
 

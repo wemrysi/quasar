@@ -13,7 +13,7 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 
 trait ReadFileExamples { self: mutable.Specification =>
-  import ReadFile._, ReadError._
+  import ReadFile._, ReadError._, PathError2._
   import ReadFileExamples._
 
   val readFile = Ops[ReadFileF]
@@ -53,7 +53,7 @@ trait ReadFileExamples { self: mutable.Specification =>
     "open returns FileNotFound when file DNE" >>* {
       val dne = currentDir </> dir("doesnt") </> file("exist")
       open(dne, Natural._0, None).run map { r =>
-        r.toEither must beLeft(FileNotFound(dne))
+        r.toEither must beLeft(PathError(FileNotFound(dne)))
       }
     }
 

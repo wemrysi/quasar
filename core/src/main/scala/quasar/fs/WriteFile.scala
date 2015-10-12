@@ -101,7 +101,7 @@ object WriteFile {
                      : Process[M, WriteError] = {
 
       def shouldNotExist: M[WriteError] =
-        MonadError[G, PathError2].raiseError(PathExistsError(dst))
+        MonadError[G, PathError2].raiseError(FileExists(dst))
 
       fileExistsM(dst).liftM[Process].ifM(
         shouldNotExist.liftM[Process],
@@ -122,7 +122,7 @@ object WriteFile {
                       : Process[M, WriteError] = {
 
       def shouldExist: M[WriteError] =
-        MonadError[G, PathError2].raiseError(PathMissingError(dst))
+        MonadError[G, PathError2].raiseError(FileNotFound(dst))
 
       fileExistsM(dst).liftM[Process].ifM(
         saveChunked0(dst, src, MoveSemantics.FailIfMissing),

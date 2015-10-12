@@ -4,6 +4,7 @@ package fs
 import quasar.Predef._
 
 import scalaz._
+import scalaz.syntax.show._
 import scalaz.syntax.monad._
 import scalaz.stream._
 import pathy.Path._
@@ -16,26 +17,29 @@ object ReadFile {
   sealed trait ReadError {
     import ReadError._
 
-    def fold[X](fnf: RelFile[Sandboxed] => X, unk: ReadHandle => X): X =
+    def fold[X](
+      unknownHandle: ReadHandle => X,
+      pathError: PathError2 => X
+    ): X =
       this match {
-        case FileNotFound0(f)   => fnf(f)
-        case UnknownHandle0(rh) => unk(rh)
+        case UnknownHandle0(h) => unknownHandle(h)
+        case PathError0(err)   => pathError(err)
       }
   }
 
   object ReadError {
-    private final case class FileNotFound0(file: RelFile[Sandboxed]) extends ReadError
-    private final case class UnknownHandle0(rh: ReadHandle) extends ReadError
+    private final case class UnknownHandle0(h: ReadHandle) extends ReadError
+    private final case class PathError0(e: PathError2) extends ReadError
 
     type ReadErrT[F[_], A] = EitherT[F, ReadError, A]
 
-    val FileNotFound: RelFile[Sandboxed] => ReadError = FileNotFound0(_)
     val UnknownHandle: ReadHandle => ReadError = UnknownHandle0(_)
+    val PathError: PathError2 => ReadError = PathError0(_)
 
     implicit def readErrorShow: Show[ReadError] =
       Show.shows(_.fold(
-        f => "File not found: " + posixCodec.printPath(f),
-        h => s"Attempted to read from unknown or closed handle: ${h.run}"))
+        h => s"Attempted to read from unknown or closed handle: ${h.run}",
+        e => e.shows))
   }
 
   final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive])
