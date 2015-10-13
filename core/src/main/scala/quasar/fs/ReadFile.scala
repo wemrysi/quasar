@@ -4,6 +4,7 @@ package fs
 import quasar.Predef._
 
 import scalaz._
+import scalaz.std.anyVal._
 import scalaz.syntax.show._
 import scalaz.syntax.monad._
 import scalaz.stream._
@@ -13,6 +14,14 @@ sealed trait ReadFile[A]
 
 object ReadFile {
   final case class ReadHandle(run: Long) extends AnyVal
+
+  object ReadHandle {
+    implicit val readHandleShow: Show[ReadHandle] =
+      Show.showFromToString
+
+    implicit val readHandleOrder: Order[ReadHandle] =
+      Order.orderBy(_.run)
+  }
 
   sealed trait ReadError {
     import ReadError._
