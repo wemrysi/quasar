@@ -21,7 +21,6 @@ import quasar.RenderTree.ops._
 
 import scalaz._, Liskov._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.effect._
 import simulacrum.{typeclass, op}
 
 sealed trait LowerPriorityTreeInstances {
@@ -352,10 +351,6 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
     */
   def ignore[A](a: A): Unit = ()
 
-  val fromIO = new (IO ~> Task) {
-    def apply[A](io: IO[A]): Task[A] = Task.delay(io.unsafePerformIO())
-  }
-
   /** `liftM` as a natural transformation
     *
     * TODO: PR to scalaz
@@ -364,16 +359,4 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
     new (F ~> G[F, ?]) {
       def apply[A](fa: F[A]) = fa.liftM[G]
     }
-
-  /** Wrapper around `IORef` to operate in `Task` */
-  final class TaskRef[A](val ioRef: IORef[A]) {
-    def read: Task[A] = fromIO(ioRef.read)
-    def write(a: => A): Task[Unit] = fromIO(ioRef.write(a))
-    def mod(f: A => A): Task[A] = fromIO(ioRef.mod(f))
-  }
-
-  object TaskRef {
-    def apply[A](a: => A): Task[TaskRef[A]] =
-      fromIO(IO.newIORef(a).map(ior => new TaskRef(ior)))
-  }
 }

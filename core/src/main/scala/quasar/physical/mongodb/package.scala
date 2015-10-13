@@ -16,6 +16,7 @@
 
 package quasar.physical
 
+import quasar.Predef._
 import quasar.namegen._
 import quasar.jscore
 import quasar.fs._
@@ -30,18 +31,6 @@ package object mongodb {
   type ReadState           = (Long, Map[ReadFile.ReadHandle, BsonCursor])
   type ReadStateT[F[_], A] = StateT[F, ReadState, A]
   type ReadMongo[A]        = ReadStateT[MongoDb, A]
-
-  final case class NameGen(nameGen: Int)
-
-  // used by State(T).runZero
-  implicit val NameGenMonoid: Monoid[NameGen] = new Monoid[NameGen] {
-    def zero = NameGen(0)
-    def append(f1: NameGen, f2: => NameGen) = NameGen(f1.nameGen max f2.nameGen)
-  }
-
-  def freshId(label: String): State[NameGen, String] = for {
-    n <- State((s: NameGen) => s.copy(nameGen = s.nameGen + 1) -> s.nameGen)
-  } yield "__" + label + n.toString
 
   // TODO: parameterize over label (SD-512)
   def freshName: State[NameGen, BsonField.Name] =
