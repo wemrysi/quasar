@@ -3,7 +3,6 @@ package physical
 package mongodb
 
 import quasar.Predef._
-import quasar.fp.TaskRef
 import quasar.fs._
 
 import scala.collection.JavaConverters._
@@ -16,6 +15,12 @@ import scalaz.concurrent.Task
 
 object readfile {
   import ReadFile._, ReadError._, MongoDb._
+
+  type BsonCursor            = AsyncBatchCursor[Document]
+
+  type ReadState             = (Long, Map[ReadFile.ReadHandle, BsonCursor])
+  type ReadStateT[F[_], A]   = StateT[F, ReadState, A]
+  type ReadMongo[A]          = ReadStateT[MongoDb, A]
 
   type OpenHandlesT[F[_], A] = WriterT[F, ISet[ReadHandle], A]
   type OpenHandles[       A] = OpenHandlesT[Task, A]

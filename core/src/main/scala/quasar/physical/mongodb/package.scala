@@ -18,13 +18,11 @@ package quasar.physical
 
 import quasar.Predef._
 import quasar.namegen._
-import quasar.jscore
 import quasar.fs._
 
+import com.mongodb.async._
+import org.bson._
 import scalaz._
-
-import org.bson.Document
-import com.mongodb.async.AsyncBatchCursor
 
 package object mongodb {
   type BsonCursor          = AsyncBatchCursor[Document]

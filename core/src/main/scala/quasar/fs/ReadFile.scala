@@ -47,7 +47,7 @@ object ReadFile {
 
     implicit def readErrorShow: Show[ReadError] =
       Show.shows(_.fold(
-        h => s"Attempted to read from unknown or closed handle: ${h.run}",
+        h => s"Attempted to read from an unknown or closed handle: ${h.run}",
         e => e.shows))
   }
 

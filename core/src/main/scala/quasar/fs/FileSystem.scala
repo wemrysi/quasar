@@ -82,7 +82,10 @@ object FileSystem {
   sealed trait Node {
     import Node._
 
-    def fold[X](mnt: RelDir[Sandboxed] => X, pln: RelPath[Sandboxed] => X): X =
+    def fold[X](
+      mnt: RelDir[Sandboxed] => X,
+      pln: RelPath[Sandboxed] => X
+    ): X =
       this match {
         case Mount0(d) => mnt(d)
         case Plain0(p) => pln(p)
