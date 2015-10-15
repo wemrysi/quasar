@@ -6,9 +6,12 @@ import quasar.Predef._
 import quasar.fp._
 
 import scala.collection.JavaConverters._
+import java.util.LinkedList
 
 import org.bson.Document
 import com.mongodb.{MongoCredential, MongoCommandException}
+import com.mongodb.bulk.BulkWriteResult
+import com.mongodb.client.model._
 import com.mongodb.async._
 import com.mongodb.async.client._
 
@@ -57,6 +60,23 @@ object MongoDb {
 
   def dropDatabase(named: String): MongoDb[Unit] =
     database(named) flatMap (d => async(d.drop).void)
+
+  /** Attempts to insert as many of the given documents into the collection as
+    * possible. The number of documents inserted is returned, if possible, and
+    * may be smaller than the original amount if any documents failed to insert.
+    */
+  def insertAny[F[_]: Foldable](docs: F[Document], coll: Collection): OptionT[MongoDb, Int] = {
+    val docList = Foldable[F].foldLeft(docs, new LinkedList[WriteModel[Document]]()) { (l, d) =>
+      l.point[Id] map (_ add new InsertOneModel(d)) as l
+    }
+
+    val writeOpts = (new BulkWriteOptions()).ordered(false)
+
+    OptionT(
+      collection(coll)
+       .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
+       .map(r => r.wasAcknowledged option r.getInsertedCount))
+  }
 
   def fail[A](t: Throwable): MongoDb[A] =
     new MongoDb(Kleisli(_ => Task.fail(t)))

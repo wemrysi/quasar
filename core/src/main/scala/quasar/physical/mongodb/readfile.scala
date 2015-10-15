@@ -62,7 +62,7 @@ object readfile {
     new (ReadMongo ~> OpenHandles) {
       def apply[A](rm: ReadMongo[A]) =
         for {
-          r <- rm.run((0, Map.empty)).run(client).liftM[OpenHandlesT]
+          r <- rm.run((1, Map.empty)).run(client).liftM[OpenHandlesT]
           ((_, cursors), a) = r
           _ <- cursors.toList.traverseU { case (h, c) =>
                  WriterT.put(Task.delay(c.close()))(ISet singleton h)
