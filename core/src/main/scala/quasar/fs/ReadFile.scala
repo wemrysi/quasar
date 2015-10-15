@@ -53,8 +53,10 @@ object ReadFile {
 
   final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive])
     extends ReadFile[ReadError \/ ReadHandle]
+
   final case class Read(h: ReadHandle)
     extends ReadFile[ReadError \/ Vector[Data]]
+
   final case class Close(h: ReadHandle)
     extends ReadFile[Unit]
 

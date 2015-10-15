@@ -4,11 +4,7 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.syntax.show._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
 import scalaz.stream._
 import pathy.Path._
 
@@ -65,8 +61,10 @@ object WriteFile {
 
   final case class Open(file: RelFile[Sandboxed])
     extends WriteFile[WriteError \/ WriteHandle]
+
   final case class Write(h: WriteHandle, chunk: Vector[Data])
     extends WriteFile[Vector[WriteError]]
+
   final case class Close(h: WriteHandle)
     extends WriteFile[Unit]
 
@@ -115,11 +113,23 @@ object WriteFile {
     }
 
     /** Same as `append` but accepts chunked [[Data]]. */
-    // TODO: Accumulate `PartialWrite` errors and emit one at the end with the sum
-    def appendChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]]): Process[M, WriteError] =
+    def appendChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]]): Process[M, WriteError] = {
+      val accumPartialWrites =
+        process1.id[WriteError]
+          .map(_.fold(κ(none), _.some, (_, _) => none, κ(none)))
+          .reduceSemigroup
+          .pipe(process1.stripNone)
+          .map(PartialWrite)
+
+      val dropPartialWrites =
+        process1.filter[WriteError](_.fold(κ(true), κ(false), (_, _) => true, κ(true)))
+
       src.translate[M](liftMT[F, WriteErrT])
         .through(appendChannel(dst))
         .flatMap(Process.emitAll)
+        .flatMap(e => Process.emitW(e) ++ Process.emitO(e))
+        .pipe(process1.multiplex(dropPartialWrites, accumPartialWrites))
+    }
 
     /** Appends data to the given file, creating it if it doesn't exist. May not
       * write all values from `src` in the presence of errors, will emit a

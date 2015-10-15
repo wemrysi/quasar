@@ -39,6 +39,7 @@ final case class Collection(databaseName: String, collectionName: String) {
 object Collection {
   import PathError._
 
+  // TODO: Remove once Path has been replaced by pathy.Path
   def foldPath[A](path: Path)(clusterF: => A, dbF: String => A, collF: Collection => A):
       PathError \/ A = {
     val abs = path.asAbsolute
@@ -63,11 +64,12 @@ object Collection {
       κ(-\/(InvalidPathError("path names a database, but no collection: " + path))),
       \/-(_)).join
 
-  // TODO: scala-pathy: flatten should be a OneAnd[IList, A]
   def fromFile(f: RelFile[Sandboxed]): PathError2 \/ Collection = {
     import PathError2._
 
     flatten(None, None, None, Some(_), Some(_), f)
+      // NB: We know there is at least one file case, but don't have a way to
+      //     prove the the result of `unite` will be non-empty.
       .unite.uncons(scala.sys.error("impossible"), (h, t) =>
         t.toNel.cata(
           ss => (for {
