@@ -24,7 +24,7 @@ import quasar.fs._, Path._
 import scala.util.parsing.combinator._
 
 import scalaz._, Scalaz._
-import pathy.Path._
+import pathy.Path.{dir => pDir, file => pFile, _}
 
 final case class Collection(databaseName: String, collectionName: String) {
   import Collection._
@@ -35,7 +35,22 @@ final case class Collection(databaseName: String, collectionName: String) {
     val segs = NonEmptyList(first, rest: _*)
     Path(DirNode.Current :: segs.list.dropRight(1).map(DirNode(_)), Some(FileNode(segs.last)))
   }
+
+  /** Attempt to convert this collection to a file.
+    *
+    * TODO: If we used a smart constructor that validated inputs for this class
+    *       (rather than it being separate), this function wouldn't need to
+    *       return an [[Option]].
+    */
+  def asFile: Option[RelFile[Sandboxed]] = {
+    val db   = DatabaseNameUnparser(databaseName)
+    val segs = CollectionNameUnparser(collectionName).reverse
+
+    segs.headOption map (f =>
+      segs.drop(1).foldRight(pDir(db))((d, p) => p </> pDir(d)) </> pFile(f))
+  }
 }
+
 object Collection {
   import PathError._
 
@@ -64,25 +79,31 @@ object Collection {
       κ(-\/(InvalidPathError("path names a database, but no collection: " + path))),
       \/-(_)).join
 
-  def fromFile(f: RelFile[Sandboxed]): PathError2 \/ Collection = {
+  // TODO: Rename to `fromPath` once old path code is deleted
+  def fromPathy(path: RelPath[Sandboxed]): PathError2 \/ Collection = {
     import PathError2._
 
-    flatten(None, None, None, Some(_), Some(_), f)
-      // NB: We know there is at least one file case, but don't have a way to
-      //     prove the the result of `unite` will be non-empty.
-      .unite.uncons(scala.sys.error("impossible"), (h, t) =>
-        t.toNel.cata(
+    flatten(None, None, None, Some(_), Some(_), path.merge)
+      .unite.uncons(
+        InvalidPath(path, "no database specified").left,
+        (h, t) => t.toNel.cata(
           ss => (for {
               db   <- DatabaseNameParser(h)
               segs <- ss.traverseU(CollectionSegmentParser(_))
               coll =  segs.toList mkString "."
               len  =  utf8length(db) + 1 + utf8length(coll)
               _    <- if (len > 120)
-                        s"database/collection name too long ($len > 120 bytes): $db.$coll".left
+                        s"database+collection name too long ($len > 120 bytes): $db.$coll".left
                       else ().right
-            } yield Collection(db, coll)) leftMap (InvalidPath(f.right, _)),
-          InvalidPath(f.right, "no database specified").left))
+            } yield Collection(db, coll)) leftMap (InvalidPath(path, _)),
+          InvalidPath(path, "path names a database, but no collection").left))
   }
+
+  def fromDir(dir: RelDir[Sandboxed]): PathError2 \/ Collection =
+    fromPathy(dir.left)
+
+  def fromFile(file: RelFile[Sandboxed]): PathError2 \/ Collection =
+    fromPathy(file.right)
 
   private trait PathParser extends RegexParsers {
     override def skipWhitespace = false
