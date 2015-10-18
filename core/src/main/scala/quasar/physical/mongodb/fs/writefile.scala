@@ -1,6 +1,7 @@
 package quasar
 package physical
 package mongodb
+package fs
 
 import quasar.Predef._
 import quasar.fp._
@@ -54,7 +55,7 @@ object writefile {
   def run(client: MongoClient): WriteMongo ~> Task =
     new (WriteMongo ~> Task) {
       def apply[A](wm: WriteMongo[A]) =
-        wm.eval((1, Map.empty)).run(client)
+        wm.eval((0, Map.empty)).run(client)
     }
 
   ////

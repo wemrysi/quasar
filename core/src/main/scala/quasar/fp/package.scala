@@ -130,11 +130,25 @@ trait EitherTInstances {
             case -\/(t)      => \/.right(\/.left(t))
             case \/-(-\/(e)) => \/.left(e)
             case \/-(\/-(a)) => \/.right(\/.right(a))
-          }
-        )
+          })
 
       def fail[A](t: Throwable) =
         EitherT[F, E, A](Catchable[F].fail(t))
+    }
+}
+
+trait OptionTInstances {
+  implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
+    new Catchable[OptionT[F, ?]] {
+      def attempt[A](fa: OptionT[F, A]) =
+        OptionT[F, Throwable \/ A](
+          Catchable[F].attempt(fa.run) map {
+            case -\/(t)  => Some(\/.left(t))
+            case \/-(oa) => oa map (\/.right)
+          })
+
+      def fail[A](t: Throwable) =
+        OptionT[F, A](Catchable[F].fail(t))
     }
 }
 
@@ -284,7 +298,7 @@ trait SKI {
 }
 object SKI extends SKI
 
-package object fp extends TreeInstances with ListMapInstances with EitherTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
+package object fp extends TreeInstances with ListMapInstances with EitherTInstances with OptionTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }

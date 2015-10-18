@@ -9,7 +9,7 @@ import scala.collection.JavaConverters._
 import java.util.LinkedList
 
 import org.bson.Document
-import com.mongodb.{MongoCredential, MongoCommandException}
+import com.mongodb.{MongoNamespace, MongoCredential, MongoCommandException}
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.client.model._
 import com.mongodb.async._
@@ -36,11 +36,13 @@ object MongoDb {
 
   /** All discoverable collections on the server. */
   def collections: Process[MongoDb, Collection] =
-    for {
-      name <- databaseNames
-      db   <- database(name).liftM[Process]
-      coll <- iterableToProcess(db.listCollectionNames)
-    } yield Collection(name, coll)
+    databaseNames flatMap collectionsIn
+
+  /** The collections in the named database. */
+  def collectionsIn(dbName: String): Process[MongoDb, Collection] =
+    database(dbName).liftM[Process]
+      .flatMap(db => iterableToProcess(db.listCollectionNames))
+      .map(Collection(dbName, _))
 
   /** Names of all discoverable databases on the server. */
   def databaseNames: Process[MongoDb, String] =
@@ -61,6 +63,31 @@ object MongoDb {
   def dropDatabase(named: String): MongoDb[Unit] =
     database(named) flatMap (d => async(d.drop).void)
 
+  def dropAllDatabases: MongoDb[Unit] =
+    databaseNames.map(dropDatabase).eval.run
+
+  /** Returns the name of the first database where an insert to the collection
+    * having the given name succeeds.
+    */
+  def firstWritableDb(collName: String): OptionT[MongoDb, String] = {
+    type M[A] = OptionT[MongoDb, A]
+
+    val testDoc = Bson.Doc(ListMap("a" -> Bson.Int32(1))).repr
+
+    def canWriteToCol(coll: Collection): M[String] =
+      insertAny[Id](testDoc, coll)
+        .filter(_ == 1)
+        .as(coll.databaseName)
+        .attempt
+        .flatMap(r => OptionT(r.toOption.point[MongoDb]))
+
+    databaseNames
+      .translate[M](liftMT[MongoDb, OptionT])
+      .map(n => canWriteToCol(Collection(n, collName)))
+      .eval.take(1).runLast
+      .flatMap(n => OptionT(n.point[MongoDb]))
+  }
+
   /** Attempts to insert as many of the given documents into the collection as
     * possible. The number of documents inserted is returned, if possible, and
     * may be smaller than the original amount if any documents failed to insert.
@@ -78,12 +105,32 @@ object MongoDb {
        .map(r => r.wasAcknowledged option r.getInsertedCount))
   }
 
+  /** Rename `src` to `dst` using the given semantics. */
+  def rename(src: Collection, dst: Collection, semantics: RenameSemantics): MongoDb[Unit] = {
+    import RenameSemantics._
+
+    val dropDst = semantics match {
+      case Overwrite    => true
+      case FailIfExists => false
+    }
+
+    if (src == dst)
+      ().point[MongoDb]
+    else
+      collection(src)
+        .flatMap(c => async[java.lang.Void](c.renameCollection(
+          new MongoNamespace(dst.databaseName, dst.collectionName),
+          (new RenameCollectionOptions) dropTarget dropDst,
+          _)))
+        .void
+  }
+
   def fail[A](t: Throwable): MongoDb[A] =
-    new MongoDb(Kleisli(_ => Task.fail(t)))
+    liftTask(Task.fail(t))
 
   val liftTask: Task ~> MongoDb =
     new (Task ~> MongoDb) {
-      def apply[A](t: Task[A]) = new MongoDb(Kleisli(_ => t))
+      def apply[A](t: Task[A]) = lift(_ => t)
     }
 
   private[mongodb] def find(c: Collection): MongoDb[FindIterable[Document]] =

@@ -7,6 +7,7 @@ import quasar.fp._
 import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
+import scalaz.syntax.either._
 import pathy.{Path => PPath}, PPath._
 
 sealed trait FileSystem[A]
@@ -43,7 +44,7 @@ object FileSystem {
     val Overwrite: MoveSemantics = Overwrite0
 
     /** Indicates the move should (atomically, if possible) fail if the
-      * exists.
+      * destination exists.
       */
     val FailIfExists: MoveSemantics = FailIfExists0
 
@@ -118,10 +119,17 @@ object FileSystem {
       Plain compose \/.right
   }
 
-  final case class Move(scenario: MoveScenario, semantics: MoveSemantics) extends FileSystem[PathError2 \/ Unit]
-  final case class Delete(path: RelPath[Sandboxed]) extends FileSystem[PathError2 \/ Unit]
-  final case class ListContents(dir: RelDir[Sandboxed]) extends FileSystem[PathError2 \/ Set[Node]]
-  final case class TempFile(nearTo: Option[RelFile[Sandboxed]]) extends FileSystem[RelFile[Sandboxed]]
+  final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
+    extends FileSystem[PathError2 \/ Unit]
+
+  final case class Delete(path: RelPath[Sandboxed])
+    extends FileSystem[PathError2 \/ Unit]
+
+  final case class ListContents(dir: RelDir[Sandboxed])
+    extends FileSystem[PathError2 \/ Set[Node]]
+
+  final case class TempFile(nearTo: Option[RelFile[Sandboxed]])
+    extends FileSystem[RelFile[Sandboxed]]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
     type F[A] = Free[S, A]
@@ -153,11 +161,11 @@ object FileSystem {
 
     /** Delete the given directory, fails if the directory does not exist. */
     def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
-      delete(\/.left(dir))
+      delete(dir.left)
 
     /** Delete the given file, fails if the file does not exist. */
     def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
-      delete(\/.right(file))
+      delete(file.right)
 
     /** Returns immediate children of the given directory, fails if the
       * directory does not exist.
@@ -167,7 +175,7 @@ object FileSystem {
 
     /** The children of the root directory. */
     def ls: M[Set[Node]] =
-      ls(currentDir[Sandboxed])
+      ls(currentDir)
 
     /** Returns the children of the given directory and all of their
       * descendants, fails if the directory does not exist.
@@ -181,22 +189,17 @@ object FileSystem {
             d => lsR(desc </> d),
             f => Node.File(desc </> f).point[S]))
 
-      lsR(currentDir[Sandboxed]).foldLeft(Set.empty[Node])(_ + _)
+      lsR(currentDir).foldLeft(Set.empty[Node])(_ + _)
     }
 
-    /** Returns whether the given file exists.
-      *
-      * TODO: This seems a bit sloppy w.r.t. equality, may want to normalize and
-      *       convert to strings for comparision. Or see about adding an Equal[_]
-      *       instance for pathy.Path intead of relying on Object#equals/hashCode.
-      */
+    /** Returns whether the given file exists. */
     def fileExists(file: RelFile[Sandboxed]): F[Boolean] = {
       // TODO: Add fileParent[B, S](f: Path[B, File, S]): Path[B, Dir, S] to pathy
       val parent =
         parentDir(file) getOrElse scala.sys.error("impossible, files have parents!")
 
       ls(parent)
-        .map(_ flatMap (_.file map (parent </> _)) contains file)
+        .map(_ flatMap (_.file map (parent </> _)) exists (identicalPath(file, _)))
         .getOrElse(false)
     }
 
