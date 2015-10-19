@@ -18,6 +18,9 @@ final class Natural private (val run: Long) {
 
   def * (other: Natural): Natural =
     times(other)
+
+  def toInt: Int =
+    run.toInt
 }
 
 object Natural {

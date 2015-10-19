@@ -18,6 +18,9 @@ final class Positive private (val run: Long) {
 
   def * (other: Positive): Positive =
     times(other)
+
+  def toInt: Int =
+    run.toInt
 }
 
 object Positive {

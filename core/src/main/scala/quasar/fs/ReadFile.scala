@@ -66,10 +66,10 @@ object ReadFile {
     type F[A] = Free[S, A]
     type M[A] = ReadErrT[F, A]
 
-    /** Returns a read handle for the given file, positioned at the given offset,
-      * that may be used to read chunks of data from the file. An optional limit
-      * may be supplied to restrict the total amount of data able to be read using
-      * the handle.
+    /** Returns a read handle for the given file, positioned at the given
+      * zero-indexed offset, that may be used to read chunks of data from the
+      * file. An optional limit may be supplied to restrict the total amount of
+      * data able to be read using the handle.
       *
       * Care must be taken to `close` the returned handle in order to avoid
       * potential resource leaks.
