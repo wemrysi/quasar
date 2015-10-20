@@ -98,7 +98,7 @@ object ManageFile {
     def file: Option[RelFile[Sandboxed]] =
       fold(κ(none[RelFile[Sandboxed]]), _.toOption)
 
-    def path: RelDir[Sandboxed] \/ RelFile[Sandboxed] =
+    def path: RelPath[Sandboxed] =
       fold(\/.left, ι)
   }
 
@@ -120,20 +120,20 @@ object ManageFile {
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
-    extends ManageFile[PathError2 \/ Unit]
+    extends ManageFile[FileSystemError \/ Unit]
 
   final case class Delete(path: RelPath[Sandboxed])
-    extends ManageFile[PathError2 \/ Unit]
+    extends ManageFile[FileSystemError \/ Unit]
 
   final case class ListContents(dir: RelDir[Sandboxed])
-    extends ManageFile[PathError2 \/ Set[Node]]
+    extends ManageFile[FileSystemError \/ Set[Node]]
 
   final case class TempFile(nearTo: Option[RelFile[Sandboxed]])
     extends ManageFile[RelFile[Sandboxed]]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S) {
     type F[A] = Free[S, A]
-    type M[A] = PathErr2T[F, A]
+    type M[A] = FileSystemErrT[F, A]
 
     /** Request the given move scenario be applied to the file system, using the
       * given semantics.

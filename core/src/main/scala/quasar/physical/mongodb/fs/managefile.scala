@@ -14,7 +14,7 @@ import scalaz.concurrent.Task
 import pathy.Path._
 
 object filesystem {
-  import ManageFile._, PathError2._, MongoDb._
+  import ManageFile._, FileSystemError._, PathError2._, MongoDb._
 
   type GenState              = (String, Long)
   type ManageStateT[F[_], A] = StateT[F, GenState, A]
@@ -62,7 +62,7 @@ object filesystem {
               .map(_.asFile map (Node.File))
               .pipe(process1.stripNone)
               .runLog
-              .map(_.toSet.right[PathError2])
+              .map(_.toSet.right[FileSystemError])
 
           case None =>
             nonExistentParent[Set[Node]](dir).run
@@ -87,7 +87,7 @@ object filesystem {
 
   ////
 
-  private type M[A] = PathErr2T[MongoDb, A]
+  private type M[A] = FileSystemErrT[MongoDb, A]
   private type G[E, A] = EitherT[MongoDb, E, A]
 
   private val prefixL: GenState @> String =
@@ -106,7 +106,7 @@ object filesystem {
     for {
       colls    <- collectionsInDir(src)
       srcFiles <- if (colls.nonEmpty) colls.flatMap(_.asFile).point[M]
-                  else MonadError[G, PathError2].raiseError(DirNotFound(src))
+                  else MonadError[G, FileSystemError].raiseError(PathError(DirNotFound(src)))
       dstFiles =  srcFiles flatMap (_ relativeTo (src) map (dst </> _))
       _        <- srcFiles zip dstFiles traverseU {
                     case (s, d) => moveFile(s, d, sem)
@@ -122,10 +122,10 @@ object filesystem {
     def reifyMongoErr(m: MongoDb[Unit]): M[Unit] =
       EitherT(m.attempt flatMap {
         case -\/(e: MongoServerException) if e.getCode == 10026 =>
-          FileNotFound(src).left.point[MongoDb]
+          PathError(FileNotFound(src)).left.point[MongoDb]
 
         case -\/(e: MongoServerException) if e.getCode == 10027 =>
-          FileExists(dst).left.point[MongoDb]
+          PathError(FileExists(dst)).left.point[MongoDb]
 
         case -\/(t) =>
           fail(t)
@@ -138,7 +138,7 @@ object filesystem {
       EitherT(collectionsIn(dstColl.databaseName)
                 .filter(_ == dstColl)
                 .runLast
-                .map(_.toRightDisjunction(FileNotFound(dst)).void))
+                .map(_.toRightDisjunction(PathError(FileNotFound(dst))).void))
 
     for {
       srcColl <- collFromFileM(src)
@@ -154,37 +154,37 @@ object filesystem {
   private def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
     dirName(dir) match {
       case Some(n) if depth(dir) == 1 =>
-        dropDatabase(n.value).liftM[PathErr2T]
+        dropDatabase(n.value).liftM[FileSystemErrT]
 
       case Some(_) =>
         collectionsInDir(dir)
-          .flatMap(_.traverseU_(c => dropCollection(c).liftM[PathErr2T]))
+          .flatMap(_.traverseU_(c => dropCollection(c).liftM[FileSystemErrT]))
 
       case None if depth(dir) == 0 =>
-        dropAllDatabases.liftM[PathErr2T]
+        dropAllDatabases.liftM[FileSystemErrT]
 
       case None =>
         nonExistentParent(dir)
     }
 
   private def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
-    collFromFileM(file) flatMap (c => dropCollection(c).liftM[PathErr2T])
+    collFromFileM(file) flatMap (c => dropCollection(c).liftM[FileSystemErrT])
 
   private def collectionsInDir(dir: RelDir[Sandboxed]): M[Vector[Collection]] =
     collFromDirM(dir) flatMap (c =>
       collectionsIn(c.databaseName)
         .filter(_.collectionName startsWith c.collectionName)
-        .runLog.map(_.toVector).liftM[PathErr2T])
+        .runLog.map(_.toVector).liftM[FileSystemErrT])
 
   private def collFromDirM(dir: RelDir[Sandboxed]): M[Collection] =
-    EitherT(Collection.fromDir(dir).point[MongoDb])
+    EitherT(Collection.fromDir(dir).leftMap(PathError).point[MongoDb])
 
   private def collFromFileM(file: RelFile[Sandboxed]): M[Collection] =
-    EitherT(Collection.fromFile(file).point[MongoDb])
+    EitherT(Collection.fromFile(file).leftMap(PathError).point[MongoDb])
 
   // TODO: This would be eliminated if we switched to AbsDir everywhere.
   private def nonExistentParent[A](dir: RelDir[Sandboxed]): M[A] =
-    InvalidPath(dir.left, "directory refers to nonexistent parent")
+    PathError(InvalidPath(dir.left, "directory refers to nonexistent parent"))
       .raiseError[G, A]
 
   private def freshName: ManageMongo[String] =

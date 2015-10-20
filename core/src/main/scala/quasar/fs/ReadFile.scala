@@ -5,7 +5,6 @@ import quasar.Predef._
 
 import scalaz._
 import scalaz.std.anyVal._
-import scalaz.syntax.show._
 import scalaz.syntax.monad._
 import scalaz.stream._
 import pathy.Path._
@@ -23,48 +22,18 @@ object ReadFile {
       Order.orderBy(_.run)
   }
 
-  sealed trait ReadError {
-    import ReadError._
-
-    def fold[X](
-      unknownHandle: ReadHandle => X,
-      pathError: PathError2 => X
-    ): X =
-      this match {
-        case UnknownHandle0(h) => unknownHandle(h)
-        case PathError0(err)   => pathError(err)
-      }
-  }
-
-  object ReadError {
-    private final case class UnknownHandle0(h: ReadHandle) extends ReadError
-    private final case class PathError0(e: PathError2) extends ReadError
-
-    type ReadErrT[F[_], A] = EitherT[F, ReadError, A]
-
-    val UnknownHandle: ReadHandle => ReadError = UnknownHandle0(_)
-    val PathError: PathError2 => ReadError = PathError0(_)
-
-    implicit def readErrorShow: Show[ReadError] =
-      Show.shows(_.fold(
-        h => s"Attempted to read from an unknown or closed handle: ${h.run}",
-        e => e.shows))
-  }
-
   final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive])
-    extends ReadFile[ReadError \/ ReadHandle]
+    extends ReadFile[FileSystemError \/ ReadHandle]
 
   final case class Read(h: ReadHandle)
-    extends ReadFile[ReadError \/ Vector[Data]]
+    extends ReadFile[FileSystemError \/ Vector[Data]]
 
   final case class Close(h: ReadHandle)
     extends ReadFile[Unit]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S) {
-    import ReadError._
-
     type F[A] = Free[S, A]
-    type M[A] = ReadErrT[F, A]
+    type M[A] = FileSystemErrT[F, A]
 
     /** Returns a read handle for the given file, positioned at the given
       * zero-indexed offset, that may be used to read chunks of data from the
@@ -96,7 +65,7 @@ object ReadFile {
       Process.await(open(file, offset, limit))(rh =>
         Process.repeatEval(read(rh))
           .flatMap(data => if (data.isEmpty) Process.halt else Process.emitAll(data))
-          .onComplete(Process.eval_[M, Unit](close(rh).liftM[ReadErrT])))
+          .onComplete(Process.eval_[M, Unit](close(rh).liftM[FileSystemErrT])))
 
     /** Returns a process that produces all the data contained in the
       * given file.

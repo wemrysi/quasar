@@ -4,16 +4,20 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import monocle.std.{disjunction => D}
+
 import org.specs2.{scalaz => _, _}
 import org.specs2.execute._
 import org.specs2.specification._
+
 import pathy.Path._
+
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
 trait ReadFileExamples { self: mutable.Specification =>
-  import ReadFile._, ReadError._, PathError2._
+  import ReadFile._, FileSystemError._, PathError2._
   import ReadFileExamples._
 
   val readFile = Ops[ReadFileF]
@@ -37,9 +41,9 @@ trait ReadFileExamples { self: mutable.Specification =>
       def apply[A](fa: F[A]) = Free.runFC(fa)(interpret)
     }
 
-  def runP[O](p: Process[M, O]): ReadErrT[Task, IndexedSeq[O]] =
-    p.translate[ReadErrT[Task, ?]](Hoist[ReadErrT].hoist(run))
-      .runLog[ReadErrT[Task, ?], O]
+  def runP[O](p: Process[M, O]): FileSystemErrT[Task, IndexedSeq[O]] =
+    p.translate[FileSystemErrT[Task, ?]](Hoist[FileSystemErrT].hoist(run))
+      .runLog[FileSystemErrT[Task, ?], O]
 
   implicit class RFExample(s: String) {
     def >>*[A: AsResult](fa: => F[A]): Example =
@@ -57,23 +61,23 @@ trait ReadFileExamples { self: mutable.Specification =>
       }
     }
 
-    "read unopened file handle returns UnknownHandle" >>* {
+    "read unopened file handle returns UnknownReadHandle" >>* {
       val h = ReadHandle(42)
       read(h).run map { r =>
-        r.toEither must beLeft(UnknownHandle(h))
+        r.toEither must beLeft(UnknownReadHandle(h))
       }
     }
 
-    "read closed file handle returns UnknownHandle" >>* {
+    "read closed file handle returns UnknownReadHandle" >>* {
       val r = for {
         h  <- open(smallFile.file, Natural._0, None)
-        _  <- close(h).liftM[ReadErrT]
+        _  <- close(h).liftM[FileSystemErrT]
         xs <- read(h)
       } yield xs
 
-      r.run map (_ must beLike {
-        case -\/(e) => e.fold(_ => ko("expected unknown handle"), _ => ok)
-      })
+      r.run map { x =>
+        (D.left composePrism unknownReadHandle).isMatching(x) must beTrue
+      }
     }
 
     "scan with offset zero and no limit reads entire file" >> {

@@ -15,6 +15,7 @@ package object fs {
   type RelPath[S] = RelDir[S] \/ RelFile[S]
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
+  type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
   def interpretFileSystem[M[_]: Functor](
     r: ReadFile ~> M,

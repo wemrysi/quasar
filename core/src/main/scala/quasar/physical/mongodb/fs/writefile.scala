@@ -13,7 +13,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object writefile {
-  import WriteFile._, WriteError._, MongoDb._
+  import WriteFile._, FileSystemError._, MongoDb._
 
   type WriteState           = (Long, Map[WriteHandle, Collection])
   type WriteStateT[F[_], A] = StateT[F, WriteState, A]
@@ -26,7 +26,7 @@ object writefile {
         Collection.fromFile(file) fold (
           err  => PathError(err).left.point[WriteMongo],
           coll => seqL.modo(_ + 1).map(WriteHandle(_))
-                    .flatMap(h => collectionL(h).assign(Some(coll)).as(h.right[WriteError]))
+                    .flatMap(h => collectionL(h).assign(Some(coll)).as(h.right[FileSystemError]))
                     .lift[MongoDb])
 
       case Write(h, data) =>
@@ -42,7 +42,7 @@ object writefile {
                  .map(n => PartialWrite(docs.size - n))
                  .run.map(errs ++ _)
                  .liftM[WriteStateT],
-          (errs :+ UnknownHandle(h)).point[WriteMongo]))
+          (errs :+ UnknownWriteHandle(h)).point[WriteMongo]))
 
       case Close(h) =>
         collectionL(h).mods_(κ(None)).lift[MongoDb]
@@ -72,7 +72,7 @@ object writefile {
   private def lookupCollection(h: WriteHandle): WriteMongo[Option[Collection]] =
     collectionL(h).st.lift[MongoDb]
 
-  private def dataToDocument(d: Data): WriteError \/ Document =
+  private def dataToDocument(d: Data): FileSystemError \/ Document =
     BsonCodec.fromData(d)
       .leftMap(err => WriteFailed(d, err.toString))
       .flatMap {

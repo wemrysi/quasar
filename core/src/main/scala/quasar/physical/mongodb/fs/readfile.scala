@@ -15,7 +15,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
-  import ReadFile._, ReadError._, MongoDb._
+  import ReadFile._, FileSystemError._, MongoDb._
 
   type BsonCursor            = AsyncBatchCursor[Document]
 
@@ -45,7 +45,7 @@ object readfile {
       case Read(h) =>
         lookupCursor(h)
           .flatMapF(nextChunk)
-          .toRight(UnknownHandle(h))
+          .toRight(UnknownReadHandle(h))
           .run
 
       case Close(h) =>
