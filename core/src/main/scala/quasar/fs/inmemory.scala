@@ -15,15 +15,15 @@ import pathy.Path._
 object inmemory {
   import ReadFile._, WriteFile._, FileSystem._
 
-  type FS = Map[RelFile[Sandboxed], Vector[Data]]
-  type RH = Map[ReadHandle, Reading]
-  type WH = Map[WriteHandle, RelFile[Sandboxed]]
+  type FM = Map[RelFile[Sandboxed], Vector[Data]]
+  type RM = Map[ReadHandle, Reading]
+  type WM = Map[WriteHandle, RelFile[Sandboxed]]
 
   type InMemoryFs[A]  = State[InMemState, A]
   type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: RelFile[Sandboxed], start: Natural, lim: Option[Positive], pos: Int)
-  final case class InMemState(seq: Long, fs: FS, rh: RH, wh: WH)
+  final case class InMemState(seq: Long, fm: FM, rm: RM, wm: WM)
 
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
     def apply[A](rf: ReadFile[A]) = rf match {
@@ -101,7 +101,7 @@ object inmemory {
         path.fold(deleteDir, deleteFile)
 
       case ListContents(dir) =>
-        fsL flatMap (
+        fmL flatMap (
           _.keys.flatMap(_ relativeTo dir)
             .toList.toNel
             .cata(
@@ -116,14 +116,6 @@ object inmemory {
     }
   }
 
-  /** Pure interpreter that interprets InMemoryFs into a tuple of the
-    * final state and value produced.
-    */
-  val run: InMemoryFs ~> InMemStateR = new (InMemoryFs ~> InMemStateR) {
-    def apply[A](imfs: InMemoryFs[A]) =
-      imfs.run(InMemState(0, Map.empty, Map.empty, Map.empty))
-  }
-
   ////
 
   private def tmpDir: RelDir[Sandboxed] = dir("__quasar") </> dir("tmp")
@@ -135,11 +127,11 @@ object inmemory {
   private def nextSeq: InMemoryFs[Long] =
     seqL <%= (_ + 1)
 
-  private val fsL: InMemState @> FS =
-    Lens.lensg(s => m => s.copy(fs = m), _.fs)
+  private val fmL: InMemState @> FM =
+    Lens.lensg(s => m => s.copy(fm = m), _.fm)
 
   private def fileL(f: RelFile[Sandboxed]): InMemState @> Option[Vector[Data]] =
-    Lens.mapVLens(f) <=< fsL
+    Lens.mapVLens(f) <=< fmL
 
   //----
 
@@ -149,11 +141,11 @@ object inmemory {
   private def rNotFound[A](f: RelFile[Sandboxed]): InMemoryFs[ReadError \/ A] =
     ReadError.PathError(PathError2.FileNotFound(f)).left.point[InMemoryFs]
 
-  private val rhL: InMemState @> RH =
-    Lens.lensg(s => m => s.copy(rh = m), _.rh)
+  private val rmL: InMemState @> RM =
+    Lens.lensg(s => m => s.copy(rm = m), _.rm)
 
   private def readingL(h: ReadHandle): InMemState @> Option[Reading] =
-    Lens.mapVLens(h) <=< rhL
+    Lens.mapVLens(h) <=< rmL
 
   private val readingPosL: Reading @> Int =
     Lens.lensg(r => p => r.copy(pos = p), _.pos)
@@ -166,11 +158,11 @@ object inmemory {
 
   //----
 
-  private val whL: InMemState @> WH =
-    Lens.lensg(s => m => s.copy(wh = m), _.wh)
+  private val wmL: InMemState @> WM =
+    Lens.lensg(s => m => s.copy(wm = m), _.wm)
 
   private def wFileL(h: WriteHandle): InMemState @> Option[RelFile[Sandboxed]] =
-    Lens.mapVLens(h) <=< whL
+    Lens.mapVLens(h) <=< wmL
 
   //----
 
@@ -185,7 +177,7 @@ object inmemory {
 
   private def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], s: MoveSemantics): InMemoryFs[PathError2 \/ Unit] =
     for {
-      m     <- fsL.st
+      m     <- fmL.st
       sufxs =  m.keys.flatMap(_ relativeTo src).toStream
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
@@ -210,7 +202,7 @@ object inmemory {
 
   private def deleteDir(d: RelDir[Sandboxed]): InMemoryFs[PathError2 \/ Unit] =
     for {
-      m  <- fsL.st
+      m  <- fmL.st
       ss =  m.keys.flatMap(_ relativeTo d).toStream
       r0 <- ss.traverseU(f => EitherT(deleteFile(f))).run
       r1 <- r0.fold(_.left.point[InMemoryFs],

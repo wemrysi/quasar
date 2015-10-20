@@ -152,6 +152,21 @@ trait OptionTInstances {
     }
 }
 
+trait StateTInstances {
+  implicit def stateTCatchable[F[_]: Catchable : Functor, S]: Catchable[StateT[F, S, ?]] =
+    new Catchable[StateT[F, S, ?]] {
+      def attempt[A](fa: StateT[F, S, A]) =
+        StateT[F, S, Throwable \/ A](s =>
+          Catchable[F].attempt(fa.run(s)) map {
+            case -\/(t)       => (s, t.left)
+            case \/-((s1, a)) => (s1, a.right)
+          })
+
+      def fail[A](t: Throwable) =
+        StateT[F, S, A](_ => Catchable[F].fail(t))
+    }
+}
+
 trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
     import SKI._
@@ -298,7 +313,7 @@ trait SKI {
 }
 object SKI extends SKI
 
-package object fp extends TreeInstances with ListMapInstances with EitherTInstances with OptionTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
+package object fp extends TreeInstances with ListMapInstances with EitherTInstances with OptionTInstances with StateTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with SKI {
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }
@@ -372,5 +387,17 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
   def liftMT[F[_]: Monad, G[_[_], _]: MonadTrans]: F ~> G[F, ?] =
     new (F ~> G[F, ?]) {
       def apply[A](fa: F[A]) = fa.liftM[G]
+    }
+
+  /** `point` as a natural transformation */
+  def pointNT[F[_]: Applicative]: Id ~> F =
+    new (Id ~> F) {
+      def apply[A](a: A) = Applicative[F].point(a)
+    }
+
+  /** `Free#foldMap` as a natural transformation */
+  def hoistFree[S[_]: Functor, M[_]: Monad](f: S ~> M): Free[S, ?] ~> M =
+    new (Free[S, ?] ~> M) {
+      def apply[A](fa: Free[S, A]) = fa foldMap f
     }
 }
