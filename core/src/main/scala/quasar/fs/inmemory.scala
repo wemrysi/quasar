@@ -6,14 +6,14 @@ import quasar.Predef._
 import scalaz._, Scalaz._
 import pathy.Path._
 
-/** In-Memory Read/Write/FileSystem interpreters, useful for testing/stubbing
+/** In-Memory Read/Write/ManageFile interpreters, useful for testing/stubbing
   * when a "real" interpreter isn't needed or desired.
   *
   * NB: Since this is in-memory, careful with writing large amounts of data to
   *     the file system.
   */
 object inmemory {
-  import ReadFile._, WriteFile._, FileSystem._
+  import ReadFile._, WriteFile._, ManageFile._
 
   type FM = Map[RelFile[Sandboxed], Vector[Data]]
   type RM = Map[ReadHandle, Reading]
@@ -92,8 +92,8 @@ object inmemory {
     }
   }
 
-  val fileSystem: FileSystem ~> InMemoryFs = new (FileSystem ~> InMemoryFs) {
-    def apply[A](fsa: FileSystem[A]) = fsa match {
+  val manageFile: ManageFile ~> InMemoryFs = new (ManageFile ~> InMemoryFs) {
+    def apply[A](fsa: ManageFile[A]) = fsa match {
       case Move(scenario, semantics) =>
         scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
 

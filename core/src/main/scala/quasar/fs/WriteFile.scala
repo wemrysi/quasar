@@ -70,7 +70,7 @@ object WriteFile {
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S) {
     import WriteError._, PathError2._
-    import FileSystem.MoveSemantics
+    import ManageFile.MoveSemantics
 
     type F[A]    = Free[S, A]
     type M[A]    = WriteErrT[F, A]
@@ -140,7 +140,7 @@ object WriteFile {
 
     /** Same as `save` but accepts chunked [[Data]]. */
     def saveChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
-                   (implicit FS: FileSystem.Ops[S])
+                   (implicit MF: ManageFile.Ops[S])
                    : Process[M, WriteError] = {
 
       saveChunked0(dst, src, MoveSemantics.Overwrite)
@@ -151,7 +151,7 @@ object WriteFile {
       * leaving any existing values unaffected.
       */
     def save(dst: RelFile[Sandboxed], src: Process[F, Data])
-            (implicit FS: FileSystem.Ops[S])
+            (implicit MF: ManageFile.Ops[S])
             : Process[M, WriteError] = {
 
       saveChunked(dst, src map (Vector(_)))
@@ -159,7 +159,7 @@ object WriteFile {
 
     /** Same as `create` but accepts chunked [[Data]]. */
     def createChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
-                     (implicit FS: FileSystem.Ops[S])
+                     (implicit MF: ManageFile.Ops[S])
                      : Process[M, WriteError] = {
 
       def shouldNotExist: M[WriteError] =
@@ -172,7 +172,7 @@ object WriteFile {
 
     /** Create the given file with the contents of `src`. Fails if already exists. */
     def create(dst: RelFile[Sandboxed], src: Process[F, Data])
-              (implicit FS: FileSystem.Ops[S])
+              (implicit MF: ManageFile.Ops[S])
               : Process[M, WriteError] = {
 
       createChunked(dst, src map (Vector(_)))
@@ -180,7 +180,7 @@ object WriteFile {
 
     /** Same as `replace` but accepts chunked [[Data]]. */
     def replaceChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
-                      (implicit FS: FileSystem.Ops[S])
+                      (implicit MF: ManageFile.Ops[S])
                       : Process[M, WriteError] = {
 
       def shouldExist: M[WriteError] =
@@ -195,7 +195,7 @@ object WriteFile {
       * doesn't exist.
       */
     def replace(dst: RelFile[Sandboxed], src: Process[F, Data])
-               (implicit FS: FileSystem.Ops[S])
+               (implicit MF: ManageFile.Ops[S])
                : Process[M, WriteError] = {
 
       replaceChunked(dst, src map (Vector(_)))
@@ -204,25 +204,25 @@ object WriteFile {
     ////
 
     private def fileExistsM(file: RelFile[Sandboxed])
-                           (implicit FS: FileSystem.Ops[S])
+                           (implicit MF: ManageFile.Ops[S])
                            : M[Boolean] = {
 
-      FS.fileExists(file).liftM[WriteErrT]
+      MF.fileExists(file).liftM[WriteErrT]
     }
 
     private def saveChunked0(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]], sem: MoveSemantics)
-                            (implicit FS: FileSystem.Ops[S])
+                            (implicit MF: ManageFile.Ops[S])
                             : Process[M, WriteError] = {
 
       def cleanupTmp(tmp: RelFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
-        Process.eval_[M, Unit](transErr(FS.deleteFile(tmp)))
+        Process.eval_[M, Unit](transErr(MF.deleteFile(tmp)))
           .causedBy(Cause.Error(t))
 
-      FS.tempFileNear(dst).liftM[WriteErrT].liftM[Process] flatMap { tmp =>
+      MF.tempFileNear(dst).liftM[WriteErrT].liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src).terminated.take(1)
           .flatMap(_.cata(
-            werr => transErr(FS.deleteFile(tmp)).as(werr).liftM[Process],
-            Process.eval_[M, Unit](transErr(FS.moveFile(tmp, dst, sem)))))
+            werr => transErr(MF.deleteFile(tmp)).as(werr).liftM[Process],
+            Process.eval_[M, Unit](transErr(MF.moveFile(tmp, dst, sem)))))
           .onFailure(cleanupTmp(tmp))
       }
     }

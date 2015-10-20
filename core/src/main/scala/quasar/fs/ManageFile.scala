@@ -10,9 +10,9 @@ import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import pathy.{Path => PPath}, PPath._
 
-sealed trait FileSystem[A]
+sealed trait ManageFile[A]
 
-object FileSystem {
+object ManageFile {
   sealed trait MoveSemantics {
     import MoveSemantics._
 
@@ -120,18 +120,18 @@ object FileSystem {
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
-    extends FileSystem[PathError2 \/ Unit]
+    extends ManageFile[PathError2 \/ Unit]
 
   final case class Delete(path: RelPath[Sandboxed])
-    extends FileSystem[PathError2 \/ Unit]
+    extends ManageFile[PathError2 \/ Unit]
 
   final case class ListContents(dir: RelDir[Sandboxed])
-    extends FileSystem[PathError2 \/ Set[Node]]
+    extends ManageFile[PathError2 \/ Set[Node]]
 
   final case class TempFile(nearTo: Option[RelFile[Sandboxed]])
-    extends FileSystem[RelFile[Sandboxed]]
+    extends ManageFile[RelFile[Sandboxed]]
 
-  final class Ops[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S) {
+  final class Ops[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S) {
     type F[A] = Free[S, A]
     type M[A] = PathErr2T[F, A]
 
@@ -222,12 +222,12 @@ object FileSystem {
 
     ////
 
-    private def lift[A](fs: FileSystem[A]): F[A] =
+    private def lift[A](fs: ManageFile[A]): F[A] =
       Free.liftF(S1.inj(Coyoneda.lift(fs)))
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S0: Functor[S], S1: FileSystemF :<: S): Ops[S] =
+    implicit def apply[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S): Ops[S] =
       new Ops[S]
   }
 }

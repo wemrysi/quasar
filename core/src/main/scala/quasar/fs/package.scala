@@ -7,17 +7,21 @@ import pathy.Path._
 package object fs {
   type ReadFileF[A]   = Coyoneda[ReadFile, A]
   type WriteFileF[A]  = Coyoneda[WriteFile, A]
-  type FileSystemF[A] = Coyoneda[FileSystem, A]
+  type ManageFileF[A] = Coyoneda[ManageFile, A]
 
-  type FS0[A] = Coproduct[WriteFileF, FileSystemF, A]
-  type FS[A]  = Coproduct[ReadFileF, FS0, A]
+  type FileSystem0[A] = Coproduct[WriteFileF, ManageFileF, A]
+  type FileSystem[A]  = Coproduct[ReadFileF, FileSystem0, A]
 
   type RelPath[S] = RelDir[S] \/ RelFile[S]
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
 
-  def interpretFS[M[_]: Functor](r: ReadFile ~> M, w: WriteFile ~> M, f: FileSystem ~> M): FS ~> M =
-    interpret.interpret3[ReadFileF, WriteFileF, FileSystemF, M](
-      Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(f))
+  def interpretFileSystem[M[_]: Functor](
+    r: ReadFile ~> M,
+    w: WriteFile ~> M,
+    m: ManageFile ~> M
+  ): FileSystem ~> M =
+    interpret.interpret3[ReadFileF, WriteFileF, ManageFileF, M](
+      Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(m))
 }
 

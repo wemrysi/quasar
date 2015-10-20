@@ -14,11 +14,11 @@ import scalaz.concurrent.Task
 import pathy.Path._
 
 object filesystem {
-  import FileSystem._, PathError2._, MongoDb._
+  import ManageFile._, PathError2._, MongoDb._
 
-  type GenState          = (String, Long)
-  type FsStateT[F[_], A] = StateT[F, GenState, A]
-  type FsMongo[A]        = FsStateT[MongoDb, A]
+  type GenState              = (String, Long)
+  type ManageStateT[F[_], A] = StateT[F, GenState, A]
+  type ManageMongo[A]        = ManageStateT[MongoDb, A]
 
   /** TODO: There are still some questions regarding Path
     *   1) Should we be requiring Rel or Abs paths? Abs seems
@@ -30,25 +30,25 @@ object filesystem {
     *      allowed in an absolute path.
     *
     *   2) We should assume all paths will be canonicalized and can do so
-    *      with a FileSystem ~> FileSystem that canonicalizes everything.
+    *      with a ManageFile ~> ManageFile that canonicalizes everything.
     *
     *   3) Currently, parsing a directory like "/../foo/bar/" as an absolute
     *      dir succeeds, this should probably be changed to fail.
     */
 
-  /** Interpret [[FileSystem]] into [[FsMongo]], given the name of a database
+  /** Interpret [[ManageFile]] into [[ManageMongo]], given the name of a database
     * to use as a default location for temp collections when no other database
     * can be deduced.
     */
-  def interpret(defaultDb: String): FileSystem ~> FsMongo = new (FileSystem ~> FsMongo) {
-    def apply[A](fs: FileSystem[A]) = fs match {
+  def interpret(defaultDb: String): ManageFile ~> ManageMongo = new (ManageFile ~> ManageMongo) {
+    def apply[A](fs: ManageFile[A]) = fs match {
       case Move(scenario, semantics) =>
         scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
-          .run.liftM[FsStateT]
+          .run.liftM[ManageStateT]
 
       case Delete(path) =>
         path.fold(deleteDir, deleteFile)
-          .run.liftM[FsStateT]
+          .run.liftM[ManageStateT]
 
       case ListContents(dir) =>
         (dirName(dir) match {
@@ -66,7 +66,7 @@ object filesystem {
 
           case None =>
             nonExistentParent[Set[Node]](dir).run
-        }).liftM[FsStateT]
+        }).liftM[ManageStateT]
 
       case TempFile(maybeNear) =>
         val dbName = maybeNear
@@ -77,9 +77,9 @@ object filesystem {
     }
   }
 
-  def run(client: MongoClient): FsMongo ~> Task =
-    new (FsMongo ~> Task) {
-      def apply[A](fs: FsMongo[A]) =
+  def run(client: MongoClient): ManageMongo ~> Task =
+    new (ManageMongo ~> Task) {
+      def apply[A](fs: ManageMongo[A]) =
         Task.delay(scala.util.Random.nextInt().toHexString)
           .map(s => s"__quasar.tmp_${s}_")
           .flatMap(p => fs.eval((p, 0)).run(client))
@@ -187,6 +187,6 @@ object filesystem {
     InvalidPath(dir.left, "directory refers to nonexistent parent")
       .raiseError[G, A]
 
-  private def freshName: FsMongo[String] =
+  private def freshName: ManageMongo[String] =
     (prefixL.st |@| seqL.modo(_ + 1))(_ + _).lift[MongoDb]
 }
