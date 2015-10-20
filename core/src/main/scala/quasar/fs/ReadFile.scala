@@ -61,11 +61,18 @@ object ReadFile {
       * at the specified offset. An optional limit may be supplied to restrict
       * the maximum amount of data read.
       */
-    def scan(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] =
-      Process.await(open(file, offset, limit))(rh =>
-        Process.repeatEval(read(rh))
-          .flatMap(data => if (data.isEmpty) Process.halt else Process.emitAll(data))
-          .onComplete(Process.eval_[M, Unit](close(rh).liftM[FileSystemErrT])))
+    def scan(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+      def readUntilEmpty(h: ReadHandle): Process[M, Data] =
+        Process.await(read(h)) { data =>
+          if (data.isEmpty)
+            Process.halt
+          else
+            Process.emitAll(data) ++ readUntilEmpty(h)
+        }
+
+      Process.await(open(file, offset, limit))(h =>
+        readUntilEmpty(h) onComplete Process.eval_[M, Unit](close(h).liftM[FileSystemErrT]))
+    }
 
     /** Returns a process that produces all the data contained in the
       * given file.

@@ -23,7 +23,12 @@ object inmemory {
   type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: RelFile[Sandboxed], start: Natural, lim: Option[Positive], pos: Int)
+
   final case class InMemState(seq: Long, fm: FM, rm: RM, wm: WM)
+
+  object InMemState {
+    val empty = InMemState(0, Map.empty, Map.empty, Map.empty)
+  }
 
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
     def apply[A](rf: ReadFile[A]) = rf match {
@@ -45,16 +50,19 @@ object inmemory {
           case Some(Reading(f, st, lim, pos)) =>
             fileL(f).st flatMap {
               case Some(xs) =>
+                val rIdx =
+                  st.toInt + pos
+
                 val rCount =
                   rChunkSize                          min
                   lim.cata(_.toInt - pos, rChunkSize) min
-                  (xs.length - (st.toInt + pos))
+                  (xs.length - rIdx)
 
                 if (rCount <= 0)
-                  rClose(h) as Vector.empty.right
+                  Vector.empty.right.point[InMemoryFs]
                 else
                   (rPosL(h) := (pos + rCount))
-                    .map(_ => xs.slice(st.toInt, st.toInt + rCount).right)
+                    .map(_ => xs.slice(rIdx, rIdx + rCount).right)
 
               case None =>
                 fsFileNotFound(f)
