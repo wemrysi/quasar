@@ -32,6 +32,6 @@ object PathyGen {
   def genSegment: Gen[String] =
     Gen.nonEmptyListOf(Gen.frequency(
       (100, Arbitrary.arbitrary[Char]) ::
-      "$./\\_~ *+-".toList.map(Gen.const).strengthL(50): _*))
+      "$./\\_~ *+-".toList.map(Gen.const).strengthL(10): _*))
       .map(_.mkString)
 }

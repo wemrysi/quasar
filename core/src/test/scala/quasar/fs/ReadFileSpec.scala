@@ -4,56 +4,34 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
 import scalaz._
-import scalaz.stream._
-import scalaz.concurrent.Task
+import scalaz.std.vector._
 import pathy.Path._
 
-class ReadFileSpec extends Specification with ScalaCheck {
-  import inmemory._, DataGen._
-
-  type F[A] = Free[FileSystem, A]
-  type G[A] = StateT[Task, InMemState, A]
-  type M[A] = FileSystemErrT[G, A]
-
-  val testDir = dir("readfile") </> dir("spec")
-  val rFile = ReadFile.Ops[FileSystem]
-  val wFile = WriteFile.Ops[FileSystem]
-
-  val hoistFs: InMemoryFs ~> G =
-    Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
-
-  val run: F ~> G =
-    hoistFs compose[F] hoistFree(interpretFileSystem(readFile, writeFile, manageFile))
-
-  val runT: FileSystemErrT[F, ?] ~> M =
-    Hoist[FileSystemErrT].hoist(run)
+class ReadFileSpec extends FileSystemSpec {
+  import DataGen._, PathyGen._
 
   "ReadFile" should {
-    "scan should read data until an empty vector is received" ! prop { xs: List[Data] =>
-      xs.nonEmpty ==> {
-        val f = testDir </> file("foo")
-        val p = wFile.append(f, Process(xs: _*)).drain ++ rFile.scanAll(f)
+    "scan should read data until an empty vector is received" ! prop {
+      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+        val p = write.appendF(f, xs).drain ++ read.scanAll(f)
 
-        p.translate[M](runT).runLog.map(_.toList)
-          .run.eval(InMemState.empty)
-          .run.toEither must beRight(xs)
+        evalLogZero(p).run.toEither must beRight(xs)
       }
     }
 
-    "scan should automatically close the read handle when terminated early" ! prop { xs: List[Data] =>
-      xs.nonEmpty ==> {
-        val f = testDir </> file("bar")
+    "scan should automatically close the read handle when terminated early" ! prop {
+      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         val n = xs.length / 2
-        val p = wFile.append(f, Process(xs: _*)).drain ++ rFile.scanAll(f).take(n)
+        val p = write.appendF(f, xs).drain ++ read.scanAll(f).take(n)
 
-        p.translate[M](runT).runLog.map(_.toList)
+        p.translate[M](runT).runLog
           .run.leftMap(_.rm)
-          .run(InMemState.empty)
+          .run(emptyState)
           .run must_== ((Map.empty, \/.right(xs take n)))
       }
     }
+
+    "scan should automatically close the read handle on failure" >> todo
   }
 }

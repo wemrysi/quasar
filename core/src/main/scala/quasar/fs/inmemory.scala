@@ -109,11 +109,11 @@ object inmemory {
         path.fold(deleteDir, deleteFile)
 
       case ListContents(dir) =>
-        fmL flatMap (
+        fmL.st flatMap (
           _.keys.flatMap(_ relativeTo dir)
             .toList.toNel
             .cata(
-              _.foldMap(s => Set(Node.File(dir </> s)))
+              _.foldMap(Node.File andThen (Set(_)))
                 .right.point[InMemoryFs],
               fsDirNotFound(dir)))
 
