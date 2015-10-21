@@ -27,7 +27,7 @@ class ReadFileSpec extends FileSystemSpec {
 
         p.translate[M](runT).runLog
           .run.leftMap(_.rm)
-          .run(emptyState)
+          .run(emptyMem)
           .run must_== ((Map.empty, \/.right(xs take n)))
       }
     }
