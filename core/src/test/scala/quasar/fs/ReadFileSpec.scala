@@ -6,10 +6,11 @@ import quasar.fp._
 
 import scalaz._
 import scalaz.std.vector._
+import scalaz.syntax.either._
 import pathy.Path._
 
 class ReadFileSpec extends FileSystemSpec {
-  import DataGen._, PathyGen._
+  import DataGen._, PathyGen._, FileSystemError._, PathError2._
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" ! prop {
@@ -32,6 +33,15 @@ class ReadFileSpec extends FileSystemSpec {
       }
     }
 
-    "scan should automatically close the read handle on failure" >> todo
+    "scan should automatically close the read handle on failure" ! prop {
+      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+        val reads = List(xs.right, PathError(FileNotFound(f)).left)
+
+        runLogWithReads(reads, read.scanAll(f)).run
+          .leftMap(_.rm)
+          .run(emptyMem)
+          .run must_== ((Map.empty, \/.left(PathError(FileNotFound(f)))))
+      }
+    }
   }
 }
