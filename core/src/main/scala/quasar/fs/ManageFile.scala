@@ -4,6 +4,8 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import argonaut._, Argonaut._
+import scala.Ordering
 import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.applicative._
@@ -117,6 +119,18 @@ object ManageFile {
 
     val File: RelFile[Sandboxed] => Node =
       Plain compose \/.right
+
+    implicit val nodeEncodeJson: EncodeJson[Node] =
+      EncodeJson(node => Json(
+        "name" := node.path.fold(posixCodec.printPath, posixCodec.printPath),
+        "type" := node.fold(κ("mount"), _.fold(κ("directory"), κ("file")))
+      ))
+
+    implicit val nodeOrdering: Ordering[Node] =
+      Ordering.by(_.path.fold(posixCodec.printPath, posixCodec.printPath))
+
+    implicit val nodeOrder: Order[Node] =
+      Order.fromScalaOrdering
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)

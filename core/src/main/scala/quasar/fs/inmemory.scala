@@ -28,6 +28,7 @@ object inmemory {
 
   object InMemState {
     val empty = InMemState(0, Map.empty, Map.empty, Map.empty)
+    def fromFiles(files: FM) = empty.copy(fm = files)
   }
 
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {

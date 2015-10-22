@@ -33,6 +33,7 @@ import org.http4s.util._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
+import pathy.Path._
 
 package object api {
 
@@ -126,6 +127,16 @@ package object api {
 
   object AsDirPath {
     def unapply(p: HPath): Option[Path] = AsPath.unapply(p).map(_.asDir)
+  }
+
+  // TODO: Rename to `AsPath`
+  object AsPathyPath {
+    def unapply(p: HPath): Option[AbsPath[Sandboxed]] = {
+      val str = "/" + p.toList.map(java.net.URLDecoder.decode(_, "UTF-8")).mkString("/")
+      val maybeDir = posixCodec.parseAbsDir(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
+      val maybeFile = posixCodec.parseAbsFile(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
+      maybeDir.map(\/.left) orElse maybeFile.map(\/.right)
+    }
   }
 
   def staticFileService(basePath: String): HttpService = {

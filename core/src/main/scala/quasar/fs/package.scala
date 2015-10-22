@@ -10,6 +10,7 @@ package object fs {
   type ManageFileF[A] = Coyoneda[ManageFile, A]
 
   type FileSystem0[A] = Coproduct[WriteFileF, ManageFileF, A]
+  /** FileSystem[A] = [[ReadFileF]] \/ [[WriteFileF]] \/ [[ManageFileF]] */
   type FileSystem[A]  = Coproduct[ReadFileF, FileSystem0, A]
 
   type RelPath[S] = RelDir[S] \/ RelFile[S]
