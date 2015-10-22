@@ -22,7 +22,7 @@ object ReadFile {
       Order.orderBy(_.run)
   }
 
-  final case class Open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive])
+  final case class Open(file: AbsFile[Sandboxed], offset: Natural, limit: Option[Positive])
     extends ReadFile[FileSystemError \/ ReadHandle]
 
   final case class Read(h: ReadHandle)
@@ -43,7 +43,7 @@ object ReadFile {
       * Care must be taken to `close` the returned handle in order to avoid
       * potential resource leaks.
       */
-    def open(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): M[ReadHandle] =
+    def open(file: AbsFile[Sandboxed], offset: Natural, limit: Option[Positive]): M[ReadHandle] =
       EitherT(lift(Open(file, offset, limit)))
 
     /** Read a chunk of data from the file represented by the given handle.
@@ -61,7 +61,7 @@ object ReadFile {
       * at the specified offset. An optional limit may be supplied to restrict
       * the maximum amount of data read.
       */
-    def scan(file: RelFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+    def scan(file: AbsFile[Sandboxed], offset: Natural, limit: Option[Positive]): Process[M, Data] = {
       def readUntilEmpty(h: ReadHandle): Process[M, Data] =
         Process.await(read(h)) { data =>
           if (data.isEmpty)
@@ -77,19 +77,19 @@ object ReadFile {
     /** Returns a process that produces all the data contained in the
       * given file.
       */
-    def scanAll(file: RelFile[Sandboxed]): Process[M, Data] =
+    def scanAll(file: AbsFile[Sandboxed]): Process[M, Data] =
       scan(file, Natural._0, None)
 
     /** Returns a process that produces at most `limit` items from the beginning
       * of the given file.
       */
-    def scanTo(file: RelFile[Sandboxed], limit: Positive): Process[M, Data] =
+    def scanTo(file: AbsFile[Sandboxed], limit: Positive): Process[M, Data] =
       scan(file, Natural._0, Some(limit))
 
     /** Returns a process that produces data from the given file, beginning
       * at the specified offset.
       */
-    def scanFrom(file: RelFile[Sandboxed], offset: Natural): Process[M, Data] =
+    def scanFrom(file: AbsFile[Sandboxed], offset: Natural): Process[M, Data] =
       scan(file, offset, None)
 
     ////

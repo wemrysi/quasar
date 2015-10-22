@@ -42,12 +42,12 @@ final case class Collection(databaseName: String, collectionName: String) {
     *       (rather than it being separate), this function wouldn't need to
     *       return an [[Option]].
     */
-  def asFile: Option[RelFile[Sandboxed]] = {
+  def asFile: Option[AbsFile[Sandboxed]] = {
     val db   = DatabaseNameUnparser(databaseName)
     val segs = CollectionNameUnparser(collectionName).reverse
 
     segs.headOption map (f =>
-      segs.drop(1).foldRight(pDir(db))((d, p) => p </> pDir(d)) </> pFile(f))
+      rootDir </> segs.drop(1).foldRight(pDir(db))((d, p) => p </> pDir(d)) </> pFile(f))
   }
 }
 
@@ -80,7 +80,7 @@ object Collection {
       \/-(_)).join
 
   // TODO: Rename to `fromPath` once old path code is deleted
-  def fromPathy(path: RelPath[Sandboxed]): PathError2 \/ Collection = {
+  def fromPathy(path: AbsPath[Sandboxed]): PathError2 \/ Collection = {
     import PathError2._
 
     flatten(None, None, None, Some(_), Some(_), path.merge)
@@ -99,10 +99,10 @@ object Collection {
           InvalidPath(path, "path names a database, but no collection").left))
   }
 
-  def fromDir(dir: RelDir[Sandboxed]): PathError2 \/ Collection =
+  def fromDir(dir: AbsDir[Sandboxed]): PathError2 \/ Collection =
     fromPathy(dir.left)
 
-  def fromFile(file: RelFile[Sandboxed]): PathError2 \/ Collection =
+  def fromFile(file: AbsFile[Sandboxed]): PathError2 \/ Collection =
     fromPathy(file.right)
 
   private trait PathParser extends RegexParsers {

@@ -13,6 +13,7 @@ package object fs {
   type FileSystem[A]  = Coproduct[ReadFileF, FileSystem0, A]
 
   type RelPath[S] = RelDir[S] \/ RelFile[S]
+  type AbsPath[S] = AbsDir[S] \/ AbsFile[S]
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]

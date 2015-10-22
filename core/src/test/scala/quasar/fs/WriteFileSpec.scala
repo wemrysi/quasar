@@ -15,7 +15,7 @@ class WriteFileSpec extends FileSystemSpec {
   "WriteFile" should {
 
     "append should consume input and close write handle when finished" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         val p = write.appendF(f, xs).drain ++ read.scanAll(f)
 
         p.translate[M](runT).runLog.run
@@ -26,7 +26,7 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "append should aggregate all `PartialWrite` errors and emit the sum" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => (xs.length > 1) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => (xs.length > 1) ==> {
         val wf = WriteFailed(Data.Str("foo"), "b/c reasons")
         val ws = Vector(wf) +: xs.tail.as(Vector(PartialWrite(1)))
 
@@ -37,7 +37,7 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "save should replace existing file" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
         val p = (write.appendF(f, xs) ++ write.saveF(f, ys)).drain ++ read.scanAll(f)
 
         evalLogZero(p).run.toEither must beRight(ys)
@@ -45,7 +45,7 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "save should leave existing file untouched on failure" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
         val err = WriteFailed(Data.Str("bar"), "")
         val ws = (xs ++ ys.init).as(Vector()) :+ Vector(err)
         val p = (write.appendF(f, xs) ++ write.saveF(f, ys)).drain ++ read.scanAll(f)
@@ -58,7 +58,7 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "create should fail if file exists" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
         val p = write.appendF(f, xs) ++ write.createF(f, ys)
 
         evalLogZero(p).run.toEither must beLeft(PathError(FileExists(f)))
@@ -66,21 +66,21 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "create should consume all input into a new file" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         evalLogZero(write.createF(f, xs) ++ read.scanAll(f))
           .run.toEither must beRight(xs)
       }
     }
 
     "replace should fail if the file does not exist" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         evalLogZero(write.replaceF(f, xs))
           .run.toEither must beLeft(PathError(FileNotFound(f)))
       }
     }
 
     "replace should leave the existing file untouched on failure" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
         val err = WriteFailed(Data.Int(42), "")
         val ws = (xs ++ ys.init).as(Vector()) :+ Vector(err)
         val p = (write.appendF(f, xs) ++ write.replaceF(f, ys)).drain ++ read.scanAll(f)
@@ -93,7 +93,7 @@ class WriteFileSpec extends FileSystemSpec {
     }
 
     "replace should overwrite the existing file with new data" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data], ys: Vector[Data]) => (xs.nonEmpty && ys.nonEmpty) ==> {
         val p = write.saveF(f, xs) ++ write.replaceF(f, ys) ++ read.scanAll(f)
 
         evalLogZero(p).run.toEither must beRight(ys)

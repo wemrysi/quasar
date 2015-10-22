@@ -14,7 +14,7 @@ class ReadFileSpec extends FileSystemSpec {
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         val p = write.appendF(f, xs).drain ++ read.scanAll(f)
 
         evalLogZero(p).run.toEither must beRight(xs)
@@ -22,7 +22,7 @@ class ReadFileSpec extends FileSystemSpec {
     }
 
     "scan should automatically close the read handle when terminated early" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         val n = xs.length / 2
         val p = write.appendF(f, xs).drain ++ read.scanAll(f).take(n)
 
@@ -34,7 +34,7 @@ class ReadFileSpec extends FileSystemSpec {
     }
 
     "scan should automatically close the read handle on failure" ! prop {
-      (f: RelFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
         val reads = List(xs.right, PathError(FileNotFound(f)).left)
 
         runLogWithReads(reads, read.scanAll(f)).run

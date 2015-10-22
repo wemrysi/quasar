@@ -13,7 +13,7 @@ import scalaz.stream._
 import scalaz.concurrent.Task
 import pathy.Path._
 
-object filesystem {
+object managefile {
   import ManageFile._, FileSystemError._, PathError2._, MongoDb._
 
   type GenState              = (String, Long)
@@ -21,18 +21,10 @@ object filesystem {
   type ManageMongo[A]        = ManageStateT[MongoDb, A]
 
   /** TODO: There are still some questions regarding Path
-    *   1) Should we be requiring Rel or Abs paths? Abs seems
-    *      like it might be a better fit as "/" refers to the
-    *      root of this filesystem, they also have less ambiguity
-    *      w.r.t. the relative "operators", '.' and '..', i.e.
-    *      "./foo/../../bar/" is a valid relative path that refers
-    *      to the parent of the current directory, this shouldn't be
-    *      allowed in an absolute path.
-    *
-    *   2) We should assume all paths will be canonicalized and can do so
+    *   1) We should assume all paths will be canonicalized and can do so
     *      with a ManageFile ~> ManageFile that canonicalizes everything.
     *
-    *   3) Currently, parsing a directory like "/../foo/bar/" as an absolute
+    *   2) Currently, parsing a directory like "/../foo/bar/" as an absolute
     *      dir succeeds, this should probably be changed to fail.
     */
 
@@ -53,13 +45,13 @@ object filesystem {
       case ListContents(dir) =>
         (dirName(dir) match {
           case Some(_) =>
-            collectionsInDir(dir)
-              .map(_.flatMap(_.asFile.map(Node.File)).toSet)
-              .run
+            collectionsInDir(dir).map(_.flatMap(c =>
+              c.asFile flatMap (_ relativeTo rootDir) map Node.File
+            ).toSet).run
 
           case None if depth(dir) == 0 =>
             collections
-              .map(_.asFile map (Node.File))
+              .map(_.asFile flatMap (_ relativeTo rootDir) map Node.File)
               .pipe(process1.stripNone)
               .runLog
               .map(_.toSet.right[FileSystemError])
@@ -73,7 +65,7 @@ object filesystem {
           .flatMap(f => Collection.fromFile(f).toOption)
           .cata(_.databaseName, defaultDb)
 
-        freshName map (n => dir(dbName) </> file(n))
+        freshName map (n => rootDir </> dir(dbName) </> file(n))
     }
   }
 
@@ -101,7 +93,7 @@ object filesystem {
     sem.fold(Overwrite, FailIfExists, Overwrite)
   }
 
-  private def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], sem: MoveSemantics)
+  private def moveDir(src: AbsDir[Sandboxed], dst: AbsDir[Sandboxed], sem: MoveSemantics)
                      : M[Unit] = {
     for {
       colls    <- collectionsInDir(src)
@@ -114,7 +106,7 @@ object filesystem {
     } yield ()
   }
 
-  private def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], sem: MoveSemantics)
+  private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], sem: MoveSemantics)
                       : M[Unit] = {
     /** Error codes obtained from MongoDB `renameCollection` docs:
       * See http://docs.mongodb.org/manual/reference/command/renameCollection/
@@ -151,7 +143,7 @@ object filesystem {
 
   // TODO: Really need a Path#fold[A] method, which will be much more reliable
   //       than this process of deduction.
-  private def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
+  private def deleteDir(dir: AbsDir[Sandboxed]): M[Unit] =
     dirName(dir) match {
       case Some(n) if depth(dir) == 1 =>
         dropDatabase(n.value).liftM[FileSystemErrT]
@@ -167,23 +159,24 @@ object filesystem {
         nonExistentParent(dir)
     }
 
-  private def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
+  private def deleteFile(file: AbsFile[Sandboxed]): M[Unit] =
     collFromFileM(file) flatMap (c => dropCollection(c).liftM[FileSystemErrT])
 
-  private def collectionsInDir(dir: RelDir[Sandboxed]): M[Vector[Collection]] =
+  private def collectionsInDir(dir: AbsDir[Sandboxed]): M[Vector[Collection]] =
     collFromDirM(dir) flatMap (c =>
       collectionsIn(c.databaseName)
         .filter(_.collectionName startsWith c.collectionName)
         .runLog.map(_.toVector).liftM[FileSystemErrT])
 
-  private def collFromDirM(dir: RelDir[Sandboxed]): M[Collection] =
+  private def collFromDirM(dir: AbsDir[Sandboxed]): M[Collection] =
     EitherT(Collection.fromDir(dir).leftMap(PathError).point[MongoDb])
 
-  private def collFromFileM(file: RelFile[Sandboxed]): M[Collection] =
+  private def collFromFileM(file: AbsFile[Sandboxed]): M[Collection] =
     EitherT(Collection.fromFile(file).leftMap(PathError).point[MongoDb])
 
-  // TODO: This would be eliminated if we switched to AbsDir everywhere.
-  private def nonExistentParent[A](dir: RelDir[Sandboxed]): M[A] =
+  // TODO: This would be eliminated if we switched to AbsDir everywhere and
+  //       disallowed AbsDirs like "/../foo" by construction.
+  private def nonExistentParent[A](dir: AbsDir[Sandboxed]): M[A] =
     PathError(InvalidPath(dir.left, "directory refers to nonexistent parent"))
       .raiseError[G, A]
 

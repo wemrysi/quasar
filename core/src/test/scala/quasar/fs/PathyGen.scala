@@ -10,19 +10,31 @@ import pathy.Path._
 
 object PathyGen {
 
-  implicit val arbitraryFile: Arbitrary[RelFile[Sandboxed]] =
-    Arbitrary(Gen.resize(10, genFile))
+  implicit val arbitraryAbsFile: Arbitrary[AbsFile[Sandboxed]] =
+    Arbitrary(Gen.resize(10, genAbsFile))
 
-  implicit val arbitraryDir: Arbitrary[RelDir[Sandboxed]] =
-    Arbitrary(Gen.resize(10, genDir))
+  implicit val arbitraryRelFile: Arbitrary[RelFile[Sandboxed]] =
+    Arbitrary(Gen.resize(10, genRelFile))
 
-  def genFile: Gen[RelFile[Sandboxed]] =
+  implicit val arbitraryAbsDir: Arbitrary[AbsDir[Sandboxed]] =
+    Arbitrary(Gen.resize(10, genAbsDir))
+
+  implicit val arbitraryRelDir: Arbitrary[RelDir[Sandboxed]] =
+    Arbitrary(Gen.resize(10, genRelDir))
+
+  def genAbsFile: Gen[AbsFile[Sandboxed]] =
+    genRelFile map (rootDir </> _)
+
+  def genRelFile: Gen[RelFile[Sandboxed]] =
     for {
-      d <- genDir
+      d <- genRelDir
       s <- genSegment
     } yield d </> file(s)
 
-  def genDir: Gen[RelDir[Sandboxed]] =
+  def genAbsDir: Gen[AbsDir[Sandboxed]] =
+    genRelDir map (rootDir </> _)
+
+  def genRelDir: Gen[RelDir[Sandboxed]] =
     Gen.frequency(
       (  1, Gen.const(currentDir[Sandboxed])),
       (100, Gen.nonEmptyListOf(genSegment)

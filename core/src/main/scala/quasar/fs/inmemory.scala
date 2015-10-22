@@ -15,14 +15,14 @@ import pathy.Path._
 object inmemory {
   import ReadFile._, WriteFile._, ManageFile._, FileSystemError._, PathError2._
 
-  type FM = Map[RelFile[Sandboxed], Vector[Data]]
+  type FM = Map[AbsFile[Sandboxed], Vector[Data]]
   type RM = Map[ReadHandle, Reading]
-  type WM = Map[WriteHandle, RelFile[Sandboxed]]
+  type WM = Map[WriteHandle, AbsFile[Sandboxed]]
 
   type InMemoryFs[A]  = State[InMemState, A]
   type InMemStateR[A] = (InMemState, A)
 
-  final case class Reading(f: RelFile[Sandboxed], start: Natural, lim: Option[Positive], pos: Int)
+  final case class Reading(f: AbsFile[Sandboxed], start: Natural, lim: Option[Positive], pos: Int)
 
   final case class InMemState(seq: Long, fm: FM, rm: RM, wm: WM)
 
@@ -126,7 +126,7 @@ object inmemory {
 
   ////
 
-  private def tmpDir: RelDir[Sandboxed] = dir("__quasar") </> dir("tmp")
+  private def tmpDir: AbsDir[Sandboxed] = rootDir </> dir("__quasar") </> dir("tmp")
   private def tmpName(n: Long) = s"__quasar.gen_$n"
 
   private val seqL: InMemState @> Long =
@@ -138,7 +138,7 @@ object inmemory {
   private val fmL: InMemState @> FM =
     Lens.lensg(s => m => s.copy(fm = m), _.fm)
 
-  private def fileL(f: RelFile[Sandboxed]): InMemState @> Option[Vector[Data]] =
+  private def fileL(f: AbsFile[Sandboxed]): InMemState @> Option[Vector[Data]] =
     Lens.mapVLens(f) <=< fmL
 
   //----
@@ -166,21 +166,21 @@ object inmemory {
   private val wmL: InMemState @> WM =
     Lens.lensg(s => m => s.copy(wm = m), _.wm)
 
-  private def wFileL(h: WriteHandle): InMemState @> Option[RelFile[Sandboxed]] =
+  private def wFileL(h: WriteHandle): InMemState @> Option[AbsFile[Sandboxed]] =
     Lens.mapVLens(h) <=< wmL
 
   //----
 
-  private def fsFileNotFound[A](f: RelFile[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
+  private def fsFileNotFound[A](f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
     PathError(FileNotFound(f)).left.point[InMemoryFs]
 
-  private def fsFileExists[A](f: RelFile[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
+  private def fsFileExists[A](f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
     PathError(FileExists(f)).left.point[InMemoryFs]
 
-  private def fsDirNotFound[A](d: RelDir[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
+  private def fsDirNotFound[A](d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
     PathError(DirNotFound(d)).left.point[InMemoryFs]
 
-  private def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
+  private def moveDir(src: AbsDir[Sandboxed], dst: AbsDir[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
       m     <- fmL.st
       sufxs =  m.keys.flatMap(_ relativeTo src).toStream
@@ -191,7 +191,7 @@ object inmemory {
                              else ().right.point[InMemoryFs])
     } yield r1
 
-  private def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
+  private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
     val move0: InMemoryFs[FileSystemError \/ Unit] = for {
       v <- fileL(src) <:= None
       r <- v.cata(
@@ -205,17 +205,17 @@ object inmemory {
       fileL(dst).st flatMap (_ ? move0 | fsFileNotFound(dst)))
   }
 
-  private def deleteDir(d: RelDir[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
+  private def deleteDir(d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
     for {
       m  <- fmL.st
       ss =  m.keys.flatMap(_ relativeTo d).toStream
-      r0 <- ss.traverseU(f => EitherT(deleteFile(f))).run
+      r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
       r1 <- r0.fold(_.left.point[InMemoryFs],
                     xs => if (xs.isEmpty) fsDirNotFound(d)
                           else ().right.point[InMemoryFs])
     } yield r1
 
-  private def deleteFile(f: RelFile[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
+  private def deleteFile(f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
     (fileL(f) <:= None)
       .flatMap(_ ? ().right[FileSystemError].point[InMemoryFs] | fsFileNotFound(f))
 }

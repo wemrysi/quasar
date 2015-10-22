@@ -58,8 +58,8 @@ object ManageFile {
     import MoveScenario._
 
     def fold[X](
-      d2d: (RelDir[Sandboxed], RelDir[Sandboxed]) => X,
-      f2f: (RelFile[Sandboxed], RelFile[Sandboxed]) => X
+      d2d: (AbsDir[Sandboxed], AbsDir[Sandboxed]) => X,
+      f2f: (AbsFile[Sandboxed], AbsFile[Sandboxed]) => X
     ): X =
       this match {
         case DirToDir0(sd, dd)   => d2d(sd, dd)
@@ -68,15 +68,15 @@ object ManageFile {
   }
 
   object MoveScenario {
-    private final case class DirToDir0(src: RelDir[Sandboxed], dst: RelDir[Sandboxed])
+    private final case class DirToDir0(src: AbsDir[Sandboxed], dst: AbsDir[Sandboxed])
       extends MoveScenario
-    private final case class FileToFile0(src: RelFile[Sandboxed], dst: RelFile[Sandboxed])
+    private final case class FileToFile0(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed])
       extends MoveScenario
 
-    val DirToDir: (RelDir[Sandboxed], RelDir[Sandboxed]) => MoveScenario =
+    val DirToDir: (AbsDir[Sandboxed], AbsDir[Sandboxed]) => MoveScenario =
       DirToDir0(_, _)
 
-    val FileToFile: (RelFile[Sandboxed], RelFile[Sandboxed]) => MoveScenario =
+    val FileToFile: (AbsFile[Sandboxed], AbsFile[Sandboxed]) => MoveScenario =
       FileToFile0(_, _)
   }
 
@@ -122,14 +122,14 @@ object ManageFile {
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)
     extends ManageFile[FileSystemError \/ Unit]
 
-  final case class Delete(path: RelPath[Sandboxed])
+  final case class Delete(path: AbsPath[Sandboxed])
     extends ManageFile[FileSystemError \/ Unit]
 
-  final case class ListContents(dir: RelDir[Sandboxed])
+  final case class ListContents(dir: AbsDir[Sandboxed])
     extends ManageFile[FileSystemError \/ Set[Node]]
 
-  final case class TempFile(nearTo: Option[RelFile[Sandboxed]])
-    extends ManageFile[RelFile[Sandboxed]]
+  final case class TempFile(nearTo: Option[AbsFile[Sandboxed]])
+    extends ManageFile[AbsFile[Sandboxed]]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S) {
     type F[A] = Free[S, A]
@@ -142,45 +142,45 @@ object ManageFile {
       EitherT(lift(Move(scenario, semantics)))
 
     /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
-    def moveDir(src: RelDir[Sandboxed], dst: RelDir[Sandboxed], sem: MoveSemantics): M[Unit] =
+    def moveDir(src: AbsDir[Sandboxed], dst: AbsDir[Sandboxed], sem: MoveSemantics): M[Unit] =
       move(MoveScenario.DirToDir(src, dst), sem)
 
     /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
-    def moveFile(src: RelFile[Sandboxed], dst: RelFile[Sandboxed], sem: MoveSemantics): M[Unit] =
+    def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], sem: MoveSemantics): M[Unit] =
       move(MoveScenario.FileToFile(src, dst), sem)
 
     /** Rename the `src` file in the same directory. */
-    def renameFile(src: RelFile[Sandboxed], name: String): M[RelFile[Sandboxed]] = {
+    def renameFile(src: AbsFile[Sandboxed], name: String): M[AbsFile[Sandboxed]] = {
       val dst = PPath.renameFile(src, κ(FileName(name)))
       moveFile(src, dst, MoveSemantics.Overwrite).as(dst)
     }
 
     /** Delete the given file system path, fails if the path does not exist. */
-    def delete(path: RelPath[Sandboxed]): M[Unit] =
+    def delete(path: AbsPath[Sandboxed]): M[Unit] =
       EitherT(lift(Delete(path)))
 
     /** Delete the given directory, fails if the directory does not exist. */
-    def deleteDir(dir: RelDir[Sandboxed]): M[Unit] =
+    def deleteDir(dir: AbsDir[Sandboxed]): M[Unit] =
       delete(dir.left)
 
     /** Delete the given file, fails if the file does not exist. */
-    def deleteFile(file: RelFile[Sandboxed]): M[Unit] =
+    def deleteFile(file: AbsFile[Sandboxed]): M[Unit] =
       delete(file.right)
 
     /** Returns immediate children of the given directory, fails if the
       * directory does not exist.
       */
-    def ls(dir: RelDir[Sandboxed]): M[Set[Node]] =
+    def ls(dir: AbsDir[Sandboxed]): M[Set[Node]] =
       EitherT(lift(ListContents(dir)))
 
     /** The children of the root directory. */
     def ls: M[Set[Node]] =
-      ls(currentDir)
+      ls(rootDir)
 
     /** Returns the children of the given directory and all of their
       * descendants, fails if the directory does not exist.
       */
-    def lsAll(dir: RelDir[Sandboxed]): M[Set[Node]] = {
+    def lsAll(dir: AbsDir[Sandboxed]): M[Set[Node]] = {
       type S[A] = StreamT[M, A]
 
       def lsR(desc: RelDir[Sandboxed]): StreamT[M, Node] =
@@ -193,7 +193,7 @@ object ManageFile {
     }
 
     /** Returns whether the given file exists. */
-    def fileExists(file: RelFile[Sandboxed]): F[Boolean] = {
+    def fileExists(file: AbsFile[Sandboxed]): F[Boolean] = {
       // TODO: Add fileParent[B, S](f: Path[B, File, S]): Path[B, Dir, S] to pathy
       val parent =
         parentDir(file) getOrElse scala.sys.error("impossible, files have parents!")
@@ -207,17 +207,17 @@ object ManageFile {
       * an attempt is made to return a tmp path that is as physically close to
       * the given file as possible.
       */
-    def tempFile(nearTo: Option[RelFile[Sandboxed]]): F[RelFile[Sandboxed]] =
+    def tempFile(nearTo: Option[AbsFile[Sandboxed]]): F[AbsFile[Sandboxed]] =
       lift(TempFile(nearTo))
 
     /** Returns the path to a new temporary file. */
-    def anyTempFile: F[RelFile[Sandboxed]] =
+    def anyTempFile: F[AbsFile[Sandboxed]] =
       tempFile(None)
 
     /** Returns the path to a new temporary file as physically close to the
       * specified file as possible.
       */
-    def tempFileNear(file: RelFile[Sandboxed]): F[RelFile[Sandboxed]] =
+    def tempFileNear(file: AbsFile[Sandboxed]): F[AbsFile[Sandboxed]] =
       tempFile(Some(file))
 
     ////

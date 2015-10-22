@@ -21,7 +21,7 @@ object WriteFile {
       Order.orderBy(_.run)
   }
 
-  final case class Open(file: RelFile[Sandboxed])
+  final case class Open(file: AbsFile[Sandboxed])
     extends WriteFile[FileSystemError \/ WriteHandle]
 
   final case class Write(h: WriteHandle, chunk: Vector[Data])
@@ -44,7 +44,7 @@ object WriteFile {
       * Care must be taken to `close` the handle when it is no longer needed
       * to avoid potential resource leaks.
       */
-    def open(file: RelFile[Sandboxed]): M[WriteHandle] =
+    def open(file: AbsFile[Sandboxed]): M[WriteHandle] =
       EitherT(lift(Open(file)))
 
     /** Write a chunk of data to the file represented by the write handle.
@@ -65,7 +65,7 @@ object WriteFile {
       * all attempts are made to continue consuming input until the source is
       * exhausted.
       */
-    def appendChannel(dst: RelFile[Sandboxed]): Channel[M, Vector[Data], Vector[FileSystemError]] = {
+    def appendChannel(dst: AbsFile[Sandboxed]): Channel[M, Vector[Data], Vector[FileSystemError]] = {
       def writeChunk(h: WriteHandle): Vector[Data] => M[Vector[FileSystemError]] =
         xs => write(h, xs).liftM[FileSystemErrT]
 
@@ -75,7 +75,7 @@ object WriteFile {
     }
 
     /** Same as `append` but accepts chunked [[Data]]. */
-    def appendChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]]): Process[M, FileSystemError] = {
+    def appendChunked(dst: AbsFile[Sandboxed], src: Process[F, Vector[Data]]): Process[M, FileSystemError] = {
       val accumPartialWrites =
         process1.id[FileSystemError]
           .map(partialWrite.getOption)
@@ -97,15 +97,15 @@ object WriteFile {
       * write all values from `src` in the presence of errors, will emit a
       * [[FileSystemError]] for each input value that failed to write.
       */
-    def append(dst: RelFile[Sandboxed], src: Process[F, Data]): Process[M, FileSystemError] =
+    def append(dst: AbsFile[Sandboxed], src: Process[F, Data]): Process[M, FileSystemError] =
       appendChunked(dst, src map (Vector(_)))
 
     /** Same as `append` but accepts a [[Foldable]] of [[Data]]. */
-    def appendF[H[_]: Foldable](dst: RelFile[Sandboxed], data: H[Data]): Process[M, FileSystemError] =
+    def appendF[H[_]: Foldable](dst: AbsFile[Sandboxed], data: H[Data]): Process[M, FileSystemError] =
       append(dst, processF(data))
 
     /** Same as `save` but accepts chunked [[Data]]. */
-    def saveChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+    def saveChunked(dst: AbsFile[Sandboxed], src: Process[F, Vector[Data]])
                    (implicit MF: ManageFile.Ops[S])
                    : Process[M, FileSystemError] = {
 
@@ -116,7 +116,7 @@ object WriteFile {
       * atomically. Any errors during writing will abort the entire operation
       * leaving any existing values unaffected.
       */
-    def save(dst: RelFile[Sandboxed], src: Process[F, Data])
+    def save(dst: AbsFile[Sandboxed], src: Process[F, Data])
             (implicit MF: ManageFile.Ops[S])
             : Process[M, FileSystemError] = {
 
@@ -124,14 +124,14 @@ object WriteFile {
     }
 
     /** Same as `save` but accepts a [[Foldable]] of [[Data]]. */
-    def saveF[H[_]: Foldable](dst: RelFile[Sandboxed], data: H[Data])
+    def saveF[H[_]: Foldable](dst: AbsFile[Sandboxed], data: H[Data])
                              (implicit MF: ManageFile.Ops[S])
                              : Process[M, FileSystemError] = {
       save(dst, processF(data))
     }
 
     /** Same as `create` but accepts chunked [[Data]]. */
-    def createChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+    def createChunked(dst: AbsFile[Sandboxed], src: Process[F, Vector[Data]])
                      (implicit MF: ManageFile.Ops[S])
                      : Process[M, FileSystemError] = {
 
@@ -144,7 +144,7 @@ object WriteFile {
     }
 
     /** Create the given file with the contents of `src`. Fails if already exists. */
-    def create(dst: RelFile[Sandboxed], src: Process[F, Data])
+    def create(dst: AbsFile[Sandboxed], src: Process[F, Data])
               (implicit MF: ManageFile.Ops[S])
               : Process[M, FileSystemError] = {
 
@@ -152,14 +152,14 @@ object WriteFile {
     }
 
     /** Same as `create` but accepts a [[Foldable]] of [[Data]]. */
-    def createF[H[_]: Foldable](dst: RelFile[Sandboxed], data: H[Data])
+    def createF[H[_]: Foldable](dst: AbsFile[Sandboxed], data: H[Data])
                                (implicit MF: ManageFile.Ops[S])
                                : Process[M, FileSystemError] = {
       create(dst, processF(data))
     }
 
     /** Same as `replace` but accepts chunked [[Data]]. */
-    def replaceChunked(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]])
+    def replaceChunked(dst: AbsFile[Sandboxed], src: Process[F, Vector[Data]])
                       (implicit MF: ManageFile.Ops[S])
                       : Process[M, FileSystemError] = {
 
@@ -174,7 +174,7 @@ object WriteFile {
     /** Replace the contents of the given file with `src`. Fails if the file
       * doesn't exist.
       */
-    def replace(dst: RelFile[Sandboxed], src: Process[F, Data])
+    def replace(dst: AbsFile[Sandboxed], src: Process[F, Data])
                (implicit MF: ManageFile.Ops[S])
                : Process[M, FileSystemError] = {
 
@@ -182,7 +182,7 @@ object WriteFile {
     }
 
     /** Same as `replace` but accepts a [[Foldable]] of [[Data]]. */
-    def replaceF[H[_]: Foldable](dst: RelFile[Sandboxed], data: H[Data])
+    def replaceF[H[_]: Foldable](dst: AbsFile[Sandboxed], data: H[Data])
                                 (implicit MF: ManageFile.Ops[S])
                                 : Process[M, FileSystemError] = {
       replace(dst, processF(data))
@@ -190,18 +190,18 @@ object WriteFile {
 
     ////
 
-    private def fileExistsM(file: RelFile[Sandboxed])
+    private def fileExistsM(file: AbsFile[Sandboxed])
                            (implicit MF: ManageFile.Ops[S])
                            : M[Boolean] = {
 
       MF.fileExists(file).liftM[FileSystemErrT]
     }
 
-    private def saveChunked0(dst: RelFile[Sandboxed], src: Process[F, Vector[Data]], sem: MoveSemantics)
+    private def saveChunked0(dst: AbsFile[Sandboxed], src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])
                             : Process[M, FileSystemError] = {
 
-      def cleanupTmp(tmp: RelFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
+      def cleanupTmp(tmp: AbsFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
         Process.eval_[M, Unit](MF.deleteFile(tmp))
           .causedBy(Cause.Error(t))
 

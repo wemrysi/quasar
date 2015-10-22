@@ -12,9 +12,9 @@ sealed trait PathError2 {
   import PathError2._
 
   def fold[X](
-    pathExists: RelPath[Sandboxed] => X,
-    pathNotFound: RelPath[Sandboxed] => X,
-    invalidPath: (RelPath[Sandboxed], String) => X
+    pathExists: AbsPath[Sandboxed] => X,
+    pathNotFound: AbsPath[Sandboxed] => X,
+    invalidPath: (AbsPath[Sandboxed], String) => X
   ): X =
     this match {
       case PathExists0(p)     => pathExists(p)
@@ -24,36 +24,36 @@ sealed trait PathError2 {
 }
 
 object PathError2 {
-  private final case class PathExists0(path: RelPath[Sandboxed])
+  private final case class PathExists0(path: AbsPath[Sandboxed])
     extends PathError2
-  private final case class PathNotFound0(path: RelPath[Sandboxed])
+  private final case class PathNotFound0(path: AbsPath[Sandboxed])
     extends PathError2
-  private final case class InvalidPath0(path: RelPath[Sandboxed], reason: String)
+  private final case class InvalidPath0(path: AbsPath[Sandboxed], reason: String)
     extends PathError2
 
-  val PathExists: RelPath[Sandboxed] => PathError2 =
+  val PathExists: AbsPath[Sandboxed] => PathError2 =
     PathExists0(_)
 
-  val DirExists: RelDir[Sandboxed] => PathError2 =
+  val DirExists: AbsDir[Sandboxed] => PathError2 =
     PathExists compose \/.left
 
-  val FileExists: RelFile[Sandboxed] => PathError2 =
+  val FileExists: AbsFile[Sandboxed] => PathError2 =
     PathExists compose \/.right
 
-  val PathNotFound: RelPath[Sandboxed] => PathError2 =
+  val PathNotFound: AbsPath[Sandboxed] => PathError2 =
     PathNotFound0(_)
 
-  val DirNotFound: RelDir[Sandboxed] => PathError2 =
+  val DirNotFound: AbsDir[Sandboxed] => PathError2 =
     PathNotFound compose \/.left
 
-  val FileNotFound: RelFile[Sandboxed] => PathError2 =
+  val FileNotFound: AbsFile[Sandboxed] => PathError2 =
     PathNotFound compose \/.right
 
-  val InvalidPath: (RelPath[Sandboxed], String) => PathError2 =
+  val InvalidPath: (AbsPath[Sandboxed], String) => PathError2 =
     InvalidPath0(_, _)
 
   implicit val pathErrorShow: Show[PathError2] = {
-    val typeStr: RelPath[Sandboxed] => String =
+    val typeStr: AbsPath[Sandboxed] => String =
       _.fold(κ("Dir"), κ("File"))
 
     Show.shows(_.fold(

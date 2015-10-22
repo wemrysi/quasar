@@ -55,7 +55,7 @@ trait ReadFileExamples { self: mutable.Specification =>
 
   "ReadFile interpreter" should {
     "open returns FileNotFound when file DNE" >>* {
-      val dne = dir("doesnt") </> file("exist")
+      val dne = rootDir </> dir("doesnt") </> file("exist")
       open(dne, Natural._0, None).run map { r =>
         r.toEither must beLeft(PathError(FileNotFound(dne)))
       }
@@ -136,14 +136,14 @@ trait ReadFileExamples { self: mutable.Specification =>
 }
 
 object ReadFileExamples {
-  final case class TestDatum(file: RelFile[Sandboxed], data: Stream[Data])
+  final case class TestDatum(file: AbsFile[Sandboxed], data: Stream[Data])
 
   val emptyFile = TestDatum(
-    file("empty"),
+    rootDir </> file("empty"),
     Stream())
 
   val smallFile = TestDatum(
-    dir("testfiles") </> file("small"),
+    rootDir </> dir("testfiles") </> file("small"),
     Stream.range(1, 100) map (Data.Int(_)))
 
   val largeFile = {
@@ -161,11 +161,11 @@ object ReadFileExamples {
       Data.Obj(ListMap("seq" -> Data.Int(i), "filler" -> jsonTree(3)))
 
     TestDatum(
-      dir("testfiles") </> file("large"),
+      rootDir </> dir("testfiles") </> file("large"),
       Stream.range(1, numDocs) map (json))
   }
 
   val veryLongFile = TestDatum(
-    dir("testfiles") </> dir("length") </> file("very.long"),
+    rootDir </> dir("testfiles") </> dir("length") </> file("very.long"),
     Stream.range(1, 1000000) map (Data.Int(_)))
 }
