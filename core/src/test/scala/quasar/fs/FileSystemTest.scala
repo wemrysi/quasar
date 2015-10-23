@@ -15,8 +15,8 @@ import scalaz.syntax.std.option._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
-trait FileSystemSpec extends Specification with ScalaCheck {
-  import FileSystemSpec._, inmemory._
+trait FileSystemTest extends Specification with ScalaCheck {
+  import FileSystemTest._, inmemory._
 
   // NB: These are mostly to make composition/implicit search nicer
   type F[A]   = Free[FileSystem, A]
@@ -75,7 +75,7 @@ trait FileSystemSpec extends Specification with ScalaCheck {
     runLogWithRW(List(), ws, p)
 }
 
-object FileSystemSpec {
+object FileSystemTest {
   import ReadFile._, WriteFile._
 
   type Reads      = List[FileSystemError \/ Vector[Data]]

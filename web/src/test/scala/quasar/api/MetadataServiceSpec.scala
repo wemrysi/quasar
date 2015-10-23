@@ -12,7 +12,7 @@ import scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
 
-class MetadataServiceSpec extends FileSystemSpec with Http4s {
+class MetadataServiceSpec extends FileSystemTest with Http4s {
   import inmemory._, ManageFile.Node, DataGen._
 
   def runService(mem: InMemState): ManageFile ~> Task =

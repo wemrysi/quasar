@@ -9,7 +9,7 @@ import scalaz.std.vector._
 import scalaz.syntax.either._
 import pathy.Path._
 
-class ReadFileSpec extends FileSystemSpec {
+class ReadFileSpec extends FileSystemTest {
   import DataGen._, PathyGen._, FileSystemError._, PathError2._
 
   "ReadFile" should {

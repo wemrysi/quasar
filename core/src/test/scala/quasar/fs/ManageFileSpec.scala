@@ -8,7 +8,7 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 import pathy.Path._
 
-class ManageFileSpec extends FileSystemSpec {
+class ManageFileSpec extends FileSystemTest {
   import inmemory._, DataGen._, PathyGen._, FileSystemError._, PathError2._, ManageFile.Node
 
   "ManageFile" should {

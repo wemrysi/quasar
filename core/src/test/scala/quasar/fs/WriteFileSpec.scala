@@ -9,7 +9,7 @@ import scalaz.std.vector._
 import scalaz.syntax.functor._
 import pathy.Path._
 
-class WriteFileSpec extends FileSystemSpec {
+class WriteFileSpec extends FileSystemTest {
   import DataGen._, PathyGen._, FileSystemError._, PathError2._
 
   "WriteFile" should {
