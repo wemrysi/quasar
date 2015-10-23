@@ -2,6 +2,7 @@ package quasar
 package fs
 
 import quasar.Predef._
+import quasar.fp._
 
 import scalaz._, Scalaz._
 import pathy.Path._
@@ -63,7 +64,7 @@ object inmemory {
                   Vector.empty.right.point[InMemoryFs]
                 else
                   (rPosL(h) := (pos + rCount))
-                    .map(_ => xs.slice(rIdx, rIdx + rCount).right)
+                    .map(κ(xs.slice(rIdx, rIdx + rCount).right))
 
               case None =>
                 fsFileNotFound(f)
@@ -110,17 +111,11 @@ object inmemory {
         path.fold(deleteDir, deleteFile)
 
       case ListContents(dir) =>
-        fmL.st flatMap (
-          _.keys.flatMap(_ relativeTo dir)
-            .toList.toNel
-            .cata(
-              _.foldMap(Node.File andThen (Set(_)))
-                .right.point[InMemoryFs],
-              fsDirNotFound(dir)))
+        ls(dir)
 
       case TempFile(nearTo) =>
         nextSeq map (n => nearTo.cata(
-          renameFile(_, _ => FileName(tmpName(n))),
+          renameFile(_, κ(FileName(tmpName(n)))),
           tmpDir </> file(tmpName(n))))
     }
   }
@@ -178,26 +173,19 @@ object inmemory {
   private def fsFileExists[A](f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
     PathError(FileExists(f)).left.point[InMemoryFs]
 
-  private def fsDirNotFound[A](d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ A] =
-    PathError(DirNotFound(d)).left.point[InMemoryFs]
-
   private def moveDir(src: AbsDir[Sandboxed], dst: AbsDir[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
       m     <- fmL.st
       sufxs =  m.keys.flatMap(_ relativeTo src).toStream
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
-      r1    <- r0.fold(_.left.point[InMemoryFs],
-                       xs => if (xs.isEmpty) fsDirNotFound(src)
-                             else ().right.point[InMemoryFs])
+      r1    =  r0 flatMap (_.isEmpty either (()) or PathError(DirNotFound(src)))
     } yield r1
 
   private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
     val move0: InMemoryFs[FileSystemError \/ Unit] = for {
       v <- fileL(src) <:= None
-      r <- v.cata(
-             xs => (fileL(dst) := Some(xs)) as ().right,
-             fsFileNotFound(src))
+      r <- v.cata(xs => (fileL(dst) := Some(xs)) as ().right, fsFileNotFound(src))
     } yield r
 
     s.fold(
@@ -211,12 +199,22 @@ object inmemory {
       m  <- fmL.st
       ss =  m.keys.flatMap(_ relativeTo d).toStream
       r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
-      r1 <- r0.fold(_.left.point[InMemoryFs],
-                    xs => if (xs.isEmpty) fsDirNotFound(d)
-                          else ().right.point[InMemoryFs])
+      r1 =  r0 flatMap (_.isEmpty either (()) or PathError(DirNotFound(d)))
     } yield r1
 
   private def deleteFile(f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
-    (fileL(f) <:= None)
-      .flatMap(_ ? ().right[FileSystemError].point[InMemoryFs] | fsFileNotFound(f))
+    (fileL(f) <:= None) map (_.void \/> PathError(FileNotFound(f)))
+
+  private def ls(d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ Set[Node]] = {
+    def firstSegmentAsNode(f: RelFile[Sandboxed]): Option[Node] =
+      flatten(none, none, none,
+        n => Node.Dir(dir(n)).some,
+        n => Node.File(file(n)).some,
+        f).unite.headOption
+
+    fmL.st map (
+      _.keys.flatMap(_ relativeTo d).toList.toNel
+        .map(_ foldMap (f => firstSegmentAsNode(f).toSet))
+        .toRightDisjunction(PathError(DirNotFound(d))))
+  }
 }
