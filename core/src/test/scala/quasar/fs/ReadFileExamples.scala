@@ -12,7 +12,7 @@ import org.specs2.specification._
 
 import pathy.Path._
 
-import scalaz._, Scalaz._
+import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
@@ -88,8 +88,10 @@ trait ReadFileExamples { self: mutable.Specification =>
     "scan with offset k > 0 and no limit skips first k data" >> {
       val k = Natural._9 * Natural._2
       val r = runP(scan(smallFile.file, k, None))
+      val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
+                .dropWhile(_._2 < k.run.toInt).map(_._1)
 
-      r.run.run.toEither must beRight(smallFile.data.drop(k.run.toInt).toIndexedSeq)
+      r.run.run.toEither must beRight(d.toIndexedSeq)
     }
 
     "scan with offset zero and limit j stops after j data" >> {
@@ -102,9 +104,11 @@ trait ReadFileExamples { self: mutable.Specification =>
     "scan with offset k and limit j takes j data, starting from k" >> {
       val j = Positive._5 * Positive._5 * Positive._5
       val r = runP(scan(largeFile.file, Natural.fromPositive(j), Some(j)))
-      val d = largeFile.data.drop(j.run.toInt).take(j.run.toInt).toIndexedSeq
+      val d = largeFile.data.zip(EStream.iterate(0)(_ + 1))
+                .dropWhile(_._2 < j.run.toInt).map(_._1)
+                .take(j.run.toInt)
 
-      r.run.run.toEither must beRight(d)
+      r.run.run.toEither must beRight(d.toIndexedSeq)
     }
 
     "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
@@ -136,15 +140,15 @@ trait ReadFileExamples { self: mutable.Specification =>
 }
 
 object ReadFileExamples {
-  final case class TestDatum(file: AbsFile[Sandboxed], data: Stream[Data])
+  final case class TestDatum(file: AbsFile[Sandboxed], data: EStream[Data])
 
   val emptyFile = TestDatum(
     rootDir </> file("empty"),
-    Stream())
+    EStream())
 
   val smallFile = TestDatum(
     rootDir </> dir("testfiles") </> file("small"),
-    Stream.range(1, 100) map (Data.Int(_)))
+    EStream.range(1, 100) map (Data.Int(_)))
 
   val largeFile = {
     val sizeInMb = 10.0
@@ -162,10 +166,10 @@ object ReadFileExamples {
 
     TestDatum(
       rootDir </> dir("testfiles") </> file("large"),
-      Stream.range(1, numDocs) map (json))
+      EStream.range(1, numDocs) map (json))
   }
 
   val veryLongFile = TestDatum(
     rootDir </> dir("testfiles") </> dir("length") </> file("very.long"),
-    Stream.range(1, 1000000) map (Data.Int(_)))
+    EStream.range(1, 100000) map (Data.Int(_)))
 }
