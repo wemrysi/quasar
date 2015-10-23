@@ -109,8 +109,8 @@ object Server {
     def start(port0: Int, config: Config): EnvTask[(Int, Http4sServer)] =
       for {
         port    <- choosePort(port0).liftM[EnvErrT]
-        fsApi   =  FileSystemApi(config, mounter, tester, reload, configWriter)
-        server  <- createServer(port, idleTimeout, fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc))
+        fsApi   =  ??? //FileSystemApi(config, mounter, tester, reload, configWriter)
+        server  <- createServer(port, idleTimeout, ???/*fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc)*/)
         _       <- stdout("Server started listening on port " + port).liftM[EnvErrT]
       } yield (port, server)
 

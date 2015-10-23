@@ -1,8 +1,10 @@
 package quasar.api
 
+import org.specs2.ScalaCheck
 import quasar.Predef._
 
 import org.specs2.mutable._
+import quasar.fs.Positive
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
@@ -11,9 +13,11 @@ import scalaz.stream.{Process}
 import scodec.bits._
 import scodec.interop.scalaz._
 
-import quasar.fs.{Path}
+import pathy.Path._
+import quasar.fs.PathyGen._
+import quasar.fs.NumericGen._
 
-class ZipSpecs extends Specification {
+class ZipSpecs extends Specification with ScalaCheck {
   args.report(showtimes=true)
 
   "zipFiles" should {
@@ -22,27 +26,24 @@ class ZipSpecs extends Specification {
     def rand = new java.util.Random
     def randBlock = Array.fill[Byte](1000)(rand.nextInt.toByte)
 
-    val f1: Process[Task, ByteVector] = Process.emit(ByteVector.view(Array[Byte](0)))
-    val f2: Process[Task, ByteVector] = Process.emit(ByteVector.view(Array.fill[Byte](1000)(0)))
-    def f3: Process[Task, ByteVector] = Process.emit(ByteVector.view(randBlock))
     def f4: Process[Task, ByteVector] = {
       val block = ByteVector.view(randBlock)
       Process.emitAll(Vector.fill(1000)(block))
     }
 
-    def unzip[A](f: java.io.InputStream => A)(p: Process[Task, ByteVector]): Task[List[(Path, A)]] =
+    def unzip[A](f: java.io.InputStream => A)(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], A)]] =
       Task.delay {
         val bytes = p.runLog.run.toList.concatenate  // FIXME: this means we can't use this to test anything big
         val is = new java.io.ByteArrayInputStream(bytes.toArray)
         val zis = new java.util.zip.ZipInputStream(is)
         Stream.continually(zis.getNextEntry).takeWhile(_ != null).map { entry =>
-          Path(entry.getName) -> f(zis)
+          (posixCodec.parseRelFile(entry.getName).get relativeTo currentDir[Sandboxed]).get -> f(zis)
         }.toList
       }
 
     // For testing, capture all the bytes from a process, parse them with a
     // ZipInputStream, and capture just the size of the contents of each file.
-    def counts(p: Process[Task, ByteVector]): Task[List[(Path, Long)]] = {
+    def counts(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], Long)]] = {
       def count(is: java.io.InputStream): Long = {
         def loop(n: Long): Long = if (is.read ≟ -1) n else loop(n+1)
         loop(0)
@@ -50,7 +51,7 @@ class ZipSpecs extends Specification {
       unzip(count)(p)
     }
 
-    def bytes(p: Process[Task, ByteVector]): Task[List[(Path, ByteVector)]] = {
+    def bytes(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], ByteVector)]] = {
       def read(is: java.io.InputStream): ByteVector = {
         def loop(acc: ByteVector): ByteVector = {
           val buffer = new Array[Byte](16*1024)
@@ -62,34 +63,20 @@ class ZipSpecs extends Specification {
       unzip(read)(p)
     }
 
-    "zip one file" in {
-      val z = zipFiles(List(Path("foo") -> f1))
-      counts(z).run must_== List(Path("foo") -> 1)
+    "zip files of constant bytes" ! prop { (filesAndSize: Map[RelFile[Sandboxed], Positive], byte: Byte) =>
+      def byteStream(size: Positive): Process[Task, ByteVector] =
+        Process.emit(ByteVector.view(Array.fill(size.toInt)(byte)))
+      val bytesMapping = filesAndSize.mapValues(byteStream)
+      val z = zipFiles(bytesMapping.toList)
+      counts(z).run must_== filesAndSize.toList
     }
 
-    "zip two files" in {
-      val z = zipFiles(List(
-        Path("foo") -> f1,
-        Path("bar") -> f1))
-      counts(z).run must_== List(Path("foo") -> 1, Path("bar") -> 1)
-    }
-
-    "zip one larger file" in {
-      val z = zipFiles(List(
-        Path("foo") -> f2))
-      counts(z).run must_== List(Path("foo") -> 1000)
-    }
-
-    "zip one file of random bytes" in {
-      val z = zipFiles(List(
-        Path("foo") -> f3))
-      counts(z).run must_== List(Path("foo") -> 1000)
-    }
-
-    "zip one large file of random bytes" in {
-      val z = zipFiles(List(
-        Path("foo") -> f4))
-      counts(z).run must_== List(Path("foo") -> 1000*1000)
+    "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
+      def byteStream(size: Positive): Process[Task, ByteVector] =
+        Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
+      val bytesMapping = filesAndSize.mapValues(byteStream)
+      val z = zipFiles(bytesMapping.toList)
+      counts(z).run must_== filesAndSize.toList
     }
 
     "zip many large files of random bytes (100 MB)" in {
@@ -99,7 +86,7 @@ class ZipSpecs extends Specification {
       val MinExpectedSize = (RawSize*0.005).toInt
       val MaxExpectedSize = (RawSize*0.010).toInt
 
-      val paths = (0 until Files).toList.map(i => Path("foo" + i))
+      val paths = (0 until Files).toList.map(i => file[Sandboxed]("foo" + i))
       val z = zipFiles(paths.map(_ -> f4))
 
       // NB: can't use my naive `list` function on a large file
@@ -115,18 +102,18 @@ class ZipSpecs extends Specification {
       val MinExpectedSize = (RawSize*0.005).toInt
       val MaxExpectedSize = (RawSize*0.010).toInt
 
-      val paths = (0 until Files).toList.map(i => Path("foo" + i))
+      val paths = (0 until Files).toList.map(i => file[Sandboxed]("foo" + i))
       val z = zipFiles(paths.map(_ -> f4))
 
       // NB: can't use my naive `list` function on a large file
       z.map(_.size).sum.runLog.run(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
-    "read twice without conflict" in {
-      val z = zipFiles(List(
-        Path("foo") -> f2,
-        Path("bar") -> f2))
-
+    "read twice without conflict" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
+      def byteStream(size: Positive): Process[Task, ByteVector] =
+        Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
+      val bytesMapping = filesAndSize.mapValues(byteStream)
+      val z = zipFiles(bytesMapping.toList)
       bytes(z).run must_== bytes(z).run
     }
   }
