@@ -8,11 +8,13 @@ import argonaut._, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.server._
+import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 import scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
 
-class MetadataServiceSpec extends FileSystemTest with Http4s {
+class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import inmemory._, ManageFile.Node, DataGen._
 
   def runService(mem: InMemState): ManageFile ~> Task =

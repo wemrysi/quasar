@@ -5,8 +5,6 @@ import quasar.Predef._
 import quasar.fp._
 import scala.collection.IndexedSeq
 
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
 import scalaz._
 import scalaz.std.list._
 import scalaz.std.vector._
@@ -15,8 +13,8 @@ import scalaz.syntax.std.option._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
-trait FileSystemTest extends Specification with ScalaCheck {
-  import FileSystemTest._, inmemory._
+trait FileSystemFixture {
+  import FileSystemFixture._, inmemory._
 
   // NB: These are mostly to make composition/implicit search nicer
   type F[A]   = Free[FileSystem, A]
@@ -75,7 +73,7 @@ trait FileSystemTest extends Specification with ScalaCheck {
     runLogWithRW(List(), ws, p)
 }
 
-object FileSystemTest {
+object FileSystemFixture {
   import ReadFile._, WriteFile._
 
   type Reads      = List[FileSystemError \/ Vector[Data]]

@@ -4,12 +4,14 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 import scalaz._
 import scalaz.std.vector._
 import scalaz.syntax.functor._
 import pathy.Path._
 
-class WriteFileSpec extends FileSystemTest {
+class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
   import DataGen._, PathyGen._, FileSystemError._, PathError2._
 
   "WriteFile" should {

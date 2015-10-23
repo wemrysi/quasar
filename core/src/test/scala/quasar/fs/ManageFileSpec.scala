@@ -4,11 +4,13 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
 import scalaz.stream._
 import pathy.Path._
 
-class ManageFileSpec extends FileSystemTest {
+class ManageFileSpec extends Specification with ScalaCheck with FileSystemFixture {
   import inmemory._, DataGen._, PathyGen._, FileSystemError._, PathError2._, ManageFile.Node
 
   "ManageFile" should {
