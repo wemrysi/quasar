@@ -114,19 +114,19 @@ object QueryFile {
     def ls: M[Set[Node]] =
       ls(rootDir)
 
-    /** Returns the children of the given directory and all of their
-      * descendants, fails if the directory does not exist.
+    /** Returns all files in this directory and all of it's sub-directories
+      * Fails if the directory does not exist.
       */
-    def lsAll(dir: AbsDir[Sandboxed]): M[Set[Node]] = {
+    def descendantFiles(dir: AbsDir[Sandboxed]): M[Set[RelFile[Sandboxed]]] = {
       type S[A] = StreamT[M, A]
 
-      def lsR(desc: RelDir[Sandboxed]): StreamT[M, Node] =
+      def lsR(desc: RelDir[Sandboxed]): StreamT[M, RelFile[Sandboxed]] =
         StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
           .flatMap(_.path.fold(
             d => lsR(desc </> d),
-            f => Node.File(desc </> f).point[S]))
+            f => (desc </> f).point[S]))
 
-      lsR(currentDir).foldLeft(Set.empty[Node])(_ + _)
+      lsR(currentDir).foldLeft(Set.empty[RelFile[Sandboxed]])(_ + _)
     }
 
     /** Returns whether the given file exists. */

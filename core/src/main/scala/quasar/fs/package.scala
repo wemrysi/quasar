@@ -12,6 +12,7 @@ package object fs {
 
   type FileSystem0[A] = Coproduct[WriteFileF, ManageFileF, A]
   type FileSystem1[A] = Coproduct[ReadFileF, FileSystem0, A]
+  /** FileSystem[A] = [[ReadFileF]] \/ [[WriteFileF]] \/ [[ManageFileF]] \/ [[QueryFileF]] */
   type FileSystem[A]  = Coproduct[QueryFileF, FileSystem1, A]
 
   type RelPath[S] = RelDir[S] \/ RelFile[S]

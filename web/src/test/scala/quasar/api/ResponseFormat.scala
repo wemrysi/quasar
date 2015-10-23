@@ -7,34 +7,36 @@ class ResponseFormatSpecs extends org.specs2.mutable.Specification {
   import org.http4s.headers.{Accept}
 
   import MessageFormat._
+  import JsonPrecision._
+  import JsonFormat._
 
   "fromAccept" should {
-    "be Readable by default" in {
-      fromAccept(None) must_== JsonStream.Readable
+    "use default if no accept provided" in {
+      fromAccept(None) must_== MessageFormat.Default
     }
 
     "choose precise" in {
       val accept = Accept(
         new MediaType("application", "ldjson").withExtensions(Map("mode" -> "precise")))
-      fromAccept(Some(accept)) must_== JsonStream.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose streaming via boundary extension" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("boundary" -> "NL")))
-      fromAccept(Some(accept)) must_== JsonStream.Readable
+      fromAccept(Some(accept)) must_== JsonContentType(Readable, LineDelimited)
     }
 
     "choose precise list" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("mode" -> "precise")))
-      fromAccept(Some(accept)) must_== JsonArray.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, SingleArray)
     }
 
     "choose streaming and precise via extensions" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("mode" -> "precise", "boundary" -> "NL")))
-      fromAccept(Some(accept)) must_== JsonStream.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose CSV" in {
@@ -64,7 +66,7 @@ class ResponseFormatSpecs extends org.specs2.mutable.Specification {
       val accept = Accept(
         new MediaType("text", "csv").withQValue(q(0.9)),
         new MediaType("application", "ldjson"))
-      fromAccept(Some(accept)) must_== JsonStream.Readable
+      fromAccept(Some(accept)) must_== JsonContentType(Readable, LineDelimited)
     }
   }
 

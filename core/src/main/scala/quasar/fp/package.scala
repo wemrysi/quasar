@@ -288,7 +288,7 @@ trait JsonOps {
 trait ProcessOps {
   import scalaz.stream.{Process, Cause}
 
-  class PrOps[F[_], O](self: Process[F, O]) {
+  implicit class PrOps[F[_], O](self: Process[F, O]) {
     def cleanUpWith(t: F[Unit]): Process[F, O] =
       self.onComplete(Process.eval(t).drain)
 
@@ -314,9 +314,6 @@ trait ProcessOps {
       }
     }
   }
-
-  implicit class PrOpsTask[O](self: Process[Task, O])
-      extends PrOps[Task, O](self)
 }
 
 trait SKI {

@@ -323,7 +323,7 @@ object MongoDb {
 
       val finalized = cfg.finalizer.cata(it.finalizeFunction, it)
       val filtered  = cfg.inputFilter.cata(finalized.filter, finalized)
-      val limited   = cfg.inputLimit.cata(l => filtered.limit(l.run.toInt), filtered)
+      val limited   = cfg.inputLimit.cata(l => filtered.limit(l.value.toInt), filtered)
       val scoped    = cfg.scope.cata(limited.scope, limited)
       val sorted    = cfg.sort.cata(scoped.sort, scoped)
 

@@ -6,21 +6,21 @@ import quasar.Predef._
 import scalaz._
 import scalaz.Tags.{Multiplication => Mult}
 
-final class Positive private (val run: Long) {
+final class Positive private (val value: Long) {
   def plus(other: Positive): Positive =
-    new Positive(run + other.run)
+    new Positive(value + other.value)
 
   def + (other: Positive): Positive =
     plus(other)
 
   def times(other: Positive): Positive =
-    new Positive(run * other.run)
+    new Positive(value * other.value)
 
   def * (other: Positive): Positive =
     times(other)
 
   def toInt: Int =
-    run.toInt
+    value.toInt
 }
 
 object Positive {

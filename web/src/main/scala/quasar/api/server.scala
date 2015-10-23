@@ -127,9 +127,9 @@ class ServerOps[WC: CodecJson, SC](
     def start(config: WC): EnvTask[(Int, Http4sServer)] =
       for {
         port    <- choosePort(wcPort.get(config)).liftM[EnvErrT]
-        fsApi   =  FileSystemApi(config, mounter, tester, reload, configWriter, webConfigLens)
+        fsApi   =  ??? //FileSystemApi(config, mounter, tester, reload, configWriter, webConfigLens)
         updCfg  =  wcPort.set(port)(config)
-        server  <- createServer(updCfg, idleTimeout, fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc))
+        server  <- createServer(updCfg, idleTimeout, ???/*fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc)*/)
         _       <- stdout("Server started listening on port " + port).liftM[EnvErrT]
       } yield (port, server)
 

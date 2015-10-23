@@ -6,21 +6,21 @@ import quasar.Predef._
 import scalaz._
 import scalaz.Tags.{Multiplication => Mult}
 
-final class Natural private (val run: Long) {
+final class Natural private (val value: Long) {
   def plus(other: Natural): Natural =
-    new Natural(run + other.run)
+    new Natural(value + other.value)
 
   def + (other: Natural): Natural =
     plus(other)
 
   def times(other: Natural): Natural =
-    new Natural(run * other.run)
+    new Natural(value * other.value)
 
   def * (other: Natural): Natural =
     times(other)
 
   def toInt: Int =
-    run.toInt
+    value.toInt
 }
 
 object Natural {
@@ -39,7 +39,7 @@ object Natural {
   val _9: Natural = new Natural(9)
 
   def fromPositive(n: Positive): Natural =
-    new Natural(n.run)
+    new Natural(n.value)
 
   implicit val naturalAddition: Monoid[Natural] =
     Monoid.instance(_ + _, _0)
