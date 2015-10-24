@@ -400,4 +400,10 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
     new (Free[S, ?] ~> M) {
       def apply[A](fa: Free[S, A]) = fa foldMap f
     }
+
+  /** `Inject#inj` as a natural transformation. */
+  def injectNT[F[_], G[_]](implicit I: F :<: G): F ~> G =
+    new (F ~> G) {
+      def apply[A](fa: F[A]) = I inj fa
+    }
 }

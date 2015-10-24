@@ -8,6 +8,11 @@ object interpret {
   type Coproduct4[F[_], G[_], H[_], I[_], A] = Coproduct[F, Coproduct3[G, H, I, ?], A]
   type Coproduct5[F[_], G[_], H[_], I[_], J[_], A] = Coproduct[F, Coproduct4[G, H, I, J, ?], A]
 
+  def injectedNT[F[_], G[_]](f: F ~> F)(implicit G: F :<: G): G ~> G =
+    new (G ~> G) {
+      def apply[A](ga: G[A]) = G.prj(ga).fold(ga)(fa => G.inj(f(fa)))
+    }
+
   def interpret2[F[_], G[_], M[_]](f: F ~> M, g: G ~> M): Coproduct[F, G, ?] ~> M =
     new (Coproduct[F, G, ?] ~> M) {
       def apply[A](fa: Coproduct[F, G, A]) =

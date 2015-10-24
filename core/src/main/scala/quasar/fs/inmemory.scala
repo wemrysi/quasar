@@ -5,6 +5,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 import pathy.Path._
 
 /** In-Memory Read/Write/ManageFile interpreters, useful for testing/stubbing
@@ -119,6 +120,16 @@ object inmemory {
           tmpDir </> file(tmpName(n))))
     }
   }
+
+  val runStatefully: Task[InMemoryFs ~> Task] =
+    TaskRef(InMemState.empty) map { ref =>
+      new (InMemoryFs ~> Task) {
+        def apply[A](mfs: InMemoryFs[A]) =
+          ref.read map (mfs.run) flatMap {
+            case (s, a) => ref.write(s).as(a)
+          }
+      }
+    }
 
   ////
 
