@@ -125,9 +125,7 @@ object inmemory {
     TaskRef(InMemState.empty) map { ref =>
       new (InMemoryFs ~> Task) {
         def apply[A](mfs: InMemoryFs[A]) =
-          ref.read map (mfs.run) flatMap {
-            case (s, a) => ref.write(s).as(a)
-          }
+          ref.modifyS(mfs.run)
       }
     }
 

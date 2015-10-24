@@ -21,8 +21,6 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
   import FileSystemSpec._, FileSystemError._, PathError2._
   import ReadFile._
 
-  sequential
-
   implicit class FSExample(s: String) {
     def >>*[A: AsResult](fa: => F[A])(implicit run: Run): Example =
       s >> run(fa).run
