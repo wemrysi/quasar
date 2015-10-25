@@ -6,10 +6,7 @@ import quasar.fp._
 
 import argonaut._, Argonaut._
 import scala.Ordering
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.applicative._
-import scalaz.syntax.either._
+import scalaz._, Scalaz._
 import pathy.{Path => PPath}, PPath._
 
 sealed trait ManageFile[A]
@@ -119,6 +116,12 @@ object ManageFile {
 
     val File: RelFile[Sandboxed] => Node =
       Plain compose \/.right
+
+    def fromFirstSegmentOf(f: RelFile[Sandboxed]): Option[Node] =
+      flatten(none, none, none,
+        n => Dir(dir(n)).some,
+        n => File(file(n)).some,
+        f).unite.headOption
 
     implicit val nodeEncodeJson: EncodeJson[Node] =
       EncodeJson(node => Json(

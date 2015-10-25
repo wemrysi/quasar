@@ -7,7 +7,7 @@ import quasar.Predef._
 import quasar.fp.TaskRef
 import quasar.fs._
 
-import com.mongodb.MongoServerException
+import com.mongodb.{MongoCommandException, MongoServerException}
 import com.mongodb.async.client.MongoClient
 import scalaz._, Scalaz._
 import scalaz.stream._
@@ -43,13 +43,13 @@ object managefile {
       case ListContents(dir) =>
         (dirName(dir) match {
           case Some(_) =>
-            collectionsInDir(dir).map(_.flatMap(c =>
-              c.asFile flatMap (_ relativeTo rootDir) map Node.File
-            ).toSet).run
+            collectionsInDir(dir)
+              .map(_ foldMap (collectionToNode(dir) andThen (_.toSet)))
+              .run
 
           case None if depth(dir) == 0 =>
             collections
-              .map(_.asFile flatMap (_ relativeTo rootDir) map Node.File)
+              .map(collectionToNode(dir))
               .pipe(process1.stripNone)
               .runLog
               .map(_.toSet.right[FileSystemError])
@@ -96,8 +96,7 @@ object managefile {
                      : M[Unit] = {
     for {
       colls    <- collectionsInDir(src)
-      srcFiles <- if (colls.nonEmpty) colls.flatMap(_.asFile).point[M]
-                  else MonadError[G, FileSystemError].raiseError(PathError(DirNotFound(src)))
+      srcFiles =  colls flatMap (_.asFile)
       dstFiles =  srcFiles flatMap (_ relativeTo (src) map (dst </> _))
       _        <- srcFiles zip dstFiles traverseU {
                     case (s, d) => moveFile(s, d, sem)
@@ -107,6 +106,12 @@ object managefile {
 
   private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], sem: MoveSemantics)
                       : M[Unit] = {
+
+    // TODO: Is there a more structured indicator for these errors, the code
+    //       appears to be '-1', which is suspect.
+    val srcNotFoundErr = "source namespace does not exist"
+    val dstExistsErr = "target namespace exists"
+
     /** Error codes obtained from MongoDB `renameCollection` docs:
       * See http://docs.mongodb.org/manual/reference/command/renameCollection/
       */
@@ -116,6 +121,12 @@ object managefile {
           PathError(FileNotFound(src)).left.point[MongoDb]
 
         case -\/(e: MongoServerException) if e.getCode == 10027 =>
+          PathError(FileExists(dst)).left.point[MongoDb]
+
+        case -\/(e: MongoCommandException) if e.getErrorMessage == srcNotFoundErr =>
+          PathError(FileNotFound(src)).left.point[MongoDb]
+
+        case -\/(e: MongoCommandException) if e.getErrorMessage == dstExistsErr =>
           PathError(FileExists(dst)).left.point[MongoDb]
 
         case -\/(t) =>
@@ -131,13 +142,22 @@ object managefile {
                 .runLast
                 .map(_.toRightDisjunction(PathError(FileNotFound(dst))).void))
 
-    for {
-      srcColl <- collFromFileM(src)
-      dstColl <- collFromFileM(dst)
-      rSem    =  moveToRename(sem)
-      _       <- sem.fold(().point[M], ().point[M], ensureDstExists(dstColl))
-      _       <- reifyMongoErr(rename(srcColl, dstColl, rSem))
-    } yield ()
+    if (src == dst)
+      collFromFileM(src) flatMap (srcColl =>
+        collectionExists(srcColl).liftM[FileSystemErrT].ifM(
+          sem.fold(
+            ().point[M],
+            MonadError[G, FileSystemError].raiseError(PathError(FileExists(src))),
+            ().point[M]),
+          MonadError[G, FileSystemError].raiseError(PathError(FileNotFound(src)))))
+    else
+      for {
+        srcColl <- collFromFileM(src)
+        dstColl <- collFromFileM(dst)
+        rSem    =  moveToRename(sem)
+        _       <- sem.fold(().point[M], ().point[M], ensureDstExists(dstColl))
+        _       <- reifyMongoErr(rename(srcColl, dstColl, rSem))
+      } yield ()
   }
 
   // TODO: Really need a Path#fold[A] method, which will be much more reliable
@@ -159,13 +179,23 @@ object managefile {
     }
 
   private def deleteFile(file: AbsFile[Sandboxed]): M[Unit] =
-    collFromFileM(file) flatMap (c => dropCollection(c).liftM[FileSystemErrT])
+    collFromFileM(file) flatMap (c =>
+      collectionExists(c).liftM[FileSystemErrT].ifM(
+        dropCollection(c).liftM[FileSystemErrT],
+        PathError(FileNotFound(file)).raiseError[G, Unit]))
 
   private def collectionsInDir(dir: AbsDir[Sandboxed]): M[Vector[Collection]] =
-    collFromDirM(dir) flatMap (c =>
-      collectionsIn(c.databaseName)
-        .filter(_.collectionName startsWith c.collectionName)
-        .runLog.map(_.toVector).liftM[FileSystemErrT])
+    for {
+      c  <- collFromDirM(dir)
+      cs <- collectionsIn(c.databaseName)
+              .filter(_.collectionName startsWith c.collectionName)
+              .runLog.map(_.toVector).liftM[FileSystemErrT]
+      _  <- if (cs.isEmpty) PathError(DirNotFound(dir)).raiseError[G, Unit]
+            else ().point[M]
+    } yield cs
+
+  private def collectionToNode(dir: AbsDir[Sandboxed]): Collection => Option[Node] =
+    _.asFile flatMap (_ relativeTo dir) flatMap Node.fromFirstSegmentOf
 
   private def collFromDirM(dir: AbsDir[Sandboxed]): M[Collection] =
     EitherT(Collection.fromDir(dir).leftMap(PathError).point[MongoDb])

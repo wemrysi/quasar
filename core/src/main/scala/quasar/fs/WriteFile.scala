@@ -4,6 +4,8 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import monocle.std.{disjunction => D}
+
 import scalaz._, Scalaz._
 import scalaz.stream._
 import pathy.Path._
@@ -201,15 +203,22 @@ object WriteFile {
                             (implicit MF: ManageFile.Ops[S])
                             : Process[M, FileSystemError] = {
 
+      val fsFileNotFound = pathError composePrism pathNotFound composePrism D.right
+
       def cleanupTmp(tmp: AbsFile[Sandboxed])(t: Throwable): Process[M, Nothing] =
         Process.eval_[M, Unit](MF.deleteFile(tmp))
           .causedBy(Cause.Error(t))
+
+      def attemptMove(tmp: AbsFile[Sandboxed]): M[Unit] =
+        MonadError[G, FileSystemError].handleError(MF.moveFile(tmp, dst, sem))(e =>
+          if (fsFileNotFound.getOption(e) exists (_ == tmp)) ().point[M]
+          else MonadError[G, FileSystemError].raiseError(e))
 
       MF.tempFileNear(dst).liftM[FileSystemErrT].liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src).terminated.take(1)
           .flatMap(_.cata(
             werr => MF.deleteFile(tmp).as(werr).liftM[Process],
-            Process.eval_[M, Unit](MF.moveFile(tmp, dst, sem))))
+            Process.eval_[M, Unit](attemptMove(tmp))))
           .onFailure(cleanupTmp(tmp))
       }
     }

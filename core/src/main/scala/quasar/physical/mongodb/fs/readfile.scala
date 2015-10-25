@@ -16,7 +16,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
-  import ReadFile._, FileSystemError._, MongoDb._
+  import ReadFile._, FileSystemError._, PathError2._, MongoDb._
 
   type BsonCursor          = AsyncBatchCursor[Document]
   type ReadState           = (Long, Map[ReadHandle, BsonCursor])
@@ -29,14 +29,9 @@ object readfile {
       case Open(file, offset, limit) =>
         Collection.fromFile(file).fold(
           err  => PathError(err).left.point[MongoRead],
-          coll => for {
-            it   <- find(coll).liftM[ReadStateT]
-            skpd =  it skip offset.run.toInt
-            ltd  =  limit cata (n => skpd.limit(n.run.toInt), skpd)
-            // TODO: Does MongoDB error if the database doesn't exist?
-            cur  <- async(ltd.batchCursor).liftM[ReadStateT]
-            h    <- recordCursor(cur)
-          } yield h.right)
+          coll => collectionExists(coll).liftM[ReadStateT].ifM(
+                    openCursor(coll, offset, limit) map (_.right[FileSystemError]),
+                    PathError(FileNotFound(file)).left.point[MongoRead]))
 
       case Read(h) =>
         lookupCursor(h)
@@ -87,6 +82,15 @@ object readfile {
 
   private def lookupCursor(h: ReadHandle): OptionT[MongoRead, BsonCursor] =
     OptionT[MongoRead, BsonCursor](readState map (cursorL(h).get))
+
+  private def openCursor(c: Collection, off: Natural, lim: Option[Positive]): MongoRead[ReadHandle] =
+    for {
+      it   <- find(c).liftM[ReadStateT]
+      skpd =  it skip off.run.toInt
+      ltd  =  lim cata (n => skpd.limit(n.run.toInt), skpd)
+      cur  <- async(ltd.batchCursor).liftM[ReadStateT]
+      h    <- recordCursor(cur)
+    } yield h
 
   private def nextChunk(c: BsonCursor): MongoRead[Vector[Data]] = {
     val withoutId: Document => Document =

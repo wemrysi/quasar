@@ -3,7 +3,7 @@ import Keys._
 import de.heikoseeberger.sbtheader.license.Apache2_0
 import de.heikoseeberger.sbtheader.HeaderPlugin
 
-val scalazVersion  = "7.1.3"
+val scalazVersion  = "7.1.4"
 val slcVersion     = "0.4"
 val monocleVersion = "1.1.1"
 

@@ -4,8 +4,13 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
-import scalaz._
+import monocle.{Prism, Lens}
+
 import pathy.Path._
+
+import scalaz._
+import scalaz.syntax.std.option._
+import scalaz.std.option._
 
 // TODO: Rename to [[PathError]] once we've deprecated the other [[Path]] type.
 sealed trait PathError2 {
@@ -51,6 +56,19 @@ object PathError2 {
 
   val InvalidPath: (AbsPath[Sandboxed], String) => PathError2 =
     InvalidPath0(_, _)
+
+  val pathExists: Prism[PathError2, AbsPath[Sandboxed]] =
+    Prism((_: PathError2).fold(_.some, κ(none), κ(none)))(PathExists)
+
+  val pathNotFound: Prism[PathError2, AbsPath[Sandboxed]] =
+    Prism((_: PathError2).fold(κ(none), _.some, κ(none)))(PathNotFound)
+
+  val invalidPath: Prism[PathError2, (AbsPath[Sandboxed], String)] =
+    Prism((_: PathError2).fold(κ(none), κ(none), (_, _).some))(InvalidPath.tupled)
+
+  val errorPath: Lens[PathError2, AbsPath[Sandboxed]] =
+    Lens((_: PathError2).fold(ι, ι, (p, _) => p))(p =>
+      _.fold(κ(PathExists(p)), κ(PathNotFound(p)), (_, r) => InvalidPath(p, r)))
 
   implicit val pathErrorShow: Show[PathError2] = {
     val typeStr: AbsPath[Sandboxed] => String =

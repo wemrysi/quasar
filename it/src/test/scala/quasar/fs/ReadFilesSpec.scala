@@ -4,10 +4,9 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
-import monocle.std.{disjunction => D}
+import java.lang.RuntimeException
 
-import org.specs2.execute._
-import org.specs2.specification._
+import monocle.std.{disjunction => D}
 
 import pathy.Path._
 
@@ -17,19 +16,11 @@ import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
 
-class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) {
-  import FileSystemSpec._, FileSystemError._, PathError2._
+class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
+  import ReadFilesSpec._, FileSystemError._, PathError2._
   import ReadFile._
 
-  implicit class FSExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A])(implicit run: Run): Example =
-      s >> run(fa).run
-  }
-
-  def deleteReadOnly: FileSystemErrT[F, Unit] =
-    manage.deleteDir(readOnlyPrefix)
-
-  def loadReadOnly: Process[FileSystemErrT[F, ?], Unit] = {
+  def loadForReading(run: Run): FsTask[Unit] = {
     type P[A] = Process[write.M, A]
 
     def loadDatum(td: TestDatum) = {
@@ -40,14 +31,18 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
 
     List(emptyFile, smallFile, largeFile, veryLongFile)
       .foldMap(loadDatum)(PlusEmpty[P].monoid)
-      .drain
+      .flatMap(err => Process.fail(new RuntimeException(err.shows)))
+      .translate[FsTask](runT(run))
+      .run
   }
+
+  def deleteForReading(run: Run): FsTask[Unit] =
+    runT(run)(manage.deleteDir(readsPrefix))
 
   fileSystemShould { implicit run =>
     "Reading Files" should {
       // Load read-only data
-      step((runT(run)(deleteReadOnly) *> loadReadOnly.translate[FsTask](runT(run)).run)
-            .run.void.run)
+      step((deleteForReading(run).run.void *> loadForReading(run).run.void).run)
 
       "open returns FileNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
@@ -77,7 +72,7 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
 
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, Natural._0, None))
-        r.run.run.toEither must beRight(smallFile.data.toIndexedSeq)
+        r.runEither must beRight(smallFile.data.toIndexedSeq)
       }
 
       "scan with offset k > 0 and no limit skips first k data" >> {
@@ -86,14 +81,14 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
                   .dropWhile(_._2 < k.run.toInt).map(_._1)
 
-        r.run.run.toEither must beRight(d.toIndexedSeq)
+        r.runEither must beRight(d.toIndexedSeq)
       }
 
       "scan with offset zero and limit j stops after j data" >> {
         val j = Positive._5
         val r = runLogT(run, read.scan(smallFile.file, Natural._0, Some(j)))
 
-        r.run.run.toEither must beRight(smallFile.data.take(j.run.toInt).toIndexedSeq)
+        r.runEither must beRight(smallFile.data.take(j.run.toInt).toIndexedSeq)
       }
 
       "scan with offset k and limit j takes j data, starting from k" >> {
@@ -103,7 +98,7 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
                   .dropWhile(_._2 < j.run.toInt).map(_._1)
                   .take(j.run.toInt)
 
-        r.run.run.toEither must beRight(d.toIndexedSeq)
+        r.runEither must beRight(d.toIndexedSeq)
       }
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" >> {
@@ -111,7 +106,7 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
         val r = runLogT(run, read.scan(smallFile.file, Natural._0, Some(j)))
 
         (j.run.toInt must beGreaterThan(smallFile.data.length)) and
-        (r.run.run.toEither must beRight(smallFile.data.toIndexedSeq))
+        (r.runEither must beRight(smallFile.data.toIndexedSeq))
       }
 
       // TODO: What is the expected behavior here?
@@ -119,7 +114,7 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
 
       "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(veryLongFile.file).foldMap(_ => 1))
-          .run.run.toEither must beRight(List(veryLongFile.data.length).toIndexedSeq)
+          .runEither must beRight(List(veryLongFile.data.length).toIndexedSeq)
       }
 
       // TODO: This was copied from existing tests, but what is being tested?
@@ -127,44 +122,28 @@ class FileSystemSpec extends FileSystemTest[FileSystem](FileSystemSpec.inMemUT) 
         val r = runLogT(run, read.scanAll(veryLongFile.file).foldMap(_ => 1))
         val l = List(veryLongFile.data.length).toIndexedSeq
 
-        (r.run.run.toEither must beRight(l)) and (r.run.run.toEither must beRight(l))
+        (r.runEither must beRight(l)) and (r.runEither must beRight(l))
       }
 
-      step(deleteReadOnly)
-    }
-
-    "Writing Files" should {
-    }
-
-    "Managing Files" should {
+      step(deleteForReading(run).runVoid)
     }; ()
   }
 }
 
-object FileSystemSpec {
+object ReadFilesSpec {
   import FileSystemTest._
-
-  val InMem: Task[FileSystem ~> Task] =
-    inmemory.runStatefully map { f =>
-      f compose interpretFileSystem(
-                  inmemory.readFile,
-                  inmemory.writeFile,
-                  inmemory.manageFile)
-    }
-
-  def inMemUT = FileSystemUT("In-Memory", InMem.run, rootDir)
 
   final case class TestDatum(file: AbsFile[Sandboxed], data: EStream[Data])
 
-  val readOnlyPrefix: AbsDir[Sandboxed] = rootDir </> dir("readonly")
+  val readsPrefix: AbsDir[Sandboxed] = rootDir </> dir("forreading")
 
   val emptyFile = TestDatum(
-    readOnlyPrefix </> file("empty"),
+    readsPrefix </> file("empty"),
     EStream())
 
   val smallFile = TestDatum(
-    readOnlyPrefix </> file("small"),
-    EStream.range(1, 100) map (Data.Int(_)))
+    readsPrefix </> file("small"),
+    manyDocs(100))
 
   val largeFile = {
     val sizeInMb = 10.0
@@ -181,13 +160,13 @@ object FileSystemSpec {
       Data.Obj(ListMap("seq" -> Data.Int(i), "filler" -> jsonTree(3)))
 
     TestDatum(
-      readOnlyPrefix </> file("large"),
+      readsPrefix </> file("large"),
       EStream.range(1, numDocs) map (json))
   }
 
   val veryLongFile = TestDatum(
-    readOnlyPrefix </> dir("length") </> file("very.long"),
-    EStream.range(1, 100000) map (Data.Int(_)))
+    readsPrefix </> dir("length") </> file("very.long"),
+    manyDocs(100000))
 
   ////
 
