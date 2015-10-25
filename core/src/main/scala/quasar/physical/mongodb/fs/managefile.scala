@@ -4,6 +4,7 @@ package mongodb
 package fs
 
 import quasar.Predef._
+import quasar.fp.TaskRef
 import quasar.fs._
 
 import com.mongodb.MongoServerException
@@ -16,9 +17,9 @@ import pathy.Path._
 object managefile {
   import ManageFile._, FileSystemError._, PathError2._, MongoDb._
 
-  type GenState              = (String, Long)
-  type ManageStateT[F[_], A] = StateT[F, GenState, A]
-  type ManageMongo[A]        = ManageStateT[MongoDb, A]
+  type ManageIn           = (DefaultDb, TmpPrefix, TaskRef[Long])
+  type ManageInT[F[_], A] = ReaderT[F, ManageIn, A]
+  type MongoManage[A]     = ManageInT[MongoDb, A]
 
   /** TODO: There are still some questions regarding Path
     *   1) We should assume all paths will be canonicalized and can do so
@@ -28,19 +29,16 @@ object managefile {
     *      dir succeeds, this should probably be changed to fail.
     */
 
-  /** Interpret [[ManageFile]] into [[ManageMongo]], given the name of a database
-    * to use as a default location for temp collections when no other database
-    * can be deduced.
-    */
-  def interpret(defaultDb: String): ManageFile ~> ManageMongo = new (ManageFile ~> ManageMongo) {
+  /** Interpret [[ManageFile]] using MongoDB. */
+  val interpret: ManageFile ~> MongoManage = new (ManageFile ~> MongoManage) {
     def apply[A](fs: ManageFile[A]) = fs match {
       case Move(scenario, semantics) =>
         scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
-          .run.liftM[ManageStateT]
+          .run.liftM[ManageInT]
 
       case Delete(path) =>
         path.fold(deleteDir, deleteFile)
-          .run.liftM[ManageStateT]
+          .run.liftM[ManageInT]
 
       case ListContents(dir) =>
         (dirName(dir) match {
@@ -58,35 +56,36 @@ object managefile {
 
           case None =>
             nonExistentParent[Set[Node]](dir).run
-        }).liftM[ManageStateT]
+        }).liftM[ManageInT]
 
       case TempFile(maybeNear) =>
-        val dbName = maybeNear
-          .flatMap(f => Collection.fromFile(f).toOption)
-          .cata(_.databaseName, defaultDb)
+        val dbName = defaultDb map { defDb =>
+          maybeNear
+            .flatMap(f => Collection.fromFile(f).toOption)
+            .cata(_.databaseName, defDb.run)
+        }
 
-        freshName map (n => rootDir </> dir(dbName) </> file(n))
+        (defaultDb |@| freshName)((db, n) => rootDir </> dir(db.run) </> file(n))
     }
   }
 
-  def run(client: MongoClient): ManageMongo ~> Task =
-    new (ManageMongo ~> Task) {
-      def apply[A](fs: ManageMongo[A]) =
-        Task.delay(scala.util.Random.nextInt().toHexString)
-          .map(s => s"__quasar.tmp_${s}_")
-          .flatMap(p => fs.eval((p, 0)).run(client))
+  /** Run [[MongoManage]], given a [[MongoClient]] and the name of a database
+    * to use as a default location for temp collections when no other database
+    * can be deduced.
+    */
+  def run(client: MongoClient, defDb: DefaultDb): Task[MongoManage ~> Task] =
+    (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
+      new (MongoManage ~> Task) {
+        def apply[A](fs: MongoManage[A]) =
+          fs.run((defDb, prefix, ref)).run(client)
+      }
     }
 
   ////
 
   private type M[A] = FileSystemErrT[MongoDb, A]
   private type G[E, A] = EitherT[MongoDb, E, A]
-
-  private val prefixL: GenState @> String =
-    Lens.firstLens
-
-  private val seqL: GenState @> Long =
-    Lens.secondLens
+  private type R[S, A] = Kleisli[MongoDb, S, A]
 
   private def moveToRename(sem: MoveSemantics): RenameSemantics = {
     import RenameSemantics._
@@ -180,6 +179,17 @@ object managefile {
     PathError(InvalidPath(dir.left, "directory refers to nonexistent parent"))
       .raiseError[G, A]
 
-  private def freshName: ManageMongo[String] =
-    (prefixL.st |@| seqL.modo(_ + 1))(_ + _).lift[MongoDb]
+  private def defaultDb: MongoManage[DefaultDb] =
+    MonadReader[R, ManageIn].ask.map(_._1)
+
+  private def freshName: MongoManage[String] =
+    for {
+      in <- MonadReader[R, ManageIn].ask
+      (_, prefix, ref) = in
+      n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
+    } yield prefix.run + n
+
+  private def tmpPrefix: Task[TmpPrefix] =
+    Task.delay(scala.util.Random.nextInt().toHexString)
+      .map(s => TmpPrefix(s"__quasar.tmp_${s}_"))
 }
