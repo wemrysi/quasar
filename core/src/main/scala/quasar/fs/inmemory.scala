@@ -5,6 +5,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 import pathy.Path._
 
 /** In-Memory Read/Write/ManageFile interpreters, useful for testing/stubbing
@@ -120,6 +121,14 @@ object inmemory {
     }
   }
 
+  val runStatefully: Task[InMemoryFs ~> Task] =
+    TaskRef(InMemState.empty) map { ref =>
+      new (InMemoryFs ~> Task) {
+        def apply[A](mfs: InMemoryFs[A]) =
+          ref.modifyS(mfs.run)
+      }
+    }
+
   ////
 
   private def tmpDir: AbsDir[Sandboxed] = rootDir </> dir("__quasar") </> dir("tmp")
@@ -179,7 +188,7 @@ object inmemory {
       sufxs =  m.keys.flatMap(_ relativeTo src).toStream
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
-      r1    =  r0 flatMap (_.isEmpty either (()) or PathError(DirNotFound(src)))
+      r1    =  r0 flatMap (_.nonEmpty either (()) or PathError(DirNotFound(src)))
     } yield r1
 
   private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
@@ -199,22 +208,15 @@ object inmemory {
       m  <- fmL.st
       ss =  m.keys.flatMap(_ relativeTo d).toStream
       r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
-      r1 =  r0 flatMap (_.isEmpty either (()) or PathError(DirNotFound(d)))
+      r1 =  r0 flatMap (_.nonEmpty either (()) or PathError(DirNotFound(d)))
     } yield r1
 
   private def deleteFile(f: AbsFile[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
     (fileL(f) <:= None) map (_.void \/> PathError(FileNotFound(f)))
 
-  private def ls(d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ Set[Node]] = {
-    def firstSegmentAsNode(f: RelFile[Sandboxed]): Option[Node] =
-      flatten(none, none, none,
-        n => Node.Dir(dir(n)).some,
-        n => Node.File(file(n)).some,
-        f).unite.headOption
-
+  private def ls(d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ Set[Node]] =
     fmL.st map (
       _.keys.flatMap(_ relativeTo d).toList.toNel
-        .map(_ foldMap (f => firstSegmentAsNode(f).toSet))
+        .map(_ foldMap (f => Node.fromFirstSegmentOf(f).toSet))
         .toRightDisjunction(PathError(DirNotFound(d))))
-  }
 }

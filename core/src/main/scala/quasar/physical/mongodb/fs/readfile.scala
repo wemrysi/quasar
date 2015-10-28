@@ -4,6 +4,7 @@ package mongodb
 package fs
 
 import quasar.Predef._
+import quasar.fp.TaskRef
 import quasar.fs._
 
 import scala.collection.JavaConverters._
@@ -15,32 +16,22 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object readfile {
-  import ReadFile._, FileSystemError._, MongoDb._
+  import ReadFile._, FileSystemError._, PathError2._, MongoDb._
 
-  type BsonCursor            = AsyncBatchCursor[Document]
-
-  type ReadState             = (Long, Map[ReadFile.ReadHandle, BsonCursor])
-  type ReadStateT[F[_], A]   = StateT[F, ReadState, A]
-  type ReadMongo[A]          = ReadStateT[MongoDb, A]
-
-  type OpenHandlesT[F[_], A] = WriterT[F, ISet[ReadHandle], A]
-  type OpenHandles[       A] = OpenHandlesT[Task, A]
+  type BsonCursor          = AsyncBatchCursor[Document]
+  type ReadState           = (Long, Map[ReadHandle, BsonCursor])
+  type ReadStateT[F[_], A] = ReaderT[F, TaskRef[ReadState], A]
+  type MongoRead[A]        = ReadStateT[MongoDb, A]
 
   /** Interpret the [[ReadFile]] algebra using MongoDB */
-  val interpret: ReadFile ~> ReadMongo = new (ReadFile ~> ReadMongo) {
+  val interpret: ReadFile ~> MongoRead = new (ReadFile ~> MongoRead) {
     def apply[A](rf: ReadFile[A]) = rf match {
       case Open(file, offset, limit) =>
         Collection.fromFile(file).fold(
-          err  => PathError(err).left.point[ReadMongo],
-          coll => for {
-            it   <- find(coll).liftM[ReadStateT]
-            skpd =  it skip offset.run.toInt
-            ltd  =  limit cata (n => skpd.limit(n.run.toInt), skpd)
-            // TODO: Does MongoDB error if the database doesn't exist?
-            cur  <- async(ltd.batchCursor).liftM[ReadStateT]
-            h    <- seqL.modo(_ + 1).map(ReadHandle(_)).lift[MongoDb]
-            _    <- cursorL(h).assign(Some(cur)).lift[MongoDb]
-          } yield h.right)
+          err  => PathError(err).left.point[MongoRead],
+          coll => collectionExists(coll).liftM[ReadStateT].ifM(
+                    openCursor(coll, offset, limit) map (_.right[FileSystemError]),
+                    PathError(FileNotFound(file)).left.point[MongoRead]))
 
       case Read(h) =>
         lookupCursor(h)
@@ -49,35 +40,27 @@ object readfile {
           .run
 
       case Close(h) =>
-        OptionT[ReadMongo, BsonCursor](cursorL(h).assigno(None).lift[MongoDb])
+        OptionT[MongoRead, BsonCursor](MongoRead(cursorL(h) <:= None))
           .flatMapF(c => liftTask(Task.delay(c.close())).liftM[ReadStateT])
           .run.void
     }
   }
 
-  /** Run [[ReadMongo]] using the given [[MongoClient]], discarding the resulting
-    * state and automatically closing any remaining open [[ReadHandle]]s. Any handles
-    * closed in such a manner are reported in the result.
-    */
-  def run(client: MongoClient): ReadMongo ~> OpenHandles =
-    new (ReadMongo ~> OpenHandles) {
-      def apply[A](rm: ReadMongo[A]) =
-        for {
-          r <- rm.run((0, Map.empty)).run(client).liftM[OpenHandlesT]
-          ((_, cursors), a) = r
-          _ <- cursors.toList.traverseU { case (h, c) =>
-                 WriterT.put(Task.delay(c.close()))(ISet singleton h)
-               }
-        } yield a
-    }
-
-  /** Transform [[OpenHandles]] to [[Task]] by discarding the written handles. */
-  val ignoreOpenHandles: OpenHandles ~> Task =
-    new (OpenHandles ~> Task) {
-      def apply[A](oh: OpenHandles[A]) = oh.value
+  /** Run [[MongoRead]], using the given [[MongoClient]], in the [[Task]] monad. */
+  def run(client: MongoClient): Task[MongoRead ~> Task] =
+    TaskRef[ReadState]((0, Map.empty)) map { ref =>
+      new (MongoRead ~> Task) {
+        def apply[A](rm: MongoRead[A]) = rm.run(ref).run(client)
+      }
     }
 
   ////
+
+  private def MongoRead[A](f: TaskRef[ReadState] => Task[A]): MongoRead[A] =
+    Kleisli(ref => liftTask(f(ref)))
+
+  private def MongoRead[A](s: State[ReadState, A]): MongoRead[A] =
+    MongoRead(_ modifyS s.run)
 
   private val seqL: ReadState @> Long =
     Lens.firstLens
@@ -88,7 +71,28 @@ object readfile {
   private def cursorL(h: ReadHandle): ReadState @> Option[BsonCursor] =
     Lens.mapVLens(h) compose cursorsL
 
-  private def nextChunk(c: BsonCursor): ReadMongo[Vector[Data]] = {
+  private def readState: MongoRead[ReadState] =
+    MongoRead(_.read)
+
+  private def freshHandle: MongoRead[ReadHandle] =
+    MongoRead(seqL <%= (_ + 1)) map (ReadHandle(_))
+
+  private def recordCursor(c: BsonCursor): MongoRead[ReadHandle] =
+    freshHandle flatMap (h => MongoRead(cursorL(h) := Some(c)) as h)
+
+  private def lookupCursor(h: ReadHandle): OptionT[MongoRead, BsonCursor] =
+    OptionT[MongoRead, BsonCursor](readState map (cursorL(h).get))
+
+  private def openCursor(c: Collection, off: Natural, lim: Option[Positive]): MongoRead[ReadHandle] =
+    for {
+      it   <- find(c).liftM[ReadStateT]
+      skpd =  it skip off.run.toInt
+      ltd  =  lim cata (n => skpd.limit(n.run.toInt), skpd)
+      cur  <- async(ltd.batchCursor).liftM[ReadStateT]
+      h    <- recordCursor(cur)
+    } yield h
+
+  private def nextChunk(c: BsonCursor): MongoRead[Vector[Data]] = {
     val withoutId: Document => Document =
       d => (d: Id[Document]) map (_ remove "_id") as d
 
@@ -101,7 +105,4 @@ object readfile {
       .map(r => Option(r).map(_.asScala.toVector).orZero.map(toData))
       .liftM[ReadStateT]
   }
-
-  private def lookupCursor(h: ReadHandle): OptionT[ReadMongo, BsonCursor] =
-    OptionT[ReadMongo, BsonCursor](cursorL(h).st.lift[MongoDb])
 }

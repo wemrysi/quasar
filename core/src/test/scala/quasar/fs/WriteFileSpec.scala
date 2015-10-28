@@ -4,12 +4,15 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 
+import org.specs2.mutable.Specification
+import org.specs2.ScalaCheck
 import scalaz._
 import scalaz.std.vector._
-import scalaz.syntax.functor._
+import scalaz.syntax.monad._
+import scalaz.stream._
 import pathy.Path._
 
-class WriteFileSpec extends FileSystemSpec {
+class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
   import DataGen._, PathyGen._, FileSystemError._, PathError2._
 
   "WriteFile" should {
@@ -42,6 +45,13 @@ class WriteFileSpec extends FileSystemSpec {
 
         evalLogZero(p).run.toEither must beRight(ys)
       }
+    }
+
+    "save with empty input should not create the file" ! prop { f: AbsFile[Sandboxed] =>
+      val p = write.saveF(f, Vector[Data]()) ++
+              (manage.fileExists(f).liftM[FileSystemErrT]: manage.M[Boolean]).liftM[Process]
+
+      evalLogZero(p).run must_== \/.right(Vector(false))
     }
 
     "save should leave existing file untouched on failure" ! prop {

@@ -34,6 +34,11 @@ final class MongoDb[A] private (protected val r: ReaderT[Task, MongoClient, A]) 
 
 object MongoDb {
 
+  def collectionExists(c: Collection): MongoDb[Boolean] =
+    collectionsIn(c.databaseName)
+      .exists(_.collectionName == c.collectionName)
+      .runLastOr(false)
+
   /** All discoverable collections on the server. */
   def collections: Process[MongoDb, Collection] =
     databaseNames flatMap collectionsIn
@@ -93,16 +98,17 @@ object MongoDb {
     * may be smaller than the original amount if any documents failed to insert.
     */
   def insertAny[F[_]: Foldable](docs: F[Document], coll: Collection): OptionT[MongoDb, Int] = {
-    val docList = Foldable[F].foldLeft(docs, new LinkedList[WriteModel[Document]]()) { (l, d) =>
-      l.point[Id] map (_ add new InsertOneModel(d)) as l
-    }
-
+    val docList = new LinkedList[WriteModel[Document]]
     val writeOpts = (new BulkWriteOptions()).ordered(false)
 
-    OptionT(
-      collection(coll)
-       .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
-       .map(r => r.wasAcknowledged option r.getInsertedCount))
+    Foldable[F].traverse_(docs)(d => docList.add(new InsertOneModel(d)): Id[Boolean])
+
+    if (docList.isEmpty)
+      OptionT.none
+    else
+      OptionT(collection(coll)
+        .flatMap(c => async[BulkWriteResult](c.bulkWrite(docList, writeOpts, _)))
+        .map(r => r.wasAcknowledged option r.getInsertedCount))
   }
 
   /** Rename `src` to `dst` using the given semantics. */
