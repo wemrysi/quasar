@@ -6,26 +6,26 @@ import quasar.Predef._
 import scalaz._
 import scalaz.Tags.{Multiplication => Mult}
 
-final class Positive private (val run: Long) {
+final class Positive private (val value: Long) {
   def plus(other: Positive): Positive =
-    new Positive(run + other.run)
+    new Positive(value + other.value)
 
   def + (other: Positive): Positive =
     plus(other)
 
   def times(other: Positive): Positive =
-    new Positive(run * other.run)
+    new Positive(value * other.value)
 
   def * (other: Positive): Positive =
     times(other)
 
   def toInt: Int =
-    run.toInt
+    value.toInt
 }
 
 object Positive {
   def apply(n: Long): Option[Positive] =
-    Some(n).filter(_ > 1).map(new Positive(_))
+    Some(n).filter(_ > 0).map(new Positive(_))
 
   val _1: Positive = new Positive(1)
   val _2: Positive = new Positive(2)

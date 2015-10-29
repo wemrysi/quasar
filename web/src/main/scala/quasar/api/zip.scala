@@ -16,6 +16,7 @@
 
 package quasar.api
 
+import pathy.Path._
 import quasar.Predef._
 import quasar.fs.{Path}
 
@@ -26,7 +27,7 @@ import scalaz.stream._
 import scodec.bits.{ByteVector}
 
 object Zip {
-  def zipFiles[F[_]: Monad](files: List[(Path, Process[F, ByteVector])]):
+  def zipFiles[F[_]: Monad](files: List[(RelFile[Sandboxed], Process[F, ByteVector])]):
       Process[F, ByteVector] = {
     // First construct a single Process of Ops which can be performed in
     // sequence to produce the entire archive.
@@ -40,8 +41,8 @@ object Zip {
     }
 
     val ops: Process[F, Op] = {
-      def fileOps(path: Path, bytes: Process[F, ByteVector]) =
-        Process.emit(Op.StartEntry(new jzip.ZipEntry(path.simplePathname))) ++
+      def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) =
+        Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file)))) ++
       bytes.map(Op.Chunk(_)) ++
       Process.emit(Op.EndEntry)
 

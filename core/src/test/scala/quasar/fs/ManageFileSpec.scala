@@ -45,15 +45,15 @@ class ManageFileSpec extends Specification with ScalaCheck with FileSystemFixtur
           val fds = fs map (f => (od </> f, body))
 
           val mem = InMemState fromFiles (f1s ::: f2s ::: fds).toMap
-          val expectedNodes = (fs.map(dc1 </> _) ::: fs.map(dc2 </> _)).map(Node.File).distinct
+          val expectedFiles = (fs.map(dc1 </> _) ::: fs.map(dc2 </> _)).distinct
 
-          runT(manage.lsAll(dp)).run.eval(mem)
-            .run.toEither must beRight(containTheSameElementsAs(expectedNodes))
+          runT(manage.descendantFiles(dp)).run.eval(mem)
+            .run.toEither must beRight(containTheSameElementsAs(expectedFiles))
         }
       }
 
       "returns not found when dir does not exist" ! prop { d: AbsDir[Sandboxed] =>
-        runT(manage.lsAll(d)).run.eval(emptyMem)
+        runT(manage.descendantFiles(d)).run.eval(emptyMem)
           .run.toEither must beLeft(PathError(DirNotFound(d)))
       }
     }
