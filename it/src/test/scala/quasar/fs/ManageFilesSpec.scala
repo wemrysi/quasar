@@ -227,7 +227,9 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val p = write.saveF(f, oneDoc).drain ++
                 (manage.tempFileNear(f).liftM[FileSystemErrT]: manage.M[AbsFile[Sandboxed]])
                   .liftM[Process] flatMap { tf =>
-                    write.saveF(tf, anotherDoc).drain ++ read.scanAll(tf)
+                    write.saveF(tf, anotherDoc).drain ++
+                    read.scanAll(tf) ++
+                    manage.deleteFile(tf).liftM[Process].drain
                   }
 
         runLogT(run, p).runEither must beRight(anotherDoc)
@@ -238,7 +240,9 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val f = d </> file("somefile")
         val p = (manage.tempFileNear(f).liftM[FileSystemErrT]: manage.M[AbsFile[Sandboxed]])
                   .liftM[Process] flatMap { tf =>
-                    write.saveF(tf, anotherDoc).drain ++ read.scanAll(tf)
+                    write.saveF(tf, anotherDoc).drain ++
+                    read.scanAll(tf) ++
+                    manage.deleteFile(tf).liftM[Process].drain
                   }
 
         runLogT(run, p).runEither must beRight(anotherDoc)
@@ -247,7 +251,9 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
       "write/read from arbitrary temp dir" >> {
         val p = (manage.anyTempFile.liftM[FileSystemErrT]: manage.M[AbsFile[Sandboxed]])
                   .liftM[Process] flatMap { tf =>
-                    write.saveF(tf, oneDoc).drain ++ read.scanAll(tf)
+                    write.saveF(tf, oneDoc).drain ++
+                    read.scanAll(tf) ++
+                    manage.deleteFile(tf).liftM[Process].drain
                   }
 
         runLogT(run, p).runEither must beRight(oneDoc)
