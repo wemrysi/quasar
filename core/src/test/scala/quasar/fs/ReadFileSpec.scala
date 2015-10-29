@@ -16,11 +16,11 @@ class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture 
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" ! prop {
-      (f: AbsFile[Sandboxed], xs: Vector[Data]) => xs.nonEmpty ==> {
-        val p = write.appendF(f, xs).drain ++ read.scanAll(f)
+      (f: AbsFile[Sandboxed], xs: Vector[Data]) =>
 
-        evalLogZero(p).run.toEither must beRight(xs)
-      }
+      val p = write.appendF(f, xs).drain ++ read.scanAll(f)
+
+      evalLogZero(p).run.toEither must beRight(xs)
     }
 
     "scan should automatically close the read handle when terminated early" ! prop {

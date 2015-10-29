@@ -49,6 +49,11 @@ object MongoDb {
       .flatMap(db => iterableToProcess(db.listCollectionNames))
       .map(Collection(dbName, _))
 
+  /** Creates the given collection. */
+  def createCollection(c: Collection): MongoDb[Unit] =
+    database(c.databaseName) flatMap (db =>
+      async[java.lang.Void](db.createCollection(c.collectionName, _)).void)
+
   /** Names of all discoverable databases on the server. */
   def databaseNames: Process[MongoDb, String] =
     client.liftM[Process]
@@ -70,6 +75,10 @@ object MongoDb {
 
   def dropAllDatabases: MongoDb[Unit] =
     databaseNames.map(dropDatabase).eval.run
+
+  /** Ensure the given collection exists, creating it if not. */
+  def ensureCollection(c: Collection): MongoDb[Unit] =
+    collectionExists(c).ifM(().point[MongoDb], createCollection(c))
 
   /** Returns the name of the first database where an insert to the collection
     * having the given name succeeds.

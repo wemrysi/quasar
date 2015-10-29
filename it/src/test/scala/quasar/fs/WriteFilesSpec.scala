@@ -24,6 +24,18 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
     "Writing Files" should {
       step(deleteForWriting(run).runVoid)
 
+      "opening a file should create it" >>* {
+        val f = writesPrefix </> dir("opencreates") </> file("f1")
+
+        val r = for {
+          h <- write.open(f)
+          _ <- write.close(h).liftM[FileSystemErrT]
+          p <- manage.fileExists(f).liftM[FileSystemErrT]
+        } yield p
+
+        r.run map (_.toEither must beRight(true))
+      }
+
       "write to unknown handle returns UnknownWriteHandle" >>* {
         val h = WriteHandle(42)
         write.write(h, Vector()) map { r =>
@@ -53,12 +65,12 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         runLogT(run, p).runEither must beRight(oneDoc)
       }
 
-      "append empty input should not result in a new file" >> {
+      "append empty input should result in a new file" >> {
         val f = writesPrefix </> file("emptyfile")
         val p = write.appendF(f, Vector[Data]()).drain ++
                 (manage.fileExists(f).liftM[FileSystemErrT] : manage.M[Boolean]).liftM[Process]
 
-        runLogT(run, p).run.run must_== \/.right(Vector(false))
+        runLogT(run, p).run.run must_== \/.right(Vector(true))
       }
 
       "append two files, one in subdir of the other's parent, should succeed" >> {
