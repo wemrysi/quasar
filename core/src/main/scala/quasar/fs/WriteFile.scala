@@ -88,8 +88,11 @@ object WriteFile {
       val dropPartialWrites =
         process1.filter[FileSystemError](e => !partialWrite.isMatching(e))
 
-      src.translate[M](liftMT[F, FileSystemErrT])
-        .through(appendChannel(dst))
+      // NB: We don't use `through` as we want to ensure the `Open` from
+      //     `appendChannel` happens even if the src process never emits.
+      appendChannel(dst)
+        .zipWith(src.translate[M](liftMT[F, FileSystemErrT]))((f, o) => f(o))
+        .eval
         .flatMap(Process.emitAll)
         .flatMap(e => Process.emitW(e) ++ Process.emitO(e))
         .pipe(process1.multiplex(dropPartialWrites, accumPartialWrites))

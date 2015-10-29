@@ -87,6 +87,7 @@ object inmemory {
           i <- nextSeq
           h =  WriteHandle(i)
           _ <- wFileL(h) := Some(f)
+          _ <- fileL(f) %= (_ orElse Some(Vector()))
         } yield h.right
 
       case WriteFile.Write(h, xs) =>

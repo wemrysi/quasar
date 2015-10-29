@@ -25,7 +25,8 @@ object writefile {
       case Open(file) =>
         Collection.fromFile(file) fold (
           err => PathError(err).left.point[MongoWrite],
-          col => recordCollection(col) map \/.right)
+          col => ensureCollection(col).liftM[WriteStateT] *>
+                 recordCollection(col) map \/.right)
 
       case Write(h, data) =>
         val (errs, docs) = data foldMap { d =>

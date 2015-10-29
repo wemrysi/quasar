@@ -70,6 +70,11 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         }
       }
 
+      "scan an empty file succeeds, yielding no data" >> {
+        val r = runLogT(run, read.scanAll(emptyFile.file))
+        r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
+      }
+
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, Natural._0, None))
         r.runEither must beRight(smallFile.data.toIndexedSeq)
