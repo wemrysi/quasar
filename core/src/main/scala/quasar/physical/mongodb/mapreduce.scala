@@ -17,10 +17,12 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.fs.Positive
 
 import scalaz._
 import monocle.macros.{GenLens}
 import com.mongodb._
+import org.bson.conversions.{Bson => ToBson}
 
 import quasar.javascript._
 
@@ -65,10 +67,20 @@ object MapReduce {
     def nonAtomic: Option[Boolean]
   }
   object Action {
+    /** Replace any existing documents in the destination collection with the
+      * result of the map reduce.
+      */
     final case object Replace extends Action {
       def nonAtomic = None
     }
+    /** Merge the result of the map reduce with the existing contents of the
+      * output collection.
+      */
     final case class Merge(nonAtomic: Option[Boolean]) extends Action
+    /** The name would suggest the output of the map reduce is reduced, using
+      * the reducer function, with any existing contents of the output
+      * collection, but the MongoDB docs are incomplete here.
+      */
     final case class Reduce(nonAtomic: Option[Boolean]) extends Action
   }
 
@@ -96,6 +108,58 @@ object MapReduce {
     def outputTypeEnum = MapReduceCommand.OutputType.INLINE
     def bson(dst: Collection) = Bson.Doc(ListMap("inline" -> Bson.Int64(1)))
   }
+
+  /** Configuration parameters for MapReduce operations
+    *
+    * @param finalizer JavaScript function applied to the output after the
+    *                  `reduce` function.
+    * @param inputFilter Query selector to apply to input documents
+    * @param inputLimit Limit the number of input documents to `map`
+    * @param map The mapping function
+    * @param reduce The reducing function
+    * @param scope Global variables made available to the `map`, `reduce` and
+    *              `finalizer` functions.
+    * @param inputSortCriteria Criteria to use to sort the input documents.
+    * @param useJsMode Whether to avoid converting intermediate values to
+    *                  BSON, leaving them as JavaScript objects instead.
+    *                  Setting this to `true` has implications on the size of
+    *                  the input, see the MongoDB `mapReduce` documentation
+    *                  for details.
+    * @param verboseResults Whether to include additional information, such
+    *                       as timing, in the results.
+    */
+  final case class Config(
+    finalizer: Option[String],
+    inputFilter: Option[ToBson],
+    inputLimit: Option[Positive],
+    map: String,
+    reduce: String,
+    scope: Option[ToBson],
+    sort: Option[ToBson],
+    useJsMode: Boolean,
+    verboseResults: Boolean
+  )
+
+  /** Action to apply to output collection.
+    *
+    * @param action The action to take if the output collection exists.
+    * @param databaseName the database containing the output collection,
+    *                     defaulting to the source database
+    * @param shardOutputCollection whether the output collection should be
+    *                              sharded (the output database must support
+    *                              sharding).
+    */
+  final case class ActionedOutput(
+    action: Action,
+    databaseName: Option[String],
+    shardOutputCollection: Option[Boolean]
+  )
+
+  /** Output collection for non-inline map-reduce jobs. */
+  final case class OutputCollection(
+    collectionName: String,
+    withAction: Option[ActionedOutput]
+  )
 
   val _map       = GenLens[MapReduce](_.map)
   val _reduce    = GenLens[MapReduce](_.reduce)
