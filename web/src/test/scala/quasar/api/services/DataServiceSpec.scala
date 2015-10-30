@@ -201,14 +201,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                   response.as[String].run must_== s"invalid limit: $limit (must be >= 1)"
                 }
               }
-              "a negative offset" ! prop { (offset: Int, limit: Positive) =>
-                (offset < 0) ==> {
-                  val request = Request(
-                    uri = Uri(path = samplePath).+?("offset", offset.toString).+?("limit", limit.value.toString))
-                  val response = service(InMemState.empty)(request).run
-                  response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"invalid offset: $offset (must be >= 0)"
-                }
+              "a negative offset" ! prop { (offset: Negative, limit: Positive) =>
+                val request = Request(
+                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+                val response = service(InMemState.empty)(request).run
+                response.status must_== Status.BadRequest
+                response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
               }
               "if provided with multiple limits?" ! prop { (offset: Natural, limits: List[Positive]) =>
                 (limits.length >= 2) ==> {
