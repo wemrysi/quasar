@@ -208,15 +208,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
               }
-              "if provided with multiple limits?" ! prop { (offset: Natural, limits: List[Positive]) =>
-                (limits.length >= 2) ==> {
-                  val request = Request(
-                    uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
-                  val response = service(InMemState.empty)(request).run
-                  response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"Two limits were provided, only supply one limit"
-                }
-              }
+              "if provided with multiple limits?" ! prop { (offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
+                val limits = limit1 :: limit2 :: otherLimits
+                val request = Request(
+                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
+                val response = service(InMemState.empty)(request).run
+                response.status must_== Status.BadRequest
+                response.as[String].run must_== s"Two limits were provided, only supply one limit"
+              }.pendingUntilFixed("SD-1082")
               "if provided with multiple offsets?" ! prop { (limit: Positive, offsets: List[Natural]) =>
                 (offsets.length >= 2) ==> {
                   val request = Request(
@@ -227,7 +226,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                   todo // Confirm this is the expected behavior because http4s defaults to just grabbing the first one
                        // and going against that default behavior would be more work
                 }
-              }
+              }.pendingUntilFixed("SD-1082")
               "an unparsable limit" >> {
                 val request = Request(
                   uri = Uri(path = samplePath).+?("limit", "a"))

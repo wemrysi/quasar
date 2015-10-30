@@ -1,11 +1,10 @@
 package quasar.fs
 
-import org.scalacheck.Arbitrary
+import org.scalacheck.{Arbitrary, Gen}
 import quasar.Predef._
 
 object NumericGen {
-  // TODO: Replace use of get with `flatten` or `collect` once we upgrade scalacheck
-  implicit val arbPositive  = Arbitrary.apply(Arbitrary.arbitrary[Short].filter(_ > 0).map(long => Positive(long).get))
-  implicit val arbNatural   = Arbitrary.apply(Arbitrary.arbitrary[Short].filter(_ >= 0).map(long => Natural(long).get))
-  implicit val arbNegative  = Arbitrary.apply(Arbitrary.arbitrary[Int].filter(_ < 0).map(Negative(_).get))
+  implicit val arbPositive  = Arbitrary.apply(Gen.choose(1, Short.MaxValue).map(short => Positive(short).get))
+  implicit val arbNatural   = Arbitrary.apply(Gen.choose(0, Short.MaxValue).map(long => Natural(long).get))
+  implicit val arbNegative  = Arbitrary.apply(Gen.choose(Int.MinValue, -1).map(Negative(_).get))
 }
