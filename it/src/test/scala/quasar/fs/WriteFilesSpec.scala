@@ -75,16 +75,14 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "append two files, one in subdir of the other's parent, should succeed" >> {
         val d = writesPrefix </> dir("subdir1")
-        val f1 = d </> file("subdirfile1")
-        val f1Node = Node.File(file("subdirfile1"))
-        val f2 = d </> dir("subdir2") </> file("subdirfile2")
-        val f2Node = Node.File(dir("subdir2") </> file("subdirfile2"))
-        val p = write.appendF(f1, oneDoc).drain ++
-                write.appendF(f2, oneDoc).drain ++
-                manage.lsAll(d).liftM[Process]
+        val f1 = file[Sandboxed]("subdirfile1")
+        val f2 = dir[Sandboxed]("subdir2") </> file("subdirfile2")
+        val p = write.appendF(d </> f1, oneDoc).drain ++
+                write.appendF(d </> f2, oneDoc).drain ++
+                manage.descendantFiles(d).liftM[Process]
 
         runLogT(run, p).map(_.flatMap(_.toVector))
-          .runEither must beRight(containTheSameElementsAs(List(f1Node, f2Node)))
+          .runEither must beRight(containTheSameElementsAs(List(f1, f2)))
       }
 
       step(deleteForWriting(run).runVoid)

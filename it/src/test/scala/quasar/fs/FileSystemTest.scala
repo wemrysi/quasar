@@ -129,7 +129,7 @@ object FileSystemTest {
   }
 
   private def InMem: Task[FileSystem ~> Task] =
-    inmemory.runStatefully map { f =>
+    inmemory.runStatefully(inmemory.InMemState.empty) map { f =>
       f compose interpretFileSystem(
                   inmemory.readFile,
                   inmemory.writeFile,
