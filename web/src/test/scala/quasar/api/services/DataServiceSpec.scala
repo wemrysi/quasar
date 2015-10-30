@@ -234,15 +234,15 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"""invalid limit: Query decoding Long failed (For input string: "a")"""
               }
-              "if provided with both an invalid offset and limit" ! prop { (limit: Int, offset: Int) =>
-                (limit < 1 && offset < 0) ==> {
+              "if provided with both an invalid offset and limit" ! prop { (limit: Int, offset: Negative) =>
+                (limit < 1) ==> {
                   val request = Request(
-                    uri = Uri(path = samplePath).+?("limit", limit.toString).+?("offset", offset.toString))
+                    uri = Uri(path = samplePath).+?("limit", limit.toString).+?("offset", offset.value.toString))
                   val response = service(InMemState.empty)(request).run
                   response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)"
+                  response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)"
                 }
-              }
+              }.pendingUntilFixed("SD-1083")
             }
           }
           "support very large data set" >> {
