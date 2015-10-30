@@ -17,7 +17,6 @@ import argonaut.{JsonObject, JsonNumber, Json}
 import argonaut.Argonaut._
 import jawnstreamz._
 import org.http4s._
-import org.http4s.argonaut._
 import org.http4s.headers._
 import org.http4s.server._
 import quasar.fs.{Path => _, _}
@@ -94,6 +93,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
     }
   }
 
+  // Remove once version 0.8.4 or higher of jawn is realeased.
+  implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
+
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
@@ -138,7 +140,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "in the request-headers" ! prop { data: Vector[Data] =>
               val request = Request(
                 uri = Uri(path = samplePath).+?("request-headers", """{"Accept": "application/ldjson; mode=precise" }"""))
-              val response = service(fileSystemWithSampleFile(data))(request).run
+              val response = HeaderParam(service(fileSystemWithSampleFile(data)))(request).run
               isExpectedResponse(data, response, JsonContentType(Precise,LineDelimited))
             }
           }
