@@ -118,7 +118,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           ) = {
             val expectedData = data.map(format.mode.codec.encode).sequenceU.toOption.get
             format.format match {
-              case LineDelimited  => response.as[List[Json]].run must_== expectedData.toList
+              case LineDelimited  => response.as[List[Json]].handleWith{case t => response.as[String]}.run must_== expectedData.toList
               case SingleArray    => response.as[Json].run must_== Json.array(expectedData: _*)
             }
             response.status must_== Status.Ok
@@ -183,12 +183,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             response.headers.get(`Content-Disposition`) must_== Some(disposition)
           }
           "support offset and limit" >> {
-            "return expected result if user supplies valid values" ! prop { (data: Vector[Data], offset: Int, limit: Int) =>
-              (offset > 0 && limit >= 1) ==> {
+            "return expected result if user supplies valid values" ! prop { (data: Vector[Data], offset: Natural, limit: Positive) =>
+              (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
                 val request = Request(
-                  uri = Uri(path = samplePath).+?("offset", offset.toString).+?("limit", limit.toString))
+                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
                 val response = service(fileSystemWithSampleFile(data))(request).run
-                isExpectedResponse(data.slice(offset, limit), response)
+                isExpectedResponse(data.drop(offset.value.toInt).take(limit.value.toInt), response)
               }
             }
             "return 400 if provided with" >> {
