@@ -279,8 +279,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             )
             val response = service(fileSystemWithSampleFile(data.toVector))(request).run
             response.status must_== Status.Ok
-            response.contentType must_== Some(expectedResponseMediaType)
-            response.as[String].run must_== expectedLines.mkString("\n")
+            response.contentType must_== Some(`Content-Type`(expectedResponseMediaType, Charset.`UTF-8`))
+            response.as[String].run must_== expectedLines.mkString("", "\r\n", "\r\n")
           }
 
           "simple" >> test(
@@ -545,19 +545,19 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         response.status must_== Status.Ok
         // Check if dir was actually deleted
       }
-      "be 200 with missing file (idempotency)" ! prop { (file: Path[Abs,File,Sandboxed], data: Vector[Data]) =>
+      "be 404 with missing file" ! prop { (file: Path[Abs,File,Sandboxed], data: Vector[Data]) =>
         val path = posixCodec.printPath(file)
         val request = Request(uri = Uri(path = path), method = Method.DELETE)
         val response = service(emptyMem)(request).run
-        response.status must_== Status.Ok
+        response.status must_== Status.NotFound
         // Check if still empty?
       }
-      "be 200 with missing dir (idempotency)" ! prop { dir: Path[Abs,Dir,Sandboxed] =>
+      "be 404 with missing dir" ! prop { dir: Path[Abs,Dir,Sandboxed] =>
         val dirPath = posixCodec.printPath(dir)
         val request = Request(uri = Uri(path = dirPath), method = Method.DELETE)
         val response = service(emptyMem)(request).run
-        response.status must_== Status.Ok
-        // Check if dir was actually deleted
+        response.status must_== Status.NotFound
+        // Check if still empty?
       }
     }
   }
