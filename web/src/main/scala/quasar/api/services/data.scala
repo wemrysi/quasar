@@ -9,7 +9,7 @@ import org.http4s.server._
 import pathy.Path._
 import quasar.repl.Prettify
 import quasar.Predef._
-import quasar.api.{MessageFormat, AsPathyPath}
+import quasar.api.{MessageFormat, AsPath}
 import quasar.fs._
 import scodec.bits.ByteVector
 
@@ -53,7 +53,7 @@ object data {
                                                     Q: QueryFile.Ops[S]): HttpService = {
 
     HttpService {
-      case req @ GET -> AsPathyPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
+      case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
         val offsetWithDefault = offsetParam.getOrElse(Natural._0.successNel)
         val offsetWithErrorMsg: String \/ Natural = offsetWithDefault.disjunction.leftMap(
           nel => s"invalid offset: ${nel.head.sanitized} (${nel.head.details})")
