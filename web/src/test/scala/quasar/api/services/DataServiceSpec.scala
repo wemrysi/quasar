@@ -29,9 +29,10 @@ import scala.collection.mutable
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
+import scalaz.scalacheck.ScalazArbitrary._
+import scalaz.scalacheck.ScalaCheckBinding._
 
 import org.scalacheck.Arbitrary
-
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import inmemory._, quasar.DataGen._
@@ -96,6 +97,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   // Remove once version 0.8.4 or higher of jawn is realeased.
   implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
 
+  case class SingleFileFileSystem(file: Path[Abs,File, Sandboxed], contents: Vector[Data]) {
+    def path = posixCodec.printPath(file)
+    def state = InMemState fromFiles Map(file -> contents)
+  }
+
+  implicit val arbSingleFileFileSystem: Arbitrary[SingleFileFileSystem] = Arbitrary(
+    (Arbitrary.arbitrary[Path[Abs,File,Sandboxed]] |@| Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
+
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
@@ -124,9 +133,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             response.status must_== Status.Ok
             response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
           }
-          "readable by default" ! prop { data: Vector[Data] =>
-            val response = service(fileSystemWithSampleFile(data))(Request(uri = Uri(path = samplePath))).run
-            isExpectedResponse(data, response)
+          "readable by default" ! prop { filesystem: SingleFileFileSystem =>
+            val response = service(filesystem.state)(Request(uri = Uri(path = filesystem.path))).run
+            isExpectedResponse(filesystem.contents, response)
           }
           "precise if specified" >> {
             "in the content-type header" ! prop { data: Vector[Data] =>
@@ -167,13 +176,6 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             response.status must_== Status.Ok
           }
           // TODO: Make the filename a property in order to remove this test
-          "even if file name contains a space" ! prop { data: Vector[Data] =>
-            val fileWithSpaceInName = rootDir[Sandboxed] </> dir("foo") </> file("bar bix.json")
-            val path: String = posixCodec.printPath(fileWithSpaceInName)
-            val filesystem = InMemState fromFiles Map(fileWithSpaceInName -> data)
-            val response = service(filesystem)(Request(uri = Uri(path = path))).run
-            isExpectedResponse(data, response)
-          }
           "support disposition" ! prop { data: Vector[Data] =>
             val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
             val request = Request(
