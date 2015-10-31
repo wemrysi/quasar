@@ -31,6 +31,8 @@ import scalaz.stream.Process
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.scalacheck.ScalaCheckBinding._
 
+import quasar.api.MessageFormatGen._
+
 import org.scalacheck.Arbitrary
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
@@ -118,226 +120,174 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
       }
       "respond with file data" >> {
-        val sampleFile = rootDir[Sandboxed] </> dir("foo") </> file("bar")
-        val samplePath: String = printPath(sampleFile)
-        def fileSystemWithSampleFile(data: Vector[Data]) = InMemState fromFiles Map(sampleFile -> data)
-        "json by default" >> {
-          def isExpectedResponse(
-            data: Vector[Data], response: Response, format: MessageFormat = JsonContentType(Readable, LineDelimited)
-          ) = {
-            val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-            response.as[String].run must_== expectedBody.runLog.run.mkString("")
-            response.status must_== Status.Ok
-            response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
-          }
-          "readable and line delimited by default" ! prop { filesystem: SingleFileFileSystem =>
+        def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
+          val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
+          response.as[String].run must_== expectedBody.runLog.run.mkString("")
+          response.status must_== Status.Ok
+          response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
+        }
+        "in correct format" >> {
+          "readable and line delimited json by default" ! prop { filesystem: SingleFileFileSystem =>
             val response = service(filesystem.state)(Request(uri = Uri(path = filesystem.path))).run
-            isExpectedResponse(filesystem.contents, response)
+            isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
           }
           "in any supported format if specified" >> {
             "in the content-type header" >> {
-              def test(contentType: JsonContentType) = prop { filesystem: SingleFileFileSystem =>
+              def testProp(format: MessageFormat) = prop { filesystem: SingleFileFileSystem => test(format, filesystem) }
+              def test(format: MessageFormat, filesystem: SingleFileFileSystem) = {
                 val request = Request(
                   uri = Uri(path = filesystem.path),
-                  headers = Headers(Accept(contentType.mediaType)))
+                  headers = Headers(Accept(format.mediaType)))
                 val response = service(filesystem.state)(request).run
-                isExpectedResponse(filesystem.contents, response, contentType)
+                isExpectedResponse(filesystem.contents, response, format)
               }
-              s"readable and line delimited (${jsonReadableLine.mediaType.renderString})" >> {
-                test(jsonReadableLine)
+              "json" >> {
+                s"readable and line delimited (${jsonReadableLine.mediaType.renderString})" >> {
+                  testProp(jsonReadableLine)
+                }
+                s"precise and line delimited (${jsonPreciseLine.mediaType.renderString})" >> {
+                  testProp(jsonPreciseLine)
+                }
+                s"readable and in a single json array (${jsonReadableArray.mediaType.renderString})" >> {
+                  testProp(jsonReadableArray)
+                }
+                s"precise and in a single json array (${jsonPreciseArray.mediaType.renderString})" >> {
+                  testProp(jsonPreciseArray)
+                }
               }
-              s"precise and line delimited (${jsonPreciseLine.mediaType.renderString})" >> {
-                test(jsonPreciseLine)
-              }
-              s"readable and in a single json array (${jsonReadableArray.mediaType.renderString})" >> {
-                test(jsonReadableArray)
-              }
-              s"precise and in a single json array (${jsonPreciseArray.mediaType.renderString})" >> {
-                test(jsonPreciseArray)
-              }
+              "csv" ! prop { (filesystem: SingleFileFileSystem, format: Csv) => test(format, filesystem) }
               "or a more complicated proposition" ! prop { filesystem: SingleFileFileSystem =>
                 val request = Request(
                   uri = Uri(path = filesystem.path),
                   headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
                 val response = service(filesystem.state)(request).run
-                isExpectedResponse(filesystem.contents, response, JsonContentType(Precise,LineDelimited))
+                isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
               }
             }
             "in the request-headers" ! prop { filesystem: SingleFileFileSystem =>
-              val contentType = JsonContentType(Precise,LineDelimited)
+              val contentType = JsonContentType(Precise, LineDelimited)
               val request = Request(
                 uri = Uri(path = filesystem.path).+?("request-headers", s"""{"Accept": "application/ldjson; mode=precise" }"""))
               val response = HeaderParam(service(filesystem.state))(request).run
-              isExpectedResponse(filesystem.contents, response, JsonContentType(Precise,LineDelimited))
-            }
-          }
-          "with gziped encoding when specified" ! prop { filesystem: SingleFileFileSystem =>
-            val request = Request(
-              uri = Uri(path = filesystem.path),
-              headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
-            val response = GZip(service(filesystem.state))(request).run
-            response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
-            response.status must_== Status.Ok
-          }
-          "support disposition" ! prop { filesystem: SingleFileFileSystem =>
-            val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
-            val request = Request(
-              uri = Uri(path = filesystem.path),
-              headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
-            val response = service(filesystem.state)(request).run
-            response.headers.get(`Content-Disposition`) must_== Some(disposition)
-          }
-          "support offset and limit" >> {
-            "return expected result if user supplies valid values" ! prop { (filesystem: SingleFileFileSystem, offset: Natural, limit: Positive) =>
-              // Not sure why this precondition is necessary...
-              (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
-                val request = Request(
-                  uri = Uri(path = filesystem.path).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
-                val response = service(filesystem.state)(request).run
-                isExpectedResponse(filesystem.contents.drop(offset.value.toInt).take(limit.value.toInt), response)
-              }
-            }
-            "return 400 if provided with" >> {
-              "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
-                (limit < 1) ==> {
-                  val request = Request(
-                    uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.toString))
-                  val response = service(InMemState.empty)(request).run
-                  response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"invalid limit: $limit (must be >= 1)"
-                }
-              }
-              "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Negative, limit: Positive) =>
-                val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
-                val response = service(InMemState.empty)(request).run
-                response.status must_== Status.BadRequest
-                response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
-              }
-              "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
-                val limits = limit1 :: limit2 :: otherLimits
-                val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
-                val response = service(InMemState.empty)(request).run
-                response.status must_== Status.BadRequest
-                response.as[String].run must_== s"Two limits were provided, only supply one limit"
-              }.pendingUntilFixed("SD-1082")
-              "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
-                (offsets.length >= 2) ==> {
-                  val request = Request(
-                    uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
-                  val response = service(InMemState.empty)(request).run
-                  response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"Two offsets were provided, only supply one offset"
-                  todo // Confirm this is the expected behavior because http4s defaults to just grabbing the first one
-                       // and going against that default behavior would be more work
-                }
-              }.pendingUntilFixed("SD-1082")
-              "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
-                val request = Request(
-                  uri = Uri(path = printPath(path)).+?("limit", "a"))
-                val response = service(InMemState.empty)(request).run
-                response.status must_== Status.BadRequest
-                response.as[String].run must_== s"""invalid limit: Query decoding Long failed (For input string: "a")"""
-              }
-              "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Negative) =>
-                (limit < 1) ==> {
-                  val request = Request(
-                    uri = Uri(path = printPath(path)).+?("limit", limit.toString).+?("offset", offset.value.toString))
-                  val response = service(InMemState.empty)(request).run
-                  response.status must_== Status.BadRequest
-                  response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)"
-                }
-              }.pendingUntilFixed("SD-1083")
-            }
-          }
-          "support very large data set" >> {
-            val data = (0 until 100*1000).map(n => Data.Obj(ListMap("n" -> Data.Int(n)))).toVector
-            "plain text" >> {
-              val request = Request(
-                uri = Uri(path = samplePath))
-              val response = service(fileSystemWithSampleFile(data))(request).run
-              isExpectedResponse(data, response)
-            }
-            "gziped" >> {
-              val request = Request(
-                uri = Uri(path = samplePath),
-                headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
-              val response = service(fileSystemWithSampleFile(data))(request).run
-              isExpectedResponse(data, response)
+              isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
             }
           }
         }
-        "csv if specified" >> {
-          val simpleData = List(
-            Data.Obj(ListMap("a" -> Data.Int(1))),
-            Data.Obj(ListMap("b" -> Data.Int(2))),
-            Data.Obj(ListMap("c" -> Data.Set(List(Data.Int(3))))))
-          val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
-          def test(
-                  data: List[Data],
-                  expectedBodyAsString: String,
-                  requestMediaType: MediaType = MediaType.`text/csv`,
-                  expectedResponseMediaType: MediaType = MessageFormat.Csv.Default.mediaType) = {
+        "with gziped encoding when specified" ! prop { filesystem: SingleFileFileSystem =>
+          val request = Request(
+            uri = Uri(path = filesystem.path),
+            headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
+          val response = GZip(service(filesystem.state))(request).run
+          response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
+          response.status must_== Status.Ok
+        }
+        "support disposition" ! prop { filesystem: SingleFileFileSystem =>
+          val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
+          val request = Request(
+            uri = Uri(path = filesystem.path),
+            headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
+          val response = service(filesystem.state)(request).run
+          response.headers.get(`Content-Disposition`) must_== Some(disposition)
+        }
+        "support offset and limit" >> {
+          "return expected result if user supplies valid values" ! prop {
+            (filesystem: SingleFileFileSystem, offset: Natural, limit: Positive, format: MessageFormat) =>
+            // Not sure why this precondition is necessary...
+            (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
+              val request = Request(
+                uri = Uri(path = filesystem.path).+?("offset", offset.value.toString).+?("limit", limit.value.toString),
+                headers = Headers(Accept(format.mediaType)))
+              val response = service(filesystem.state)(request).run
+              isExpectedResponse(filesystem.contents.drop(offset.value.toInt).take(limit.value.toInt), response, format)
+            }
+          }
+          "return 400 if provided with" >> {
+            "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
+              (limit < 1) ==> {
+                val request = Request(
+                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.toString))
+                val response = service(InMemState.empty)(request).run
+                response.status must_== Status.BadRequest
+                response.as[String].run must_== s"invalid limit: $limit (must be >= 1)"
+              }
+            }
+            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Negative, limit: Positive) =>
+              val request = Request(
+                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+              val response = service(InMemState.empty)(request).run
+              response.status must_== Status.BadRequest
+              response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
+            }
+            "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
+              val limits = limit1 :: limit2 :: otherLimits
+              val request = Request(
+                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
+              val response = service(InMemState.empty)(request).run
+              response.status must_== Status.BadRequest
+              response.as[String].run must_== s"Two limits were provided, only supply one limit"
+            }.pendingUntilFixed("SD-1082")
+            "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
+              (offsets.length >= 2) ==> {
+                val request = Request(
+                  uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
+                val response = service(InMemState.empty)(request).run
+                response.status must_== Status.BadRequest
+                response.as[String].run must_== s"Two offsets were provided, only supply one offset"
+                todo // Confirm this is the expected behavior because http4s defaults to just grabbing the first one
+                     // and going against that default behavior would be more work
+              }
+            }.pendingUntilFixed("SD-1082")
+            "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
+              val request = Request(
+                uri = Uri(path = printPath(path)).+?("limit", "a"))
+              val response = service(InMemState.empty)(request).run
+              response.status must_== Status.BadRequest
+              response.as[String].run must_== s"""invalid limit: Query decoding Long failed (For input string: "a")"""
+            }
+            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Negative) =>
+              (limit < 1) ==> {
+                val request = Request(
+                  uri = Uri(path = printPath(path)).+?("limit", limit.toString).+?("offset", offset.value.toString))
+                val response = service(InMemState.empty)(request).run
+                response.status must_== Status.BadRequest
+                response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)"
+              }
+            }.pendingUntilFixed("SD-1083")
+          }
+        }
+        "support very large data set" >> {
+          val sampleFile = rootDir[Sandboxed] </> dir("foo") </> file("bar")
+          val samplePath: String = printPath(sampleFile)
+          def fileSystemWithSampleFile(data: Vector[Data]) = InMemState fromFiles Map(sampleFile -> data)
+          val data = (0 until 100*1000).map(n => Data.Obj(ListMap("n" -> Data.Int(n)))).toVector
+          "plain text" >> {
+            val request = Request(
+              uri = Uri(path = samplePath))
+            val response = service(fileSystemWithSampleFile(data))(request).run
+            isExpectedResponse(data, response, MessageFormat.Default)
+          }
+          "gziped" >> {
             val request = Request(
               uri = Uri(path = samplePath),
-              headers = Headers(headers.Accept(requestMediaType))
-            )
-            val response = service(fileSystemWithSampleFile(data.toVector))(request).run
-            response.status must_== Status.Ok
-            response.contentType must_== Some(`Content-Type`(expectedResponseMediaType, Charset.`UTF-8`))
-            response.as[String].run must_== expectedBodyAsString
+              headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
+            val response = service(fileSystemWithSampleFile(data))(request).run
+            isExpectedResponse(data, response, MessageFormat.Default)
           }
-
-          "simple" >> test(
-            data = simpleData,
-            expectedBodyAsString = simpleExpected
-          )
-          "with quoting" >> test(
-            data = List(
-              Data.Obj(ListMap(
-                "a" -> Data.Str("\"Hey\""),
-                "b" -> Data.Str("a, b, c")))),
-            expectedBodyAsString = List("a,b", "\"\"\"Hey\"\"\",\"a, b, c\"").mkString("", "\r\n", "\r\n")
-          )
-          "specifying format exactly" >> {
-            "alternative delimiters" >> {
-              val extensions = Map(
-                "columnDelimiter" -> "\t",
-                "rowDelimiter" -> ";",
-                "quoteChar" -> "'",
-                "escapeChar" -> "\\"
-              )
-              val alternative = MediaType.`text/csv`.withExtensions(extensions)
-              test(
-                data = simpleData,
-                expectedBodyAsString = "a\tb\tc[0];1\t\t;\t2\t;\t\t3;",
-                requestMediaType = alternative,
-                expectedResponseMediaType = alternative
-              )
-            }
-            "the default parameters" >> test(
-              data = simpleData,
-              expectedBodyAsString = simpleExpected,
-              requestMediaType = MessageFormat.Csv.Default.mediaType,
-              expectedResponseMediaType = MessageFormat.Csv.Default.mediaType
-            )
-          }
-          "using disposition to download as zipped directory" ! prop { filesystem: NonEmptyDir =>
-            val dirPath = printPath(filesystem.dir)
-            val disposition = `Content-Disposition`("attachement", Map("filename" -> "foo.zip"))
-            val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
-            val request = Request(
-              uri = Uri(path = dirPath),
-              headers = Headers(Accept(requestMediaType)))
-            val response = service(filesystem.state)(request).run
-            response.status must_== Status.Ok
-            response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
-            response.headers.get(`Content-Disposition`) must_== disposition
-          }.pendingUntilFixed("Seem to have some problems testing directories") // TODO: FIXME
         }
-        "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
       }
+      "using disposition to download as zipped directory" ! prop { filesystem: NonEmptyDir =>
+        val dirPath = printPath(filesystem.dir)
+        val disposition = `Content-Disposition`("attachement", Map("filename" -> "foo.zip"))
+        val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
+        val request = Request(
+          uri = Uri(path = dirPath),
+          headers = Headers(Accept(requestMediaType)))
+        val response = service(filesystem.state)(request).run
+        response.status must_== Status.Ok
+        response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
+        response.headers.get(`Content-Disposition`) must_== disposition
+      }.pendingUntilFixed("Seem to have some problems testing directories, also, I don't think is specific to csv") // TODO: FIXME
+      "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {
       def testBoth[A](test: org.http4s.Method => Unit) = {

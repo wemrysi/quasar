@@ -1,8 +1,12 @@
 package quasar.api
 
+import quasar.Data
 import quasar.Predef._
 
-class ResponseFormatSpecs extends org.specs2.mutable.Specification {
+import scalaz.concurrent.Task
+import scalaz.stream.Process
+
+class MessageFormatSpec extends org.specs2.mutable.Specification {
   import org.http4s._, QValue._
   import org.http4s.headers.{Accept}
 
@@ -87,6 +91,39 @@ class ResponseFormatSpecs extends org.specs2.mutable.Specification {
 
     """not affect \"""" in {
       Csv.escapeNewlines("""\"""") must_== """\""""
+    }
+  }
+
+  "encoding" should {
+    "csv" >> {
+      val simpleData = List(
+        Data.Obj(ListMap("a" -> Data.Int(1))),
+        Data.Obj(ListMap("b" -> Data.Int(2))),
+        Data.Obj(ListMap("c" -> Data.Set(List(Data.Int(3))))))
+      val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
+      def test(data: List[Data], expectedEncoding: String, format: Csv) =
+        format.encode(Process.emitAll(data): Process[Task,Data]).runLog.run.mkString("") must_== expectedEncoding
+      "simple" >> test(
+        data = simpleData,
+        expectedEncoding = simpleExpected,
+        format = Csv.Default
+      )
+      "with quoting" >> test(
+        data = List(
+          Data.Obj(ListMap(
+            "a" -> Data.Str("\"Hey\""),
+            "b" -> Data.Str("a, b, c")))),
+        expectedEncoding = List("a,b", "\"\"\"Hey\"\"\",\"a, b, c\"").mkString("", "\r\n", "\r\n"),
+        format = Csv.Default
+      )
+      "alternative delimiters" >> {
+        val alternative = Csv(columnDelimiter = '\t', rowDelimiter = ";", quoteChar = '\'', escapeChar = '\\', None)
+        test(
+          data = simpleData,
+          expectedEncoding = "a\tb\tc[0];1\t\t;\t2\t;\t\t3;",
+          format = alternative
+        )
+      }
     }
   }
 }
