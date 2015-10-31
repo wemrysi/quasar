@@ -14,6 +14,7 @@ import org.http4s.server._
 import scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
+import quasar.fs.PathyGen._
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import inmemory._, DataGen._
@@ -27,14 +28,15 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
   def service(mem: InMemState): HttpService =
     metadata.service[QueryFileF](Coyoneda.liftTF(runService(mem)))
 
+  import posixCodec.printPath
+
   "Metadata Service" should {
     "respond with NotFound" >> {
-      "if directory does not exist" >> {
-        val unexistantDir = rootDir[Sandboxed] </> dir("foo") </> dir("bar")
-        val path:String = posixCodec.printPath(unexistantDir)
+      "if directory does not exist" ! prop { dir: AbsDir[Sandboxed] =>
+        val path:String = printPath(dir)
         val response = service(InMemState.empty)(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== jSingleObject("error", jString(s"Dir not found: $path"))
+        response.as[String].run must_== s"${printPath(dir)}: doesn't exist"
       }
 
       "file does not exist" >> {
