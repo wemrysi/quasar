@@ -6,7 +6,7 @@ import quasar.Predef._
 import scalaz._
 import scalaz.Tags.{Multiplication => Mult}
 
-final class Natural private (val value: Long) {
+final class Natural private[fs] (val value: Long) {
   def plus(other: Natural): Natural =
     new Natural(value + other.value)
 
@@ -21,11 +21,18 @@ final class Natural private (val value: Long) {
 
   def toInt: Int =
     value.toInt
+
+  override def equals(other: scala.Any) = other match {
+    case Natural(a) => value == a
+    case _ => false
+  }
 }
 
 object Natural {
   def apply(n: Long): Option[Natural] =
     Some(n).filter(_ >= 0).map(new Natural(_))
+
+  def unapply(n: Natural): Option[Long] = Some(n.value)
 
   val _0: Natural = new Natural(0)
   val _1: Natural = new Natural(1)
