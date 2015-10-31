@@ -11,7 +11,7 @@ import scalaz.syntax.std.boolean._
 
 import pathy.Path._
 
-import quasar.api.AsPathyPath
+import quasar.api.AsPath
 import quasar.fs._
 
 object metadata {
@@ -27,7 +27,7 @@ object metadata {
       M.fileExists(f) map (_ ? Ok(Json.obj()) | NotFound(Json("error" := s"File not found: ${posixCodec.printPath(f)}")))
 
     HttpService {
-      case GET -> AsPathyPath(path) =>
+      case GET -> AsPath(path) =>
         path.fold(dirMetadata, fileMetadata).foldMap(f).join
     }
   }

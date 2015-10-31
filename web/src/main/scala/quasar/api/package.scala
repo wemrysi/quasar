@@ -119,23 +119,23 @@ package object api {
     }
   }
 
-  object AsPath {
-    def unapply(p: HPath): Option[Path] = {
-      Some(Path("/" + p.toList.map(java.net.URLDecoder.decode(_, "UTF-8")).mkString("/")))
+  object AsDirPath {
+    def unapply(p: HPath): Option[AbsDir[Sandboxed]] = {
+      val str = "/" + p.toList.mkString("/")
+      posixCodec.parseAbsDir(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
     }
   }
 
-  object AsDirPath {
-    def unapply(p: HPath): Option[Path] = AsPath.unapply(p).map(_.asDir)
+  object AsFilePath {
+    def unapply(p: HPath): Option[AbsFile[Sandboxed]] = {
+      val str = "/" + p.toList.mkString("/")
+      posixCodec.parseAbsFile(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
+    }
   }
 
-  // TODO: Rename to `AsPath`
-  object AsPathyPath {
+  object AsPath {
     def unapply(p: HPath): Option[AbsPath[Sandboxed]] = {
-      val str = "/" + p.toList.map(java.net.URLDecoder.decode(_, "UTF-8")).mkString("/")
-      val maybeDir = posixCodec.parseAbsDir(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
-      val maybeFile = posixCodec.parseAbsFile(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
-      maybeDir.map(\/.left) orElse maybeFile.map(\/.right)
+      AsDirPath.unapply(p).map(\/.left) orElse AsFilePath.unapply(p).map(\/.right)
     }
   }
 
