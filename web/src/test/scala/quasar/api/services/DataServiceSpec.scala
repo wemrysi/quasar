@@ -15,7 +15,6 @@ import quasar.DataCodec
 
 import argonaut.{JsonObject, JsonNumber, Json}
 import argonaut.Argonaut._
-import jawnstreamz._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server._
@@ -86,17 +85,6 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
     }
 
-  implicit val lineDelimitedJsonDecoder: EntityDecoder[List[Json]] = {
-    EntityDecoder.decodeBy(JsonFormat.LineDelimited.mediaType) { msg =>
-      DecodeResult {
-        msg.body.parseJson(AsyncParser.ValueStream).partialAttempt {
-          case pe: ParseException =>
-            Process.emit(ParseFailure("Invalid JSON", pe.getMessage))
-        }.runLog.map(_.toList.sequenceU)
-      }
-    }
-  }
-
   import posixCodec.printPath
 
   // Remove once version 0.8.4 or higher of jawn is realeased.
@@ -131,24 +119,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
       "respond with file data" >> {
         val sampleFile = rootDir[Sandboxed] </> dir("foo") </> file("bar")
-        val samplePath: String = posixCodec.printPath(sampleFile)
+        val samplePath: String = printPath(sampleFile)
         def fileSystemWithSampleFile(data: Vector[Data]) = InMemState fromFiles Map(sampleFile -> data)
         "json by default" >> {
           def isExpectedResponse(
-            data: Vector[Data], response: Response,
-            format: JsonContentType = JsonContentType(Readable, LineDelimited)
+            data: Vector[Data], response: Response, format: MessageFormat = JsonContentType(Readable, LineDelimited)
           ) = {
-            val expectedData = data.map(format.mode.codec.encode).sequenceU.toOption.get
-            (format.format match {
-              case LineDelimited => response.as[List[Json]].map(_ must_== expectedData.toList).handleWith {
-                case decodeFailure =>
-                  response.as[String].map(json => ko(s"Unable to decode the following as line delimited json: $json"))
-              }
-              case SingleArray => response.as[Json].map(_ must_== expectedData.toList).handleWith {
-                case decodeFailure =>
-                  response.as[String].map(json => ko(s"Unable to decode the following as a single json array: $json"))
-              }
-            }).run
+            val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
+            response.as[String].run must_== expectedBody.runLog.run.mkString("")
             response.status must_== Status.Ok
             response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
           }
