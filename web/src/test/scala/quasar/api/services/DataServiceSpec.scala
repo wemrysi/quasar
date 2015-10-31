@@ -43,6 +43,9 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
 
   val jsonReadableLine = JsonContentType(Readable,LineDelimited)
+  val jsonPreciseLine = JsonContentType(Precise,LineDelimited)
+  val jsonReadableArray = JsonContentType(Readable,SingleArray)
+  val jsonPreciseArray = JsonContentType(Precise,SingleArray)
   val csv = MediaType.`text/csv`
 
   // See: https://github.com/non/jawn/pull/43
@@ -94,26 +97,36 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
     }
   }
 
+  import posixCodec.printPath
+
   // Remove once version 0.8.4 or higher of jawn is realeased.
   implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
 
-  case class SingleFileFileSystem(file: Path[Abs,File, Sandboxed], contents: Vector[Data]) {
-    def path = posixCodec.printPath(file)
+  case class SingleFileFileSystem(file: AbsFile[Sandboxed], contents: Vector[Data]) {
+    def path = printPath(file)
     def state = InMemState fromFiles Map(file -> contents)
   }
 
+  case class NonEmptyDir(dir: AbsDir[Sandboxed], filesInDir: NonEmptyList[(NonEmptyString, Vector[Data])]) {
+    def state = {
+      val fileMapping = filesInDir.map{ case (fileName,data) => (dir </> file(fileName.value), data)}
+      InMemState fromFiles fileMapping.toList.toMap
+    }
+  }
+
   implicit val arbSingleFileFileSystem: Arbitrary[SingleFileFileSystem] = Arbitrary(
-    (Arbitrary.arbitrary[Path[Abs,File,Sandboxed]] |@| Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
+    (Arbitrary.arbitrary[AbsFile[Sandboxed]] |@| Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
+
+  implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
+    (Arbitrary.arbitrary[AbsDir[Sandboxed]] |@| Arbitrary.arbitrary[NonEmptyList[(NonEmptyString, Vector[Data])]])(NonEmptyDir.apply))
 
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
-        "if file does not exist" >> {
-          val unexistantFile = rootDir[Sandboxed] </> dir("foo") </> file("bar.json")
-          val path:String = posixCodec.printPath(unexistantFile)
-          val response = service(InMemState.empty)(Request(uri = Uri(path = path))).run
+        "if file does not exist" ! prop { file: AbsFile[Sandboxed] =>
+          val response = service(InMemState.empty)(Request(uri = Uri(path = printPath(file)))).run
           response.status must_== Status.NotFound
-          response.as[String].run must_== "/foo/bar.json: doesn't exist"
+          response.as[String].run must_== s"${printPath(file)}: doesn't exist"
         }
       }
       "respond with file data" >> {
@@ -126,102 +139,115 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             format: JsonContentType = JsonContentType(Readable, LineDelimited)
           ) = {
             val expectedData = data.map(format.mode.codec.encode).sequenceU.toOption.get
-            format.format match {
-              case LineDelimited  => response.as[List[Json]].handleWith{case t => response.as[String]}.run must_== expectedData.toList
-              case SingleArray    => response.as[Json].run must_== Json.array(expectedData: _*)
-            }
+            (format.format match {
+              case LineDelimited => response.as[List[Json]].map(_ must_== expectedData.toList).handleWith {
+                case decodeFailure =>
+                  response.as[String].map(json => ko(s"Unable to decode the following as line delimited json: $json"))
+              }
+              case SingleArray => response.as[Json].map(_ must_== expectedData.toList).handleWith {
+                case decodeFailure =>
+                  response.as[String].map(json => ko(s"Unable to decode the following as a single json array: $json"))
+              }
+            }).run
             response.status must_== Status.Ok
             response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
           }
-          "readable by default" ! prop { filesystem: SingleFileFileSystem =>
+          "readable and line delimited by default" ! prop { filesystem: SingleFileFileSystem =>
             val response = service(filesystem.state)(Request(uri = Uri(path = filesystem.path))).run
             isExpectedResponse(filesystem.contents, response)
           }
-          "precise if specified" >> {
-            "in the content-type header" ! prop { data: Vector[Data] =>
+          "in any supported format if specified" >> {
+            "in the content-type header" >> {
+              def test(contentType: JsonContentType) = prop { filesystem: SingleFileFileSystem =>
+                val request = Request(
+                  uri = Uri(path = filesystem.path),
+                  headers = Headers(Accept(contentType.mediaType)))
+                val response = service(filesystem.state)(request).run
+                isExpectedResponse(filesystem.contents, response, contentType)
+              }
+              s"readable and line delimited (${jsonReadableLine.mediaType.renderString})" >> {
+                test(jsonReadableLine)
+              }
+              s"precise and line delimited (${jsonPreciseLine.mediaType.renderString})" >> {
+                test(jsonPreciseLine)
+              }
+              s"readable and in a single json array (${jsonReadableArray.mediaType.renderString})" >> {
+                test(jsonReadableArray)
+              }
+              s"precise and in a single json array (${jsonPreciseArray.mediaType.renderString})" >> {
+                test(jsonPreciseArray)
+              }
+              "or a more complicated proposition" ! prop { filesystem: SingleFileFileSystem =>
+                val request = Request(
+                  uri = Uri(path = filesystem.path),
+                  headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
+                val response = service(filesystem.state)(request).run
+                isExpectedResponse(filesystem.contents, response, JsonContentType(Precise,LineDelimited))
+              }
+            }
+            "in the request-headers" ! prop { filesystem: SingleFileFileSystem =>
               val contentType = JsonContentType(Precise,LineDelimited)
               val request = Request(
-                uri = Uri(path = samplePath),
-                headers = Headers(Accept(contentType.mediaType)))
-              val response = service(fileSystemWithSampleFile(data))(request).run
-              isExpectedResponse(data, response, contentType)
-            }
-            "in the request-headers" ! prop { data: Vector[Data] =>
-              val request = Request(
-                uri = Uri(path = samplePath).+?("request-headers", """{"Accept": "application/ldjson; mode=precise" }"""))
-              val response = HeaderParam(service(fileSystemWithSampleFile(data)))(request).run
-              isExpectedResponse(data, response, JsonContentType(Precise,LineDelimited))
+                uri = Uri(path = filesystem.path).+?("request-headers", s"""{"Accept": "application/ldjson; mode=precise" }"""))
+              val response = HeaderParam(service(filesystem.state))(request).run
+              isExpectedResponse(filesystem.contents, response, JsonContentType(Precise,LineDelimited))
             }
           }
-          "complicated Accept Header" ! prop { data: Vector[Data] =>
+          "with gziped encoding when specified" ! prop { filesystem: SingleFileFileSystem =>
             val request = Request(
-              uri = Uri(path = samplePath),
-              headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
-            val response = service(fileSystemWithSampleFile(data))(request).run
-            isExpectedResponse(data, response, JsonContentType(Precise,LineDelimited))
-          }
-          "in array if specified" ! prop { data: Vector[Data] =>
-            val request = Request(
-              uri = Uri(path = samplePath),
-              headers = Headers(Accept(MediaType.`application/json`)))
-            val response = service(fileSystemWithSampleFile(data))(request).run
-            isExpectedResponse(data, response, JsonContentType(Readable, SingleArray))
-          }
-          "with gziped encoding when specified" ! prop { data: Vector[Data] =>
-            val request = Request(
-              uri = Uri(path = samplePath),
+              uri = Uri(path = filesystem.path),
               headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
-            val response = GZip(service(fileSystemWithSampleFile(data)))(request).run
+            val response = GZip(service(filesystem.state))(request).run
             response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
             response.status must_== Status.Ok
           }
-          // TODO: Make the filename a property in order to remove this test
-          "support disposition" ! prop { data: Vector[Data] =>
+          "support disposition" ! prop { filesystem: SingleFileFileSystem =>
             val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
             val request = Request(
-              uri = Uri(path = samplePath),
+              uri = Uri(path = filesystem.path),
               headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
-            val response = service(fileSystemWithSampleFile(data))(request).run
+            val response = service(filesystem.state)(request).run
             response.headers.get(`Content-Disposition`) must_== Some(disposition)
           }
           "support offset and limit" >> {
-            "return expected result if user supplies valid values" ! prop { (data: Vector[Data], offset: Natural, limit: Positive) =>
+            "return expected result if user supplies valid values" ! prop { (filesystem: SingleFileFileSystem, offset: Natural, limit: Positive) =>
+              // Not sure why this precondition is necessary...
               (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
                 val request = Request(
-                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
-                val response = service(fileSystemWithSampleFile(data))(request).run
-                isExpectedResponse(data.drop(offset.value.toInt).take(limit.value.toInt), response)
+                  uri = Uri(path = filesystem.path).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+                val response = service(filesystem.state)(request).run
+                isExpectedResponse(filesystem.contents.drop(offset.value.toInt).take(limit.value.toInt), response)
               }
             }
             "return 400 if provided with" >> {
-              "a non-positive limit (0 is invalid)" ! prop { (offset: Natural, limit: Int) =>
+              "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
                 (limit < 1) ==> {
                   val request = Request(
-                    uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limit.toString))
+                    uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.toString))
                   val response = service(InMemState.empty)(request).run
                   response.status must_== Status.BadRequest
                   response.as[String].run must_== s"invalid limit: $limit (must be >= 1)"
                 }
               }
-              "a negative offset" ! prop { (offset: Negative, limit: Positive) =>
+              "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Negative, limit: Positive) =>
                 val request = Request(
-                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"invalid offset: ${offset.value} (must be >= 0)"
               }
-              "if provided with multiple limits?" ! prop { (offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
+              "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
                 val limits = limit1 :: limit2 :: otherLimits
                 val request = Request(
-                  uri = Uri(path = samplePath).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
+                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"Two limits were provided, only supply one limit"
               }.pendingUntilFixed("SD-1082")
-              "if provided with multiple offsets?" ! prop { (limit: Positive, offsets: List[Natural]) =>
+              "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
                 (offsets.length >= 2) ==> {
                   val request = Request(
-                    uri = Uri(path = samplePath).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
+                    uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
                   val response = service(InMemState.empty)(request).run
                   response.status must_== Status.BadRequest
                   response.as[String].run must_== s"Two offsets were provided, only supply one offset"
@@ -229,17 +255,17 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                        // and going against that default behavior would be more work
                 }
               }.pendingUntilFixed("SD-1082")
-              "an unparsable limit" >> {
+              "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
                 val request = Request(
-                  uri = Uri(path = samplePath).+?("limit", "a"))
+                  uri = Uri(path = printPath(path)).+?("limit", "a"))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[String].run must_== s"""invalid limit: Query decoding Long failed (For input string: "a")"""
               }
-              "if provided with both an invalid offset and limit" ! prop { (limit: Int, offset: Negative) =>
+              "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Negative) =>
                 (limit < 1) ==> {
                   val request = Request(
-                    uri = Uri(path = samplePath).+?("limit", limit.toString).+?("offset", offset.value.toString))
+                    uri = Uri(path = printPath(path)).+?("limit", limit.toString).+?("offset", offset.value.toString))
                   val response = service(InMemState.empty)(request).run
                   response.status must_== Status.BadRequest
                   response.as[String].run must_== s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)"
@@ -319,16 +345,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               expectedResponseMediaType = MessageFormat.Csv.Default.mediaType
             )
           }
-          "using disposition to download as zipped directory" ! prop { (dir: Path[Abs,Dir,Sandboxed], filesInDir: NonEmptyList[(NonEmptyString, Vector[Data])]) =>
-            val dirPath = posixCodec.printPath(dir)
-            val fileMapping = filesInDir.map{ case (fileName,data) => (dir </> file(fileName.value), data)}
+          "using disposition to download as zipped directory" ! prop { filesystem: NonEmptyDir =>
+            val dirPath = printPath(filesystem.dir)
             val disposition = `Content-Disposition`("attachement", Map("filename" -> "foo.zip"))
             val requestMediaType = MediaType.`text/csv`.withExtensions(Map("disposition" -> disposition.value))
             val request = Request(
               uri = Uri(path = dirPath),
               headers = Headers(Accept(requestMediaType)))
-            val filesystem = InMemState fromFiles fileMapping.toList.toMap
-            val response = service(filesystem)(request).run
+            val response = service(filesystem.state)(request).run
             response.status must_== Status.Ok
             response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
             response.headers.get(`Content-Disposition`) must_== disposition
@@ -493,14 +517,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
     }
     "MOVE" >> {
-      "be 400 for missing Destination header" ! prop { path: Path[Abs,File,Sandboxed] =>
+      "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
         val pathString = posixCodec.printPath(path)
         val request = Request(uri = Uri(path = pathString), method = Method.MOVE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.BadRequest
         response.as[String].run must_== "The 'Destination' header must be specified"
       }
-      "be 404 for missing source file" ! prop { (source: Path[Abs,File,Sandboxed], destination: Path[Abs,File,Sandboxed]) =>
+      "be 404 for missing source file" ! prop { (source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed]) =>
         val sourceString = posixCodec.printPath(source)
         val destinationString = posixCodec.printPath(destination)
         val request = Request(uri = Uri(path = sourceString), headers = Headers(Header("Destination", destinationString)), method = Method.MOVE)
@@ -508,10 +532,10 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         response.status must_== Status.NotFound
         response.as[String].run must_== s"$sourceString: doesn't exist"
       }
-      "be 404 for missing destination file" ! prop { (source: Path[Abs,File,Sandboxed], destination: Path[Abs,File,Sandboxed]) =>
+      "be 404 for missing destination file" ! prop { (source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed]) =>
         todo // Figure out what we are doing with nested backends because not sure this test makes sense without them
       }
-      "be 201 with file" ! prop {(source: Path[Abs,File,Sandboxed], destination: Path[Abs,File,Sandboxed], data: Vector[Data]) =>
+      "be 201 with file" ! prop {(source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed], data: Vector[Data]) =>
         val sourceString = posixCodec.printPath(source)
         val destinationString = posixCodec.printPath(destination)
         val request = Request(uri = Uri(path = sourceString), headers = Headers(Header("Destination", destinationString)), method = Method.MOVE)
@@ -520,45 +544,40 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         response.status must_== Status.Created
         // TODO: Check that the file was moved properly (not in old test though...)
       }
-      "be 201 with dir" ! prop {(sourceDir: Path[Abs,Dir,Sandboxed], sampleFiles: Map[String, Vector[Data]], destinationDir: Path[Abs,Dir,Sandboxed]) =>
-        val sourceDirString = posixCodec.printPath(sourceDir)
-        val fileMapping = sampleFiles.map{ case (fileName,data) => (sourceDir </> file(fileName), data)}
-        val destinationString = posixCodec.printPath(destinationDir)
-        val request = Request(uri = Uri(path = sourceDirString), headers = Headers(Header("Destination", destinationString)), method = Method.MOVE)
-        val filesystem = InMemState fromFiles fileMapping
-        val response = service(filesystem)(request).run
+      "be 201 with dir" ! prop {(sourceDir: NonEmptyDir, destinationDir: AbsDir[Sandboxed]) =>
+        val request = Request(
+          uri = Uri(path = printPath(sourceDir.dir)),
+          headers = Headers(Header("Destination", printPath(destinationDir))),
+          method = Method.MOVE)
+        val response = service(sourceDir.state)(request).run
         response.status must_== Status.Created
         // TODO: Check that the file was moved properly (not in old test though...)
       }
       "be 501 for src and dst not in the same backend" >> todo // What are we doing? make sure that we test all error conditions that the backend can return
     }
     "DELETE" >> {
-      "be 200 with existing file" ! prop { (file: Path[Abs,File,Sandboxed], data: Vector[Data]) =>
-        val path = posixCodec.printPath(file)
-        val request = Request(uri = Uri(path = path), method = Method.DELETE)
-        val filesystem = InMemState fromFiles (Map(file -> data))
-        val response = service(filesystem)(request).run
+      "be 200 with existing file" ! prop { filesystem: SingleFileFileSystem =>
+        val request = Request(uri = Uri(path = filesystem.path), method = Method.DELETE)
+        val response = service(filesystem.state)(request).run
         response.status must_== Status.Ok
         // Check if file was actually deleted
       }
-      "be 200 with existing dir" ! prop { (dir: Path[Abs,Dir,Sandboxed], sampleFiles: Map[String, Vector[Data]]) =>
-        val dirPath = posixCodec.printPath(dir)
-        val fileMapping = sampleFiles.map{ case (fileName,data) => (dir </> file(fileName), data)}
+      "be 200 with existing dir" ! prop { filesystem: NonEmptyDir =>
+        val dirPath = printPath(filesystem.dir)
         val request = Request(uri = Uri(path = dirPath), method = Method.DELETE)
-        val filesystem = InMemState fromFiles fileMapping
-        val response = service(filesystem)(request).run
+        val response = service(filesystem.state)(request).run
         response.status must_== Status.Ok
         // Check if dir was actually deleted
       }
-      "be 404 with missing file" ! prop { (file: Path[Abs,File,Sandboxed], data: Vector[Data]) =>
-        val path = posixCodec.printPath(file)
+      "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
+        val path = printPath(file)
         val request = Request(uri = Uri(path = path), method = Method.DELETE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.NotFound
         // Check if still empty?
       }
-      "be 404 with missing dir" ! prop { dir: Path[Abs,Dir,Sandboxed] =>
-        val dirPath = posixCodec.printPath(dir)
+      "be 404 with missing dir" ! prop { dir: AbsDir[Sandboxed] =>
+        val dirPath = printPath(dir)
         val request = Request(uri = Uri(path = dirPath), method = Method.DELETE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.NotFound
