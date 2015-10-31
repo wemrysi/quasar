@@ -21,11 +21,20 @@ final class Positive private (val value: Long) {
 
   def toInt: Int =
     value.toInt
+
+  def toNatural: Natural = new Natural(value)
+
+  override def equals(other: scala.Any) = other match {
+    case Positive(a) => value == a
+    case _ => false
+  }
 }
 
 object Positive {
   def apply(n: Long): Option[Positive] =
     Some(n).filter(_ > 0).map(new Positive(_))
+
+  def unapply(p: Positive) = Some(p.value)
 
   val _1: Positive = new Positive(1)
   val _2: Positive = new Positive(2)
