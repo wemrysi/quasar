@@ -2,14 +2,20 @@ package quasar.api.services
 
 import java.nio.charset.StandardCharsets
 
+import quasar.fp._
+
+import argonaut.Json
+import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.dsl._
+import org.http4s.argonaut._
 import org.http4s.headers.{`Content-Type`, Accept}
 import org.http4s.server._
 import pathy.Path._
+import quasar.{DataCodec, Data}
 import quasar.repl.Prettify
 import quasar.Predef._
-import quasar.api.{MessageFormat, AsPath}
+import quasar.api._
 import quasar.fs._
 import scodec.bits.ByteVector
 
@@ -21,6 +27,7 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.TraverseOps
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
+import scalaz.syntax.show._
 import scalaz.std.option._
 
 object data {
@@ -76,6 +83,19 @@ object data {
         }
         possibleResponse.leftMap(errMessage => BadRequest(errMessage)).merge
       }
+      // TODO: Create a upload method because this is major duplication...
+      case req @ POST -> AsFilePath(path) => handleMissingContentType(
+        req.decode[(List[WriteError], List[Data])] { case (errors, rows) =>
+          // Does the fact that save take a Process[Free, A] doom us to non-streaming upload?
+          responseForUpload(errors, convert[S, FileSystemError](f)(W.append(path, Process.emitAll(rows))).runLog.map(_.toList))
+        }
+      )
+      case req @ PUT -> AsFilePath(path) => handleMissingContentType(
+        req.decode[(List[WriteError], List[Data])] { case (errors, rows) =>
+          // Does the fact that save take a Process[Free, A] doom us to non-streaming upload?
+          responseForUpload(errors, convert[S, FileSystemError](f)(W.save(path, Process.emitAll(rows))).runLog.map(_.toList))
+        }
+      )
     }
   }
 
@@ -90,5 +110,28 @@ object data {
       quasar.api.Zip.zipFiles(filesAndBytes)
     }
   }
+
+  def handleMissingContentType(response: Task[Response]) =
+    response.handleWith{ case MessageFormat.UnsupportedContentType =>
+      UnsupportedMediaType("No media-type is specified in Content-Type header")
+        .withContentType(Some(`Content-Type`(MediaType.`text/plain`)))
+    }
+
+  private def responseForUpload[A](decodeErrors: List[WriteError], persistErrors: FilesystemTask[List[FileSystemError]]): Task[Response] = {
+    def dataErrorBody[A: Show](status: org.http4s.dsl.impl.EntityResponseGenerator, errs: List[A]) =
+      status(Json(
+        "error" := "some uploaded value(s) could not be processed",
+        "details" := errs.map(e => Json("detail" := e.shows))))
+
+    if (decodeErrors.nonEmpty)
+      dataErrorBody(BadRequest, decodeErrors)
+    else
+      persistErrors.run.flatMap(_.fold(
+        fileSystemErrorResponse,
+        errors => if(errors.isEmpty) Ok("") else dataErrorBody(InternalServerError, errors)))
+  }
+
+  implicit val dataDecoder: EntityDecoder[(List[WriteError], List[Data])] =
+    MessageFormat.decoder orElse EntityDecoder.error(MessageFormat.UnsupportedContentType)
 }
 
