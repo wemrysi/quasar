@@ -13,7 +13,7 @@ import JsonPrecision._
 import JsonFormat._
 import quasar.DataCodec
 
-import argonaut.{JsonObject, JsonNumber, Json}
+import argonaut.{Argonaut, JsonObject, JsonNumber, Json}
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
@@ -109,6 +109,34 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
 
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
     (Arbitrary.arbitrary[AbsDir[Sandboxed]] |@| Arbitrary.arbitrary[NonEmptyList[(NonEmptyString, Vector[Data])]])(NonEmptyDir.apply))
+
+  sealed trait JsonType
+
+  case class PreciseJson(value: Json) extends JsonType
+  object PreciseJson {
+    implicit val entityEncoder: EntityEncoder[PreciseJson] =
+      EntityEncoder.encodeBy(`Content-Type`(jsonPreciseArray.mediaType, Charset.`UTF-8`)) { pJson =>
+        org.http4s.argonaut.jsonEncoder.toEntity(pJson.value)
+      }
+  }
+
+  case class ReadableJson(value: Json) extends JsonType
+  object ReadableJson {
+    implicit val entityEncoder: EntityEncoder[ReadableJson] =
+      EntityEncoder.encodeBy(`Content-Type`(jsonReadableArray.mediaType, Charset.`UTF-8`)) { rJson =>
+        org.http4s.argonaut.jsonEncoder.toEntity(rJson.value)
+      }
+  }
+
+  implicit val readableLineDelimitedJson: EntityEncoder[List[ReadableJson]] =
+    EntityEncoder.stringEncoder.contramap[List[ReadableJson]] { rJsons =>
+      rJsons.map(rJson => Argonaut.nospace.pretty(rJson.value)).mkString("\n")
+    }.withContentType(`Content-Type`(jsonReadableLine.mediaType, Charset.`UTF-8`))
+
+  implicit val preciseLineDelimitedJson: EntityEncoder[List[PreciseJson]] =
+    EntityEncoder.stringEncoder.contramap[List[PreciseJson]] { pJsons =>
+      pJsons.map(pJson => Argonaut.nospace.pretty(pJson.value)).mkString("\n")
+    }.withContentType(`Content-Type`(jsonPreciseLine.mediaType, Charset.`UTF-8`))
 
   "Data Service" should {
     "GET" >> {
@@ -300,7 +328,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
       testBoth { method =>
         "be 415 if media-type is missing" ! prop { file: Path[Abs,File,Sandboxed] =>
-          val path = posixCodec.printPath(file)
+          val path = printPath(file)
           val request = Request(
             uri = Uri(path = path),
             method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run
@@ -313,8 +341,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             prop { file: Path[Abs, File, Sandboxed] =>
               val path = posixCodec.printPath(file)
               val request = Request(
-                uri = Uri(path = path),
-                headers = Headers(`Content-Type`(mediaType, Charset.`UTF-8`))).withBody(body).run
+                uri = Uri(path = path),             // We do it this way becuase withBody sets the content-type
+                method = method).withBody(body).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
               val response = service(emptyMem)(request).run
               response.status must_== Status.BadRequest
               response.as[String].run must_== expectedBody
@@ -342,74 +370,60 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           }
         }
         "accept valid data" >> {
-          def accept(body: String, expected: List[Data], mediaType: MediaType) =
-            prop { file: Path[Abs, File, Sandboxed] =>
-              (Path.depth(file) == 1) ==> {
-                val path = posixCodec.printPath(file)
-                val request = Request(
-                  uri = Uri(path = path),
-                  method = method,
-                  headers = Headers(`Content-Type`(mediaType, Charset.`UTF-8`))).withBody(body).run
-                val response = service(emptyMem)(request).run
-                response.status must_== Status.Ok
-                response.as[String] must_== ""
-                // TODO: How do I check the in-memory interpreter to find out if the files were create
-                // also need to test for Append vs Save
-              }
+          def accept[A: EntityEncoder](body: A, expected: List[Data]) =
+            prop { fileName: String =>
+              val sampleFile = rootDir[Sandboxed] </> file(fileName)
+              val path = printPath(sampleFile)
+              val request = Request(uri = Uri(path = path), method = method).withBody(body).run
+              val response = service(emptyMem)(request).run
+              response.status must_== Status.Ok
+              response.as[String].run must_== ""
+              // TODO: How do I check the in-memory interpreter to find out if the files were create
+              // also need to test for Append vs Save
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
             Data.Obj(ListMap("b" -> Data.Time(org.threeten.bp.LocalTime.parse("12:34:56")))))
           "Json" >> {
-            def formatAsMultiLineArray(jsonBlob: String) = {
-              // insert a comma at the end of each line (because we are in an array)
-              val adaptedBlob = jsonBlob.split("\n").mkString(",\n")
-              s"[$adaptedBlob]"
-            }
-            def formatAsSingleLineArray(jsonBlob: String) = {
-              // Remove the newline and replace with a comma only (because we are in an array)
-              val adaptedBlob = jsonBlob.split("\n").mkString(",")
-              s"[$adaptedBlob]"
-            }
-            def testPreciseAndReadable[A](test: (JsonPrecision, String) => Unit) = {
-              "Precise" should {
-                val jsonBlob =
-                  """{"a" : 1}
-                    |{"b" : {"$time": "12:34:56"}}""".stripMargin
-                test(Precise, jsonBlob)
-              }//.pendingUntilFixed("SD-1066") Damn you specs2 2.x!!
-              "Readable" should {
-                val jsonBlob =
-                  """{"a" : 1}
-                    |{"b" : "12:34:56"}""".stripMargin
-                test(Readable, jsonBlob)
+            val line1 = Json("a" := 1)
+            val preciseLine2 = Json("b" := Json("$time" := "12:34:56"))
+            val readableLine2 = Json("b" := "12:34:56")
+            "when formatted with one json object per line" >> {
+              "Precise" ! {
+                accept(List(line1, preciseLine2).map(PreciseJson(_)), expectedData)
+              }
+              "Readable" ! {
+                accept(List(line1, readableLine2).map(ReadableJson(_)), expectedData)
               }
             }
-            testPreciseAndReadable { (precision, jsonBlob) =>
-              "when formatted with one json object per line" ! {
-                accept(jsonBlob, expectedData, JsonContentType(precision, LineDelimited).mediaType)
+            "when formatted as a single json array" >> {
+              "Precise" ! {
+                accept(PreciseJson(Json.array(line1, preciseLine2)), List(Data.Arr(expectedData)))
               }
-              "when formatted as a single json array" ! {
-                accept(formatAsMultiLineArray(jsonBlob), List(Data.Arr(expectedData)), JsonContentType(precision, SingleArray).mediaType)
+              "Readable" ! {
+                accept(ReadableJson(Json.array(line1, readableLine2)), List(Data.Arr(expectedData)))
               }
-              "when having multiple lines containing arrays" ! {
-                val arbitraryValue = 3
-                def replicate[A](a: A) = Applicative[Id].replicateM[A](arbitraryValue, a)
-                val jsonString = replicate(formatAsSingleLineArray(jsonBlob)).mkString("\n")
-                accept(jsonString, replicate(Data.Arr(expectedData)), JsonContentType(precision, LineDelimited).mediaType)
+            }
+            "when having multiple lines containing arrays" >> {
+              val arbitraryValue = 3
+              def replicate[A](a: A) = Applicative[Id].replicateM[A](arbitraryValue, a)
+              "Precise" ! {
+                accept(PreciseJson(Json.array(replicate(Json.array(line1, preciseLine2)): _*)), replicate(Data.Arr(expectedData)))
               }
-              () // Eliminates warning, specs2 3.x will allow us to remove
+              "Readable" ! {
+                accept(ReadableJson(Json.array(replicate(Json.array(line1, readableLine2)): _*)), replicate(Data.Arr(expectedData)))
+              }
             }
           }
           "CSV" >> {
             "standard" >> {
-              accept("a,b\n1,\n,12:34:56", expectedData, MediaType.`text/csv`)
+              accept("a,b\n1,\n,12:34:56", expectedData)
             }
             "weird" >> {
               val weirdData = List(
                 Data.Obj(ListMap("a" -> Data.Int(1))),
                 Data.Obj(ListMap("b" -> Data.Str("[1|2|3]"))))
-              accept("a|b\n1|\n|'[1|2|3]'\n", weirdData, MediaType.`text/csv`)
+              accept("a|b\n1|\n|'[1|2|3]'\n", weirdData)
             }
           }
         }
@@ -429,19 +443,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           jsonResponse must_== Json("details" := "expected two error messages") // TODO: Put actual error messages
           // TODO: Make sure the filesystem has not been changed?
         }
+        "be 500 with server side error" >> todo
         () // Required for testBoth (not required with specs2 3.x)
-      }
-    }
-    "PUT" >> {
-      "be 500 with simualated error on a particular value" >> {
-        todo
-        // TODO: Understand what this test is meant to assert
-      }
-    }
-    "POST" >> {
-      "be 500 with simulated error on a particular value" >> {
-        todo
-        // TODO: Understand what this test is meant to assert
       }
     }
     "MOVE" >> {

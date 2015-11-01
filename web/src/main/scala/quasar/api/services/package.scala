@@ -26,8 +26,8 @@ package object services {
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error.fold(
       pathErrorResponse,
-      unknownReadHandle => BadRequest("unknow read handle"),
-      unknownWriteHandle => BadRequest("unknow write handle"),
+      unknownReadHandle => BadRequest("unknown read handle"),
+      unknownWriteHandle => BadRequest("unknown write handle"),
       partialWrite => BadRequest("Partial write"),
       (data, str) => BadRequest("some other thing")
     )
@@ -43,30 +43,34 @@ package object services {
 //  def failureResponse(f: Json => Task[Response], message: String): Task[Response] =
 //    f(Json("error" := message))
 
-  type FSTask[A] = FileSystemErrT[Task, A]
+  type FilesystemTask[A] = FileSystemErrT[Task, A]
   /** Flatten by inserting the [[quasar.fs.FileSystemError]] into the failure case of the [[scalaz.concurrent.Task]] */
-  val flatten = new (FSTask ~> Task) {
-    def apply[A](t: FSTask[A]): Task[A] =
+  val flatten = new (FilesystemTask ~> Task) {
+    def apply[A](t: FilesystemTask[A]): Task[A] =
       t.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now).join
   }
 
   def formatAsHttpResponse[S[_]: Functor,A: EntityEncoder](f: S ~> Task)(data: Process[FileSystemErrT[Free[S,?], ?], A],
                                                                          contentType: `Content-Type`,
                                                                          disposition: Option[`Content-Disposition`]): Task[Response] = {
-    type F[A] = Free[S,A]
-    type M[A] = FileSystemErrT[F,A]
-    val trans: F ~> Task = hoistFree(f)
-    val trans2: M ~> FSTask  = Hoist[FileSystemErrT].hoist(trans)
     def withFormatHeaders(resp: Response) = {
       val headers = contentType :: disposition.toList
       resp.putHeaders(headers: _*)
     }
     // Check the first element of data, if it's an error return an error response, otherwise serialize any
     // other errors among the remaining data that is sent to the client.
-    data.translate(trans2).unconsOption.fold(
+    convert(f)(data).unconsOption.fold(
       fileSystemErrorResponse,
       _.fold(Ok(""))({ case (first, rest) =>
         Ok(Process.emit(first) ++ rest.translate(flatten))
       }).map(withFormatHeaders)).join
+  }
+
+  def convert[S[_]: Functor, A](f: S ~> Task)(from: Process[FileSystemErrT[Free[S,?],?], A]): Process[FilesystemTask, A] = {
+    type F[A] = Free[S,A]
+    type M[A] = FileSystemErrT[F,A]
+    val trans: F ~> Task = hoistFree(f)
+    val trans2: M ~> FilesystemTask = Hoist[FileSystemErrT].hoist(trans)
+    from.translate(trans2)
   }
 }
