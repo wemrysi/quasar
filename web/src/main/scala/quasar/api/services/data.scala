@@ -120,6 +120,9 @@ object data {
             }.leftMap(BadRequest(_)).merge
           }
         )
+      case DELETE -> AsPath(path) =>
+        val response = M.delete(path).fold(fileSystemErrorResponse, _ => Ok(""))
+        hoistFree(f).apply(response).join
     }
   }
 
