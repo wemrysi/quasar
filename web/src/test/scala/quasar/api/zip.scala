@@ -1,6 +1,8 @@
 package quasar.api
 
 import org.specs2.ScalaCheck
+import org.specs2.scalaz.ScalazMatchers
+import pathy.Path
 import quasar.Predef._
 
 import org.specs2.mutable._
@@ -17,8 +19,11 @@ import pathy.Path._
 import quasar.fs.PathyGen._
 import quasar.fs.NumericGen._
 
-class ZipSpecs extends Specification with ScalaCheck {
+class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
   args.report(showtimes=true)
+
+  // Remove after upgrading to version of Path that defines Equal itself
+  implicit def pathEqual[B,T,S]: Equal[Path[B,T,S]] = Equal.equalA
 
   "zipFiles" should {
     import Zip._
@@ -68,7 +73,7 @@ class ZipSpecs extends Specification with ScalaCheck {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(byte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must_== filesAndSize.mapValues(_.toNatural).toList
+      counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
     }
 
     "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
@@ -76,7 +81,7 @@ class ZipSpecs extends Specification with ScalaCheck {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must_== filesAndSize.mapValues(_.toNatural).toList
+      counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
     }
 
     "zip many large files of random bytes (100 MB)" in {
@@ -114,7 +119,7 @@ class ZipSpecs extends Specification with ScalaCheck {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      bytes(z).run must_== bytes(z).run
+      bytes(z).run must equal(bytes(z).run)
     }
   }
 }
