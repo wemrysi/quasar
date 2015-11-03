@@ -91,7 +91,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                   testProp(jsonPreciseArray)
                 }
               }
-              "csv" ! prop { (filesystem: SingleFileFileSystem, format: Csv) => test(format, filesystem) }
+              "csv" ! prop { (filesystem: SingleFileFileSystem, format: MessageFormat.Csv) => test(format, filesystem) }
               "or a more complicated proposition" ! prop { filesystem: SingleFileFileSystem =>
                 val request = Request(
                   uri = Uri(path = filesystem.path),
@@ -245,47 +245,57 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           response.as[String].run must_== "No media-type is specified in Content-Type header"
         }
         "be 400 with" >> {
-          def be400(body: String, expectedBody: String, mediaType: MediaType = jsonReadableLine.mediaType) = {
+          def be400[A: EntityDecoder](body: String, expectedBody: A, mediaType: MediaType = jsonReadableLine.mediaType) = {
             prop { file: Path[Abs, File, Sandboxed] =>
-              val path = posixCodec.printPath(file)
+              val path = printPath(file)
               val request = Request(
                 uri = Uri(path = path),             // We do it this way becuase withBody sets the content-type
                 method = method).withBody(body).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
               val response = service(emptyMem)(request).run
+              response.as[A].run must_== expectedBody
               response.status must_== Status.BadRequest
-              response.as[String].run must_== expectedBody
               // TODO: Assert nothing changed in the backend
             }
           }
           "invalid body" >> {
             "no body" ! be400(body = "", expectedBody = "Request has no body")
-            "invalid JSON" ! be400(body = "{", expectedBody = "Some uploaded value(s) could not be processed")
+            "invalid JSON" ! be400(
+              body = "{",
+              expectedBody = Json("error" := "some uploaded value(s) could not be processed",
+                                  "details" := Json.array(jString("parse error: JSON terminates unexpectedly. in the following line: {")))
+            )
             "invalid CSV" >> {
-              "empty (no headers)" ! {
-                be400(body = "", expectedBody = "Some uploaded value(s) could not be processed", csv)
-              }
+              "empty (no headers)" ! be400(
+                body = "",
+                expectedBody = "Request has no body",
+                mediaType = csv
+              )
               "if broken (after the tenth data line)" ! {
                 val brokenBody = "\"a\",\"b\"\n1,2\n3,4\n5,6\n7,8\n9,10\n11,12\n13,14\n15,16\n17,18\n19,20\n\",\n"
-                be400(body = brokenBody, expectedBody = "Some uploaded value(s) could not be processed", csv)
+                be400(
+                  body = brokenBody,
+                  expectedBody = Json("error" := "some uploaded value(s) could not be processed",
+                    "details" := Json.array(jString("parse error: Malformed Input!: Some(\",\n)"))),
+                  mediaType = csv)
               }
             }
           }
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
           "if path is invalid (parent directory does not exist)" ! prop { (file: Path[Abs,File,Sandboxed], json: Json) =>
             Path.depth(file) != 1 ==> {
-              be400(body = json.spaces4, s"Invalid path: ${posixCodec.printPath(file)}")
+              be400(body = json.spaces4, s"Invalid path: ${printPath(file)}")
             }
-          }
+          }.pendingUntilFixed("What do we want here, create it or not?")
         }
         "accept valid data" >> {
           def accept[A: EntityEncoder](body: A, expected: List[Data]) =
-            prop { fileName: String =>
-              val sampleFile = rootDir[Sandboxed] </> file(fileName)
+            prop { fileName: NonEmptyString =>
+              val sampleFile = rootDir[Sandboxed] </> file(fileName.value)
               val path = printPath(sampleFile)
               val request = Request(uri = Uri(path = path), method = method).withBody(body).run
               val response = service(emptyMem)(request).run
-              response.status must_== Status.Ok
               response.as[String].run must_== ""
+              response.status must_== Status.Ok
               // TODO: How do I check the in-memory interpreter to find out if the files were create
               // also need to test for Append vs Save
             }
@@ -325,13 +335,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           }
           "CSV" >> {
             "standard" >> {
-              accept("a,b\n1,\n,12:34:56", expectedData)
+              accept(Csv("a,b\n1,\n,12:34:56"), expectedData)
             }
             "weird" >> {
               val weirdData = List(
                 Data.Obj(ListMap("a" -> Data.Int(1))),
                 Data.Obj(ListMap("b" -> Data.Str("[1|2|3]"))))
-              accept("a|b\n1|\n|'[1|2|3]'\n", weirdData)
+              accept(Csv("a|b\n1|\n|'[1|2|3]'\n"), weirdData)
             }
           }
         }
@@ -341,14 +351,18 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                                |{"b": 2}
                                |}
                                |{"c": 3}""".stripMargin
-          val pathString = posixCodec.printPath(path)
+          val pathString = printPath(path)
           val request = Request(
-            uri = Uri(path = pathString),
-            method = method,
-            headers = Headers(`Content-Type`(jsonReadableLine.mediaType))).withBody(twoErrorJson).run
+            uri = Uri(path = pathString),               // withBody replaces the headers which is why we need to specify them here
+            method = method).withBody(twoErrorJson).run.replaceAllHeaders(Headers(`Content-Type`(jsonReadableLine.mediaType)))
           val response = service(emptyMem)(request).run
+          response.status must_== Status.BadRequest // TODO: Is this really what we want?
           val jsonResponse = response.as[Json].run
-          jsonResponse must_== Json("details" := "expected two error messages") // TODO: Put actual error messages
+          jsonResponse must_== Json("error" := "some uploaded value(s) could not be processed",
+            "details" := Json.array(
+              jString("parse error: JSON terminates unexpectedly. in the following line: \"unmatched"),
+              jString("parse error: Unexpected content found: } in the following line: }")
+            ))
           // TODO: Make sure the filesystem has not been changed?
         }
         "be 500 with server side error" >> todo

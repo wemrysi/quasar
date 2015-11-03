@@ -64,6 +64,36 @@ object data {
                                                     M: ManageFile.Ops[S],
                                                     Q: QueryFile.Ops[S]): HttpService = {
 
+    def download(format: MessageFormat, path: AbsPath[Sandboxed], offset: Natural, limit: Option[Positive]) = {
+      path.fold(
+        dirPath => formatAsHttpResponse(f)(
+          data = zippedBytes[S](dirPath, format, offset, limit),
+          contentType = `Content-Type`(MediaType.`application/zip`)
+        ),
+        filePath => formatAsHttpResponse(f)(
+          data = format.encode(R.scan(filePath, offset, limit)),
+          contentType = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))
+        )
+      )
+    }
+
+    def upload(req: Request,
+               by: Process[Free[S,?], Data] => Process[FileSystemErrT[Free[S,?],?], FileSystemError]) = {
+      handleMissingContentType(
+        req.decode[Process[Task,DecodeError \/ Data]] { data =>
+          for {
+            all <- data.runLog
+            result <- if (all.isEmpty) BadRequest("Request has no body")
+            else {
+              val (errors, cleanData) = unzipDisj(all.toList)
+              // Does the fact that save take a Process[Free, A] doom us to non-streaming upload?
+              responseForUpload(errors, convert[S, FileSystemError](f)(by(Process.emitAll(cleanData))).runLog.map(_.toList))
+            }
+          } yield result
+        }
+      )
+    }
+
     HttpService {
       case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
         val offsetWithDefault = offsetParam.getOrElse(Natural._0.successNel)
@@ -71,20 +101,9 @@ object data {
           nel => s"invalid offset: ${nel.head.sanitized} (${nel.head.details})")
         val limitWithErrorMsg: String \/ Option[Positive] = limitParam.traverseU(_.disjunction.leftMap(
           nel => s"invalid limit: ${nel.head.sanitized} (${nel.head.details})"))
-        val possibleResponse = (offsetWithErrorMsg |@| limitWithErrorMsg){(offset, limit) =>
+        val possibleResponse = (offsetWithErrorMsg |@| limitWithErrorMsg) { (offset, limit) =>
           val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-          path.fold(
-            dirPath => formatAsHttpResponse(f)(
-              data = zippedBytes[S](dirPath, requestedFormat, offset, limit),
-              contentType = `Content-Type`(MediaType.`application/zip`),
-              disposition = requestedFormat.disposition
-            ),
-            filePath => formatAsHttpResponse(f)(
-              data = requestedFormat.encode(R.scan(filePath, offset, limit)),
-              contentType = `Content-Type`(requestedFormat.mediaType, Some(Charset.`UTF-8`)),
-              disposition = requestedFormat.disposition
-            )
-          )
+          download(requestedFormat, path, offset, limit).map(_.putHeaders(requestedFormat.disposition.toList: _*))
         }
         possibleResponse.leftMap(errMessage => BadRequest(errMessage)).merge
       }
@@ -130,11 +149,11 @@ object data {
         .withContentType(Some(`Content-Type`(MediaType.`text/plain`)))
     }
 
-  private def responseForUpload[A](decodeErrors: List[WriteError], persistErrors: FilesystemTask[List[FileSystemError]]): Task[Response] = {
+  private def responseForUpload[A](decodeErrors: List[DecodeError], persistErrors: FilesystemTask[List[FileSystemError]]): Task[Response] = {
     def dataErrorBody[A: Show](status: org.http4s.dsl.impl.EntityResponseGenerator, errs: List[A]) =
       status(Json(
         "error" := "some uploaded value(s) could not be processed",
-        "details" := errs.map(e => Json("detail" := e.shows))))
+        "details" := Json.array(errs.map(e => jString(e.shows)): _*)))
 
     if (decodeErrors.nonEmpty)
       dataErrorBody(BadRequest, decodeErrors)
@@ -144,6 +163,6 @@ object data {
         errors => if(errors.isEmpty) Ok("") else dataErrorBody(InternalServerError, errors)))
   }
 
-  implicit val dataDecoder: EntityDecoder[(List[WriteError], List[Data])] =
+  implicit val dataDecoder: EntityDecoder[Process[Task,DecodeError \/ Data]] =
     MessageFormat.decoder orElse EntityDecoder.error(MessageFormat.UnsupportedContentType)
 }
