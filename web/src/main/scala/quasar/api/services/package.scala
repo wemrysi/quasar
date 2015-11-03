@@ -51,19 +51,14 @@ package object services {
   }
 
   def formatAsHttpResponse[S[_]: Functor,A: EntityEncoder](f: S ~> Task)(data: Process[FileSystemErrT[Free[S,?], ?], A],
-                                                                         contentType: `Content-Type`,
-                                                                         disposition: Option[`Content-Disposition`]): Task[Response] = {
-    def withFormatHeaders(resp: Response) = {
-      val headers = contentType :: disposition.toList
-      resp.putHeaders(headers: _*)
-    }
+                                                                         contentType: `Content-Type`): Task[Response] = {
     // Check the first element of data, if it's an error return an error response, otherwise serialize any
     // other errors among the remaining data that is sent to the client.
     convert(f)(data).unconsOption.fold(
       fileSystemErrorResponse,
       _.fold(Ok(""))({ case (first, rest) =>
         Ok(Process.emit(first) ++ rest.translate(flatten))
-      }).map(withFormatHeaders)).join
+      }).map(_.putHeaders(contentType))).join
   }
 
   def convert[S[_]: Functor, A](f: S ~> Task)(from: Process[FileSystemErrT[Free[S,?],?], A]): Process[FilesystemTask, A] = {
