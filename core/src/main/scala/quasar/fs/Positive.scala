@@ -4,6 +4,7 @@ package fs
 import quasar.Predef._
 
 import scalaz._
+import scalaz.std.anyVal._
 import scalaz.Tags.{Multiplication => Mult}
 
 final class Positive private (val value: Long) {
@@ -53,4 +54,6 @@ object Positive {
     Monoid.instance(
       (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
       Mult(_1))
+
+  implicit val equal: Equal[Positive] = Equal.equalBy(_.value)
 }

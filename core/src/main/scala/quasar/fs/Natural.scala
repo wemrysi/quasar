@@ -4,6 +4,7 @@ package fs
 import quasar.Predef._
 
 import scalaz._
+import scalaz.std.anyVal._
 import scalaz.Tags.{Multiplication => Mult}
 
 final class Natural private[fs] (val value: Long) {
@@ -55,4 +56,8 @@ object Natural {
     Monoid.instance(
       (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
       Mult(_1))
+
+  implicit val equal: Equal[Natural] = Equal.equalBy(_.value)
+
+  implicit val show: Show[Natural] = Show.shows(_.value.toString)
 }
