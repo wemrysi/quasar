@@ -12,6 +12,7 @@ import org.http4s.argonaut._
 import org.http4s.headers.{`Content-Type`, Accept}
 import org.http4s.server._
 import pathy.Path._
+import quasar.fs.ManageFile.{MoveSemantics, MoveScenario}
 import quasar.{DataCodec, Data}
 import quasar.repl.Prettify
 import quasar.Predef._
@@ -29,6 +30,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 import scalaz.syntax.show._
 import scalaz.std.option._
+
+import posixCodec._
 
 object data {
   import scalaz.Validation.FlatMap._
@@ -49,6 +52,8 @@ object data {
 
   object Offset extends OptionalValidatingQueryParamDecoderMatcher[Natural]("offset")
   object Limit  extends OptionalValidatingQueryParamDecoderMatcher[Positive]("limit")
+
+  private val DestinationHeaderMustExist = BadRequest("The '" + Destination.name + "' header must be specified")
 
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
@@ -99,6 +104,22 @@ object data {
       }
       case req @ POST -> AsFilePath(path) => upload(req, W.append(path,_))
       case req @ PUT -> AsFilePath(path) => upload(req, W.save(path,_))
+      case req @ Method.MOVE -> AsPath(path) =>
+        req.headers.get(Destination).fold(
+          DestinationHeaderMustExist)(
+          destPathString => {
+            val scenarioOrProblem = path.fold(
+              src => parseAbsDir(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(
+                dest => MoveScenario.DirToDir(src, dest)) \/> "Cannot move directory into a file",
+              src => parseAbsFile(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(
+                dest => MoveScenario.FileToFile(src, dest)) \/> "Cannot move a file into a directory, must specify destination precisely"
+            )
+            scenarioOrProblem.map{ scenario =>
+              val response = M.move(scenario, MoveSemantics.FailIfExists).fold(fileSystemErrorResponse,_ => Created(""))
+              hoistFree(f).apply(response).join
+            }.leftMap(BadRequest(_)).merge
+          }
+        )
     }
   }
 
@@ -137,4 +158,3 @@ object data {
   implicit val dataDecoder: EntityDecoder[Process[Task,DecodeError \/ Data]] =
     MessageFormat.decoder orElse EntityDecoder.error(MessageFormat.UnsupportedContentType)
 }
-

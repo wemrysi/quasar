@@ -470,43 +470,66 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
     }
     "MOVE" >> {
+      def testMove[A: EntityDecoder](from: AbsPath[Sandboxed],
+                                     to: AbsPath[Sandboxed], state: InMemState, expectedBody: A, status: Status) = {
+        // TODO: Consider it's possible to invent syntax Move(...)
+        val request = Request(
+          uri = Uri(path = from.fold(printPath, printPath)),
+          headers = Headers(Header("Destination", to.fold(printPath, printPath))),
+          method = Method.MOVE)
+        val response = service(state)(request).run
+        response.status must_== status
+        response.as[A].run must_== expectedBody
+      }
       "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
-        val pathString = posixCodec.printPath(path)
+        val pathString = printPath(path)
         val request = Request(uri = Uri(path = pathString), method = Method.MOVE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.BadRequest
         response.as[String].run must_== "The 'Destination' header must be specified"
       }
-      "be 404 for missing source file" ! prop { (source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed]) =>
-        val sourceString = posixCodec.printPath(source)
-        val destinationString = posixCodec.printPath(destination)
-        val request = Request(uri = Uri(path = sourceString), headers = Headers(Header("Destination", destinationString)), method = Method.MOVE)
-        val response = service(emptyMem)(request).run
-        response.status must_== Status.NotFound
-        response.as[String].run must_== s"$sourceString: doesn't exist"
+      "be 404 for missing source file" ! prop { (file: AbsFile[Sandboxed], destFile: AbsFile[Sandboxed]) =>
+        testMove(
+          from = file.right,
+          to = destFile.right,
+          state = emptyMem,
+          status = Status.NotFound,
+          expectedBody = s"${printPath(file)}: doesn't exist")
       }
-      "be 404 for missing destination file" ! prop { (source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed]) =>
-        todo // Figure out what we are doing with nested backends because not sure this test makes sense without them
+      "be 404 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
+        testMove(
+          from = fs.dir.left,
+          to = file.right,
+          state = fs.state,
+          status = Status.BadRequest,
+          expectedBody = "Cannot move directory into a file")
       }
-      "be 201 with file" ! prop {(source: AbsFile[Sandboxed], destination: AbsFile[Sandboxed], data: Vector[Data]) =>
-        val sourceString = posixCodec.printPath(source)
-        val destinationString = posixCodec.printPath(destination)
-        val request = Request(uri = Uri(path = sourceString), headers = Headers(Header("Destination", destinationString)), method = Method.MOVE)
-        val filesystem = InMemState.fromFiles(Map(source -> data))
-        val response = service(filesystem)(request).run
-        response.status must_== Status.Created
+      "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileFileSystem, dir: AbsDir[Sandboxed]) =>
+        testMove(
+          from = fs.file.right,
+          to = dir.left,
+          state = fs.state,
+          status = Status.BadRequest,
+          expectedBody = "Cannot move a file into a directory, must specify destination precisely")
+      }
+      "be 201 with file" ! prop {(fs: SingleFileFileSystem, file: AbsFile[Sandboxed]) =>
+        testMove(
+          from = fs.file.right,
+          to = file.right,
+          state = fs.state,
+          status = Status.Created,
+          expectedBody = "")
         // TODO: Check that the file was moved properly (not in old test though...)
       }
-      "be 201 with dir" ! prop {(sourceDir: NonEmptyDir, destinationDir: AbsDir[Sandboxed]) =>
-        val request = Request(
-          uri = Uri(path = printPath(sourceDir.dir)),
-          headers = Headers(Header("Destination", printPath(destinationDir))),
-          method = Method.MOVE)
-        val response = service(sourceDir.state)(request).run
-        response.status must_== Status.Created
+      "be 201 with dir" ! prop {(fs: NonEmptyDir, dir: AbsDir[Sandboxed]) =>
+        testMove(
+          from = fs.dir.left,
+          to = dir.left,
+          state = fs.state,
+          status = Status.Created,
+          expectedBody = "")
         // TODO: Check that the file was moved properly (not in old test though...)
       }
-      "be 501 for src and dst not in the same backend" >> todo // What are we doing? make sure that we test all error conditions that the backend can return
     }
     "DELETE" >> {
       "be 200 with existing file" ! prop { filesystem: SingleFileFileSystem =>
