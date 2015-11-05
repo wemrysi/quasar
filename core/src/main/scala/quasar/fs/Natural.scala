@@ -57,7 +57,7 @@ object Natural {
       (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
       Mult(_1))
 
-  implicit val equal: Equal[Natural] = Equal.equalBy(_.value)
+  implicit val equal: Equal[Natural] = Equal.equalA
 
   implicit val show: Show[Natural] = Show.shows(_.value.toString)
 }

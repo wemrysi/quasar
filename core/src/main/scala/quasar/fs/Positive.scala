@@ -55,5 +55,5 @@ object Positive {
       (x, y) => Mult(Mult.unwrap(x) * Mult.unwrap(y)),
       Mult(_1))
 
-  implicit val equal: Equal[Positive] = Equal.equalBy(_.value)
+  implicit val equal: Equal[Positive] = Equal.equalA
 }
