@@ -37,8 +37,6 @@ import pathy.Path._
 
 package object api {
 
-  val versionAndNameInfo = jObjectAssocList(List("version" -> jString(quasar.build.BuildInfo.version), "name" -> jString("Quasar")))
-
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header
     val name = CaseInsensitiveString("Destination")

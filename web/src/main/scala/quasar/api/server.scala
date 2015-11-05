@@ -111,9 +111,9 @@ object Server {
    * Simply terminate the process of builders in order to shutdown any running server and prevent
    * new ones from being started.
    */
-  def servers(triggerRestartWithConfiguration: Process[Task, Configuration]): Process[Task, (Int,Http4sServer)] = {
+  def servers(configurations: Process[Task, Configuration]): Process[Task, (Int,Http4sServer)] = {
 
-    val serversAndPort = triggerRestartWithConfiguration.evalMap(conf =>
+    val serversAndPort = configurations.evalMap(conf =>
       startServer(conf).map((conf.port, _)) <* stdout("Server started listening on port " + conf.port))
 
     serversAndPort.evalScan1{case ((oldPort, oldServer), newServerAndPort) => oldServer.shutdown *> stdout("Stopped server listening on port " + oldPort) *> Task.now(newServerAndPort)}
@@ -175,14 +175,6 @@ object Server {
   def main(args: Array[String]): Unit = {
     val idleTimeout = Duration.Inf
 
-    def startAndStopOnkeyEntered(conf: Configuration, openClient: Boolean): Process[Task, Configuration] = {
-      val msg = stdout("Press Enter to stop.")
-      val start = if (openClient) openBrowser(conf.port) *> msg else msg
-      val alive = async.signalUnset[Nothing]
-      val waitAndClose = waitForInput.onFinish(_ => alive.close)
-      Process.eval_(start *> Task.fork(waitAndClose)) ++ alive.discrete
-    }
-
     val exec: EnvTask[Unit] = for {
       opts           <- optionParser.parse(args, Options(None, None, None, false, false, None)).cata(
                           _.point[EnvTask],
@@ -191,8 +183,15 @@ object Server {
       interpreter = runStatefully(InMemState.empty).run.compose(filesystem)
       redirect = content.map(_.loc)
       port           =  opts.port getOrElse 8080
-      config         = Configuration(port,idleTimeout, new RestApi(content.toList,redirect, port,???).AllServices(interpreter))
-      _ <-  servers(startAndStopOnkeyEntered(config, opts.openClient)).run.liftM[EnvErrT]
+      configQ        = async.boundedQueue[Configuration](1)
+      config         = {
+        def reload(port: Int): Task[Unit] = configQ.enqueueOne(Configuration(port,idleTimeout, RestApi(content.toList,redirect, port, reload).AllServices(interpreter)))
+        Configuration(port,idleTimeout, RestApi(content.toList,redirect, port,reload).AllServices(interpreter))
+      }
+      _ <-  servers(configQ.dequeue).run.liftM[EnvErrT]
+      msg = stdout("Press Enter to stop.")
+      _ <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
+      _ <- Task.fork(waitForInput.onFinish(_ => configQ.close)).liftM[EnvErrT]
     } yield ()
 
     exec.swap
