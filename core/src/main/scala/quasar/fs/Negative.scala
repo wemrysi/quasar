@@ -18,5 +18,5 @@ object Negative {
     Some(n).filter(_ < 0).map(new Negative(_))
   def unapply(n: Negative) = Some(n.value)
 
-  implicit val equal: Equal[Negative] = Equal.equalBy(_.value)
+  implicit val equal: Equal[Negative] = Equal.equalA
 }
