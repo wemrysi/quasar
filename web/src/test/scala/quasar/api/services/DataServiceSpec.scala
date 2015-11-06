@@ -38,7 +38,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   import inmemory._, ManageFile.Node, quasar.DataGen._
 
   def service(mem: InMemState): HttpService =
-    data.service[FileSystem](runStatefully(mem).run.compose(filesystem))
+    data.service[FileSystem](runStatefully(mem).run.compose(fileSystem))
 
   implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
 

@@ -122,7 +122,8 @@ object inmemory {
     }
   }
 
-  val filesystem: FileSystem ~> InMemoryFs = interpretFileSystem(readFile, writeFile, manageFile)
+  val fileSystem: FileSystem ~> InMemoryFs =
+    interpretFileSystem(readFile, writeFile, manageFile)
 
   def runStatefully(initial: InMemState): Task[InMemoryFs ~> Task] =
     runInspect(initial).map(_._1)
