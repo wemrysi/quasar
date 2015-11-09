@@ -4,7 +4,6 @@ package fs
 import quasar.Predef._
 
 import scalaz._
-import scalaz.std.anyVal._
 import scalaz.Tags.{Multiplication => Mult}
 
 final class Natural private[fs] (val value: Long) {

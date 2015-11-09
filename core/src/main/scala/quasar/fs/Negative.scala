@@ -4,7 +4,6 @@ package fs
 import quasar.Predef._
 
 import scalaz.Equal
-import scalaz.std.anyVal._
 
 final class Negative private (val value: Int) {
   override def equals(other: scala.Any) = other match {

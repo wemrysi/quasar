@@ -92,45 +92,53 @@ class ServerOps[WC: CodecJson, SC](
 
   case class ServerBlueprint(config: WC, idleTimeout: Duration, svcs: ListMap[String, HttpService])
 
-  /** Start `Server` with supplied [[ServerBlueprint]] */
-  def startServer(blueprint : ServerBlueprint): Task[Http4sServer] = {
-    val initialBuilder = BlazeBuilder
-      .withIdleTimeout(blueprint.idleTimeout)
-      .bindHttp(wcPort.get(blueprint.config), "0.0.0.0")
+  /** Start `Server` with supplied [[ServerBlueprint]]
+    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
+    * @return Server that has been started along with the port on which it was started
+    */
+  def startServer(blueprint : ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+    val port = wcPort.get(blueprint.config)
+    for {
+      actualPort <- if (flexibleOnPort) choosePort(port) else Task.now(port)
+      builder <- Task.delay {
+        val initialBuilder = BlazeBuilder
+          .withIdleTimeout(blueprint.idleTimeout)
+          .bindHttp(actualPort, "0.0.0.0")
 
-    val builder = blueprint.svcs.toList.reverse.foldLeft(initialBuilder) {
-      case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
-    }
-    Task.delay(builder.run)
+        blueprint.svcs.toList.reverse.foldLeft(initialBuilder) {
+          case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
+        }
+      }
+      server <- Task.delay(builder.run)
+    } yield (server, actualPort)
   }
 
   final case class StaticContent(loc: String, path: String)
 
-  implicit class AugmentedProcess[A](p: Process[Task,A]) {
-    def evalScan1(f: (A, A) => Task[A]): Process[Task, A] = {
-      p.zipWithPrevious.evalMap {
-        case (None, next) => Task.now(next)
-        case (Some(prev), next) => f(prev, next)
-      }
-    }
-  }
-
-  /**
-   * Given a process of [[ServerBlueprint]], returns a process of [[org.http4s.server.Server]].
-   *
-   * The process will emit each time a new server configuration is provided and ensures only
-   * one server is running at a time, i.e. providing a new builder ensures
-   * the previous server has been stopped.
-   *
-   * Simply terminate the process of builders in order to shutdown any running server and prevent
-   * new ones from being started.
-   */
-  def servers(configurations: Process[Task, Configuration]): Process[Task, (Int,Http4sServer)] = {
+  /** Given a [[Process]] of [[quasar.api.Server.ServerBlueprint]], returns a [[Process]] of [[org.http4s.server.Server]].
+    *
+    * The returned process will emit each time a new server configuration is provided and ensures only
+    * one server is running at a time, i.e. providing a new Configuration ensures
+    * the previous server has been stopped.
+    *
+    * When the process of configurations terminates for any reason, the last server is shutdown and the
+    * process of servers will terminate.
+    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
+    */
+  def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf).map((conf.port, _)) <* stdout("Server started listening on port " + conf.port))
+      startServer(conf, flexibleOnPort).onSuccess{ case (_,port) =>
+        stdout("Server started. Listening on port " + port)})
 
-    serversAndPort.evalScan1{case ((oldPort, oldServer), newServerAndPort) => oldServer.shutdown *> stdout("Stopped server listening on port " + oldPort) *> Task.now(newServerAndPort)}
+    serversAndPort.evalScan1{case ((oldServer, oldPort), newServerAndPort) =>
+      oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
+      Task.now(newServerAndPort)
+    }.cleanUpWithA{ server =>
+      server.map { case (lastServer, lastPort) =>
+        lastServer.shutdown.flatMap(_ => stdout("Stopped last server listening on port " + lastPort))
+      }.getOrElse(Task.now(()))
+    }
   }
 
   // Lifted from unfiltered.
@@ -196,7 +204,9 @@ class ServerOps[WC: CodecJson, SC](
         def reload(port: Int): Task[Unit] = configQ.enqueueOne(Configuration(port,idleTimeout, RestApi(content.toList,redirect, port, reload).AllServices(interpreter)))
         Configuration(port,idleTimeout, RestApi(content.toList,redirect, port,reload).AllServices(interpreter))
       }
-      _ <-  servers(configQ.dequeue).run.liftM[EnvErrT]
+      // Is isFlexibleOnPort = true what we want here, it seems this could be non ideal, because to my knowlegde
+      // we do not send the port back to the client, so how is he to figure out that it succe
+      _ <-  servers(configQ.dequeue, true).run.liftM[EnvErrT]
       msg = stdout("Press Enter to stop.")
       _ <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
       _ <- Task.fork(waitForInput.onFinish(_ => configQ.close)).liftM[EnvErrT]

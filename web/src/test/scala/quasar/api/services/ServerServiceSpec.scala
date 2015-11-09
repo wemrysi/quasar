@@ -3,6 +3,7 @@ package api
 package services
 
 import Predef._
+import fp._
 import argonaut.Json
 
 import org.http4s.Uri.Authority
@@ -30,13 +31,17 @@ class ServerServiceSpec extends Specification {
       Configuration(port, Duration.Inf, ListMap("" -> server.service(port, restart)))
     }
 
-    val servers = Server.servers(Process.emit(initialConfig) ++ configQ.dequeue)
+    val servers = Server.servers(Process.emit(initialConfig) ++ configQ.dequeue, false)
 
     (for {
-      _ <- servers.take(1).run
+      unconsResult <- servers.unconsOption
+      (server, others) = unconsResult.get
       _ <- causeRestart(uri)
-      _ <- servers.drop(1).take(1).run
+      unconsResult2 <- others.unconsOption
+      (_, moreOthers) = unconsResult2.get
       b <- afterRestart
+      _ <- configQ.close
+      _ <- moreOthers.run // Run the server process in order for it to cleanup
     } yield b).runFor(timeoutMillis)
   }
 
