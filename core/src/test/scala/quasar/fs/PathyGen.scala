@@ -13,6 +13,9 @@ object PathyGen {
   implicit val arbitraryAbsFile: Arbitrary[AbsFile[Sandboxed]] =
     Arbitrary(Gen.resize(10, genAbsFile))
 
+  implicit val arbitraryFileName: Arbitrary[FileName] =
+    Arbitrary(genAbsFile.map(fileName(_)))
+
   implicit val arbitraryRelFile: Arbitrary[RelFile[Sandboxed]] =
     Arbitrary(Gen.resize(10, genRelFile))
 

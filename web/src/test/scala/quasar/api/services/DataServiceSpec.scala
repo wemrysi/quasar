@@ -8,7 +8,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import quasar.Data
 import quasar.Predef._
-import quasar.api.MessageFormat._
+import quasar.api.MessageFormat.JsonContentType
 import JsonPrecision._
 import JsonFormat._
 import quasar.DataCodec
@@ -24,127 +24,27 @@ import pathy.Path._
 import quasar.fs.PathyGen._
 import quasar.fs.NumericGen._
 
-import scala.collection.mutable
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
-import scalaz.scalacheck.ScalazArbitrary._
-import scalaz.scalacheck.ScalaCheckBinding._
 
 import quasar.api.MessageFormatGen._
 
 import org.scalacheck.Arbitrary
 
+import Fixture._
+
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import inmemory._, ManageFile.Node, quasar.DataGen._
+  import inmemory._, ManageFile.Node
 
   def service(mem: InMemState): HttpService =
     data.service[FileSystem](runStatefully(mem).run.compose(filesystem))
 
   implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
 
-  val jsonReadableLine = JsonContentType(Readable,LineDelimited)
-  val jsonPreciseLine = JsonContentType(Precise,LineDelimited)
-  val jsonReadableArray = JsonContentType(Readable,SingleArray)
-  val jsonPreciseArray = JsonContentType(Precise,SingleArray)
   val csv = MediaType.`text/csv`
 
-  // See: https://github.com/non/jawn/pull/43
-  implicit val bugFreeArgonautFacade: Facade[Json] =
-    new Facade[Json] {
-      def jnull() = Json.jNull
-      def jfalse() = Json.jFalse
-      def jtrue() = Json.jTrue
-      def jnum(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jint(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jstring(s: String) = Json.jString(s)
-
-      def singleContext() = new FContext[Json] {
-        var value: Json = null
-        def add(s: String) = { value = jstring(s) }
-        def add(v: Json) = { value = v }
-        def finish: Json = value
-        def isObj: Boolean = false
-      }
-
-      def arrayContext() = new FContext[Json] {
-        val vs = mutable.ListBuffer.empty[Json]
-        def add(s: String) = { vs += jstring(s); () }
-        def add(v: Json) = { vs += v; () }
-        def finish: Json = Json.jArray(vs.toList)
-        def isObj: Boolean = false
-      }
-
-      def objectContext() = new FContext[Json] {
-        var key: String = null
-        var vs = JsonObject.empty
-        def add(s: String): Unit =
-          if (key == null) { key = s } else { vs = vs + (key, jstring(s)); key = null }
-        def add(v: Json): Unit =
-        { vs = vs + (key, v); key = null }
-        def finish = Json.jObject(vs)
-        def isObj = true
-      }
-    }
-
   import posixCodec.printPath
-
-  // Remove once version 0.8.4 or higher of jawn is realeased.
-  implicit val normalJsonBugFreeDecoder = org.http4s.jawn.jawnDecoder(bugFreeArgonautFacade)
-
-  case class SingleFileFileSystem(file: AbsFile[Sandboxed], contents: Vector[Data]) {
-    def path = printPath(file)
-    def state = InMemState fromFiles Map(file -> contents)
-  }
-
-  case class NonEmptyDir(dir: AbsDir[Sandboxed], filesInDir: NonEmptyList[(NonEmptyString, Vector[Data])]) {
-    def state = {
-      val fileMapping = filesInDir.map{ case (fileName,data) => (dir </> file(fileName.value), data)}
-      InMemState fromFiles fileMapping.toList.toMap
-    }
-  }
-
-  implicit val arbSingleFileFileSystem: Arbitrary[SingleFileFileSystem] = Arbitrary(
-    (Arbitrary.arbitrary[AbsFile[Sandboxed]] |@| Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
-
-  implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
-    (Arbitrary.arbitrary[AbsDir[Sandboxed]] |@| Arbitrary.arbitrary[NonEmptyList[(NonEmptyString, Vector[Data])]])(NonEmptyDir.apply))
-
-  sealed trait JsonType
-
-  case class PreciseJson(value: Json) extends JsonType
-  object PreciseJson {
-    implicit val entityEncoder: EntityEncoder[PreciseJson] =
-      EntityEncoder.encodeBy(`Content-Type`(jsonPreciseArray.mediaType, Charset.`UTF-8`)) { pJson =>
-        org.http4s.argonaut.jsonEncoder.toEntity(pJson.value)
-      }
-  }
-
-  case class ReadableJson(value: Json) extends JsonType
-  object ReadableJson {
-    implicit val entityEncoder: EntityEncoder[ReadableJson] =
-      EntityEncoder.encodeBy(`Content-Type`(jsonReadableArray.mediaType, Charset.`UTF-8`)) { rJson =>
-        org.http4s.argonaut.jsonEncoder.toEntity(rJson.value)
-      }
-  }
-
-  implicit val readableLineDelimitedJson: EntityEncoder[List[ReadableJson]] =
-    EntityEncoder.stringEncoder.contramap[List[ReadableJson]] { rJsons =>
-      rJsons.map(rJson => Argonaut.nospace.pretty(rJson.value)).mkString("\n")
-    }.withContentType(`Content-Type`(jsonReadableLine.mediaType, Charset.`UTF-8`))
-
-  implicit val preciseLineDelimitedJson: EntityEncoder[List[PreciseJson]] =
-    EntityEncoder.stringEncoder.contramap[List[PreciseJson]] { pJsons =>
-      pJsons.map(pJson => Argonaut.nospace.pretty(pJson.value)).mkString("\n")
-    }.withContentType(`Content-Type`(jsonPreciseLine.mediaType, Charset.`UTF-8`))
-
-  case class Csv(value: String)
-  object Csv {
-    implicit val entityEncoder: EntityEncoder[Csv] =
-      EntityEncoder.encodeBy(`Content-Type`(MediaType.`text/csv`, Charset.`UTF-8`)) { csv =>
-        EntityEncoder.stringEncoder(Charset.`UTF-8`).toEntity(csv.value)
-      }
-  }
 
   "Data Service" should {
     "GET" >> {
