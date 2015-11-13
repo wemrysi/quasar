@@ -3,7 +3,8 @@ package quasar.api.services
 import quasar.Predef._
 
 import argonaut._, Argonaut._
-import org.http4s._, argonaut._, dsl._, server._
+import org.http4s._, argonaut._, dsl._
+import org.http4s.server.HttpService
 
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
