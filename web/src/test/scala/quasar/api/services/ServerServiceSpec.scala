@@ -14,34 +14,33 @@ import quasar.api.Server.Configuration
 
 import scala.concurrent.duration.Duration
 import scalaz.concurrent.Task
-import scalaz.stream._
+import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
+
+import scalaz._, Scalaz._
 
 class ServerServiceSpec extends Specification {
 
-  def withServerExpectingRestart[B](timeoutMillis: Long = 10000, port: Int = 8888)
+  val client = org.http4s.client.blaze.defaultClient
+
+  def withServerExpectingRestart[B](timeoutMillis: Long = 10000, initialPort: Int = 8888, defaultPort: Int = 8888)
                                       (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
-    val uri = Uri(authority = Some(Authority(port = Some(port))))
+    val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
-    val configQ = async.boundedQueue[Configuration](1)
-
-    val initialConfig = {
-      def restart(port: Int): Task[Unit] =
-        configQ.enqueueOne(
-          Configuration(port, Duration.Inf, ListMap("" -> server.service(port, restart)))).map(_ => ())
-      Configuration(port, Duration.Inf, ListMap("" -> server.service(port, restart)))
-    }
-
-    val servers = Server.servers(Process.emit(initialConfig) ++ configQ.dequeue, false)
+    val servers = Server.startServers(initialPort, reload => ListMap("" -> server.service(defaultPort,reload)))
 
     (for {
-      unconsResult <- servers.unconsOption
-      (server, others) = unconsResult.get
-      _ <- causeRestart(uri)
-      unconsResult2 <- others.unconsOption
-      (_, moreOthers) = unconsResult2.get
-      b <- afterRestart
-      _ <- configQ.close
-      _ <- moreOthers.run // Run the server process in order for it to cleanup
+      result <- servers
+      (servers, shutdown) = result
+      b <- (for {
+        unconsResult <- servers.unconsOption
+        (_, others) = unconsResult.get
+        _ <- causeRestart(uri)
+        unconsResult2 <- others.unconsOption
+        (_, others2) = unconsResult2.get
+        b <- afterRestart
+        _ <- shutdown
+        _ <- others2.run
+      } yield b).timed(timeoutMillis)(DefaultTimeoutScheduler).onFinish(_ => shutdown)
     } yield b).runFor(timeoutMillis)
   }
 
@@ -52,19 +51,26 @@ class ServerServiceSpec extends Specification {
       response.as[Json].run must_== server.nameAndVersionInfo
       response.status must_== Status.Ok
     }
+    def checkRunningOn(port: Int) = {
+      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))) / "info", method = Method.GET)
+      client(req).map(response => response.status must_== Status.Ok)
+    }
     "restart on new port when PUT /port succeeds" in {
       val newPort = 8889
-      val client = org.http4s.client.blaze.defaultClient
 
       withServerExpectingRestart(){ baseUri: Uri =>
         for {
           req <- Request(uri = baseUri / "port", method = Method.PUT).withBody(newPort.toString)
           _   <- client(req)
         } yield ()
-      }{
-        val req = Request(uri = Uri(authority = Some(Authority(port = Some(newPort)))) / "info", method = Method.GET)
-        client(req).map(response => response.status must_== Status.Ok)
-      }
+      }{ checkRunningOn(newPort) }
+    }
+    "restart on default port when DELETE /port succeeds" in {
+      val defaultPort = 9001
+      withServerExpectingRestart(initialPort = 9000, defaultPort = defaultPort){ baseUri: Uri =>
+        val req = Request(uri = baseUri / "port", method = Method.DELETE)
+        client(req).void
+      }{ checkRunningOn(defaultPort) }
     }
   }
 }

@@ -141,6 +141,28 @@ class ServerOps[WC: CodecJson, SC](
     }
   }
 
+  /** Produce a stream of servers that can be restarted on a supplied port
+    * @param initialPort The port on which to start the initial server
+    * @param produceRoutes A function that given a function to restart a server on a new port, supplies a server mapping
+    *                      from path to [[Http4sServer]]
+    * @return The [[Task]] will start the first server and provide a function to shutdown the active server.
+    *         It will also return a process of servers and ports. This [[Process]] must be run in order for servers
+    *         to actually be started and stopped. The [[Process]] must be run to completion in order for appropriate
+    *         clean up to occur.
+    */
+  def startServers(initialPort: Int,
+                   produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
+    val configQ = async.boundedQueue[Configuration](1)
+    def startNew(port: Int): Task[Unit] = {
+      val conf = Configuration(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
+      configQ.enqueueOne(conf)
+    }
+    startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
+      case None => throw new java.lang.AssertionError("should never happen")
+      case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
+    })
+  }
+
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
   //     will run indefinitely when started from a script.
@@ -189,8 +211,6 @@ class ServerOps[WC: CodecJson, SC](
   }
 
   def main(args: Array[String]): Unit = {
-    val idleTimeout = Duration.Inf
-
     val exec: EnvTask[Unit] = for {
       opts           <- optionParser.parse(args, Options(None, None, None, false, false, None)).cata(
                           _.point[EnvTask],
@@ -199,17 +219,13 @@ class ServerOps[WC: CodecJson, SC](
       interpreter = runStatefully(InMemState.empty).run.compose(filesystem)
       redirect = content.map(_.loc)
       port           =  opts.port getOrElse 8080
-      configQ        = async.boundedQueue[Configuration](1)
-      config         = {
-        def reload(port: Int): Task[Unit] = configQ.enqueueOne(Configuration(port,idleTimeout, RestApi(content.toList,redirect, port, reload).AllServices(interpreter)))
-        Configuration(port,idleTimeout, RestApi(content.toList,redirect, port,reload).AllServices(interpreter))
-      }
-      // Is isFlexibleOnPort = true what we want here, it seems this could be non ideal, because to my knowlegde
-      // we do not send the port back to the client, so how is he to figure out that it succe
-      _ <-  servers(configQ.dequeue, true).run.liftM[EnvErrT]
+      produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) = reload => RestApi(content.toList,redirect,port,reload).AllServices(interpreter)
+      result <- startServers(port, produceRoutes).liftM[EnvErrT]
+      (servers, shutdown) = result
       msg = stdout("Press Enter to stop.")
       _ <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
-      _ <- Task.fork(waitForInput.onFinish(_ => configQ.close)).liftM[EnvErrT]
+      _ <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[EnvErrT]
+      _ <- servers.run.liftM[EnvErrT] // We need to run the servers in order to make sure everything is cleaned up properly
     } yield ()
 
     exec.swap
