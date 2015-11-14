@@ -12,6 +12,8 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 
 import pathy.Path._
+import quasar.fs._
+import quasar.fs.inmemory._
 import quasar.fs.PathyGen._
 import quasar.fs.inmemory.InMemState
 
@@ -20,11 +22,14 @@ import Fixture._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
+import query._
+
 class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
 
   import posixCodec.printPath
-  def compile(state: InMemState): HttpService = ???
-  def query(state: InMemState): HttpService = ???
+
+  def compile(state: InMemState): HttpService = compileService[FileSystem](runStatefully(state).run.compose(filesystem))
+  def query(state: InMemState): HttpService = service[FileSystem](runStatefully(state).run.compose(filesystem))
 
   def post(service: InMemState => HttpService)(path: AbsDir[Sandboxed],
             query: Option[String],
@@ -37,9 +42,9 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
     val req = destination.map(destination =>
       reqWithQuery.copy(headers = Headers(Header("Destination", printPath(destination))))
     ).getOrElse(reqWithQuery)
-    val response = service(state)(req).run
-    response.status must_== status
-    response.as[String].run must_== response
+    val actualResponse = service(state)(req).run
+    actualResponse.status must_== status
+    actualResponse.as[String].run must_== response
   }
 
   def get(service: InMemState => HttpService)(path: AbsDir[Sandboxed],
@@ -49,9 +54,9 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response: String) = {
     val baseReq = Request(uri = Uri(path = printPath(path)))
     val req = query.map(query => baseReq.copy(uri = baseReq.uri.+?("q", query))).getOrElse(baseReq)
-    val response = service(state)(req).run
-    response.status must_== status
-    response.as[String].run must_== response
+    val actualResponse = service(state)(req).run
+    actualResponse.status must_== status
+    actualResponse.as[String].run must_== response
   }
 
   def selectAll(from: FileName) = s"select * from ${from.value}"
@@ -95,48 +100,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
           )
         }
       }
-      "POST" should {
-        "be 404 for missing directory" ! prop { (dir: AbsDir[Sandboxed], destination: AbsFile[Sandboxed], filename: FileName) =>
-          post(service)(
-            path = dir,
-            query = Some(selectAll(filename)),
-            destination = Some(destination),
-            state = InMemState.empty,
-            status = Status.NotFound,
-            response = "???"
-          )
-        }.pendingUntilFixed("SD-773")
-        "be 400 with missing query" ! prop { (filesystem: SingleFileFileSystem, destination: AbsFile[Sandboxed]) =>
-          post(service)(
-            path = filesystem.parent,
-            query = None,
-            destination = Some(destination),
-            state = filesystem.state,
-            status = Status.BadRequest,
-            response = "The body of the POST must contain a query"
-          )
-        }
-        "be 400 with missing Destination header" ! prop { filesystem: SingleFileFileSystem =>
-          post(service)(
-            path = filesystem.parent,
-            query = Some(selectAll(filesystem.filename)),
-            destination = None,
-            state = filesystem.state,
-            status = Status.BadRequest,
-            response = "The 'Destination' header must be specified"
-          )
-        }
-        "be 400 for query error" ! prop { (filesystem: SingleFileFileSystem, destination: AbsFile[Sandboxed]) =>
-          post(service)(
-            path = filesystem.parent,
-            query = Some("select date where"),
-            destination = Some(destination),
-            state = filesystem.state,
-            status = Status.BadRequest,
-            response = "keyword 'case' expected; `where'"
-          )
-        }
-      }
+
       () // TODO: Remove after upgrading to specs2 3.x
     }
   }
@@ -162,9 +126,50 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
           response = Json("out" := printPath(destination)).spaces2
         )
       }
+      "POST (error conditions)" >> {
+        "be 404 for missing directory" ! prop { (dir: AbsDir[Sandboxed], destination: AbsFile[Sandboxed], filename: FileName) =>
+          post(query)(
+            path = dir,
+            query = Some(selectAll(filename)),
+            destination = Some(destination),
+            state = InMemState.empty,
+            status = Status.NotFound,
+            response = "???"
+          )
+        }.pendingUntilFixed("SD-773")
+        "be 400 with missing query" ! prop { (filesystem: SingleFileFileSystem, destination: AbsFile[Sandboxed]) =>
+          post(query)(
+            path = filesystem.parent,
+            query = None,
+            destination = Some(destination),
+            state = filesystem.state,
+            status = Status.BadRequest,
+            response = "The body of the POST must contain a query"
+          )
+        }
+        "be 400 with missing Destination header" ! prop { filesystem: SingleFileFileSystem =>
+          post(query)(
+            path = filesystem.parent,
+            query = Some(selectAll(filesystem.filename)),
+            destination = None,
+            state = filesystem.state,
+            status = Status.BadRequest,
+            response = "The 'Destination' header must be specified"
+          )
+        }
+        "be 400 for query error" ! prop { (filesystem: SingleFileFileSystem, destination: AbsFile[Sandboxed]) =>
+          post(query)(
+            path = filesystem.parent,
+            query = Some("select date where"),
+            destination = Some(destination),
+            state = filesystem.state,
+            status = Status.BadRequest,
+            response = "keyword 'case' expected; `where'"
+          )
+        }
+      }
     }
   }
-
   "Compile" should {
     "plan simple query" ! prop { filesystem: SingleFileFileSystem =>
       get(compile)(
