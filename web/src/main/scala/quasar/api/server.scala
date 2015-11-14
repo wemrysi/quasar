@@ -24,6 +24,8 @@ import quasar.config._
 
 import java.io.File
 import java.lang.System
+import quasar.fs.inmemory._
+
 import scala.concurrent.duration._
 
 import scalaz._, Scalaz._
@@ -32,6 +34,8 @@ import scalaz.stream._
 
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
+
+import quasar.api.services.RestApi
 
 object Server {
   // NB: This is a terrible thing.
@@ -72,66 +76,76 @@ object Server {
                        anyAvailablePort)
       .getOrElse(requested)
 
-  def createServer(port: Int, idleTimeout: Duration, svcs: EnvTask[ListMap[String, HttpService]]): EnvTask[Http4sServer] = {
-    val builder = BlazeBuilder
-                  .withIdleTimeout(idleTimeout)
-                  .bindHttp(port, "0.0.0.0")
+  case class Configuration(port: Int, idleTimeout: Duration, svcs: ListMap[String, HttpService])
 
-    svcs.flatMap(_.toList.reverse.foldLeft(builder) {
-      case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
-    }.start.liftM[EnvErrT])
+  /** Start `Server` with supplied [[Configuration]]
+    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
+    * @return Server that has been started along with the port on which it was started
+    */
+  def startServer(config : Configuration, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+    for {
+      actualPort <- if (flexibleOnPort) choosePort(config.port) else Task.now(config.port)
+      builder <- Task.delay {
+        val initialBuilder = BlazeBuilder
+          .withIdleTimeout(config.idleTimeout)
+          .bindHttp(config.port, "0.0.0.0")
+
+        config.svcs.toList.reverse.foldLeft(initialBuilder) {
+          case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
+        }
+      }
+      server <- Task.delay(builder.run)
+    } yield (server, actualPort)
   }
 
- final case class StaticContent(loc: String, path: String)
+  final case class StaticContent(loc: String, path: String)
 
-  /**
-   * Returns a process of (port, server) and an effectful function which will
-   * start a server using the provided configuration.
-   *
-   * The process will emit each time a new server is started and ensures only
-   * one server is running at a time, i.e. calling the function to start a
-   * server automatically stops any running server.
-   *
-   * Pass [[scala.None]] to the returned function to shutdown any running server and
-   * prevent new ones from being started.
-   */
-  def servers(staticContent: List[StaticContent], redirect: Option[String],
-              idleTimeout: Duration, tester: BackendConfig => EnvTask[Unit],
-              mounter: Config => EnvTask[Backend], configWriter: Config => Task[Unit])
-             : (Process[Task, (Int, Http4sServer)], Option[(Int, Config)] => Task[Unit]) = {
+  /** Given a [[Process]] of [[quasar.api.Server.Configuration]], returns a [[Process]] of [[org.http4s.server.Server]].
+    *
+    * The returned process will emit each time a new server configuration is provided and ensures only
+    * one server is running at a time, i.e. providing a new Configuration ensures
+    * the previous server has been stopped.
+    *
+    * When the process of configurations terminates for any reason, the last server is shutdown and the
+    * process of servers will terminate.
+    * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
+    */
+  def servers(configurations: Process[Task, Configuration], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
-    val configQ = async.boundedQueue[Option[(Int, Config)]](2)(Strategy.DefaultStrategy)
-    val reload = (cfg: Config) => configQ.enqueueOne(Some((cfg.server.port, cfg)))
+    val serversAndPort = configurations.evalMap(conf =>
+      startServer(conf, flexibleOnPort).onSuccess{ case (_,port) =>
+        stdout("Server started. Listening on port " + port)})
 
-    val fileSvcs = staticContent.map { case StaticContent(l, p) => l -> staticFileService(p) }.toListMap
-    val redirSvc = ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
+    serversAndPort.evalScan1{case ((oldServer, oldPort), newServerAndPort) =>
+      oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
+      Task.now(newServerAndPort)
+    }.cleanUpWithA{ server =>
+      server.map { case (lastServer, lastPort) =>
+        lastServer.shutdown.flatMap(_ => stdout("Stopped last server listening on port " + lastPort))
+      }.getOrElse(Task.now(()))
+    }
+  }
 
-    def start(port0: Int, config: Config): EnvTask[(Int, Http4sServer)] =
-      for {
-        port    <- choosePort(port0).liftM[EnvErrT]
-        fsApi   =  ??? //FileSystemApi(config, mounter, tester, reload, configWriter)
-        server  <- createServer(port, idleTimeout, ???/*fsApi.AllServices.map(_ ++ fileSvcs ++ redirSvc)*/)
-        _       <- stdout("Server started listening on port " + port).liftM[EnvErrT]
-      } yield (port, server)
-
-    def shutdown(srv: Option[(Int, Http4sServer)], log: Boolean): Task[Unit] =
-      srv.traverse_ { case (p, s) =>
-        s.shutdown *> (if (log) stdout("Stopped server listening on port " + p) else Task.now(()))
-      }
-
-    def go(prevServer: Option[(Int, Http4sServer)]): Process[Task, (Int, Http4sServer)] =
-      configQ.dequeue.take(1) flatMap {
-        case Some((port, cfg)) =>
-          Process.await(shutdown(prevServer, true) *> start(port, cfg).run)(_.fold(
-            err => Process.halt.causedBy(Cause.Error(new RuntimeException(err.message))),
-            tpl => Process.emit(tpl) ++ go(Some(tpl))
-          ))
-
-        case None =>
-          Process.eval_(shutdown(prevServer, true))
-      }
-
-    (go(None).onComplete(Process.eval_(configQ.kill)), configQ.enqueueOne)
+  /** Produce a stream of servers that can be restarted on a supplied port
+    * @param initialPort The port on which to start the initial server
+    * @param produceRoutes A function that given a function to restart a server on a new port, supplies a server mapping
+    *                      from path to [[Http4sServer]]
+    * @return The [[Task]] will start the first server and provide a function to shutdown the active server.
+    *         It will also return a process of servers and ports. This [[Process]] must be run in order for servers
+    *         to actually be started and stopped. The [[Process]] must be run to completion in order for appropriate
+    *         clean up to occur.
+    */
+  def startServers(initialPort: Int,
+                   produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
+    val configQ = async.boundedQueue[Configuration](1)
+    def startNew(port: Int): Task[Unit] = {
+      val conf = Configuration(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
+      configQ.enqueueOne(conf)
+    }
+    startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
+      case None => throw new java.lang.AssertionError("should never happen")
+      case Some((head, rest)) => (Process.emit(head) ++ rest, configQ.close)
+    })
   }
 
   // Lifted from unfiltered.
@@ -188,33 +202,21 @@ object Server {
   }
 
   def main(args: Array[String]): Unit = {
-    val idleTimeout = Duration.Inf
-
-    def reactToFirstServerStarted(openClient: Boolean): Sink[Task, (Int, Http4sServer)] =
-      Process.emit[((Int, Http4sServer)) => Task[Unit]] {
-        case (port, _) =>
-          val msg = stdout("Press Enter to stop.")
-          if (openClient) openBrowser(port) *> msg else msg
-      } ++ Process.constant(κ(Task.now(())))
-
     val exec: EnvTask[Unit] = for {
       opts           <- optionParser.parse(args, Options(None, None, None, false, false, None)).cata(
                           _.point[EnvTask],
                           EitherT.left(Task.now(InvalidConfig("couldn’t parse options"))))
       content <- interpretPaths(opts)
-      redirect = content.map(_.loc).getOrElse("/welcome")
-      cfgPath        <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
-          liftE(Task.now(None)))(
-          cfg => FsPath.parseSystemFile(cfg).toRight(InvalidConfig("Invalid path to config file: " + cfg)).map(Some(_)))
-      config         <- Config.fromFileOrEmpty(cfgPath)
-      port           =  opts.port getOrElse config.server.port
-      (proc, useCfg) =  servers(content.toList, Some(redirect), idleTimeout, Backend.test, Mounter.defaultMount,
-                                cfg => Config.toFile(cfg, cfgPath))
-      _              <- Task.gatherUnordered(List(
-                          proc.observe(reactToFirstServerStarted(opts.openClient)).run,
-                          useCfg(Some((port, config))),
-                          waitForInput *> useCfg(None)
-                        )).liftM[EnvErrT]
+      interpreter = runStatefully(InMemState.empty).run.compose(filesystem)
+      redirect = content.map(_.loc)
+      port           =  opts.port getOrElse 8080
+      produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) = reload => RestApi(content.toList,redirect,port,reload).AllServices(interpreter)
+      result <- startServers(port, produceRoutes).liftM[EnvErrT]
+      (servers, shutdown) = result
+      msg = stdout("Press Enter to stop.")
+      _ <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
+      _ <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[EnvErrT]
+      _ <- servers.run.liftM[EnvErrT] // We need to run the servers in order to make sure everything is cleaned up properly
     } yield ()
 
     exec.swap

@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
+import quasar.fp.TaskRef
 
 import scalaz._, Liskov._, Scalaz._
 import scalaz.concurrent.Task
@@ -299,6 +300,31 @@ trait ProcessOps {
           case _ : EarlyCause => C.fail(cause.asThrowable)
         }
       }
+    }
+    def evalScan1(f: (O, O) => F[O])(implicit monad: Monad[F]): Process[F, O] = {
+      self.zipWithPrevious.evalMap {
+        case (None, next) => monad.point(next)
+        case (Some(prev), next) => f(prev, next)
+      }
+    }
+  }
+
+  implicit class AugmentedProcessOfTask[O](self: Process[Task,O]) {
+    // Is there a better way to implement this?
+    def onHaltWithLastElement(f: (Option[O], Cause) => Process[Task,O]): Process[Task,O] = {
+      val lastA: TaskRef[Option[O]] = TaskRef[Option[O]](None).run
+      self.observe(Process.constant((a:O) => lastA.write(Some(a)))).onHalt{ cause =>
+        Process.await(lastA.read)( a => f(a,cause))
+      }
+    }
+    def cleanUpWithA(f: Option[O] => Task[Unit]): Process[Task,O] = {
+      self.onHaltWithLastElement((a, cause) => Process.eval_(f(a)).causedBy(cause))
+    }
+  }
+
+  implicit class AugmentedTask[A](t: Task[A]) {
+    def onSuccess(f: A => Task[Unit]): Task[A] = {
+      t.flatMap(a => f(a).as(a))
     }
   }
 }

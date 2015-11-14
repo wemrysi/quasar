@@ -21,12 +21,14 @@ import org.http4s.parser.HttpHeaderParser
 import quasar.Predef._
 import quasar.fp._
 
-import org.http4s.MediaType
+import org.http4s.{ParseFailure, EntityDecoder, MediaType}
 import org.http4s.headers.{Accept, `Content-Disposition`}
+import quasar.repl.Prettify
 
 import quasar.{DataEncodingError, Data, DataCodec}
 
-import scalaz.NonEmptyList
+import scalaz.concurrent.Task
+import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 sealed trait JsonPrecision {
@@ -55,10 +57,25 @@ object JsonFormat {
   }
 }
 
-sealed trait MessageFormat {
+case class DecodeError(msg: String)
+
+object DecodeError {
+  implicit val show: Show[DecodeError] = Show.shows(_.msg)
+}
+
+trait Decoder {
   def mediaType: MediaType
+  def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data]
+  def decode(txtStream: Process[Task,String]): Task[DecodeError \/ Process[Task, DecodeError \/ Data]] =
+    txtStream.runLog.map(_.mkString).map(decode(_))
+  def decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = EntityDecoder.decodeBy(mediaType) { msg =>
+    EitherT(decode(msg.bodyAsText).map(_.leftMap(err => ParseFailure(err.msg, ""))))
+  }
+}
+
+sealed trait MessageFormat extends Decoder {
   def disposition: Option[`Content-Disposition`]
-  def encode[F[_]](a: Process[F, Data]): Process[F, String]
+  def encode[F[_]](data: Process[F, Data]): Process[F, String]
   protected def dispositionExtension: Map[String, String] =
     disposition.map(disp => Map("disposition" -> disp.value)).getOrElse(Map.empty)
 }
@@ -73,7 +90,7 @@ object MessageFormat {
       val extensions = Map("mode" -> mode.name) ++ dispositionExtension
       format.mediaType.withExtensions(extensions)
     }
-    def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
+    override def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
       val encodedData =
         data.map(DataCodec.render(_)(mode.codec).fold(EncodeJson.of[DataEncodingError].encode(_).toString, ι))
       format match {
@@ -83,6 +100,23 @@ object MessageFormat {
           encodedData.map(_ + LineSep)
       }
     }
+    def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] =
+      if (txt.isEmpty) Process.empty.right
+      else {
+        implicit val codec = mode.codec
+        format match {
+          case JsonFormat.SingleArray =>
+            DataCodec.parse(txt).fold(
+              err => DecodeError("parse error: " + err.message).left,
+              data => Process.emit(data.right).right
+            )
+          case JsonFormat.LineDelimited =>
+            val jsonByLine = txt.split("\n").map(line => DataCodec.parse(line).leftMap(
+              e => DecodeError(s"parse error: ${e.message} in the following line: $line")
+            )).toList
+            Process.emitAll(jsonByLine).right
+        }
+      }
   }
 
   val Default = JsonContentType(JsonPrecision.Readable, JsonFormat.LineDelimited)
@@ -101,7 +135,7 @@ object MessageFormat {
       val extensions = alwaysExtensions ++ dispositionExtension
       Csv.mediaType.withExtensions(extensions)
     }
-    def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
+    override def encode[F[_]](data: Process[F, Data]): Process[F, String] = {
       import quasar.repl.Prettify
       import com.github.tototoshi.csv._
 
@@ -115,8 +149,9 @@ object MessageFormat {
         w.toString
       }
     }
+    override def decode(txt: String): DecodeError \/ Process[Task, DecodeError \/ Data] = Csv.decode(txt)
   }
-  object Csv {
+  object Csv extends Decoder {
     val mediaType = MediaType.`text/csv`
 
     val Default = Csv(',', "\r\n", '"', '"', None)
@@ -126,9 +161,42 @@ object MessageFormat {
 
     def unescapeNewlines(str: String): String =
       str.replace("\\r", "\r").replace("\\n", "\n")
+
+    override def decode(txt: String): (DecodeError \/ Process[Task, DecodeError \/ Data]) = {
+      CsvDetect.parse(txt).fold(
+        err => DecodeError("parse error: " + err).left,
+        lines => {
+          val data = lines.headOption.map { header =>
+            val paths = header.fold(κ(Nil), _.fields.map(Prettify.Path.parse(_).toOption))
+            lines.drop(1).map(_.bimap(
+              err => DecodeError("parse error: " + err),
+              rec => {
+                val pairs = paths zip rec.fields.map(Prettify.parse)
+                val good = pairs.map { case (p, s) => (p |@| s).tupled }.flatten
+                Prettify.unflatten(good.toListMap)
+              }
+            ))
+          }.getOrElse(Stream.empty)
+          Process.emitAll(data).right
+        }
+      )
+    }
   }
 
   case object UnsupportedContentType extends scala.Exception
+
+  val decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = {
+    val json = {
+      import JsonPrecision._
+      import JsonFormat._
+      JsonContentType(Readable,LineDelimited).decoder orElse
+      JsonContentType(Precise,LineDelimited).decoder orElse
+      JsonContentType(Readable,SingleArray).decoder orElse
+      JsonContentType(Precise,SingleArray).decoder
+    }
+    Csv.decoder orElse json
+
+  }
 
   def fromAccept(accept: Option[Accept]): MessageFormat = {
     val mediaTypes = NonEmptyList(
