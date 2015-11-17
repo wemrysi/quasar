@@ -10,9 +10,7 @@ import org.http4s.Uri.Authority
 import org.http4s.{Status, Method, Uri, Request}
 import org.http4s.argonaut._
 import org.specs2.mutable.Specification
-import quasar.api.Server.Configuration
 
-import scala.concurrent.duration.Duration
 import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 

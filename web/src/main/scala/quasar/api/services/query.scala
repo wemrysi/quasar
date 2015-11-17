@@ -67,10 +67,10 @@ object query {
                                            W: WriteFile.Ops[S],
                                            M: ManageFile.Ops[S]): HttpService = {
     HttpService{
-      case GET -> AsDirPath(path) :? Q(query) => {
-        for {
-          expr <- SQLParser.parseInContext(query, convert(path)).leftMap(formatParsingError)
-        } yield ???
+      case GET -> AsDirPath(path) :? QueryParam(query) => {
+//        for {
+//          expr <- SQLParser.parseInContext(query, convert(path)).leftMap(formatParsingError)
+//        } yield ???
         ???
       }
       case GET -> _ => QueryParameterMustContainQuery

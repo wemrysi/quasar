@@ -17,6 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
+import quasar.api.services.RestApi
 import quasar.fp._
 import quasar.console._
 import quasar._, Errors._, Evaluator._
@@ -44,6 +45,8 @@ object ServerOps {
     contentPathRelative: Boolean,
     openClient: Boolean,
     port: Option[Int])
+
+  final case class StaticContent(loc: String, path: String)
 }
 
 class ServerOps[WC: CodecJson, SC](
@@ -90,16 +93,15 @@ class ServerOps[WC: CodecJson, SC](
                        anyAvailablePort)
       .getOrElse(requested)
 
-  case class ServerBlueprint(config: WC, idleTimeout: Duration, svcs: ListMap[String, HttpService])
+  case class ServerBlueprint(port: Int, idleTimeout: Duration, svcs: ListMap[String, HttpService])
 
   /** Start `Server` with supplied [[ServerBlueprint]]
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
   def startServer(blueprint : ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
-    val port = wcPort.get(blueprint.config)
     for {
-      actualPort <- if (flexibleOnPort) choosePort(port) else Task.now(port)
+      actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
       builder <- Task.delay {
         val initialBuilder = BlazeBuilder
           .withIdleTimeout(blueprint.idleTimeout)
@@ -112,8 +114,6 @@ class ServerOps[WC: CodecJson, SC](
       server <- Task.delay(builder.run)
     } yield (server, actualPort)
   }
-
-  final case class StaticContent(loc: String, path: String)
 
   /** Given a [[Process]] of [[quasar.api.Server.ServerBlueprint]], returns a [[Process]] of [[org.http4s.server.Server]].
     *
@@ -152,9 +152,9 @@ class ServerOps[WC: CodecJson, SC](
     */
   def startServers(initialPort: Int,
                    produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
-    val configQ = async.boundedQueue[Configuration](1)
+    val configQ = async.boundedQueue[ServerBlueprint](1)
     def startNew(port: Int): Task[Unit] = {
-      val conf = Configuration(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
+      val conf = ServerBlueprint(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
       configQ.enqueueOne(conf)
     }
     startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
@@ -216,7 +216,7 @@ class ServerOps[WC: CodecJson, SC](
                           _.point[EnvTask],
                           EitherT.left(Task.now(InvalidConfig("couldn’t parse options"))))
       content <- interpretPaths(opts)
-      interpreter = runStatefully(InMemState.empty).run.compose(filesystem)
+      interpreter = runStatefully(InMemState.empty).run.compose(fileSystem)
       redirect = content.map(_.loc)
       port           =  opts.port getOrElse 8080
       produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) = reload => RestApi(content.toList,redirect,port,reload).AllServices(interpreter)

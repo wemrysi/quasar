@@ -57,7 +57,7 @@ object JsonFormat {
   }
 }
 
-case class DecodeError(msg: String)
+final case class DecodeError(msg: String)
 
 object DecodeError {
   implicit val show: Show[DecodeError] = Show.shows(_.msg)
@@ -176,7 +176,7 @@ object MessageFormat {
               err => DecodeError("parse error: " + err),
               rec => {
                 val pairs = paths zip rec.fields.map(Prettify.parse)
-                val good = pairs.map { case (p, s) => (p |@| s).tupled }.flatten
+                val good = pairs.map { case (p, s) => (p |@| s).tupled }.foldMap(_.toList)
                 Prettify.unflatten(good.toListMap)
               }
             ))

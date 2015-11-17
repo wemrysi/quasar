@@ -28,8 +28,8 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
 
   import posixCodec.printPath
 
-  def compile(state: InMemState): HttpService = compileService[FileSystem](runStatefully(state).run.compose(filesystem))
-  def query(state: InMemState): HttpService = service[FileSystem](runStatefully(state).run.compose(filesystem))
+  def compile(state: InMemState): HttpService = compileService[FileSystem](runStatefully(state).run.compose(fileSystem))
+  def query(state: InMemState): HttpService = service[FileSystem](runStatefully(state).run.compose(fileSystem))
 
   def post(service: InMemState => HttpService)(path: AbsDir[Sandboxed],
             query: Option[String],

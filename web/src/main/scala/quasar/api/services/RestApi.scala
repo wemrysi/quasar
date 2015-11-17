@@ -5,9 +5,9 @@ import org.http4s.server.middleware.{CORS, GZip}
 import org.http4s.server.syntax.ServiceOps
 import org.http4s.dsl._
 import quasar.Predef._
-import quasar.api.Server.StaticContent
+import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
-import quasar.fs.{ReadFile, WriteFile, ManageFile}
+import quasar.fs.{ReadFile, WriteFile, ManageFile, QueryFile}
 
 import scala.collection.immutable.ListMap
 import scalaz.concurrent.Task
@@ -18,7 +18,7 @@ import quasar.api._
 
 import scala.concurrent.duration._
 
-case class RestApi(staticContent: List[StaticContent],
+final case class RestApi(staticContent: List[StaticContent],
                    redirect: Option[String],
                    defaultPort: Int,
                    restart: Int => Task[Unit]) {
@@ -36,7 +36,8 @@ case class RestApi(staticContent: List[StaticContent],
 
   def AllServices[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                W: WriteFile.Ops[S],
-                                               M: ManageFile.Ops[S]): ListMap[String,HttpService] = {
+                                               M: ManageFile.Ops[S],
+                                               Q: QueryFile.Ops[S]): ListMap[String,HttpService] = {
     val apiServices = ListMap(
       "/data/fs"      -> data.service(f),
       "/metadata/fs"  -> metadata.service(f),
@@ -50,7 +51,7 @@ case class RestApi(staticContent: List[StaticContent],
       })))
     }
     apiServices ++
-      staticContent.map{ case StaticContent(loc, path) => loc -> staticFileService(path)}.toListMap
+      staticContent.map{ case StaticContent(loc, path) => loc -> staticFileService(path)}.toListMap ++
       ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
   }
 }
