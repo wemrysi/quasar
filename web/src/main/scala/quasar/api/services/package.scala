@@ -1,10 +1,11 @@
 package quasar.api
 
+import quasar.Data
 import quasar.Predef._
 
-import org.http4s.{EntityEncoder, Response}
+import org.http4s.{Charset, EntityEncoder, Response}
 import org.http4s.dsl._
-import org.http4s.headers.`Content-Type`
+import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
 
 import quasar.fs.FileSystemError._
 import quasar.fs._
@@ -44,14 +45,24 @@ package object services {
   }
 
   def formatAsHttpResponse[S[_]: Functor,A: EntityEncoder](f: S ~> Task)(data: Process[FileSystemErrT[Free[S,?], ?], A],
-                                                                         contentType: `Content-Type`): Task[Response] = {
+                                                                         contentType: `Content-Type`,
+                                                                         disposition: Option[`Content-Disposition`]): Task[Response] = {
     // Check the first element of data, if it's an error return an error response, otherwise serialize any
     // other errors among the remaining data that is sent to the client.
     convert(f)(data).unconsOption.fold(
       fileSystemErrorResponse,
       _.fold(Ok(""))({ case (first, rest) =>
         Ok(Process.emit(first) ++ rest.translate(flatten))
-      }).map(_.putHeaders(contentType))).join
+      }).map(_.putHeaders(contentType :: disposition.toList : _*))).join
+  }
+
+  def formatQuasarDataStreamAsHttpResponse[S[_]: Functor](f: S ~> Task)(data: Process[FileSystemErrT[Free[S,?], ?], Data],
+                                                                        format: MessageFormat): Task[Response] = {
+    formatAsHttpResponse(f)(
+      data = format.encode[FileSystemErrT[Free[S,?], ?]](data),
+      contentType = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`)),
+      disposition = format.disposition
+    )
   }
 
   def convert[S[_]: Functor, A](f: S ~> Task)(from: Process[FileSystemErrT[Free[S,?],?], A]): Process[FilesystemTask, A] = {

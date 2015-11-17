@@ -68,11 +68,12 @@ object data {
       path.fold(
         dirPath => formatAsHttpResponse(f)(
           data = zippedBytes[S](dirPath, format, offset, limit),
-          contentType = `Content-Type`(MediaType.`application/zip`)
+          contentType = `Content-Type`(MediaType.`application/zip`),
+          disposition = format.disposition
         ),
-        filePath => formatAsHttpResponse(f)(
-          data = format.encode(R.scan(filePath, offset, limit)),
-          contentType = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))
+        filePath => formatQuasarDataStreamAsHttpResponse(f)(
+          data = R.scan(filePath, offset, limit),
+          format = format
         )
       )
     }
@@ -103,7 +104,7 @@ object data {
           nel => s"invalid limit: ${nel.head.sanitized} (${nel.head.details})"))
         val possibleResponse = (offsetWithErrorMsg |@| limitWithErrorMsg) { (offset, limit) =>
           val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-          download(requestedFormat, path, offset, limit).map(_.putHeaders(requestedFormat.disposition.toList: _*))
+          download(requestedFormat, path, offset, limit)
         }
         possibleResponse.leftMap(errMessage => BadRequest(errMessage)).merge
       }
