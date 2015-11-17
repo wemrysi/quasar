@@ -95,8 +95,7 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion  % "test",
     "org.specs2"        %% "specs2-core"               % "2.4"          % "test",
     "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"        % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test",
-    "net.databinder.dispatch" %% "dispatch-core"       % "0.11.1"       % "test"),
+    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion     % "test"),
   licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")))
 
 // Using a Seq of desired warts instead of Warts.allBut due to an incremental compilation issue.
