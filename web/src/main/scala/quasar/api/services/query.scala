@@ -1,12 +1,12 @@
 package quasar.api.services
 
+import argonaut._, Argonaut._
 import org.http4s.headers.Accept
-import org.http4s.util.CaseInsensitiveString
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.server._
-import pathy.Path.{AbsDir, Sandboxed}
-import quasar.Planner.{CompilePathError, CompilationError}
+import org.http4s.argonaut._
+import pathy.Path._
 import quasar._
 import quasar.Predef._
 import quasar.api.{MessageFormat, Destination, AsDirPath}
@@ -16,7 +16,6 @@ import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 import scalaz.~>
 
 object query {
@@ -40,6 +39,8 @@ object query {
   private val DestinationHeaderMustExist     = BadRequest("The '" + Destination.name + "' header must be specified")
 
   def translateSemanticErrors(error: SemanticErrors): Task[Response] = ???
+
+  private def vars(req: Request) = Variables(req.params.map { case (k, v) => (VarName(k), VarValue(v)) })
 
   def convert(path: AbsDir[Sandboxed]): fs.Path = ???
 
@@ -76,9 +77,36 @@ object query {
           else {
             req.headers.get(Destination).fold(DestinationHeaderMustExist) { destination =>
               val parseRes = SQLParser.parseInContext(Query(query),convert(path)).leftMap(formatParsingError)
-              val pathRes = ??? //Path(destination.value).from(convert(path)).leftMap(formatParsingError)
-
-              ???
+              val destinationFile = posixCodec.parsePath(
+                relFile => \/-(\/-(relFile)),
+                absFile => \/-(-\/(absFile)),
+                relDir => -\/(BadRequest("Destination must be a file")),
+                absDir => -\/(BadRequest("Destination must be a file")))(destination.value)
+              // Add path of query if destination is a relative file or else just jump through Sandbox hoop
+              val absDestination = destinationFile.flatMap(_.bimap(
+                absFile => sandbox(rootDir, absFile).map(file0 => rootDir </> file0) \/> InternalServerError("Could not sandbox file"),
+                relFile => sandbox(currentDir, relFile).map(file0 => currentDir </> file0).map(file1 => path </> file1) \/> InternalServerError("Could not sandbox file")
+              ).merge)
+              val resultOrError = (parseRes |@| absDestination)((expr, out) => {
+                // Unwrap the 3 level Monad Transformer, convert from Free to Task
+                Q.executeQuery(expr, vars(req), out).run.run.run.foldMap(f).flatMap { case (phases, result) =>
+                  result.fold(
+                    translateSemanticErrors,
+                    _.fold(
+                      fileSystemErrorResponse,
+                      resultFile => {
+                        Ok(Json.obj(
+                          "out" := resultFile.fold(
+                            posixCodec.printPath,
+                            posixCodec.printPath),
+                          "phases" := phases
+                        ))
+                      }
+                    )
+                  )
+                }
+              })
+              resultOrError.merge
             }
           }
         }
