@@ -118,10 +118,15 @@ object query {
                                            M: ManageFile.Ops[S]): HttpService = {
     HttpService{
       case GET -> AsDirPath(path) :? QueryParam(query) => {
-//        for {
-//          expr <- SQLParser.parseInContext(query, convert(path)).leftMap(formatParsingError)
-//        } yield ???
-        ???
+        SQLParser.parseInContext(query, convert(path)).fold(
+          formatParsingError,
+          expr => {
+            val phases = queryPlan(expr,Variables(Map())).run.written
+            phases.lastOption.map{
+              case PhaseResult.Tree(name, value)    => Ok(Json(name := value))
+              case PhaseResult.Detail(name, value)  => Ok(name + "\n" + value)
+            }.getOrElse(InternalServerError("no plan"))
+          })
       }
       case GET -> _ => QueryParameterMustContainQuery
     }
