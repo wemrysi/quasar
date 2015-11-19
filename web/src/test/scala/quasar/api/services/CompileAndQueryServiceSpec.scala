@@ -43,8 +43,8 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
       reqWithQuery.copy(headers = Headers(Header("Destination", printPath(destination))))
     ).getOrElse(reqWithQuery)
     val actualResponse = service(state)(req).run
-    actualResponse.status must_== status
     actualResponse.as[String].run must_== response
+    actualResponse.status must_== status
   }
 
   def get(service: InMemState => HttpService)(path: AbsDir[Sandboxed],
@@ -55,11 +55,11 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
     val baseReq = Request(uri = Uri(path = printPath(path)))
     val req = query.map(query => baseReq.copy(uri = baseReq.uri.+?("q", query))).getOrElse(baseReq)
     val actualResponse = service(state)(req).run
-    actualResponse.status must_== status
     actualResponse.as[String].run must_== response
+    actualResponse.status must_== status
   }
 
-  def selectAll(from: FileName) = s"select * from ${from.value}"
+  def selectAll(from: FileName) = "select * from \"" + from.value + "\""
 
   "Compile and Query Service" should {
     def testBoth[A](test: (InMemState => HttpService) => Unit) = {
@@ -172,12 +172,14 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
   }
   "Compile" should {
     "plan simple query" ! prop { filesystem: SingleFileFileSystem =>
+      // Representation of the directory as a string without the leading slash
+      val pathString = printPath(filesystem.file).drop(1)
       get(compile)(
         path = filesystem.parent,
         query = Some(selectAll(filesystem.filename)),
         state = filesystem.state,
         status = Status.Ok,
-        response = "Stub\nPlan(logical: Squash(Read(Path(\"bar\"))))"
+        response = "InMemory\nPlan(logical: Squash(Read(Path(\"" + pathString + "\"))))"
       )
     }
   }

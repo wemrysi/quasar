@@ -124,6 +124,9 @@ object chroot {
           Coyoneda.lift(ExecutePlan(lp.translate(rebasePlan), rebase(out, prefix)))
             .map(_.map(_.bimap(stripPathError(prefix), resultFile.modify(stripPrefix(prefix)))))
 
+        case Explain(lp) =>
+          Coyoneda.lift(Explain(lp.translate(rebasePlan)))
+
         case ListContents(d) =>
           Coyoneda.lift(ListContents(rebase(d, prefix)))
             .map(_.bimap(stripPathError(prefix), _ map stripNodePrefix(prefix)))

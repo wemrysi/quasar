@@ -17,6 +17,8 @@ object QueryFile {
   final case class ExecutePlan(lp: Fix[LogicalPlan], out: AbsFile[Sandboxed])
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultFile)]
 
+  final case class Explain(lp: Fix[LogicalPlan]) extends QueryFile[PhaseResults]
+
   final case class ListContents(dir: AbsDir[Sandboxed])
     extends QueryFile[FileSystemError \/ Set[Node]]
 
@@ -38,6 +40,9 @@ object QueryFile {
       */
     def execute(plan: Fix[LogicalPlan], out: AbsFile[Sandboxed]): ExecM[ResultFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ ResultFile])
+
+    def explain(plan: Fix[LogicalPlan]): F[PhaseResults] =
+      lift(Explain(plan))
 
     /** Returns the path to the result of executing the given [[LogicalPlan]] */
     def execute_(plan: Fix[LogicalPlan])
@@ -102,6 +107,13 @@ object QueryFile {
       def comp = compToCompExec(queryPlan(query, vars)).liftM[Process]
 
       comp flatMap (lp => evaluate(lp).translate[CompExecM](execToCompExec))
+    }
+
+    def explainQuery(query: sql.Expr, vars: Variables): SemanticErrsT[F,PhaseResults] = {
+      val writer = queryPlan(query, vars).run
+      val phases = writer.written
+      EitherT[F,SemanticErrors,PhaseResults](
+        writer.value.map(lp => explain(lp).map(physicalPhases => phases ++ physicalPhases)).sequenceU)
     }
 
     /** Returns immediate children of the given directory, fails if the

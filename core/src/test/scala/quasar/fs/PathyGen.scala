@@ -8,7 +8,7 @@ import scalaz.std.list._
 import org.scalacheck._
 import pathy.Path._
 
-object PathyGen {
+trait PathyGenImpl {
 
   implicit val arbitraryAbsFile: Arbitrary[AbsFile[Sandboxed]] =
     Arbitrary(Gen.resize(10, genAbsFile))
@@ -43,10 +43,17 @@ object PathyGen {
       (100, Gen.nonEmptyListOf(genSegment)
         .map(_.foldLeft(currentDir)((d, s) => d </> dir(s)))))
 
-  // TODO: Are these special characters MongoDB-specific?
+  def genSegment: Gen[String]
+}
+
+object PathyGen extends PathyGenImpl {
   def genSegment: Gen[String] =
-    Gen.nonEmptyListOf(Gen.frequency(
-      (100, Arbitrary.arbitrary[Char]) ::
+  Gen.nonEmptyListOf(Gen.frequency(
+    (100, Arbitrary.arbitrary[Char]) ::
       "$./\\_~ *+-".toList.map(Gen.const).strengthL(10): _*))
-      .map(_.mkString)
+    .map(_.mkString)
+}
+
+object SimplePathyGen extends PathyGenImpl {
+  def genSegment: Gen[String] = Gen.alphaStr.filter(_.nonEmpty)
 }

@@ -47,6 +47,8 @@ object queryfile {
               coll   <- execWorkflow(wf, dst, execMongo) run prefix
             } yield ResultFile.User(coll.asFile)).run.run
 
+          case Explain(lp) => ???
+
           case ListContents(dir) =>
             (dirName(dir) match {
               case Some(_) =>

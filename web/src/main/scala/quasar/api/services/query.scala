@@ -31,7 +31,7 @@ object query {
 
   def formatParsingError(error: ParsingError): Task[Response] = error match {
     case ParsingPathError(e) => ???
-    case _ => BadRequest(error.message)
+    case _ => BadRequest("Generic parsing error: " + error.message)
   }
 
   private val QueryParameterMustContainQuery = BadRequest("The request must contain a query")
@@ -42,7 +42,7 @@ object query {
 
   private def vars(req: Request) = Variables(req.params.map { case (k, v) => (VarName(k), VarValue(v)) })
 
-  def convert(path: AbsDir[Sandboxed]): fs.Path = ???
+  def convert(path: AbsDir[Sandboxed]): fs.Path = fs.Path(posixCodec.printPath(path))
 
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
@@ -113,21 +113,22 @@ object query {
     }
   }
 
-  def compileService[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
-                                           W: WriteFile.Ops[S],
-                                           M: ManageFile.Ops[S]): HttpService = {
+  def compileService[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S]): HttpService = {
     HttpService{
-      case GET -> AsDirPath(path) :? QueryParam(query) => {
+      case GET -> AsDirPath(path) :? QueryParam(query) =>
         SQLParser.parseInContext(query, convert(path)).fold(
           formatParsingError,
           expr => {
-            val phases = queryPlan(expr,Variables(Map())).run.written
-            phases.lastOption.map{
-              case PhaseResult.Tree(name, value)    => Ok(Json(name := value))
-              case PhaseResult.Detail(name, value)  => Ok(name + "\n" + value)
-            }.getOrElse(InternalServerError("no plan"))
-          })
-      }
+            Q.explainQuery(expr,Variables(Map())).run.foldMap(f).flatMap(_.fold(
+              translateSemanticErrors,
+              phases =>
+                phases.lastOption.map{
+                  case PhaseResult.Tree(name, value)    => Ok(Json(name := value))
+                  case PhaseResult.Detail(name, value)  => Ok(name + "\n" + value)
+                }.getOrElse(InternalServerError("no plan"))
+            ))
+          }
+        )
       case GET -> _ => QueryParameterMustContainQuery
     }
   }

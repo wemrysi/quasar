@@ -16,7 +16,7 @@ import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
 import quasar.fs.inmemory.InMemState
 import quasar.fs.NonEmptyString
-import quasar.fs.PathyGen._
+import quasar.fs.SimplePathyGen._
 import quasar.DataGen._
 import quasar.fs.NumericGen._
 

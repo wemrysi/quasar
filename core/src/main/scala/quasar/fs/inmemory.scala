@@ -3,6 +3,7 @@ package fs
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.recursionschemes.Fix
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -123,10 +124,13 @@ object inmemory {
   }
 
   val queryFile: QueryFile ~> InMemoryFs = new (QueryFile ~> InMemoryFs) {
+    def phase(lp: Fix[LogicalPlan]): PhaseResult = PhaseResult.Detail("InMemory", s"Plan(logical: ${lp.toString})")
     def apply[A](qf: QueryFile[A]) = qf match {
       case ExecutePlan(lp, out) =>
-        (Vector.empty[PhaseResult], ResultFile.User(out).right[FileSystemError])
+        (Vector(phase(lp)), ResultFile.User(out).right[FileSystemError])
           .point[InMemoryFs]
+
+      case Explain(lp) => Vector(phase(lp)).point[InMemoryFs]
 
       case ListContents(dir) =>
         ls(dir)
