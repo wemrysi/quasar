@@ -9,7 +9,7 @@ import org.specs2.ScalaCheck
 import pathy.Path._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import inmemory._, PathyGen._, FileSystemError._, PathError2._
+  import InMemory._, PathyGen._, FileSystemError._, PathError2._
 
   "QueryFile" should {
     "descendantFiles" >> {
@@ -24,13 +24,13 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
           val mem = InMemState fromFiles (f1s ::: f2s ::: fds).toMap
           val expectedFiles = (fs.map(dc1 </> _) ::: fs.map(dc2 </> _)).distinct
 
-          runT(query.descendantFiles(dp)).run.eval(mem)
+          runResult(query.descendantFiles(dp)).run.eval(mem)
             .run.toEither must beRight(containTheSameElementsAs(expectedFiles))
         }
       }
 
       "returns not found when dir does not exist" ! prop { d: AbsDir[Sandboxed] =>
-        runT(query.descendantFiles(d)).run.eval(emptyMem)
+        runResult(query.descendantFiles(d)).run.eval(emptyMem)
           .run.toEither must beLeft(PathError(DirNotFound(d)))
       }
     }

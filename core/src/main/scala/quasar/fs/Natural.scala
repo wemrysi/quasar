@@ -6,7 +6,7 @@ import quasar.Predef._
 import scalaz._
 import scalaz.Tags.{Multiplication => Mult}
 
-final class Natural private[fs] (val value: Long) {
+final class Natural private[fs] (val value: Long) extends scala.AnyVal {
   def plus(other: Natural): Natural =
     new Natural(value + other.value)
 

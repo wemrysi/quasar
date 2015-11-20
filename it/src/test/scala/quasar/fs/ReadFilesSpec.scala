@@ -50,23 +50,23 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
 
       "open returns FileNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
-        read.open(dne, Natural._0, None).run map { r =>
+        read.unsafe.open(dne, Natural._0, None).run map { r =>
           r.toEither must beLeft(PathError(FileNotFound(dne)))
         }
       }
 
       "read unopened file handle returns UnknownReadHandle" >>* {
         val h = ReadHandle(42)
-        read.read(h).run map { r =>
+        read.unsafe.read(h).run map { r =>
           r.toEither must beLeft(UnknownReadHandle(h))
         }
       }
 
       "read closed file handle returns UnknownReadHandle" >>* {
         val r = for {
-          h  <- read.open(smallFile.file, Natural._0, None)
-          _  <- read.close(h).liftM[FileSystemErrT]
-          xs <- read.read(h)
+          h  <- read.unsafe.open(smallFile.file, Natural._0, None)
+          _  <- read.unsafe.close(h).liftM[FileSystemErrT]
+          xs <- read.unsafe.read(h)
         } yield xs
 
         r.run map { x =>
@@ -82,6 +82,22 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, Natural._0, None))
         r.runEither must beRight(smallFile.data.toIndexedSeq)
+      }
+
+      "scan with offset = |file| and no limit yields no data" >> {
+        val off = Natural._5 * Natural._5 * Natural._4
+        val r = runLogT(run, read.scan(smallFile.file, off, None))
+        r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
+      }
+
+      /** TODO: This just specifies the default MongoDB behavior as that was
+        *       the easiest to implement, however an argument could be made
+        *       for erroring instead of returning nothing.
+        */
+      "scan with offset k, where k > |file|, and no limit succeeds with empty result" >> {
+        val off = (Natural._5 * Natural._5 * Natural._4) + Natural._1
+        val r = runLogT(run, read.scan(smallFile.file, off, None))
+        r.runEither must beRight((xs: scala.collection.IndexedSeq[Data]) => xs must beEmpty)
       }
 
       "scan with offset k > 0 and no limit skips first k data" >> {
@@ -117,9 +133,6 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
         (j.value.toInt must beGreaterThan(smallFile.data.length)) and
         (r.runEither must beRight(smallFile.data.toIndexedSeq))
       }
-
-      // TODO: What is the expected behavior here?
-      "scan with offset k, where k > |file|, and no limit ???" >> todo
 
       "scan very long file is stack-safe" >> {
         runLogT(run, read.scanAll(veryLongFile.file).foldMap(_ => 1))

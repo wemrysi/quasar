@@ -2,11 +2,10 @@ package quasar
 package fs
 
 import quasar.Predef._
+import quasar.fp._
 
 import monocle.std.{disjunction => D}
-
 import pathy.Path._
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
@@ -33,8 +32,8 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val f = writesPrefix </> dir("opencreates") </> file("f1")
 
         val r = for {
-          h <- write.open(f)
-          _ <- write.close(h).liftM[FileSystemErrT]
+          h <- write.unsafe.open(f)
+          _ <- write.unsafe.close(h).liftM[FileSystemErrT]
           p <- query.fileExists(f).liftM[FileSystemErrT]
         } yield p
 
@@ -43,7 +42,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "write to unknown handle returns UnknownWriteHandle" >>* {
         val h = WriteHandle(42)
-        write.write(h, Vector()) map { r =>
+        write.unsafe.write(h, Vector()) map { r =>
           r must_== Vector(UnknownWriteHandle(h))
         }
       }
@@ -51,9 +50,9 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
       "write to closed handle returns UnknownWriteHandle" >>* {
         val f = writesPrefix </> dir("d1") </> file("f1")
         val r = for {
-          h    <- write.open(f)
-          _    <- write.close(h).liftM[FileSystemErrT]
-          errs <- write.write(h, Vector()).liftM[FileSystemErrT]
+          h    <- write.unsafe.open(f)
+          _    <- write.unsafe.close(h).liftM[FileSystemErrT]
+          errs <- write.unsafe.write(h, Vector()).liftM[FileSystemErrT]
         } yield errs
 
         r.run.map { xs =>
@@ -65,14 +64,14 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "append should write data to file" >> {
         val f = writesPrefix </> file("saveone")
-        val p = write.appendF(f, oneDoc).drain ++ read.scanAll(f)
+        val p = write.append(f, oneDoc.toProcess).drain ++ read.scanAll(f)
 
         runLogT(run, p).runEither must beRight(oneDoc)
       }
 
       "append empty input should result in a new file" >> {
         val f = writesPrefix </> file("emptyfile")
-        val p = write.appendF(f, Vector[Data]()).drain ++
+        val p = write.append(f, Process.empty).drain ++
                 (query.fileExists(f).liftM[FileSystemErrT] : query.M[Boolean]).liftM[Process]
 
         runLogT(run, p).run.run must_== \/.right(Vector(true))
@@ -84,8 +83,8 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val f1 = d </> descendant1
         val descendant2 = dir[Sandboxed]("subdir2") </> file[Sandboxed]("subdirfile2")
         val f2 = d </> descendant2
-        val p = write.appendF(f1, oneDoc).drain ++
-                write.appendF(f2, oneDoc).drain ++
+        val p = write.append(f1, oneDoc.toProcess).drain ++
+                write.append(f2, oneDoc.toProcess).drain ++
                 query.descendantFiles(d).liftM[Process]
 
         runLogT(run, p).map(_.flatMap(_.toVector))

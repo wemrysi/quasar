@@ -9,13 +9,13 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
 
-/** In-Memory Read/Write/ManageFile interpreters, useful for testing/stubbing
+/** In-Memory FileSystem interpreters, useful for testing/stubbing
   * when a "real" interpreter isn't needed or desired.
   *
   * NB: Since this is in-memory, careful with writing large amounts of data to
   *     the file system.
   */
-object inmemory {
+object InMemory {
   import ReadFile._, WriteFile._, ManageFile._, QueryFile._
   import FileSystemError._, PathError2._
 
@@ -216,15 +216,21 @@ object inmemory {
     } yield r1
 
   private def moveFile(src: AbsFile[Sandboxed], dst: AbsFile[Sandboxed], s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
+    import MoveSemantics.Case._
+
     val move0: InMemoryFs[FileSystemError \/ Unit] = for {
       v <- fileL(src) <:= None
       r <- v.cata(xs => (fileL(dst) := Some(xs)) as ().right, fsFileNotFound(src))
     } yield r
 
-    s.fold(
-      move0,
-      fileL(dst).st flatMap (_ ? fsFileExists[Unit](dst) | move0),
-      fileL(dst).st flatMap (_ ? move0 | fsFileNotFound(dst)))
+    s match {
+      case Overwrite =>
+        move0
+      case FailIfExists =>
+        fileL(dst).st flatMap (_ ? fsFileExists[Unit](dst) | move0)
+      case FailIfMissing =>
+        fileL(dst).st flatMap (_ ? move0 | fsFileNotFound(dst))
+    }
   }
 
   private def deleteDir(d: AbsDir[Sandboxed]): InMemoryFs[FileSystemError \/ Unit] =
