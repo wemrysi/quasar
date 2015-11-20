@@ -17,7 +17,7 @@ import pathy.Path._
 import quasar.fs.PathyGen._
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import inmemory._, DataGen._
+  import InMemory._, DataGen._
 
   def runService(mem: InMemState): QueryFile ~> Task =
     new (QueryFile ~> Task) {

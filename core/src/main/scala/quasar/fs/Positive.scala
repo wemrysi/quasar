@@ -23,11 +23,6 @@ final class Positive private (val value: Long) extends scala.AnyVal {
     value.toInt
 
   def toNatural: Natural = new Natural(value)
-
-  override def equals(other: scala.Any) = other match {
-    case Positive(a) => value == a
-    case _ => false
-  }
 }
 
 object Positive {

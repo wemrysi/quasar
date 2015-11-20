@@ -35,7 +35,7 @@ import org.scalacheck.Arbitrary
 import Fixture._
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import inmemory._
+  import InMemory._
 
   def service(mem: InMemState): HttpService =
     data.service[FileSystem](runStatefully(mem).run.compose(fileSystem))

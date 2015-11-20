@@ -57,7 +57,7 @@ object query {
     HttpService {
       case req @ GET -> AsDirPath(path) :? QueryParam(query) => {
 
-        SQLParser.parseInContext(query, convert(path)).fold(
+        SQLParser.parseInContext(query, fs.convert(path)).fold(
           formatParsingError,
           expr => queryPlan(expr, Variables(Map())).run.value.fold(
             errs => translateSemanticErrors(errs),
@@ -76,7 +76,7 @@ object query {
           if (query == "") POSTContentMustContainQuery
           else {
             req.headers.get(Destination).fold(DestinationHeaderMustExist) { destination =>
-              val parseRes = SQLParser.parseInContext(Query(query),convert(path)).leftMap(formatParsingError)
+              val parseRes = SQLParser.parseInContext(Query(query),fs.convert(path)).leftMap(formatParsingError)
               val destinationFile = posixCodec.parsePath(
                 relFile => \/-(\/-(relFile)),
                 absFile => \/-(-\/(absFile)),
@@ -96,9 +96,7 @@ object query {
                       fileSystemErrorResponse,
                       resultFile => {
                         Ok(Json.obj(
-                          "out" := resultFile.fold(
-                            posixCodec.printPath,
-                            posixCodec.printPath),
+                          "out" := posixCodec.printPath(ResultFile.resultFile.get(resultFile)),
                           "phases" := phases
                         ))
                       }
@@ -116,7 +114,7 @@ object query {
   def compileService[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S]): HttpService = {
     HttpService{
       case GET -> AsDirPath(path) :? QueryParam(query) =>
-        SQLParser.parseInContext(query, convert(path)).fold(
+        SQLParser.parseInContext(query, fs.convert(path)).fold(
           formatParsingError,
           expr => {
             Q.explainQuery(expr,Variables(Map())).run.foldMap(f).flatMap(_.fold(

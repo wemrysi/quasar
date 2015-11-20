@@ -13,9 +13,8 @@ import org.specs2.mutable.Specification
 
 import pathy.Path._
 import quasar.fs._
-import quasar.fs.inmemory._
+import quasar.fs.InMemory._
 import quasar.fs.PathyGen._
-import quasar.fs.inmemory.InMemState
 
 import Fixture._
 

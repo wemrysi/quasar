@@ -20,22 +20,23 @@ import pathy.Path._
 package object services {
   // TODO: Polish this up
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
-    error.fold(
-      pathErrorResponse,
-      (logicalPlan, plannerError) => BadRequest("Planner error"),
-      unknownReadHandle => InternalServerError(s"Unknown read handle: $unknownReadHandle"),
-      unknownWriteHandle => InternalServerError(s"Unknown write handle: $unknownWriteHandle"),
-      numFailed => InternalServerError(s"Failed to write $numFailed records"),
-      (data, reason) => InternalServerError(s"Failed to write ${data.shows} because of $reason")
-    )
+    error match {
+      case Case.PathError(e) => pathErrorResponse(e)
+      case Case.PlannerError(_, _) => BadRequest("Planner error")
+      case Case.UnknownReadHandle(handle) => InternalServerError(s"Unknown read handle: $handle")
+      case Case.UnknownWriteHandle(handle) => InternalServerError(s"Unknown write handle: $handle")
+      case Case.PartialWrite(numFailed) => InternalServerError(s"Failed to write $numFailed records")
+      case Case.WriteFailed(data, reason) => InternalServerError(s"Failed to write ${data.shows} because of $reason")
+    }
+
 
   def pathErrorResponse(error: PathError2): Task[Response] =
-    error.fold(
-      path => Conflict(s"$path already exists"),
+    error match {
+      case PathError2.Case.PathExists(path) => Conflict(s"$path already exists")
       // TODO: Adjust definition of `AbsPath` in order to avoid this fold...
-      path => NotFound(s"${path.fold(posixCodec.printPath,posixCodec.printPath)}: doesn't exist"),
-      (path, reason) => BadRequest(s"$path is an invalid path because $reason")
-    )
+      case PathError2.Case.PathNotFound(path) => NotFound(s"${path.fold(posixCodec.printPath, posixCodec.printPath)}: doesn't exist")
+      case PathError2.Case.InvalidPath(path, reason) => BadRequest(s"$path is an invalid path because $reason")
+    }
 
   type FilesystemTask[A] = FileSystemErrT[Task, A]
   /** Flatten by inserting the [[quasar.fs.FileSystemError]] into the failure case of the [[scalaz.concurrent.Task]] */

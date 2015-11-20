@@ -21,11 +21,6 @@ final class Natural private[fs] (val value: Long) extends scala.AnyVal {
 
   def toInt: Int =
     value.toInt
-
-  override def equals(other: scala.Any) = other match {
-    case Natural(a) => value == a
-    case _ => false
-  }
 }
 
 object Natural {

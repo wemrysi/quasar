@@ -25,7 +25,7 @@ import quasar.config._
 
 import java.io.File
 import java.lang.System
-import quasar.fs.inmemory._
+import quasar.fs.InMemory._
 
 import scala.concurrent.duration._
 
