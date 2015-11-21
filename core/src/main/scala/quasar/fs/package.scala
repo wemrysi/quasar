@@ -15,8 +15,12 @@ package object fs {
   /** FileSystem[A] = [[ReadFileF]] \/ [[WriteFileF]] \/ [[ManageFileF]] \/ [[QueryFileF]] */
   type FileSystem[A]  = Coproduct[QueryFileF, FileSystem1, A]
 
-  type RelPath[S] = RelDir[S] \/ RelFile[S]
-  type AbsPath[S] = AbsDir[S] \/ AbsFile[S]
+  type ADir  = AbsDir[Sandboxed]
+  type RDir  = RelDir[Sandboxed]
+  type AFile = AbsFile[Sandboxed]
+  type RFile = RelFile[Sandboxed]
+  type APath = pathy.Path[Abs,_,Sandboxed]
+  type RPath = pathy.Path[Rel,_,Sandboxed]
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]

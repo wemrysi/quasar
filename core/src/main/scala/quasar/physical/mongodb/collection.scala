@@ -37,7 +37,7 @@ final case class Collection(databaseName: String, collectionName: String) {
   }
 
   /** Convert this collection to a file. */
-  def asFile: AbsFile[Sandboxed] = {
+  def asFile: AFile = {
     val db   = DatabaseNameUnparser(databaseName)
     val segs = CollectionNameUnparser(collectionName).reverse
     val f    = segs.headOption getOrElse db
@@ -75,11 +75,11 @@ object Collection {
       \/-(_)).join
 
   // TODO: Rename to `fromPath` once old path code is deleted
-  def fromPathy(path: AbsPath[Sandboxed]): PathError2 \/ Collection = {
+  def fromPathy(path: APath): PathError2 \/ Collection = {
     import PathError2._
 
-    flatten(None, None, None, Some(_), Some(_), path.merge)
-      .unite.uncons(
+    flatten(None, None, None, Some(_), Some(_), path)
+      .toIList.unite.uncons(
         InvalidPath(path, "no database specified").left,
         (h, t) => t.toNel.cata(
           ss => (for {
@@ -93,12 +93,6 @@ object Collection {
             } yield Collection(db, coll)) leftMap (InvalidPath(path, _)),
           InvalidPath(path, "path names a database, but no collection").left))
   }
-
-  def fromDir(dir: AbsDir[Sandboxed]): PathError2 \/ Collection =
-    fromPathy(dir.left)
-
-  def fromFile(file: AbsFile[Sandboxed]): PathError2 \/ Collection =
-    fromPathy(file.right)
 
   private trait PathParser extends RegexParsers {
     override def skipWhitespace = false

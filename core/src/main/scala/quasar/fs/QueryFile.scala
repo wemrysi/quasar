@@ -13,12 +13,21 @@ import scalaz.stream.Process
 sealed trait QueryFile[A]
 
 object QueryFile {
-  final case class ExecutePlan(lp: Fix[LogicalPlan], out: AbsFile[Sandboxed])
+  final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultFile)]
 
   final case class Explain(lp: Fix[LogicalPlan]) extends QueryFile[PhaseResults]
 
-  final case class ListContents(dir: AbsDir[Sandboxed])
+  /** TODO: While this is a bit better in one dimension here in `QueryFile`,
+    *       @mossprescott points out it is still a bit of a stretch to include
+    *       in this algebra. We need to revisit this and probably add algebras
+    *       over multiple dimensions to better organize these (and other)
+    *       operations.
+    *
+    *       For more discussion, see
+    *       https://github.com/quasar-analytics/quasar/pull/986#discussion-diff-45081757
+    */
+  final case class ListContents(dir: ADir)
     extends QueryFile[FileSystemError \/ Set[Node]]
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S) {
@@ -37,7 +46,7 @@ object QueryFile {
       * requested file if it is more efficient to do so (i.e. to avoid copying
       * lots of data for a plan consisting of a single `ReadF(...)`).
       */
-    def execute(plan: Fix[LogicalPlan], out: AbsFile[Sandboxed]): ExecM[ResultFile] =
+    def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[ResultFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ ResultFile])
 
     def explain(plan: Fix[LogicalPlan]): F[PhaseResults] =
@@ -71,11 +80,11 @@ object QueryFile {
       val hoistFS: FileSystemErrT[F, ?] ~> ExecM =
         Hoist[FileSystemErrT].hoist[F, G](liftMT[F, PhaseResultT])
 
-      def values(f: AbsFile[Sandboxed]) =
+      def values(f: AFile) =
         R.scanAll(f).translate[ExecM](hoistFS)
 
-      def handleTemp(tmp: AbsFile[Sandboxed]) = {
-        val cleanup = (hoistFS(M.deleteFile(tmp)): ExecM[Unit])
+      def handleTemp(tmp: AFile) = {
+        val cleanup = (hoistFS(M.delete(tmp)): ExecM[Unit])
                         .liftM[Process].drain
         values(tmp) onComplete cleanup
       }
@@ -89,7 +98,7 @@ object QueryFile {
     /** Returns the path to the result of executing the given SQL^2 query
       * using the given output file if possible.
       */
-    def executeQuery(query: sql.Expr, vars: Variables, out: AbsFile[Sandboxed])
+    def executeQuery(query: sql.Expr, vars: Variables, out: AFile)
                     : CompExecM[ResultFile] = {
 
       compileAnd(query, vars)(execute(_, out))
@@ -123,7 +132,7 @@ object QueryFile {
     /** Returns immediate children of the given directory, fails if the
       * directory does not exist.
       */
-    def ls(dir: AbsDir[Sandboxed]): M[Set[Node]] =
+    def ls(dir: ADir): M[Set[Node]] =
       EitherT(lift(ListContents(dir)))
 
     /** The children of the root directory. */
@@ -133,12 +142,12 @@ object QueryFile {
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.
       */
-    def descendantFiles(dir: AbsDir[Sandboxed]): M[Set[RelFile[Sandboxed]]] = {
+    def descendantFiles(dir: ADir): M[Set[RelFile[Sandboxed]]] = {
       type S[A] = StreamT[M, A]
 
-      def lsR(desc: RelDir[Sandboxed]): StreamT[M, RelFile[Sandboxed]] =
+      def lsR(desc: RDir): StreamT[M, RelFile[Sandboxed]] =
         StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
-          .flatMap(_.path.fold(
+          .flatMap(n => refineType(n.path).fold(
             d => lsR(desc </> d),
             f => (desc </> f).point[S]))
 
@@ -146,10 +155,8 @@ object QueryFile {
     }
 
     /** Returns whether the given file exists. */
-    def fileExists(file: AbsFile[Sandboxed]): F[Boolean] = {
-      // TODO: Add fileParent[B, S](f: Path[B, File, S]): Path[B, Dir, S] to pathy
-      val parent =
-        parentDir(file) getOrElse scala.sys.error("impossible, files have parents!")
+    def fileExists(file: AFile): F[Boolean] = {
+      val parent = fileParent(file)
 
       ls(parent)
         .map(_ flatMap (_.file.map(parent </> _).toSet) exists (identicalPath(file, _)))
@@ -165,7 +172,7 @@ object QueryFile {
         .flatMap(lp => execToCompExec(f(lp)))
     }
 
-    private def pathToAbsFile(p: QPath): Option[AbsFile[Sandboxed]] =
+    private def pathToAbsFile(p: QPath): Option[AFile] =
       p.file map (fn =>
         p.asAbsolute.dir
           .foldLeft(rootDir[Sandboxed])((d, n) => d </> dir(n.value)) </>
