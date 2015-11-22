@@ -33,5 +33,7 @@ package object fs {
   ): FileSystem ~> M =
     interpret.interpret4[QueryFileF, ReadFileF, WriteFileF, ManageFileF, M](
       Coyoneda.liftTF(q), Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(m))
+
+  def convert(path: pathy.Path[_,_,Sandboxed]): fs.Path = fs.Path(posixCodec.printPath(path))
 }
 

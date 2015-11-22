@@ -118,22 +118,22 @@ package object api {
   }
 
   object AsDirPath {
-    def unapply(p: HPath): Option[AbsDir[Sandboxed]] = {
+    def unapply(p: HPath): Option[ADir] = {
       val str = "/" + p.toList.mkString("/")
       posixCodec.parseAbsDir(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
     }
   }
 
   object AsFilePath {
-    def unapply(p: HPath): Option[AbsFile[Sandboxed]] = {
+    def unapply(p: HPath): Option[AFile] = {
       val str = "/" + p.toList.mkString("/")
       posixCodec.parseAbsFile(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
     }
   }
 
   object AsPath {
-    def unapply(p: HPath): Option[AbsPath[Sandboxed]] = {
-      AsDirPath.unapply(p).map(\/.left) orElse AsFilePath.unapply(p).map(\/.right)
+    def unapply(p: HPath): Option[APath] = {
+      AsDirPath.unapply(p) orElse AsFilePath.unapply(p)
     }
   }
 

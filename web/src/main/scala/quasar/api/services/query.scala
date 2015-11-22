@@ -31,7 +31,7 @@ object query {
 
   def formatParsingError(error: ParsingError): Task[Response] = error match {
     case ParsingPathError(e) => ???
-    case _ => BadRequest("Generic parsing error: " + error.message)
+    case _ => BadRequest(error.message)
   }
 
   private val QueryParameterMustContainQuery = BadRequest("The request must contain a query")

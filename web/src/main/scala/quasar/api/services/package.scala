@@ -34,7 +34,7 @@ package object services {
     error match {
       case PathError2.Case.PathExists(path) => Conflict(s"$path already exists")
       // TODO: Adjust definition of `AbsPath` in order to avoid this fold...
-      case PathError2.Case.PathNotFound(path) => NotFound(s"${path.fold(posixCodec.printPath, posixCodec.printPath)}: doesn't exist")
+      case PathError2.Case.PathNotFound(path) => NotFound(s"${posixCodec.printPath(path)}: doesn't exist")
       case PathError2.Case.InvalidPath(path, reason) => BadRequest(s"$path is an invalid path because $reason")
     }
 

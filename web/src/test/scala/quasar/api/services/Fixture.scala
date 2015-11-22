@@ -9,18 +9,19 @@ import org.http4s.{MediaType, Charset, EntityEncoder}
 import org.http4s.headers.`Content-Type`
 
 import pathy.Path._
+import pathy.Path
+import pathy.scalacheck.{RelFileOf, AbsDirOf, AbsFileOf}
 
 import quasar.Data
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
 import quasar.fs.InMemory.InMemState
-import quasar.fs.NonEmptyString
-import quasar.fs.SimplePathyGen._
+import quasar.fs.RPath
 import quasar.DataGen._
-import quasar.fs.NumericGen._
+import pathy.scalacheck.PathOf._
 
-import org.scalacheck.Arbitrary
+import org.scalacheck.{Arbitrary, Gen}
 
 import scala.collection.mutable
 import scalaz._, Scalaz._
@@ -31,26 +32,47 @@ object Fixture {
 
   import posixCodec.printPath
 
-  case class SingleFileFileSystem(file: AbsFile[Sandboxed], contents: Vector[Data]) {
+  case class AlphaCharacters(value: String)
+
+  object AlphaCharacters {
+    implicit val arb: Arbitrary[AlphaCharacters] = Arbitrary(Gen.alphaStr.filter(_.nonEmpty).map(AlphaCharacters(_)))
+    implicit val show: Show[AlphaCharacters] = Show.shows(_.value)
+  }
+
+  case class SingleFileFileSystem(fileOfCharacters: AbsFileOf[AlphaCharacters], contents: Vector[Data]) {
+    def file = fileOfCharacters.path
     def path = printPath(file)
     def state = InMemState fromFiles Map(file -> contents)
-    // A better Pathy signature here would avoid this get which should never fail
-    def parent = parentDir(file).get
+    def parent = fileParent(file)
     def filename = fileName(file)
   }
 
-  case class NonEmptyDir(dir: AbsDir[Sandboxed], filesInDir: NonEmptyList[(NonEmptyString, Vector[Data])]) {
+  def segAt[B,T,S](index: Int, path: Path[B,T,S]): Option[RPath] = {
+    scala.Predef.require(index >= 0)
+    val list = pathy.Path.flatten(none,none,none,dir(_).some,file(_).some,path).toIList.unite
+    list.drop(index).headOption
+  }
+
+  case class NonEmptyDir(
+    dirOfCharacters: AbsDirOf[AlphaCharacters],
+    filesInDir: NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]
+  ) {
+    def dir = dirOfCharacters.path
     def state = {
-      val fileMapping = filesInDir.map{ case (fileName,data) => (dir </> file(fileName.value), data)}
+      val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}
       InMemState fromFiles fileMapping.toList.toMap
     }
+    def relFiles = filesInDir.unzip._1.map(_.path)
+    def ls = relFiles.map(segAt(0,_)).list.flatten.toSet.toList.sortBy((path: RPath) => printPath(path))
   }
 
   implicit val arbSingleFileFileSystem: Arbitrary[SingleFileFileSystem] = Arbitrary(
-    (Arbitrary.arbitrary[AbsFile[Sandboxed]] |@| Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
+    (Arbitrary.arbitrary[AbsFileOf[AlphaCharacters]] |@|
+     Arbitrary.arbitrary[Vector[Data]])(SingleFileFileSystem.apply))
 
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
-    (Arbitrary.arbitrary[AbsDir[Sandboxed]] |@| Arbitrary.arbitrary[NonEmptyList[(NonEmptyString, Vector[Data])]])(NonEmptyDir.apply))
+    (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
+     Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
 
   val jsonReadableLine = JsonContentType(Readable,LineDelimited)
   val jsonPreciseLine = JsonContentType(Precise,LineDelimited)

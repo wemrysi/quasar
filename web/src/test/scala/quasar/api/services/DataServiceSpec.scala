@@ -21,7 +21,7 @@ import org.http4s.server._
 import quasar.fs.{Path => _, _}
 import pathy.Path
 import pathy.Path._
-import quasar.fs.PathyGen._
+import pathy.scalacheck.PathyArbitrary._
 import quasar.fs.NumericGen._
 
 import scalaz._, Scalaz._
@@ -49,7 +49,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
-        "if file does not exist" ! prop { file: AbsFile[Sandboxed] =>
+        "if file does not exist" ! prop { file: AFile =>
           val response = service(InMemState.empty)(Request(uri = Uri(path = printPath(file)))).run
           response.status must_== Status.NotFound
           response.as[String].run must_== s"${printPath(file)}: doesn't exist"
@@ -370,12 +370,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
     }
     "MOVE" >> {
-      def testMove[A: EntityDecoder](from: AbsPath[Sandboxed],
-                                     to: AbsPath[Sandboxed], state: InMemState, expectedBody: A, status: Status) = {
+      def testMove[A: EntityDecoder](from: APath,
+                                     to: APath, state: InMemState, expectedBody: A, status: Status) = {
         // TODO: Consider it's possible to invent syntax Move(...)
         val request = Request(
-          uri = Uri(path = from.fold(printPath, printPath)),
-          headers = Headers(Header("Destination", to.fold(printPath, printPath))),
+          uri = Uri(path = printPath(from)),
+          headers = Headers(Header("Destination", printPath(to))),
           method = Method.MOVE)
         val response = service(state)(request).run
         response.status must_== status
@@ -390,32 +390,32 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
       "be 404 for missing source file" ! prop { (file: AbsFile[Sandboxed], destFile: AbsFile[Sandboxed]) =>
         testMove(
-          from = file.right,
-          to = destFile.right,
+          from = file,
+          to = destFile,
           state = emptyMem,
           status = Status.NotFound,
           expectedBody = s"${printPath(file)}: doesn't exist")
       }
       "be 404 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
         testMove(
-          from = fs.dir.left,
-          to = file.right,
+          from = fs.dir,
+          to = file,
           state = fs.state,
           status = Status.BadRequest,
           expectedBody = "Cannot move directory into a file")
       }
       "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileFileSystem, dir: AbsDir[Sandboxed]) =>
         testMove(
-          from = fs.file.right,
-          to = dir.left,
+          from = fs.file,
+          to = dir,
           state = fs.state,
           status = Status.BadRequest,
           expectedBody = "Cannot move a file into a directory, must specify destination precisely")
       }
       "be 201 with file" ! prop {(fs: SingleFileFileSystem, file: AbsFile[Sandboxed]) =>
         testMove(
-          from = fs.file.right,
-          to = file.right,
+          from = fs.file,
+          to = file,
           state = fs.state,
           status = Status.Created,
           expectedBody = "")
@@ -423,8 +423,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
       "be 201 with dir" ! prop {(fs: NonEmptyDir, dir: AbsDir[Sandboxed]) =>
         testMove(
-          from = fs.dir.left,
-          to = dir.left,
+          from = fs.dir,
+          to = dir,
           state = fs.state,
           status = Status.Created,
           expectedBody = "")

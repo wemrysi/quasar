@@ -64,8 +64,8 @@ object data {
                                                     M: ManageFile.Ops[S],
                                                     Q: QueryFile.Ops[S]): HttpService = {
 
-    def download(format: MessageFormat, path: AbsPath[Sandboxed], offset: Natural, limit: Option[Positive]) = {
-      path.fold(
+    def download(format: MessageFormat, path: APath, offset: Natural, limit: Option[Positive]) = {
+      refineType(path).fold(
         dirPath => formatAsHttpResponse(f)(
           data = zippedBytes[S](dirPath, format, offset, limit),
           contentType = `Content-Type`(MediaType.`application/zip`),
@@ -114,7 +114,7 @@ object data {
         req.headers.get(Destination).fold(
           DestinationHeaderMustExist)(
           destPathString => {
-            val scenarioOrProblem = path.fold(
+            val scenarioOrProblem = refineType(path).fold(
               src => parseAbsDir(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(
                 dest => MoveScenario.DirToDir(src, dest)) \/> "Cannot move directory into a file",
               src => parseAbsFile(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(

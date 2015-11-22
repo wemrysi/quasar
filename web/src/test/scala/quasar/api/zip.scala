@@ -16,14 +16,11 @@ import scodec.bits._
 import scodec.interop.scalaz._
 
 import pathy.Path._
-import quasar.fs.PathyGen._
 import quasar.fs.NumericGen._
+import pathy.scalacheck.PathyArbitrary._
 
 class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
   args.report(showtimes=true)
-
-  // Remove after upgrading to version of Path that defines Equal itself
-  implicit def pathEqual[B,T,S]: Equal[Path[B,T,S]] = Equal.equalA
 
   "zipFiles" should {
     import Zip._

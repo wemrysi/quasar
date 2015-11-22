@@ -4,7 +4,9 @@ package services
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
+import pathy.scalacheck.AbsFileOf
 import quasar.Predef._
+import quasar.api.services.Fixture.{AlphaCharacters, SingleFileFileSystem, NonEmptyDir}
 import quasar.fs._
 
 import argonaut._, Argonaut._
@@ -14,10 +16,10 @@ import org.http4s.server._
 import scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
-import quasar.fs.PathyGen._
+import pathy.scalacheck.PathyArbitrary._
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import InMemory._, DataGen._
+  import InMemory._
 
   def runService(mem: InMemState): QueryFile ~> Task =
     new (QueryFile ~> Task) {
@@ -39,48 +41,38 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         response.as[String].run must_== s"${printPath(dir)}: doesn't exist"
       }
 
-      "file does not exist" >> {
-        val unexistantFile = rootDir[Sandboxed] </> dir("foo") </> file("bar.json")
-        val path:String = posixCodec.printPath(unexistantFile)
+      "file does not exist" ! prop { file: AbsFileOf[AlphaCharacters] =>
+        val path:String = posixCodec.printPath(file.path)
         val response = service(InMemState.empty)(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
         response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
       }
 
-      "if file with same name as existing directory (without trailing slash)" >> {
-        val fileWithDirName = rootDir[Sandboxed] </> dir("foo") </> file("bar")
-        // We need a "bogus" file in order to create a "directory" in the in-memory filesystem
-        val bogusFile = rootDir[Sandboxed] </> dir("foo") </> dir("bar") </> file("bogus")
-        val filesystem = InMemState fromFiles Map(bogusFile -> Vector(Data.Bool(true)))
-        val path:String = posixCodec.printPath(fileWithDirName)
-        val response = service(filesystem)(Request(uri = Uri(path = path))).run
-        response.status must_== Status.NotFound
-        response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
-      }
+      "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileFileSystem =>
+        depth(s.file) > 1 ==> {
+          val parent = fileParent(s.file)
+          // .get here is because we know thanks to the property guard, that the parent directory has a name
+          val fileWithSameName = parentDir(parent).get </> file(dirName(parent).get.value)
+          val path = printPath(fileWithSameName)
+          val response = service(s.state)(Request(uri = Uri(path = path))).run
+          response.status must_== Status.NotFound
+          response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
+        }
+      }.pendingUntilFixed("Fix generation (it gives up way too easy...)")
     }
 
     "respond with empty list for existing empty directory" >>
       todo // The current in-memory filesystem does not support empty directories
 
-    "respond with list of children for existing nonempty directory" ! prop {
-      (xss: List[Vector[Data]]) => (xss.nonEmpty) ==> {
-        val parentDir = rootDir[Sandboxed] </> dir("foo") </> dir("bar")
-        val path:String = posixCodec.printPath(parentDir)
-        val filenames = xss.zipWithIndex.map { case (_, i) => parentDir </> file(s"f${i}.txt") }
-        val filesystem = InMemState fromFiles filenames.zip(xss).toMap
-        val childNodes = filenames.flatMap(_ relativeTo parentDir).map(Node.File).sorted
+    "respond with list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
+      val childNodes = s.ls.map(Node.Plain(_))
 
-        service(filesystem)(Request(uri = Uri(path = path)))
-          .as[Json].run must_== Json("children" := childNodes)
-      }
-    }
+      service(s.state)(Request(uri = Uri(path = printPath(s.dir))))
+        .as[Json].run must_== Json("children" := childNodes)
+    }.pendingUntilFixed("Fix generation (it gives up way too easy...)")
 
-    "respond with Ok for existing file" ! prop { xs: Vector[Data] =>
-      val aFile = rootDir[Sandboxed] </> dir("foo") </> file("bar.json")
-      val path: String = posixCodec.printPath(aFile)
-      val mem = InMemState fromFiles Map(aFile -> xs)
-
-      service(mem)(Request(uri = Uri(path = path)))
+    "respond with Ok for existing file" ! prop { s: SingleFileFileSystem =>
+      service(s.state)(Request(uri = Uri(path = s.path)))
         .as[Json].run must_== Json.obj()
     }
   }
