@@ -1,17 +1,28 @@
 package quasar
 package fs
 
+import org.scalacheck.{Gen, Arbitrary}
+import pathy.Path._
+import pathy.scalacheck._
+import pathy.scalacheck.PathOf._
 import quasar.Predef._
 import quasar.fp._
 import scala.collection.IndexedSeq
 
-import scalaz._
-import scalaz.std.list._
-import scalaz.std.vector._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
+import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz.scalacheck.ScalazArbitrary._
+import quasar.DataGen._
 import scalaz.stream._
 import scalaz.concurrent.Task
+
+case class AlphaCharacters(value: String)
+
+object AlphaCharacters {
+  implicit val arb: Arbitrary[AlphaCharacters] =
+    Arbitrary(Gen.nonEmptyListOf(Gen.alphaChar).map(chars => AlphaCharacters(chars.mkString)))
+  implicit val show: Show[AlphaCharacters] = Show.shows(_.value)
+}
 
 trait FileSystemFixture {
   import FileSystemFixture._, InMemory._
@@ -30,6 +41,51 @@ trait FileSystemFixture {
 
   val emptyMem = InMemState.empty
 
+  import posixCodec.printPath
+
+  case class SingleFileMemState(fileOfCharacters: AbsFileOf[AlphaCharacters], contents: Vector[Data]) {
+    def file = fileOfCharacters.path
+    def path = printPath(file)
+    def state = InMemState fromFiles Map(file -> contents)
+    def parent = fileParent(file)
+    def filename = fileName(file)
+  }
+  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[RPath] = {
+    scala.Predef.require(index >= 0)
+    val list = pathy.Path.flatten(none,none,none,dir(_).some,file(_).some,path).toIList.unite
+    list.drop(index).headOption
+  }
+
+  case class NonEmptyDir(
+                          dirOfCharacters: AbsDirOf[AlphaCharacters],
+                          filesInDir: NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]
+                        ) {
+    def dir = dirOfCharacters.path
+    def state = {
+      val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}
+      InMemState fromFiles fileMapping.toList.toMap
+    }
+    def relFiles = filesInDir.unzip._1.map(_.path)
+    def ls = relFiles.map(segAt(0,_)).list.flatten.toSet.toList.sortBy((path: RPath) => printPath(path))
+  }
+
+  implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(
+    (Arbitrary.arbitrary[AbsFileOf[AlphaCharacters]] |@|
+      Arbitrary.arbitrary[Vector[Data]])(SingleFileMemState.apply))
+
+  implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
+    (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
+      Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
+
+  object InMem {
+    val interpret: F ~> State[InMemState, ?] =
+      hoistFree(interpretInMem)
+    def interpretT[T[_[_],_]: Hoist]: T[F,?] ~> T[State[InMemState, ?],?] =
+      Hoist[T].hoist[F,State[InMemState,?]](interpret)
+
+    def interpret[A](term: FileSystemErrT[F,A]): State[InMemState,FileSystemError \/ A] =
+      interpretT[FileSystemErrT].apply(term).run
+  }
   val hoistInMem: InMemoryFs ~> InMemIO =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 

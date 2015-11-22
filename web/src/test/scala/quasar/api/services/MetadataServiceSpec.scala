@@ -6,7 +6,6 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import pathy.scalacheck.AbsFileOf
 import quasar.Predef._
-import quasar.api.services.Fixture.{AlphaCharacters, SingleFileFileSystem, NonEmptyDir}
 import quasar.fs._
 
 import argonaut._, Argonaut._
@@ -48,7 +47,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
       }
 
-      "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileFileSystem =>
+      "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
         depth(s.file) > 1 ==> {
           val parent = fileParent(s.file)
           // .get here is because we know thanks to the property guard, that the parent directory has a name
@@ -58,7 +57,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           response.status must_== Status.NotFound
           response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
         }
-      }.pendingUntilFixed("Fix generation (it gives up way too easy...)")
+      }
     }
 
     "respond with empty list for existing empty directory" >>
@@ -69,9 +68,9 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
 
       service(s.state)(Request(uri = Uri(path = printPath(s.dir))))
         .as[Json].run must_== Json("children" := childNodes)
-    }.pendingUntilFixed("Fix generation (it gives up way too easy...)")
+    }
 
-    "respond with Ok for existing file" ! prop { s: SingleFileFileSystem =>
+    "respond with Ok for existing file" ! prop { s: SingleFileMemState =>
       service(s.state)(Request(uri = Uri(path = s.path)))
         .as[Json].run must_== Json.obj()
     }

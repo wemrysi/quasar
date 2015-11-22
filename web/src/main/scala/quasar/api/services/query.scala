@@ -42,8 +42,6 @@ object query {
 
   private def vars(req: Request) = Variables(req.params.map { case (k, v) => (VarName(k), VarValue(v)) })
 
-  def convert(path: AbsDir[Sandboxed]): fs.Path = fs.Path(posixCodec.printPath(path))
-
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
                                                     M: ManageFile.Ops[S],

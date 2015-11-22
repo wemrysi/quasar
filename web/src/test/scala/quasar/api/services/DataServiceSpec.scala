@@ -63,14 +63,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
         }
         "in correct format" >> {
-          "readable and line delimited json by default" ! prop { filesystem: SingleFileFileSystem =>
+          "readable and line delimited json by default" ! prop { filesystem: SingleFileMemState =>
             val response = service(filesystem.state)(Request(uri = Uri(path = filesystem.path))).run
             isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
           }
           "in any supported format if specified" >> {
             "in the content-type header" >> {
-              def testProp(format: MessageFormat) = prop { filesystem: SingleFileFileSystem => test(format, filesystem) }
-              def test(format: MessageFormat, filesystem: SingleFileFileSystem) = {
+              def testProp(format: MessageFormat) = prop { filesystem: SingleFileMemState => test(format, filesystem) }
+              def test(format: MessageFormat, filesystem: SingleFileMemState) = {
                 val request = Request(
                   uri = Uri(path = filesystem.path),
                   headers = Headers(Accept(format.mediaType)))
@@ -91,8 +91,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                   testProp(jsonPreciseArray)
                 }
               }
-              "csv" ! prop { (filesystem: SingleFileFileSystem, format: MessageFormat.Csv) => test(format, filesystem) }
-              "or a more complicated proposition" ! prop { filesystem: SingleFileFileSystem =>
+              "csv" ! prop { (filesystem: SingleFileMemState, format: MessageFormat.Csv) => test(format, filesystem) }
+              "or a more complicated proposition" ! prop { filesystem: SingleFileMemState =>
                 val request = Request(
                   uri = Uri(path = filesystem.path),
                   headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
@@ -100,7 +100,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
               }
             }
-            "in the request-headers" ! prop { filesystem: SingleFileFileSystem =>
+            "in the request-headers" ! prop { filesystem: SingleFileMemState =>
               val contentType = JsonContentType(Precise, LineDelimited)
               val request = Request(
                 uri = Uri(path = filesystem.path).+?("request-headers", s"""{"Accept": "application/ldjson; mode=precise" }"""))
@@ -109,7 +109,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             }
           }
         }
-        "with gziped encoding when specified" ! prop { filesystem: SingleFileFileSystem =>
+        "with gziped encoding when specified" ! prop { filesystem: SingleFileMemState =>
           val request = Request(
             uri = Uri(path = filesystem.path),
             headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
@@ -117,7 +117,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
           response.status must_== Status.Ok
         }
-        "support disposition" ! prop { filesystem: SingleFileFileSystem =>
+        "support disposition" ! prop { filesystem: SingleFileMemState =>
           val disposition = `Content-Disposition`("attachement", Map("filename" -> "data.json"))
           val request = Request(
             uri = Uri(path = filesystem.path),
@@ -127,7 +127,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" ! prop {
-            (filesystem: SingleFileFileSystem, offset: Natural, limit: Positive, format: MessageFormat) =>
+            (filesystem: SingleFileMemState, offset: Natural, limit: Positive, format: MessageFormat) =>
             // Not sure why this precondition is necessary...
             (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
               val request = Request(
@@ -404,7 +404,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           status = Status.BadRequest,
           expectedBody = "Cannot move directory into a file")
       }
-      "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileFileSystem, dir: AbsDir[Sandboxed]) =>
+      "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
         testMove(
           from = fs.file,
           to = dir,
@@ -412,7 +412,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           status = Status.BadRequest,
           expectedBody = "Cannot move a file into a directory, must specify destination precisely")
       }
-      "be 201 with file" ! prop {(fs: SingleFileFileSystem, file: AbsFile[Sandboxed]) =>
+      "be 201 with file" ! prop {(fs: SingleFileMemState, file: AbsFile[Sandboxed]) =>
         testMove(
           from = fs.file,
           to = file,
@@ -432,7 +432,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       }
     }
     "DELETE" >> {
-      "be 200 with existing file" ! prop { filesystem: SingleFileFileSystem =>
+      "be 200 with existing file" ! prop { filesystem: SingleFileMemState =>
         val request = Request(uri = Uri(path = filesystem.path), method = Method.DELETE)
         val response = service(filesystem.state)(request).run
         response.status must_== Status.Ok

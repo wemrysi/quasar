@@ -24,7 +24,7 @@ import scalaz.stream.Process
 
 import query._
 
-class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
+class CompileAndQueryServiceSpec extends Specification with FileSystemFixture with ScalaCheck {
 
   // Remove if eventually included in upstream scala-pathy
   implicit val arbitraryFileName: Arbitrary[FileName] =
@@ -85,7 +85,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response = "???"
           )
         }.pendingUntilFixed("SD-773")
-        "be 400 for missing query" ! prop { filesystem: SingleFileFileSystem =>
+        "be 400 for missing query" ! prop { filesystem: SingleFileMemState =>
           get(service)(
             path = filesystem.parent,
             query = None,
@@ -94,7 +94,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response = "The request must contain a query"
           )
         }
-        "be 400 for query error" ! prop { filesystem: SingleFileFileSystem =>
+        "be 400 for query error" ! prop { filesystem: SingleFileMemState =>
           get(service)(
             path = filesystem.parent,
             query = Some("select data where"),
@@ -111,7 +111,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
 
   "Query" should {
     "execute a simple query" >> {
-      "GET" ! prop { filesystem: SingleFileFileSystem =>
+      "GET" ! prop { filesystem: SingleFileMemState =>
         get(query)(
           path = filesystem.parent,
           query = Some(selectAll(filesystem.filename)),
@@ -120,7 +120,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
           response = jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run.mkString("")
         )
       }.pendingUntilFixed("TODO: Debug")
-      "POST" ! prop { (filesystem: SingleFileFileSystem, destination: AFile) =>
+      "POST" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
         post(query)(
           path = filesystem.parent,
           query = Some(selectAll(filesystem.filename)),
@@ -141,7 +141,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response = "???"
           )
         }.pendingUntilFixed("SD-773")
-        "be 400 with missing query" ! prop { (filesystem: SingleFileFileSystem, destination: AFile) =>
+        "be 400 with missing query" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
           post(query)(
             path = filesystem.parent,
             query = None,
@@ -151,7 +151,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response = "The body of the POST must contain a query"
           )
         }
-        "be 400 with missing Destination header" ! prop { filesystem: SingleFileFileSystem =>
+        "be 400 with missing Destination header" ! prop { filesystem: SingleFileMemState =>
           post(query)(
             path = filesystem.parent,
             query = Some(selectAll(filesystem.filename)),
@@ -161,7 +161,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
             response = "The 'Destination' header must be specified"
           )
         }
-        "be 400 for query error" ! prop { (filesystem: SingleFileFileSystem, destination: AFile) =>
+        "be 400 for query error" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
           post(query)(
             path = filesystem.parent,
             query = Some("select date where"),
@@ -175,7 +175,7 @@ class CompileAndQueryServiceSpec extends Specification with ScalaCheck {
     }
   }
   "Compile" should {
-    "plan simple query" ! prop { filesystem: SingleFileFileSystem =>
+    "plan simple query" ! prop { filesystem: SingleFileMemState =>
       // Representation of the directory as a string without the leading slash
       val pathString = printPath(filesystem.file).drop(1)
       get(compile)(
