@@ -72,42 +72,36 @@ trait FileSystemFixture {
       Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
 
   type F[A]            = Free[FileSystem, A]
-  type InMemFix[A]     = ReadWriteT[MemState, A]
+  type InMemFix[A]     = ReadWriteT[InMemoryFs, A]
   type MemStateTask[A] = StateT[Task, InMemState,A]
   type MemStateFix[A]  = ReadWriteT[MemStateTask,A]
 
-  object Mem extends Interpreter[FileSystem,MemState] {
-    val interpretTerm: FileSystem ~> MemState =
-      interpretFileSystem(queryFile, readFile, writeFile, manageFile)
-
-    val interpret: F ~> MemState = super.interpret
-
-    def interpret[E,A](term: EitherT[F,E,A]): MemState[E \/ A] =
+  object Mem extends Interpreter[FileSystem,InMemoryFs](
+    interpretTerm = interpretFileSystem(queryFile, readFile, writeFile, manageFile)
+  ) {
+    def interpret[E,A](term: EitherT[F,E,A]): InMemoryFs[E \/ A] =
       interpretT[EitherT[?[_],E,?]].apply(term).run
   }
 
-  val hoistTask: MemState ~> MemStateTask =
+  val hoistTask: InMemoryFs ~> MemStateTask =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 
-  object MemTask extends Interpreter[FileSystem, MemStateTask] {
-    val interpretTerm: FileSystem ~> MemStateTask =
-      hoistTask compose Mem.interpretTerm
-  }
+  object MemTask extends Interpreter[FileSystem, MemStateTask](
+    interpretTerm = hoistTask compose Mem.interpretTerm
+  )
 
-  val hoistFix: ReadWriteT[MemState,?] ~> MemStateFix =
+  val hoistFix: ReadWriteT[InMemoryFs,?] ~> MemStateFix =
     Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistTask)
 
-  object MemFixTask extends Interpreter[FileSystem, MemStateFix] {
+  val readWrite: FileSystem ~> ReadWriteT[InMemoryFs,?] = interpretFileSystem[InMemFix](
+    liftMT[InMemoryFs, ReadWriteT] compose queryFile,
+    interceptReads(readFile),
+    amendWrites(writeFile),
+    liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 
-    val readWrite: FileSystem ~> ReadWriteT[MemState,?] = interpretFileSystem[InMemFix](
-      liftMT[MemState, ReadWriteT] compose queryFile,
-      interceptReads(readFile),
-      amendWrites(writeFile),
-      liftMT[MemState, ReadWriteT] compose manageFile)
-
-    val interpretTerm: FileSystem ~> MemStateFix =
-      hoistFix compose readWrite
-
+  object MemFixTask extends Interpreter[FileSystem, MemStateFix](
+    interpretTerm = hoistFix compose readWrite
+  ) {
     def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
       EitherT(runLog(p).run.eval((rs, ws)))
 

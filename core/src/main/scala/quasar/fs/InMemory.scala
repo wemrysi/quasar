@@ -23,7 +23,7 @@ object InMemory {
   type RM = Map[ReadHandle, Reading]
   type WM = Map[WriteHandle, AFile]
 
-  type MemState[A]  = State[InMemState, A]
+  type InMemoryFs[A]  = State[InMemState, A]
   type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
@@ -37,7 +37,7 @@ object InMemory {
       empty copy (fm = files)
   }
 
-  val readFile: ReadFile ~> MemState = new (ReadFile ~> MemState) {
+  val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
     def apply[A](rf: ReadFile[A]) = rf match {
       case ReadFile.Open(f, off, lim) =>
         fileL(f).st flatMap {
@@ -66,7 +66,7 @@ object InMemory {
                   (xs.length - rIdx)
 
                 if (rCount <= 0)
-                  Vector.empty.right.point[MemState]
+                  Vector.empty.right.point[InMemoryFs]
                 else
                   (rPosL(h) := (pos + rCount))
                     .map(κ(xs.slice(rIdx, rIdx + rCount).right))
@@ -76,7 +76,7 @@ object InMemory {
             }
 
           case None =>
-            UnknownReadHandle(h).left.point[MemState]
+            UnknownReadHandle(h).left.point[InMemoryFs]
         }
 
       case ReadFile.Close(h) =>
@@ -84,7 +84,7 @@ object InMemory {
     }
   }
 
-  val writeFile: WriteFile ~> MemState = new (WriteFile ~> MemState) {
+  val writeFile: WriteFile ~> InMemoryFs = new (WriteFile ~> InMemoryFs) {
     def apply[A](wf: WriteFile[A]) = wf match {
       case WriteFile.Open(f) =>
         for {
@@ -100,7 +100,7 @@ object InMemory {
             fileL(f) mods (_ map (_ ++ xs) orElse Some(xs)) as Vector.empty
 
           case None =>
-            Vector(UnknownWriteHandle(h)).point[MemState]
+            Vector(UnknownWriteHandle(h)).point[InMemoryFs]
         }
 
       case WriteFile.Close(h) =>
@@ -108,7 +108,7 @@ object InMemory {
     }
   }
 
-  val manageFile: ManageFile ~> MemState = new (ManageFile ~> MemState) {
+  val manageFile: ManageFile ~> InMemoryFs = new (ManageFile ~> InMemoryFs) {
     def apply[A](fsa: ManageFile[A]) = fsa match {
       case Move(scenario, semantics) =>
         scenario.fold(moveDir(_, _, semantics), moveFile(_, _, semantics))
@@ -123,30 +123,30 @@ object InMemory {
     }
   }
 
-  val queryFile: QueryFile ~> MemState = new (QueryFile ~> MemState) {
+  val queryFile: QueryFile ~> InMemoryFs = new (QueryFile ~> InMemoryFs) {
     def phase(lp: Fix[LogicalPlan]): PhaseResult = PhaseResult.Detail("InMemory", s"Plan(logical: ${lp.toString})")
     def apply[A](qf: QueryFile[A]) = qf match {
       case ExecutePlan(lp, out) =>
         (Vector(phase(lp)), ResultFile.User(out).right[FileSystemError])
-          .point[MemState]
+          .point[InMemoryFs]
 
-      case Explain(lp) => Vector(phase(lp)).point[MemState]
+      case Explain(lp) => Vector(phase(lp)).point[InMemoryFs]
 
       case ListContents(dir) =>
         ls(dir)
     }
   }
 
-  val fileSystem: FileSystem ~> MemState =
+  val fileSystem: FileSystem ~> InMemoryFs =
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
-  def runStatefully(initial: InMemState): Task[MemState ~> Task] =
+  def runStatefully(initial: InMemState): Task[InMemoryFs ~> Task] =
     runInspect(initial).map(_._1)
 
-  def runInspect(initial: InMemState): Task[(MemState ~> Task, Task[InMemState])] =
+  def runInspect(initial: InMemState): Task[(InMemoryFs ~> Task, Task[InMemState])] =
     TaskRef(initial) map { ref =>
-      val trans = new (MemState ~> Task) {
-        def apply[A](mfs: MemState[A]) =
+      val trans = new (InMemoryFs ~> Task) {
+        def apply[A](mfs: InMemoryFs[A]) =
           ref.modifyS(mfs.run)
       }
 
@@ -161,7 +161,7 @@ object InMemory {
   private val seqL: InMemState @> Long =
     Lens.lensg(s => n => s.copy(seq = n), _.seq)
 
-  private def nextSeq: MemState[Long] =
+  private def nextSeq: InMemoryFs[Long] =
     seqL <%= (_ + 1)
 
   private val fmL: InMemState @> FM =
@@ -187,7 +187,7 @@ object InMemory {
   private def rPosL(h: ReadHandle): InMemState @?> Int =
     ~readingL(h) >=> PLens.somePLens >=> ~readingPosL
 
-  private def rClose(h: ReadHandle): MemState[Unit] =
+  private def rClose(h: ReadHandle): InMemoryFs[Unit] =
     (readingL(h) := None).void
 
   //----
@@ -200,13 +200,13 @@ object InMemory {
 
   //----
 
-  private def fsPathNotFound[A](f: AFile): MemState[FileSystemError \/ A] =
-    PathError(PathNotFound(f)).left.point[MemState]
+  private def fsPathNotFound[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
+    PathError(PathNotFound(f)).left.point[InMemoryFs]
 
-  private def fsPathExists[A](f: AFile): MemState[FileSystemError \/ A] =
-    PathError(PathExists(f)).left.point[MemState]
+  private def fsPathExists[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
+    PathError(PathExists(f)).left.point[InMemoryFs]
 
-  private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): MemState[FileSystemError \/ Unit] =
+  private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
       m     <- fmL.st
       sufxs =  m.keys.toStream.map(_ relativeTo src).unite
@@ -215,10 +215,10 @@ object InMemory {
       r1    =  r0 flatMap (_.nonEmpty either (()) or PathError(PathNotFound(src)))
     } yield r1
 
-  private def moveFile(src: AFile, dst: AFile, s: MoveSemantics): MemState[FileSystemError \/ Unit] = {
+  private def moveFile(src: AFile, dst: AFile, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
     import MoveSemantics.Case._
 
-    val move0: MemState[FileSystemError \/ Unit] = for {
+    val move0: InMemoryFs[FileSystemError \/ Unit] = for {
       v <- fileL(src) <:= None
       r <- v.cata(xs => (fileL(dst) := Some(xs)) as ().right, fsPathNotFound(src))
     } yield r
@@ -233,7 +233,7 @@ object InMemory {
     }
   }
 
-  private def deleteDir(d: ADir): MemState[FileSystemError \/ Unit] =
+  private def deleteDir(d: ADir): InMemoryFs[FileSystemError \/ Unit] =
     for {
       m  <- fmL.st
       ss =  m.keys.toStream.map(_ relativeTo d).unite
@@ -241,10 +241,10 @@ object InMemory {
       r1 =  r0 flatMap (_.nonEmpty either (()) or PathError(PathNotFound(d)))
     } yield r1
 
-  private def deleteFile(f: AFile): MemState[FileSystemError \/ Unit] =
+  private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
     (fileL(f) <:= None) map (_.void \/> PathError(PathNotFound(f)))
 
-  private def ls(d: ADir): MemState[FileSystemError \/ Set[Node]] =
+  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[Node]] =
     fmL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
         .map(_ foldMap (f => Node.fromFirstSegmentOf(f).toSet))
