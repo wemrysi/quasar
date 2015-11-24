@@ -28,13 +28,6 @@ object AlphaCharacters {
 trait FileSystemFixture {
   import FileSystemFixture._, InMemory._
 
-  type F[A]              = Free[FileSystem, A]
-  type InMemFix[A]       = ReadWriteT[InMemoryFs, A]
-  type InMemIO[A]        = StateT[Task, InMemState, A]
-  type InMemResult[A]    = FileSystemErrT[InMemIO, A]
-  type InMemFixIO[A]     = ReadWriteT[InMemIO, A]
-  type InMemFixResult[A] = FileSystemErrT[InMemFixIO, A]
-
   val query  = QueryFile.Ops[FileSystem]
   val read   = ReadFile.Ops[FileSystem]
   val write  = WriteFile.Ops[FileSystem]
@@ -78,53 +71,52 @@ trait FileSystemFixture {
     (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
       Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
 
-  object Mem extends Interpreter[FileSystem,State[InMemState,?]] {
-    val interpretTerm: FileSystem ~> State[InMemState,?] =
+  type F[A]            = Free[FileSystem, A]
+  type InMemFix[A]     = ReadWriteT[MemState, A]
+  type MemStateTask[A] = StateT[Task, InMemState,A]
+  type MemStateFix[A]  = ReadWriteT[MemStateTask,A]
+
+  object Mem extends Interpreter[FileSystem,MemState] {
+    val interpretTerm: FileSystem ~> MemState =
       interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
-    val interpret: F ~> State[InMemState,?] = super.interpret
+    val interpret: F ~> MemState = super.interpret
 
-    def interpret[E,A](term: EitherT[F,E,A]): State[InMemState,E \/ A] =
+    def interpret[E,A](term: EitherT[F,E,A]): MemState[E \/ A] =
       interpretT[EitherT[?[_],E,?]].apply(term).run
   }
 
-  val memTask = new Interpreter[FileSystem, StateT[Task,InMemState,?]] {
-    val interpretTerm: FileSystem ~> StateT[Task,InMemState,?] =
-      Hoist[StateT[?[_],InMemState,?]].hoist(pointNT[Task]) compose Mem.interpretTerm
-  }
-
-  // TODO: Instantiate a fixMemTask interpreter
-
-  val hoistInMem: InMemoryFs ~> InMemIO =
+  val hoistTask: MemState ~> MemStateTask =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 
-  val hoistFix: InMemFix ~> InMemFixIO =
-    Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistInMem)
+  object MemTask extends Interpreter[FileSystem, MemStateTask] {
+    val interpretTerm: FileSystem ~> MemStateTask =
+      hoistTask compose Mem.interpretTerm
+  }
 
-  val interpretInMemFix: FileSystem ~> InMemFix =
-    interpretFileSystem[InMemFix](
-      liftMT[InMemoryFs, ReadWriteT] compose queryFile,
+  val hoistFix: ReadWriteT[MemState,?] ~> MemStateFix =
+    Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistTask)
+
+  object MemFixTask extends Interpreter[FileSystem, MemStateFix] {
+
+    val readWrite: FileSystem ~> ReadWriteT[MemState,?] = interpretFileSystem[InMemFix](
+      liftMT[MemState, ReadWriteT] compose queryFile,
       interceptReads(readFile),
       amendWrites(writeFile),
-      liftMT[InMemoryFs, ReadWriteT] compose manageFile)
+      liftMT[MemState, ReadWriteT] compose manageFile)
 
-  val runFixIO: F ~> InMemFixIO =
-    hoistFix compose[F] hoistFree(interpretInMemFix)
+    val interpretTerm: FileSystem ~> MemStateFix =
+      hoistFix compose readWrite
 
-  val runFixResult: FileSystemErrT[F, ?] ~> InMemFixResult =
-    Hoist[FileSystemErrT].hoist(runFixIO)
+    def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+      EitherT(runLog(p).run.eval((rs, ws)))
 
-  def runLogFix[A](p: Process[FileSystemErrT[F, ?], A]): InMemFixResult[IndexedSeq[A]] =
-    p.translate[InMemFixResult](runFixResult).runLog
+    def runLogWithReads[E,A](rs: Reads, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+      runLogWithRW(rs, List(), p)
 
-  def runLogWithRW[A](rs: Reads, ws: Writes, p: Process[FileSystemErrT[F, ?], A]): InMemResult[IndexedSeq[A]] =
-    EitherT(runLogFix(p).run.eval((rs, ws)))
-
-  def runLogWithReads[A](rs: Reads, p: Process[FileSystemErrT[F, ?], A]): InMemResult[IndexedSeq[A]] =
-    runLogWithRW(rs, List(), p)
-
-  def runLogWithWrites[A](ws: Writes, p: Process[FileSystemErrT[F, ?], A]): InMemResult[IndexedSeq[A]] =
-    runLogWithRW(List(), ws, p)
+    def runLogWithWrites[E,A](ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+      runLogWithRW(List(), ws, p)
+  }
 }
 
 object FileSystemFixture {
