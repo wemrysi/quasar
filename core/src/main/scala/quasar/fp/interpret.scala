@@ -36,4 +36,49 @@ object interpret {
       def apply[A](fa: Coproduct5[F, G, H, I, J, A]) =
         fa.run.fold(f, interpret4(g, h, i, j)(_))
     }
+
+  trait Interpreter[ALGEBRA[_], M[_]] {
+
+    import scala.collection.IndexedSeq
+    import scalaz.stream.Process
+
+    type F[A] = Free[ALGEBRA,A]
+
+    val interpretTerm: ALGEBRA ~> M
+
+    def interpret(implicit functor:Functor[ALGEBRA], monad: Monad[M]): F ~> M =
+      hoistFree(interpretTerm)
+
+    def interpretT[T[_[_],_]: Hoist](implicit functor:Functor[ALGEBRA], monad: Monad[M]): T[F,?] ~> T[M,?] =
+      Hoist[T].hoist[F,M](interpret)
+
+    def interpretT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist](implicit functor:Functor[ALGEBRA], monad: Monad[M]): T1[T2[F,?],?] ~> T1[T2[M,?],?] =
+      Hoist[T1].hoist[T2[F,?],T2[M,?]](interpretT[T2])(Hoist[T2].apply[F])
+
+    def runLog[A](p: Process[F,A])(implicit functor: Functor[ALGEBRA], monad:Monad[M], catchable: Catchable[M]): M[IndexedSeq[A]] =
+      p.translate(interpret).runLog
+
+    // Would be possible if `MonadTrans` had a notion of `Catchable`. Instead we need to copy paste and
+    // replace the value of T with a particular Monad Transformer
+    // def runLogT[T[_[_],_]:Hoist,A](p: Process[T[F,?],A]): T[TaskMemState,IndexedSeq[A]] = {
+    //   p.translate[T[TaskMemState,?]](interpretTaskT[T]).runLog
+    // }
+
+    // hard coded `MonadTrans`
+
+    def runLog[E,A](p: Process[EitherT[F,E,?],A])(implicit functor: Functor[ALGEBRA], monad:Monad[M], catchable: Catchable[M]): EitherT[M,E,IndexedSeq[A]] = {
+      type T[F[_],A] = EitherT[F,E,A]
+      type ResultT[A] = T[M,A]
+      p.translate[ResultT](interpretT[T]).runLog[ResultT,A]
+    }
+    def runLog[E,L:Monoid,A](p: Process[EitherT[WriterT[F,L,?],E,?],A])(implicit functor: Functor[ALGEBRA], monad:Monad[M], catchable: Catchable[M]): EitherT[WriterT[M,L,?],E,IndexedSeq[A]] = {
+      type OutsideT[F[_],A] = EitherT[F,E,A]
+      type T[F[_],A] = OutsideT[WriterT[F,L,?],A]
+      type ResultT[A] = T[M,A]
+      // inference is hard... let's help Scalac out a bit...
+      val monadR: Monad[ResultT] = EitherT.eitherTMonad[WriterT[M,L,?],E](WriterT.writerTMonad[M,L])
+      val catchableR: Catchable[ResultT] = eitherTCatchable[WriterT[M,L,?],E](writerTCatchable[M,L], WriterT.writerTFunctor[M,L])
+      p.translate[ResultT](interpretT2[EitherT[?[_],E,?], WriterT[?[_],L,?]](EitherT.eitherTHoist,WriterT.writerTHoist[L], functor, monad)).runLog[ResultT,A](monadR,catchableR)
+    }
+  }
 }

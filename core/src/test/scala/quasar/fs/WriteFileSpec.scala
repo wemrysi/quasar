@@ -22,7 +22,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
 
-      p.translate[InMemResult](runResult).runLog.run
+      p.translate[InMemResult](memTask.interpretT).runLog.run
         .leftMap(_.wm)
         .run(emptyMem)
         .run must_== ((Map.empty, \/.right(xs)))
@@ -44,14 +44,14 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = (write.append(f, xs.toProcess) ++ write.save(f, ys.toProcess)).drain ++ read.scanAll(f)
 
-      evalLogZero(p).run.toEither must beRight(ys)
+      memTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(ys)
     }
 
     "save with empty input should create an empty file" ! prop { f: AFile =>
       val p = write.save(f, Process.empty) ++
               (query.fileExists(f).liftM[FileSystemErrT]: query.M[Boolean]).liftM[Process]
 
-      evalLogZero(p).run must_== \/.right(Vector(true))
+      memTask.runLog(p).run.eval(emptyMem).run must_== \/.right(Vector(true))
     }
 
     "save should leave existing file untouched on failure" ! prop {
@@ -72,21 +72,23 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.append(f, xs.toProcess) ++ write.create(f, ys.toProcess)
 
-      evalLogZero(p).run.toEither must beLeft(PathError(PathExists(f)))
+      memTask.runLog(p).run.eval(emptyMem).run.toEither must beLeft(PathError(PathExists(f)))
     }
 
     "create should consume all input into a new file" ! prop {
       (f: AFile, xs: Vector[Data]) =>
 
-      evalLogZero(write.create(f, xs.toProcess) ++ read.scanAll(f))
-        .run.toEither must beRight(xs)
+      val p = write.create(f, xs.toProcess) ++ read.scanAll(f)
+
+        memTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(xs)
     }
 
     "replace should fail if the file does not exist" ! prop {
       (f: AFile, xs: Vector[Data]) =>
 
-      evalLogZero(write.replace(f, xs.toProcess))
-        .run.toEither must beLeft(PathError(PathNotFound(f)))
+        val p = write.replace(f, xs.toProcess)
+
+        memTask.runLog(p).run.eval(emptyMem).run.toEither must beLeft(PathError(PathNotFound(f)))
     }
 
     "replace should leave the existing file untouched on failure" ! prop {
@@ -107,7 +109,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.save(f, xs.toProcess) ++ write.replace(f, ys.toProcess) ++ read.scanAll(f)
 
-      evalLogZero(p).run.toEither must beRight(ys)
+      memTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(ys)
     }
   }
 }

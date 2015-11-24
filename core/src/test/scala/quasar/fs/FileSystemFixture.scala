@@ -7,6 +7,7 @@ import pathy.scalacheck._
 import pathy.scalacheck.PathOf._
 import quasar.Predef._
 import quasar.fp._
+import quasar.fp.interpret.Interpreter
 import scala.collection.IndexedSeq
 
 import scalaz._, Scalaz._
@@ -66,7 +67,7 @@ trait FileSystemFixture {
       InMemState fromFiles fileMapping.toList.toMap
     }
     def relFiles = filesInDir.unzip._1.map(_.path)
-    def ls = relFiles.map(segAt(0,_)).list.flatten.toSet.toList.sortBy((path: RPath) => printPath(path))
+    def ls = relFiles.map(segAt(0,_)).list.flatten.distinct.sortBy((path: RPath) => printPath(path))
   }
 
   implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(
@@ -77,26 +78,28 @@ trait FileSystemFixture {
     (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
       Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
 
-  object InMem {
-    val interpret: F ~> State[InMemState, ?] =
-      hoistFree(interpretInMem)
-    def interpretT[T[_[_],_]: Hoist]: T[F,?] ~> T[State[InMemState, ?],?] =
-      Hoist[T].hoist[F,State[InMemState,?]](interpret)
+  object Mem extends Interpreter[FileSystem,State[InMemState,?]] {
+    val interpretTerm: FileSystem ~> State[InMemState,?] =
+      interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
-    def interpret[A](term: FileSystemErrT[F,A]): State[InMemState,FileSystemError \/ A] =
-      interpretT[FileSystemErrT].apply(term).run
+    val interpret: F ~> State[InMemState,?] = super.interpret
+
+    def interpret[E,A](term: EitherT[F,E,A]): State[InMemState,E \/ A] =
+      interpretT[EitherT[?[_],E,?]].apply(term).run
   }
+
+  val memTask = new Interpreter[FileSystem, StateT[Task,InMemState,?]] {
+    val interpretTerm: FileSystem ~> StateT[Task,InMemState,?] =
+      Hoist[StateT[?[_],InMemState,?]].hoist(pointNT[Task]) compose Mem.interpretTerm
+  }
+
+  // TODO: Instantiate a fixMemTask interpreter
+
   val hoistInMem: InMemoryFs ~> InMemIO =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 
   val hoistFix: InMemFix ~> InMemFixIO =
     Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistInMem)
-
-  val interpretInMem: FileSystem ~> InMemoryFs =
-    interpretFileSystem(queryFile, readFile, writeFile, manageFile)
-
-  val run: F ~> InMemIO =
-    hoistInMem compose[F] hoistFree(interpretInMem)
 
   val interpretInMemFix: FileSystem ~> InMemFix =
     interpretFileSystem[InMemFix](
@@ -108,17 +111,8 @@ trait FileSystemFixture {
   val runFixIO: F ~> InMemFixIO =
     hoistFix compose[F] hoistFree(interpretInMemFix)
 
-  val runResult: FileSystemErrT[F, ?] ~> InMemResult =
-    Hoist[FileSystemErrT].hoist(run)
-
   val runFixResult: FileSystemErrT[F, ?] ~> InMemFixResult =
     Hoist[FileSystemErrT].hoist(runFixIO)
-
-  def runLog[A](p: Process[FileSystemErrT[F, ?], A]): InMemResult[IndexedSeq[A]] =
-    p.translate[InMemResult](runResult).runLog
-
-  def evalLogZero[A](p: Process[FileSystemErrT[F, ?], A]): Task[FileSystemError \/ IndexedSeq[A]] =
-    runLog(p).run.eval(emptyMem)
 
   def runLogFix[A](p: Process[FileSystemErrT[F, ?], A]): InMemFixResult[IndexedSeq[A]] =
     p.translate[InMemFixResult](runFixResult).runLog
