@@ -124,17 +124,21 @@ object InMemory {
   }
 
   val queryFile: QueryFile ~> InMemoryFs = new (QueryFile ~> InMemoryFs) {
-    def phase(lp: Fix[LogicalPlan]): PhaseResult = PhaseResult.Detail("InMemory", s"Plan(logical: ${lp.toString})")
     def apply[A](qf: QueryFile[A]) = qf match {
-      case ExecutePlan(lp, out) =>
-        (Vector(phase(lp)), ResultFile.User(out).right[FileSystemError])
+      case ExecutePlan(_, out) =>
+        (Vector(unsupported), ResultFile.User(out).right[FileSystemError])
           .point[InMemoryFs]
 
-      case Explain(lp) => Vector(phase(lp)).point[InMemoryFs]
+      case Explain(_, _) =>
+        (Vector(unsupported), none[FileSystemError])
+          .point[InMemoryFs]
 
       case ListContents(dir) =>
         ls(dir)
     }
+
+    private val unsupported: PhaseResult =
+      PhaseResult.Detail("InMemory", "Unsupported")
   }
 
   val fileSystem: FileSystem ~> InMemoryFs =

@@ -53,7 +53,6 @@ class ServerOps[WC: CodecJson, SC](
   configOps: ConfigOps[WC],
   defaultWC: WC,
   val webConfigLens: WebConfigLens[WC, SC]) {
-  import webConfigLens._
   import ServerOps._
 
   // NB: This is a terrible thing.
