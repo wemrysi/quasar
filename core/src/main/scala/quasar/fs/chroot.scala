@@ -1,7 +1,7 @@
 package quasar
 package fs
 
-import quasar.fp._
+import quasar.fp.free._
 import quasar.recursionschemes._, FunctorT.ops._
 import LogicalPlan.ReadF
 
@@ -40,7 +40,7 @@ object chroot {
   }
 
   def readFileIn[S[_]](prefix: ADir)(implicit S: ReadFileF :<: S): S ~> S =
-    interpret.injectedNT[ReadFileF, S](readFile(prefix))
+    injectedNT[ReadFileF, S](readFile(prefix))
 
   /** Rebases all paths in `WriteFile` operations onto the given prefix. */
   def writeFile(prefix: ADir): WriteFileF ~> WriteFileF = {
@@ -67,7 +67,7 @@ object chroot {
   }
 
   def writeFileIn[S[_]](prefix: ADir)(implicit S: WriteFileF :<: S): S ~> S =
-    interpret.injectedNT[WriteFileF, S](writeFile(prefix))
+    injectedNT[WriteFileF, S](writeFile(prefix))
 
   /** Rebases all paths in `ManageFile` operations onto the given prefix. */
   def manageFile(prefix: ADir): ManageFileF ~> ManageFileF = {
@@ -99,7 +99,7 @@ object chroot {
   }
 
   def manageFileIn[S[_]](prefix: ADir)(implicit S: ManageFileF :<: S): S ~> S =
-    interpret.injectedNT[ManageFileF, S](manageFile(prefix))
+    injectedNT[ManageFileF, S](manageFile(prefix))
 
   /** Rebases paths in `QueryFile` onto the given prefix. */
   def queryFile(prefix: ADir): QueryFileF ~> QueryFileF = {
@@ -137,7 +137,7 @@ object chroot {
   }
 
   def queryFileIn[S[_]](prefix: ADir)(implicit S: QueryFileF :<: S): S ~> S =
-    interpret.injectedNT[QueryFileF, S](queryFile(prefix))
+    injectedNT[QueryFileF, S](queryFile(prefix))
 
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
   def fileSystem[S[_]](prefix: ADir)

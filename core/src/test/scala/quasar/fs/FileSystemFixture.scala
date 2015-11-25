@@ -7,7 +7,7 @@ import pathy.scalacheck._
 import pathy.scalacheck.PathOf._
 import quasar.Predef._
 import quasar.fp._
-import quasar.fp.interpret.Interpreter
+import quasar.fp.free.{Interpreter, SpecializedInterpreter}
 import scala.collection.IndexedSeq
 
 import scalaz._, Scalaz._
@@ -86,9 +86,12 @@ trait FileSystemFixture {
   val hoistTask: InMemoryFs ~> MemStateTask =
     Hoist[StateT[?[_], InMemState, ?]].hoist(pointNT[Task])
 
-  object MemTask extends Interpreter[FileSystem, MemStateTask](
+  object MemTask extends SpecializedInterpreter[FileSystem, MemStateTask](
     interpretTerm = hoistTask compose Mem.interpretTerm
-  )
+  ) {
+    def runLogEmpty[A](p: Process[FileSystemErrT[F,?],A]): Task[FileSystemError \/ IndexedSeq[A]] =
+      runLog(p).run.eval(emptyMem)
+  }
 
   val hoistFix: ReadWriteT[InMemoryFs,?] ~> MemStateFix =
     Hoist[StateT[?[_], ReadWrites, ?]].hoist(hoistTask)
@@ -99,7 +102,7 @@ trait FileSystemFixture {
     amendWrites(writeFile),
     liftMT[InMemoryFs, ReadWriteT] compose manageFile)
 
-  object MemFixTask extends Interpreter[FileSystem, MemStateFix](
+  object MemFixTask extends SpecializedInterpreter[FileSystem, MemStateFix](
     interpretTerm = hoistFix compose readWrite
   ) {
     def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =

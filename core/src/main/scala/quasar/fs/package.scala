@@ -1,6 +1,6 @@
 package quasar
 
-import quasar.fp._
+import quasar.fp.free._
 import scalaz._
 import pathy.Path._
 
@@ -31,7 +31,7 @@ package object fs {
     w: WriteFile ~> M,
     m: ManageFile ~> M
   ): FileSystem ~> M =
-    interpret.interpret4[QueryFileF, ReadFileF, WriteFileF, ManageFileF, M](
+    interpret4[QueryFileF, ReadFileF, WriteFileF, ManageFileF, M](
       Coyoneda.liftTF(q), Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(m))
 
   def convert(path: pathy.Path[_,_,Sandboxed]): fs.Path = fs.Path(posixCodec.printPath(path))

@@ -46,14 +46,14 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = (write.append(f, xs.toProcess) ++ write.save(f, ys.toProcess)).drain ++ read.scanAll(f)
 
-      MemTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(ys)
+      MemTask.runLogEmpty(p).run must_== \/-(ys)
     }
 
     "save with empty input should create an empty file" ! prop { f: AFile =>
       val p = write.save(f, Process.empty) ++
               (query.fileExists(f).liftM[FileSystemErrT]: query.M[Boolean]).liftM[Process]
 
-      MemTask.runLog(p).run.eval(emptyMem).run must_== \/.right(Vector(true))
+      MemTask.runLogEmpty(p).run must_== \/-(Vector(true))
     }
 
     "save should leave existing file untouched on failure" ! prop {
@@ -74,7 +74,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.append(f, xs.toProcess) ++ write.create(f, ys.toProcess)
 
-      MemTask.runLog(p).run.eval(emptyMem).run.toEither must beLeft(PathError(PathExists(f)))
+      MemTask.runLogEmpty(p).run must_== -\/(PathError(PathExists(f)))
     }
 
     "create should consume all input into a new file" ! prop {
@@ -82,7 +82,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.create(f, xs.toProcess) ++ read.scanAll(f)
 
-      MemTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(xs)
+      MemTask.runLogEmpty(p).run must_== \/-(xs)
     }
 
     "replace should fail if the file does not exist" ! prop {
@@ -90,7 +90,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
         val p = write.replace(f, xs.toProcess)
 
-        MemTask.runLog(p).run.eval(emptyMem).run.toEither must beLeft(PathError(PathNotFound(f)))
+        MemTask.runLogEmpty(p).run must_== -\/(PathError(PathNotFound(f)))
     }
 
     "replace should leave the existing file untouched on failure" ! prop {
@@ -111,7 +111,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.save(f, xs.toProcess) ++ write.replace(f, ys.toProcess) ++ read.scanAll(f)
 
-      MemTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(ys)
+      MemTask.runLogEmpty(p).run must_== \/-(ys)
     }
   }
 }

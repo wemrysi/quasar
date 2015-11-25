@@ -23,7 +23,7 @@ class ManageFileSpec extends Specification with ScalaCheck with FileSystemFixtur
           val existsAndData: Process[manage.M, (Boolean, Data)] =
             existsP tuple read.scanAll(fileParent(s.file) </> file(name))
 
-          MemTask.runLog(rename.drain ++ existsAndData)
+          MemTask.runLogT(rename.drain ++ existsAndData)
             .map(_.unzip.leftMap(_ exists ι))
             .run.eval(s.state)
             .run.toEither must beRight((false, s.contents))

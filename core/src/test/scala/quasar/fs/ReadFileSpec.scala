@@ -18,7 +18,7 @@ class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture 
 
       val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
 
-      MemTask.runLog(p).run.eval(emptyMem).run.toEither must beRight(xs)
+      MemTask.runLogEmpty(p).run must_== \/-(xs)
     }
 
     "scan should automatically close the read handle when terminated early" ! prop {
