@@ -63,7 +63,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
         val p = (write.append(f, xs.toProcess) ++ write.save(f, ys.toProcess)).drain ++ read.scanAll(f)
 
         MemFixTask.runLogWithWrites(ws.toList, p).run
-          .leftMap(_.fm.keySet)
+          .leftMap(_.contents.keySet)
           .run(emptyMem)
           .run must_== ((Set(f), \/.right(xs)))
       }
@@ -100,7 +100,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
         val p = (write.append(f, xs.toProcess) ++ write.replace(f, ys.toProcess)).drain ++ read.scanAll(f)
 
         MemFixTask.runLogWithWrites(ws.toList, p).run
-          .leftMap(_.fm.keySet)
+          .leftMap(_.contents.keySet)
           .run(emptyMem)
           .run must_== ((Set(f), \/.right(xs)))
       }

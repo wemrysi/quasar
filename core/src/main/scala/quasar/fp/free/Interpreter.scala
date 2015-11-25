@@ -9,11 +9,11 @@ import scalaz.stream.Process
 import scala.collection.IndexedSeq
 
 /** Provides a range of natural transformations that can be derived from the natural transformation of a term
-  * of an algebra into the desired [[Monad]]
-  * @param interpretTerm A natural transformation from the Algebra into the desired [[Monad]] from which
+  * of an algebra into the desired `Monad`
+  * @param interpretTerm A natural transformation from the Algebra into the desired `Monad` from which
   *                      many other natural transformations can be derived
-  * @tparam F The type of the [[Functor]] that represents the algebra to be interpreted
-  * @tparam M The [[Monad]] into which to translate the [[Free]] Algebra
+  * @tparam F The type of the `Functor` that represents the algebra to be interpreted
+  * @tparam M The `Monad` into which to translate the `Free` Algebra
   */
 class Interpreter[F[_]: Functor, M[_]: Monad](val interpretTerm: F ~> M) {
   type Program[A] = Free[F,A]
@@ -43,11 +43,11 @@ class Interpreter[F[_]: Functor, M[_]: Monad](val interpretTerm: F ~> M) {
   }
 }
 
-/** Extends Interpreter to provide a version with better type inference for commonly used [[MonadTrans]]
-  * @param interpretTerm A natural transformation from the Algebra into the desired [[Monad]] from which
+/** Extends Interpreter to provide a version with better type inference for commonly used `MonadTrans`
+  * @param interpretTerm A natural transformation from the Algebra into the desired `Monad` from which
   *                      many other natural transformations can be derived
-  * @tparam F The type of the [[Functor]] that represents the algebra to be interpreted
-  * @tparam M The [[Monad]] into which to translate the [[Free]] Algebra
+  * @tparam F The type of the `Functor` that represents the algebra to be interpreted
+  * @tparam M The `Monad` into which to translate the `Free` Algebra
   */
 // https://github.com/puffnfresh/wartremover/issues/149
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))

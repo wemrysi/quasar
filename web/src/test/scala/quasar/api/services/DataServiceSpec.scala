@@ -2,10 +2,10 @@ package quasar
 package api
 package services
 
-import jawn.{FContext, Facade, AsyncParser}
 import org.http4s.server.middleware.GZip
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
+import pathy.scalacheck.AbsFileOf
 import quasar.Data
 import quasar.Predef._
 import quasar.api.MessageFormat.JsonContentType
@@ -49,10 +49,11 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   "Data Service" should {
     "GET" >> {
       "respond with NotFound" >> {
-        "if file does not exist" ! prop { file: AFile =>
-          val response = service(InMemState.empty)(Request(uri = Uri(path = printPath(file)))).run
+        "if file does not exist" ! prop { file: AbsFileOf[AlphaCharacters] =>
+          val pathString = printPath(file.path)
+          val response = service(InMemState.empty)(Request(uri = Uri(path = pathString))).run
           response.status must_== Status.NotFound
-          response.as[String].run must_== s"${printPath(file)}: doesn't exist"
+          response.as[String].run must_== s"$pathString: doesn't exist"
         }
       }
       "respond with file data" >> {

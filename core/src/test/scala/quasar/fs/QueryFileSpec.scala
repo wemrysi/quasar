@@ -13,7 +13,7 @@ import scalaz.scalacheck.ScalazArbitrary._
 import scalaz._, Scalaz._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import InMemory._, FileSystemError._, PathError2._, DataGen._
+  import InMemory._, FileSystemError._, PathError2._, DataGen._, query._
 
   "QueryFile" should {
     "descendantFiles" >> {
@@ -56,10 +56,22 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }
     }
 
+    def selectAll(file: AFile) = LogicalPlan.Read(convert(file))
+
     "evaluate" ! prop { s: SingleFileMemState =>
-      val lp = LogicalPlan.Read(convert(s.file))
-      val result = MemTask.runLog[FileSystemError, PhaseResults, Data](query.evaluate(lp)).run.run.eval(s.state)
+      val query = selectAll(s.file)
+      val state = s.state.copy(queryResps = Map(query -> s.contents))
+      val result = MemTask.runLog[FileSystemError, PhaseResults, Data](evaluate(selectAll(s.file))).run.run.eval(state)
       result.run._2.toEither must beRight(s.contents)
-    }.pendingUntilFixed("SD-1159")
+    }
+
+    "execute_" ! prop { s: SingleFileMemState =>
+      val query = selectAll(s.file)
+      val state = s.state.copy(queryResps = Map(query -> s.contents))
+      val (newState, (_,result)) = Mem.interpret(execute_(query)).run(state)
+      result.fold(
+        err => ko(s"Unexpected FileSystemError: $err"),
+        outFile => newState.contents.get(ResultFile.resultFile.get(outFile)) must_== Some(s.contents))
+    }
   }
 }
