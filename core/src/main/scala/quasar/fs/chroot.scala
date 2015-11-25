@@ -124,7 +124,7 @@ object chroot {
 
         case Explain(lp, out) =>
           Coyoneda.lift(Explain(lp.translate(rebasePlan), rebase(out, prefix)))
-            .map(_.map(_ leftMap stripPathError(prefix)))
+            .map(_.map(_ map stripPathError(prefix)))
 
         case ListContents(d) =>
           Coyoneda.lift(ListContents(rebase(d, prefix)))
