@@ -16,7 +16,8 @@ object QueryFile {
   final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultFile)]
 
-  final case class Explain(lp: Fix[LogicalPlan]) extends QueryFile[PhaseResults]
+  final case class Explain(lp: Fix[LogicalPlan], out: AFile)
+    extends QueryFile[(PhaseResults, Option[FileSystemError])]
 
   /** TODO: While this is a bit better in one dimension here in `QueryFile`,
     *       @mossprescott points out it is still a bit of a stretch to include
@@ -29,6 +30,11 @@ object QueryFile {
     */
   final case class ListContents(dir: ADir)
     extends QueryFile[FileSystemError \/ Set[Node]]
+
+  /** File used in explain output when a `LogicalPlan` does not contain any
+    * file references.
+    */
+  val DefaultExplainOut: AFile = rootDir </> dir("explain") </> file("out")
 
   final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S) {
     import ResultFile._
@@ -49,25 +55,28 @@ object QueryFile {
     def execute(plan: Fix[LogicalPlan], out: AFile): ExecM[ResultFile] =
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ ResultFile])
 
-    def explain(plan: Fix[LogicalPlan]): F[PhaseResults] =
-      lift(Explain(plan))
-
     /** Returns the path to the result of executing the given [[LogicalPlan]] */
     def execute_(plan: Fix[LogicalPlan])
                 (implicit M: ManageFile.Ops[S]): ExecM[ResultFile] = {
-
-      val outFile = plan.foldMap {
-        case Fix(LogicalPlan.ReadF(p)) => Vector(p)
-        case _                         => Vector.empty
-      }.headOption flatMap pathToAbsFile cata (M.tempFileNear, M.anyTempFile)
-
       for {
-        out <- toExec(outFile)
+        out <- toExec(firstFile(plan) cata (M.tempFileNear, M.anyTempFile))
         rf0 <- execute(plan, out)
         rf1 =  user.getOrModify(rf0)
                  .map(usr => if (usr == out) Temp(usr) else User(usr))
                  .merge
       } yield rf1
+    }
+
+    /** Returns a description of how the the given logical plan will be executed
+      * along with any error encountered during planning.
+      */
+    def explain(plan: Fix[LogicalPlan])
+               (implicit M: ManageFile.Ops[S])
+               : F[(PhaseResults, Option[FileSystemError])] = {
+
+      firstFile(plan)
+        .cata(M.tempFileNear, M.anyTempFile)
+        .flatMap(f => lift(Explain(plan, f)))
     }
 
     /** Returns the source of values from the result of executing the given
@@ -122,11 +131,22 @@ object QueryFile {
       comp flatMap (lp => evaluate(lp).translate[CompExecM](execToCompExec))
     }
 
-    def explainQuery(query: sql.Expr, vars: Variables): SemanticErrsT[F,PhaseResults] = {
-      val writer = queryPlan(query, vars).run
-      val phases = writer.written
-      EitherT[F,SemanticErrors,PhaseResults](
-        writer.value.map(lp => explain(lp).map(physicalPhases => phases ++ physicalPhases)).sequenceU)
+    /** Returns a description of how the the given SQL^2 query will be executed
+      * along with any error encountered during planning.
+      */
+    def explainQuery(query: sql.Expr, vars: Variables)
+                    (implicit M: ManageFile.Ops[S])
+                    : SemanticErrsT[F, (PhaseResults, Option[FileSystemError])] = {
+
+      type E[A, B] = EitherT[F, A, B]
+
+      queryPlan(query, vars).run.run match {
+        case (prs, \/-(lp)) =>
+          explain(lp).map(_.leftMap(prs ++ _)).liftM[SemanticErrsT]
+
+        case (_, -\/(semErrs)) =>
+          semErrs.raiseError[E, (PhaseResults, Option[FileSystemError])]
+      }
     }
 
     /** Returns immediate children of the given directory, fails if the
@@ -142,16 +162,16 @@ object QueryFile {
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.
       */
-    def descendantFiles(dir: ADir): M[Set[RelFile[Sandboxed]]] = {
+    def descendantFiles(dir: ADir): M[Set[RFile]] = {
       type S[A] = StreamT[M, A]
 
-      def lsR(desc: RDir): StreamT[M, RelFile[Sandboxed]] =
+      def lsR(desc: RDir): StreamT[M, RFile] =
         StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
           .flatMap(n => refineType(n.path).fold(
             d => lsR(desc </> d),
             f => (desc </> f).point[S]))
 
-      lsR(currentDir).foldLeft(Set.empty[RelFile[Sandboxed]])(_ + _)
+      lsR(currentDir).foldLeft(Set.empty[RFile])(_ + _)
     }
 
     /** Returns whether the given file exists. */
@@ -171,6 +191,12 @@ object QueryFile {
       compToCompExec(queryPlan(query, vars))
         .flatMap(lp => execToCompExec(f(lp)))
     }
+
+    private def firstFile(lp: Fix[LogicalPlan]): Option[AFile] =
+      Tag.unwrap(lp foldMap[FirstOption[QPath]] {
+        case Fix(LogicalPlan.ReadF(p)) => Tag(Some(p))
+        case _                         => Tag(None)
+      }) flatMap pathToAbsFile
 
     private def pathToAbsFile(p: QPath): Option[AFile] =
       p.file map (fn =>

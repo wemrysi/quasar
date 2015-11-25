@@ -183,7 +183,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
         query = Some(selectAll(filesystem.filename)),
         state = filesystem.state,
         status = Status.Ok,
-        response = "InMemory\nPlan(logical: Squash(Read(Path(\"" + pathString + "\"))))"
+        response = "InMemory\nUnsupported"
       )
     }
   }

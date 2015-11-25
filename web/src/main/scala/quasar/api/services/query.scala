@@ -1,5 +1,13 @@
 package quasar.api.services
 
+import quasar._
+import quasar.Predef._
+import quasar.api.{MessageFormat, Destination, AsDirPath}
+import quasar.{Variables, fs}
+import quasar.fs._
+import quasar.recursionschemes.Fix, Fix._
+import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
+
 import argonaut._, Argonaut._
 import org.http4s.headers.Accept
 import org.http4s._
@@ -7,13 +15,6 @@ import org.http4s.dsl._
 import org.http4s.server._
 import org.http4s.argonaut._
 import pathy.Path._
-import quasar._
-import quasar.Predef._
-import quasar.api.{MessageFormat, Destination, AsDirPath}
-import quasar.{Variables, fs}
-import quasar.fs._
-import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
-
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.~>
@@ -109,22 +110,32 @@ object query {
     }
   }
 
-  def compileService[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S]): HttpService = {
-    HttpService{
+  def compileService[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]): HttpService = {
+    def phaseResultsResponse(prs: PhaseResults): Option[Task[Response]] =
+      prs.lastOption map {
+        case PhaseResult.Tree(name, value)   => Ok(Json(name := value))
+        case PhaseResult.Detail(name, value) => Ok(name + "\n" + value)
+      }
+
+    def explainQuery(expr: sql.Expr): Task[Response] =
+      queryPlan(expr, Variables(Map())).run.value fold (
+        translateSemanticErrors,
+        lp => Q.explain(lp).foldMap(f) flatMap {
+          case (phases, None) =>
+            phaseResultsResponse(phases)
+              .getOrElse(InternalServerError(
+                s"No explain output for plan: \n\n" + RenderTree[Fix[LogicalPlan]].render(lp).shows
+              ))
+
+          case (_, Some(fsErr)) =>
+            fileSystemErrorResponse(fsErr)
+        })
+
+    HttpService {
       case GET -> AsDirPath(path) :? QueryParam(query) =>
-        SQLParser.parseInContext(query, fs.convert(path)).fold(
-          formatParsingError,
-          expr => {
-            Q.explainQuery(expr,Variables(Map())).run.foldMap(f).flatMap(_.fold(
-              translateSemanticErrors,
-              phases =>
-                phases.lastOption.map{
-                  case PhaseResult.Tree(name, value)    => Ok(Json(name := value))
-                  case PhaseResult.Detail(name, value)  => Ok(name + "\n" + value)
-                }.getOrElse(InternalServerError("no plan"))
-            ))
-          }
-        )
+        SQLParser.parseInContext(query, fs.convert(path))
+          .fold(formatParsingError, explainQuery)
+
       case GET -> _ => QueryParameterMustContainQuery
     }
   }
