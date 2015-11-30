@@ -22,7 +22,7 @@ package object services {
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error match {
       case Case.PathError(e) => pathErrorResponse(e)
-      case Case.PlannerError(_, _) => BadRequest("Planner error")
+      case Case.PlannerError(_, _) => BadRequest(error.shows)
       case Case.UnknownReadHandle(handle) => InternalServerError(s"Unknown read handle: $handle")
       case Case.UnknownWriteHandle(handle) => InternalServerError(s"Unknown write handle: $handle")
       case Case.PartialWrite(numFailed) => InternalServerError(s"Failed to write $numFailed records")
@@ -33,7 +33,6 @@ package object services {
   def pathErrorResponse(error: PathError2): Task[Response] =
     error match {
       case PathError2.Case.PathExists(path) => Conflict(s"$path already exists")
-      // TODO: Adjust definition of `AbsPath` in order to avoid this fold...
       case PathError2.Case.PathNotFound(path) => NotFound(s"${posixCodec.printPath(path)}: doesn't exist")
       case PathError2.Case.InvalidPath(path, reason) => BadRequest(s"$path is an invalid path because $reason")
     }

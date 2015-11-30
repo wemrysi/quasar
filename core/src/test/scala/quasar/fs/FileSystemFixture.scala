@@ -77,10 +77,16 @@ trait FileSystemFixture {
   type MemStateFix[A]  = ReadWriteT[MemStateTask,A]
 
   object Mem extends Interpreter[FileSystem,InMemoryFs](
-    interpretTerm = interpretFileSystem(queryFile, readFile, writeFile, manageFile)
+    interpretTerm = fileSystem
   ) {
     def interpret[E,A](term: EitherT[F,E,A]): InMemoryFs[E \/ A] =
       interpretT[EitherT[?[_],E,?]].apply(term).run
+    def interpret[L:Monoid,E,A](term: EitherT[WriterT[F,L,?],E,A]): InMemoryFs[(L,E \/ A)] = {
+      type T1[M[_],A] = EitherT[M,E,A]
+      type T2[M[_],A] = WriterT[M,L,A]
+      interpretT2[T1,T2].apply(term).run.run
+    }
+
   }
 
   val hoistTask: InMemoryFs ~> MemStateTask =

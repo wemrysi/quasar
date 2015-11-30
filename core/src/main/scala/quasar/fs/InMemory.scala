@@ -4,6 +4,7 @@ package fs
 import quasar.Predef._
 import quasar.fp._
 import quasar.recursionschemes.Fix
+import quasar.Planner.UnsupportedPlan
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -19,22 +20,29 @@ object InMemory {
   import ReadFile._, WriteFile._, ManageFile._, QueryFile._
   import FileSystemError._, PathError2._
 
-  type FM = Map[AFile, Vector[Data]]
+  type FileMap = Map[AFile, Vector[Data]]
   type RM = Map[ReadHandle, Reading]
   type WM = Map[WriteHandle, AFile]
+  type QueryResponses = Map[Fix[LogicalPlan],Vector[Data]]
 
   type InMemoryFs[A]  = State[InMemState, A]
   type InMemStateR[A] = (InMemState, A)
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 
-  final case class InMemState(seq: Long, fm: FM, rm: RM, wm: WM)
+  /** Represents the current state of the InMemoryFilesystem
+    * @param seq Represents the next available uid for a ReadHandle or WriteHandle
+    * @param contents The mapping of Data associated with each file in the Filesystem
+    * @param rm Currently open [[quasar.fs.ReadFile.ReadHandle]]s
+    * @param wm Currently open [[quasar.fs.WriteFile.WriteHandle]]s
+    */
+  final case class InMemState(seq: Long, contents: FileMap, rm: RM, wm: WM, queryResps: QueryResponses)
 
   object InMemState {
-    val empty = InMemState(0, Map.empty, Map.empty, Map.empty)
+    val empty = InMemState(0, Map.empty, Map.empty, Map.empty, Map.empty)
 
-    def fromFiles(files: FM): InMemState =
-      empty copy (fm = files)
+    def fromFiles(files: FileMap): InMemState =
+      empty copy (contents = files)
   }
 
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
@@ -125,20 +133,28 @@ object InMemory {
 
   val queryFile: QueryFile ~> InMemoryFs = new (QueryFile ~> InMemoryFs) {
     def apply[A](qf: QueryFile[A]) = qf match {
-      case ExecutePlan(_, out) =>
-        (Vector(unsupported), ResultFile.User(out).right[FileSystemError])
-          .point[InMemoryFs]
+      case ExecutePlan(lp, out) =>
+        val noSupportMsg = "In Memory interpreter does not currently support this plan"
+        queryResponsesL.st.flatMap { queryResponses =>
+          val result = queryResponses.get(lp).cata(
+            data => fileL(out) assigno Some(data) map(
+              previousData => (previousData ? ResultFile.User(out) | ResultFile.Temp(out)).right[FileSystemError]),
+            PlannerError(lp, UnsupportedPlan(lp.unFix, Some(noSupportMsg))).left[ResultFile].point[InMemoryFs])
+          val phase = lookup(lp,queryResponses)
+          result.map((Vector(phase),_))
+        }
 
-      case Explain(_, _) =>
-        (Vector(unsupported), none[FileSystemError])
-          .point[InMemoryFs]
+      case Explain(lp, _) =>
+        queryResponsesL.st.map( queryResps =>
+          (Vector(lookup(lp, queryResps)), none[FileSystemError])
+        )
 
       case ListContents(dir) =>
         ls(dir)
     }
 
-    private val unsupported: PhaseResult =
-      PhaseResult.Detail("InMemory", "Unsupported")
+    private def lookup(lp: Fix[LogicalPlan],queries: QueryResponses): PhaseResult =
+      PhaseResult.Detail("Lookup in Memory", s"Lookup $lp in $queries")
   }
 
   val fileSystem: FileSystem ~> InMemoryFs =
@@ -168,11 +184,11 @@ object InMemory {
   private def nextSeq: InMemoryFs[Long] =
     seqL <%= (_ + 1)
 
-  private val fmL: InMemState @> FM =
-    Lens.lensg(s => m => s.copy(fm = m), _.fm)
+  private val contentsL: InMemState @> FileMap =
+    Lens.lensg(s => newContents => s.copy(contents = newContents), _.contents)
 
   private def fileL(f: AFile): InMemState @> Option[Vector[Data]] =
-    Lens.mapVLens(f) <=< fmL
+    Lens.mapVLens(f) <=< contentsL
 
   //----
 
@@ -181,6 +197,9 @@ object InMemory {
 
   private val rmL: InMemState @> RM =
     Lens.lensg(s => m => s.copy(rm = m), _.rm)
+
+  private val queryResponsesL: InMemState @> QueryResponses =
+    Lens.lensg(s => newQueryResps => s.copy(queryResps = newQueryResps), _.queryResps)
 
   private def readingL(h: ReadHandle): InMemState @> Option[Reading] =
     Lens.mapVLens(h) <=< rmL
@@ -212,7 +231,7 @@ object InMemory {
 
   private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
-      m     <- fmL.st
+      m     <- contentsL.st
       sufxs =  m.keys.toStream.map(_ relativeTo src).unite
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
@@ -239,7 +258,7 @@ object InMemory {
 
   private def deleteDir(d: ADir): InMemoryFs[FileSystemError \/ Unit] =
     for {
-      m  <- fmL.st
+      m  <- contentsL.st
       ss =  m.keys.toStream.map(_ relativeTo d).unite
       r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
       r1 =  r0 flatMap (_.nonEmpty either (()) or PathError(PathNotFound(d)))
@@ -249,7 +268,7 @@ object InMemory {
     (fileL(f) <:= None) map (_.void \/> PathError(PathNotFound(f)))
 
   private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[Node]] =
-    fmL.st map (
+    contentsL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
         .map(_ foldMap (f => Node.fromFirstSegmentOf(f).toSet))
         .toRightDisjunction(PathError(PathNotFound(d))))
