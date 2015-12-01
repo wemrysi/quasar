@@ -38,7 +38,7 @@ package object services {
     }
 
   type FilesystemTask[A] = FileSystemErrT[Task, A]
-  /** Flatten by inserting the [[quasar.fs.FileSystemError]] into the failure case of the [[scalaz.concurrent.Task]] */
+  /** Flatten by inserting the `quasar.fs.FileSystemError` into the failure case of the `Task` */
   val flatten = new (FilesystemTask ~> Task) {
     def apply[A](t: FilesystemTask[A]): Task[A] =
       t.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now).join
