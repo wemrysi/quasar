@@ -71,7 +71,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
       counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
-    }
+    }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
       def byteStream(size: Positive): Process[Task, ByteVector] =
@@ -79,7 +79,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
       counts(z).run must equal(filesAndSize.mapValues(_.toNatural).toList)
-    }
+    }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip many large files of random bytes (100 MB)" in {
       // NB: this is mainly a performance check. Right now it's about 2 seconds for 100 MB for me.
@@ -117,6 +117,6 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
       bytes(z).run must equal(bytes(z).run)
-    }
+    }.set(minTestsOk = 10) // This test is relatively slow
   }
 }
