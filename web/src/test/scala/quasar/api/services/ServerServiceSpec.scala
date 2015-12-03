@@ -45,7 +45,7 @@ class ServerServiceSpec extends Specification {
   "Server Service" should {
     "be capable of providing it's name and version" in {
       val request = Request(uri = Uri(path = "info"), method = Method.GET)
-      val response = server.service(8888, _ => Task.now(()))(request).run
+      val response = server.service(Server.anyAvailablePort.run, _ => Task.now(()))(request).run
       response.as[Json].run must_== server.nameAndVersionInfo
       response.status must_== Status.Ok
     }

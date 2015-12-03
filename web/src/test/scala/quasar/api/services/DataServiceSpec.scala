@@ -376,17 +376,17 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         "be 500 with server side error" ! prop {
           (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
             import quasar.api.Server._
-            val port = 8888
+            val port = quasar.api.Server.anyAvailablePort.run
             val destination = rootDir[Sandboxed] </> file1(fileName)
             val request = Request(
               uri = Uri(path = printPath(destination), authority = Some(Authority(port = Some(port)))),
               method = method).withBody(body.list).run
             val failInter = new (FileSystem ~> Task) {
-              def apply[A](a: FileSystem[A]): Task[A] = Task.fail(scala.sys.error(failureMsg))
+              def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
             }
             val service = data.service(failInter)
             val serverBlueprint = ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
-            val (server, _) = startServer(serverBlueprint,false).run
+            val (server, _) = startServer(serverBlueprint,true).run
             val client = org.http4s.client.blaze.defaultClient
             val response = client(request).onFinish(_ => server.shutdown.void).run
             response.status must_== Status.InternalServerError
@@ -437,7 +437,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           expectedBody = s"${printPath(file)}: doesn't exist",
           newState = Unchanged)
       }
-      "be 404 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
+      "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
         testMove(
           from = fs.dir,
           to = file,
@@ -446,7 +446,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           expectedBody = "Cannot move directory into a file",
           newState = Unchanged)
       }
-      "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
+      "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
         testMove(
           from = fs.file,
           to = dir,
