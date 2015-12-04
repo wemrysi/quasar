@@ -23,39 +23,14 @@ import scodec.bits.ByteVector
 import scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
-import scalaz.syntax.validation._
-import scalaz.syntax.traverse._
 import scalaz.syntax.TraverseOps
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 import scalaz.syntax.show._
-import scalaz.std.option._
 
 import posixCodec._
 
 object data {
-  import scalaz.Validation.FlatMap._
-
-  implicit val naturalParamDecoder: org.http4s.QueryParamDecoder[Natural] = new QueryParamDecoder[Natural] {
-    def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Natural] =
-      QueryParamDecoder[Long].decode(value).flatMap(long =>
-        Natural(long).toSuccess(NonEmptyList(ParseFailure(value.value, "must be >= 0")))
-      )
-  }
-
-  implicit val positiveParamDecoder: org.http4s.QueryParamDecoder[Positive] = new QueryParamDecoder[Positive] {
-    def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Positive] =
-      QueryParamDecoder[Long].decode(value).flatMap(long =>
-        Positive(long).toSuccess(NonEmptyList(ParseFailure(value.value, "must be >= 1")))
-      )
-  }
-
-  // https://github.com/puffnfresh/wartremover/issues/149
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  object Offset extends OptionalValidatingQueryParamDecoderMatcher[Natural]("offset")
-  // https://github.com/puffnfresh/wartremover/issues/149
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  object Limit  extends OptionalValidatingQueryParamDecoderMatcher[Positive]("limit")
 
   private val DestinationHeaderMustExist = BadRequest("The '" + Destination.name + "' header must be specified")
 
@@ -97,16 +72,10 @@ object data {
 
     HttpService {
       case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) => {
-        val offsetWithDefault = offsetParam.getOrElse(Natural._0.successNel)
-        val offsetWithErrorMsg: String \/ Natural = offsetWithDefault.disjunction.leftMap(
-          nel => s"invalid offset: ${nel.head.sanitized} (${nel.head.details})")
-        val limitWithErrorMsg: String \/ Option[Positive] = limitParam.traverseU(_.disjunction.leftMap(
-          nel => s"invalid limit: ${nel.head.sanitized} (${nel.head.details})"))
-        val possibleResponse = (offsetWithErrorMsg |@| limitWithErrorMsg) { (offset, limit) =>
+        handleOffsetLimitParams(offsetParam,limitParam){ (offset, limit) =>
           val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-          download(requestedFormat, path, offset, limit)
+          download(requestedFormat, path, offset.getOrElse(Natural._0), limit)
         }
-        possibleResponse.leftMap(errMessage => BadRequest(errMessage)).merge
       }
       case req @ POST -> AsFilePath(path) => upload(req, W.append(path,_))
       case req @ PUT -> AsFilePath(path) => upload(req, W.save(path,_))

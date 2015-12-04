@@ -1,5 +1,6 @@
 package quasar
 
+import quasar.Predef._
 import quasar.fp.free._
 import scalaz._
 import pathy.Path._
@@ -35,5 +36,7 @@ package object fs {
       Coyoneda.liftTF(q), Coyoneda.liftTF(r), Coyoneda.liftTF(w), Coyoneda.liftTF(m))
 
   def convert(path: pathy.Path[_,_,Sandboxed]): fs.Path = fs.Path(posixCodec.printPath(path))
+
+  def convertToAFile(path: fs.Path): Option[AFile] = posixCodec.parseAbsFile(path.pathname) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
 }
 

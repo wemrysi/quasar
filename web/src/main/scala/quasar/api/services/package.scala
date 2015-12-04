@@ -3,7 +3,7 @@ package quasar.api
 import quasar.Data
 import quasar.Predef._
 
-import org.http4s.{Charset, EntityEncoder, Response}
+import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
 
@@ -71,5 +71,39 @@ package object services {
     val trans: F ~> Task = hoistFree(f)
     val trans2: M ~> FilesystemTask = Hoist[FileSystemErrT].hoist(trans)
     from.translate(trans2)
+  }
+
+  import scalaz.Validation.FlatMap._
+
+  implicit val naturalParamDecoder: org.http4s.QueryParamDecoder[Natural] = new QueryParamDecoder[Natural] {
+    def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Natural] =
+      QueryParamDecoder[Long].decode(value).flatMap(long =>
+        Natural(long).toSuccess(NonEmptyList(ParseFailure(value.value, "must be >= 0")))
+      )
+  }
+
+  implicit val positiveParamDecoder: org.http4s.QueryParamDecoder[Positive] = new QueryParamDecoder[Positive] {
+    def decode(value: QueryParameterValue): ValidationNel[ParseFailure, Positive] =
+      QueryParamDecoder[Long].decode(value).flatMap(long =>
+        Positive(long).toSuccess(NonEmptyList(ParseFailure(value.value, "must be >= 1")))
+      )
+  }
+
+  // https://github.com/puffnfresh/wartremover/issues/149
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  object Offset extends OptionalValidatingQueryParamDecoderMatcher[Natural]("offset")
+  // https://github.com/puffnfresh/wartremover/issues/149
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  object Limit  extends OptionalValidatingQueryParamDecoderMatcher[Positive]("limit")
+
+  def handleOffsetLimitParams(offset: Option[ValidationNel[ParseFailure, Natural]],
+                              limit: Option[ValidationNel[ParseFailure, Positive]])(
+                              f: (Option[Natural], Option[Positive]) => Task[Response]) = {
+    val offsetWithErrorMsg: String \/ Option[Natural] = offset.traverseU(_.disjunction.leftMap(
+      nel => s"invalid offset: ${nel.head.sanitized} (${nel.head.details})"))
+    val limitWithErrorMsg: String \/ Option[Positive] = limit.traverseU(_.disjunction.leftMap(
+      nel => s"invalid limit: ${nel.head.sanitized} (${nel.head.details})"))
+    val possibleResponse = (offsetWithErrorMsg |@| limitWithErrorMsg)(f)
+    possibleResponse.leftMap(errMessage => BadRequest(errMessage)).merge
   }
 }
