@@ -39,8 +39,10 @@ final case class RestApi(staticContent: List[StaticContent],
                                                M: ManageFile.Ops[S],
                                                Q: QueryFile.Ops[S]): ListMap[String,HttpService] = {
     val apiServices = ListMap(
+      "/compile/fs"   -> query.compileService(f),
       "/data/fs"      -> data.service(f),
       "/metadata/fs"  -> metadata.service(f),
+      "/query/fs"     -> query.service(f),
       "/server"       -> server.service(defaultPort, restart),
       "/welcome"      -> welcome.service
     ) ∘ { service =>
