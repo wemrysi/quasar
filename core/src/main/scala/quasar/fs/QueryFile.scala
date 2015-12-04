@@ -193,10 +193,15 @@ object QueryFile {
     }
 
     private def firstFile(lp: Fix[LogicalPlan]): Option[AFile] =
-      Tag.unwrap(lp foldMap[FirstOption[QPath]] {
-        case Fix(LogicalPlan.ReadF(p)) => Tag(Some(p))
-        case _                         => Tag(None)
-      }) flatMap pathToAbsFile
+    // This implementation, although more resource efficient, cannot be used right now because it triggers
+    // a compiler crash in conjunction with the scoverage compiler plugin. As a compromise in order to have
+    // code coverage, we currently have a less efficient implementation that sidesteps the compiler crash.
+    // https://github.com/scoverage/scalac-scoverage-plugin/issues/147
+    //  Tag.unwrap(lp foldMap[FirstOption[QPath]] {
+    //    case Fix(LogicalPlan.ReadF(p)) => Tag(Some(p))
+    //    case _                         => Tag(None)
+    //  }) flatMap pathToAbsFile
+    lp.collect{case Fix(LogicalPlan.ReadF(p)) => p}.headOption.flatMap(pathToAbsFile)
 
     private def pathToAbsFile(p: QPath): Option[AFile] =
       p.file map (fn =>
