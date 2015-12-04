@@ -4,15 +4,19 @@ package services
 
 import Predef._
 import argonaut.{JsonObject, JsonNumber, Json, Argonaut}
+import Argonaut._
 import jawn.{FContext, Facade}
 import org.http4s.{MediaType, Charset, EntityEncoder}
 import org.http4s.headers.`Content-Type`
+import org.scalacheck.Arbitrary
 
 import quasar.api.JsonFormat.{SingleArray, LineDelimited}
 import quasar.api.JsonPrecision.{Precise, Readable}
 import quasar.api.MessageFormat.JsonContentType
 
 object Fixture {
+
+  implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
 
   val jsonReadableLine = JsonContentType(Readable,LineDelimited)
   val jsonPreciseLine = JsonContentType(Precise,LineDelimited)
@@ -68,6 +72,7 @@ object Fixture {
       EntityEncoder.encodeBy(`Content-Type`(jsonPreciseArray.mediaType, Charset.`UTF-8`)) { pJson =>
         org.http4s.argonaut.jsonEncoder.toEntity(pJson.value)
       }
+    implicit val arb: Arbitrary[PreciseJson] = Arbitrary(Arbitrary.arbitrary[Json].map(PreciseJson(_)))
   }
 
   case class ReadableJson(value: Json) extends JsonType
@@ -76,6 +81,7 @@ object Fixture {
       EntityEncoder.encodeBy(`Content-Type`(jsonReadableArray.mediaType, Charset.`UTF-8`)) { rJson =>
         org.http4s.argonaut.jsonEncoder.toEntity(rJson.value)
       }
+    implicit val arb: Arbitrary[ReadableJson] = Arbitrary(Arbitrary.arbitrary[Json].map(ReadableJson(_)))
   }
 
   implicit val readableLineDelimitedJson: EntityEncoder[List[ReadableJson]] =

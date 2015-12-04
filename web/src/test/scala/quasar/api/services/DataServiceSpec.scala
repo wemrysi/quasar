@@ -2,6 +2,7 @@ package quasar
 package api
 package services
 
+import org.http4s.Uri.Authority
 import org.http4s.server.middleware.GZip
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
@@ -13,7 +14,7 @@ import JsonPrecision._
 import JsonFormat._
 import quasar.DataCodec
 
-import argonaut.{Argonaut, JsonObject, JsonNumber, Json}
+import argonaut.Json
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
@@ -22,7 +23,9 @@ import quasar.fs.{Path => _, _}
 import pathy.Path
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import scalaz.scalacheck.ScalazArbitrary._
 import quasar.fs.NumericGen._
+import quasar.DataGen._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -30,7 +33,7 @@ import scalaz.stream.Process
 
 import quasar.api.MessageFormatGen._
 
-import org.scalacheck.Arbitrary
+import org.scalacheck.{Arbitrary, Gen}
 
 import Fixture._
 
@@ -40,7 +43,12 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   def service(mem: InMemState): HttpService =
     data.service[FileSystem](runStatefully(mem).run.compose(fileSystem))
 
-  implicit val arbJson: Arbitrary[Json] = Arbitrary(Arbitrary.arbitrary[String].map(jString(_)))
+  def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
+    val (inter, ref) = runInspect(mem).run
+    (data.service[FileSystem](inter compose fileSystem), ref)
+  }
+
+  implicit val arbFileName: Arbitrary[FileName] = Arbitrary(Gen.alphaStr.filter(_.nonEmpty).map(FileName(_)))
 
   val csv = MediaType.`text/csv`
 
@@ -222,8 +230,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         val response = service(filesystem.state)(request).run
         response.status must_== Status.Ok
         response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
-        response.headers.get(`Content-Disposition`) must_== disposition
-      }.pendingUntilFixed("Seem to have some problems testing directories, also, I don't think is specific to csv") // TODO: FIXME
+        response.headers.get(`Content-Disposition`) must_== Some(disposition)
+      }.set(minTestsOk = 1) // This test is relatively slow
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {
@@ -247,15 +255,16 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "be 400 with" >> {
           def be400[A: EntityDecoder](body: String, expectedBody: A, mediaType: MediaType = jsonReadableLine.mediaType) = {
-            prop { file: Path[Abs, File, Sandboxed] =>
+            prop { file: AFile =>
               val path = printPath(file)
               val request = Request(
                 uri = Uri(path = path),             // We do it this way becuase withBody sets the content-type
                 method = method).withBody(body).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
-              val response = service(emptyMem)(request).run
+              val (service, ref) = serviceRef(emptyMem)
+              val response = service(request).run
               response.as[A].run must_== expectedBody
               response.status must_== Status.BadRequest
-              // TODO: Assert nothing changed in the backend
+              ref.run must_== emptyMem
             }
           }
           "invalid body" >> {
@@ -282,23 +291,41 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             }
           }
           // TODO: Consider spliting this into a case of Root (depth == 0) and missing dir (depth > 1)
-          "if path is invalid (parent directory does not exist)" ! prop { (file: Path[Abs,File,Sandboxed], json: Json) =>
+          "if path is invalid (parent directory does not exist)" ! prop { (file: AFile, json: Json) =>
             Path.depth(file) != 1 ==> {
               be400(body = json.spaces4, s"Invalid path: ${printPath(file)}")
             }
           }.pendingUntilFixed("What do we want here, create it or not?")
+          "produce two errors with partially invalid JSON" ! prop { path: Path[Abs,File,Sandboxed] =>
+            val twoErrorJson = """{"a": 1}
+                                 |"unmatched
+                                 |{"b": 2}
+                                 |}
+                                 |{"c": 3}""".stripMargin
+            val expectedResponse = Json("error" := "some uploaded value(s) could not be processed",
+              "details" := Json.array(
+                jString("parse error: JSON terminates unexpectedly. in the following line: \"unmatched"),
+                jString("parse error: Unexpected content found: } in the following line: }")
+              ))
+            be400(twoErrorJson, expectedResponse)
+          }
         }
         "accept valid data" >> {
           def accept[A: EntityEncoder](body: A, expected: List[Data]) =
-            prop { fileName: NonEmptyString =>
-              val sampleFile = rootDir[Sandboxed] </> file(fileName.value)
+            prop { (fileName: FileName, preExistingContent: Vector[Data]) =>
+              val sampleFile = rootDir[Sandboxed] </> file1(fileName)
               val path = printPath(sampleFile)
               val request = Request(uri = Uri(path = path), method = method).withBody(body).run
-              val response = service(emptyMem)(request).run
+              val (service, ref) = serviceRef(InMemState.fromFiles(Map(sampleFile -> preExistingContent)))
+              val response = service(request).run
               response.as[String].run must_== ""
               response.status must_== Status.Ok
-              // TODO: How do I check the in-memory interpreter to find out if the files were create
-              // also need to test for Append vs Save
+              val expectedWithPreExisting =
+                // PUT has override semantics
+                if (method == Method.PUT) Map(sampleFile -> expected.toVector)
+                // POST has append semantics
+                else /*method == Method.POST*/ Map(sampleFile -> (preExistingContent ++ expected.toVector))
+              ref.run.contents must_== expectedWithPreExisting
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
@@ -310,17 +337,17 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "when formatted with one json object per line" >> {
               "Precise" ! {
                 accept(List(line1, preciseLine2).map(PreciseJson(_)), expectedData)
-              }
+              }.pendingUntilFixed("SD-1066")
               "Readable" ! {
                 accept(List(line1, readableLine2).map(ReadableJson(_)), expectedData)
               }
             }
             "when formatted as a single json array" >> {
               "Precise" ! {
-                accept(PreciseJson(Json.array(line1, preciseLine2)), List(Data.Arr(expectedData)))
-              }
+                accept(PreciseJson(Json.array(line1, preciseLine2)), expectedData)
+              }.pendingUntilFixed("SD-1066")
               "Readable" ! {
-                accept(ReadableJson(Json.array(line1, readableLine2)), List(Data.Arr(expectedData)))
+                accept(ReadableJson(Json.array(line1, readableLine2)), expectedData)
               }
             }
             "when having multiple lines containing arrays" >> {
@@ -328,7 +355,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               def replicate[A](a: A) = Applicative[Id].replicateM[A](arbitraryValue, a)
               "Precise" ! {
                 accept(PreciseJson(Json.array(replicate(Json.array(line1, preciseLine2)): _*)), replicate(Data.Arr(expectedData)))
-              }
+              }.pendingUntilFixed("SD-1066")
               "Readable" ! {
                 accept(ReadableJson(Json.array(replicate(Json.array(line1, readableLine2)): _*)), replicate(Data.Arr(expectedData)))
               }
@@ -346,41 +373,53 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             }
           }
         }
-        "produce two errors with partially invalid JSON" ! prop { path: Path[Abs,File,Sandboxed] =>
-          val twoErrorJson = """{"a": 1}
-                               |"unmatched
-                               |{"b": 2}
-                               |}
-                               |{"c": 3}""".stripMargin
-          val pathString = printPath(path)
-          val request = Request(
-            uri = Uri(path = pathString),               // withBody replaces the headers which is why we need to specify them here
-            method = method).withBody(twoErrorJson).run.replaceAllHeaders(Headers(`Content-Type`(jsonReadableLine.mediaType)))
-          val response = service(emptyMem)(request).run
-          response.status must_== Status.BadRequest // TODO: Is this really what we want?
-          val jsonResponse = response.as[Json].run
-          jsonResponse must_== Json("error" := "some uploaded value(s) could not be processed",
-            "details" := Json.array(
-              jString("parse error: JSON terminates unexpectedly. in the following line: \"unmatched"),
-              jString("parse error: Unexpected content found: } in the following line: }")
-            ))
-          // TODO: Make sure the filesystem has not been changed?
+        "be 500 with server side error" ! prop {
+          (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
+            import quasar.api.Server._
+            val port = quasar.api.Server.anyAvailablePort.run
+            val destination = rootDir[Sandboxed] </> file1(fileName)
+            val request = Request(
+              uri = Uri(path = printPath(destination), authority = Some(Authority(port = Some(port)))),
+              method = method).withBody(body.list).run
+            val failInter = new (FileSystem ~> Task) {
+              def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
+            }
+            val service = data.service(failInter)
+            val serverBlueprint = ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
+            val (server, _) = startServer(serverBlueprint,true).run
+            val client = org.http4s.client.blaze.defaultClient
+            val response = client(request).onFinish(_ => server.shutdown.void).run
+            response.status must_== Status.InternalServerError
+            response.as[String].run must_== ""
         }
-        "be 500 with server side error" >> todo
         () // Required for testBoth (not required with specs2 3.x)
       }
     }
     "MOVE" >> {
+      trait StateChange
+      object Unchanged extends StateChange
+      case class Changed(newContents: FileMap) extends StateChange
+
       def testMove[A: EntityDecoder](from: APath,
-                                     to: APath, state: InMemState, expectedBody: A, status: Status) = {
-        // TODO: Consider it's possible to invent syntax Move(...)
+                                     to: APath,
+                                     state: InMemState,
+                                     expectedBody: A,
+                                     status: Status,
+                                     newState: StateChange) = {
+        // TODO: Consider if it's possible to invent syntax Move(...)
         val request = Request(
           uri = Uri(path = printPath(from)),
           headers = Headers(Header("Destination", printPath(to))),
           method = Method.MOVE)
-        val response = service(state)(request).run
+        val (service, ref) = serviceRef(state)
+        val response = service(request).run
         response.status must_== status
         response.as[A].run must_== expectedBody
+        val expectedNewContents = newState match {
+          case Unchanged => state.contents
+          case Changed(newContents) => newContents
+        }
+        ref.run.contents must_== expectedNewContents
       }
       "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
         val pathString = printPath(path)
@@ -395,32 +434,35 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = destFile,
           state = emptyMem,
           status = Status.NotFound,
-          expectedBody = s"${printPath(file)}: doesn't exist")
+          expectedBody = s"${printPath(file)}: doesn't exist",
+          newState = Unchanged)
       }
-      "be 404 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
+      "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
         testMove(
           from = fs.dir,
           to = file,
           state = fs.state,
           status = Status.BadRequest,
-          expectedBody = "Cannot move directory into a file")
+          expectedBody = "Cannot move directory into a file",
+          newState = Unchanged)
       }
-      "be 404 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
+      "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
         testMove(
           from = fs.file,
           to = dir,
           state = fs.state,
           status = Status.BadRequest,
-          expectedBody = "Cannot move a file into a directory, must specify destination precisely")
+          expectedBody = "Cannot move a file into a directory, must specify destination precisely",
+          newState = Unchanged)
       }
-      "be 201 with file" ! prop {(fs: SingleFileMemState, file: AbsFile[Sandboxed]) =>
+      "be 201 with file" ! prop {(fs: SingleFileMemState, file: AFile) =>
         testMove(
           from = fs.file,
           to = file,
           state = fs.state,
           status = Status.Created,
-          expectedBody = "")
-        // TODO: Check that the file was moved properly (not in old test though...)
+          expectedBody = "",
+          newState = Changed(Map(file -> fs.contents)))
       }
       "be 201 with dir" ! prop {(fs: NonEmptyDir, dir: AbsDir[Sandboxed]) =>
         testMove(
@@ -428,37 +470,37 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = dir,
           state = fs.state,
           status = Status.Created,
-          expectedBody = "")
-        // TODO: Check that the file was moved properly (not in old test though...)
+          expectedBody = "",
+          newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}.list.toMap))
       }
     }
     "DELETE" >> {
       "be 200 with existing file" ! prop { filesystem: SingleFileMemState =>
         val request = Request(uri = Uri(path = filesystem.path), method = Method.DELETE)
-        val response = service(filesystem.state)(request).run
+        val (service, ref) = serviceRef(filesystem.state)
+        val response = service(request).run
         response.status must_== Status.Ok
-        // Check if file was actually deleted
+        ref.run.contents must_== Map() // The filesystem no longer contains that file
       }
       "be 200 with existing dir" ! prop { filesystem: NonEmptyDir =>
         val dirPath = printPath(filesystem.dir)
         val request = Request(uri = Uri(path = dirPath), method = Method.DELETE)
-        val response = service(filesystem.state)(request).run
+        val (service, ref) = serviceRef(filesystem.state)
+        val response = service(request).run
         response.status must_== Status.Ok
-        // Check if dir was actually deleted
+        ref.run.contents must_== Map() // The filesystem no longer contains that folder
       }
       "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
         val path = printPath(file)
         val request = Request(uri = Uri(path = path), method = Method.DELETE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.NotFound
-        // Check if still empty?
       }
       "be 404 with missing dir" ! prop { dir: AbsDir[Sandboxed] =>
         val dirPath = printPath(dir)
         val request = Request(uri = Uri(path = dirPath), method = Method.DELETE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.NotFound
-        // Check if still empty?
       }
     }
   }

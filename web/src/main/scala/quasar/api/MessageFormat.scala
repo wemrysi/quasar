@@ -108,7 +108,10 @@ object MessageFormat {
           case JsonFormat.SingleArray =>
             DataCodec.parse(txt).fold(
               err => DecodeError("parse error: " + err.message).left,
-              data => Process.emit(data.right).right
+              {
+                case Data.Arr(data) => Process.emitAll(data.map(_.right)).right
+                case _              => DecodeError("Provided body is not a json array").left
+              }
             )
           case JsonFormat.LineDelimited =>
             val jsonByLine = txt.split("\n").map(line => DataCodec.parse(line).leftMap(

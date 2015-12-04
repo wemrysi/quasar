@@ -114,7 +114,7 @@ class ServerOps[WC: CodecJson, SC](
     } yield (server, actualPort)
   }
 
-  /** Given a [[Process]] of [[quasar.api.Server.ServerBlueprint]], returns a [[Process]] of [[org.http4s.server.Server]].
+  /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.
     *
     * The returned process will emit each time a new server configuration is provided and ensures only
     * one server is running at a time, i.e. providing a new Configuration ensures
@@ -143,10 +143,10 @@ class ServerOps[WC: CodecJson, SC](
   /** Produce a stream of servers that can be restarted on a supplied port
     * @param initialPort The port on which to start the initial server
     * @param produceRoutes A function that given a function to restart a server on a new port, supplies a server mapping
-    *                      from path to [[Http4sServer]]
-    * @return The [[Task]] will start the first server and provide a function to shutdown the active server.
-    *         It will also return a process of servers and ports. This [[Process]] must be run in order for servers
-    *         to actually be started and stopped. The [[Process]] must be run to completion in order for appropriate
+    *                      from path to `Server`
+    * @return The `Task` will start the first server and provide a function to shutdown the active server.
+    *         It will also return a process of servers and ports. This `Process` must be run in order for servers
+    *         to actually be started and stopped. The `Process` must be run to completion in order for appropriate
     *         clean up to occur.
     */
   def startServers(initialPort: Int,

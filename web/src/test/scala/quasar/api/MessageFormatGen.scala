@@ -12,12 +12,16 @@ import scalaz._, Scalaz._
 
 object MessageFormatGen {
   implicit val arbCSV: Arbitrary[Csv] = Arbitrary(
-    (Arbitrary.arbitrary[Char] |@| Arbitrary.arbitrary[String] |@| Arbitrary.arbitrary[Char] |@| Arbitrary.arbitrary[Char])(Csv.apply(_,_,_,_,None)))
-  implicit val arbJson: Arbitrary[JsonContentType] = Arbitrary(
+    (Arbitrary.arbitrary[Char]   |@|
+     Arbitrary.arbitrary[String] |@|
+     Arbitrary.arbitrary[Char]   |@|
+     Arbitrary.arbitrary[Char])(Csv.apply(_,_,_,_,None)))
+  implicit val arbJsonContentType: Arbitrary[JsonContentType] = Arbitrary(
     Gen.oneOf(
       JsonContentType(Readable, LineDelimited),
       JsonContentType(Readable,SingleArray),
       JsonContentType(Precise,LineDelimited),
       JsonContentType(Precise,SingleArray)))
-  implicit val arbMessageFormat: Arbitrary[MessageFormat] = Arbitrary(Gen.oneOf(arbCSV.arbitrary, arbJson.arbitrary))
+  implicit val arbMessageFormat: Arbitrary[MessageFormat] =
+    Arbitrary(Gen.oneOf(arbCSV.arbitrary, arbJsonContentType.arbitrary))
 }
