@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.fp._
+import numeric._
 import quasar.recursionschemes.{Fix, Recursive}
 import quasar.Planner.UnsupportedPlan
 
@@ -89,11 +90,11 @@ object InMemory {
             fileL(f).st flatMap {
               case Some(xs) =>
                 val rIdx =
-                  st.toInt + pos
+                  st.get.toInt + pos
 
                 val rCount =
                   rChunkSize                          min
-                  lim.cata(_.toInt - pos, rChunkSize) min
+                  lim.cata(_.get.toInt - pos, rChunkSize) min
                   (xs.length - rIdx)
 
                 if (rCount <= 0)
@@ -198,7 +199,7 @@ object InMemory {
                            (f: Vector[Data] => InMemoryFs[A])
                            : InMemoryFs[(PhaseResults, FileSystemError \/ A)] = {
       phaseResults(lp)
-        .tuple(simpleEvaluation(lp).flatMapF(f).toRight(unsupported(lp)).run)
+        .tuple(simpleEvaluation(lp).flatMap(f andThen EitherT.right[InMemoryFs, FileSystemError, A]).run)
     }
 
     private def phaseResults(lp: Fix[LogicalPlan]): InMemoryFs[PhaseResults] =
@@ -208,18 +209,20 @@ object InMemory {
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
 
-    private def simpleEvaluation(lp: Fix[LogicalPlan]): OptionT[InMemoryFs, Vector[Data]] = {
-      OptionT[InMemoryFs, Vector[Data]](State.gets { mem =>
+    private def simpleEvaluation(lp: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
+      EitherT[InMemoryFs, FileSystemError, Vector[Data]](State.gets { mem =>
         import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
-        Recursive[Fix].para[LogicalPlan, Option[Vector[Data]]](lp) {
-          case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem))
-          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) => src.map(_.drop(skip.toInt))
-          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) => src.map(_.take(limit.toInt))
+        Recursive[Fix].para[LogicalPlan, FileSystemError \/ Vector[Data]](lp) {
+          case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem)).toRightDisjunction(unsupported(lp))
+          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
+            src.flatMap(s => if (skip <= Int.MaxValue) s.drop(skip.toInt).right else unsupported(lp).left)
+          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
+            src.flatMap(s => SafeIntForVector(limit).map(i => s.take(i.value)).toRightDisjunction(unsupported(lp)))
           case InvokeF(Squash,(_,src) :: Nil) => src
-          case ConstantF(data) => Some(Vector(data))
-          case other => queryResponsesL.get(mem).get(Fix(other.map(_._1)))
+          case ConstantF(data) => Vector(data).right
+          case other => queryResponsesL.get(mem).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(lp))
         }
       })
     }

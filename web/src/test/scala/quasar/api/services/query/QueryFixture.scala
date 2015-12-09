@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._, api._, fp._, fs._
+import quasar.fp.numeric._
 import quasar.fs.InMemory._
 
 import org.http4s._

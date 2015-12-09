@@ -17,10 +17,10 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.fp.numeric.Positive
 import quasar.SKI._
 import quasar.{EnvironmentError2, EnvErr2T}
 import quasar.fp.prism._
-import quasar.fs.Positive
 import quasar.physical.mongodb.execution._
 import quasar.physical.mongodb.workflowtask._
 import quasar.physical.mongodb.mongoiterable._
