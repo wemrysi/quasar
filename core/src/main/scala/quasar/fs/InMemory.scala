@@ -3,7 +3,7 @@ package fs
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes.Fix
+import quasar.recursionschemes.{Fix, Recursive}
 import quasar.Planner.UnsupportedPlan
 
 import scalaz._, Scalaz._
@@ -136,10 +136,11 @@ object InMemory {
       case ExecutePlan(lp, out) =>
         val noSupportMsg = "In Memory interpreter does not currently support this plan"
         queryResponsesL.st.flatMap { queryResponses =>
-          val result = queryResponses.get(lp).cata(
+          val queryResponse = simpleEvaluation(lp)
+          val result = queryResponse.flatMap(_.cata(
             data => fileL(out) assigno Some(data) map(
               previousData => (previousData ? ResultFile.User(out) | ResultFile.Temp(out)).right[FileSystemError]),
-            PlannerError(lp, UnsupportedPlan(lp.unFix, Some(noSupportMsg))).left[ResultFile].point[InMemoryFs])
+            PlannerError(lp, UnsupportedPlan(lp.unFix, Some(noSupportMsg))).left[ResultFile].point[InMemoryFs]))
           val phase = lookup(lp,queryResponses)
           result.map((Vector(phase),_))
         }
@@ -155,6 +156,21 @@ object InMemory {
 
     private def lookup(lp: Fix[LogicalPlan],queries: QueryResponses): PhaseResult =
       PhaseResult.Detail("Lookup in Memory", s"Lookup $lp in $queries")
+
+    private def simpleEvaluation(lp: Fix[LogicalPlan]): InMemoryFs[Option[Vector[Data]]] = {
+      State.gets{ mem =>
+        import quasar.LogicalPlan._
+        import quasar.std.StdLib.set.{Drop, Take}
+        import quasar.std.StdLib.identity.Squash
+        Recursive[Fix].para[LogicalPlan, Option[Vector[Data]]](lp){
+          case ReadF(path) => convertToAFile(path).flatMap{ pathyPath => fileL(pathyPath).get(mem)}
+          case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) => src.map(_.drop(skip.toInt))
+          case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) => src.map(_.take(limit.toInt))
+          case InvokeF(Squash,(_,src) :: Nil) => src
+          case other => queryResponsesL.get(mem).get(Fix(other.map(_._1)))
+        }
+      }
+    }
   }
 
   val fileSystem: FileSystem ~> InMemoryFs =

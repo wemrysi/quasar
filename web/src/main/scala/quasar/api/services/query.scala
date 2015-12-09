@@ -39,9 +39,16 @@ object query {
   private val POSTContentMustContainQuery    = BadRequest("The body of the POST must contain a query")
   private val DestinationHeaderMustExist     = BadRequest("The '" + Destination.name + "' header must be specified")
 
-  def translateSemanticErrors(error: SemanticErrors): Task[Response] = ???
+  def translateSemanticErrors(error: SemanticErrors): Task[Response] = BadRequest(error.shows)
 
-  private def vars(req: Request) = Variables(req.params.map { case (k, v) => (VarName(k), VarValue(v)) })
+  private val VarPrefix = "var."
+  private def vars(req: Request) = Variables(req.params.collect {
+    case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
+
+  def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
+    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.value), sql.Offset))
+    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.value), sql.Limit))
+  }
 
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
@@ -54,20 +61,21 @@ object query {
     }
 
     HttpService {
-      case req @ GET -> AsDirPath(path) :? QueryParam(query) => {
-
-        SQLParser.parseInContext(query, fs.convert(path)).fold(
-          formatParsingError,
-          expr => queryPlan(expr, Variables(Map())).run.value.fold(
-            errs => translateSemanticErrors(errs),
-            logicalPlan => {
-              val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-              formatQuasarDataStreamAsHttpResponse(f)(
-                data = Q.evaluate(logicalPlan).translate[FileSystemErrT[Free[S,?], ?]](removePhaseResults),
-                format = requestedFormat)
-            }
+      case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => {
+        handleOffsetLimitParams(offset, limit) { (offset, limit) =>
+          SQLParser.parseInContext(query, fs.convert(path)).fold(
+            formatParsingError,
+            expr => queryPlan(addOffsetLimit(expr, offset, limit), vars(req)).run.value.fold(
+              errs => translateSemanticErrors(errs),
+              logicalPlan => {
+                val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
+                formatQuasarDataStreamAsHttpResponse(f)(
+                  data = Q.evaluate(logicalPlan).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults),
+                  format = requestedFormat)
+              }
+            )
           )
-        )
+        }
       }
       case GET -> _ => QueryParameterMustContainQuery
       case req @ POST -> AsDirPath(path) =>
@@ -117,8 +125,8 @@ object query {
         case PhaseResult.Detail(name, value) => Ok(name + "\n" + value)
       }
 
-    def explainQuery(expr: sql.Expr): Task[Response] =
-      queryPlan(expr, Variables(Map())).run.value fold (
+    def explainQuery(expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Task[Response] =
+      queryPlan(addOffsetLimit(expr, offset, limit), vars).run.value fold (
         translateSemanticErrors,
         lp => Q.explain(lp).foldMap(f) flatMap {
           case (phases, None) =>
@@ -132,9 +140,11 @@ object query {
         })
 
     HttpService {
-      case GET -> AsDirPath(path) :? QueryParam(query) =>
-        SQLParser.parseInContext(query, fs.convert(path))
-          .fold(formatParsingError, explainQuery)
+      case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) =>
+        handleOffsetLimitParams(offset, limit) { (offset, limit) =>
+          SQLParser.parseInContext(query, fs.convert(path))
+            .fold(formatParsingError, expr => explainQuery(expr, offset, limit, vars(req)))
+        }
 
       case GET -> _ => QueryParameterMustContainQuery
     }

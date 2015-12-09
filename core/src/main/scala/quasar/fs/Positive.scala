@@ -50,4 +50,6 @@ object Positive {
       Mult(_1))
 
   implicit val equal: Equal[Positive] = Equal.equalA
+
+  implicit val show: Show[Positive] = Show.shows(_.value.toString)
 }
