@@ -428,13 +428,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         response.status must_== Status.BadRequest
         response.as[String].run must_== "The 'Destination' header must be specified"
       }
-      "be 404 for missing source file" ! prop { (file: AbsFile[Sandboxed], destFile: AbsFile[Sandboxed]) =>
+      "be 404 for missing source file" ! prop { (file: AbsFileOf[AlphaCharacters], destFile: AbsFileOf[AlphaCharacters]) =>
         testMove(
-          from = file,
-          to = destFile,
+          from = file.path,
+          to = destFile.path,
           state = emptyMem,
           status = Status.NotFound,
-          expectedBody = s"${printPath(file)}: doesn't exist",
+          expectedBody = s"${printPath(file.path)}: doesn't exist",
           newState = Unchanged)
       }
       "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
