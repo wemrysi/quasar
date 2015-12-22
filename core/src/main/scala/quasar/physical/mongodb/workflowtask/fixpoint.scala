@@ -34,11 +34,11 @@ object ReadTask {
 }
 
 object QueryTask {
-  def apply(source: WorkflowTask, query: FindQuery, skip: Option[Int], limit: Option[Int]):
+  def apply(source: WorkflowTask, query: Selector, skip: Option[Int], limit: Option[Int]):
       WorkflowTask =
     Fix(QueryTaskF(source, query, skip, limit))
   def unapply(obj: WorkflowTask):
-      Option[(WorkflowTask, FindQuery, Option[Int], Option[Int])] =
+      Option[(WorkflowTask, Selector, Option[Int], Option[Int])] =
     QueryTaskF.unapply(obj.unFix)
 }
 
@@ -50,9 +50,10 @@ object PipelineTask {
 }
 
 object MapReduceTask {
-  def apply(source: WorkflowTask, mapReduce: MapReduce): WorkflowTask =
-    Fix(MapReduceTaskF(source, mapReduce))
-  def unapply(obj: WorkflowTask): Option[(WorkflowTask, MapReduce)] =
+  import MapReduce._
+  def apply(source: WorkflowTask, mapReduce: MapReduce, outAct: Option[Action]): WorkflowTask =
+    Fix(MapReduceTaskF(source, mapReduce, outAct))
+  def unapply(obj: WorkflowTask): Option[(WorkflowTask, MapReduce, Option[Action])] =
     MapReduceTaskF.unapply(obj.unFix)
 }
 

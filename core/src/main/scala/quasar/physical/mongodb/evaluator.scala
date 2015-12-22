@@ -17,18 +17,23 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.fp._
 import quasar.recursionschemes._, Recursive.ops._
 import quasar._, Errors._, Evaluator._
-import quasar.fs.Path.PathError.NonexistentPathError
+import quasar.fs.Path, Path.PathError.NonexistentPathError
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
 import Workflow._
 
 import com.mongodb._
-import com.mongodb.client.model._
 import scalaz.{Free => FreeM, _}, Scalaz._
 import scalaz.concurrent._
+import scalaz.stream._
 
-trait Executor[F[_]] {
+trait Executor[F[_], C] {
+  import MapReduce._
+
   def generateTempName(dbName: String): F[Collection]
 
   def version: F[List[Int]]
@@ -40,25 +45,69 @@ trait Executor[F[_]] {
 
   def insert(dst: Collection, value: Bson.Doc): F[Unit]
   def aggregate(source: Collection, pipeline: workflowtask.Pipeline): F[Unit]
-  def mapReduce(source: Collection, dst: Collection, mr: MapReduce): F[Unit]
+  def mapReduce(source: Collection, dst: OutputCollection, mr: MapReduce): F[Unit]
   def drop(coll: Collection): F[Unit]
-  def rename(src: Collection, dst: Collection): F[Unit]
   def exists(coll: Collection): F[Unit]
 
+  def pureCursor(values: List[Bson]): F[C]
+  def wrappedCount(field: BsonField.Name, source: Col, count: Count): F[C]
+  def find(source: Col, find: Find): F[C]
+  def aggregateCursor(source: Col, pipeline: workflowtask.Pipeline): F[C]
+  def mapReduceCursor(source: Col, mr: MapReduce): F[C]
+
   def fail[A](e: EvaluationError): F[A]
+
+  protected implicit class CursorOp[A](a: A) {
+    def app[F[_]: Foldable, B](b: F[B])(f: (A, B) => A) = b.foldLeft(a)(f)
+  }
 }
 
-class MongoDbEvaluator(impl: MongoDbEvaluatorImpl[StateT[ETask[EvaluationError, ?], SequenceNameGenerator.EvalState, ?]]) extends Evaluator[Crystallized] {
+sealed trait Col {
+  def collection: Collection
+}
+object Col {
+  final case class Tmp(collection: Collection) extends Col
+  final case class User(collection: Collection) extends Col
+}
 
-  implicit val MF: MonadState[StateT[ETask[EvaluationError, ?], ?, ?], SequenceNameGenerator.EvalState] =
-    StateT.stateTMonadState[SequenceNameGenerator.EvalState, ETask[EvaluationError, ?]]
+final case class Find(
+  query:      Option[Selector],
+  projection: Option[Bson.Doc],
+  sort:       Option[NonEmptyList[(BsonField, SortType)]],
+  skip:       Option[Long],
+  limit:      Option[Long])
+
+final case class Count(
+  query:      Option[Selector],
+  skip:       Option[Long],
+  limit:      Option[Long])
+
+class MongoDbEvaluator(impl: MongoDbEvaluatorImpl[
+    StateT[EvaluationTask, SequenceNameGenerator.EvalState, ?],
+    Process[EvaluationTask, Data]])
+    extends Evaluator[Crystallized] {
+
+  implicit val MF: MonadState[StateT[EvaluationTask, ?, ?], SequenceNameGenerator.EvalState] =
+    StateT.stateTMonadState[SequenceNameGenerator.EvalState, EvaluationTask]
 
   val name = "MongoDB"
 
-  def execute(physical: Crystallized): ETask[EvaluationError, ResultPath] = for {
-    nameSt <- EitherT.right(SequenceNameGenerator.startUnique)
-    rez    <- impl.execute(physical).eval(nameSt)
-  } yield rez
+  def executeTo(physical: Crystallized, out: Path): EvaluationTask[ResultPath] =
+    Collection.fromPath(out).fold(
+      err => EitherT.left(Task.now(EvalPathError(err))),
+      out => for {
+        nameSt <- EitherT.right(SequenceNameGenerator.startUnique)
+        rez    <- impl.execute(physical, out).eval(nameSt)
+      } yield rez)
+
+  def evaluate(physical: Crystallized): Process[EvaluationTask, Data] = {
+    val v = (for {
+      nameSt <- EitherT.right(SequenceNameGenerator.startUnique)
+      rez    <- impl.evaluate(physical).eval(nameSt)
+    } yield rez).valueOr(
+      err => Process.eval[EvaluationTask, Data](EitherT.left[Task, EvaluationError, Data](Task.now(err))))
+    Process.eval[EvaluationTask, Process[EvaluationTask, Data]](liftE(v)).join
+  }
 
   def compile(workflow: Crystallized) =
     "Mongo" -> MongoDbEvaluator.toJS(workflow).fold(e => "error: " + e.message, s => Cord(s))
@@ -108,21 +157,21 @@ object MongoDbEvaluator {
       (nxtS, wdb) =  findWritableDb(dbNames).run(genSeed)
       exec        <- wdb.run.map(new MongoDbExecutor(client0, nameGen, _)).liftM[EnvErrT]
       _           <- validateVersion(exec).eval(nxtS)
-    } yield new MongoDbEvaluator(MongoDbEvaluatorImpl[ST](exec))
+    } yield new MongoDbEvaluator(MongoDbEvaluatorImpl[ST, Process[EvaluationTask, Data]](exec))
   }
 
   def toJS(physical: Crystallized): EvaluationError \/ String = {
     type EitherState[A] = EitherT[SequenceNameGenerator.SequenceState, EvaluationError, A]
     type WriterEitherState[A] = WriterT[EitherState, Vector[Js.Stmt], A]
 
-    val executor0: Executor[WriterEitherState] = new JSExecutor(SequenceNameGenerator.Gen)
-    val impl = new MongoDbEvaluatorImpl[WriterEitherState] {
+    val executor0: Executor[WriterEitherState, Unit] = new JSExecutor(SequenceNameGenerator.Gen)
+    val impl = new MongoDbEvaluatorImpl[WriterEitherState, Unit] {
+      val F = implicitly[Monad[WriterEitherState]]
       val executor = executor0
     }
-    impl.execute(physical).run.run.eval(SequenceNameGenerator.startSimple).flatMap {
-      case (log, path) => for {
-        col <- Collection.fromPath(path.path).leftMap(EvalPathError(_))
-      } yield Js.Stmts((log :+ Js.Call(Js.Select(JSExecutor.toJsRef(col), "find"), Nil)).toList).pprint(0)
+    // NB: this _always_ renders as if the final result is to be streamed.
+    impl.evaluate(physical).run.run.eval(SequenceNameGenerator.startSimple).map {
+      case (log, _) => Js.Stmts(log.toList).pprint(0)
     }
   }
 
@@ -138,116 +187,255 @@ object MongoDbEvaluator {
   }
 }
 
-trait MongoDbEvaluatorImpl[F[_]] {
+trait MongoDbEvaluatorImpl[F[_], C] {
+  import MapReduce._
 
-  protected[mongodb] def executor: Executor[F]
+  implicit def F: Monad[F]
 
-  sealed trait Col {
-    def collection: Collection
+  protected[mongodb] def executor: Executor[F, C]
+
+  type WT[M[_], A] = WriterT[M, Vector[Col.Tmp], A]
+  type W[       A] = WT[F, A]
+
+  def emit[A](a: F[A]): W[A] = WriterT(a.map(Vector.empty -> _))
+
+  def fail[A](error: EvaluationError): F[A] = executor.fail(error)
+
+  def tempCol(physical: Crystallized): W[Col.Tmp] = {
+    val dbName = physical.op.foldMap {
+      case Fix($Read(Collection(dbName, _))) => List(dbName)
+      case _ => Nil
+    }.headOption.orElse(executor.defaultWritableDB)
+
+    dbName.fold[W[Col.Tmp]](emit(fail(NoDatabase()))) { dbName =>
+      val tmp = executor.generateTempName(dbName).map(Col.Tmp(_))
+      WriterT(tmp.map(col => (Vector(col), col)))
+    }
   }
-  object Col {
-    case class Tmp(collection: Collection) extends Col
-    case class User(collection: Collection) extends Col
-  }
 
-  def execute(physical: Crystallized)(implicit MF: Monad[F]): F[ResultPath] = {
-    type WT[M[_], A] = WriterT[M, Vector[Col.Tmp], A]
-    type W[       A] = WT[F, A]
+  def execute0(task0: workflowtask.WorkflowTask, out: Col, tempCol: W[Col.Tmp]): W[Col] = {
+    import quasar.physical.mongodb.workflowtask._
 
-    def execute0(task0: workflowtask.WorkflowTask): W[Col] = {
-      import quasar.physical.mongodb.workflowtask._
-
-      def emit[A](a: F[A]): W[A] = WriterT(a.map(Vector.empty -> _))
-
-      def fail[A](error: EvaluationError): F[A] = executor.fail(error)
-
-      def tempCol: W[Col.Tmp] = {
-        val dbName = physical.op.foldMap {
-          case Fix($Read(Collection(dbName, _))) => List(dbName)
-          case _ => Nil
-        }.headOption.orElse(executor.defaultWritableDB)
-
-        dbName.fold[W[Col.Tmp]](emit(fail(NoDatabase()))) { dbName =>
-          val tmp = executor.generateTempName(dbName).map(Col.Tmp(_))
-          WriterT(tmp.map(col => (Vector(col), col)))
-        }
-      }
-
-      task0 match {
-        case PureTask(value @ Bson.Doc(_)) =>
-          for {
-            tmp <- tempCol
-            _   <- emit(executor.insert(tmp.collection, value))
-          } yield tmp
-
-        case PureTask(Bson.Arr(value)) =>
-          for {
-            tmp <- tempCol
-            _   <- emit(value.toList.traverse[F, Unit] {
-                          case value @ Bson.Doc(_) => executor.insert(tmp.collection, value)
-                          case v => fail(UnableToStore("MongoDB cannot store anything except documents inside collections: " + v))
-                        })
-          } yield tmp
-
-        case PureTask(v) =>
-          emit(fail(UnableToStore("MongoDB cannot store anything except documents inside collections: " + v)))
-
-        case ReadTask(value) =>
-          emit(executor.exists(value).as(Col.User(value): Col))
-
-        case QueryTask(source, query, skip, limit) =>
-          // TODO: This is an approximation since we're ignoring all fields of "Query" except the selector.
-          execute0(
-            PipelineTask(
-              source,
-              $Match((), query.query) ::
-                skip.map($Skip((), _) :: Nil).getOrElse(Nil) :::
-                limit.map($Limit((), _) :: Nil).getOrElse(Nil)))
-
-        case PipelineTask(source, pipeline) => for {
-          src <- execute0(source)
-          tmp <- tempCol
-          _   <- emit(executor.aggregate(src.collection, pipeline :+ $Out[Unit]((), tmp.collection)))
-        } yield tmp
-
-        case MapReduceTask(source, mapReduce) => for {
-          src <- execute0(source)
-          tmp <- tempCol
-          _   <- emit(executor.mapReduce(src.collection, tmp.collection, mapReduce))
-        } yield tmp
-
-        case FoldLeftTask(head, tail) =>
-          for {
-            head <- execute0(head)
-            _    <- emit(head match {
-              case Col.User(_) => fail(InvalidTask("FoldLeft from simple read: " + head))
-              case _           => ().point[F]
-            })
-            _    <- tail.traverse[W, Unit] {
-              case MapReduceTask(source, mapReduce) => for {
-                src <- execute0(source)
-                _   <- emit(executor.mapReduce(src.collection, head.collection, mapReduce))
-              } yield ()
-              case t => emit(fail(InvalidTask("un-mergable FoldLeft input: " + t)))
-            }
-          } yield head
-      }
+    val execSource: workflowtask.WorkflowTask => W[Col] = {
+      case ReadTask(coll) => emit(executor.exists(coll).as(Col.User(coll)))
+      case t              => tempCol.flatMap(tmp => execute0(t, tmp, tempCol))
     }
 
+    task0 match {
+      case PureTask(value @ Bson.Doc(_)) => for {
+        _ <- emit(executor.insert(out.collection, value))
+      } yield out
+
+      case PureTask(Bson.Arr(value)) =>
+        for {
+          _   <- emit(value.toList.traverse[F, Unit] {
+                        case value @ Bson.Doc(_) => executor.insert(out.collection, value)
+                        case v => fail(UnableToStore("MongoDB cannot store anything except documents inside collections: " + v))
+                      })
+        } yield out
+
+      case PureTask(v) =>
+        emit(fail(UnableToStore("MongoDB cannot store anything except documents inside collections: " + v)))
+
+      case ReadTask(value) =>
+        emit(executor.exists(value).as(Col.User(value): Col))
+
+      case QueryTask(source, query, skip, limit) =>
+        execute0(
+          PipelineTask(
+            source,
+            $Match((), query) ::
+              skip.map($Skip((), _) :: Nil).getOrElse(Nil) :::
+              limit.map($Limit((), _) :: Nil).getOrElse(Nil)), out, tempCol)
+
+      case PipelineTask(source, pipeline) => for {
+        src <- execSource(source)
+        _   <- emit(executor.aggregate(src.collection, pipeline :+ $Out[Unit]((), out.collection)))
+      } yield out
+
+      case MapReduceTask(source, mapReduce, oact) => for {
+        src <- execSource(source)
+        act  = oact getOrElse Action.Replace
+        _   <- emit(executor.mapReduce(
+                 src.collection,
+                 outputCollection(out.collection, act),
+                 mapReduce))
+      } yield out
+
+      case FoldLeftTask(head, tail) =>
+        for {
+          head <- execute0(head, out, tempCol)
+          _    <- emit(head match {
+            case Col.User(_) => fail(InvalidTask("FoldLeft from simple read: " + head))
+            case _           => ().point[F]
+          })
+          _    <- tail.traverse[W, Unit] {
+            case MapReduceTask(source, mapReduce, Some(act)) => for {
+              src <- execSource(source)
+              _   <- emit(executor.mapReduce(
+                       src.collection,
+                       outputCollection(out.collection, act),
+                       mapReduce))
+            } yield ()
+            case t => emit(fail(InvalidTask("un-mergable FoldLeft input: " + t)))
+          }
+        } yield out
+    }
+  }
+
+  def execute(physical: Crystallized, out: Collection): F[ResultPath] =
     for {
-      dst <- execute0(Workflow.task(physical)).run
+      dst <- execute0(Workflow.task(physical), Col.User(out), tempCol(physical)).run
       (temps, dstCol) = dst
       _   <- temps.collect {
                 case tmp @ Col.Tmp(coll) => if (tmp != dstCol) executor.drop(coll)
                                             else ().point[F]
       }.sequenceU
-    } yield dstCol match { case Col.User(coll) => ResultPath.User(coll.asPath); case Col.Tmp(coll) => ResultPath.Temp(coll.asPath) }
+    } yield dstCol match {
+      case Col.User(coll) => ResultPath.User(coll.asPath)
+      case Col.Tmp(coll) => ResultPath.Temp(coll.asPath)
+    }
+
+  /** Extractor to determine whether a `$Group` represents a simple `count()`.
+    */
+  private object Countable {
+    def unapply(op: PipelineOp): Option[BsonField.Name] = op match {
+      case $Group((), Grouped(map), \/-($literal(Bson.Null)))
+          if map.size ≟ 1 =>
+        map.headOption.fold[Option[BsonField.Name]](None)(head =>
+          if (head._2 == $sum($literal(Bson.Int32(1))))
+            head._1.some
+          else None)
+      case _ => None
+    }
   }
+
+  private object Projectable {
+    def unapply(op: PipelineOp): Option[Bson.Doc] = op match {
+      case proj @ $Project((), Reshape(map), _)
+          if map.all(_ == \/-($include())) =>
+        proj.rhs.some
+      case _ => None
+    }
+  }
+
+  private def extractRange(pipeline: workflowtask.Pipeline):
+      ((workflowtask.Pipeline, workflowtask.Pipeline),
+        (Option[Long], Option[Long])) =
+    pipeline match {
+      case Nil                                => ((Nil, Nil), (None,   None))
+      case $Limit((), l) :: $Skip((), s) :: t => ((Nil, t),   (s.some, (l - s).some))
+      case $Limit((), l)                 :: t => ((Nil, t),   (None,   l.some))
+      case                  $Skip((), s) :: t => ((Nil, t),   (s.some, None))
+      case h                             :: t => (h :: (_: workflowtask.Pipeline)).first.first(extractRange(t))
+    }
+
+  /** This tries to turn a Pipline into a simpler operation (eg, `count()` or
+    * `find()`) and falls back to a pipeline if it can’t.
+    */
+  // TODO: This should really be handled when building the WorkflowTask, but
+  //       currently that phase knows neither whether the DB is read-only, nor
+  //       if the user wants a cursor.
+  private def evalPipeline(source: Col, pipeline: workflowtask.Pipeline) = {
+    val (pl, (skip, limit)) = extractRange(pipeline)
+    pl match {
+      case (Nil, Nil) =>
+        executor.find(source, Find(None, None, None, skip, limit))
+      case (List($Match((), sel)), Nil) =>
+        executor.find(source, Find(sel.some, None, None, skip, limit))
+      case (List(Projectable(bson)), Nil) =>
+        executor.find(source, Find(None, bson.some, None, skip, limit))
+      case (Nil, List(Projectable(bson))) =>
+        executor.find(source, Find(None, bson.some, None, skip, limit))
+      case (List($Sort((), keys)), Nil) =>
+        executor.find(source, Find(None, None, keys.some, skip, limit))
+      case (List($Match((), sel), Projectable(bson)), Nil) =>
+        executor.find(source, Find(sel.some, bson.some, None, skip, limit))
+      case (List($Match((), sel)), List(Projectable(bson))) =>
+        executor.find(source, Find(sel.some, bson.some, None, skip, limit))
+      case (List($Match((), sel), $Sort((), keys)), Nil) =>
+        executor.find(source, Find(sel.some, None, keys.some, skip, limit))
+      case (List(Projectable(bson), $Sort((), keys)), Nil) =>
+        executor.find(source, Find(None, bson.some, keys.some, skip, limit))
+      case (List($Match((), sel), Projectable(bson), $Sort((), keys)), Nil) =>
+        executor.find(source, Find(sel.some, bson.some, keys.some, skip, limit))
+      case (List(Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
+        executor.wrappedCount(field, source, Count(None, None, None))
+      case (Nil, List(Countable(field))) =>
+        executor.wrappedCount(field, source, Count(None, skip, limit))
+      case (List($Match((), sel), Countable(field)), Nil) if skip ≟ None && limit ≟ None =>
+        executor.wrappedCount(field, source, Count(sel.some, None, None))
+      case (List($Match((), sel)), List(Countable(field))) =>
+        executor.wrappedCount(field, source, Count(sel.some, skip, limit))
+      case _ => executor.aggregateCursor(source, pipeline)
+    }
+  }
+
+  def evaluate(physical: Crystallized): F[C] = {
+    import quasar.physical.mongodb.workflowtask._
+
+    val tempGen = tempCol(physical)
+
+    def cleanup(temps: Vector[Col.Tmp], dst: Col): F[Unit] =
+      temps.traverse(c =>
+        if (c == dst) ().point[F]
+        else executor.drop(c.collection)).map(κ(()))
+
+    Workflow.task(physical) match {
+      case PureTask(Bson.Arr(bson)) =>
+        executor.pureCursor(bson)
+      case PureTask(bson) =>
+        executor.pureCursor(bson :: Nil)
+
+      case ReadTask(src) =>
+        executor.exists(src) *>
+          executor.find(Col.User(src), Find(None, None, None, None, None))
+
+      case PipelineTask(ReadTask(src), pipeline) =>
+        executor.exists(src) *> evalPipeline(Col.User(src), pipeline)
+
+      case MapReduceTask(ReadTask(src), mapReduce, _) =>
+        executor.exists(src) *> executor.mapReduceCursor(Col.User(src), mapReduce)
+
+      case PipelineTask(src, pipeline) => for {
+        t   <- tempGen.flatMap(tmp => execute0(src, tmp, tempGen)).run
+        (temps, dstCol) = t
+        _   <- cleanup(temps, dstCol)
+        cur <- evalPipeline(dstCol, pipeline)
+      } yield cur
+
+      case MapReduceTask(src, mapReduce, _) => for {
+        t <- tempGen.flatMap(tmp => execute0(src, tmp, tempGen)).run
+        (temps, dstCol) = t
+        _   <- cleanup(temps, dstCol)
+        cur <- executor.mapReduceCursor(dstCol, mapReduce)
+      } yield cur
+
+      // NB: the last command in this case merges the output into a result
+      // collection, so it simply can't be streamed
+      case task @ FoldLeftTask(_, _) => for {
+        t <- tempGen.flatMap(tmp => execute0(task, tmp, tempGen)).run
+        (temps, dstCol) = t
+        _   <- cleanup(temps, dstCol)
+        cur <- executor.find(dstCol, Find(None, None, None, None, None))
+      } yield cur
+    }
+  }
+
+  ////
+
+  private def outputCollection(c: Collection, a: Action) =
+    OutputCollection(
+      c.collectionName,
+      Some(ActionedOutput(a, Some(c.databaseName), None)))
 }
 
 object MongoDbEvaluatorImpl {
-  def apply[F[_]](exec: Executor[F]): MongoDbEvaluatorImpl[F] =
-    new MongoDbEvaluatorImpl[F] { val executor = exec }
+  def apply[F[_], C](exec: Executor[F, C])(implicit F0: Monad[F]): MongoDbEvaluatorImpl[F, C] =
+    new MongoDbEvaluatorImpl[F, C] {
+      val F = F0
+      val executor = exec
+    }
 }
 
 trait NameGenerator[F[_]] {
@@ -275,7 +463,9 @@ object SequenceNameGenerator {
 class MongoDbExecutor[S](client: MongoClient,
                          nameGen: NameGenerator[State[S, ?]],
                          val defaultWritableDB: Option[String])
-    extends Executor[StateT[EvaluationTask, S, ?]] {
+    extends Executor[StateT[EvaluationTask, S, ?], Process[EvaluationTask, Data]] {
+
+  import MapReduce._
 
   type MT[F[_], A] = StateT[F, S, A]
   type M[A]        = MT[EvaluationTask, A]
@@ -294,28 +484,88 @@ class MongoDbExecutor[S](client: MongoClient,
         "pipeline" -> Bson.Arr(pipeline.map(_.bson)),
         "allowDiskUse" -> Bson.Bool(true))))
 
-  def mapReduce(source: Collection, dst: Collection, mr: MapReduce): M[Unit] =
+  def mapReduce(source: Collection, dst: OutputCollection, mr: MapReduce): M[Unit] =
     // FIXME: check same db
     runMongoCommand(
       source.databaseName,
-      Bson.Doc(
-        ListMap(
-          "mapReduce" -> Bson.Text(source.collectionName),
-          "map"       -> Bson.JavaScript(mr.map),
-          "reduce"    -> Bson.JavaScript(mr.reduce))
-        ++ mr.bson(dst).value)).mapK(_.leftMap{
-          case CommandFailed(s) if s.contains("ns doesn't exist" ) =>
-            EvalPathError(NonexistentPathError(source.asPath.asAbsolute,None))
-          case other => other
-        }: EvaluationTask[(S, Unit)])
+      Bson.Doc(ListMap(
+        "mapReduce" -> Bson.Text(source.collectionName),
+        "map"       -> Bson.JavaScript(mr.map),
+        "reduce"    -> Bson.JavaScript(mr.reduce)
+      ) ++ mr.toCollBson(dst).value)
+    ) mapK (_ leftMap {
+      case CommandFailed(s) if s.contains("ns doesn't exist") =>
+        EvalPathError(NonexistentPathError(source.asPath.asAbsolute, None))
+      case other => other
+    }: EvaluationTask[(S, Unit)])
 
   def drop(coll: Collection) = liftMongo(mongoCol(coll).drop())
 
-  def rename(src: Collection, dst: Collection) =
+  def pureCursor(values: List[Bson]) =
+    liftTask(Task.now(Process.emitAll(values.map(BsonCodec.toData))))
+
+  def count0(source: Col, count: Count) =
+    Process.emit(
+      mongoCol(source.collection).count(
+        count.query.fold(Bson.Doc(ListMap()).repr)(_.bson.repr),
+        new com.mongodb.client.model.CountOptions()
+          .app(count.skip)((c, count) => c.skip(count.toInt))
+          .app(count.limit)((c, count) => c.limit(count.toInt))))
+
+  def wrappedCount(field: BsonField.Name, source: Col, count: Count) =
+    liftTask(
+      Task.delay(count0(source, count).map(n =>
+        Data.Obj(ListMap(field.asText -> Data.Int(n))))))
+
+  def find(source: Col, find: Find) =
+    fromCursor(Task.delay(
+      mongoCol(source.collection)
+        .find()
+        .app(find.query)((c, sel) => c.filter(sel.bson.repr))
+        .app(find.projection)((c, proj) => c.projection(proj.repr))
+        .app(find.sort)((c, sort) => c.sort($Sort.keyBson(sort).repr))
+        .app(find.skip)((c, count) => c.skip(count.toInt))
+        .app(find.limit)((c, count) => c.limit(count.toInt))),
+      source)
+
+  def aggregateCursor(source: Col, pipeline: workflowtask.Pipeline) = {
+    import scala.collection.JavaConverters._
+    import scala.Predef.boolean2Boolean
+
+    fromCursor(
+      Task.delay(
+        mongoCol(source.collection)
+          .aggregate(pipeline.map(_.bson.repr).asJava)
+          .allowDiskUse(true)),
+      source)
+  }
+
+  def mapReduceCursor(source: Col, mr: MapReduce) = {
+    fromCursor(Task.delay {
+      mongoCol(source.collection)
+        .mapReduce(mr.map.pprint(0), mr.reduce.pprint(0))
+        .app(mr.selection)((c, q) => c.filter(q.bson.repr))
+        .app(mr.limit)((c, l) => c.limit(l.toInt))
+        .app(mr.finalizer)((c, f) => c.finalizeFunction(f.pprint(0)))
+        .scope(Bson.Doc(mr.scope).repr)
+        .app(mr.verbose)((c, v) => c.verbose(v))
+    }, source)
+  }
+
+  private def fromCursor(cursor: Task[com.mongodb.client.MongoIterable[org.bson.Document]], source: Col): M[Process[EvaluationTask, Data]] = {
+    val t = new (ETask[Backend.ResultError, ?] ~> EvaluationTask) {
+      def apply[A](t: ETask[Backend.ResultError, A]) =
+        t.leftMap(EvalResultError(_))
+    }
+    val cleanup: EvaluationTask[Unit] = source match {
+      case Col.Tmp(coll) => MongoWrapper.liftTask(Task.delay { mongoCol(coll).drop() })
+      case Col.User(_) => liftE(Task.now(()))
+    }
     liftMongo(
-      mongoCol(src).renameCollection(
-        new MongoNamespace(dst.databaseName, dst.collectionName),
-        new RenameCollectionOptions().dropTarget(true)))
+      MongoWrapper(client).readCursor(cursor)
+          .translate[EvaluationTask](t)
+          .onComplete(Process.eval_(cleanup)))
+  }
 
   def fail[A](e: EvaluationError): M[A] =
     MonadError[ETask, EvaluationError].raiseError[A](e).liftM[MT]
@@ -368,9 +618,10 @@ private[mongodb] trait LoggerT[F[_]] {
 }
 
 class JSExecutor[F[_]: Monad](nameGen: NameGenerator[F])
-    extends Executor[LoggerT[F]#Rec] {
+    extends Executor[LoggerT[F]#Rec, Unit] {
   import Js._
   import JSExecutor._
+  import MapReduce._
 
   type M0[A] = EvalErrT[F, A]
   type M[A]  = WriterT[M0, Vector[Js.Stmt], A]
@@ -385,16 +636,39 @@ class JSExecutor[F[_]: Monad](nameGen: NameGenerator[F])
       AnonElem(pipeline.map(_.bson.toJs)),
       AnonObjDecl(List("allowDiskUse" -> Bool(true))))))
 
-  def mapReduce(source: Collection, dst: Collection, mr: MapReduce) =
+  def mapReduce(source: Collection, dst: OutputCollection, mr: MapReduce) =
     write(Call(Select(toJsRef(source), "mapReduce"),
-      List(mr.map, mr.reduce, mr.bson(dst).toJs)))
+      List(mr.map, mr.reduce, mr.toCollBson(dst).toJs)))
 
   def drop(coll: Collection) =
     write(Call(Select(toJsRef(coll), "drop"), Nil))
 
-  def rename(src: Collection, dst: Collection) =
-    write(Call(Select(toJsRef(src), "renameCollection"),
-      List(Str(dst.collectionName), Bool(true))))
+  def pureCursor(values: List[Bson]) =
+    write(Bson.Arr(values).toJs)
+
+  def count0(source: Col, count: Count) =
+    Call(Select(toJsRef(source.collection), "count"), count.query.toList.map(_.bson.toJs))
+      .app(count.skip)((c, count) => Call(Select(c, "limit"), List(Num(count, false))))
+      .app(count.limit)((c, count) => Call(Select(c, "skip"), List(Num(count, false))))
+
+  def wrappedCount(field: BsonField.Name, source: Col, count: Count) =
+    write(AnonElem(List(AnonObjDecl(List(field.asText -> count0(source, count))))))
+
+  def find(source: Col, find: Find) =
+    write(
+      Call(Select(toJsRef(source.collection), "find"),
+        find.query.foldRight(
+          find.projection.foldRight[List[Js.Expr]](Nil)(_.toJs :: _))(
+          _.bson.toJs :: _))
+        .app(find.sort)((c, keys) => Call(Select(c, "sort"), List($Sort.keyBson(keys).toJs)))
+        .app(find.skip)((c, count) => Call(Select(c, "skip"), List(Num(count, false))))
+        .app(find.limit)((c, count) => Call(Select(c, "limit"), List(Num(count, false)))))
+
+  def aggregateCursor(source: Col, pipeline: workflowtask.Pipeline) =
+    aggregate(source.collection, pipeline)
+  def mapReduceCursor(source: Col, mr: MapReduce) =
+    write(Call(Select(toJsRef(source.collection), "mapReduce"),
+      List(mr.map, mr.reduce, mr.inlineBson.toJs)))
 
   def fail[A](e: EvaluationError) =
     WriterT[LoggerT[F]#EitherF, Vector[Js.Stmt], A](

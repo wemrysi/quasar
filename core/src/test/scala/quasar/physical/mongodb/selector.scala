@@ -4,7 +4,7 @@ import quasar.Predef._
 
 import org.specs2.mutable._
 
-class FindQuerySpec extends Specification  {
+class SelectorSpec extends Specification  {
 
   implicit def toBson(x: Int) = Bson.Int32(x)
   implicit def toField(name: String) = BsonField.Name(name)
@@ -29,7 +29,7 @@ class FindQuerySpec extends Specification  {
 
       "render simple selector with path" in {
         val sel = Doc(
-          BsonField.Name("foo") \ BsonField.Index(3) \ BsonField.Name("bar") -> Gt(10)
+          BsonField.Name("foo") \ BsonField.Name("3") \ BsonField.Name("bar") -> Gt(10)
         )
 
         sel.bson must_== Bson.Doc(ListMap("foo.3.bar" -> Bson.Doc(ListMap("$gt" -> 10))))

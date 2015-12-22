@@ -193,7 +193,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
     }
   }
 
-  "finalize" should {
+  "crystallize" should {
     import quasar.jscore, jscore._
 
     "coalesce previous projection into a map" in {
@@ -422,7 +422,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
         beTree(Crystallized(chain(
           $read(Collection("db", "zips")),
           $project(Reshape(ListMap(
-              BsonField.Name("loc") -> \/-($var(DocField(BsonField.Name("loc")))))),
+              BsonField.Name("loc") -> \/-($field("loc")))),
             IgnoreId),
           $unwind(DocField(BsonField.Name("loc"))),
           $simpleMap(
@@ -480,7 +480,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
       beTree(Crystallized(chain(
         $read(Collection("db", "foo")),
         $project(Reshape(ListMap(
-            BsonField.Name("loc") -> \/-($var(DocField(BsonField.Name("loc")))))),
+            BsonField.Name("loc") -> \/-($field("loc")))),
           IgnoreId),
         $unwind(DocField(BsonField.Name("bar"))),
         $unwind(DocField(BsonField.Name("baz"))),
@@ -509,11 +509,13 @@ class WorkflowSpec extends Specification with TreeMatchers {
           Js.Select(Js.Select(Js.Ident("this"), "city"), "length"),
           Js.Num(4, false))))))) must
       beTree[WorkflowTask](
-        MapReduceTask(ReadTask(Collection("db", "zips")),
+        MapReduceTask(
+          ReadTask(Collection("db", "zips")),
           MapReduce($Map.mapFn($Map.mapNOP), $Reduce.reduceNOP,
             selection = Some(Selector.Where(Js.BinOp("<",
               Js.Select(Js.Select(Js.Ident("this"), "city"), "length"),
-              Js.Num(4, false)))))))
+              Js.Num(4, false))))),
+          None))
     }
 
     "always pipeline unconverted aggregation ops" in {
@@ -547,8 +549,8 @@ class WorkflowSpec extends Specification with TreeMatchers {
               \/-($literal(Bson.Null))),
             $Project((),
               Reshape(ListMap(
-                BsonField.Name("a")      -> \/-($field("a")),
-                BsonField.Name("b")      -> \/-($field("b")),
+                BsonField.Name("a")      -> \/-($include()),
+                BsonField.Name("b")      -> \/-($include()),
                 BsonField.Name("equal?") -> \/-($eq($field("a"), $field("b"))))),
               IncludeId),
             $Match((),
@@ -559,8 +561,8 @@ class WorkflowSpec extends Specification with TreeMatchers {
             $Skip((), 5),
             $Project((),
               Reshape(ListMap(
-                BsonField.Name("a") -> \/-($field("a")),
-                BsonField.Name("b") -> \/-($field("b")))),
+                BsonField.Name("a") -> \/-($include()),
+                BsonField.Name("b") -> \/-($include()))),
               IncludeId))))
     }
 
@@ -568,7 +570,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
       task(crystallize(chain(
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
-          BsonField.Name("loc") \ BsonField.Index(0) ->
+          BsonField.Name("loc") \ BsonField.Name("0") ->
             Selector.Lt(Bson.Int64(-73)))),
         $sort(NonEmptyList(BsonField.Name("city") -> Descending)),
         $limit(100),
@@ -578,26 +580,28 @@ class WorkflowSpec extends Specification with TreeMatchers {
         $reduce($Reduce.reduceFoldLeft, ListMap()),
         $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
-        MapReduceTask(ReadTask(Collection("db", "zips")),
+        MapReduceTask(
+          ReadTask(Collection("db", "zips")),
           MapReduce(
             $Map.mapFn($Map.mapMap("value",
               Js.Access(Js.Ident("value"), Js.Num(0, false)))),
             $Reduce.reduceFoldLeft,
             selection = Some(Selector.Doc(
-              BsonField.Name("loc") \ BsonField.Index(0) ->
+              BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> Descending)),
             limit = Some(100),
             finalizer = Some($Map.finalizerFn($Map.mapMap("value",
-              Js.Ident("value")))))))
+              Js.Ident("value"))))),
+          None))
     }
 
     "create maximal map/reduce with flatMap" in {
       task(crystallize(chain(
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
-          BsonField.Name("loc") \ BsonField.Index(0) ->
+          BsonField.Name("loc") \ BsonField.Name("0") ->
             Selector.Lt(Bson.Int64(-73)))),
         $sort(NonEmptyList(BsonField.Name("city") -> Descending)),
         $limit(100),
@@ -608,45 +612,49 @@ class WorkflowSpec extends Specification with TreeMatchers {
         $reduce($Reduce.reduceFoldLeft, ListMap()),
         $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
-        MapReduceTask(ReadTask(Collection("db", "zips")),
+        MapReduceTask(
+          ReadTask(Collection("db", "zips")),
           MapReduce(
             $FlatMap.mapFn(Js.AnonFunDecl(List("key", "value"), List(
               Js.AnonElem(List(
                 Js.AnonElem(List(Js.Ident("key"), Js.Ident("value")))))))),
             $Reduce.reduceFoldLeft,
             selection = Some(Selector.Doc(
-              BsonField.Name("loc") \ BsonField.Index(0) ->
+              BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> Descending)),
             limit = Some(100),
             finalizer = Some($Map.finalizerFn($Map.mapMap("value",
-              Js.Ident("value")))))))
+              Js.Ident("value"))))),
+          None))
     }
 
     "create map/reduce without map" in {
       task(crystallize(chain(
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
-          BsonField.Name("loc") \ BsonField.Index(0) ->
+          BsonField.Name("loc") \ BsonField.Name("0") ->
             Selector.Lt(Bson.Int64(-73)))),
         $sort(NonEmptyList(BsonField.Name("city") -> Descending)),
         $limit(100),
         $reduce($Reduce.reduceFoldLeft, ListMap()),
         $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
-        MapReduceTask(ReadTask(Collection("db", "zips")),
+        MapReduceTask(
+          ReadTask(Collection("db", "zips")),
           MapReduce(
             $Map.mapFn($Map.mapNOP),
             $Reduce.reduceFoldLeft,
             selection = Some(Selector.Doc(
-              BsonField.Name("loc") \ BsonField.Index(0) ->
+              BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> Descending)),
             limit = Some(100),
             finalizer = Some($Map.finalizerFn($Map.mapMap("value",
-              Js.Ident("value")))))))
+              Js.Ident("value"))))),
+          None))
     }
 
     "fold unwind into SimpleMap (when finalize is used)" in {
@@ -685,7 +693,8 @@ class WorkflowSpec extends Specification with TreeMatchers {
                     Js.AnonFunDecl(List("__rez"), List(
                       Js.Call(Js.Select(Js.Ident("emit"), "apply"), List(Js.Null, Js.Ident("__rez"))))))))),
               $Reduce.reduceNOP,
-              scope = $SimpleMap.implicitScope(Set("clone")))),
+              scope = $SimpleMap.implicitScope(Set("clone"))),
+            None),
           List(
             $Project((),
               Reshape(ListMap(
@@ -739,7 +748,8 @@ class WorkflowSpec extends Specification with TreeMatchers {
                     Js.AnonFunDecl(List("__rez"), List(
                       Js.Call(Js.Select(Js.Ident("emit"), "apply"), List(Js.Null, Js.Ident("__rez"))))))))),
               $Reduce.reduceNOP,
-              scope = $SimpleMap.implicitScope(Set("clone")))),
+              scope = $SimpleMap.implicitScope(Set("clone"))),
+            None),
           List(
             $Project((),
               Reshape(ListMap(

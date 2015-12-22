@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, Recursive.ops._, FunctorT.ops._
+import quasar.recursionschemes._, Recursive.ops._, TraverseT.ops._
 import quasar.fs._
 
 import scalaz._, Scalaz._
@@ -33,8 +33,8 @@ package object sql {
     def extractName(expr: Expr): Option[String] = expr match {
       case Ident(name) if Some(name) != relName      => Some(name)
       case Binop(_, StringLiteral(name), FieldDeref) => Some(name)
-      case Unop(expr, ObjectFlatten)                 => extractName(expr)
-      case Unop(expr, ArrayFlatten)                  => extractName(expr)
+      case Unop(expr, FlattenMapValues)              => extractName(expr)
+      case Unop(expr, FlattenArrayValues)            => extractName(expr)
       case _                                         => None
     }
 
@@ -71,18 +71,18 @@ package object sql {
   def relativizePaths(q: Expr, basePath: Path): Path.PathError \/ Expr =
     q.cataM[Path.PathError \/ ?, Expr](mapPathsEƒ(_.from(basePath)))
 
-  def rewriteRelations(q: Expr)(f: SqlRelation[Expr] => Option[SqlRelation[Expr]]): Expr = {
-    def rewrite(r: SqlRelation[Expr]): Option[SqlRelation[Expr]] =
+  def rewriteRelationsM[F[_]: Monad](q: Expr)(f: SqlRelation[Expr] => OptionT[F, SqlRelation[Expr]]): F[Expr] = {
+    def rewrite(r: SqlRelation[Expr]): OptionT[F, SqlRelation[Expr]] =
       f(r).orElse(r match {
         case JoinRelation(left, right, tpe, clause) =>
           (rewrite(left) |@| rewrite(right))((l,r) => sql.JoinRelation(l, r, tpe, clause))
-        case _ => None
+        case _ => OptionT.none
       })
-    q.transAnaT(x => x match {
+    q.transAnaTM {
       case Fix(sel @ ExprF.SelectF(_, _, Some(rel), _, _, _)) =>
-        rewrite(rel).fold(x)(r => Fix(sel.copy(relations = Some(r))))
-      case _ => x
-    })
+        rewrite(rel).fold(r => Fix(sel.copy(relations = Some(r))), Fix(sel))
+      case x => x.point[F]
+    }
   }
 
   def pprint(sql: Expr) = sql.para(pprintƒ)
@@ -150,9 +150,15 @@ package object sql {
         case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
       }
       case UnopF(expr, op) => op match {
-        case ObjectFlatten => "(" + expr._2 + "){*}"
-        case ArrayFlatten  => "(" + expr._2 + ")[*]"
-        case IsNull        => "(" + expr._2 + ") is null"
+        case FlattenMapKeys      => "(" + expr._2 + "){*:}"
+        case FlattenMapValues    => "(" + expr._2 + "){:*}"
+        case ShiftMapKeys        => "(" + expr._2 + "){_:}"
+        case ShiftMapValues      => "(" + expr._2 + "){:_}"
+        case FlattenArrayIndices => "(" + expr._2 + ")[*:]"
+        case FlattenArrayValues  => "(" + expr._2 + ")[:*]"
+        case ShiftArrayIndices   => "(" + expr._2 + ")[_:]"
+        case ShiftArrayValues    => "(" + expr._2 + ")[:_]"
+        case IsNull              => "(" + expr._2 + ") is null"
         case _ =>
           val s = List(op.sql, "(", expr._2, ")") mkString " "
           // NB: dis-ambiguates the query in case this is the leading projection

@@ -3,13 +3,14 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.fs.Path
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
 
 import scala.collection.immutable.ListMap
 
-import scalaz._
-
 import org.specs2.mutable._
 import org.specs2.scalaz._
+import scalaz._, Scalaz._
 
 class EvaluatorSpec extends Specification with DisjunctionMatchers {
   "evaluate" should {
@@ -35,8 +36,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
       val wf = $pure(Bson.Doc(ListMap("foo" -> Bson.Text("bar"))))
 
         MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
-          """db.tmp.gen_0.insert({ "foo": "bar" });
-            |db.tmp.gen_0.find();
+          """[{ "foo": "bar" }];
             |""".stripMargin)
     }
 
@@ -46,16 +46,16 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
         Bson.Doc(ListMap("bar" -> Bson.Int64(2))))))
 
         MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
-          """db.tmp.gen_0.insert({ "foo": NumberLong(1) });
-            |db.tmp.gen_0.insert({ "bar": NumberLong(2) });
-            |db.tmp.gen_0.find();
+          """[{ "foo": NumberLong(1) }, { "bar": NumberLong(2) }];
             |""".stripMargin)
     }
 
     "fail with non-doc pure value" in {
       val wf = $pure(Bson.Text("foo"))
 
-      MongoDbEvaluator.toJS(crystallize(wf)) must beLeftDisjunction
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """["foo"];
+          |""".stripMargin)
     }
 
     "fail with multiple pure values, one not a doc" in {
@@ -63,22 +63,118 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
         Bson.Doc(ListMap("foo" -> Bson.Int64(1))),
         Bson.Int64(2))))
 
-        MongoDbEvaluator.toJS(crystallize(wf)) must beLeftDisjunction
+        MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+          """[{ "foo": NumberLong(1) }, NumberLong(2)];
+            |""".stripMargin)
     }
 
-    "write simple pipeline workflow to JS" in {
+    "write simple query to JS" in {
       val wf = chain(
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """db.zips.find({ "pop": { "$gte": NumberLong(1000) } });
+          |""".stripMargin)
+    }
+
+    "write limit to JS" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $limit(10))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """db.zips.find().limit(10);
+          |""".stripMargin)
+    }
+
+    "write project and limit to JS" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $limit(10),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("city") -> $include().right)),
+          IdHandling.ExcludeId))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """db.zips.find({ "city": true, "_id": false }).limit(10);
+          |""".stripMargin)
+    }
+
+    "write filter, project, and limit to JS" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $match(Selector.Doc(
+          BsonField.Name("pop") -> Selector.Lt(Bson.Int64(1000)))),
+        $limit(10),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("city") -> $include().right)),
+          IdHandling.ExcludeId))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """db.zips.find(
+          |  { "pop": { "$lt": NumberLong(1000) } },
+          |  { "city": true, "_id": false }).limit(
+          |  10);
+          |""".stripMargin)
+
+    }
+
+    "write simple count to JS" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $match(Selector.Doc(
+          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
+          $literal(Bson.Null).right))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """[{ "num": db.zips.count({ "pop": { "$gte": NumberLong(1000) } }) }];
+          |""".stripMargin)
+    }
+
+    "write simple pipeline workflow to JS" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $project(Reshape(ListMap(
+          BsonField.Name("popInK") -> $divide($field("pop"), $literal(Bson.Int64(1000))).right)),
+          IdHandling.ExcludeId))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
         """db.zips.aggregate(
           |  [
-          |    { "$match": { "pop": { "$gte": NumberLong(1000) } } },
-          |    { "$out": "tmp.gen_0" }],
+          |    {
+          |      "$project": {
+          |        "popInK": { "$divide": ["$pop", { "$literal": NumberLong(1000) }] },
+          |        "_id": false
+          |      }
+          |    }],
           |  { "allowDiskUse": true });
-          |db.tmp.gen_0.find();
+          |""".stripMargin)
+    }
+
+    "write chained pipeline workflow to JS find()" in {
+      val wf = chain(
+        $read(Collection("db", "zips")),
+        $match(Selector.Doc(
+          BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
+        $match(Selector.Doc(
+          BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
+        $sort(NonEmptyList(BsonField.Name("city") -> Ascending)))
+
+      MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
+        """db.zips.find(
+          |  {
+          |    "$and": [
+          |      { "pop": { "$lte": NumberLong(1000) } },
+          |      { "pop": { "$gte": NumberLong(100) } }]
+          |  }).sort(
+          |  { "city": NumberInt(1) });
           |""".stripMargin)
     }
 
@@ -89,7 +185,11 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           BsonField.Name("pop") -> Selector.Lte(Bson.Int64(1000)))),
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
-        $sort(NonEmptyList(BsonField.Name("city") -> Ascending)))
+        $group(
+          Grouped(ListMap(
+            BsonField.Name("pop") -> $sum($field("pop")))),
+          $field("city").right),
+        $sort(NonEmptyList(BsonField.Name("_id") -> Ascending)))
 
       MongoDbEvaluator.toJS(crystallize(wf)) must beRightDisjunction(
         """db.zips.aggregate(
@@ -101,10 +201,9 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |          { "pop": { "$gte": NumberLong(100) } }]
           |      }
           |    },
-          |    { "$sort": { "city": NumberInt(1) } },
-          |    { "$out": "tmp.gen_0" }],
+          |    { "$group": { "pop": { "$sum": "$pop" }, "_id": "$city" } },
+          |    { "$sort": { "_id": NumberInt(1) } }],
           |  { "allowDiskUse": true });
-          |db.tmp.gen_0.find();
           |""".stripMargin)
     }
 
@@ -131,8 +230,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |        this))
           |  },
           |  function (key, values) { return Array.sum(values) },
-          |  { "out": { "replace": "tmp.gen_0" } });
-          |db.tmp.gen_0.find();
+          |  { "out": { "inline": NumberLong(1) } });
           |""".stripMargin)
     }
 
@@ -150,10 +248,9 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |  },
           |  function (key, values) { return values[0] },
           |  {
-          |    "out": { "replace": "tmp.gen_0" },
+          |    "out": { "inline": NumberLong(1) },
           |    "query": { "$where": function () { return foo } }
           |  });
-          |db.tmp.gen_0.find();
           |""".stripMargin)
     }
 
@@ -195,7 +292,7 @@ class EvaluatorSpec extends Specification with DisjunctionMatchers {
           |  },
           |  function (key, values) { return Array.sum(values) },
           |  {
-          |    "out": { "reduce": "tmp.gen_0", "nonAtomic": true },
+          |    "out": { "reduce": "tmp.gen_0", "db": "db", "nonAtomic": true },
           |    "query": { "pop": { "$lte": NumberLong(1000) } }
           |  });
           |db.tmp.gen_0.find();

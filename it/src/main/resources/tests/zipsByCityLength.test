@@ -1,17 +1,24 @@
 {
-  "name": "count occurrences of each value of length(city), with filtering",
-
-  "data": "zips.data",
-
-  "query": "select length(city) as len, count(*) as cnt
-    from zips
-    where state != 'MI'
-    group by length(city)",
-
-  "predicate": "containsAtLeast",
-  "expected": [
-    { "len": 3.0, "cnt":  127 },
-    { "len": 4.0, "cnt":  927 },
-    { "len": 5.0, "cnt": 2181 }
-  ]
+    "name": "count occurrences of each value of length(city), with filtering",
+    "backends": { "mongodb_read_only": "pending" },
+    "data": "largeZips.data",
+    "query": "select length(city) as len, count(*) as cnt
+                from largeZips
+                where state != 'MI'
+                group by length(city)",
+    "predicate": "containsExactly",
+    "expected": [{ "cnt":   2, "len":  3 },
+                 { "cnt":  65, "len":  4 },
+                 { "cnt": 206, "len":  5 },
+                 { "cnt": 446, "len":  6 },
+                 { "cnt": 553, "len":  7 },
+                 { "cnt": 482, "len":  8 },
+                 { "cnt": 438, "len":  9 },
+                 { "cnt": 376, "len": 10 },
+                 { "cnt": 340, "len": 11 },
+                 { "cnt": 215, "len": 12 },
+                 { "cnt": 141, "len": 13 },
+                 { "cnt":  89, "len": 14 },
+                 { "cnt":  65, "len": 15 },
+                 { "cnt": 122, "len": 16 }]
 }

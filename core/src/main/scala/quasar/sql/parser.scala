@@ -103,8 +103,9 @@ class SQLParser extends StandardTokenParsers {
 
   ignore(lexical.delimiters += (
     "*", "+", "-", "%", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
-    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ";", "[", "]", "{", "}"
-  ))
+    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ";", "...",
+    "{", "}", "{*}", "{:*}", "{*:}", "{_}", "{:_}", "{_:}",
+    "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]"))
 
   override def keyword(name: String): Parser[String] =
     if (lexical.reserved.contains(name))
@@ -185,16 +186,8 @@ class SQLParser extends StandardTokenParsers {
     }
   }
 
-  def rep2sep[T, U](p: => Parser[T], s: => Parser[U]) =
-    p ~ rep1(s ~> p) ^^ { case x ~ y => x :: y }
-
-  def set_literal: Parser[Expr] =
-    (op("(") ~> rep2sep(expr, op(",")) <~ op(")")) ^^ (SetLiteral(_))
-
   def array_literal: Parser[Expr] =
     (op("[") ~> repsep(expr, op(",")) <~ op("]")) ^^ (ArrayLiteral(_))
-
-  def set_expr: Parser[Expr] = select | set_literal
 
   def cmp_expr: Parser[Expr] =
     default_expr ~ rep(relational_suffix | negatable_suffix | is_suffix) ^^ {
@@ -231,19 +224,34 @@ class SQLParser extends StandardTokenParsers {
   sealed trait DerefType
   case class ObjectDeref(expr: Expr) extends DerefType
   case class ArrayDeref(expr: Expr) extends DerefType
+  case class DimChange(unop: UnaryOperator) extends DerefType
+
+  def unshift_expr: Parser[Expr] =
+    op("{") ~> expr <~ op("...") <~ op("}") ^^ UnshiftMap |
+      op("[") ~> expr <~ op("...") <~ op("]") ^^ UnshiftArray
 
   def deref_expr: Parser[Expr] = primary_expr ~ (rep(
-    (op(".") ~> ((ident ^^ (StringLiteral(_))) ^^ (ObjectDeref(_)))) |
-      (op("{") ~> (expr ^^ (ObjectDeref(_))) <~ op("}")) |
+    (op(".") ~> (
+      (ident ^^ (StringLiteral(_))) ^^ (ObjectDeref(_))))         |
+      op("{*:}")               ^^^ DimChange(FlattenMapKeys)      |
+      (op("{*}") | op("{:*}")) ^^^ DimChange(FlattenMapValues)    |
+      op("{_:}")               ^^^ DimChange(ShiftMapKeys)        |
+      (op("{_}") | op("{:_}")) ^^^ DimChange(ShiftMapValues)      |
+      (op("{") ~> (expr ^^ (ObjectDeref(_))) <~ op("}"))          |
+      op("[*:]")               ^^^ DimChange(FlattenArrayIndices) |
+      (op("[*]") | op("[:*]")) ^^^ DimChange(FlattenArrayValues)  |
+      op("[_:]")               ^^^ DimChange(ShiftArrayIndices)   |
+      (op("[_]") | op("[:_]")) ^^^ DimChange(ShiftArrayValues)    |
       (op("[") ~> (expr ^^ (ArrayDeref(_))) <~ op("]"))
     ): Parser[List[DerefType]]) ~ opt(op(".") ~> wildcard) ^^ {
     case lhs ~ derefs ~ wild =>
-      wild.foldLeft(derefs.foldLeft[Expr](lhs) {
-        case (lhs, ObjectDeref(Splice(None))) => ObjectFlatten(lhs)
-        case (lhs, ObjectDeref(rhs))          => FieldDeref(lhs, rhs)
-        case (lhs, ArrayDeref(Splice(None)))  => ArrayFlatten(lhs)
-        case (lhs, ArrayDeref(rhs))           => IndexDeref(lhs, rhs)
-      })((lhs, rhs) => Splice(Some(lhs)))
+      wild.foldLeft(derefs.foldLeft[Expr](lhs)((lhs, deref) => deref match {
+        case DimChange(unop)           => Unop(lhs, unop)
+        case ObjectDeref(Splice(None)) => FlattenMapValues(lhs)
+        case ObjectDeref(rhs)          => FieldDeref(lhs, rhs)
+        case ArrayDeref(Splice(None))  => FlattenArrayValues(lhs)
+        case ArrayDeref(rhs)           => IndexDeref(lhs, rhs)
+      }))((lhs, rhs) => Splice(Some(lhs)))
   }
 
   def unary_operator: Parser[UnaryOperator] =
@@ -267,8 +275,12 @@ class SQLParser extends StandardTokenParsers {
     } |
     ident ^^ (Ident(_)) |
     array_literal |
-    set_expr |
-    op("(") ~> expr <~ op(")") |
+    unshift_expr |
+    op("(") ~> repsep(expr, op(",")) <~ op(")") ^^ {
+      case Nil      => SetLiteral(Nil)
+      case x :: Nil => x
+      case xs       => SetLiteral(xs)
+    } |
     unary_operator ~ primary_expr ^^ {
       case op ~ expr => op(expr)
     } |

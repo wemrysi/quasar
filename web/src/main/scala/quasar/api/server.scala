@@ -19,9 +19,12 @@ package quasar.api
 import quasar.Predef._
 import quasar.api.services.RestApi
 import quasar.fp._
+import quasar.api.ServerOps._
 import quasar.console._
 import quasar._, Errors._, Evaluator._
 import quasar.config._
+import quasar.Evaluator.EnvironmentError.EnvPathError
+import quasar.fs.Path.PathError.InvalidPathError
 
 import java.io.File
 import java.lang.System
@@ -36,8 +39,14 @@ import scalaz.stream._
 
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
+import shapeless._, nat._, ops.nat._
 
 object ServerOps {
+  type Builders = List[(Int, BlazeBuilder)]
+  type Servers = List[(Int, Http4sServer)]
+  type ServersErrors = List[(Int, Throwable \/ Http4sServer)]
+  type Services = List[(String, HttpService)]
+
   final case class Options(
     config: Option[String],
     contentLoc: Option[String],
@@ -49,10 +58,12 @@ object ServerOps {
   final case class StaticContent(loc: String, path: String)
 }
 
-class ServerOps[WC: CodecJson, SC](
+abstract class ServerOps[WC: CodecJson, SC](
   configOps: ConfigOps[WC],
+  fileSystemApi: FileSystemApi.Apply[WC, SC],
   defaultWC: WC,
   val webConfigLens: WebConfigLens[WC, SC]) {
+  import webConfigLens._
   import ServerOps._
 
   // NB: This is a terrible thing.
@@ -78,11 +89,14 @@ class ServerOps[WC: CodecJson, SC](
     })
 
   /** An available port number. */
-  def anyAvailablePort: Task[Int] = Task.delay {
-    val s = new java.net.ServerSocket(0)
-    val p = s.getLocalPort
-    s.close()
-    p
+  def anyAvailablePort: Task[Int] = anyAvailablePorts[_1].map(_.head)
+
+  /** Available port numbers. */
+  def anyAvailablePorts[A <: Nat: ToInt]: Task[Sized[IndexedSeq[Int], A]] = Task.delay {
+    Sized.wrap(
+      (1 to toInt[A])
+        .map(_ => { val s = new java.net.ServerSocket(0); (s, s.getLocalPort) })
+        .map { case (s, p) => { s.close; p } })
   }
 
   /** Returns the requested port if available, or the next available port. */
@@ -239,9 +253,20 @@ class ServerOps[WC: CodecJson, SC](
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 object Server extends ServerOps(
   WebConfig,
+  FileSystemApi.apply,
   WebConfig(ServerConfig(None), Map()),
   WebConfigLens(
     WebConfig.server,
     WebConfig.mountings,
     WebConfig.server composeLens ServerConfig.port,
-    ServerConfig.port))
+    ServerConfig.port)) {
+  import webConfigLens._
+
+  def builders(config: WebConfig, idleTimeout: Duration, fsApi: FileSystemApi[WebConfig, ServerConfig])
+    : ETask[InvalidPathError, Builders] =
+    liftE(Task.now(List(
+      wcPort.get(config) -> BlazeBuilder
+        .withIdleTimeout(idleTimeout)
+      . bindHttp(wcPort.get(config), "0.0.0.0"))))
+
+}

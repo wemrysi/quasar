@@ -1,9 +1,9 @@
-package quasar
-package physical
-package mongodb
+package quasar.physical.mongodb
 
 import quasar.Predef._
+import quasar.{EnvironmentError2, EnvErr2T, SeqNameGeneratorT}
 import quasar.{NameGenerator => QNameGenerator}
+import quasar.fp.prism._
 import quasar.javascript._
 import quasar.physical.mongodb.workflowtask._
 
@@ -13,6 +13,8 @@ import scalaz._, Scalaz._
   * MongoDB.
   */
 trait WorkflowExecutor[F[_]] {
+  import MapReduce._
+
   /** Execute the given aggregation pipeline with the given collection as
     * input.
     */
@@ -27,7 +29,7 @@ trait WorkflowExecutor[F[_]] {
   /** Execute the given MapReduce job, sourcing values from the given `src`
     * collection and writing the results to the destination collection.
     */
-  def mapReduce(src: Collection, dstCollectionName: String, mr: MapReduce): F[Unit]
+  def mapReduce(src: Collection, dst: OutputCollection, mr: MapReduce): F[Unit]
 
   /** Rename the `src` collection to `dst` collection, overwriting it if it
     * exists.
@@ -65,7 +67,7 @@ trait WorkflowExecutor[F[_]] {
 
     def tempColl: N[Collection] =
       for {
-        tmp <- NameGenerator[M].prefixedName("wf.").liftM[TempsT]
+        tmp <- QNameGenerator[M].prefixedName("wf.").liftM[TempsT]
         col =  Collection(dst.databaseName, tmp)
         _   <- wroteTo(col, true) // assume we'll write to this collection
       } yield col
@@ -105,7 +107,7 @@ trait WorkflowExecutor[F[_]] {
 
       case QueryTask(source, query, skip, limit) =>
         val pipelineQuery =
-          List($Match((), query.query)) :::
+          List($Match((), query)) :::
           skip.map($Skip((), _)).toList :::
           limit.map($Limit((), _)).toList
 
@@ -119,27 +121,35 @@ trait WorkflowExecutor[F[_]] {
                    .liftM[TempsT]
         } yield out
 
-      // TODO: Should we extract the db, if any, from `mr`?
-      case MapReduceTask(source, mr) =>
+      case MapReduceTask(source, mr, oa) =>
         for {
           tmp <- tempColl
           src <- execute0(source, tmp)
-          _   <- liftFM(mapReduce(src, out.collectionName, mr))
+          act  = oa getOrElse Action.Replace
+          _   <- liftFM(mapReduce(src, outputCollection(out, act), mr))
                    .liftM[TempsT]
         } yield out
 
       case FoldLeftTask(rd @ ReadTask(_), _) =>
-        (InvalidTask(rd, "FoldLeft from simple read")
-          .raiseError[E, Collection]: M[Collection])
-          .liftM[TempsT]
+        InvalidTask(rd, "FoldLeft from simple read")
+          .raiseError[E, Collection].liftM[TempsT]
 
       case FoldLeftTask(head, tail) =>
         for {
           h <- execute0(head, out)
-          _ <- tail.traverse_[N] { case MapReduceTask(source, mr) =>
-                 tempColl flatMap (execute0(source, _)) flatMap { src =>
-                   liftFM(mapReduce(src, h.collectionName, mr)).liftM[TempsT]
-                 }
+          _ <- tail.traverse_[N] {
+                 case MapReduceTask(source, mr, Some(act)) =>
+                   tempColl flatMap (execute0(source, _)) flatMap { src =>
+                     liftFM(mapReduce(src, outputCollection(h, act), mr)).liftM[TempsT]
+                   }
+
+                 case mrt @ MapReduceTask(_, _, _) =>
+                   InvalidTask(mrt, "no output action specified for mapReduce in FoldLeft")
+                     .raiseError[E, Unit].liftM[TempsT]
+
+                 case other =>
+                   InvalidTask(other, "un-mergable FoldLeft input")
+                     .raiseError[E, Unit].liftM[TempsT]
                }
         } yield h
     }
@@ -148,6 +158,13 @@ trait WorkflowExecutor[F[_]] {
       tmps filter (_ != coll) traverse_ (c => liftFM(drop(c))) as coll
     }
   }
+
+  ////
+
+  private def outputCollection(c: Collection, a: Action) =
+    OutputCollection(
+      c.collectionName,
+      Some(ActionedOutput(a, Some(c.databaseName), None)))
 }
 
 object WorkflowExecutor {
@@ -165,7 +182,7 @@ object WorkflowExecutor {
       if (v >= MinMongoDbVersion)
         (new MongoDbWorkflowExecutor: WorkflowExecutor[MongoDbIO]).point[M]
       else
-        UnsupportedVersion("MongoDB", v).raiseError[E, WorkflowExecutor[MongoDbIO]]
+        unsupportedVersion("MongoDB", v).raiseError[E, WorkflowExecutor[MongoDbIO]]
     }
   }
 

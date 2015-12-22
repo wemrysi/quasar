@@ -167,7 +167,7 @@ object Workflow {
     }
 
   def task(fop: Crystallized): WorkflowTask =
-    (finish(_, _)).tupled(fop.op.para(crush))._2
+    (finish(_, _)).tupled(fop.op.para(crush))._2.translate(normalize)
 
   val coalesceƒ: WorkflowF[Workflow] => Option[WorkflowF[Workflow]] = {
     case $Match(src, selector) => src.unFix match {
@@ -297,7 +297,6 @@ object Workflow {
       case op @ $Match((src, rez), selector) =>
         // TODO: If we ever allow explicit request of cursors (instead of
         //       collections), we could generate a FindQuery here.
-
         lazy val nonPipeline = {
           val (base, crushed) = (finish(_, _)).tupled(rez)
           (ExprVar,
@@ -310,7 +309,8 @@ object Workflow {
                 }),
                 $Reduce.reduceNOP,
                 // TODO: Get rid of this asInstanceOf!
-                selection = Some(rewriteRefs(PipelineFTraverse.void(op).asInstanceOf[$Match[Workflow]], prefixBase(base)).selector))))
+                selection = Some(rewriteRefs(PipelineFTraverse.void(op).asInstanceOf[$Match[Workflow]], prefixBase(base)).selector)),
+              None))
         }
         pipeline($Match(src, selector)) match {
           case Some((base, up, mine)) => (base, PipelineTask(up, mine))
@@ -321,28 +321,34 @@ object Workflow {
           case (base, up, pipe) => (base, PipelineTask(up, pipe))
         }
 
-      case op @ $Map((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(m, r, None, sel, sort, limit, None, scope0, _, _)))), fn, scope) if m == $Map.mapNOP && r == $Reduce.reduceNOP =>
+      case op @ $Map((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(m, r, sel, sort, limit, None, scope0, _, _), oa))), fn, scope) if m == $Map.mapNOP && r == $Reduce.reduceNOP =>
         Reshape.mergeMaps(scope0, scope).fold(
           op.newMR(base, src1, sel, sort, limit))(
-          s => base -> MapReduceTask(src0,
+          s => base -> MapReduceTask(
+            src0,
             mr applyLens MapReduce._map set fn
-              applyLens MapReduce._scope set s))
+               applyLens MapReduce._scope set s,
+            oa))
 
-      case op @ $Map((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, _, _, _, _, _, None, scope0, _, _)))), fn, scope) =>
+      case op @ $Map((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, _, _, _, _, None, scope0, _, _), oa))), fn, scope) =>
         Reshape.mergeMaps(scope0, scope).fold(
           op.newMR(base, src1, None, None, None))(
-          s => base -> MapReduceTask(src0,
+          s => base -> MapReduceTask(
+            src0,
             mr applyLens MapReduce._finalizer set Some($Map.finalizerFn(fn))
-              applyLens MapReduce._scope set s))
+               applyLens MapReduce._scope set s,
+            oa))
 
       case op @ $SimpleMap(_, _, _) => crush(op.raw)
 
-      case op @ $Reduce((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, reduceNOP, _, _, _, _, None, scope0, _, _)))), fn, scope) =>
+      case op @ $Reduce((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, reduceNOP, _, _, _, None, scope0, _, _), oa))), fn, scope) =>
         Reshape.mergeMaps(scope0, scope).fold(
           op.newMR(base, src1, None, None, None))(
-          s => base -> MapReduceTask(src0,
+          s => base -> MapReduceTask(
+            src0,
             mr applyLens MapReduce._reduce set fn
-              applyLens MapReduce._scope set s))
+               applyLens MapReduce._scope set s,
+            oa))
 
       case op: MapReduceF[_] =>
         op.src match {
@@ -364,20 +370,16 @@ object Workflow {
             val (nb, task) = finish(base, srcTask)
             op.newMR(nb, task, None, None, None)
         }
+
       case $FoldLeft(head, tail) =>
         (ExprVar,
           FoldLeftTask(
             (finish(_, _)).tupled(head._2)._2,
             tail.map(_._2._2 match {
-              case MapReduceTask(src, mr) =>
+              case MapReduceTask(src, mr, _) =>
                 // FIXME: $FoldLeft currently always reduces, but in future we’ll
                 //        want to have more control.
-                MapReduceTask(src,
-                  mr applyLens MapReduce._out set
-                    Some(MapReduce.WithAction(
-                      MapReduce.Action.Reduce(Some(true)),
-                      db = None,
-                      sharded = None)))
+                MapReduceTask(src, mr, Some(MapReduce.Action.Reduce(Some(true))))
               // NB: `finalize` should ensure that the final op is always a
               //     $Reduce.
               case src => scala.sys.error("not a mapReduce: " + src)
@@ -411,15 +413,6 @@ object Workflow {
 
     def applyNel[A](m: NonEmptyList[(BsonField, A)]): NonEmptyList[(BsonField, A)] = m.map(t => applyFieldName(t._1) -> t._2)
 
-    def applyFindQuery(q: FindQuery): FindQuery = {
-      q.copy(
-        query   = applySelector(q.query),
-        max     = q.max.map(applyMap _),
-        min     = q.min.map(applyMap _),
-        orderby = q.orderby.map(applyNel _)
-      )
-    }
-
     (op match {
       case $Project(src, shape, xId) =>
         $Project(src, shape.rewriteRefs(applyVar0), xId)
@@ -434,7 +427,7 @@ object Workflow {
       case g: $GeoNear[_]            =>
         g.copy(
           distanceField = applyFieldName(g.distanceField),
-          query = g.query.map(applyFindQuery _))
+          query = g.query.map(applySelector))
       case _                          => op
     }).asInstanceOf[A]
   }
@@ -447,16 +440,20 @@ object Workflow {
   }
 
   def rewrite[A <: WorkflowF[_]](op: A, base: DocVar): (A, DocVar) =
-    (rewriteRefs(op, prefixBase(base)) -> (op match {
-      case $Group(_, _, _)   => DocVar.ROOT()
-      case $Project(_, _, _) => DocVar.ROOT()
-      case _                 => base
-    }))
+    (rewriteRefs(op, prefixBase(base)),
+      op match {
+        case $Group(_, _, _)   => DocVar.ROOT()
+        case $Project(_, _, _) => DocVar.ROOT()
+        case _                 => base
+      })
 
-  def simpleShape(op: Workflow): Option[List[BsonField.Leaf]] = op.unFix match {
-    case $Pure(Bson.Doc(value))             => value.keys.toList.map(BsonField.Name).some
-    case $Project(_, Reshape(value), _)     => value.keys.toList.some
-    case sm @ $SimpleMap(_, _, _) =>
+  def simpleShape(op: Workflow): Option[List[BsonField.Name]] = op.unFix match {
+    case $Pure(Bson.Doc(value))          =>
+      value.keys.toList.map(BsonField.Name).some
+    case $Project(_, Reshape(value), id) =>
+      (if (id == IncludeId) BsonField.Name("_id") :: value.keys.toList
+      else value.keys.toList).some
+    case sm @ $SimpleMap(_, _, _)        =>
       def loop(expr: JsCore): Option[List[jscore.Name]] =
         expr.simplify match {
           case jscore.Obj(value)      => value.keys.toList.some
@@ -464,10 +461,11 @@ object Workflow {
           case _ => None
         }
       loop(sm.simpleExpr.expr).map(_.map(n => BsonField.Name(n.value)))
-    case $Group(_, Grouped(value), _)       => value.keys.toList.some
-    case $Unwind(src, _)                    => simpleShape(src)
-    case sp: ShapePreservingF[_]            => simpleShape(sp.src)
-    case _                                  => None
+    case $Group(_, Grouped(value), _)    =>
+      (BsonField.Name("_id") :: value.keys.toList).some
+    case $Unwind(src, _)                 => simpleShape(src)
+    case sp: ShapePreservingF[_]         => simpleShape(sp.src)
+    case _                               => None
   }
 
   /** Operations without an input. */
@@ -568,12 +566,13 @@ object Workflow {
       case op => op
     }
 
-    val finished = deleteUnusedFields(reorderOps(op))
+    val finished =
+      deleteUnusedFields(reorderOps(op.transCata(once(simplifyGroupƒ))))
 
     def fixShape(wf: Workflow) =
       Workflow.simpleShape(wf).fold(
         finished)(
-        n => $project(Reshape(n.map(_.toName -> \/-($include())).toListMap), IgnoreId)(finished))
+        n => $project(Reshape(n.map(_ -> \/-($include())).toListMap), IgnoreId)(finished))
 
     def promoteKnownShape(wf: Workflow): Workflow = wf.unFix match {
       case $SimpleMap(_, _, _)     => fixShape(wf)
@@ -637,7 +636,7 @@ object Workflow {
   final case class $Project[A](src: A, shape: Reshape, idExclusion: IdHandling)
       extends PipelineF[A]("$project") {
     def reparent[B](newSrc: B): $Project[B] = copy(src = newSrc)
-    def rhs = idExclusion match {
+    def rhs: Bson.Doc = idExclusion match {
       case IdHandling.ExcludeId =>
         Bson.Doc(shape.bson.value + (Workflow.IdLabel -> Bson.Bool(false)))
       case _         => shape.bson
@@ -723,9 +722,6 @@ object Workflow {
 
   final case class $Limit[A](src: A, count: Long)
       extends ShapePreservingF[A]("$limit") {
-    // TODO: If the preceding is a $Match, and it or its source isn’t
-    //       pipelineable, then return a FindQuery combining the match and this
-    //       limit
     def reparent[B](newSrc: B) = copy(src = newSrc)
     def rhs = Bson.Int64(count)
   }
@@ -737,9 +733,6 @@ object Workflow {
 
   final case class $Skip[A](src: A, count: Long)
       extends ShapePreservingF[A]("$skip") {
-    // TODO: If the preceding is a $Match (or a limit preceded by a $Match),
-    //       and it or its source isn’t pipelineable, then return a FindQuery
-    //       combining the match and this skip
     def reparent[B](newSrc: B) = copy(src = newSrc)
     def rhs = Bson.Int64(count)
   }
@@ -772,20 +765,17 @@ object Workflow {
 
     def empty = copy(grouped = Grouped(ListMap()))
 
-    def getAll: List[(BsonField.Leaf, Accumulator)] =
+    def getAll: List[(BsonField.Name, Accumulator)] =
       grouped.value.toList
 
-    def deleteAll(fields: List[BsonField.Leaf]): Workflow.$Group[A] = {
+    def deleteAll(fields: List[BsonField.Name]): Workflow.$Group[A] = {
       empty.setAll(getAll.filterNot(t => fields.contains(t._1)))
     }
 
-    def setAll(vs: Seq[(BsonField.Leaf, Accumulator)]) = copy(grouped = Grouped(ListMap(vs: _*)))
+    def setAll(vs: Seq[(BsonField.Name, Accumulator)]) = copy(grouped = Grouped(ListMap(vs: _*)))
   }
   object $Group {
-    def make(
-      grouped: Grouped, by: Reshape.Shape)(
-      src: Workflow):
-        Workflow =
+    def make(grouped: Grouped, by: Reshape.Shape)(src: Workflow): Workflow =
       Fix(coalesce($Group(src, grouped, by)))
   }
   val $group = $Group.make _
@@ -794,12 +784,15 @@ object Workflow {
       extends ShapePreservingF[A]("$sort") {
     def reparent[B](newSrc: B) = copy(src = newSrc)
     // Note: ListMap preserves the order of entries.
-    def rhs = Bson.Doc(ListMap((value.map { case (k, t) => k.asText -> t.bson }).list: _*))
+    def rhs: Bson.Doc = $Sort.keyBson(value)
   }
   object $Sort {
     def make(value: NonEmptyList[(BsonField, SortType)])(src: Workflow):
         Workflow =
       Fix(coalesce($Sort(src, value)))
+
+    def keyBson(value: NonEmptyList[(BsonField, SortType)]) =
+      Bson.Doc(ListMap((value.map { case (k, t) => k.asText -> t.bson }).list: _*))
   }
   val $sort = $Sort.make _
 
@@ -826,7 +819,7 @@ object Workflow {
     src: A,
     near: (Double, Double), distanceField: BsonField,
     limit: Option[Int], maxDistance: Option[Double],
-    query: Option[FindQuery], spherical: Option[Boolean],
+    query: Option[Selector], spherical: Option[Boolean],
     distanceMultiplier: Option[Double], includeLocs: Option[BsonField],
     uniqueDocs: Option[Boolean])
       extends PipelineF[A]("$geonear") {
@@ -847,7 +840,7 @@ object Workflow {
     def make(
       near: (Double, Double), distanceField: BsonField,
       limit: Option[Int], maxDistance: Option[Double],
-      query: Option[FindQuery], spherical: Option[Boolean],
+      query: Option[Selector], spherical: Option[Boolean],
       distanceMultiplier: Option[Double], includeLocs: Option[BsonField],
       uniqueDocs: Option[Boolean])(
       src: Workflow):
@@ -871,14 +864,16 @@ object Workflow {
 
     def newMR(base: DocVar, src: WorkflowTask, sel: Option[Selector], sort: Option[NonEmptyList[(BsonField, SortType)]], count: Option[Long]) =
       (ExprVar,
-        MapReduceTask(src,
+        MapReduceTask(
+          src,
           MapReduce(
             mapFn(base match {
               case DocVar(DocVar.ROOT, None) => this.fn
               case _ => compose(this.fn, mapProject(base))
             }),
             $Reduce.reduceNOP,
-            selection = sel, inputSort = sort, limit = count, scope = scope)))
+            selection = sel, inputSort = sort, limit = count, scope = scope),
+          None))
 
     def reparent[B](newSrc: B) = copy(src = newSrc)
   }
@@ -940,7 +935,7 @@ object Workflow {
     }
 
     def deleteAll(fields: List[BsonField]): $SimpleMap[A] = {
-      def loop(x: JsCore, fields: List[List[BsonField.Leaf]]): Option[JsCore] = x match {
+      def loop(x: JsCore, fields: List[List[BsonField.Name]]): Option[JsCore] = x match {
         case jscore.Obj(values) => Some(jscore.Obj(
           values.collect(Function.unlift[(jscore.Name, JsCore), (jscore.Name, JsCore)] { t =>
             val (k, v) = t
@@ -1087,14 +1082,16 @@ object Workflow {
 
     def newMR(base: DocVar, src: WorkflowTask, sel: Option[Selector], sort: Option[NonEmptyList[(BsonField, SortType)]], count: Option[Long]) =
       (ExprVar,
-        MapReduceTask(src,
+        MapReduceTask(
+          src,
           MapReduce(
             mapFn(base match {
               case DocVar(DocVar.ROOT, None) => this.fn
               case _ => $Map.compose(this.fn, $Map.mapProject(base))
             }),
             $Reduce.reduceNOP,
-            selection = sel, inputSort = sort, limit = count, scope = scope)))
+            selection = sel, inputSort = sort, limit = count, scope = scope),
+          None))
 
     def reparent[B](newSrc: B) = copy(src = newSrc)
   }
@@ -1142,14 +1139,16 @@ object Workflow {
       extends MapReduceF[A] {
     def newMR(base: DocVar, src: WorkflowTask, sel: Option[Selector], sort: Option[NonEmptyList[(BsonField, SortType)]], count: Option[Long]) =
       (ExprVar,
-        MapReduceTask(src,
+        MapReduceTask(
+          src,
           MapReduce(
             $Map.mapFn(base match {
               case DocVar(DocVar.ROOT, None) => $Map.mapNOP
               case _                         => $Map.mapProject(base)
             }),
             this.fn,
-            selection = sel, inputSort = sort, limit = count, scope = scope)))
+            selection = sel, inputSort = sort, limit = count, scope = scope),
+          None))
 
     def reparent[B](newSrc: B) = copy(src = newSrc)
   }

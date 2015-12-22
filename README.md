@@ -45,7 +45,7 @@ you probably want to install MongoDB locally and point Quasar to that one. Insta
 allow you to run the integration tests offline as well as make the tests run as fast as possible.
 
 In order to install MongoDB locally you can either use something like Homebrew or simply go to the MongDB website and follow the
-instructions that can be found there. 
+instructions that can be found there.
 
 Once we have a MongoDB instance handy, we need to set a few
 environment variables in order to inform Quasar about where to find the backends required in order to run the integration tests.
@@ -139,6 +139,26 @@ Then the filesystem will contain the paths `/local/test/` and `/local/students/c
 
 A database can be mounted at any directory path, but database mount paths must not be nested inside each other.
 
+#### View mounts
+
+If the mount's key is "view" then the mount represents a "virtual" file, defined by a SQL query. When the file's contents are read or referred to, the query is executed to generate the current result on-demand. A view can be used to create dynamic data that combines analysis and formatting of existing files without creating temporary results that need to be manually regenerated when sources are updated.
+
+For example, given the above MongoDB mount, an additional view could be defined in this way:
+
+```json
+  "mountings": {
+    ...,
+    "/simpleZips": {
+      "view": {
+        "connectionUri": "sql2:///?q=select%20_id%20as%20zip%2C%20city%2C%20state%20from%20%22%2Flocal%2Ftest%2Fzips%22%20where%20pop%20%3C%20%3Acutoff&var.cutoff=1000"
+      }
+    }
+  }
+```
+
+A view can be mounted at any file path. If a view's path is nested inside the path of a database mount, it will appear alongside the other files in the database. A view will "shadow" any actual file that would otherwise be mapped to the same path. Any attempt to write data to a view will result in an error.
+
+SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as additional parameters in the connectionUri using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error when the mount is created or used. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
 ## REPL Usage
 
@@ -200,9 +220,13 @@ Type `help` for information on other commands.
 
 The server provides a simple JSON API.
 
-### GET /query/fs/[path]?q=[query]
+### GET /query/fs/[path]?q=[query]&offset=[offset]&limit=[limit]&var.[foo]=[value]
 
-Executes a SQL query, contained in the single, required query parameter, on the backend responsible for the request path.
+Executes a SQL query, contained in the required `q` parameter, on the backend responsible for the request path.
+
+Optional `offset` and `limit` parameters can be specified to page through the results, and are interpreted the same way as in `GET /data`.
+
+SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
 The result is returned in the response body. An `Accept` header may be specified to select the format of the response body:
 - no `Accept` header: “readable” results, one per line (note: this response cannot be parsed as a single JSON object)
@@ -214,10 +238,8 @@ The formatting of CSV output can be controlled with an extended media type as in
 
 For compressed output use `Accept-Encoding: gzip`.
 
-SQL `limit` syntax may be used to keep the result size reasonable.
 
-
-### POST /query/fs/[path]?foo=var
+### POST /query/fs/[path]?var.[foo]=[value]
 
 Executes a SQL query, contained in the request body, on the backend responsible for the request path.
 
@@ -225,7 +247,7 @@ The `Destination` header must specify the *output path*, where the results of th
 
 All paths referenced in the query, as well as the output path, are interpreted as relative to the request path, unless they begin with `/`.
 
-SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API. Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
+SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
 This API method returns the name where the results are stored, as an absolute path, as well as logging information.
 
@@ -309,31 +331,34 @@ error at the root of the response):
 }
 ```
 
-### GET /compile/fs/[path]?q=[query]
+### GET /compile/fs/[path]?q=[query]&var.[foo]=[value]
 
 Compiles, but does not execute, a SQL query, contained in the single, required
 query parameter, on the backend responsible for the request path. The resulting
 plan is returned in the response body.
 
+SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
-### POST /compile/fs/[path]?foo=var
+
+### POST /compile/fs/[path]?var.[foo]=[value]
 
 Compiles, but does not execute, a SQL query, contained in the request body.
 The resulting plan is returned in the response body.
 
-SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API. Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
+SQL<sup>2</sup> supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as query parameters in this API using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by single quotes. Some acceptable values are `123`, `'CO'`, and `DATE '2015-07-06'`.
 
 
 ### GET /metadata/fs/[path]
 
-Retrieves metadata about the files, directories, and mounts at the specified path.
+Retrieves metadata about the files, directories, and mounts which are children of the specified directory path. If the path names a file, the result is empty.
 
 ```json
 {
   "children": [
-    {"name": "test", "type": "mount"},
     {"name": "foo", "type": "directory"},
-    {"name": "bar", "type": "file"}
+    {"name": "bar", "type": "file"},
+    {"name": "test", "type": "directory", "mount": "mongodb"},
+    {"name": "baz", "type": "file", "mount": "view"}
   ]
 }
 ```
@@ -364,6 +389,8 @@ unchanged.
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 
+Fails if the path identifies a view.
+
 ### POST /data/fs/[path]
 
 Appends data to the specified path, formatted as one JSON object per line in the same format as above.
@@ -372,14 +399,20 @@ was done.
 
 If an error occurs when reading data from the request body, the response contains a summary in the common `error` field, and a separate array of error messages about specific values under `details`.
 
+Fails if the path identifies a view.
+
 ### DELETE /data/fs/[path]
 
 Removes all data at the specified path. Single files are deleted atomically.
+
+Fails if the path identifies a view (views may be added and deleted through the `/mount` API).
 
 ### MOVE /data/fs/[path]
 
 Moves data from one path to another within the same backend. The new path must
 be provided in the "Destination" request header. Single files are moved atomically.
+
+Fails if either the request of destination path identifies a view (views may be added and deleted through the `/mount` API).
 
 ### GET /mount/fs/[path]
 

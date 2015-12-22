@@ -41,13 +41,19 @@ fi
 # Perform setup for integration tests:
 if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
   export QUASAR_TEST_PATH_PREFIX="/${QUASAR_MONGODB_TESTDB}/"
+
   if [[ "$QUASAR_MONGODB_RELEASE" == "2_6" ]]; then
     export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
   elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0" ]]; then
     export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
+  elif [[ "$QUASAR_MONGODB_RELEASE" == "3_0_RO" ]]; then
+    export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+    export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
   else
     export QUASAR_MONGODB_2_6="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_2_6}\"}}"
-    export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://${QUASAR_MONGODB_HOST_3_0}\"}}"
+    export QUASAR_MONGODB_3_0="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+    export QUASAR_MONGODB_READ_ONLY="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-read:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
+    export QUASAR_MONGODB_READ_ONLY_INSERT="{\"mongodb\": {\"connectionUri\": \"mongodb://quasar-dbOwner:quasar@${QUASAR_MONGODB_HOST_3_0}/${QUASAR_MONGODB_TESTDB}\"}}"
   fi
 
   echo "Using local MongoDB config"
@@ -67,10 +73,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   cp "$QUASAR_WEB_JAR_PATH" "$QUASAR_TEMP_JAR"
 
   # Build and run all tests everywhere (including integration)
-  # Note: scoverage is brain-dead, so each project's tests have to be run
-  # separately, and 'core' should be last, so that its report will include
-  # coverage in the core code provided by tests in other projects.
-  "$SBT" -DisCoverageRun=true -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc test exclusive:test
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc test exclusive:test
   "$SBT" coverageReport
   "$SBT" coverageAggregate
 
