@@ -19,7 +19,6 @@ package quasar.api
 import quasar.Predef._
 import quasar.api.services.RestApi
 import quasar.fp._
-import quasar.api.ServerOps._
 import quasar.console._
 import quasar._, Errors._, Evaluator._
 import quasar.config._
@@ -60,10 +59,8 @@ object ServerOps {
 
 abstract class ServerOps[WC: CodecJson, SC](
   configOps: ConfigOps[WC],
-  fileSystemApi: FileSystemApi.Apply[WC, SC],
   defaultWC: WC,
   val webConfigLens: WebConfigLens[WC, SC]) {
-  import webConfigLens._
   import ServerOps._
 
   // NB: This is a terrible thing.
@@ -253,20 +250,9 @@ abstract class ServerOps[WC: CodecJson, SC](
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 object Server extends ServerOps(
   WebConfig,
-  FileSystemApi.apply,
   WebConfig(ServerConfig(None), Map()),
   WebConfigLens(
     WebConfig.server,
     WebConfig.mountings,
     WebConfig.server composeLens ServerConfig.port,
-    ServerConfig.port)) {
-  import webConfigLens._
-
-  def builders(config: WebConfig, idleTimeout: Duration, fsApi: FileSystemApi[WebConfig, ServerConfig])
-    : ETask[InvalidPathError, Builders] =
-    liftE(Task.now(List(
-      wcPort.get(config) -> BlazeBuilder
-        .withIdleTimeout(idleTimeout)
-      . bindHttp(wcPort.get(config), "0.0.0.0"))))
-
-}
+    ServerConfig.port))
