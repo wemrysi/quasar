@@ -4,7 +4,7 @@ package services
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
-import pathy.scalacheck.AbsFileOf
+import pathy.scalacheck._
 import quasar.Predef._
 import quasar.fs._
 
@@ -15,7 +15,6 @@ import org.http4s.server._
 import scalaz._
 import scalaz.concurrent.Task
 import pathy.Path._
-import pathy.scalacheck.PathyArbitrary._
 
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import InMemory._
@@ -33,18 +32,19 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
 
   "Metadata Service" should {
     "respond with NotFound" >> {
-      "if directory does not exist" ! prop { dir: AbsDir[Sandboxed] =>
-        val path:String = printPath(dir)
+      // TODO: escaped paths do not survive being embedded in error messages
+      "if directory does not exist" ! prop { dir: AbsDirOf[AlphaCharacters] =>
+        val path:String = printPath(dir.path)
         val response = service(InMemState.empty)(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
-        response.as[String].run must_== s"${printPath(dir)}: doesn't exist"
+        response.as[Json].run must_== Json("error" := s"${printPath(dir.path)} doesn't exist")
       }
 
       "file does not exist" ! prop { file: AbsFileOf[AlphaCharacters] =>
         val path:String = posixCodec.printPath(file.path)
         val response = service(InMemState.empty)(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
+        response.as[Json].run must_== Json("error" := s"File not found: $path")
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -55,7 +55,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           val path = printPath(fileWithSameName)
           val response = service(s.state)(Request(uri = Uri(path = path))).run
           response.status must_== Status.NotFound
-          response.as[Json].run must_== jSingleObject("error", jString(s"File not found: $path"))
+          response.as[Json].run must_== Json("error" := s"File not found: $path")
         }
       }
     }

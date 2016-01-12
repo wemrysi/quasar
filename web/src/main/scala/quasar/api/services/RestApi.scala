@@ -24,6 +24,7 @@ import quasar.Predef._
 import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
 import quasar.fs.{ReadFile, WriteFile, ManageFile, QueryFile}
+import quasar.fs.mount.{Mounting}
 
 import scala.collection.immutable.ListMap
 import scalaz.concurrent.Task
@@ -56,12 +57,14 @@ final case class RestApi(staticContent: List[StaticContent],
         R: ReadFile.Ops[S],
         W: WriteFile.Ops[S],
         M: ManageFile.Ops[S],
-        Q: QueryFile.Ops[S]
-      ): ListMap[String,HttpService] = {
+        Q: QueryFile.Ops[S],
+        Mnt: Mounting.Ops[S]
+      ): ListMap[String, HttpService] = {
     val apiServices = ListMap(
       "/compile/fs"   -> query.compileService(f),
       "/data/fs"      -> data.service(f),
       "/metadata/fs"  -> metadata.service(f),
+      "/mount/fs"     -> mount.service(f),
       "/query/fs"     -> query.service(f),
       "/server"       -> server.service(defaultPort, restart),
       "/welcome"      -> welcome.service

@@ -1,18 +1,17 @@
-package quasar
-package api
-package services
+package quasar.api.services
 
-import Predef._
+import quasar.Predef._
+import quasar.api._
+import quasar.fs.InMemory._
+import quasar.fs.mount._
 
-import org.http4s._
+import org.http4s._, Method.MOVE
 import org.http4s.server.HttpService
 import org.http4s.dsl._
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.headers._
 import org.specs2.mutable.Specification
-import quasar.fs.InMemory._
-import Method.MOVE
-
+import scalaz._
 import scalaz.concurrent.Task
 
 class RestApiSpecs extends Specification {
@@ -26,7 +25,11 @@ class RestApiSpecs extends Specification {
 
   "OPTIONS" should {
     val restApi = RestApi(Nil,None,8888,_ => Task.now(()))
-    val serviceMap = restApi.AllServices(runStatefully(InMemState.empty).run.compose(fileSystem))
+    val mount = new (Mounting ~> Task) {
+      def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
+    }
+    val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).run
+    val serviceMap = restApi.AllServices(fs)
     val service = compositeService(serviceMap)
 
     def testAdvertise(path: String,
@@ -60,7 +63,7 @@ class RestApiSpecs extends Specification {
     "advertise GET, PUT, POST, DELETE, and MOVE for /data path" >> {
       advertisesMethodsCorrectly("/data/fs", List(GET, PUT, POST, DELETE, MOVE))
     }
-    
+
     "advertise Destination header for /data path and method MOVE" >> {
       advertisesHeadersCorrectly("/data/fs", MOVE, List(Destination))
     }

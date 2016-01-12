@@ -16,15 +16,17 @@
 
 package quasar.api
 
-import quasar.Data
 import quasar.Predef._
+import quasar.Data
 import quasar.fp._
-import quasar.fs._, FileSystemError._
+import quasar.fs.{Path => QPath, _}, FileSystemError._
 
+import argonaut._, Argonaut._
 import org.http4s._
-import org.http4s.dsl._
+import org.http4s.argonaut._
+import org.http4s.dsl.{Path => HPath, _}
 import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
-import pathy.Path._
+import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -34,21 +36,31 @@ package object services {
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error match {
       case PathError(e)                => pathErrorResponse(e)
-      case PlannerError(_, _)          => BadRequest(error.shows)
-      case UnknownReadHandle(handle)   => InternalServerError(s"Unknown read handle: $handle")
-      case UnknownWriteHandle(handle)  => InternalServerError(s"Unknown write handle: $handle")
-      case UnknownResultHandle(handle) => InternalServerError(s"Unknown result handle: $handle")
-      case PartialWrite(numFailed)     => InternalServerError(s"Failed to write $numFailed records")
-      case WriteFailed(data, reason)   => InternalServerError(s"Failed to write ${data.shows} because of $reason")
+      case PlannerError(_, _)          => errorResponse(BadRequest, error.shows)
+      case UnknownReadHandle(handle)   => errorResponse(InternalServerError, s"Unknown read handle: $handle")
+      case UnknownWriteHandle(handle)  => errorResponse(InternalServerError, s"Unknown write handle: $handle")
+      case UnknownResultHandle(handle) => errorResponse(InternalServerError, s"Unknown result handle: $handle")
+      case PartialWrite(numFailed)     => errorResponse(InternalServerError, s"Failed to write $numFailed records")
+      case WriteFailed(data, reason)   => errorResponse(InternalServerError, s"Failed to write ${data.shows} because of $reason")
     }
-
 
   def pathErrorResponse(error: PathError2): Task[Response] =
     error match {
-      case PathError2.Case.PathExists(path) => Conflict(s"$path already exists")
-      case PathError2.Case.PathNotFound(path) => NotFound(s"${posixCodec.printPath(path)}: doesn't exist")
-      case PathError2.Case.InvalidPath(path, reason) => BadRequest(s"$path is an invalid path because $reason")
+      case PathError2.Case.PathExists(path) => errorResponse(Conflict, s"${posixCodec.printPath(path)} already exists")
+      case PathError2.Case.PathNotFound(path) => errorResponse(NotFound, s"${posixCodec.printPath(path)} doesn't exist")
+      case PathError2.Case.InvalidPath(path, reason) => errorResponse(BadRequest, s"${posixCodec.printPath(path)} is an invalid path because $reason")
     }
+
+  def errorResponse(
+    status: org.http4s.dsl.impl.EntityResponseGenerator,
+    message: String):
+      Task[Response] =
+    status(Json("error" := message))
+
+  def requiredHeader(key: HeaderKey.Singleton, req: Request): Task[Response] \/ String =
+    req.headers.get(key).cata(
+      hdr => \/-(hdr.value),
+      -\/(errorResponse(BadRequest, "The '" + key.name + "' header must be specified")))
 
   type FilesystemTask[A] = FileSystemErrT[Task, A]
   /** Flatten by inserting the `quasar.fs.FileSystemError` into the failure case of the `Task` */

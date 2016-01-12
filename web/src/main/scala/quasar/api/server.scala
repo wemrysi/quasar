@@ -17,28 +17,23 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.api.services.RestApi
-import quasar.fp._
-import quasar.console._
 import quasar._, Errors._, Evaluator._
-import quasar.config._
 import quasar.Evaluator.EnvironmentError.EnvPathError
-import quasar.fs.Path.PathError.InvalidPathError
-
-import java.io.File
-import java.lang.System
-import quasar.fs.InMemory._
-
-import scala.concurrent.duration._
+import quasar.api.services.RestApi
+import quasar.config._
+import quasar.console._
+import quasar.fp._
+import quasar.fs._, Path.PathError.InvalidPathError
+import quasar.fs.mount._
 
 import argonaut.CodecJson
+import scala.concurrent.duration._
+import org.http4s.server.{Server => Http4sServer, HttpService}
+import org.http4s.server.blaze.BlazeBuilder
 import scalaz._, Scalaz._
 import scalaz.concurrent._
 import scalaz.stream._
-
-import org.http4s.server.{Server => Http4sServer, HttpService}
-import org.http4s.server.blaze.BlazeBuilder
-import shapeless._, nat._, ops.nat._
+import shapeless.{Coproduct => _, _}, nat._, ops.nat._
 
 object ServerOps {
   type Builders = List[(Int, BlazeBuilder)]
@@ -75,7 +70,7 @@ abstract class ServerOps[WC: CodecJson, SC](
           Option(uri.getPath)
             .getOrElse(uri.toURL.openConnection.asInstanceOf[java.net.JarURLConnection].getJarFileURL.getPath),
           "UTF-8")
-      (new File(path)).getParentFile().getPath() + "/"
+      (new java.io.File(path)).getParentFile().getPath() + "/"
     }
 
   /** Returns why the given port is unavailable or None if it is available. */
@@ -177,13 +172,16 @@ abstract class ServerOps[WC: CodecJson, SC](
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
   //     will run indefinitely when started from a script.
-  private def waitForInput: Task[Unit] = for {
-    _    <- Task.delay(java.lang.Thread.sleep(250))
-                .handle { case _: java.lang.InterruptedException => () }
-    test <- Task.delay(Option(System.console).isEmpty || System.in.available() <= 0)
-                .handle { case _ => true }
-    done <- if (test) waitForInput else Task.now(())
-  } yield done
+  private def waitForInput: Task[Unit] = {
+    import java.lang.System
+    for {
+      _    <- Task.delay(java.lang.Thread.sleep(250))
+                  .handle { case _: java.lang.InterruptedException => () }
+      test <- Task.delay(Option(System.console).isEmpty || System.in.available() <= 0)
+                  .handle { case _ => true }
+      done <- if (test) waitForInput else Task.now(())
+    } yield done
+  }
 
   private def openBrowser(port: Int): Task[Unit] = {
     val url = "http://localhost:" + port + "/"
@@ -221,6 +219,19 @@ abstract class ServerOps[WC: CodecJson, SC](
     }
   }
 
+  type MountingPlusFileSystem[A] = Coproduct[MountingF, FileSystem, A]
+
+  def interpreter(config: WC): Task[MountingPlusFileSystem ~> Task] = {
+    // TODO: use the real mount and hierarchical interpreters
+    import InMemory._
+
+    val mount = new (Mounting ~> Task) {
+      def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("TODO"))
+    }
+
+    runFs(InMemState.empty).map(fs => free.interpret2[MountingF, FileSystem, Task](Coyoneda.liftTF(mount), fs))
+  }
+
   def main(args: Array[String]): Unit = {
     val exec: EnvTask[Unit] = for {
       opts           <- optionParser.parse(args, Options(None, None, None, false, false, None)).cata(
@@ -228,21 +239,21 @@ abstract class ServerOps[WC: CodecJson, SC](
                           EitherT.left(Task.now(InvalidConfig("couldn’t parse options"))))
       content <- interpretPaths(opts)
       redirect = content.map(_.loc)
-      cfgPath        <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
+      cfgPath <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
           liftE(Task.now(None)))(
           cfg => FsPath.parseSystemFile(cfg).toRight(InvalidConfig("Invalid path to config file: " + cfg)).map(Some(_)))
-      config         <- configOps.fromFileOrDefaultPaths(cfgPath).fixedOrElse(EitherT.right(Task.now(defaultWC)))
-      port           =  opts.port getOrElse wcPort.get(config)
-      updCfg         =  wcPort.set(port)(config)
-      interpreter = runStatefully(InMemState.empty).run.compose(fileSystem)  // TEMP
+      config  <- configOps.fromFileOrDefaultPaths(cfgPath).fixedOrElse(EitherT.right(Task.now(defaultWC)))
+      port    =  opts.port getOrElse wcPort.get(config)
+      updCfg  =  wcPort.set(port)(config)
+      fs      <- liftE(interpreter(config))
       produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) =
-        reload => RestApi(content.toList, redirect, port, reload).AllServices(interpreter)
-      result <- startServers(port, produceRoutes).liftM[EnvErrT]
+        reload => RestApi(content.toList, redirect, port, reload).AllServices(fs)
+      result  <- startServers(port, produceRoutes).liftM[EnvErrT]
       (servers, shutdown) = result
-      msg = stdout("Press Enter to stop.")
-      _ <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
-      _ <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[EnvErrT]
-      _ <- servers.run.liftM[EnvErrT] // We need to run the servers in order to make sure everything is cleaned up properly
+      msg     =  stdout("Press Enter to stop.")
+      _       <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
+      _       <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[EnvErrT]
+      _       <- servers.run.liftM[EnvErrT] // We need to run the servers in order to make sure everything is cleaned up properly
     } yield ()
 
     exec.swap

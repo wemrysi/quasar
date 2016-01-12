@@ -246,6 +246,9 @@ object InMemory {
       (trans, ref.read)
     }
 
+  def runFs(initial: InMemState): Task[FileSystem ~> Task] =
+    runStatefully(initial).map(_ compose fileSystem)
+
   ////
 
   private def tmpName(n: Long) = s"__quasar.gen_$n"
