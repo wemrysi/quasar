@@ -109,7 +109,7 @@ abstract class ServerOps[WC: CodecJson, SC](
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServer(blueprint : ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
       builder <- Task.delay {
@@ -138,10 +138,10 @@ abstract class ServerOps[WC: CodecJson, SC](
   def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
-      startServer(conf, flexibleOnPort).onSuccess{ case (_,port) =>
-        stdout("Server started. Listening on port " + port)})
+      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
+        stdout("Server started. Listening on port " + port) })
 
-    serversAndPort.evalScan1{case ((oldServer, oldPort), newServerAndPort) =>
+    serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
       oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>
       Task.now(newServerAndPort)
     }.cleanUpWithA{ server =>
@@ -164,7 +164,7 @@ abstract class ServerOps[WC: CodecJson, SC](
                    produceRoutes: (Int => Task[Unit]) => ListMap[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
     def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port,idleTimeout = Duration.Inf, produceRoutes(startNew))
+      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceRoutes(startNew))
       configQ.enqueueOne(conf)
     }
     startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {

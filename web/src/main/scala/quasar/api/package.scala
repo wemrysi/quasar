@@ -158,6 +158,6 @@ package object api {
     case GET -> path if path.startsWith(HPath(basePath)) => NotFound()
 
     case GET -> AsPath(path) =>
-      TemporaryRedirect(Uri(path = basePath + path.toString))
+      TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
 }
