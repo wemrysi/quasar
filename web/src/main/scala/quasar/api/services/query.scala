@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014 - 2015 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.api.services
 
 import quasar._
@@ -101,9 +117,9 @@ object query {
                     translateSemanticErrors,
                     _.fold(
                       fileSystemErrorResponse,
-                      resultFile => {
+                      result => {
                         Ok(Json.obj(
-                          "out" := posixCodec.printPath(ResultFile.resultFile.get(resultFile)),
+                          "out" := posixCodec.printPath(result),
                           "phases" := phases
                         ))
                       }
@@ -128,14 +144,14 @@ object query {
     def explainQuery(expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Task[Response] =
       queryPlan(addOffsetLimit(expr, offset, limit), vars).run.value fold (
         translateSemanticErrors,
-        lp => Q.explain(lp).foldMap(f) flatMap {
-          case (phases, None) =>
+        lp => Q.explain(lp).run.run.foldMap(f).flatMap {
+          case (phases, \/-(_)) =>
             phaseResultsResponse(phases)
               .getOrElse(InternalServerError(
                 s"No explain output for plan: \n\n" + RenderTree[Fix[LogicalPlan]].render(lp).shows
               ))
 
-          case (_, Some(fsErr)) =>
+          case (_, -\/(fsErr)) =>
             fileSystemErrorResponse(fsErr)
         })
 
