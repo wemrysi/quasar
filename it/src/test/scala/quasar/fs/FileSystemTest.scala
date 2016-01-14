@@ -2,7 +2,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendName, Data, TestConfig, NameGenerator}
-import quasar.fp.{eitherTCatchable, hoistFree}
+import quasar.fp.{eitherTCatchable, hoistFree, TaskRef}
 import quasar.fp.free._
 import quasar.fs.mount._
 import quasar.effect._
@@ -114,11 +114,14 @@ object FileSystemTest {
     ).sequence
 
   def nullViewUT: Task[FileSystemUT[FileSystem]] =
-    (inMemUT |@| MonotonicSeq.taskRefMonotonicSeq(0) |@| ViewState.toTask(Map())) {
-      (mem, seq, viewState) =>
+    (inMemUT |@| TaskRef(0L) |@| ViewState.toTask(Map())) {
+      (mem, seqRef, viewState) =>
 
       val memPlus: ViewFileSystem ~> Task =
-        interpretViewFileSystem(viewState, seq, mem.run)
+        interpretViewFileSystem(
+          viewState,
+          MonotonicSeq.taskRefMonotonicSeq(seqRef),
+          mem.run)
 
       val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem](Views(Map.empty))
 

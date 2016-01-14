@@ -31,6 +31,12 @@ import scalaz._, Scalaz._
   * refer to each other and to concrete files.
   */
 final case class Views(map: Map[AFile, Fix[LogicalPlan]]) {
+  def add(f: AFile, lp: Fix[LogicalPlan]): Views =
+    Views(map + (f -> lp))
+
+  def remove(f: AFile): Views =
+    Views(map - f)
+
   def contains(p: AFile): Boolean = map.contains(p)
 
   /** Enumerate view files and view ancestor directories at a particular location. */

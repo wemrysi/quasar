@@ -45,7 +45,7 @@ object AtomicRef {
   final class Ops[V, S[_]: Functor](implicit S: AtomicRefF[V, ?] :<: S)
     extends LiftedOps[AtomicRef[V, ?], S] {
 
-    /** Set the value of the ref to `update` if the current value == `expect`,
+    /** Set the value of the ref to `update` if the current value is `expect`,
       * returns whether the value was updated.
       */
     def compareAndSet(expect: V, update: V): F[Boolean] =

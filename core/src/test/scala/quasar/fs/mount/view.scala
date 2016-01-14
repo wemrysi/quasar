@@ -33,11 +33,12 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   implicit val arbLogicalPlan: Arbitrary[Fix[LogicalPlan]] = Arbitrary(Gen.const(Read(Path("/zips"))))
 
   type VSF[F[_], A] = StateT[F, VS, A]
-  type VST[A] = VSF[Trace, A]
+  type TraceS[S, A] = StateT[Trace, S, A]
+  type VST[A]       = TraceS[VS, A]
 
   def traceViewFs(nodes: Map[ADir, Set[Node]]): ViewFileSystem ~> VST =
     interpretViewFileSystem[VST](
-      KeyValueStore.stateKeyValueStore[Trace](_handles),
+      KeyValueStore.toState[TraceS](_handles),
       MonotonicSeq.stateMonotonicSeq[Trace](_seq),
       liftMT[Trace, VSF] compose
         interpretFileSystem[Trace](qfTrace(nodes), rfTrace, wfTrace, mfTrace))

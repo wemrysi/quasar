@@ -10,13 +10,13 @@ import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 
 import monocle.Lens
-import org.specs2.mutable.Specification
+import org.specs2.mutable
 import pathy.Path._
 import scalaz.{Lens => _, Failure => _, Node => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 
-class HierarchicalFileSystemSpec extends Specification with FileSystemFixture {
+class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError2._
   import hierarchical.{HFSErrT, HierarchicalFileSystemError, HFSFailure, HFSFailureF, MountedResultH, MountedResultHF}
   import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._
@@ -73,7 +73,7 @@ class HierarchicalFileSystemSpec extends Specification with FileSystemFixture {
 
     val handlesNT: MountedResultHF ~> HFSM =
       liftMT[MountedFs, HFSErrT].compose[MountedResultHF](
-        Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.stateKeyValueStore[Id](handles)))
+        Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.toState[State](handles)))
 
     val runEff: HEff ~> HFSM =
       free.interpret4(seqNT, handlesNT, failNT, liftMT[MountedFs, HFSErrT]: (MountedFs ~> HFSM))
