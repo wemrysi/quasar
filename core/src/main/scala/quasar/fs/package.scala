@@ -79,12 +79,4 @@ package object fs {
       case other    => other.fold
     })
 
-  // Remove once we have fully migrated to Pathy
-  def convert(path: pathy.Path[_,_,Sandboxed]): Path =
-    Path(posixCodec.printPath(path))
-
-  // Remove once we have fully migrated to Pathy
-  def convertToAFile(path: Path): Option[AFile] =
-    posixCodec.parseAbsFile(path.pathname) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
-
 }
