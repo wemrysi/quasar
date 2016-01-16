@@ -1,19 +1,22 @@
 package quasar
 package fs
 
+import scala.collection.IndexedSeq
+
+import quasar.Predef._
+import quasar.DataGen._
+import quasar.fp._
+import quasar.fp.free.{Interpreter, SpecializedInterpreter}
+import quasar.fs.SandboxedPathy._
+
 import org.scalacheck.{Gen, Arbitrary}
 import pathy.Path._
 import pathy.scalacheck._
 import pathy.scalacheck.PathOf._
-import quasar.Predef._
-import quasar.fp._
-import quasar.fp.free.{Interpreter, SpecializedInterpreter}
-import scala.collection.IndexedSeq
-
+import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
-import quasar.DataGen._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
@@ -45,13 +48,6 @@ trait FileSystemFixture {
     def filename = fileName(file)
   }
 
-  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[FileName \/ DirName] = {
-    scala.Predef.require(index >= 0)
-    val list =
-      pathy.Path.flatten(none, none, none, DirName(_).right.some,FileName(_).left.some,path).toIList.unite
-    list.drop(index).headOption
-  }
-
   case class NonEmptyDir(
                           dirOfCharacters: AbsDirOf[AlphaCharacters],
                           filesInDir: NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]
@@ -73,6 +69,12 @@ trait FileSystemFixture {
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
     (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
       Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
+
+  implicit val arbitraryAPath: Arbitrary[APath] =
+    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[AFile], Arbitrary.arbitrary[ADir]))
+
+  implicit val arbitraryRPath: Arbitrary[RPath] =
+    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[RFile], Arbitrary.arbitrary[RDir]))
 
   type F[A]            = Free[FileSystem, A]
   type InMemFix[A]     = ReadWriteT[InMemoryFs, A]
