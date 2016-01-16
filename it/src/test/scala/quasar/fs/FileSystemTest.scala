@@ -128,11 +128,10 @@ object FileSystemTest {
   def hierarchicalUT: Task[FileSystemUT[FileSystem]] = {
     val mntDir: ADir = rootDir </> dir("mnt") </> dir("inmem")
 
-    (NameGenerator.salt |@| interpretHfsIO |@| inMemUT)((dir, f, mem) =>
+    (interpretHfsIO |@| inMemUT)((f, mem) =>
       FileSystemUT(
         BackendName("hierarchical"),
         foldMapNT[HfsIO, Task](f) compose hierarchical.fileSystem[Task, HfsIO](
-          DirName(dir),
           Mounts.singleton(mntDir, mem.run)),
         mntDir))
   }

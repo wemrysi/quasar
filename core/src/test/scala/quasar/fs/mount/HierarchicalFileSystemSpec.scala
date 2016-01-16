@@ -56,7 +56,7 @@ class HierarchicalFileSystemSpec extends Specification with FileSystemFixture {
   val cMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).c)(s => ms => ms.copy(c = s))
 
   val interpretH: FileSystem ~> HEffM =
-    hierarchical.fileSystem[MountedFs, HEff](DirName(":"), Mounts.fromFoldable(List(
+    hierarchical.fileSystem[MountedFs, HEff](Mounts.fromFoldable(List(
       (mntA, zoomNT[Id](aMem) compose Mem.interpretTerm),
       (mntB, zoomNT[Id](bMem) compose Mem.interpretTerm),
       (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
