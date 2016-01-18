@@ -76,6 +76,7 @@ object data {
             result <- if (all.isEmpty) BadRequest("Request has no body")
             else {
               val (errors, cleanData) = unzipDisj(all.toList)
+              // TODO{2.4}: FIX THIS TO BE STREAMING
               // Does the fact that save take a Process[Free, A] doom us to non-streaming upload?
               responseForUpload(errors, convert[S, FileSystemError](f)(by(Process.emitAll(cleanData))).runLog.map(_.toList))
             }

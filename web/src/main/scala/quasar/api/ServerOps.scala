@@ -263,14 +263,3 @@ abstract class ServerOps[WC: CodecJson, SC](
       .run
   }
 }
-
-// https://github.com/puffnfresh/wartremover/issues/149
-@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-object Server extends ServerOps(
-  WebConfig,
-  WebConfig(ServerConfig(None), Map()),
-  WebConfigLens(
-    WebConfig.server,
-    WebConfig.mountings,
-    WebConfig.server composeLens ServerConfig.port,
-    ServerConfig.port))
