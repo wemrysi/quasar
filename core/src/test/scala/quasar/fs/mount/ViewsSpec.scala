@@ -1,10 +1,10 @@
-package quasar.fs
+package quasar.fs.mount
 
 import quasar.Predef._
 
-import quasar._
-import LogicalPlan.{Free => LPFree, _}
+import quasar._, LogicalPlan.{Free => LPFree, _}
 import quasar.fp._
+import quasar.fs._
 import quasar.recursionschemes._
 import quasar.std.StdLib._, set._, structural._
 
@@ -110,7 +110,7 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
       // to act like a filter or decorator for an existing collection.
 
       val p = rootDir </> dir("foo") </> file("bar")
-      val q = Fix(Take(Read(convert(p)), Constant(Data.Int(10))))
+      val q = Fix(Take(Read(Path.fromAPath(p)), Constant(Data.Int(10))))
       val vs = Views(Map(p -> q))
 
       vs.lookup(p) must beSome(q)

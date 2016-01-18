@@ -1,4 +1,4 @@
-package quasar.mount
+package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.EnvironmentError2
@@ -9,7 +9,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 class MapMounterSpec extends MountingSpec[MountingF] {
-  import MapMounter.{Mounts, MountR}, MountConfig2._
+  import MapMounter.{Mountings, MountR}, MountConfig2._
 
   val invalidUri = ConnectionUri(uriA.value + "INVALID")
   val unsuppUri  = ConnectionUri(uriB.value + "VERSION")
@@ -25,7 +25,7 @@ class MapMounterSpec extends MountingSpec[MountingF] {
 
   def interpret = {
     val mm = MapMounter[Id](doMount)
-    val ref = TaskRef(Mounts.empty).run
+    val ref = TaskRef(Mountings.empty).run
 
     val interp0: Mounting ~> Task = new (Mounting ~> Task) {
       def apply[A](m: Mounting[A]) = ref.modifyS(mm(m).run)

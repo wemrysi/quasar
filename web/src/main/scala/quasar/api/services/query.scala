@@ -20,7 +20,7 @@ import quasar._
 import quasar.Predef._
 import quasar.api.{MessageFormat, Destination, AsDirPath}
 import quasar.{Variables, fs}
-import quasar.fs._
+import quasar.fs.{Path => QPath, _}
 import quasar.recursionschemes.Fix, Fix._
 import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
 
@@ -79,7 +79,7 @@ object query {
     HttpService {
       case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => {
         handleOffsetLimitParams(offset, limit) { (offset, limit) =>
-          SQLParser.parseInContext(query, fs.convert(path)).fold(
+          SQLParser.parseInContext(query, QPath.fromAPath(path)).fold(
             formatParsingError,
             expr => queryPlan(addOffsetLimit(expr, offset, limit), vars(req)).run.value.fold(
               errs => translateSemanticErrors(errs),
@@ -99,7 +99,8 @@ object query {
           if (query == "") POSTContentMustContainQuery
           else {
             req.headers.get(Destination).fold(DestinationHeaderMustExist) { destination =>
-              val parseRes = SQLParser.parseInContext(Query(query),fs.convert(path)).leftMap(formatParsingError)
+              val parseRes = SQLParser.parseInContext(Query(query), QPath.fromAPath(path))
+                .leftMap(formatParsingError)
               val destinationFile = posixCodec.parsePath(
                 relFile => \/-(\/-(relFile)),
                 absFile => \/-(-\/(absFile)),
@@ -158,7 +159,7 @@ object query {
     HttpService {
       case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) =>
         handleOffsetLimitParams(offset, limit) { (offset, limit) =>
-          SQLParser.parseInContext(query, fs.convert(path))
+          SQLParser.parseInContext(query, QPath.fromAPath(path))
             .fold(formatParsingError, expr => explainQuery(expr, offset, limit, vars(req)))
         }
 
