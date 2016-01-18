@@ -1,11 +1,11 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.fs.PathGen._
 
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
-import scalaz._, Scalaz._
 
 class PathSpecs extends Specification with DisjunctionMatchers with ScalaCheck {
   "Path.apply" should {
@@ -303,11 +303,10 @@ class PathSpecs extends Specification with DisjunctionMatchers with ScalaCheck {
 
   "Path conversion" should {
     import pathy.Path._
-    import pathy.scalacheck.PathyArbitrary._
 
     "preserve Pathy path when translated to Path and back" !
-    prop { aFile: AFile =>
-      refineType(Path.fromAPath(aFile).asAPath) ==== aFile.right
+    prop { path: APath =>
+      refineType(Path.fromAPath(path).asAPath) ==== refineType(path)
     }
   }
 

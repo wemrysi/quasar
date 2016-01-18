@@ -13,7 +13,6 @@ import org.scalacheck.{Gen, Arbitrary}
 import pathy.Path._
 import pathy.scalacheck._
 import pathy.scalacheck.PathOf._
-import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
@@ -69,12 +68,6 @@ trait FileSystemFixture {
   implicit val arbNonEmptyDir: Arbitrary[NonEmptyDir] = Arbitrary(
     (Arbitrary.arbitrary[AbsDirOf[AlphaCharacters]] |@|
       Arbitrary.arbitrary[NonEmptyList[(RelFileOf[AlphaCharacters], Vector[Data])]])(NonEmptyDir.apply))
-
-  implicit val arbitraryAPath: Arbitrary[APath] =
-    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[AFile], Arbitrary.arbitrary[ADir]))
-
-  implicit val arbitraryRPath: Arbitrary[RPath] =
-    Arbitrary(Gen.oneOf(Arbitrary.arbitrary[RFile], Arbitrary.arbitrary[RDir]))
 
   type F[A]            = Free[FileSystem, A]
   type InMemFix[A]     = ReadWriteT[InMemoryFs, A]

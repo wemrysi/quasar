@@ -1,6 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.fs.PathGen._
 import quasar.fs.SandboxedPathy._
 
 import org.specs2.mutable._
@@ -10,7 +11,7 @@ import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
-class SandboxedPathySpec extends Specification with DisjunctionMatchers with ScalaCheck with FileSystemFixture {
+class SandboxedPathySpec extends Specification with DisjunctionMatchers with ScalaCheck {
 
   "rootSubPath" should {
     "returns the correct sub path" ! prop { (d: ADir, p: RPath) =>
