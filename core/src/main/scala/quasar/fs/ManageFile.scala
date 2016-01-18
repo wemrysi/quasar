@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar
-package fs
+package quasar.fs
 
 import quasar.Predef._
+import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
 
@@ -126,8 +126,8 @@ object ManageFile {
   final case class Delete(path: APath)
     extends ManageFile[FileSystemError \/ Unit]
 
-  final case class TempFile(nearTo: Option[AFile])
-    extends ManageFile[AFile]
+  final case class TempFile(near: APath)
+    extends ManageFile[FileSystemError \/ AFile]
 
   // TODO{scalaz}: Refactor, dropping Coyoneda and Functor constraint once we
   //               update to scalaz-7.2
@@ -161,26 +161,27 @@ object ManageFile {
     def delete(path: APath): M[Unit] =
       EitherT(lift(Delete(path)))
 
-    /** Returns the path to a new temporary file. When `nearTo` is specified,
-      * an attempt is made to return a tmp path that is as physically close to
-      * the given file as possible.
-      */
-    def tempFile(nearTo: Option[AFile]): F[AFile] =
-      lift(TempFile(nearTo))
-
-    /** Returns the path to a new temporary file. */
-    def anyTempFile: F[AFile] =
-      tempFile(None)
-
     /** Returns the path to a new temporary file as physically close to the
-      * specified file as possible.
+      * supplied path as possible.
       */
-    def tempFileNear(file: AFile): F[AFile] =
-      tempFile(Some(file))
+    def tempFile(near: APath): M[AFile] =
+      EitherT(lift(TempFile(near)))
   }
 
   object Ops {
     implicit def apply[S[_]](implicit S0: Functor[S], S1: ManageFileF :<: S): Ops[S] =
       new Ops[S]
   }
+
+  implicit def RenderManageFile[A] =
+    new RenderTree[ManageFile[A]] {
+      def render(mf: ManageFile[A]) = mf match {
+        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.toString.some,
+          scenario.fold(
+            (from, to) => List(from.render, to.render),
+            (from, to) => List(from.render, to.render)))
+        case Delete(path) => NonTerminal(List("Delete"), None, List(path.render))
+        case TempFile(nearTo) => NonTerminal(List("TempFile"), None, List(nearTo.render))
+      }
+    }
 }

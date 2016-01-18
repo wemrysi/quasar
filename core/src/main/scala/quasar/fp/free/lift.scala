@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.mount
+package quasar.fp.free
 
-import quasar.Predef._
-
-import argonaut._
 import scalaz._
-import scalaz.std.string._
 
-final case class ConnectionUri(value: String) extends scala.AnyVal
+object lift {
+  final class LifterAux[F[_], A](fa: F[A]) {
+    type CF[A] = Coyoneda[F, A]
 
-object ConnectionUri {
-  implicit val connectionUriShow: Show[ConnectionUri] =
-    Show.showFromToString
+    def into[G[_]: Functor](implicit I: F :<: G): Free[G, A] =
+      Free.liftF(I.inj(fa))
 
-  implicit val connectionUriOrder: Order[ConnectionUri] =
-    Order.orderBy(_.value)
+    def intoC[G[_]: Functor](implicit I: CF :<: G): Free[G, A] =
+      lift[CF, A](Coyoneda.lift(fa)).into[G]
+  }
 
-  implicit val connectionUriCodecJson: CodecJson[ConnectionUri] =
-    CodecJson.derived[String].xmap(ConnectionUri(_))(_.value)
+  def apply[F[_], A](fa: F[A]): LifterAux[F, A] =
+    new LifterAux(fa)
 }

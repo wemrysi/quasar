@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package quasar
-package fs
+package quasar.fs
 
 import quasar.Predef._
+import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
 
+import monocle.Iso
 import scalaz._, Scalaz._
 import scalaz.stream._
 
@@ -30,12 +31,15 @@ object WriteFile {
   final case class WriteHandle(file: AFile, id: Long)
 
   object WriteHandle {
+    val tupleIso: Iso[WriteHandle, (AFile, Long)] =
+      Iso((h: WriteHandle) => (h.file, h.id))((WriteHandle(_, _)).tupled)
+
     implicit val writeHandleShow: Show[WriteHandle] =
       Show.showFromToString
 
     // TODO: Switch to order once Order[Path[B,T,S]] exists
     implicit val writeHandleEqual: Equal[WriteHandle] =
-      Equal.equalBy(h => (h.file, h.id))
+      Equal.equalBy(tupleIso.get)
   }
 
   final case class Open(file: AFile)
@@ -178,7 +182,7 @@ object WriteFile {
           if (fsPathNotFound.getOption(e) exists (_ == tmp)) ().point[M]
           else MonadError[G, FileSystemError].raiseError(e))
 
-      MF.tempFileNear(dst).liftM[FileSystemErrT].liftM[Process] flatMap { tmp =>
+      MF.tempFile(dst).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src).terminated.take(1)
           .flatMap(_.cata(
             werr => MF.delete(tmp).as(werr).liftM[Process],
@@ -229,4 +233,15 @@ object WriteFile {
     implicit def apply[S[_]](implicit S0: Functor[S], S1: WriteFileF :<: S): Unsafe[S] =
       new Unsafe[S]
   }
+
+  implicit def RenderWriteFile[A] =
+    new RenderTree[WriteFile[A]] {
+      def render(wf: WriteFile[A]) = wf match {
+        case Open(file)           => NonTerminal(List("Open"), None, List(file.render))
+        case Write(handle, chunk) =>
+          NonTerminal(List("Read"), handle.toString.some,
+            chunk.map(d => Terminal(List("Data"), d.toString.some)).toList)
+        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+      }
+    }
 }

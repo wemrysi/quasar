@@ -18,32 +18,28 @@ package quasar.api
 
 import quasar.Data
 import quasar.Predef._
+import quasar.fp._
+import quasar.fs._, FileSystemError._
 
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.{`Content-Disposition`, `Content-Type`}
-
-import quasar.fs.FileSystemError._
-import quasar.fs._
-import quasar.fp._
-
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
-
-import pathy.Path._
 
 package object services {
   // TODO: Polish this up
   def fileSystemErrorResponse(error: FileSystemError): Task[Response] =
     error match {
-      case Case.PathError(e)                => pathErrorResponse(e)
-      case Case.PlannerError(_, _)          => BadRequest(error.shows)
-      case Case.UnknownReadHandle(handle)   => InternalServerError(s"Unknown read handle: $handle")
-      case Case.UnknownWriteHandle(handle)  => InternalServerError(s"Unknown write handle: $handle")
-      case Case.UnknownResultHandle(handle) => InternalServerError(s"Unknown result handle: $handle")
-      case Case.PartialWrite(numFailed)     => InternalServerError(s"Failed to write $numFailed records")
-      case Case.WriteFailed(data, reason)   => InternalServerError(s"Failed to write ${data.shows} because of $reason")
+      case PathError(e)                => pathErrorResponse(e)
+      case PlannerError(_, _)          => BadRequest(error.shows)
+      case UnknownReadHandle(handle)   => InternalServerError(s"Unknown read handle: $handle")
+      case UnknownWriteHandle(handle)  => InternalServerError(s"Unknown write handle: $handle")
+      case UnknownResultHandle(handle) => InternalServerError(s"Unknown result handle: $handle")
+      case PartialWrite(numFailed)     => InternalServerError(s"Failed to write $numFailed records")
+      case WriteFailed(data, reason)   => InternalServerError(s"Failed to write ${data.shows} because of $reason")
     }
 
 

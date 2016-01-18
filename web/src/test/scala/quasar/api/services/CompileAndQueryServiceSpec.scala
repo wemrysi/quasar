@@ -17,7 +17,7 @@ import org.specs2.mutable.Specification
 import pathy.Path._
 import pathy.scalacheck.AbsFileOf
 import pathy.scalacheck.PathyArbitrary._
-import quasar.fs._
+import quasar.fs.{Path => QPath, _}
 import quasar.fs.InMemory._
 import quasar.recursionschemes._
 
@@ -93,7 +93,7 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
 
   type File = pathy.Path[_,pathy.Path.File,Sandboxed]
 
-  def selectAllLP(file: AFile) = LogicalPlan.Invoke(IdentityLib.Squash,List(LogicalPlan.Read(quasar.fs.convert(file))))
+  def selectAllLP(file: AFile) = LogicalPlan.Invoke(IdentityLib.Squash,List(LogicalPlan.Read(QPath.fromAPath(file))))
   def selectAll(from: File) = "select * from \"" + printPath(from) + "\""
   def selectAllWithVar(from: File, varName: String) = selectAll(from) + " where pop < :" + varName
 

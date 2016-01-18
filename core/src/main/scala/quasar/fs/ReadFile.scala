@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-package quasar
-package fs
+package quasar.fs
 
 import quasar.Predef._
-import quasar.effect.LiftedOps
 
+import quasar._, RenderTree.ops._
+import quasar.effect.LiftedOps
+import quasar.fp._
+
+import monocle.Iso
 import scalaz._
 import scalaz.std.anyVal._
 import scalaz.std.tuple._
 import scalaz.syntax.monad._
+import scalaz.syntax.std.option._
 import scalaz.stream._
 
 sealed trait ReadFile[A]
@@ -32,12 +36,15 @@ object ReadFile {
   final case class ReadHandle(file: AFile, id: Long)
 
   object ReadHandle {
+    val tupleIso: Iso[ReadHandle, (AFile, Long)] =
+      Iso((h: ReadHandle) => (h.file, h.id))((ReadHandle(_, _)).tupled)
+
     implicit val readHandleShow: Show[ReadHandle] =
       Show.showFromToString
 
     // TODO: Switch to order once Order[Path[B,T,S]] exists
     implicit val readHandleEqual: Equal[ReadHandle] =
-      Equal.equalBy(h => (h.file, h.id))
+      Equal.equalBy(tupleIso.get)
   }
 
   final case class Open(file: AFile, offset: Natural, limit: Option[Positive])
@@ -130,4 +137,15 @@ object ReadFile {
     implicit def apply[S[_]](implicit S0: Functor[S], S1: ReadFileF :<: S): Unsafe[S] =
       new Unsafe[S]
   }
+
+  implicit def RenderReadFile[A] =
+    new RenderTree[ReadFile[A]] {
+      def render(rf: ReadFile[A]) = rf match {
+        case Open(file, off, lim) => NonTerminal(List("Open"), None,
+          file.render :: Terminal(List("Offset"), Some(off.toString)) ::
+            lim.map(l => Terminal(List("Limit"), Some(l.toString))).toList)
+        case Read(handle)         => Terminal(List("Read"), handle.toString.some)
+        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+      }
+    }
 }

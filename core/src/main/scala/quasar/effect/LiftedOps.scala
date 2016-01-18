@@ -16,6 +16,8 @@
 
 package quasar.effect
 
+import quasar.fp.free
+
 import scalaz._
 
 /** Encapsulates boilerplate useful in defining lifted operations on free
@@ -25,5 +27,5 @@ abstract class LiftedOps[G[_], S[_]: Functor](implicit S: Coyoneda[G, ?] :<: S) 
   type F[A] = Free[S, A]
 
   def lift[A](ga: G[A]): F[A] =
-    Free.liftF(S.inj(Coyoneda.lift(ga)))
+    free.lift(ga).intoC[S]
 }
