@@ -7,7 +7,7 @@ import org.specs2.scalaz._
 
 import scalaz._
 
-class ServerSpecs extends Specification with DisjunctionMatchers {
+class ServerSpec extends Specification with DisjunctionMatchers {
   import ServerOps.StaticContent, Server._
 
   val defaultOpts = ServerOps.Options(None, None, None, false, false, None)
