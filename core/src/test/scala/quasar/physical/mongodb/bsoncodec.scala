@@ -15,7 +15,7 @@ import quasar._
 class BsonCodecSpecs extends Specification with ScalaCheck with DisjunctionMatchers {
   import BsonCodec._
 
-  import DataGen._
+  import DataArbitrary._
   import BsonGen._
 
   implicit val ShowData = new Show[Data] {
@@ -72,9 +72,6 @@ class BsonCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
         bson => fromData(toData(bson)) must beRightDisjunction(bson))
     }
   }
-
-
-  import DataGen._
 
   "round trip to repr (all Data types)" ! prop { (data: Data) =>
     BsonCodec.fromData(data).fold(

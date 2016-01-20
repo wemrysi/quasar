@@ -1,7 +1,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.TypeGen
+import quasar.TypeArbitrary
 import quasar.recursionschemes.Fix
 import quasar.specs2.PendingWithAccurateCoverage
 
@@ -14,7 +14,7 @@ import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 import scalaz.{Validation, ValidationNel, Success, Failure}
 import scalaz.Validation.FlatMap._
 
-class MathSpec extends Specification with ScalaCheck with TypeGen with ValidationMatchers with PendingWithAccurateCoverage {
+class MathSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const
