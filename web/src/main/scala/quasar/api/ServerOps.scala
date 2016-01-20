@@ -17,17 +17,20 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar._, Errors._, Evaluator._
-import quasar.Evaluator.EnvironmentError.EnvPathError
+import quasar._
 import quasar.api.services.RestApi
-import quasar.config._
 import quasar.console._
+import quasar.config._
 import quasar.fp._
-import quasar.fs._, Path.PathError.InvalidPathError
+import quasar.fs.{FileSystem, InMemory}
 import quasar.fs.mount._
 
-import argonaut.CodecJson
+import java.io.File
+import java.lang.System
+
 import scala.concurrent.duration._
+
+import argonaut.CodecJson
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
 import scalaz._, Scalaz._
@@ -58,6 +61,11 @@ abstract class ServerOps[WC: CodecJson, SC](
     val webConfigLens: WebConfigLens[WC, SC]) {
   import ServerOps._
   import webConfigLens._
+
+  type MainErrT[F[_], A] = EitherT[F, String, A]
+  type MainTask[A]       = MainErrT[Task, A]
+
+  val mainTask = MonadError[EitherT[Task,?,?], String]
 
   // NB: This is a terrible thing.
   //     Is there a better way to find the path to a jar?
@@ -202,20 +210,20 @@ abstract class ServerOps[WC: CodecJson, SC](
     help("help") text("prints this usage text")
   }
 
-  def interpretPaths(options: Options): EnvTask[Option[StaticContent]] = {
+  def interpretPaths(options: Options): MainTask[Option[StaticContent]] = {
     val defaultLoc = "/files"
 
-    def path(p: String): EnvTask[String] =
-      liftE(
-        if (options.contentPathRelative) jarPath.map(_ + p)
-        else Task.now(p))
+    def path(p: String): Task[String] =
+      if (options.contentPathRelative) jarPath.map(_ + p)
+      else p.point[Task]
 
     (options.contentLoc, options.contentPath) match {
-      case (None, None) => none.point[EnvTask]
-
-      case (Some(_), None) => EitherT.left(Task.now(InvalidConfig("content-location specified but not content-path")))
-
-      case (loc, Some(p)) => path(p).map(p => Some(StaticContent(loc.getOrElse(defaultLoc), p)))
+      case (None, None) =>
+        none.point[MainTask]
+      case (Some(_), None) =>
+        mainTask.raiseError("content-location specified but not content-path")
+      case (loc, Some(p)) =>
+        path(p).map(p => some(StaticContent(loc.getOrElse(defaultLoc), p))).liftM[MainErrT]
     }
   }
 
@@ -233,31 +241,34 @@ abstract class ServerOps[WC: CodecJson, SC](
   }
 
   def main(args: Array[String]): Unit = {
-    val exec: EnvTask[Unit] = for {
-      opts           <- optionParser.parse(args, Options(None, None, None, false, false, None)).cata(
-                          _.point[EnvTask],
-                          EitherT.left(Task.now(InvalidConfig("couldn’t parse options"))))
-      content <- interpretPaths(opts)
-      redirect = content.map(_.loc)
-      cfgPath <- opts.config.fold[EnvTask[Option[FsPath[pathy.Path.File, pathy.Path.Sandboxed]]]](
-          liftE(Task.now(None)))(
-          cfg => FsPath.parseSystemFile(cfg).toRight(InvalidConfig("Invalid path to config file: " + cfg)).map(Some(_)))
-      config  <- configOps.fromFileOrDefaultPaths(cfgPath).fixedOrElse(EitherT.right(Task.now(defaultWC)))
-      port    =  opts.port getOrElse wcPort.get(config)
-      updCfg  =  wcPort.set(port)(config)
-      fs      <- liftE(interpreter(config))
-      produceRoutes: ((Int => Task[Unit]) => ListMap[String, HttpService]) =
-        reload => RestApi(content.toList, redirect, port, reload).AllServices(fs)
-      result  <- startServers(port, produceRoutes).liftM[EnvErrT]
+    val exec: MainTask[Unit] = for {
+      opts          <- optionParser.parse(args, Options(None, None, None, false, false, None))
+                         .cata(_.point[MainTask], mainTask.raiseError("couldn't parse options"))
+      content       <- interpretPaths(opts)
+      redirect      =  content.map(_.loc)
+      cfgPath       <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+                         FsPath.parseSystemFile(cfg)
+                           .toRight(s"Invalid path to config file: $cfg")
+                           .map(some))
+      config        <- configOps.fromFileOrDefaultPaths(cfgPath)
+                         .leftMap(_.shows)
+                         .fixedOrElse(defaultWC.point[MainTask])
+      port          =  opts.port getOrElse wcPort.get(config)
+      updCfg        =  wcPort.set(port)(config)
+      fs            <- interpreter(config).liftM[MainErrT]
+      produceRoutes =  (reload: (Int => Task[Unit])) =>
+                         RestApi(content.toList, redirect, port, reload).AllServices(fs)
+      result        <- startServers(port, produceRoutes).liftM[MainErrT]
       (servers, shutdown) = result
-      msg     =  stdout("Press Enter to stop.")
-      _       <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[EnvErrT]
-      _       <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[EnvErrT]
-      _       <- servers.run.liftM[EnvErrT] // We need to run the servers in order to make sure everything is cleaned up properly
+      msg           =  stdout("Press Enter to stop.")
+      _             <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[MainErrT]
+      _             <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[MainErrT]
+                    // We need to run the servers in order to make sure everything is cleaned up properly
+      _             <- servers.run.liftM[MainErrT]
     } yield ()
 
     exec.swap
-      .flatMap(e => stderr(e.message).liftM[EitherT[?[_], Unit, ?]])
+      .flatMap(e => stderr(e).liftM[EitherT[?[_], Unit, ?]])
       .merge
       .handleWith { case err => stderr(err.getMessage) }
       .run

@@ -17,12 +17,12 @@
 package quasar.config
 
 import quasar.Predef._
-import quasar.config.implicits._
+import quasar.fs.mount.MountingsConfig2
 
 import argonaut._, Argonaut._
 import monocle._, macros.Lenses
 
-@Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig)
+@Lenses final case class WebConfig(server: ServerConfig, mountings: MountingsConfig2)
 
 object WebConfig extends ConfigOps[WebConfig] {
   def mountingsLens = WebConfig.mountings
@@ -33,6 +33,6 @@ object WebConfig extends ConfigOps[WebConfig] {
 
 final case class WebConfigLens[WC, SC](
   server: Lens[WC, SC],
-  mountings: Lens[WC, MountingsConfig],
+  mountings: Lens[WC, MountingsConfig2],
   wcPort: Lens[WC, Int],
   scPort: Lens[SC, Int])

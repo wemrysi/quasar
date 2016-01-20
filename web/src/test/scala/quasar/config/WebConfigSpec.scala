@@ -1,31 +1,32 @@
 package quasar.config
 
 import quasar.Predef._
-import quasar.fs.{Path => EnginePath}
+import quasar.fp.prism._
+import quasar.fs.mount._
+import quasar.physical.mongodb.fs.MongoDBFsType
 
-import com.mongodb.ConnectionString
+import pathy.Path._
 
 class WebConfigSpec extends ConfigSpec[WebConfig] {
 
   def configOps: ConfigOps[WebConfig] = WebConfig
 
-  def sampleConfig(uri: ConnectionString): WebConfig = WebConfig(
+  def sampleConfig(uri: ConnectionUri): WebConfig = WebConfig(
     server = ServerConfig(Some(92)),
-    mountings = Map(
-      EnginePath.Root -> MongoDbConfig(uri)))
+    mountings = MountingsConfig2(Map(
+      rootDir -> MountConfig2.fileSystemConfig(MongoDBFsType, uri))))
 
   override val ConfigStr =
-    """{
+    s"""{
       |  "server": {
       |    "port": 92
       |  },
       |  "mountings": {
       |    "/": {
       |      "mongodb": {
-      |        "connectionUri": "mongodb://slamengine:slamengine@ds045089.mongolab.com:45089/slamengine-test-01"
+      |        "connectionUri": "${testUri.value}"
       |      }
       |    }
       |  }
       |}""".stripMargin
-
 }

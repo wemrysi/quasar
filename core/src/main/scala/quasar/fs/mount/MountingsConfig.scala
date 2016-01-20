@@ -31,20 +31,23 @@ import scalaz.syntax.foldable._
 import scalaz.std.tuple._
 import scalaz.std.list._
 
-final case class MountingsConfig(toMap: Map[APath, MountConfig2]) extends AnyVal
+final case class MountingsConfig2(toMap: Map[APath, MountConfig2]) extends AnyVal
 
-object MountingsConfig {
-  val mapIso: Iso[MountingsConfig, Map[APath, MountConfig2]] =
-    Iso((_: MountingsConfig).toMap)(MountingsConfig(_))
+object MountingsConfig2 {
+  val empty: MountingsConfig2 =
+    MountingsConfig2(Map())
 
-  implicit val mountingsConfigEncodeJson: EncodeJson[MountingsConfig] =
+  val mapIso: Iso[MountingsConfig2, Map[APath, MountConfig2]] =
+    Iso((_: MountingsConfig2).toMap)(MountingsConfig2(_))
+
+  implicit val mountingsConfigEncodeJson: EncodeJson[MountingsConfig2] =
     EncodeJson.of[Map[String, MountConfig2]]
       .contramap(_.toMap.map(_.leftMap(posixCodec.printPath(_))))
 
-  implicit val mountingsConfigDecodeJson: DecodeJson[MountingsConfig] =
+  implicit val mountingsConfigDecodeJson: DecodeJson[MountingsConfig2] =
     DecodeJson.of[Map[String, MountConfig2]]
       .flatMap(m0 => DecodeJson(κ(m0.toList.foldLeftM(Map[APath, MountConfig2]()) {
         case (m, (s, mc)) =>
           jString(s).as[APath](aPathDecodeJson).map(p => m + (p -> mc))
-      }))).map(MountingsConfig(_))
+      }))).map(MountingsConfig2(_))
 }

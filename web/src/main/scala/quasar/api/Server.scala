@@ -18,12 +18,13 @@ package quasar.api
 
 import quasar.Predef.{Array, Map, None, SuppressWarnings}
 import quasar.config.{ServerConfig, WebConfig, WebConfigLens}
+import quasar.fs.mount.MountingsConfig2
 
 // https://github.com/puffnfresh/wartremover/issues/149
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 object Server extends ServerOps(
   WebConfig,
-  WebConfig(ServerConfig(None), Map()),
+  WebConfig(ServerConfig(None), MountingsConfig2.empty),
   WebConfigLens(
     WebConfig.server,
     WebConfig.mountings,
