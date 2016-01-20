@@ -54,33 +54,34 @@ object MonotonicSeq {
       new Ops[S]
   }
 
-  def taskRefMonotonicSeq(ref: TaskRef[Long]): MonotonicSeq ~> Task =
+  /** Returns an interpreter of `MonotonicSeq` into `Task`, given a
+    * `TaskRef[Long]`.
+    */
+  def fromTaskRef(ref: TaskRef[Long]): MonotonicSeq ~> Task =
     new (MonotonicSeq ~> Task) {
-      def apply[A](fa: MonotonicSeq[A]): Task[A] = fa match {
-        case Next => ref.modifyS(n => (n+1, n))
-      }
+      val toST = toState[State](Lens.id[Long])
+      def apply[A](fa: MonotonicSeq[A]) =
+        ref.modifyS(toST(fa).run)
     }
 
-  /** Returns an interpreter of `MonotonicSeq` into `StateT[F, S, ?]`,
-    * given a `Lens[S, Long]`.
+  /** Returns an interpreter of `MonotonicSeq` into `F[S, ?]`,
+    * given a `Lens[S, Long]` and `MonadState[F, S]`.
     *
-    * NB: Uses partial application of `F[_]` for better type inference, usage:
-    *
-    *   `stateMonotonicSeq[F](lens)`
+    * NB: Uses partial application of `F[_, _]` for better type inference, usage:
+    *   `toState[F](lens)`
     */
-  object stateMonotonicSeq {
-    def apply[F[_]]: Aux[F] =
+  object toState {
+    def apply[F[_, _]]: Aux[F] =
       new Aux[F]
 
-    final class Aux[F[_]] {
-      def apply[S](l: Lens[S, Long])(implicit F: Applicative[F])
-                  : MonotonicSeq ~> StateT[F, S, ?] = {
-        new (MonotonicSeq ~> StateT[F, S, ?]) {
+    final class Aux[F[_, _]] {
+      def apply[S](l: Lens[S, Long])(implicit F: MonadState[F, S])
+                  : MonotonicSeq ~> F[S, ?] =
+        new (MonotonicSeq ~> F[S, ?]) {
           def apply[A](seq: MonotonicSeq[A]) = seq match {
-            case Next => StateT((s: S) => (l.modify(_ + 1)(s), l.get(s)).point[F])
+            case Next => F.gets(l.get) <* F.modify(l.modify(_ + 1))
           }
         }
-      }
     }
   }
 }

@@ -114,27 +114,27 @@ object KeyValueStore {
         ref.modifyS(toST(fa).run)
     }
 
-  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `ST[S, ?]`,
-    * given a `Lens[S, Map[K, V]]` and `MonadState[ST, S]`.
+  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `F[S, ?]`,
+    * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
     *
-    * NB: Uses partial application of `ST[_, _]` for better type inference, usage:
-    *   `toState[ST](lens)`
+    * NB: Uses partial application of `F[_, _]` for better type inference, usage:
+    *   `toState[F](lens)`
     */
   object toState {
-    def apply[ST[_, _]]: Aux[ST] =
-      new Aux[ST]
+    def apply[F[_, _]]: Aux[F] =
+      new Aux[F]
 
-    final class Aux[ST[_, _]] {
-      def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit ST: MonadState[ST, S])
-                        : KeyValueStore[K, V, ?] ~> ST[S, ?] =
-        new(KeyValueStore[K, V, ?] ~> ST[S, ?]) {
-          def apply[A](fa: KeyValueStore[K, V, A]): ST[S, A] = fa match {
+    final class Aux[F[_, _]] {
+      def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
+                        : KeyValueStore[K, V, ?] ~> F[S, ?] =
+        new(KeyValueStore[K, V, ?] ~> F[S, ?]) {
+          def apply[A](fa: KeyValueStore[K, V, A]): F[S, A] = fa match {
             case CompareAndPut(k, expect, update) =>
               lookup(k) flatMap { cur =>
                 if (cur == expect)
                   modify(_ + (k -> update)).as(true)
                 else
-                  ST.point(false)
+                  F.point(false)
               }
 
             case Delete(key) =>
@@ -147,13 +147,13 @@ object KeyValueStore {
               modify(_ + (key -> value))
           }
 
-          type M[A] = ST[S, A]
+          type M[A] = F[S, A]
 
           def lookup(k: K): M[Option[V]] =
-            ST.gets(s => l.get(s).get(k))
+            F.gets(s => l.get(s).get(k))
 
           def modify(f: Map[K, V] => Map[K, V]): M[Unit] =
-            ST.modify(l.modify(f))
+            F.modify(l.modify(f))
         }
     }
   }

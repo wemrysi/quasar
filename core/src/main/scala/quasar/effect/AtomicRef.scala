@@ -23,7 +23,6 @@ import quasar.fp.TaskRef
 import scalaz._
 import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
-import scalaz.syntax.equal._
 import scalaz.syntax.id._
 
 /** A reference to a value that may be updated atomically.
@@ -96,20 +95,23 @@ object AtomicRef {
       }
     }
 
-  def toState[F[_]: Applicative, S: Equal]: AtomicRef[S, ?] ~> StateT[F, S, ?] =
-    new (AtomicRef[S, ?] ~> StateT[F, S, ?]) {
+  def toState[F[_, _], S](implicit F: MonadState[F, S])
+                         : AtomicRef[S, ?] ~> F[S, ?] =
+    new (AtomicRef[S, ?] ~> F[S, ?]) {
       def apply[A](fa: AtomicRef[S, A]) = fa match {
         case Get(f) =>
-          state(s => (s, f(s)))
+          F.gets(f)
 
         case Set(s) =>
-          state(κ((s, ())))
+          F.put(s)
 
         case CompareAndSet(expect, update) =>
-          state(s => if (s === expect) (update, true) else (s, false))
+          F.bind(F.get) { s =>
+            if (s == expect)
+              F.put(update).as(true)
+            else
+              F.point(false)
+          }
       }
-
-      def state[A](f: S => (S, A)) =
-        StateT[F, S, A](s => f(s).point[F])
     }
 }
