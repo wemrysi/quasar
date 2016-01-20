@@ -25,8 +25,8 @@ import pathy.Path
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.scalacheck.ScalazArbitrary._
-import quasar.fs.NumericGen._
-import quasar.DataGen._
+import quasar.fs.NumericArbitrary._
+import quasar.DataArbitrary._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task

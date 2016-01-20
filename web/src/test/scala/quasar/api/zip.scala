@@ -16,7 +16,7 @@ import scodec.bits._
 import scodec.interop.scalaz._
 
 import pathy.Path._
-import quasar.fs.NumericGen._
+import quasar.fs.NumericArbitrary._
 import pathy.scalacheck.PathyArbitrary._
 
 class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {

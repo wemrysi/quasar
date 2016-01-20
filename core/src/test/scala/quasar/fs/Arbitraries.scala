@@ -6,7 +6,8 @@ import org.scalacheck.Gen
 
 trait Arbitraries extends
   NumericArbitrary with
-  FileSystemTypeArbitrary
+  FileSystemTypeArbitrary with
+  NonEmptyStringArbitrary
 
 object Arbitraries extends Arbitraries {
   // TODO: Replace with built-in version when we update scalacheck
