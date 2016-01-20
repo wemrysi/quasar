@@ -54,14 +54,12 @@ object MonotonicSeq {
       new Ops[S]
   }
 
-  def taskRefMonotonicSeq(initial: Long): Task[MonotonicSeq ~> Task] = {
-    TaskRef(initial).map(ref =>
-      new (MonotonicSeq ~> Task) {
-        def apply[A](fa: MonotonicSeq[A]): Task[A] = fa match {
-          case Next => ref.modifyS(n => (n+1, n))
-        }
-      })
-  }
+  def taskRefMonotonicSeq(ref: TaskRef[Long]): MonotonicSeq ~> Task =
+    new (MonotonicSeq ~> Task) {
+      def apply[A](fa: MonotonicSeq[A]): Task[A] = fa match {
+        case Next => ref.modifyS(n => (n+1, n))
+      }
+    }
 
   /** Returns an interpreter of `MonotonicSeq` into `StateT[F, S, ?]`,
     * given a `Lens[S, Long]`.

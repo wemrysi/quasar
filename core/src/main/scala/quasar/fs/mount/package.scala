@@ -18,15 +18,18 @@ package quasar.fs
 
 import quasar.Predef.Map
 import quasar.effect._
-import quasar.fp.free
+import quasar.fp.{free, TaskRef}
 
 import monocle.Lens
-import scalaz.{Lens => _, _}, Id.Id
+import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
 package object mount {
-  type MountingF[A] = Coyoneda[Mounting, A]
   type MntErrT[F[_], A] = EitherT[F, MountingError, A]
+  type MountingF[A] = Coyoneda[Mounting, A]
+
+  type MountConfigs[A]  = KeyValueStore[APath, MountConfig2, A]
+  type MountConfigsF[A] = Coyoneda[MountConfigs, A]
 
   //-- Views --
 
@@ -41,6 +44,9 @@ package object mount {
 
   type ViewStateF[A] = Coyoneda[ViewState, A]
 
+  type MountedViews[A]  = AtomicRef[Views, A]
+  type MountedViewsF[A] = Coyoneda[MountedViews, A]
+
   object ViewState {
     def Ops[S[_]: Functor](
       implicit S: ViewStateF :<: S
@@ -48,10 +54,10 @@ package object mount {
       KeyValueStore.Ops[ReadFile.ReadHandle, ReadFile.ReadHandle \/ QueryFile.ResultHandle, S]
 
     def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
-      KeyValueStore.taskRefKeyValueStore(initial)
+      TaskRef(initial) map KeyValueStore.fromTaskRef
 
     def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
-      KeyValueStore.stateKeyValueStore[Id](l)
+      KeyValueStore.toState[State](l)
   }
 
   type ViewFileSystem0[A] = Coproduct[MonotonicSeqF, FileSystem, A]
