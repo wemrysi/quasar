@@ -204,7 +204,12 @@ abstract class ConfigSpec[Config: CodecJson] extends Specification with Disjunct
   }
 
   "loadAndTest" should {
+    // TODO: this test is unreliable because it depends on a remote MongoDB
+    // instance being available. It should be switched to use the currently-
+    // configured test instance (if available), and be skipped otherwise.
     "load a correct config" in {
+      skipped("-- skipped pending switch to local DB instance")
+
       withTestConfigFile(fp =>
         configOps.toFile(TestConfig, Some(fp)) *>
         configOps.loadAndTest(fp).run
