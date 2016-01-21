@@ -72,7 +72,7 @@ object mount {
         M.lookup(path).fold(
           cfg => Ok(EncodeJson.of[MountConfig2].encode(cfg)),
           errorResponse(NotFound, "There is no mount point at " + posixCodec.printPath(path)))
-        .foldMap(f).run
+        .foldMap(f).join
 
       case req @ MOVE -> AsPath(src) =>
         def move[T](src: Path[Abs, T, Sandboxed], dstStr: String, parse: String => Option[Path[Abs, T, Unsandboxed]], typeStr: String)
