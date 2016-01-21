@@ -25,7 +25,13 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s {
 
   val StubFs = FileSystemType("stub")
 
-  def pathUri(path: APath): Uri = Uri(path = printPath(path))
+  // NB: workaround for apparent bug in http4s's decoding of paths, where
+  // a '%' followed by '/' or a high code-point is dropped. This won't directly
+  // affect the production code path, because it parses the path from the
+  // request stream, where these characters should be escaped anyway.
+  // However, `posixCodec` is certainly not the right way to escape paths
+  // for HTTP and we will want to sort that out at some point. See SD-1322.
+  def pathUri(path: APath): Uri = Uri(path = printPath(path).replaceAll("%(?![0-9a-fA-F])", "%25"))
 
   def viewConfig(q: String, vars: (String, String)*): (Expr, Variables) =
     ((new quasar.sql.SQLParser).parse(quasar.sql.Query(q)).toOption.get,
@@ -77,6 +83,22 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s {
   "Mount Service" should {
     "GET" should {
       "succeed with correct filesystem path" ! prop { d: ADir =>
+        runTest { service =>
+          for {
+            _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo")).run.flatMap(orFailF)
+
+            resp <- service(Request(uri = pathUri(d)))
+          } yield {
+            resp.as[Json].run must_== Json("stub" -> Json("connectionUri" := "foo"))
+            resp.status must_== Status.Ok
+          }
+        }
+      }
+
+      "succeed with correct, problematic filesystem path" in {
+        // NB: the trailing '%' is what breaks http4s
+        val d = rootDir </> dir("a.b c/d\ne%f%")
+
         runTest { service =>
           for {
             _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo")).run.flatMap(orFailF)
