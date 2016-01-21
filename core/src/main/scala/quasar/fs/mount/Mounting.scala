@@ -46,7 +46,7 @@ object Mounting {
   /** Indicates the wrong type of path (file vs. dir) was supplied to the `mount`
     * convenience function.
     */
-  final case class PathTypeMismatch(path: APath)
+  final case class PathTypeMismatch(path: APath) extends scala.AnyVal
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
@@ -106,13 +106,13 @@ object Mounting {
 
     private type ErrF[A, B] = EitherT[F, A, B]
 
-    def bifold[G[_]: Functor, E, A, EE, AA](v: EitherT[G,E,A])(e: E => EE \/ AA, a: A => EE \/ AA): EitherT[G, EE, AA] =
+    private def bifold[G[_]: Functor, E, A, EE, AA](v: EitherT[G,E,A])(e: E => EE \/ AA, a: A => EE \/ AA): EitherT[G, EE, AA] =
       EitherT[G,EE,AA](v.run.map(_.fold(e, a)))
 
-    def toLeft[G[_]: Functor, E1, E2, A](v: EitherT[G, E1, E2 \/ A]): EitherT[G, E1 \/ E2, A] =
+    private def toLeft[G[_]: Functor, E1, E2, A](v: EitherT[G, E1, E2 \/ A]): EitherT[G, E1 \/ E2, A] =
       bifold(v)(_.left.left, _.fold(_.right.left, _.right))
 
-    def toRight[G[_]: Functor, E1, E2, A](v: EitherT[G, E1 \/ E2, A]): EitherT[G, E1, E2 \/ A] =
+    private def toRight[G[_]: Functor, E1, E2, A](v: EitherT[G, E1 \/ E2, A]): EitherT[G, E1, E2 \/ A] =
       bifold(v)(_.fold(_.left, _.left.right), _.right.right)
 
     private val notFound: Prism[MountingError, APath] =
