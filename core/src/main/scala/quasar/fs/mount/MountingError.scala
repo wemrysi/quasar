@@ -21,6 +21,7 @@ import quasar.EnvironmentError2
 import quasar.fs._
 
 import monocle.Prism
+import scalaz.NonEmptyList
 
 sealed trait MountingError
 
@@ -31,7 +32,7 @@ object MountingError {
   final case class EnvironmentError private[mount] (err: EnvironmentError2)
     extends MountingError
 
-  final case class InvalidConfig private[mount] (config: MountConfig2, reason: String)
+  final case class InvalidConfig private[mount] (config: MountConfig2, reasons: NonEmptyList[String])
     extends MountingError
 
   val pathError: Prism[MountingError, PathError2] =
@@ -46,9 +47,9 @@ object MountingError {
       case _ => None
     } (EnvironmentError(_))
 
-  val invalidConfig: Prism[MountingError, (MountConfig2, String)] =
-    Prism[MountingError, (MountConfig2, String)] {
-      case InvalidConfig(cfg, reason) => Some((cfg, reason))
+  val invalidConfig: Prism[MountingError, (MountConfig2, NonEmptyList[String])] =
+    Prism[MountingError, (MountConfig2, NonEmptyList[String])] {
+      case InvalidConfig(cfg, reasons) => Some((cfg, reasons))
       case _ => None
     } ((InvalidConfig(_, _)).tupled)
 }

@@ -186,11 +186,18 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
           .run map (_ must beSome(fsCfgA))
       }
 
-      "fail when mounting above an existing fs mount" >>* {
+      "succeed mounting above an existing fs mount" >>* {
         val d1 = rootDir </> dir("d1")
         val d2 = d1 </> dir("d2")
 
-        mountFF(d2, d1).run map (dj => maybeInvalid(dj) must beSome(d1))
+        (mountFF(d2, d1).toOption *> lookup(d1)).run map (_ must beSome(fsCfgB))
+      }
+
+      "succeed mounting below an existing fs mount" >>* {
+        val d1 = rootDir </> dir("d1")
+        val d2 = d1 </> dir("d2")
+
+        (mountFF(d1, d2).toOption *> lookup(d2)).run map (_ must beSome(fsCfgB))
       }
 
       "fail when mounting at an existing fs mount" >>* {
@@ -199,13 +206,6 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
         mountFF(d, d).run.tuple(lookup(d).run) map { case (dj, cfg) =>
           maybeExists(dj).tuple(cfg) must beSome((d, fsCfgA))
         }
-      }
-
-      "fail when mounting below an existing fs mount" >>* {
-        val d1 = rootDir </> dir("d1")
-        val d2 = d1 </> dir("d2")
-
-        mountFF(d1, d2).run map (dj => maybeInvalid(dj) must beSome(d2))
       }
 
       "succeed when mounting above an existing view mount" >>* {

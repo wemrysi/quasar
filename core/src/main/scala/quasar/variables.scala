@@ -30,7 +30,11 @@ final case class VarName(value: String) {
 final case class VarValue(value: String)
 
 object Variables {
-  def fromMap(value: Map[String, String]): Variables = Variables(value.map(t => VarName(t._1) -> VarValue(t._2)))
+  val empty: Variables =
+    Variables(Map())
+
+  def fromMap(value: Map[String, String]): Variables =
+    Variables(value.map(t => VarName(t._1) -> VarValue(t._2)))
 
   def substVarsƒ[A](vars: Variables): ExprF[Expr] => SemanticError \/ Expr = {
     case VariF(name) =>

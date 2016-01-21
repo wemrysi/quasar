@@ -19,6 +19,7 @@ package quasar
 import scalaz.Coyoneda
 
 package object effect {
+  type AtomicRefF[V, A] = Coyoneda[AtomicRef[V, ?], A]
   type FailureF[E, A] = Coyoneda[Failure[E, ?], A]
   type KeyValueStoreF[K, V, A] = Coyoneda[KeyValueStore[K, V, ?], A]
   type MonotonicSeqF[A] = Coyoneda[MonotonicSeq, A]

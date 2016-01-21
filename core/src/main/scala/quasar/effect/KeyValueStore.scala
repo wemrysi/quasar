@@ -22,6 +22,8 @@ import quasar.fp.TaskRef
 import monocle.Lens
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
+import scalaz.syntax.monad._
+import scalaz.syntax.id._
 
 /** Provides the ability to read, write and delete from a store of values
   * indexed by keys.
@@ -38,6 +40,9 @@ object KeyValueStore {
   final case class Put[K, V](k: K, v: V)
     extends KeyValueStore[K, V, Unit]
 
+  final case class CompareAndPut[K, V](k: K, expect: Option[V], update: V)
+    extends KeyValueStore[K, V, Boolean]
+
   final case class Delete[K, V](k: K)
     extends KeyValueStore[K, V, Unit]
 
@@ -45,17 +50,53 @@ object KeyValueStore {
   final class Ops[K, V, S[_]: Functor](implicit S: KeyValueStoreF[K, V, ?] :<: S)
     extends LiftedOps[KeyValueStore[K, V, ?], S] {
 
-    def get(k: K): OptionT[F, V] =
-      OptionT(lift(Get[K, V](k)))
+    /** Similar to `alterS`, but returns the updated value. */
+    def alter(k: K, f: Option[V] => V): F[V] =
+      alterS(k, v => f(v).squared)
 
-    def put(k: K, v: V): F[Unit] =
-      lift(Put(k, v))
+    /** Atomically associates the given key with the first part of the result
+      * of applying the given function to the value currently associated with
+      * the key, returning the second part of the result.
+      */
+    def alterS[A](k: K, f: Option[V] => (V, A)): F[A] =
+      for {
+        cur       <- get(k).run
+        (nxt, a0) =  f(cur)
+        updated   <- compareAndPut(k, cur, nxt)
+        a         <- if (updated) a0.point[F] else alterS(k, f)
+      } yield a
 
+    /** Returns whether a value is associated with the given key. */
+    def contains(k: K): F[Boolean] =
+      get(k).isDefined
+
+    /** Associate `update` with the given key if the current value at the key
+      * is `expect`, passing `None` for `expect` indicates that they key is
+      * expected not to be associated with a value. Returns whether the value
+      * was updated.
+      */
+    def compareAndPut(k: K, expect: Option[V], update: V): F[Boolean] =
+      lift(CompareAndPut(k, expect, update))
+
+    /** Remove any associated with the given key. */
     def delete(k: K): F[Unit] =
       lift(Delete(k))
 
+    /** Returns the current value associated with the given key. */
+    def get(k: K): OptionT[F, V] =
+      OptionT(lift(Get[K, V](k)))
+
+    /** Atomically updates the value associated with the given key with the
+      * result of applying the given function to the current value, if defined.
+      */
     def modify(k: K, f: V => V): F[Unit] =
-      get(k) flatMapF (v => put(k, f(v))) getOrElse (())
+      get(k) flatMapF { v =>
+        compareAndPut(k, Some(v), f(v)).ifM(().point[F], modify(k, f))
+      } getOrElse (())
+
+    /** Associate the given value with the given key. */
+    def put(k: K, v: V): F[Unit] =
+      lift(Put(k, v))
   }
 
   object Ops {
@@ -63,52 +104,57 @@ object KeyValueStore {
       new Ops[K, V, S]
   }
 
-  def taskRefKeyValueStore[A, B](
-    initial: Map[A, B]
-  ): Task[KeyValueStore[A, B, ?] ~> Task] =
-    TaskRef(initial) map { ref =>
-      new (KeyValueStore[A, B, ?] ~> Task) {
-        def apply[C](fa: KeyValueStore[A, B, C]): Task[C] = fa match {
-          case Put(key, value) =>
-            ref.modifyS(m => (m + (key -> value), ()))
-          case Get(key) =>
-            ref.read.map(_.get(key))
-          case Delete(key) =>
-            ref.modifyS(m => ((m - key), ()))
-        }
-      }
+  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `Task`, given a
+    * `TaskRef[Map[K, V]]`.
+    */
+  def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
+    new (KeyValueStore[K, V, ?] ~> Task) {
+      val toST = toState[State](Lens.id[Map[K,V]])
+      def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
+        ref.modifyS(toST(fa).run)
     }
 
-  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `StateT[F, S, ?]`,
-    * given a `Lens[S, Map[K, V]]`.
+  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `ST[S, ?]`,
+    * given a `Lens[S, Map[K, V]]` and `MonadState[ST, S]`.
     *
-    * NB: Uses partial application of `F[_]` for better type inference, usage:
-    *
-    *   `stateKeyValueStore[F](lens)`
+    * NB: Uses partial application of `ST[_, _]` for better type inference, usage:
+    *   `toState[ST](lens)`
     */
-  object stateKeyValueStore {
-    def apply[F[_]]: Aux[F] =
-      new Aux[F]
+  object toState {
+    def apply[ST[_, _]]: Aux[ST] =
+      new Aux[ST]
 
-    final class Aux[F[_]] {
-      type ST[S, A] = StateT[F, S, A]
-
-      def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: Monad[F])
-                        : KeyValueStore[K, V, ?] ~> ST[S, ?] = {
+    final class Aux[ST[_, _]] {
+      def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit ST: MonadState[ST, S])
+                        : KeyValueStore[K, V, ?] ~> ST[S, ?] =
         new(KeyValueStore[K, V, ?] ~> ST[S, ?]) {
           def apply[A](fa: KeyValueStore[K, V, A]): ST[S, A] = fa match {
-            case Put(key, value) =>
-              st.modify(l.modify(_ + (key -> value)))
-
-            case Get(key) =>
-              st.gets(s => l.get(s).get(key))
+            case CompareAndPut(k, expect, update) =>
+              lookup(k) flatMap { cur =>
+                if (cur == expect)
+                  modify(_ + (k -> update)).as(true)
+                else
+                  ST.point(false)
+              }
 
             case Delete(key) =>
-              st.modify(l.modify(_ - key))
+              modify(_ - key)
+
+            case Get(key) =>
+              lookup(key)
+
+            case Put(key, value) =>
+              modify(_ + (key -> value))
           }
-          val st = MonadState[ST, S]
+
+          type M[A] = ST[S, A]
+
+          def lookup(k: K): M[Option[V]] =
+            ST.gets(s => l.get(s).get(k))
+
+          def modify(f: Map[K, V] => Map[K, V]): M[Unit] =
+            ST.modify(l.modify(f))
         }
-      }
     }
   }
 }

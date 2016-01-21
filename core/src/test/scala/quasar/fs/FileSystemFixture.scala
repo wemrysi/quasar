@@ -1,19 +1,21 @@
 package quasar
 package fs
 
+import scala.collection.IndexedSeq
+
+import quasar.Predef._
+import quasar.DataGen._
+import quasar.fp._
+import quasar.fp.free.{Interpreter, SpecializedInterpreter}
+import quasar.fs.SandboxedPathy._
+
 import org.scalacheck.{Gen, Arbitrary}
 import pathy.Path._
 import pathy.scalacheck._
 import pathy.scalacheck.PathOf._
-import quasar.Predef._
-import quasar.fp._
-import quasar.fp.free.{Interpreter, SpecializedInterpreter}
-import scala.collection.IndexedSeq
-
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazArbitrary._
-import quasar.DataGen._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
@@ -43,13 +45,6 @@ trait FileSystemFixture {
     def state = InMemState fromFiles Map(file -> contents)
     def parent = fileParent(file)
     def filename = fileName(file)
-  }
-
-  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[FileName \/ DirName] = {
-    scala.Predef.require(index >= 0)
-    val list =
-      pathy.Path.flatten(none, none, none, DirName(_).right.some,FileName(_).left.some,path).toIList.unite
-    list.drop(index).headOption
   }
 
   case class NonEmptyDir(

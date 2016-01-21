@@ -1,11 +1,13 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.fs.PathGen._
 
 import org.specs2.mutable._
+import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 
-class PathSpecs extends Specification with DisjunctionMatchers {
+class PathSpecs extends Specification with DisjunctionMatchers with ScalaCheck {
   "Path.apply" should {
     "Parse empty string as root" in {
       Path("") must_== Path.Root
@@ -298,4 +300,14 @@ class PathSpecs extends Specification with DisjunctionMatchers {
       Path("./foo/bar/").rebase(Path("./foo/bar/")) must beRightDisjunction(Path("./"))
     }
   }
+
+  "Path conversion" should {
+    import pathy.Path._
+
+    "preserve Pathy path when translated to Path and back" !
+    prop { path: APath =>
+      refineType(Path.fromAPath(path).asAPath) ==== refineType(path)
+    }
+  }
+
 }

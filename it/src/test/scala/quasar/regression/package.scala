@@ -1,8 +1,8 @@
 package quasar
 
-import quasar.Predef.Map
+import quasar.Predef.{Long, Map}
 import quasar.fs.{QueryFile, FileSystem, ADir}
-import quasar.fp.free
+import quasar.fp.{free, TaskRef}
 import quasar.effect._
 
 import scalaz.{Failure => _, _}
@@ -22,19 +22,25 @@ package object regression {
     import QueryFile.ResultHandle
     import quasar.fs.mount.hierarchical._
 
-    val handlesTask: Task[MountedResultHF ~> Task] =
-      KeyValueStore.taskRefKeyValueStore[ResultHandle, (ADir, ResultHandle)](Map())
-        .map(Coyoneda.liftTF[MountedResultH, Task](_))
+    def handlesTask(
+      ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+    ) : MountedResultHF ~> Task =
+      Coyoneda.liftTF[MountedResultH, Task](
+        KeyValueStore.fromTaskRef(ref))
 
-    val monoSeqTask: Task[MonotonicSeqF ~> Task] =
-      MonotonicSeq.taskRefMonotonicSeq(0)
-        .map(Coyoneda.liftTF[MonotonicSeq, Task](_))
+    def monoSeqTask(ref: TaskRef[Long]): MonotonicSeqF ~> Task =
+      Coyoneda.liftTF[MonotonicSeq, Task](
+        MonotonicSeq.taskRefMonotonicSeq(ref))
 
     val hfsFailTask: HFSFailureF ~> Task =
       Coyoneda.liftTF[HFSFailure, Task](
         Failure.toTaskFailure[HierarchicalFileSystemError])
 
-    (handlesTask |@| monoSeqTask)((hndl, monos) =>
-      free.interpret4(monos, hfsFailTask, hndl, NaturalTransformation.refl))
+    (TaskRef(Map.empty[ResultHandle, (ADir, ResultHandle)]) |@| TaskRef(0L))(
+      (handles, ct) => free.interpret4(
+        monoSeqTask(ct),
+        hfsFailTask,
+        handlesTask(handles),
+        NaturalTransformation.refl))
   }
 }
