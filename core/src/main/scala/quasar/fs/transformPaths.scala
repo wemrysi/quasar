@@ -20,7 +20,7 @@ import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.fp.free.injectedNT
 import quasar.recursionschemes.{FunctorT, Fix}, FunctorT.ops._
 
-import monocle.Optional
+import monocle.{Lens, Optional}
 import monocle.syntax.fields._
 import monocle.std.tuple2._
 import scalaz.{Optional => _, _}
@@ -28,6 +28,7 @@ import scalaz.std.tuple._
 import scalaz.syntax.functor._
 
 object transformPaths {
+  import ReadFile.ReadHandle, WriteFile.WriteHandle
 
   /** Returns a natural transformation that transforms all paths in `ReadFile`
     * operations using the given transformations.
@@ -47,14 +48,14 @@ object transformPaths {
       def apply[A](rf: ReadFile[A]) = rf match {
         case Open(src, off, lim) =>
           Coyoneda.lift(Open(inPath(src), off, lim))
-            .map(_ leftMap transformErrorPath(outPath))
+            .map(_ bimap (transformErrorPath(outPath), readHFile.modify(outPath(_))))
 
         case Read(h) =>
-          Coyoneda.lift(Read(h))
+          Coyoneda.lift(Read(readHFile.modify(inPath(_))(h)))
             .map(_ leftMap transformErrorPath(outPath))
 
         case Close(h) =>
-          Coyoneda.lift(Close(h))
+          Coyoneda.lift(Close(readHFile.modify(inPath(_))(h)))
       }
     }
 
@@ -79,14 +80,14 @@ object transformPaths {
       def apply[A](wf: WriteFile[A]) = wf match {
         case Open(dst) =>
           Coyoneda.lift(Open(inPath(dst)))
-            .map(_ leftMap transformErrorPath(outPath))
+            .map(_ bimap (transformErrorPath(outPath), writeHFile.modify(outPath(_))))
 
         case Write(h, d) =>
-          Coyoneda.lift(Write(h, d))
+          Coyoneda.lift(Write(writeHFile.modify(inPath(_))(h), d))
             .map(_ map transformErrorPath(outPath))
 
         case Close(h) =>
-          Coyoneda.lift(Close(h))
+          Coyoneda.lift(Close(writeHFile.modify(inPath(_))(h)))
       }
     }
 
@@ -205,6 +206,18 @@ object transformPaths {
 
   ////
 
+  private val readHFile: Lens[ReadHandle, AFile] =
+    ReadHandle.tupleIso composeLens _1
+
+  private val fsUnkRdError: Optional[FileSystemError, AFile] =
+    FileSystemError.unknownReadHandle composeLens readHFile
+
+  private val writeHFile: Lens[WriteHandle, AFile] =
+    WriteHandle.tupleIso composeLens _1
+
+  private val fsUnkWrError: Optional[FileSystemError, AFile] =
+    FileSystemError.unknownWriteHandle composeLens writeHFile
+
   private val fsPathError: Optional[FileSystemError, APath] =
     FileSystemError.pathError composeLens PathError2.errorPath
 
@@ -215,7 +228,9 @@ object transformPaths {
     f: AbsPath ~> AbsPath
   ): FileSystemError => FileSystemError =
     fsPathError.modify(f(_)) compose
-      fsPlannerError.modify(_ translate transformLPPaths(f))
+    fsUnkRdError.modify(f(_)) compose
+    fsUnkWrError.modify(f(_)) compose
+    fsPlannerError.modify(_ translate transformLPPaths(f))
 
   private def transformLPPaths(f: AbsPath ~> AbsPath): LogicalPlan ~> LogicalPlan =
     new (LogicalPlan ~> LogicalPlan) {

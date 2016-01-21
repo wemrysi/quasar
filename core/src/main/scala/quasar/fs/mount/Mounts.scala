@@ -26,25 +26,29 @@ import scalaz._, Scalaz._
   * path is a prefix of any other path.
   *
   * The current implementation is linear in the number of mounts, might be able
-  * to do better using a bintree given an `Order` on `ADir`.
+  * to do better using a different data structure that takes advantage of the
+  * invariant and structure of the `ADir` keys.
   */
 final class Mounts[A] private (val toMap: Map[ADir, A]) {
-  def add(at: ADir, a: A): String \/ Mounts[A] = {
-    def added: Mounts[A] =
-      new Mounts(toMap + (at -> a))
-
-    if (toMap contains at)
-      added.right
+  /** Returns whether the given directory is a candidate as a mapping key,
+    * a "left" result describes why the key is not a candidate and a "right"
+    * signifies a valid candidate.
+    */
+  def candidacy(d: ADir): String \/ Unit =
+    if (toMap contains d)
+      ().right
     else
       toMap.keys.toStream.traverseU_ { mnt =>
-        mnt.relativeTo(at)
+        mnt.relativeTo(d)
           .as("existing mount below: " + posixCodec.printPath(mnt))
           .toLeftDisjunction(()) *>
-        at.relativeTo(mnt)
+        d.relativeTo(mnt)
           .as("existing mount above: " + posixCodec.printPath(mnt))
           .toLeftDisjunction(())
-      } as added
-  }
+      }
+
+  def add(at: ADir, a: A): String \/ Mounts[A] =
+    candidacy(at) as (new Mounts(toMap + (at -> a)))
 
   def + (mount: (ADir, A)): String \/ Mounts[A] =
     add(mount._1, mount._2)

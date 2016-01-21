@@ -246,19 +246,18 @@ object QueryRegressionTest {
     } yield hfsUts
   }
 
-  private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] = {
-    (NameGenerator.salt |@| interpretHfsIO) { (dir, hfs) =>
+  private def hierarchicalFSIO(mnt: ADir, f: FileSystemIO ~> Task): Task[FileSystemIO ~> Task] =
+    interpretHfsIO map { hfs =>
       val interpFS = f compose injectNT[FileSystem, FileSystemIO]
 
       val g: FileSystem ~> Free[HfsIO, ?] =
-        hierarchical.fileSystem[Task, HfsIO](DirName(dir), Mounts.singleton(mnt, interpFS))
+        hierarchical.fileSystem[Task, HfsIO](Mounts.singleton(mnt, interpFS))
           .compose(chroot.fileSystem[FileSystem](mnt))
 
       free.interpret2(
         NaturalTransformation.refl[Task],
         free.foldMapNT(hfs) compose g)
     }
-  }
 
   implicit val dataEncodeJson: EncodeJson[Data] =
     EncodeJson(d =>

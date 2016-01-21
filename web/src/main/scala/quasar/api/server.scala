@@ -140,7 +140,7 @@ abstract class ServerOps[WC: CodecJson, SC](
 
     val serversAndPort = configurations.evalMap(conf =>
       startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
-        stdout("Server started. Listening on port " + port) })
+        stdout("Server started listening on port " + port) })
 
     serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
       oldServer.shutdown.flatMap(_ => stdout("Stopped server listening on port " + oldPort)) *>

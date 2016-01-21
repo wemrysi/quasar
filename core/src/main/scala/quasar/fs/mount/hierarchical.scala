@@ -24,8 +24,6 @@ import quasar.fs._
 import quasar.recursionschemes.{free => _, _}, Recursive.ops._
 
 import monocle.{Iso, Prism}
-import monocle.syntax.fields._
-import monocle.std.tuple2._
 import pathy.Path._
 import scalaz.{Failure => _, Node => _, _}, Scalaz._
 
@@ -65,11 +63,9 @@ object hierarchical {
   /** Returns a `ReadFileF` interpreter that selects one of the configured
     * child interpreters based on the path of the incoming request.
     *
-    * @param mountSep used to separate the mount from the original file in handles
     * @param rfs `ReadFileF` interpreters indexed by mount
     */
   def readFile[F[_], S[_]](
-    mountSep: DirName,
     rfs: Mounts[ReadFileF ~> F]
   )(implicit
     S0: Functor[S],
@@ -89,21 +85,18 @@ object hierarchical {
     val f = new (ReadFile ~> M) {
       def apply[A](rf: ReadFile[A]) = rf match {
         case Open(loc, off, lim) =>
-          lookupMounted(mountedRfs, loc)
-            .fold(pathError(pathNotFound(loc)).left[ReadHandle].point[M]) {
-              case (mnt, g) =>
-                evalRead(g, Open(loc, off, lim))
-                  .map(_ map prefixH(mountSep, ReadHandle.tupleIso, mnt))
-            }
+          lookupMounted(mountedRfs, loc) map { case (mnt, g) =>
+            evalRead(g, Open(loc, off, lim))
+          } getOrElse pathError(pathNotFound(loc)).left.point[M]
 
         case Read(h) =>
-          mntH(mountSep, ReadHandle.tupleIso, h).flatMap { case (mnt, origH) =>
-            mountedRfs.lookup(mnt) map (evalRead(_, Read(origH)))
+          lookupMounted(mountedRfs, h.file) map { case (mnt, g) =>
+            evalRead(g, Read(h))
           } getOrElse unknownReadHandle(h).left.point[M]
 
         case Close(h) =>
-          mntH(mountSep, ReadHandle.tupleIso, h).flatMap { case (mnt, origH) =>
-            mountedRfs.lookup(mnt) map (evalRead(_, Close(origH)))
+          lookupMounted(mountedRfs, h.file) map { case (mnt, g) =>
+            evalRead(g, Close(h))
           } getOrElse ().point[M]
       }
     }
@@ -118,7 +111,6 @@ object hierarchical {
     * @param wfs `WriteFileF` interpreters indexed by mount
     */
   def writeFile[F[_], S[_]](
-    mountSep: DirName,
     wfs: Mounts[WriteFileF ~> F]
   )(implicit
     S0: Functor[S],
@@ -138,21 +130,18 @@ object hierarchical {
     val f = new (WriteFile ~> M) {
       def apply[A](wf: WriteFile[A]) = wf match {
         case Open(loc) =>
-          lookupMounted(mountedWfs, loc)
-            .fold(pathError(pathNotFound(loc)).left[WriteHandle].point[M]) {
-              case (mnt, g) =>
-                evalWrite(g, Open(loc))
-                  .map(_ map prefixH(mountSep, WriteHandle.tupleIso, mnt))
-            }
+          lookupMounted(mountedWfs, loc) map { case (mnt, g) =>
+            evalWrite(g, Open(loc))
+          } getOrElse pathError(pathNotFound(loc)).left.point[M]
 
         case Write(h, chunk) =>
-          mntH(mountSep, WriteHandle.tupleIso, h).flatMap { case (mnt, origH) =>
-            mountedWfs.lookup(mnt) map (evalWrite(_, Write(origH, chunk)))
+          lookupMounted(mountedWfs, h.file) map { case (mnt, g) =>
+            evalWrite(g, Write(h, chunk))
           } getOrElse Vector(unknownWriteHandle(h)).point[M]
 
         case Close(h) =>
-          mntH(mountSep, WriteHandle.tupleIso, h).flatMap { case (mnt, origH) =>
-            mountedWfs.lookup(mnt) map (evalWrite(_, Close(origH)))
+          lookupMounted(mountedWfs, h.file) map { case (mnt, g) =>
+            evalWrite(g, Close(h))
           } getOrElse ().point[M]
       }
     }
@@ -328,7 +317,6 @@ object hierarchical {
   }
 
   def fileSystem[F[_], S[_]](
-    mountSep: DirName,
     mounts: Mounts[FileSystem ~> F]
   )(implicit
     S0: Functor[S],
@@ -343,8 +331,8 @@ object hierarchical {
     def injFS[G[_]](implicit I: G :<: FS): G ~> FS = injectNT[G, FS]
 
     val qf: QueryFileF ~> M  = queryFile[F, S](mounts map (_ compose injFS[QueryFileF]))
-    val rf: ReadFileF ~> M   = readFile[F, S](mountSep, mounts map (_ compose injFS[ReadFileF]))
-    val wf: WriteFileF ~> M  = writeFile[F, S](mountSep, mounts map (_ compose injFS[WriteFileF]))
+    val rf: ReadFileF ~> M   = readFile[F, S](mounts map (_ compose injFS[ReadFileF]))
+    val wf: WriteFileF ~> M  = writeFile[F, S](mounts map (_ compose injFS[WriteFileF]))
     val mf: ManageFileF ~> M = manageFile[F, S](mounts map (_ compose injFS[ManageFileF]))
 
     free.interpret4(qf, rf, wf, mf)
@@ -416,41 +404,6 @@ object hierarchical {
       case xs  => xs.toSet.some
     }
   }
-
-  /** Returns the extracted mount from the given handle and a new handle with
-    * the mount prefix and separator removed.
-    */
-  private def mntH[H](sep: DirName, iso: Iso[H, (AFile, Long)], h: H): Option[(ADir, H)] = {
-    import IList.{single, empty}
-    type F[A] = Option[(ADir, A)]
-
-    def splitAtSep(f: AFile): Option[(ADir, AFile)] = {
-      val segs = {
-        val ss = flatten[IList[String]](empty, empty, empty, single, single, f)
-        (ss.head :: ss.tail).join
-      }
-      val mntSegs = segs.takeWhile(_ != sep.value)
-      val fileSegs = segs.drop(mntSegs.length + 1)
-
-      val mnt = mntSegs.foldLeft(rootDir[Sandboxed])(_ </> dir(_))
-      val origF = fileSegs.toNel.map(_.reverse).map { nel =>
-        nel.tail.foldRight(rootDir[Sandboxed])((s, d) => d </> dir(s)) </> file(nel.head)
-      }
-
-      origF strengthL mnt
-    }
-
-    iso.composeLens(_1)
-      .modifyF[F](splitAtSep)(h)(Functor[Option].compose[(ADir, ?)])
-  }
-
-  /** Returns a function that adds a mount-specific prefix to a handle,
-    * separated by `sep`.
-    */
-  private def prefixH[H](sep: DirName, iso: Iso[H, (AFile, Long)], mnt: ADir): H => H =
-    iso.composeLens(_1) modify { f =>
-      f.relativeTo(rootDir).fold(f)(rf => mnt </> dir1(sep) </> rf)
-    }
 
   private object getMounted {
     final class Aux[S[_]] {
