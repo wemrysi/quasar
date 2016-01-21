@@ -20,7 +20,7 @@ class ServerServiceSpec extends Specification {
 
   val client = org.http4s.client.blaze.defaultClient
 
-  def withServerExpectingRestart[B](timeoutMillis: Long = 10000, initialPort: Int = 8888, defaultPort: Int = 8888)
+  def withServerExpectingRestart[B](timeoutMillis: Long = 30000, initialPort: Int = 8888, defaultPort: Int = 8888)
                                       (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
     val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
