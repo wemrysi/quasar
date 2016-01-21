@@ -26,6 +26,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
   type ExecM[A] = transforms.ExecM[A]
   type MountedFs[A] = State[MountedState, A]
+  type MountedFsE[E, A] = EitherT[MountedFs, E, A]
   type HFSM[A] = HFSErrT[MountedFs, A]
 
   type HEff0[A] = Coproduct[HFSFailureF, MountedFs, A]
@@ -65,11 +66,11 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
   def runH: F ~> HFSM = {
     val seqNT: MonotonicSeqF ~> HFSM =
       liftMT[MountedFs, HFSErrT].compose[MonotonicSeqF](
-        Coyoneda.liftTF[MonotonicSeq, MountedFs](MonotonicSeq.stateMonotonicSeq[Id](seq)))
+        Coyoneda.liftTF[MonotonicSeq, MountedFs](MonotonicSeq.toState[State](seq)))
 
     val failNT: HFSFailureF ~> HFSM =
       Coyoneda.liftTF[HFSFailure, HFSM](
-        Failure.toEitherT[MountedFs, HierarchicalFileSystemError])
+        Failure.toError[MountedFsE, HierarchicalFileSystemError])
 
     val handlesNT: MountedResultHF ~> HFSM =
       liftMT[MountedFs, HFSErrT].compose[MountedResultHF](

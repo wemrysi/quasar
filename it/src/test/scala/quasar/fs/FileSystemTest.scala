@@ -120,7 +120,7 @@ object FileSystemTest {
       val memPlus: ViewFileSystem ~> Task =
         interpretViewFileSystem(
           viewState,
-          MonotonicSeq.taskRefMonotonicSeq(seqRef),
+          MonotonicSeq.fromTaskRef(seqRef),
           mem.run)
 
       val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem](Views(Map.empty))
