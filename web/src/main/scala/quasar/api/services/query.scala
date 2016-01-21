@@ -53,7 +53,6 @@ object query {
 
   private val QueryParameterMustContainQuery = BadRequest("The request must contain a query")
   private val POSTContentMustContainQuery    = BadRequest("The body of the POST must contain a query")
-  private val DestinationHeaderMustExist     = BadRequest("The '" + Destination.name + "' header must be specified")
 
   def translateSemanticErrors(error: SemanticErrors): Task[Response] = BadRequest(error.shows)
 
@@ -98,7 +97,7 @@ object query {
         EntityDecoder.decodeString(req).flatMap { query =>
           if (query == "") POSTContentMustContainQuery
           else {
-            req.headers.get(Destination).fold(DestinationHeaderMustExist) { destination =>
+            requiredHeader(Destination, req).map { destination =>
               val parseRes = SQLParser.parseInContext(Query(query), QPath.fromAPath(path))
                 .leftMap(formatParsingError)
               val destinationFile = posixCodec.parsePath(
@@ -129,7 +128,7 @@ object query {
                 }
               })
               resultOrError.merge
-            }
+            }.merge
           }
         }
     }

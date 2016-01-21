@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs._
+import quasar.fs.{Path => QPath, _}
 
 import argonaut.{DecodeResult => _, _}
 import Argonaut._
@@ -33,7 +33,7 @@ import org.http4s.util._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
-import pathy.Path._
+import pathy.Path, Path._
 
 package object api {
 
@@ -46,7 +46,7 @@ package object api {
     }
   }
 
-  object FileName extends HeaderKey.Singleton {
+  object XFileName extends HeaderKey.Singleton {
     type HeaderT = Header
     val name = CaseInsensitiveString("X-File-Name")
     override def matchHeader(header: Header): Option[HeaderT] = {
@@ -117,11 +117,17 @@ package object api {
     }
   }
 
+  /** Convert an absolute path to sandboxed. Needed only because parseAbsDir/File
+    * produces an Unsandboxed path. NB: never fails, despite producing an Option.
+    */
+  def resandbox[T](path: Path[Abs, T, Unsandboxed]): Option[Path[Abs, T, Sandboxed]] =
+    sandbox(rootDir, path).map(rootDir </> _)
+
   // TODO: probably need a URL-specific codec here
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
       val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsDir(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
+      posixCodec.parseAbsDir(str) flatMap resandbox
     }
   }
 
@@ -129,7 +135,7 @@ package object api {
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
       val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsFile(str) flatMap (sandbox(rootDir, _)) map (rootDir </> _)
+      posixCodec.parseAbsFile(str) flatMap resandbox
     }
   }
 

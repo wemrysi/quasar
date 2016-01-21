@@ -48,8 +48,6 @@ import posixCodec._
 
 object data {
 
-  private val DestinationHeaderMustExist = BadRequest("The '" + Destination.name + "' header must be specified")
-
   def service[S[_]: Functor](f: S ~> Task)(implicit R: ReadFile.Ops[S],
                                                     W: WriteFile.Ops[S],
                                                     M: ManageFile.Ops[S],
@@ -96,21 +94,19 @@ object data {
       case req @ POST -> AsFilePath(path) => upload(req, W.append(path,_))
       case req @ PUT -> AsFilePath(path) => upload(req, W.save(path,_))
       case req @ Method.MOVE -> AsPath(path) =>
-        req.headers.get(Destination).fold(
-          DestinationHeaderMustExist)(
-          destPathString => {
+        requiredHeader(Destination, req).map { destPathString =>
             val scenarioOrProblem = refineType(path).fold(
-              src => parseAbsDir(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(
+              src => parseAbsDir(destPathString.value).flatMap(resandbox).map(
                 dest => MoveScenario.DirToDir(src, dest)) \/> "Cannot move directory into a file",
-              src => parseAbsFile(destPathString.value).flatMap(sandbox(rootDir, _)).map(rootDir </> _).map(
+              src => parseAbsFile(destPathString.value).flatMap(resandbox).map(
                 dest => MoveScenario.FileToFile(src, dest)) \/> "Cannot move a file into a directory, must specify destination precisely"
             )
             scenarioOrProblem.map{ scenario =>
               val response = M.move(scenario, MoveSemantics.FailIfExists).fold(fileSystemErrorResponse,_ => Created(""))
               hoistFree(f).apply(response).join
             }.leftMap(BadRequest(_)).merge
-          }
-        )
+          }.merge
+
       case DELETE -> AsPath(path) =>
         val response = M.delete(path).fold(fileSystemErrorResponse, _ => Ok(""))
         hoistFree(f).apply(response).join

@@ -41,7 +41,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   import InMemory._
 
   def service(mem: InMemState): HttpService =
-    data.service[FileSystem](runStatefully(mem).run.compose(fileSystem))
+    data.service[FileSystem](runFs(mem).run)
 
   def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
     val (inter, ref) = runInspect(mem).run
@@ -61,7 +61,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           val pathString = printPath(file.path)
           val response = service(InMemState.empty)(Request(uri = Uri(path = pathString))).run
           response.status must_== Status.NotFound
-          response.as[String].run must_== s"$pathString: doesn't exist"
+          response.as[Json].run must_== Json("error" := s"$pathString doesn't exist")
         }
       }
       "respond with file data" >> {
@@ -426,7 +426,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         val request = Request(uri = Uri(path = pathString), method = Method.MOVE)
         val response = service(emptyMem)(request).run
         response.status must_== Status.BadRequest
-        response.as[String].run must_== "The 'Destination' header must be specified"
+        response.as[Json].run must_== Json("error" := "The 'Destination' header must be specified")
       }
       "be 404 for missing source file" ! prop { (file: AbsFileOf[AlphaCharacters], destFile: AbsFileOf[AlphaCharacters]) =>
         testMove(
@@ -434,7 +434,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = destFile.path,
           state = emptyMem,
           status = Status.NotFound,
-          expectedBody = s"${printPath(file.path)}: doesn't exist",
+          expectedBody = Json("error" := s"${printPath(file.path)} doesn't exist"),
           newState = Unchanged)
       }
       "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>

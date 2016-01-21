@@ -5,7 +5,7 @@ package services
 import Predef._
 import quasar.fp._
 
-import argonaut._
+import argonaut._, Argonaut._
 
 import org.http4s.server.HttpService
 import org.http4s._
@@ -41,8 +41,8 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
   import posixCodec.printPath
 
   def compileService(state: InMemState): HttpService =
-    services.query.compileService[FileSystem](runStatefully(state).run.compose(fileSystem))
-  def queryService(state: InMemState): HttpService = service[FileSystem](runStatefully(state).run.compose(fileSystem))
+    services.query.compileService[FileSystem](runFs(state).run)
+  def queryService(state: InMemState): HttpService = service[FileSystem](runFs(state).run)
 
   case class Query(
     q: String,
@@ -224,13 +224,13 @@ class CompileAndQueryServiceSpec extends Specification with FileSystemFixture wi
         )
       }
       "be 400 with missing Destination header" ! prop { filesystem: SingleFileMemState =>
-        post[String](queryService)(
+        post[Json](queryService)(
           path = filesystem.parent,
           query = Some(Query(selectAll(file(filesystem.filename.value)))),
           destination = None,
           state = filesystem.state,
           status = Status.BadRequest,
-          response = _ must_== "The 'Destination' header must be specified"
+          response = _ must_== Json("error" := "The 'Destination' header must be specified")
         )
       }
       "be 400 for query error" ! prop { (filesystem: SingleFileMemState, destination: AFile) =>
