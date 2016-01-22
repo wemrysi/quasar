@@ -7,13 +7,12 @@ import quasar.Predef._
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
-import org.scalacheck._
 
 import org.threeten.bp._
 import scalaz._
 
 class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatchers {
-  import DataGen._
+  import DataArbitrary._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }
   implicit val ShowStr = new Show[String] { override def show(v: String) = v }
@@ -203,38 +202,5 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
       val sample:Json = jString("foo")
       UnescapedKeyError(sample).message must_== s"un-escaped key: $sample"
     }
-  }
-}
-object DataGen {
-  val LargeInt = Data.Int(new java.math.BigInteger(Long.MaxValue.toString + "0"))  // Too big for Long
-
-  val simpleData: Gen[Data] =
-    Gen.oneOf(
-      Data.Null, Data.True, Data.False,
-      Data.Str("abc"), Data.Int(0), Data.Dec(1.1),
-      Data.Timestamp(Instant.now),
-      Data.Interval(Duration.ofSeconds(1)),
-      Data.Date(LocalDate.now),
-      Data.Time(LocalTime.now),
-      Data.Binary(Array[Byte](0, 1, 2, 3)),
-      Data.Id("123456789012345678901234"),  // NB: a (nominally) valid MongoDB id, because we use this generator to test BSON conversion, too
-      Data.NA,
-
-      // Tricky cases:
-      LargeInt,
-      Data.Dec(2.0)) // Looks like an Int, so needs special handling
-
-  implicit val arbitraryData: Arbitrary[Data] = Arbitrary {
-    Gen.oneOf(
-      simpleData,
-      Gen.oneOf(
-        Data.Obj(ListMap("a" -> Data.Int(0), "b" -> Data.Int(1))),
-        Data.Arr(List(Data.Int(0), Data.Int(1))),
-        Data.Set(List(Data.Int(0), Data.Int(1))),
-        // Tricky cases:
-        Data.Obj(ListMap("$date" -> Data.Str("Jan 1"))),
-        Data.Obj(ListMap(
-          "$obj" -> Data.Obj(ListMap(
-            "$obj" -> Data.Int(1)))))))
   }
 }

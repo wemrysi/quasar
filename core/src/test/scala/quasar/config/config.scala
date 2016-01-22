@@ -1,6 +1,5 @@
 package quasar.config
 
-import com.mongodb.ConnectionString
 import quasar.Predef._
 import quasar.config.FsPath.NonexistentFileError
 import quasar.Evaluator.EnvironmentError.EnvFsPathError
@@ -8,13 +7,14 @@ import quasar.fp._
 import quasar.fs.{Path => QPath}
 
 import argonaut._, Argonaut._
-import pathy._, Path._
-import scalaz._, concurrent.Task, Scalaz._
-import scala.util.Properties
+import com.mongodb.ConnectionString
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.specs2.ScalaCheck
 import org.scalacheck._
+import pathy._, Path._
+import scalaz._, concurrent.Task, Scalaz._
+import scala.util.Properties
 
 abstract class ConfigSpec[Config: CodecJson] extends Specification with DisjunctionMatchers {
   import FsPath._
@@ -221,6 +221,7 @@ abstract class ConfigSpec[Config: CodecJson] extends Specification with Disjunct
 }
 
 class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
+  import CoreConfigArbitrary._
 
   def configOps: ConfigOps[CoreConfig] = CoreConfig
 
@@ -247,45 +248,10 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
   }
 
   "encoding" should {
-    import CoreConfigGen._
-
     "round-trip any well-formed config" ! prop { (cfg: CoreConfig) =>
       val json = CoreConfig.Codec.encode(cfg)
       val cfg2 = CoreConfig.Codec.decode(json.hcursor)
       cfg2.result must beRightDisjunction(cfg)
     }
   }
-}
-
-object CoreConfigGen {
-  import quasar.{Variables, VarName, VarValue}
-  import quasar.sql
-  import Arbitrary._
-  import Gen._
-
-  implicit val arbitraryConfig: Arbitrary[CoreConfig] = Arbitrary {
-    for {
-      mounts <- listOf(mountGen)
-    } yield CoreConfig(Map(mounts: _*))
-  }
-
-  def mountGen: Gen[(QPath, MountConfig)] = for {
-    path <- arbitrary[String]
-    cfg  <- Gen.oneOf(mongoCfgGen, viewCfgGen)
-  } yield (QPath(path), cfg)
-
-  def mongoCfgGen =
-    Gen.const(MongoDbConfig(new ConnectionString("mongodb://localhost/test")))
-
-  val SimpleQuery = sql.Select(sql.SelectAll,
-    List(sql.Proj(sql.Splice(None), None)),
-    Some(sql.TableRelationAST("foo", None)),
-    None, None, None)
-
-  def viewCfgGen = for {
-    vars <- listOf(for {
-      n <- alphaChar
-      x <- choose(0, 100)
-    } yield VarName(n.toString) -> VarValue(x.toString))
-  } yield ViewConfig(SimpleQuery, Variables(vars.toMap))
 }

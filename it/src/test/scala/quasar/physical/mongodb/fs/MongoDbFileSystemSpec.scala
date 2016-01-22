@@ -36,7 +36,7 @@ class MongoDbFileSystemSpec
 
   import FileSystemTest._
   import FileSystemError._
-  import DataGen._
+  import DataArbitrary._
 
   val query  = QueryFile.Ops[FileSystemIO]
   val write  = WriteFile.Ops[FileSystemIO]

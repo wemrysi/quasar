@@ -205,7 +205,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
       parse("1") must beSome(Data.Int(1))
     }
 
-    import DataGen._
+    import DataArbitrary._
 
     def representable(data: Data) = data match {
       case Data.Int(x)    => x.isValidLong

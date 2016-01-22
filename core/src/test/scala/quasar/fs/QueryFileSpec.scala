@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, DataGen, LogicalPlan, PhaseResults}
+import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
 import quasar.fp._
 import quasar.scalacheck._
 
@@ -13,7 +13,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import InMemory._, FileSystemError._, PathError2._, DataGen._, query._
+  import InMemory._, FileSystemError._, PathError2._, DataArbitrary._, query._
 
   "QueryFile" should {
     "descendantFiles" >> {

@@ -6,7 +6,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz.std.list._
 import scalaz.syntax.std.option._
 
-object MountsArbitrary {
+trait MountsArbitrary {
   import Arbitrary.arbitrary
 
   implicit def mountsArbitrary[A: Arbitrary]: Arbitrary[Mounts[A]] =
@@ -22,3 +22,5 @@ object MountsArbitrary {
       mnts <- mres.toOption.cata(Gen.const, Gen.fail)
     } yield mnts)
 }
+
+object MountsArbitrary extends MountsArbitrary

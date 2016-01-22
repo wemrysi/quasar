@@ -35,7 +35,7 @@ class LogicalPlanSpecs extends Spec {
 
   def readGen[A]: Gen[LogicalPlan[A]] = Gen.const(ReadF(Path.Root))
 
-  import DataGen._
+  import DataArbitrary._
 
   def constGen[A]: Gen[LogicalPlan[A]] = for {
     data <- Arbitrary.arbitrary[Data]
