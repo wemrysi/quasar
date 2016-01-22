@@ -5,6 +5,7 @@ package services
 import org.http4s.Uri.Authority
 import org.http4s.server.middleware.GZip
 import org.specs2.ScalaCheck
+import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
 import pathy.scalacheck.AbsFileOf
 import quasar.Data
@@ -400,12 +401,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       object Unchanged extends StateChange
       case class Changed(newContents: FileMap) extends StateChange
 
-      def testMove[A: EntityDecoder](from: APath,
-                                     to: APath,
-                                     state: InMemState,
-                                     expectedBody: A,
-                                     status: Status,
-                                     newState: StateChange) = {
+      def testMove[A: EntityDecoder, R: AsResult](
+          from: APath,
+          to: APath,
+          state: InMemState,
+          body: A => R,
+          status: Status,
+          newState: StateChange) = {
         // TODO: Consider if it's possible to invent syntax Move(...)
         val request = Request(
           uri = Uri(path = printPath(from)),
@@ -414,7 +416,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         val (service, ref) = serviceRef(state)
         val response = service(request).run
         response.status must_== status
-        response.as[A].run must_== expectedBody
+        body(response.as[A].run)
         val expectedNewContents = newState match {
           case Unchanged => state.contents
           case Changed(newContents) => newContents
@@ -434,7 +436,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = destFile.path,
           state = emptyMem,
           status = Status.NotFound,
-          expectedBody = Json("error" := s"${printPath(file.path)} doesn't exist"),
+          body = (json: Json) => json must_== Json("error" := s"${printPath(file.path)} doesn't exist"),
           newState = Unchanged)
       }
       "be 400 if attempting to move a dir into a file" ! prop {(fs: NonEmptyDir, file: AbsFile[Sandboxed]) =>
@@ -443,7 +445,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = file,
           state = fs.state,
           status = Status.BadRequest,
-          expectedBody = "Cannot move directory into a file",
+          body = (str: String) => str must_== "Cannot move directory into a file",
           newState = Unchanged)
       }
       "be 400 if attempting to move a file into a dir" ! prop {(fs: SingleFileMemState, dir: AbsDir[Sandboxed]) =>
@@ -452,26 +454,49 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           to = dir,
           state = fs.state,
           status = Status.BadRequest,
-          expectedBody = "Cannot move a file into a directory, must specify destination precisely",
+          body = (str: String) => str must_== "Cannot move a file into a directory, must specify destination precisely",
           newState = Unchanged)
       }
       "be 201 with file" ! prop {(fs: SingleFileMemState, file: AFile) =>
-        testMove(
-          from = fs.file,
-          to = file,
-          state = fs.state,
-          status = Status.Created,
-          expectedBody = "",
-          newState = Changed(Map(file -> fs.contents)))
+        (fs.file ≠ file) ==>
+          testMove(
+            from = fs.file,
+            to = file,
+            state = fs.state,
+            status = Status.Created,
+            body = (str: String) => str must_== "",
+            newState = Changed(Map(file -> fs.contents)))
       }
       "be 201 with dir" ! prop {(fs: NonEmptyDir, dir: AbsDir[Sandboxed]) =>
+        (fs.dir ≠ dir) ==>
+          testMove(
+            from = fs.dir,
+            to = dir,
+            state = fs.state,
+            status = Status.Created,
+            body = (str: String) => str must_== "",
+            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}.list.toMap))
+      }
+      "be 409 with file to same location" ! prop {(fs: SingleFileMemState) =>
+        testMove(
+          from = fs.file,
+          to = fs.file,
+          state = fs.state,
+          status = Status.Conflict,
+          body = (json: Json) => json must_== Json("error" := s"${printPath(fs.file)} already exists"),
+          newState = Unchanged)
+      }
+      "be 409 with dir to same location" ! prop {(fs: NonEmptyDir) =>
         testMove(
           from = fs.dir,
-          to = dir,
+          to = fs.dir,
           state = fs.state,
-          status = Status.Created,
-          expectedBody = "",
-          newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile.path, data)}.list.toMap))
+          status = Status.Conflict,
+          body = (json: Json) => json must beOneOf(
+            fs.filesInDir.list.map { case (p, _) =>
+              Json("error" := s"${printPath(fs.dir </> p.path)} already exists")
+            }: _*),
+          newState = Unchanged)
       }
     }
     "DELETE" >> {
