@@ -17,13 +17,14 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.EnvErr2T
+import quasar.{EnvironmentError2, EnvErr2T, EnvErrF}
+import quasar.effect.Failure
 import quasar.fp._
 import quasar.fs.{Path => _, _}
 import quasar.physical.mongodb.fs.bsoncursor._
 
 import com.mongodb.async.client.MongoClient
-import scalaz.{Hoist, ~>}
+import scalaz.{Free, Functor, Hoist, ~>, :<:}
 import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
@@ -61,5 +62,30 @@ package object fs {
         liftWF compose rfile compose readfile.interpret,
         liftWF compose wfile compose writefile.interpret,
         liftWF compose mfile compose managefile.interpret))
+  }
+
+  /** TODO: Refactor MongoDB interpreters to interpret into these (and other) effects. */
+  def mongoDbFileSystemF[S[_]: Functor](
+    client: MongoClient,
+    defDb: Option[DefaultDb]
+  )(implicit
+    S0: Task :<: S,
+    S1: EnvErrF :<: S,
+    S2: WorkflowExecErrF :<: S
+  ): Free[S, FileSystem ~> Free[S, ?]] = {
+    type M[A] = Free[S, A]
+
+    val envErr = Failure.Ops[EnvironmentError2, S]
+    val wfeErr = Failure.Ops[WorkflowExecutionError, S]
+    def liftT[A](ta: Task[A]): M[A] = free.lift(ta).into[S]
+
+    val toS: WFTask ~> M =
+      new (WFTask ~> M) {
+        def apply[A](wf: WFTask[A]) =
+          liftT(wf.run).flatMap(_.fold(wfeErr.fail, _.point[M]))
+      }
+
+    liftT(mongoDbFileSystem(client, defDb).run)
+      .flatMap(_.fold(envErr.fail, f => (toS compose f).point[M]))
   }
 }

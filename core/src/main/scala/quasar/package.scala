@@ -15,6 +15,7 @@
  */
 
 import quasar.Predef.{Long, String, Vector}
+import quasar.effect.Failure
 import quasar.fp._
 import quasar.recursionschemes._, Fix._
 import quasar.sql._
@@ -36,6 +37,8 @@ package object quasar {
 
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
 
+  type EnvErr[A]         = Failure[EnvironmentError2, A]
+  type EnvErrF[A]        = Coyoneda[EnvErr, A]
   type EnvErr2T[F[_], A] = EitherT[F, EnvironmentError2, A]
 
   type SeqNameGeneratorT[F[_], A] = StateT[F, Long, A]
