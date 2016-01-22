@@ -17,21 +17,26 @@
 package quasar
 
 import quasar.Predef._
+import quasar.effect.Failure
 import quasar.fs.Path
 import quasar.fs.mount.MountingsConfig2
 
 import argonaut._, Argonaut._
 import pathy.Path.{File, Dir, Sandboxed}
-import scalaz.EitherT
+import scalaz.{Coyoneda, EitherT}
 import scalaz.concurrent.Task
 
 package object config {
   type FsFile = FsPath[File, Sandboxed]
   type FsDir  = FsPath[Dir, Sandboxed]
 
+  type CfgErr[A]  = Failure[ConfigError, A]
+  type CfgErrF[A] = Coyoneda[CfgErr, A]
+
   type CfgErrT[F[_], A] = EitherT[F, ConfigError, A]
   type CfgTask[A]       = CfgErrT[Task, A]
 
+  // NB: Deprecated
   type MountingsConfig = Map[Path, MountConfig]
 
   object MountingsConfig {

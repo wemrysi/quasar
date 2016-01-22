@@ -17,7 +17,6 @@
 package quasar
 
 import Predef._
-import quasar.fs.PathError2
 
 import argonaut._, Argonaut._
 import monocle._
