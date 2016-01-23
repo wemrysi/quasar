@@ -133,17 +133,18 @@ package object fs {
   ): DefErrT[Free[S, ?], MongoClient] = {
     import quasar.Errors.convertError
     type M[A] = Free[S, A]
+    type ME[A, B] = EitherT[M, A, B]
     type DefM[A] = DefErrT[M, A]
 
     val evalEnvErr: EnvErrF ~> DefM =
       Coyoneda.liftTF[EnvErr, DefM](
         convertError[M]((_: EnvironmentError2).right[NonEmptyList[String]])
-          .compose[EnvErr](Failure.toEitherT[M, EnvironmentError2]))
+          .compose[EnvErr](Failure.toError[ME, EnvironmentError2]))
 
     val evalCfgErr: CfgErrF ~> DefM =
       Coyoneda.liftTF[CfgErr, DefM](
         convertError[M]((_: ConfigError).shows.wrapNel.left[EnvironmentError2])
-          .compose[CfgErr](Failure.toEitherT[M, ConfigError]))
+          .compose[CfgErr](Failure.toError[ME, ConfigError]))
 
     val liftTask: Task ~> DefM =
       liftMT[M, DefErrT] compose liftFT[S] compose injectNT[Task, S]

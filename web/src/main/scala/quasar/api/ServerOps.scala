@@ -17,13 +17,16 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar._
+import quasar.{Mounter => _, _}
 import quasar.api.services.RestApi
 import quasar.console._
 import quasar.config._
+import quasar.effect._
 import quasar.fp._
-import quasar.fs.{FileSystem, InMemory}
+import quasar.fs.{FileSystem, QueryFile, ADir, APath, Empty}
 import quasar.fs.mount._
+import quasar.physical.mongodb._
+import quasar.physical.mongodb.fs.mongoDbFileSystemDef
 
 import java.io.File
 import java.lang.System
@@ -33,8 +36,15 @@ import scala.concurrent.duration._
 import argonaut.CodecJson
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
-import scalaz._, Scalaz._
-import scalaz.concurrent._
+import scalaz.{Failure => _, _}
+import scalaz.syntax.monad._
+import scalaz.syntax.show._
+import scalaz.syntax.either._
+import scalaz.syntax.foldable._
+import scalaz.syntax.std.option._
+import scalaz.std.option._
+import scalaz.std.list._
+import scalaz.concurrent.Task
 import scalaz.stream._
 import shapeless.{Coproduct => _, _}, nat._, ops.nat._
 
@@ -56,11 +66,16 @@ object ServerOps {
 }
 
 abstract class ServerOps[WC: CodecJson, SC](
-    configOps: ConfigOps[WC],
-    defaultWC: WC,
-    val webConfigLens: WebConfigLens[WC, SC]) {
+  configOps: ConfigOps[WC],
+  defaultWC: WC,
+  val webConfigLens: WebConfigLens[WC, SC]) {
+
   import ServerOps._
   import webConfigLens._
+  import QueryFile.ResultHandle
+  import FileSystemDef.DefinitionResult
+  import hierarchical._
+  import Mounting.PathTypeMismatch
 
   type MainErrT[F[_], A] = EitherT[F, String, A]
   type MainTask[A]       = MainErrT[Task, A]
@@ -227,17 +242,114 @@ abstract class ServerOps[WC: CodecJson, SC](
     }
   }
 
-  type MountingPlusFileSystem[A] = Coproduct[MountingF, FileSystem, A]
+  // Task \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF \/ HFSFailureF
+  type FsEff0[A] = Coproduct[MountedResultHF, HFSFailureF, A]
+  type FsEff1[A] = Coproduct[ViewStateF, FsEff0, A]
+  type FsEff2[A] = Coproduct[MonotonicSeqF, FsEff1, A]
+  type FsEff[A]  = Coproduct[Task, FsEff2, A]
+  type FsEffM[A] = Free[FsEff, A]
 
-  def interpreter(config: WC): Task[MountingPlusFileSystem ~> Task] = {
-    // TODO: use the real mount and hierarchical interpreters
-    import InMemory._
+  // NB: Will eventually be the lcd of all physical filesystems, or we limit
+  //     to a fixed set of effects that filesystems must interpret into.
+  val mongoDbFs: FileSystemDef[Task] = {
+    type MongoEff[A] = Coproduct[Task, WorkflowExecErrF, A]
 
-    val mount = new (Mounting ~> Task) {
-      def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("TODO"))
+    mongoDbFileSystemDef[MongoEff].translate(free.foldMapNT[MongoEff, Task](
+      free.interpret2[Task, WorkflowExecErrF, Task](
+        NaturalTransformation.refl,
+        Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toTaskFailure[WorkflowExecutionError]))))
+  }
+
+  def fsEffToTask(
+    seqRef: TaskRef[Long],
+    viewHandlesRef: TaskRef[ViewHandles],
+    mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+  ): FsEff ~> Task =
+    free.interpret5[Task, MonotonicSeqF, ViewStateF, MountedResultHF, HFSFailureF, Task](
+      NaturalTransformation.refl[Task],
+      Coyoneda.liftTF[MonotonicSeq, Task](MonotonicSeq.fromTaskRef(seqRef)),
+      Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef)),
+      Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef)),
+      Coyoneda.liftTF[HFSFailure, Task](Failure.toTaskFailure[HierarchicalFileSystemError]))
+
+  val evalMounter = EvaluatorMounter[Task, FsEff](mongoDbFs)
+  import evalMounter.{EvalFSRef, EvalFSRefF}
+
+  type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[Task]], A]
+  type MountedFsF[A] = Coyoneda[MountedFs, A]
+
+  // EvalFSRefF \/ Task \/ MountedFsF \/ MountedViewsF
+  type EvalEff0[A] = Coproduct[MountedFsF, MountedViewsF, A]
+  type EvalEff1[A] = Coproduct[Task, EvalEff0, A]
+  type EvalEff[A]  = Coproduct[EvalFSRefF, EvalEff1, A]
+  type EvalEffM[A] = Free[EvalEff, A]
+
+  def evalEffToTask(
+    evalRef: TaskRef[FileSystem ~> FsEffM],
+    mntsRef: TaskRef[Mounts[DefinitionResult[Task]]],
+    viewsRef: TaskRef[Views]
+  ): EvalEff ~> Task =
+    free.interpret4[EvalFSRefF, Task, MountedFsF, MountedViewsF, Task](
+      Coyoneda.liftTF[EvalFSRef, Task](AtomicRef.fromTaskRef(evalRef)),
+      NaturalTransformation.refl[Task],
+      Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(mntsRef)),
+      Coyoneda.liftTF[MountedViews, Task](AtomicRef.fromTaskRef(viewsRef)))
+
+  type MntEff[A]  = Coproduct[EvalEffM, MountConfigsF, A]
+  type MntEffM[A] = Free[MntEff, A]
+
+  // TODO: For some reason, scalac complains of a diverging implicits when
+  //       attempting to resolve this.
+  implicit val mntEffFunctor =
+    Coproduct.coproductFunctor[EvalEffM, MountConfigsF](implicitly, implicitly)
+
+  val mounter: Mounting ~> MntEffM =
+    Mounter[EvalEffM, MntEff](
+      evalMounter.mount[EvalEff](_),
+      evalMounter.unmount[EvalEff](_))
+
+  def evalFromRef(ref: TaskRef[FileSystem ~> FsEffM], f: FsEff ~> Task): FileSystem ~> Task =
+    new (FileSystem ~> Task) {
+      def apply[A](fs: FileSystem[A]) =
+        ref.read.map(free.foldMapNT(f) compose _).flatMap(_.apply(fs))
     }
 
-    runFs(InMemState.empty).map(fs => free.interpret2[MountingF, FileSystem, Task](Coyoneda.liftTF(mount), fs))
+  type ApiEff[A] = Coproduct[MountingF, FileSystem, A]
+
+  val evalApi: Task[ApiEff ~> Task] =
+    for {
+      startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
+      seqRef     <- TaskRef(startSeq)
+      viewHRef   <- TaskRef[ViewHandles](Map())
+      mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
+      evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
+      mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[Task]])
+      viewsRef   <- TaskRef(Views.empty)
+      cfgsRef    <- TaskRef(Map[APath, MountConfig2]())
+    } yield {
+      val f: FsEff ~> Task = fsEffToTask(seqRef, viewHRef, mntedRHRef)
+      val g: EvalEff ~> Task = evalEffToTask(evalFsRef, mntsRef, viewsRef)
+
+      val mnt: MntEff ~> Task =
+        free.interpret2[EvalEffM, MountConfigsF, Task](
+          free.foldMapNT(g),
+          Coyoneda.liftTF[MountConfigs, Task](KeyValueStore.fromTaskRef(cfgsRef)))
+
+      val mounting: MountingF ~> Task =
+        Coyoneda.liftTF[Mounting, Task](free.foldMapNT(mnt) compose mounter)
+
+      free.interpret2(mounting,  evalFromRef(evalFsRef, f))
+    }
+
+  def mountAll(mc: MountingsConfig2): Free[ApiEff, String \/ Unit] = {
+    val mnt = Mounting.Ops[ApiEff]
+    type N[A] = EitherT[mnt.F, String, A]
+
+    def toN(v: mnt.M[PathTypeMismatch \/ Unit]): N[Unit] =
+      EitherT[mnt.F, String, Unit](
+        v.fold(_.shows.left, _.fold(_.shows.left, _.right)))
+
+    mc.toMap.toList.traverse_ { case (p, cfg) => toN(mnt.mount(p, cfg)) }.run
   }
 
   def main(args: Array[String]): Unit = {
@@ -254,21 +366,21 @@ abstract class ServerOps[WC: CodecJson, SC](
                          .leftMap(_.shows)
                          .fixedOrElse(defaultWC.point[MainTask])
       port          =  opts.port getOrElse wcPort.get(config)
-      updCfg        =  wcPort.set(port)(config)
-      fs            <- interpreter(config).liftM[MainErrT]
+      api           <- evalApi.liftM[MainErrT]
+      _             <- EitherT(mountAll(mountings.get(config)) foldMap api)
       produceRoutes =  (reload: (Int => Task[Unit])) =>
-                         RestApi(content.toList, redirect, port, reload).AllServices(fs)
+                         RestApi(content.toList, redirect, port, reload).AllServices(api)
       result        <- startServers(port, produceRoutes).liftM[MainErrT]
       (servers, shutdown) = result
       msg           =  stdout("Press Enter to stop.")
-      _             <- (if(opts.openClient) openBrowser(port) *> msg else msg).liftM[MainErrT]
+      _             <- (if (opts.openClient) openBrowser(port) *> msg else msg).liftM[MainErrT]
       _             <- Task.delay(waitForInput.runAsync(_ => shutdown.run)).liftM[MainErrT]
                     // We need to run the servers in order to make sure everything is cleaned up properly
       _             <- servers.run.liftM[MainErrT]
     } yield ()
 
     exec.swap
-      .flatMap(e => stderr(e).liftM[EitherT[?[_], Unit, ?]])
+      .flatMapF(e => stderr(e).map(_.right))
       .merge
       .handleWith { case err => stderr(err.getMessage) }
       .run

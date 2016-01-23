@@ -54,7 +54,12 @@ object MountConfig2 {
     } ((FileSystemConfig(_, _)).tupled)
 
   implicit val mountConfigShow: Show[MountConfig2] =
-    Show.showFromToString
+    Show.shows {
+      case ViewConfig(expr, vars) =>
+        viewConfigUri.reverseGet((expr, vars))
+      case FileSystemConfig(typ, uri) =>
+        s"[${typ.value}] ${uri.value}"
+    }
 
 /** TODO: Equal[sql.Expr]
   implicit val mountConfigEqual: Equal[MountConfig2] =
