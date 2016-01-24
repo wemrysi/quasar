@@ -350,9 +350,9 @@ object InMemory {
   private def resultL(h: ResultHandle): InMemState @> Option[Vector[Data]] =
     Lens.mapVLens(h) <=< resultMapL
 
-  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[Node]] =
+  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[PathName]] =
     contentsL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
-        .map(_ foldMap (f => Node.fromFirstSegmentOf(f).toSet))
+        .map(_ foldMap (f => firstSegmentName(f).toSet))
         .toRightDisjunction(pathError(PathNotFound(d))))
 }

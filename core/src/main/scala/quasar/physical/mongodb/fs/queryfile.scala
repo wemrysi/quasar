@@ -26,7 +26,7 @@ import quasar.recursionschemes.{Fix, Recursive}
 
 import com.mongodb.async.client.MongoClient
 import pathy.Path._
-import scalaz.{Node => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import scalaz.stream._
 import scalaz.concurrent.Task
 
@@ -141,18 +141,18 @@ private final class QueryFileInterpreter[C](
       (dirName(dir) match {
         case Some(_) =>
           collectionsInDir(dir)
-            .map(_ foldMap (collectionToNode(dir) andThen (_.toSet)))
+            .map(_ foldMap (collectionPathName(dir) andThen (_.toSet)))
             .run
 
         case None if depth(dir) == 0 =>
           MongoDbIO.collections
-            .map(collectionToNode(dir))
+            .map(collectionPathName(dir))
             .pipe(process1.stripNone)
             .runLog
             .map(_.toSet.right[FileSystemError])
 
         case None =>
-          nonExistentParent[Set[Node]](dir).run
+          nonExistentParent[Set[PathName]](dir).run
       }).liftM[QRT].liftM[WorkflowExecErrT]
 
     case FileExists(file) =>

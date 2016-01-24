@@ -12,7 +12,7 @@ import quasar.std.SetLib.Take
 import monocle.Lens
 import org.specs2.mutable
 import pathy.Path._
-import scalaz.{Lens => _, Failure => _, Node => _, _}, Id.Id
+import scalaz.{Lens => _, Failure => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 
@@ -181,12 +181,12 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
       "listing children" >> {
         "of mount ancestor dir should return dir nodes" >> {
-          val dirs = Set(Node.Plain(dir("bar")), Node.Plain(dir("foo")))
+          val dirs = Set(DirName("bar").left, DirName("foo").left)
           runH(query.ls(rootDir).run).run.eval(emptyMS) must_== dirs.right.right
         }
 
         "of mount parent dir should return mounts nodes" >> {
-          val mnts = Set(Node.Mount(dir("mntA")), Node.Mount(dir("mntB")))
+          val mnts = Set(DirName("mntA").left, DirName("mntB").left)
           runH(query.ls(rootDir </> dir("bar")).run)
             .run.eval(emptyMS) must_== mnts.right.right
         }

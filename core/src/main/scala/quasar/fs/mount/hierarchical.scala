@@ -25,7 +25,7 @@ import quasar.recursionschemes.{free => _, _}, Recursive.ops._
 
 import monocle.{Iso, Prism}
 import pathy.Path._
-import scalaz.{Failure => _, Node => _, _}, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 
 object hierarchical {
   import QueryFile.ResultHandle
@@ -391,18 +391,11 @@ object hierarchical {
       })
   }
 
-  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[Node]] = {
-    def mkNode(rdir: RDir): Option[Node] =
-      flatten(none, none, none, n => dir(n).some, κ(none), rdir).toList.unite match {
-        case d :: Nil => Node.Mount(d).some
-        case d :: _   => Node.Plain(d).some
-        case Nil      => none
-      }
+  private def lsMounts(mounts: Set[ADir], ls: ADir): Option[Set[PathName]] = {
+    def firstDir(rdir: RDir): Option[DirName] =
+      firstSegmentName(rdir).flatMap(_.swap.toOption)
 
-    mounts.toList.map(_ relativeTo ls flatMap mkNode).unite match {
-      case Nil => none
-      case xs  => xs.toSet.some
-    }
+    mounts.foldMap(_ relativeTo ls flatMap firstDir map (d => Set(d.left)))
   }
 
   private object getMounted {

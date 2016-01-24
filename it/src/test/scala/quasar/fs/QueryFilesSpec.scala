@@ -29,7 +29,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
         val d1 = d </> dir("d1")
         val f1 = d1 </> file("f1")
         val f2 = d1 </> dir("d2") </> file("f1")
-        val expectedNodes = List(Node.Plain(dir("d2")), Node.Plain(file("f1")))
+        val expectedNodes = List[PathName](DirName("d2").left, FileName("f1").right)
 
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, anotherDoc.toProcess).drain ++
@@ -54,7 +54,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
                  query.ls(d).liftM[Process]
                    .flatMap(ns => Process.emitAll(ns.toVector))
 
-        val preDelete = List(Node.Plain(file("f1")), Node.Plain(file("f2")))
+        val preDelete = List[PathName](FileName("f1").right, FileName("f2").right)
 
         (runLogT(run, p)
           .runEither must beRight(containTheSameElementsAs(preDelete))) and

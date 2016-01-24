@@ -147,20 +147,15 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
     }
 
     "list view under its parent dir" ! prop { (path: AFile) =>
-      val views = Views(Map(
-        path -> Read(Path("/foo"))))
-      views.ls(fileParent(path)) must_==
-        Set(\/-(path.relativeTo(fileParent(path)).get))
+      val views = Views(Map(path -> Read(Path("/foo"))))
+      views.ls(fileParent(path)) must_== Set(fileName(path).right)
     }
 
     "list view parent under grand-parent dir" ! prop { (dir: ADir) =>
       (dir ≠ rootDir) ==> {
         val parent = parentDir(dir).get
-
-        val views = Views(Map(
-          (dir </> file("view1")) -> Read(Path("/foo"))))
-        views.ls(parent) must_==
-          Set(-\/(dir.relativeTo(parent).get))
+        val views = Views(Map((dir </> file("view1")) -> Read(Path("/foo"))))
+        views.ls(parent) must_== Set(dirName(dir).get.left)
       }
     }
   }

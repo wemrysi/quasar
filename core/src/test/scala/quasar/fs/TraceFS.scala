@@ -13,10 +13,11 @@ object TraceFS {
 
   type Trace[A] = Writer[Vector[RenderedTree], A]
 
-  def qfTrace(nodes: Map[ADir, Set[Node]]) = new (QueryFile ~> Trace) {
+  def qfTrace(paths: Map[ADir, Set[PathName]]) = new (QueryFile ~> Trace) {
     import QueryFile._
 
-    def ls(dir: ADir) = nodes.getOrElse(dir, Set())
+    def ls(dir: ADir) =
+      paths.getOrElse(dir, Set())
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
       WriterT.writer((Vector(qf.render),
@@ -27,10 +28,7 @@ object TraceFS {
           case Close(handle)        => ()
           case Explain(lp)          => (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString)))
           case ListContents(dir)    => \/-(ls(dir))
-          case FileExists(file)     =>
-            val relevantNodes = ls(fileParent(file))
-            val rFile = file1[Sandboxed](fileName(file))
-            (relevantNodes.exists(node => node === Node.Case.Plain(rFile) || node === Node.Case.View(rFile))).right
+          case FileExists(file)     => ls(fileParent(file)).contains(fileName(file).right).right
         }))
   }
 
@@ -71,10 +69,10 @@ object TraceFS {
         }))
   }
 
-  def traceFs(nodes: Map[ADir, Set[Node]]): FileSystem ~> Trace =
-    interpretFileSystem[Trace](qfTrace(nodes), rfTrace, wfTrace, mfTrace)
+  def traceFs(paths: Map[ADir, Set[PathName]]): FileSystem ~> Trace =
+    interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace)
 
-  def traceInterp[A](t: Free[FileSystem, A], nodes: Map[ADir, Set[Node]]): (Vector[RenderedTree], A) = {
-    new free.Interpreter(traceFs(nodes)).interpret(t).run
+  def traceInterp[A](t: Free[FileSystem, A], paths: Map[ADir, Set[PathName]]): (Vector[RenderedTree], A) = {
+    new free.Interpreter(traceFs(paths)).interpret(t).run
   }
 }

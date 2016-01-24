@@ -22,7 +22,7 @@ import quasar.fs._
 import quasar.physical.mongodb._
 
 import pathy.Path._
-import scalaz.{Node => _, _}
+import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.monadError._
 
@@ -43,11 +43,11 @@ object fsops {
             else ().point[MongoFsM]
     } yield cs
 
-  /** A filesystem `Node` representing the first segment of a collection name
+  /** A filesystem `PathName` representing the first segment of a collection name
     * relative to the given parent directory.
     */
-  def collectionToNode(parent: ADir): Collection => Option[Node] =
-    _.asFile relativeTo parent flatMap Node.fromFirstSegmentOf
+  def collectionPathName(parent: ADir): Collection => Option[PathName] =
+    _.asFile relativeTo parent flatMap firstSegmentName
 
   /** The collection represented by the given path. */
   def collFromPathM(path: APath): MongoFsM[Collection] =

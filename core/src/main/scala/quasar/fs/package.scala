@@ -45,6 +45,8 @@ package object fs {
   type APath = AbsPath[_]
   type RPath = RelPath[_]
 
+  type PathName = DirName \/ FileName
+
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
@@ -73,6 +75,14 @@ package object fs {
         apath.relativeTo(prefix).fold(apath)(rootDir </> _)
     }
 
+  /** Returns the first named segment of the given relative path. */
+  def firstSegmentName(f: RPath): Option[PathName] =
+    flatten(none, none, none,
+      n => DirName(n).left.some,
+      n => FileName(n).right.some,
+      f).toIList.unite.headOption
+
+  // TODO: Move to/near LogicalPlan
   def paths(lp: Fix[LogicalPlan]): Set[Path] =
     lp.foldMap(_.cata[Set[Path]] {
       case quasar.LogicalPlan.ReadF(p) => Set(p)
