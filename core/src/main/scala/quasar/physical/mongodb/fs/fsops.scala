@@ -35,12 +35,16 @@ object fsops {
   /** The collections having a prefix equivalent to the given directory path. */
   def collectionsInDir(dir: ADir): MongoFsM[Vector[Collection]] =
     for {
-      c  <- collFromPathM(dir)
-      cs <- MongoDbIO.collectionsIn(c.databaseName)
-              .filter(_.collectionName startsWith c.collectionName)
-              .runLog.map(_.toVector).liftM[FileSystemErrT]
-      _  <- if (cs.isEmpty) pathError(PathNotFound(dir)).raiseError[MongoE, Unit]
-            else ().point[MongoFsM]
+      dbName <- dbNameFromPathM(dir)
+      cName  <- collFromPathM(dir)
+                  .map(_.collectionName)
+                  .getOrElse("")
+                  .liftM[FileSystemErrT]
+      cs     <- MongoDbIO.collectionsIn(dbName)
+                  .filter(_.collectionName startsWith cName)
+                  .runLog.map(_.toVector).liftM[FileSystemErrT]
+      _      <- if (cs.isEmpty) pathError(pathNotFound(dir)).raiseError[MongoE, Unit]
+                else ().point[MongoFsM]
     } yield cs
 
   /** A filesystem `PathName` representing the first segment of a collection name
@@ -52,6 +56,10 @@ object fsops {
   /** The collection represented by the given path. */
   def collFromPathM(path: APath): MongoFsM[Collection] =
     EitherT(Collection.fromPathy(path).leftMap(pathError(_)).point[MongoDbIO])
+
+  /** The database referred to by the given path. */
+  def dbNameFromPathM(path: APath): MongoFsM[String] =
+    EitherT(Collection.dbNameFromPath(path).leftMap(pathError(_)).point[MongoDbIO])
 
   /** An error indicating that the directory refers to an ancestor of `/`.
     *

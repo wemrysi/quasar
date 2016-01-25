@@ -233,6 +233,24 @@ class MongoDbFileSystemSpec
           }
         }
       }
+
+      "List dirs" >> {
+        "listing the root dir should succeed" >> {
+          runT(run)(query.ls(rootDir)).runEither must beRight
+        }
+
+        "listing a non-empty top dir (i.e. a database) should succeed" >> {
+          val tdir = rootDir </> dir("__topdir__")
+          val tfile = tdir </> file("foobar")
+
+          val p = write.save(tfile, oneDoc.toProcess).drain ++
+                  query.ls(tdir).liftM[Process]
+                    .flatMap(ns => Process.emitAll(ns.toVector))
+
+          (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
+            .runEither must beRight(contain(FileName("foobar").right[DirName]))
+        }
+      }
     }; ()
   }
 
