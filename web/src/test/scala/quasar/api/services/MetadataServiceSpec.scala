@@ -53,12 +53,12 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
   "Metadata Service" should {
     "respond with NotFound" >> {
       // TODO: escaped paths do not survive being embedded in error messages
-      "if directory does not exist" ! prop { dir: AbsDirOf[AlphaCharacters] =>
+      "if directory does not exist" ! prop { dir: AbsDirOf[AlphaCharacters] => (dir.path != rootDir) ==> {
         val path:String = printPath(dir.path)
         val response = service(InMemState.empty, Map())(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
         response.as[Json].run must_== Json("error" := s"${printPath(dir.path)} doesn't exist")
-      }
+      }}
 
       "file does not exist" ! prop { file: AbsFileOf[AlphaCharacters] =>
         val path:String = posixCodec.printPath(file.path)
@@ -81,8 +81,10 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
     }
 
     "respond with OK" >> {
-      "and empty list for existing empty directory" >>
-        todo // The current in-memory filesystem does not support empty directories
+      "and empty list for existing empty directory" >> {
+        service(InMemState.empty, Map())(Request(uri = Uri(path = "/")))
+          .as[Json].run must_== Json("children" := List[FsNode]())
+      }
 
       "respond with list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
         val childNodes = s.ls.map(p => FsNode(p.swap, None))

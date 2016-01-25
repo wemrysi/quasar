@@ -188,7 +188,7 @@ object InMemory {
           .tuple(queryResponsesL.st map (qrs => executionPlan(lp, qrs).right))
 
       case ListContents(dir) =>
-        ls(dir)
+        ls(dir) map (r => if (dir == rootDir) r.getOrElse(Set()).right else r)
 
       case FileExists(file) =>
         contentsL.st.map(_.contains(file).right)

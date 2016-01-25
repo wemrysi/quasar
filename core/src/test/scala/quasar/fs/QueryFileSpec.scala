@@ -33,10 +33,10 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }(implicitly,implicitly,implicitly,nonEmptyListSmallerThan(10),implicitly,listSmallerThan(5),implicitly) // Use better syntax once specs2 3.x
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
-      "returns not found when dir does not exist" ! prop { d: ADir =>
+      "returns not found when dir does not exist" ! prop { d: ADir => (d != rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
           .toEither must beLeft(pathError(PathNotFound(d)))
-      }
+      }}
     }
 
     "fileExists" >> {

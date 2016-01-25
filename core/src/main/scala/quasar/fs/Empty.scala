@@ -16,7 +16,7 @@
 
 package quasar.fs
 
-import quasar.Predef.{Vector, None}
+import quasar.Predef.{Vector, None, Set}
 import quasar.Planner.UnsupportedPlan
 import quasar.LogicalPlan
 import quasar.fp.prism._
@@ -92,7 +92,10 @@ object Empty {
           unsupportedPlan(lp).strengthL(Vector())
 
         case QueryFile.ListContents(d) =>
-          fsPathNotFound(d)
+          if (d == rootDir)
+            \/.right[FileSystemError, Set[PathName]](Set()).point[F]
+          else
+            fsPathNotFound(d)
 
         case QueryFile.FileExists(_) =>
           false.right.point[F]
