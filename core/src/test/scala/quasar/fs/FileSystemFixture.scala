@@ -1,13 +1,13 @@
 package quasar
 package fs
 
-import scala.collection.IndexedSeq
-
 import quasar.Predef._
-import quasar.DataGen._
+import quasar.DataArbitrary._
 import quasar.fp._
 import quasar.fp.free.{Interpreter, SpecializedInterpreter}
 import quasar.fs.SandboxedPathy._
+
+import scala.collection.IndexedSeq
 
 import org.scalacheck.{Gen, Arbitrary}
 import pathy.Path._

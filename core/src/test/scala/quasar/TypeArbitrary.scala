@@ -1,13 +1,13 @@
 package quasar
 
 import quasar.Predef.{Set => _, _}
-import quasar.DataGen._
+import quasar.DataArbitrary._
 import quasar.Type._
 
 import org.scalacheck._, Gen._
 import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 
-trait TypeGen {
+trait TypeArbitrary {
   implicit def arbitraryType: Arbitrary[Type] = Arbitrary { Gen.sized(depth => typeGen(depth/25)) }
 
   def arbitrarySimpleType = Arbitrary { Gen.sized(depth => complexGen(depth/25, simpleGen)) }
@@ -52,7 +52,7 @@ trait TypeGen {
 
   def terminalGen: Gen[Type] = Gen.oneOf(Null, Str, Type.Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval)
 
-  def simpleConstGen: Gen[Type] = DataGen.simpleData.map(Const(_))
+  def simpleConstGen: Gen[Type] = DataArbitrary.simpleData.map(Const(_))
   def constGen: Gen[Type] = Arbitrary.arbitrary[Data].map(Const(_))
 
   // TODO: can a Set contain constants? objects? arrays?
@@ -81,4 +81,4 @@ trait TypeGen {
   def arrayGen: Gen[Type] = Gen.oneOf(arrGen, flexArrayGen)
 }
 
-object TypeGen extends TypeGen
+object TypeArbitrary extends TypeArbitrary

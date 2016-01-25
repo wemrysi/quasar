@@ -90,20 +90,12 @@ object Failure {
       new Ops[E, S]
   }
 
-  def toDisjunction[E]: Failure[E, ?] ~> (E \/ ?) =
-    new (Failure[E, ?] ~> (E \/ ?)) {
-      def apply[A](fa: Failure[E, A]): E \/ A = fa match {
-        case Fail(e) => \/.left(e)
+  def toError[F[_, _], E](implicit F: MonadError[F, E]): Failure[E, ?] ~> F[E, ?] =
+    new (Failure[E, ?] ~> F[E, ?]) {
+      def apply[A](fa: Failure[E, A]) = fa match {
+        case Fail(e) => F.raiseError(e)
       }
     }
-
-  def toEitherT[F[_]: Applicative, E]: Failure[E, ?] ~> EitherT[F, E, ?] = {
-    val f = new ((E \/ ?) ~> EitherT[F, E, ?]) {
-      def apply[A](ea: E \/ A) = EitherT.fromDisjunction[F](ea)
-    }
-
-    f.compose[Failure[E, ?]](toDisjunction[E])
-  }
 
   def toTaskFailure[E: Show]: Failure[E, ?] ~> Task =
     new (Failure[E, ?] ~> Task) {

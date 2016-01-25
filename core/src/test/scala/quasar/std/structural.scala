@@ -14,8 +14,8 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
 
   import StructuralLib._
 
-  import DataGen._
-  import TypeGen._
+  import DataArbitrary._
+  import TypeArbitrary._
 
   "ConcatOp" should {
     // NB: the func's domain is the type assigned to any argument if nothing

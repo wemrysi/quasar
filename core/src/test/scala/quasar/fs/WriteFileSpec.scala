@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, DataGen}
+import quasar.{Data, DataArbitrary}
 import quasar.fp._
 
 import org.specs2.mutable.Specification
@@ -13,7 +13,7 @@ import scalaz.syntax.monad._
 import scalaz.stream._
 
 class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import DataGen._, FileSystemError._, PathError2._
+  import DataArbitrary._, FileSystemError._, PathError2._
 
   "WriteFile" should {
 
