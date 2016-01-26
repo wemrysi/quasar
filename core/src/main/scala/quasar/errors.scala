@@ -51,6 +51,12 @@ object Errors {
     liftMT[Task, G]
   }
 
+  /** Given a function A => B, returns a natural transformation from
+    * EitherT[F, A, ?] ~> EitherT[F, B, ?].
+    *
+    * Partially applies the monad, `F`, for better inference, so use like
+    *   `convertError[F](f)`
+    */
   object convertError {
     def apply[F[_]]: Aux[F] =
       new Aux[F]
