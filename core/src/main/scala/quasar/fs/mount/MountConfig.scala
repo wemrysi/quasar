@@ -118,8 +118,12 @@ object MountConfig2 {
   private def viewCfgAsUri(query: Expr, vars: Variables): String = {
     import org.http4s._, util._, CaseInsensitiveString._
 
+    // TODO: Workaround for https://github.com/http4s/http4s/issues/510
+    val urlEncode: String => String =
+      UrlCodingUtils.urlEncode(_, spaceIsPlus = false, toSkip = UrlFormCodec.urlUnreserved)
+
     val qryMap = vars.value.foldLeft(Map("q" -> List(sql.pprint(query)))) {
-      case (qm, (n, v)) => qm + ((VarPrefix + n.value, List(v.value)))
+      case (qm, (n, v)) => qm + ((urlEncode(VarPrefix + n.value), List(v.value)))
     }
 
     /** NB: host and path are specified here just to force the URI to have

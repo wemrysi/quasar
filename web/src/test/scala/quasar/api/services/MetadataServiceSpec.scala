@@ -1,7 +1,7 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.Variables
+import quasar.{Variables, VariablesArbitrary}
 import quasar.effect.KeyValueStore
 import quasar.fp.free
 import quasar.fp.prism._
@@ -25,6 +25,8 @@ import scalaz.concurrent.Task
 class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import InMemory._
   import metadata.FsNode
+  import VariablesArbitrary._, ExprArbitrary._
+  import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
 
   type MetadataEff[A] = Coproduct[QueryFileF, MountingF, A]
 
@@ -86,25 +88,25 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           .as[Json].run must_== Json("children" := List[FsNode]())
       }
 
-      "respond with list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
+      "and list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
         val childNodes = s.ls.map(p => FsNode(p.swap, None))
 
         service(s.state, Map())(Request(uri = Uri(path = printPath(s.dir))))
           .as[Json].run must_== Json("children" := childNodes.sorted)
       }
 
-      "and mounts when any children happen to be mount points" ! prop {
-        (fName: AlphaCharacters, dName: AlphaCharacters, mName: AlphaCharacters, vName: AlphaCharacters) => (fName != vName && dName != mName) ==> {
+      "and mounts when any children happen to be mount points" ! prop { (
+        fName: AlphaCharacters,
+        dName: AlphaCharacters,
+        mName: AlphaCharacters,
+        vName: AlphaCharacters,
+        vcfg: (Expr, Variables),
+        fsCfg: (FileSystemType, ConnectionUri)
+      ) => (fName != vName && dName != mName) ==> {
         val parent: ADir = rootDir </> dir("foo")
-        val vcfg = MountConfig2.viewConfig(
-          Fix(IntLiteralF[Expr](1)),
-          Variables.empty)
-        val fsCfg = MountConfig2.fileSystemConfig(
-          FileSystemType("testfs"),
-          ConnectionUri("fs:bar"))
         val mnts = Map[APath, MountConfig2](
-          (parent </> file(vName.value), vcfg),
-          (parent </> dir(mName.value), fsCfg))
+          (parent </> file(vName.value), MountConfig2.viewConfig(vcfg)),
+          (parent </> dir(mName.value), MountConfig2.fileSystemConfig(fsCfg)))
         val mem = InMemState fromFiles Map(
           (parent </> file(fName.value), Vector()),
           (parent </> dir(dName.value) </> file("quux"), Vector()),
@@ -116,7 +118,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
             FsNode(fName.value, "file", None),
             FsNode(dName.value, "directory", None),
             FsNode(vName.value, "file", Some("view")),
-            FsNode(mName.value, "directory", Some("testfs"))
+            FsNode(mName.value, "directory", Some(fsCfg._1.value))
           ).sorted)
       }}
 
