@@ -9,9 +9,6 @@ import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
-
-import scalaz._, Scalaz._
-
 import scalaz._, Scalaz._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
@@ -33,7 +30,7 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }(implicitly,implicitly,implicitly,nonEmptyListSmallerThan(10),implicitly,listSmallerThan(5),implicitly) // Use better syntax once specs2 3.x
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
-      "returns not found when dir does not exist" ! prop { d: ADir => (d != rootDir) ==> {
+      "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
           .toEither must beLeft(pathError(PathNotFound(d)))
       }}
