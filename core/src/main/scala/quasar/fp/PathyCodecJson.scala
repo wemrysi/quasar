@@ -17,7 +17,7 @@
 package quasar.fp
 
 import quasar.Predef.{Array, String, SuppressWarnings}
-import quasar.fs.APath
+import quasar.fs.{APath, sandboxAbs}
 
 import argonaut._, Argonaut._
 import pathy.Path, Path._
@@ -32,9 +32,4 @@ object PathyCodecJson {
       posixCodec.parseAbsFile(s).orElse(posixCodec.parseAbsDir(s))
         .map(sandboxAbs)
         .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
-
-  // TODO: We know this can't fail, remove once Pathy is refactored to be more precise
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
-  private def sandboxAbs[T,S](p: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
-    rootDir[Sandboxed] </> p.relativeTo(rootDir).get
 }

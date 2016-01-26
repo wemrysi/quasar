@@ -76,8 +76,6 @@ object data {
             result <- if (all.isEmpty) BadRequest("Request has no body")
             else {
               val (errors, cleanData) = unzipDisj(all.toList)
-              // TODO{2.4}: FIX THIS TO BE STREAMING
-              // Does the fact that save take a Process[Free, A] doom us to non-streaming upload?
               responseForUpload(errors, convert[S, FileSystemError](f)(by(Process.emitAll(cleanData))).runLog.map(_.toList))
             }
           } yield result
@@ -97,9 +95,9 @@ object data {
       case req @ Method.MOVE -> AsPath(path) =>
         requiredHeader(Destination, req).map { destPathString =>
             val scenarioOrProblem = refineType(path).fold(
-              src => parseAbsDir(destPathString.value).flatMap(resandbox).map(
+              src => parseAbsDir(destPathString.value).map(sandboxAbs).map(
                 dest => MoveScenario.DirToDir(src, dest)) \/> "Cannot move directory into a file",
-              src => parseAbsFile(destPathString.value).flatMap(resandbox).map(
+              src => parseAbsFile(destPathString.value).map(sandboxAbs).map(
                 dest => MoveScenario.FileToFile(src, dest)) \/> "Cannot move a file into a directory, must specify destination precisely"
             )
             scenarioOrProblem.map{ scenario =>

@@ -82,6 +82,15 @@ package object fs {
       n => FileName(n).right.some,
       f).toIList.unite.headOption
 
+  /** Sandboxes an absolute path, needed due to parsing functions producing
+    * unsandboxed paths.
+    *
+    * TODO: We know this can't fail, remove once Pathy is refactored to be more precise
+    */
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
+  def sandboxAbs[T, S](apath: PPath[Abs,T,S]): PPath[Abs,T,Sandboxed] =
+    rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
+
   // TODO: Move to/near LogicalPlan
   def paths(lp: Fix[LogicalPlan]): Set[Path] =
     lp.foldMap(_.cata[Set[Path]] {
