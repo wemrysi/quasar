@@ -81,7 +81,7 @@ trait ExprArbitrary {
       } yield Vari(n)),
       1 -> (for {
         n  <- Gen.chooseNum(2, 5)  // Note: at least two, to be valid set syntax
-        cs <- Gen.listOfN(n, constGen)
+        cs <- Gen.listOfN(n, constExprGen)
       } yield SetLiteral(cs)),
       10 -> (for {
         n <- Gen.oneOf(
@@ -154,7 +154,7 @@ trait ExprArbitrary {
         expr <- exprGen(depth)
       } yield Case(cond, expr))
 
-  private def constGen: Gen[Expr] =
+  def constExprGen: Gen[Expr] =
     Gen.oneOf(
       Gen.chooseNum(0, 100).flatMap(IntLiteral(_)),       // Note: negative numbers are parsed as Unop(-, _)
       Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),  // Note: negative numbers are parsed as Unop(-, _)
