@@ -19,8 +19,10 @@ package quasar.effect
 import quasar.Predef._
 import quasar.SKI._
 import quasar.fp.TaskRef
+import quasar.fp.free
 
-import scalaz._
+import monocle.Lens
+import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 import scalaz.syntax.applicative._
 import scalaz.syntax.id._
@@ -114,4 +116,76 @@ object AtomicRef {
           }
       }
     }
+
+  /** Decorate AtomicRef operations by running an effect after each successful
+    * update. Usage: `onSet[V](effect)`
+    */
+  object onSet {
+    def apply[V]: Aux[V] = new Aux[V]
+
+    final class Aux[V] {
+      type Ref[A] = AtomicRef[V, A]
+      type RefF[A] = Coyoneda[Ref, A]
+
+      def apply[S[_]: Functor, F[_]: Applicative]
+          (f: V => F[Unit])
+          (implicit
+            S0: F :<: S,
+            S1: RefF :<: S
+          ): AtomicRef[V, ?] ~> Free[S, ?] = {
+        val R = Ops[V, S]
+
+        new (AtomicRef[V, ?] ~> Free[S, ?]) {
+          def apply[A](r: AtomicRef[V, A]) = r match {
+            case Get(f) =>
+              R.get.map(f)
+
+            case Set(value) =>
+              R.set(value) *> free.lift(f(value)).into[S]
+
+            case CompareAndSet(expect, update) =>
+              for {
+                upd <- R.compareAndSet(expect, update)
+                _   <- free.lift {
+                          if (upd) f(update) else ().point[F]
+                        }.into[S]
+              } yield upd
+          }
+        }
+      }
+    }
+  }
+
+  /** Given a lens A -> B, lifts AtomicRef[B, ?] into any effect type
+    * providing AtomicRef[A, ?]. Usage: `zoom(aLens).into[S]`.
+    */
+  object zoom {
+    def apply[A, B](lens: Lens[A, B]) = new Aux(lens)
+
+    final class Aux[A, B](lens: Lens[A, B]) {
+      type RefA[C] = AtomicRef[A, C]
+      type RefAF[C] = Coyoneda[RefA, C]
+
+      def into[S[_]: Functor](implicit S0: RefAF :<: S)
+          : AtomicRef[B, ?] ~> Free[S, ?] = {
+
+        val R = AtomicRef.Ops[A, S]
+
+        new (AtomicRef[B, ?] ~> Free[S, ?]) {
+          def apply[C](r: AtomicRef[B, C]) = r match {
+            case Get(f) =>
+              R.get.map(v => f(lens.get(v)))
+
+            case Set(v) =>
+              R.modify(u => lens.set(v)(u)).void
+
+            case CompareAndSet(expect, update) =>
+              R.modifyS(v =>
+                if (lens.get(v) == expect) (lens.set(update)(v), true)
+                else (v, false))
+          }
+        }
+      }
+    }
+  }
 }
