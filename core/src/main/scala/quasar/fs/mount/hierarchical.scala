@@ -340,6 +340,7 @@ object hierarchical {
 
   ////
 
+  // TODO{performance}: Move the prefix find op to `Mounts` so it can be optimized
   private def lookupMounted[A](mounts: Mounts[A], path: APath): Option[(ADir, A)] =
     mounts.toMap find { case (d, a) => path.relativeTo(d).isDefined }
 
@@ -395,7 +396,10 @@ object hierarchical {
     def firstDir(rdir: RDir): Option[DirName] =
       firstSegmentName(rdir).flatMap(_.swap.toOption)
 
-    mounts.foldMap(_ relativeTo ls flatMap firstDir map (d => Set(d.left)))
+    if (mounts.isEmpty && ls === rootDir)
+      Some(Set())
+    else
+      mounts.foldMap(_ relativeTo ls flatMap firstDir map (d => Set(d.left)))
   }
 
   private object getMounted {
