@@ -18,16 +18,20 @@ package quasar.fs
 
 import quasar.Predef.{Vector, None, Set}
 import quasar.Planner.UnsupportedPlan
-import quasar.LogicalPlan
+import quasar.{LogicalPlan, PhaseResults}
 import quasar.fp.prism._
 import quasar.recursionschemes.Fix
 
 import pathy.Path._
 import scalaz.{~>, \/, Applicative}
+import scalaz.syntax.equal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
+import scalaz.syntax.std.option._
 
-/** Empty FileSystem interpreters which perform zero side-effects. */
+/** `FileSystem` interpreters for a filesystem that has no, and doesn't support
+  * creating any, files.
+  */
 object Empty {
   import FileSystemError._, PathError2._
 
@@ -49,10 +53,10 @@ object Empty {
     new (WriteFile ~> F) {
       def apply[A](wf: WriteFile[A]) = wf match {
         case WriteFile.Open(f) =>
-          fsPathNotFound(f)
+          WriteFile.WriteHandle(f, 0).right.point[F]
 
-        case WriteFile.Write(h, _) =>
-          Vector(unknownWriteHandle(h)).point[F]
+        case WriteFile.Write(_, data) =>
+          data.map(writeFailed(_, "empty filesystem")).point[F]
 
         case WriteFile.Close(_) =>
           ().point[F]
@@ -76,11 +80,11 @@ object Empty {
   def queryFile[F[_]: Applicative]: QueryFile ~> F =
     new (QueryFile ~> F) {
       def apply[A](qf: QueryFile[A]) = qf match {
-        case QueryFile.ExecutePlan(_, f) =>
-          fsPathNotFound(f).strengthL(Vector())
+        case QueryFile.ExecutePlan(lp, _) =>
+          lpResult(lp)
 
         case QueryFile.EvaluatePlan(lp) =>
-          unsupportedPlan(lp).strengthL(Vector())
+          lpResult(lp)
 
         case QueryFile.More(h) =>
           unknownResultHandle(h).left.point[F]
@@ -89,10 +93,10 @@ object Empty {
           ().point[F]
 
         case QueryFile.Explain(lp) =>
-          unsupportedPlan(lp).strengthL(Vector())
+          lpResult(lp)
 
         case QueryFile.ListContents(d) =>
-          if (d == rootDir)
+          if (d === rootDir)
             \/.right[FileSystemError, Set[PathName]](Set()).point[F]
           else
             fsPathNotFound(d)
@@ -106,6 +110,12 @@ object Empty {
     interpretFileSystem(queryFile, readFile, writeFile, manageFile)
 
   ////
+
+  private def lpResult[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[(PhaseResults, FileSystemError \/ A)] =
+    LogicalPlan.paths(lp)
+      .headOption
+      .cata(p => fsPathNotFound[F, A](p.asAPath), unsupportedPlan[F, A](lp))
+      .strengthL(Vector())
 
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
     pathError(PathNotFound(p)).left.point[F]

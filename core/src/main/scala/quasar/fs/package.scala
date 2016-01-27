@@ -20,8 +20,6 @@ import quasar.Predef._
 import quasar.fp.free._
 
 import pathy.{Path => PPath}, PPath._
-import quasar.recursionschemes.Fix, Fix._
-import quasar.recursionschemes.Recursive.ops._
 import scalaz._, Scalaz._
 
 package object fs {
@@ -90,12 +88,4 @@ package object fs {
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
   def sandboxAbs[T, S](apath: PPath[Abs,T,S]): PPath[Abs,T,Sandboxed] =
     rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
-
-  // TODO: Move to/near LogicalPlan
-  def paths(lp: Fix[LogicalPlan]): Set[Path] =
-    lp.foldMap(_.cata[Set[Path]] {
-      case quasar.LogicalPlan.ReadF(p) => Set(p)
-      case other    => other.fold
-    })
-
 }

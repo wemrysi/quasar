@@ -262,7 +262,7 @@ private final class QueryFileInterpreter[C](
     } yield ()
 
     EitherT[MongoLogWF, FileSystemError, Unit](
-      (paths(lp).traverse_(checkPathExists).run
+      (LogicalPlan.paths(lp).traverse_(checkPathExists).run
         .liftM[QRT]
         .liftM[WorkflowExecErrT]: MQ[FileSystemError \/ Unit])
         .liftM[PhaseResultT])
