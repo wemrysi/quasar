@@ -39,7 +39,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
   def runMount(mnts: Map[APath, MountConfig2]): Mounting ~> Task =
     new (Mounting ~> Task) {
       type F[A] = State[Map[APath, MountConfig2], A]
-      val mntr = Mounter.pure[MountConfigsF]
+      val mntr = Mounter.trivial[MountConfigsF]
       val kvf = KeyValueStore.toState[State](Lens.id[Map[APath, MountConfig2]])
       def apply[A](ma: Mounting[A]) =
         Task.now(mntr(ma).foldMap(Coyoneda.liftTF[MountConfigs, F](kvf)).eval(mnts))

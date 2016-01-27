@@ -89,8 +89,11 @@ object Mounter {
     }
   }
 
-  /** Mounting interpreter that does not handle mount requests. */
-  def pure[S[_]: Functor](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
+  /** A mounter where all mount requests succeed trivially.
+    *
+    * Useful in scenarios where only the bookkeeping of mounts is needed.
+    */
+  def trivial[S[_]: Functor](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
     new (Mounting ~> Free[S, ?]) {
       type F[A] = Coproduct[Id, S, A]
       type M[A] = Free[S, A]
