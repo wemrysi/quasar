@@ -64,22 +64,6 @@ object util {
       liftAndHandle(Task.delay(new ConnectionString(uri.value)))(t =>
         cfgErr.fail(malformedConfig(uri.value, t.getMessage)))
 
-    def clientSettings(cs: ConnectionString) =
-      MongoClientSettings.builder()
-        .clusterSettings(
-          DefaultClusterSettingsBuilder
-            .applyConnectionString(cs)
-            .build())
-        .socketSettings(
-          SocketSettings.builder()
-            .applyConnectionString(cs)
-            build())
-        .sslSettings(
-          SslSettings.builder()
-            .applyConnectionString(cs)
-            .build())
-        .build()
-
     /** Attempts a benign operation (reading the server version) using the
       * given client in order to test whether the connection was successful,
       * necessary as otherwise, given a bad connection URI, the driver will
@@ -104,16 +88,16 @@ object util {
             Task.now(())
         }
 
-    def createClient(settings: MongoClientSettings) =
+    def createClient(cs: ConnectionString) =
       liftAndHandle(for {
-        client <- Task.delay(MongoClients.create(settings))
+        client <- Task.delay(MongoClients.create(cs))
         _      <- testConnection(client) onFinish {
                     case Some(_) => Task.delay(client.close())
                     case None    => Task.now(())
                   }
       } yield client)(t => envErr.fail(connectionFailed(t.getMessage)))
 
-    disableLogging *> connString map clientSettings >>= createClient
+    disableLogging *> connString >>= createClient
   }
 
   ////
@@ -125,10 +109,6 @@ object util {
     (new MongoClientOptions.Builder)
       .serverSelectionTimeout(defaultTimeoutMillis)
       .build
-
-  private def DefaultClusterSettingsBuilder =
-    ClusterSettings.builder()
-      .serverSelectionTimeout(defaultTimeoutMillis, TimeUnit.MILLISECONDS)
 
   private val mongoClient: ConnectionString => Task[MongoClient] = {
     val memo = Memo.mutableHashMapMemo[ConnectionString, MongoClient] { (uri: ConnectionString) =>
