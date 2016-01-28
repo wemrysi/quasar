@@ -17,7 +17,10 @@ object TraceFS {
     import QueryFile._
 
     def ls(dir: ADir) =
-      paths.getOrElse(dir, Set())
+      paths.get(dir).cata(
+        _.right,
+        if (dir === rootDir) Set[PathName]().right
+        else FileSystemError.pathError(PathError2.PathNotFound(dir)).left)
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
       WriterT.writer((Vector(qf.render),
@@ -27,8 +30,11 @@ object TraceFS {
           case More(handle)         => \/-(Vector.empty)
           case Close(handle)        => ()
           case Explain(lp)          => (Vector.empty, \/-(ExecutionPlan(FsType, lp.toString)))
-          case ListContents(dir)    => \/-(ls(dir))
-          case FileExists(file)     => ls(fileParent(file)).contains(fileName(file).right).right
+          case ListContents(dir)    => ls(dir)
+          case FileExists(file)     =>
+            ls(fileParent(file)).fold(
+              κ(false),
+              _.contains(fileName(file).right)).right
         }))
   }
 

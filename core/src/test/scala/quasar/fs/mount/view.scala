@@ -285,8 +285,40 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       viewInterp(views, twoNodes(aDir), f) must_==(
         (traceInterp(f, twoNodes(aDir))._1,
           \/-(Set(
-            FileName("afile").right,    // hides the regular file
+            FileName("afile").right,  // hides the regular file
             DirName("adir").left))))  // no conflict with same dir
+    }
+
+    "preserve empty dir result" ! prop { (aDir: ADir) =>
+      val views = Views(Map())
+
+      val f = query.ls(aDir).run
+
+      viewInterp(views, Map(aDir -> Set()), f) must_==(
+        (traceInterp(f, Map(aDir -> Set()))._1,
+          \/-(Set())))
+    }
+
+    "preserve error for non-existent dir" ! prop { (aDir: ADir) =>
+      (aDir =/= rootDir) ==> {
+        val views = Views(Map())
+
+        val f = query.ls(aDir).run
+
+        viewInterp(views, Map(), f) must_==(
+          (traceInterp(f, Map())._1,
+            -\/(FileSystemError.pathError(PathError2.PathNotFound(aDir)))))
+      }
+    }
+
+    "preserve empty dir result at root" in {
+      val views = Views(Map())
+
+      val f = query.ls(rootDir).run
+
+      viewInterp(views, Map(), f) must_==(
+        (traceInterp(f, Map())._1,
+          \/-(Set())))
     }
   }
 
