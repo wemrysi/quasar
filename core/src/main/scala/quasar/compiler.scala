@@ -404,6 +404,10 @@ trait Compiler[F[_]] {
       case ArrayLiteralF(exprs) =>
         exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
 
+      case MapLiteralF(exprs) =>
+        exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>
+          Fix(MakeObjectN(elems: _*)))
+
       case SpliceF(expr) =>
         expr.fold(
           CompilerState.fullTable.flatMap(_.map(emit _).getOrElse(fail(GenericError("Not within a table context so could not find table expression for wildcard")))))(

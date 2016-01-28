@@ -49,7 +49,9 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
   }
 
-  val queryPlanner = MongoDbPlanner.queryPlanner(κ("Mongo" -> Cord.empty))
+  def queryPlanner(qr: QueryRequest) =
+    MongoDbPlanner.compileToLP.apply(qr)
+      .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
 
   def plan(query: String): Either[CompilationError, Crystallized] =
     SQLParser.parseInContext(Query(query), Path("/db/")).fold(
@@ -84,6 +86,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         beWorkflow($pure(Bson.Doc(ListMap("0" -> Bson.Int64(1)))))
     }
 
+    "plan complex constant" in {
+      plan("[1, 2, 3, 4, 5][*] limit 3 offset 1") must
+        beWorkflow($pure(Bson.Arr(List(Bson.Int64(2), Bson.Int64(3)))))
+    }
+
     "plan simple constant from collection" in {
       plan("select 1 from zips") must
         beWorkflow(chain(
@@ -91,6 +98,26 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $project(
             reshape("0" -> $literal(Bson.Int64(1))),
             IgnoreId)))
+    }
+
+    // TODO: currently, Data.Obj doesn’t maintain order. The result here will
+    //       change once it does.
+    "select complex constant" in {
+      plan("select {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5}{*} limit 3 offset 1") must
+        beWorkflow($pure(Bson.Arr(List(
+          Bson.Doc(ListMap("0" -> Bson.Int64(1))),
+          Bson.Doc(ListMap("0" -> Bson.Int64(2)))))))
+
+    }
+
+    // TODO: currently, Data.Obj doesn’t maintain order. The result here will
+    //       change once it does.
+    "select complex constant 2" in {
+      plan("select {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5}{*:} limit 3 offset 1") must
+      beWorkflow($pure(Bson.Arr(List(
+        Bson.Doc(ListMap("0" -> Bson.Text("a"))),
+        Bson.Doc(ListMap("0" -> Bson.Text("b")))))))
+
     }
 
     "plan simple select *" in {
