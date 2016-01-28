@@ -19,7 +19,7 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar._
 import quasar.fp._
-import quasar.fs.{AFile, ADir, RFile, RDir, Path}
+import quasar.fs.{AFile, ADir, Path, PathName, firstSegmentName}
 import quasar.recursionschemes._, FunctorT.ops._
 
 import monocle.Optional
@@ -40,25 +40,8 @@ final case class Views(map: Map[AFile, Fix[LogicalPlan]]) {
   def contains(p: AFile): Boolean = map.contains(p)
 
   /** Enumerate view files and view ancestor directories at a particular location. */
-  def ls(dir: ADir): Set[RDir \/ RFile] = {
-    /** Extract the first node from a relative path, if any. */
-    def firstNode[T, S](p: PPath[Rel, T, S]):
-        Option[PPath[Rel, Dir, S] \/ PPath[Rel, File, S]] =
-      PPath.flatten(
-        None,
-        Some(-\/(())),
-        None,
-        dn => Some(\/-(-\/ (PPath.dir(dn)))),
-        fn => Some(\/-( \/-(PPath.file(fn)))),
-        p).toList match {
-          case Some(-\/(_)) :: Some(\/-(a)) :: _ => Some(a)
-          case _ => None
-        }
-
-    map.keys.toList.map(
-      _.relativeTo(dir).flatMap(firstNode))
-      .foldMap(_.toSet)
-  }
+  def ls(dir: ADir): Set[PathName] =
+    map.keySet.foldMap(_.relativeTo(dir).flatMap(firstSegmentName).toSet)
 
   /** Resolve a path to the query for the view found there if any. */
   def lookup(p: AFile): Option[Fix[LogicalPlan]] =

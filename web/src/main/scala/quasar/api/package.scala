@@ -117,17 +117,11 @@ package object api {
     }
   }
 
-  /** Convert an absolute path to sandboxed. Needed only because parseAbsDir/File
-    * produces an Unsandboxed path. NB: never fails, despite producing an Option.
-    */
-  def resandbox[T](path: Path[Abs, T, Unsandboxed]): Option[Path[Abs, T, Sandboxed]] =
-    sandbox(rootDir, path).map(rootDir </> _)
-
   // TODO: probably need a URL-specific codec here
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
       val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsDir(str) flatMap resandbox
+      posixCodec.parseAbsDir(str) map sandboxAbs
     }
   }
 
@@ -135,7 +129,7 @@ package object api {
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
       val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsFile(str) flatMap resandbox
+      posixCodec.parseAbsFile(str) map sandboxAbs
     }
   }
 

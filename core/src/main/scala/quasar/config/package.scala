@@ -17,14 +17,33 @@
 package quasar
 
 import quasar.Predef._
+import quasar.effect.Failure
 import quasar.fs.Path
+import quasar.fs.mount.MountingsConfig2
 
 import argonaut._, Argonaut._
+import pathy.Path.{File, Dir, Sandboxed}
+import scalaz.{Coyoneda, EitherT}
+import scalaz.concurrent.Task
 
 package object config {
+  type FsFile = FsPath[File, Sandboxed]
+  type FsDir  = FsPath[Dir, Sandboxed]
+
+  type CfgErr[A]  = Failure[ConfigError, A]
+  type CfgErrF[A] = Coyoneda[CfgErr, A]
+
+  type CfgErrT[F[_], A] = EitherT[F, ConfigError, A]
+  type CfgTask[A]       = CfgErrT[Task, A]
+
+  // NB: Deprecated
   type MountingsConfig = Map[Path, MountConfig]
 
-  object implicits {
+  object MountingsConfig {
+    // TODO: !!!!
+    def fromMC2(mc2: MountingsConfig2): MountingsConfig =
+      mc2.asJson.as[MountingsConfig].getOr(Map.empty)
+
     implicit val mountingsConfigCodecJson: CodecJson[MountingsConfig] =
       CodecJson[MountingsConfig](
         encoder = map => map.map(t => t._1.pathname -> t._2).asJson,

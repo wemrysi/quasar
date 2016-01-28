@@ -3,7 +3,7 @@ package quasar.fs
 import org.scalacheck.{Gen, Arbitrary}
 import pathy.scalacheck.PathyArbitrary._
 
-trait PathGen {
+trait PathArbitrary {
 
   implicit val arbitraryAPath: Arbitrary[APath] =
     Arbitrary(Gen.oneOf(Arbitrary.arbitrary[AFile], Arbitrary.arbitrary[ADir]))
@@ -13,4 +13,4 @@ trait PathGen {
 
 }
 
-object PathGen extends PathGen
+object PathArbitrary extends PathArbitrary

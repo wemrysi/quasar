@@ -203,7 +203,7 @@ trait PlannerBackend[PhysicalPlan] extends Backend {
   def eval0(req: QueryRequest) =
     queryPlanner(req).map(plan =>
       evaluator.evaluate(plan)
-        .translate[Backend.ProcessingTask](convertError(Backend.PEvalError(_))))
+        .translate[Backend.ProcessingTask](convertError[Task](Backend.PEvalError(_))))
 }
 
 /** Wraps a backend which handles some or all requests via blocking network
@@ -335,7 +335,7 @@ final case class ViewBackend(backend: Backend, views0: Map[Path, ViewConfig]) ex
 
       backend.eval(QueryRequest(scanQuery, Variables(Map.empty))).run._2.fold[Process[ResTask, Data]](
         e => Process.eval[ResTask, Data](EitherT.left(Task.now(ResultCompilationError(e)))),
-        p => p.translate[Backend.ResTask](Errors.convertError(ResultProcessingError(_))))
+        p => p.translate[Backend.ResTask](Errors.convertError[Task](ResultProcessingError(_))))
     }))
 
   def run0(req: QueryRequest, out: Path) = expand(req.query).fold(

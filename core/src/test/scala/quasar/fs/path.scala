@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.fs.PathGen._
+import quasar.fs.PathArbitrary._
 
 import org.specs2.mutable._
 import org.specs2.ScalaCheck

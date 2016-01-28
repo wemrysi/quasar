@@ -17,13 +17,12 @@
 package quasar.repl
 
 import quasar.Predef._
-import quasar.fp._
 import quasar._, Backend._, Errors._, Planner._
+import quasar.Evaluator._
 import quasar.config._
-import quasar.config.FsPath.NonexistentFileError
-import quasar.Evaluator._, EnvironmentError.EnvFsPathError
 import quasar.fp._
 import quasar.fs._, Path._
+import quasar.fs.mount.MountingsConfig2
 import quasar.physical.mongodb.util
 import quasar.sql._
 import quasar.stacktrace.StackUtil
@@ -408,10 +407,12 @@ object Repl {
           new RuntimeException(s"Invalid path to config file: $s")))
 
       def configFromPath(fsPath: Option[FsPath[File, Sandboxed]]): Task[CoreConfig] =
-        CoreConfig.fromFileOrDefaultPaths(fsPath).fold(κ(CoreConfig(Map())), ι)
+        CoreConfig.fromFileOrDefaultPaths(fsPath) | CoreConfig(MountingsConfig2.empty)
 
       def backendFromConfig(config: CoreConfig): Task[Backend] =
-        Mounter.defaultMount(config.mountings).fold(e => printErrorAndFail(e.message), Task.now _).join
+        Mounter.defaultMount(MountingsConfig.fromMC2(config.mountings))
+          .fold(e => printErrorAndFail(e.message), Task.now _)
+          .join
 
       for {
         fsPath <- args.headOption.map(parsePath).sequence

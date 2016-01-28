@@ -17,27 +17,68 @@
 package quasar.api.services
 
 import quasar.Predef._
+import quasar.SKI._
+import quasar.api.AsPath
+import quasar.fs._
+import quasar.fs.mount._
+
+import scala.math.Ordering
 
 import argonaut._, Argonaut._
 import org.http4s._, argonaut._, dsl._
 import org.http4s.server.HttpService
-
+import pathy.Path._
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._
+import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
-
-import pathy.Path._
-
-import quasar.api.AsPath
-import quasar.fs._
+import scalaz.std.list._
 
 object metadata {
+  import MountConfig2._
 
-  def service[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S]): HttpService = {
+  final case class FsNode(name: String, typ: String, mount: Option[String])
+
+  object FsNode {
+    def apply(pathName: PathName, mount: Option[String]): FsNode =
+      FsNode(
+        pathName.fold(_.value, _.value),
+        pathName.fold(κ("directory"), κ("file")),
+        mount)
+
+    implicit val fsNodeOrdering: Ordering[FsNode] =
+      Ordering.by(n => (n.name, n.typ, n.mount))
+
+    implicit val fsNodeOrder: Order[FsNode] =
+      Order.fromScalaOrdering
+
+    implicit val fsNodeEncodeJson: EncodeJson[FsNode] =
+      EncodeJson { case FsNode(name, typ, mount) =>
+        ("name" := name)    ->:
+        ("type" := typ)     ->:
+        ("mount" :=? mount) ->?:
+        jEmptyObject
+      }
+
+    implicit val fsNodeDecodeJson: DecodeJson[FsNode] =
+      jdecode3L(FsNode.apply)("name", "type", "mount")
+  }
+
+  def service[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): HttpService = {
+    val mountType: MountConfig2 => String = {
+      case ViewConfig(_, _)         => "view"
+      case FileSystemConfig(typ, _) => typ.value
+    }
+
+    def mkNode(parent: ADir, name: PathName): Q.M[FsNode] =
+      M.lookup(parent </> name.fold(dir1, file1))
+        .run.map(cfg => FsNode(name, cfg map mountType))
+        .liftM[FileSystemErrT]
+
     def dirMetadata(d: ADir): Q.F[Task[Response]] =
-      Q.ls(d).fold(
-          fileSystemErrorResponse,
-          nodes => Ok(Json.obj("children" := nodes.toList.sorted)))
+      Q.ls(d).flatMap(_.toList.traverse(mkNode(d, _))).fold(
+        fileSystemErrorResponse,
+        nodes => Ok(Json.obj("children" := nodes.sorted)))
 
     def fileMetadata(f: AFile): Q.F[Task[Response]] =
       Q.fileExists(f).fold(

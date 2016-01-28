@@ -19,7 +19,6 @@ package quasar
 import quasar.Predef._
 import quasar.Backend.ResultError
 import quasar.Planner.CompilationError
-import quasar.config.FsPath.FsPathError
 import quasar.fs._, Path._
 import quasar.Errors._
 
@@ -90,10 +89,6 @@ object Evaluator {
     final case class InvalidCredentials(message: String) extends EnvironmentError
     final case class InsufficientPermissions(message: String) extends EnvironmentError
     final case class EnvPathError(error: PathError) extends EnvironmentError {
-      def message = error.message
-    }
-    // TODO: use PathError from the Free Architecture work once merged
-    final case class EnvFsPathError(error: FsPathError) extends EnvironmentError {
       def message = error.message
     }
     final case class EnvEvalError(error: EvaluationError) extends EnvironmentError {

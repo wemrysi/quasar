@@ -460,7 +460,7 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
           _   <- insertFs.save(TestDir ++ tmp, manyDocs(COUNT)).run
 
           ds = fs.scan(TestDir ++ tmp, 0, None).map(encode)
-          ds1 = ds.translate[ProcessingTask](convertError(PResultError(_)))
+          ds1 = ds.translate[ProcessingTask](convertError[Task](PResultError(_)))
           ds  <- zipped(ds1).map(v => v.length).sum.runLast.run
         } yield {
           ds.toOption.join must beSome.which(_ must beBetween(200*1000, 250*1000))

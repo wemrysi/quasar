@@ -22,7 +22,7 @@ import quasar.fs.InMemory._
 import quasar.recursionschemes._
 
 import Fixture._
-import NumericGen._
+import NumericArbitrary._
 import quasar.std.IdentityLib
 
 import scalaz.concurrent.Task

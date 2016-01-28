@@ -12,7 +12,7 @@ import scalaz.Monad
 class TypesSpec extends Specification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
   import Type._
 
-  import TypeGen._
+  import TypeArbitrary._
 
   val LatLong = Obj(Map("lat" -> Dec, "long" -> Dec), Some(Top))
   val Azim = Obj(Map("az" -> Dec), Some(Top))

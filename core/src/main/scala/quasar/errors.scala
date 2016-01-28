@@ -51,7 +51,21 @@ object Errors {
     liftMT[Task, G]
   }
 
-  def convertError[E, F](f: E => F) = new (ETask[E, ?] ~> ETask[F, ?]) {
-    def apply[A](t: ETask[E, A]) = t.leftMap(f)
+  /** Given a function A => B, returns a natural transformation from
+    * EitherT[F, A, ?] ~> EitherT[F, B, ?].
+    *
+    * Partially applies the monad, `F`, for better inference, so use like
+    *   `convertError[F](f)`
+    */
+  object convertError {
+    def apply[F[_]]: Aux[F] =
+      new Aux[F]
+
+    final class Aux[F[_]] {
+      def apply[A, B](f: A => B)(implicit F: Functor[F]): EitherT[F, A, ?] ~> EitherT[F, B, ?] =
+        new (EitherT[F, A, ?] ~> EitherT[F, B, ?]) {
+          def apply[C](ea: EitherT[F, A, C]) = ea.leftMap(f)
+        }
+    }
   }
 }

@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.fs.PathGen._
+import quasar.fs.PathArbitrary._
 import quasar.fs.SandboxedPathy._
 
 import org.specs2.mutable._
@@ -41,7 +41,7 @@ class SandboxedPathySpec extends Specification with DisjunctionMatchers with Sca
 
   "segAt" should {
     "segment at specified index" ! prop { (d: ADir, dirName: String, p: RPath) =>
-      segAt(depth(d), d </> dir(dirName) </> p) ==== DirName(dirName).right.some
+      segAt(depth(d), d </> dir(dirName) </> p) ==== DirName(dirName).left.some
     }
   }
 

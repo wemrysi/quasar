@@ -20,7 +20,9 @@ class FileSystemMounterSpec extends mutable.Specification {
   type AbortF[A] = Coyoneda[Abort, A]
   type AbortM[A] = Free[AbortF, A]
 
-  type ResMnts = Mounts[DefinitionResult[AbortM]]
+  type ResMnts         = Mounts[DefinitionResult[AbortM]]
+  type ResMntsS[A]     = State[ResMnts, A]
+  type ResMntsSE[A, B] = EitherT[ResMntsS, A, B]
 
   type MountedFs[A]  = AtomicRef[ResMnts, A]
   type MountedFsF[A] = Coyoneda[MountedFs, A]
@@ -29,30 +31,29 @@ class FileSystemMounterSpec extends mutable.Specification {
   type Eff[A]  = Coproduct[AbortM, Eff0, A]
   type EffM[A] = Free[Eff, A]
 
-  type TaskR[A] = Task[(ResMnts, String \/ A)]
+  type EffR[A] = (ResMnts, String \/ A)
 
   val abort = Failure.Ops[String, AbortF](implicitly, implicitly[AbortF :<: AbortF])
 
-  def eval(rms: ResMnts): EffM ~> TaskR =
-    new (EffM ~> TaskR) {
+  def eval(rms: ResMnts): EffM ~> EffR =
+    new (EffM ~> EffR) {
       type MT[F[_], A] = EitherT[F, String, A]
-      type M[A] = MT[Task, A]
+      type M[A]        = MT[ResMntsS, A]
 
       val evalAbort: AbortF ~> M =
-        Coyoneda.liftTF[Abort, M](Failure.toEitherT[Task, String])
+        Coyoneda.liftTF[Abort, M](Failure.toError[ResMntsSE, String])
 
-      def apply[A](ma: EffM[A]) = TaskRef(rms) flatMap { ref =>
-        val evalMnts: MountedFsF ~> Task =
-          Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(ref))
+      val evalMnts: MountedFsF ~> ResMntsS =
+        Coyoneda.liftTF[MountedFs, ResMntsS](AtomicRef.toState[State, ResMnts])
 
-        val evalEff: Eff ~> M =
-          free.interpret3[AbortM, AbortF, MountedFsF, M](
-            free.foldMapNT(evalAbort),
-            evalAbort,
-            liftMT[Task, MT] compose evalMnts)
+      val evalEff: Eff ~> M =
+        free.interpret3[AbortM, AbortF, MountedFsF, M](
+          free.foldMapNT(evalAbort),
+          evalAbort,
+          liftMT[ResMntsS, MT] compose evalMnts)
 
-        (ma.foldMap(evalEff).run |@| ref.read)((r, mnts) => (mnts, r))
-      }
+      def apply[A](ma: EffM[A]) =
+        ma.foldMap(evalEff).run(rms)
     }
 
 
@@ -88,7 +89,7 @@ class FileSystemMounterSpec extends mutable.Specification {
         val d1 = rootDir </> dir("foo")
         val d2 = d1 </> dir("bar")
 
-        eval(Mounts.singleton(d2, fsResult("A")))(mount(d1)).run._2 must beLike {
+        eval(Mounts.singleton(d2, fsResult("A")))(mount(d1))._2 must beLike {
           case \/-(-\/(err)) => invalidPath.getOption(err) must beSome(d1)
         }
       }
@@ -97,7 +98,7 @@ class FileSystemMounterSpec extends mutable.Specification {
         val d1 = rootDir </> dir("foo")
         val d2 = d1 </> dir("bar")
 
-        eval(Mounts.singleton(d1, fsResult("B")))(mount(d2)).run._2 must beLike {
+        eval(Mounts.singleton(d1, fsResult("B")))(mount(d2))._2 must beLike {
           case \/-(-\/(err)) => invalidPath.getOption(err) must beSome(d2)
         }
       }
@@ -107,21 +108,20 @@ class FileSystemMounterSpec extends mutable.Specification {
         val fsd = Monoid[FileSystemDef[AbortM]].zero
         val fsm = FileSystemMounter(fsd)
 
-        eval(Mounts.empty)(fsm.mount[Eff](d, testType, testUri))
-          .run._2 must beLike {
-            case \/-(-\/(MountingError.InvalidConfig(_, _))) => ok
-          }
+        eval(Mounts.empty)(fsm.mount[Eff](d, testType, testUri))._2 must beLike {
+          case \/-(-\/(MountingError.InvalidConfig(_, _))) => ok
+        }
       }
 
       "stores the interpreter and cleanup effect when successful" >> {
         val d = rootDir </> dir("success")
-        eval(Mounts.empty)(mount(d)).run._1.toMap.isEmpty must beFalse
+        eval(Mounts.empty)(mount(d))._1.toMap.isEmpty must beFalse
       }
 
       "cleans up previous filesystem when mount is replaced" >> {
         val d = rootDir </> dir("replace") </> dir("cleanup")
         val cln = "CLEAN"
-        val (rmnts, signal) = eval(Mounts.singleton(d, fsResult(cln)))(mount(d)).run
+        val (rmnts, signal) = eval(Mounts.singleton(d, fsResult(cln)))(mount(d))
 
         (rmnts.toMap.isEmpty must beFalse) and (signal must_== \/.left(cln))
       }
@@ -132,15 +132,13 @@ class FileSystemMounterSpec extends mutable.Specification {
         val d = rootDir </> dir("unmount") </> dir("cleanup")
         val undo = "UNDO"
 
-        eval(Mounts.singleton(d, fsResult(undo)))(unmount(d))
-          .run._2 must_== \/.left(undo)
+        eval(Mounts.singleton(d, fsResult(undo)))(unmount(d))._2 must_== \/.left(undo)
       }
 
       "deletes the entry from mounts" >> {
         val d = rootDir </> dir("unmount") </> dir("deletes")
 
-        eval(Mounts.singleton(d, fsResult("C")))(unmount(d))
-          .run._1.toMap.isEmpty must beTrue
+        eval(Mounts.singleton(d, fsResult("C")))(unmount(d))._1.toMap.isEmpty must beTrue
       }
     }
   }

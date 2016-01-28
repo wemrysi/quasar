@@ -19,7 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._
 import quasar.fp._
-import quasar.fs.{APath, PathError2}
+import quasar.fs.{APath, PathError2, sandboxAbs}
 import quasar.fs.mount._
 
 import argonaut._
@@ -77,7 +77,7 @@ object mount {
       case req @ MOVE -> AsPath(src) =>
         def move[T](src: Path[Abs, T, Sandboxed], dstStr: String, parse: String => Option[Path[Abs, T, Unsandboxed]], typeStr: String)
             : EitherT[M.F, Task[Response], Unit] =
-          parse(dstStr).flatMap(resandbox).cata(
+          parse(dstStr).map(sandboxAbs).cata(
             dst => M.remount[T](src, dst).leftMap(mountingErrorResponse),
             EitherT.left(errorResponse(BadRequest, s"Not an absolute $typeStr path: $dstStr").point[M.F]))
         (for {

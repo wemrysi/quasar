@@ -16,17 +16,16 @@ import scalaz.concurrent.Task
 class ViewMounterSpec extends mutable.Specification {
   import MountingError._
 
-  type F[A]     = Free[MountedViewsF, A]
-  type TaskS[A] = Task[(Views, A)]
+  type F[A]      = Free[MountedViewsF, A]
+  type ViewsS[A] = State[Views, A]
+  type Res[A]    = (Views, A)
 
-  def eval(vs: Views): F ~> TaskS =
-    new (F ~> TaskS) {
-      def apply[A](fa: F[A]) = for {
-        ref <- TaskRef(vs)
-        f   =  AtomicRef.fromTaskRef(ref)
-        a   <- fa.foldMap(Coyoneda.liftTF[MountedViews, Task](f))
-        vs1 <- ref.read
-      } yield (vs1, a)
+  def eval(vs: Views): F ~> Res =
+    new (F ~> Res) {
+      def apply[A](fa: F[A]) = {
+        val f = AtomicRef.toState[State, Views]
+        fa.foldMap(Coyoneda.liftTF[MountedViews, ViewsS](f)).run(vs)
+      }
     }
 
   "mounting views" >> {
@@ -35,7 +34,7 @@ class ViewMounterSpec extends mutable.Specification {
       val f     = rootDir </> dir("mnt") </> file("dne")
 
       eval(Views.empty)(ViewMounter.mount[MountedViewsF](f, fnDNE, Variables.empty))
-        .map(_._2).run must beLike {
+        ._2 must beLike {
           case -\/(InvalidConfig(_, _)) => ok
         }
     }
@@ -50,7 +49,7 @@ class ViewMounterSpec extends mutable.Specification {
       val f = rootDir </> dir("mnt") </> file("selectStar")
 
       eval(Views.empty)(ViewMounter.mount[MountedViewsF](f, selStar, Variables.empty))
-        .map(_._1).run.map.get(f) must beSome
+        ._1.map.get(f) must beSome
     }
   }
 
@@ -60,7 +59,7 @@ class ViewMounterSpec extends mutable.Specification {
       val f  = rootDir </> dir("mnt") </> file("foo")
 
       eval(Views(Map(f -> rd)))(ViewMounter.unmount[MountedViewsF](f))
-        .map(_._1).run.map.toList must beEmpty
+        ._1.map.toList must beEmpty
     }
   }
 }

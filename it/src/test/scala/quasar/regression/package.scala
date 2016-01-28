@@ -30,7 +30,7 @@ package object regression {
 
     def monoSeqTask(ref: TaskRef[Long]): MonotonicSeqF ~> Task =
       Coyoneda.liftTF[MonotonicSeq, Task](
-        MonotonicSeq.taskRefMonotonicSeq(ref))
+        MonotonicSeq.fromTaskRef(ref))
 
     val hfsFailTask: HFSFailureF ~> Task =
       Coyoneda.liftTF[HFSFailure, Task](

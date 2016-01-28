@@ -51,10 +51,10 @@ object SandboxedPathy {
     rootSubPath(i.getOrElse(0), a)
   }
 
-  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[FileName \/ DirName] = {
+  def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[PathName] = {
     scala.Predef.require(index >= 0)
     val list =
-      pathy.Path.flatten(none, none, none, DirName(_).right.some,FileName(_).left.some,path).toIList.unite
+      pathy.Path.flatten(none, none, none, DirName(_).left.some,FileName(_).right.some,path).toIList.unite
     list.drop(index).headOption
   }
 

@@ -48,6 +48,14 @@ object Mounting {
     */
   final case class PathTypeMismatch(path: APath) extends scala.AnyVal
 
+  object PathTypeMismatch {
+    implicit val pathTypeMismatchShow: Show[PathTypeMismatch] =
+      Show.shows { v =>
+        val expectedType = refineType(v.path).fold(κ("file"), κ("directory"))
+        s"Expected ${expectedType} path instead of '${posixCodec.printPath(v.path)}'"
+      }
+  }
+
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
     extends LiftedOps[Mounting, S] {

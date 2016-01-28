@@ -1,7 +1,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.TypeGen
+import quasar.TypeArbitrary
 import quasar.fp._
 import quasar.specs2.PendingWithAccurateCoverage
 
@@ -15,7 +15,7 @@ import org.specs2.mutable._
 import org.specs2.scalaz._
 import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 
-class SetSpec extends Specification with ScalaCheck with TypeGen with ValidationMatchers with PendingWithAccurateCoverage {
+class SetSpec extends Specification with ScalaCheck with TypeArbitrary with ValidationMatchers with PendingWithAccurateCoverage {
   import SetLib._
   import quasar.Data
   import quasar.Data.{Bool, Date, Dec, Int, Null, Str}

@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, DataGen, LogicalPlan, PhaseResults}
+import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
 import quasar.fp._
 import quasar.scalacheck._
 
@@ -9,13 +9,10 @@ import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
-
-import scalaz._, Scalaz._
-
 import scalaz._, Scalaz._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import InMemory._, FileSystemError._, PathError2._, DataGen._, query._
+  import InMemory._, FileSystemError._, PathError2._, DataArbitrary._, query._
 
   "QueryFile" should {
     "descendantFiles" >> {
@@ -33,10 +30,10 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }(implicitly,implicitly,implicitly,nonEmptyListSmallerThan(10),implicitly,listSmallerThan(5),implicitly) // Use better syntax once specs2 3.x
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
-      "returns not found when dir does not exist" ! prop { d: ADir =>
+      "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
           .toEither must beLeft(pathError(PathNotFound(d)))
-      }
+      }}
     }
 
     "fileExists" >> {

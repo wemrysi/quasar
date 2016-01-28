@@ -16,12 +16,12 @@
 
 package quasar.config
 
-import quasar.config.implicits._
+import quasar.fs.mount.MountingsConfig2
 
 import argonaut._, Argonaut._
 import monocle.macros.Lenses
 
-@Lenses final case class CoreConfig(mountings: MountingsConfig)
+@Lenses final case class CoreConfig(mountings: MountingsConfig2)
 
 object CoreConfig extends ConfigOps[CoreConfig] {
 

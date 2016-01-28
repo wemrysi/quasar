@@ -65,7 +65,7 @@ object QueryFile {
     *       https://github.com/quasar-analytics/quasar/pull/986#discussion-diff-45081757
     */
   final case class ListContents(dir: ADir)
-    extends QueryFile[FileSystemError \/ Set[Node]]
+    extends QueryFile[FileSystemError \/ Set[PathName]]
 
   final case class FileExists(file: AFile)
     extends QueryFile[FileSystemError \/ Boolean]
@@ -147,14 +147,14 @@ object QueryFile {
       compileAnd(query, vars)(explain)
     }
 
-    /** Returns immediate children of the given directory, fails if the
-      * directory does not exist.
+    /** Returns the names of the immediate children of the given directory,
+      * fails if the directory does not exist.
       */
-    def ls(dir: ADir): M[Set[Node]] =
+    def ls(dir: ADir): M[Set[PathName]] =
       EitherT(lift(ListContents(dir)))
 
     /** The children of the root directory. */
-    def ls: M[Set[Node]] =
+    def ls: M[Set[PathName]] =
       ls(rootDir)
 
     /** Returns all files in this directory and all of it's sub-directories
@@ -164,10 +164,10 @@ object QueryFile {
       type S[A] = StreamT[M, A]
 
       def lsR(desc: RDir): StreamT[M, RFile] =
-        StreamT.fromStream[M, Node](ls(dir </> desc) map (_.toStream))
-          .flatMap(n => refineType(n.path).fold(
-            d => lsR(desc </> d),
-            f => (desc </> f).point[S]))
+        StreamT.fromStream[M, PathName](ls(dir </> desc) map (_.toStream))
+          .flatMap(_.fold(
+            d => lsR(desc </> dir1(d)),
+            f => (desc </> file1(f)).point[S]))
 
       lsR(currentDir).foldLeft(Set.empty[RFile])(_ + _)
     }

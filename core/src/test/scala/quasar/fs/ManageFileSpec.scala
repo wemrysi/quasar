@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, DataGen}
+import quasar.Data
 import quasar.fp._
 
 import org.specs2.mutable.Specification

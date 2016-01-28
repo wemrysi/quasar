@@ -1,7 +1,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{Data, DataGen}
+import quasar.{Data, DataArbitrary}
 import quasar.fp._
 
 import org.specs2.mutable.Specification
@@ -10,7 +10,7 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture {
-  import DataGen._, FileSystemError._, PathError2._
+  import DataArbitrary._, FileSystemError._, PathError2._
 
   "ReadFile" should {
     "scan should read data until an empty vector is received" ! prop {
