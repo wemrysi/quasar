@@ -58,7 +58,7 @@ trait FileSystemFixture {
     }
     def relFiles = filesInDir.unzip._1.map(_.path)
     def ls = relFiles.map(segAt(0,_)).list.flatten.distinct
-      .sortBy((seg: FileName \/ DirName) => printPath(seg.fold(file1, dir1)))
+      .sortBy((pname: PathName) => printPath(pname.fold(dir1, file1)))
   }
 
   implicit val arbSingleFileMemState: Arbitrary[SingleFileMemState] = Arbitrary(

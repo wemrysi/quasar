@@ -89,7 +89,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
       }
 
       "and list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
-        val childNodes = s.ls.map(p => FsNode(p.swap, None))
+        val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = Uri(path = printPath(s.dir))))
           .as[Json].run must_== Json("children" := childNodes.sorted)
