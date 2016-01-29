@@ -117,19 +117,23 @@ package object api {
     }
   }
 
-  // TODO: probably need a URL-specific codec here
+  val UriPathCodec = PathCodec('/',
+    UrlCodingUtils.urlEncode(_, toSkip = HPath.pathUnreserved),
+    UrlCodingUtils.urlDecode(_))
+
+  // NB: oddly, every path is prefixed with '/', except "".
+  private def pathString(p: HPath) =
+    if (p.toString === "") "/" else p.toString
+
   object AsDirPath {
     def unapply(p: HPath): Option[ADir] = {
-      val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsDir(str) map sandboxAbs
+      UriPathCodec.parseAbsDir(pathString(p)) map sandboxAbs
     }
   }
 
-  // TODO: probably need a URL-specific codec here
   object AsFilePath {
     def unapply(p: HPath): Option[AFile] = {
-      val str = "/" + p.toList.mkString("/")
-      posixCodec.parseAbsFile(str) map sandboxAbs
+      UriPathCodec.parseAbsFile(pathString(p)) map sandboxAbs
     }
   }
 

@@ -117,18 +117,18 @@ object Collection {
   val DatabaseNameEscapes = List(
     " "  -> "+",
     "."  -> "~",
-    "$"  -> "$$",
-    "+"  -> "$add",
-    "~"  -> "$tilde",
-    "/"  -> "$div",
-    "\\" -> "$esc",
-    "\"" -> "$quot",
-    "*"  -> "$mul",
-    "<"  -> "$lt",
-    ">"  -> "$gt",
-    ":"  -> "$colon",
-    "|"  -> "$bar",
-    "?"  -> "$qmark")
+    "%"  -> "%%",
+    "+"  -> "%add",
+    "~"  -> "%tilde",
+    "/"  -> "%div",
+    "\\" -> "%esc",
+    "\"" -> "%quot",
+    "*"  -> "%mul",
+    "<"  -> "%lt",
+    ">"  -> "%gt",
+    ":"  -> "%colon",
+    "|"  -> "%bar",
+    "?"  -> "%qmark")
 
   private object DatabaseNameParser extends PathParser {
     def name: Parser[String] =
