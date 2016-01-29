@@ -495,6 +495,12 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
       def apply[A](fa: F[A]) = I inj fa
     }
 
+  def evalNT[F[_]: Functor, S](initial: S): StateT[F, S, ?] ~> F =
+    new (StateT[F, S, ?] ~> F) {
+      def apply[A](sa: StateT[F, S, A]): F[A] =
+        sa.eval(initial)
+    }
+
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.
     *
     * NB: Uses partial application of `F[_]` for better type inference, usage:

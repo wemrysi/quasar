@@ -114,6 +114,39 @@ object KeyValueStore {
         ref.modifyS(toST(fa).run)
     }
 
+  /** Interpret `KeyValueStore[K, V, ?]` into `AtomicRef[Map[K, V], ?]`, plus Free.
+    * Usage: `toAtomicRef[K, V]()`. */
+  object toAtomicRef {
+    def apply[K, V]: Aux[K, V] = new Aux[K, V]
+
+    final class Aux[K, V] {
+      type Ref[A] = AtomicRef[Map[K, V], A]
+      type RefF[A] = Coyoneda[Ref, A]
+
+      // NB: second implicit param not resolved here
+      val R = AtomicRef.Ops[Map[K, V], RefF](Functor[RefF], Inject[RefF, RefF])
+
+      def apply(): KeyValueStore[K, V, ?] ~> Free[RefF, ?] =
+        new (KeyValueStore[K, V, ?] ~> Free[RefF, ?]) {
+          def apply[A](m: KeyValueStore[K, V, A]) = m match {
+            case Get(path) =>
+              R.get.map(_.get(path))
+
+            case Put(path, cfg) =>
+              R.modify(_ + (path -> cfg)).void
+
+            case CompareAndPut(path, expect, update) =>
+              R.modifyS(m =>
+                if (m.get(path) == expect) (m + (path -> update), true)
+                else (m, false))
+
+            case Delete(path) =>
+              R.modify(_ - path).void
+          }
+        }
+    }
+  }
+
   /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `F[S, ?]`,
     * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
     *

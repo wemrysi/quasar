@@ -23,7 +23,7 @@ import quasar.console._
 import quasar.config._
 import quasar.effect._
 import quasar.fp._
-import quasar.fs.{FileSystem, QueryFile, ADir, APath, Empty}
+import quasar.fs.{FileSystem, QueryFile, APath, ADir, Empty}
 import quasar.fs.mount._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.mongoDbFileSystemDef
@@ -34,9 +34,10 @@ import java.lang.System
 import scala.concurrent.duration._
 
 import argonaut.CodecJson
+import monocle.Lens
 import org.http4s.server.{Server => Http4sServer, HttpService}
 import org.http4s.server.blaze.BlazeBuilder
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, Lens => _, _}
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scalaz.syntax.either._
@@ -315,8 +316,10 @@ abstract class ServerOps[WC: CodecJson, SC](
     }
 
   type ApiEff[A] = Coproduct[MountingF, FileSystem, A]
+  type TaskAndConfigs[A] = Coproduct[Task, MountConfigsF, A]
+  type TaskAndConfigsM[A] = Free[TaskAndConfigs, A]
 
-  val evalApi: Task[ApiEff ~> Task] =
+  val evalApi: Task[ApiEff ~> Free[TaskAndConfigs, ?]] =
     for {
       startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
       seqRef     <- TaskRef(startSeq)
@@ -325,21 +328,45 @@ abstract class ServerOps[WC: CodecJson, SC](
       evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
       mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[Task]])
       viewsRef   <- TaskRef(Views.empty)
-      cfgsRef    <- TaskRef(Map[APath, MountConfig2]())
     } yield {
       val f: FsEff ~> Task = fsEffToTask(seqRef, viewHRef, mntedRHRef)
       val g: EvalEff ~> Task = evalEffToTask(evalFsRef, mntsRef, viewsRef)
 
-      val mnt: MntEff ~> Task =
-        free.interpret2[EvalEffM, MountConfigsF, Task](
-          free.foldMapNT(g),
-          Coyoneda.liftTF[MountConfigs, Task](KeyValueStore.fromTaskRef(cfgsRef)))
+      val liftTask: Task ~> TaskAndConfigsM =
+        liftFT[TaskAndConfigs] compose injectNT[Task, TaskAndConfigs]
 
-      val mounting: MountingF ~> Task =
-        Coyoneda.liftTF[Mounting, Task](free.foldMapNT(mnt) compose mounter)
+      val mnt: MntEff ~> TaskAndConfigsM =
+        free.interpret2[EvalEffM, MountConfigsF, TaskAndConfigsM](
+          liftTask.compose[EvalEffM](free.foldMapNT(g)),
+          liftFT[TaskAndConfigs] compose injectNT[MountConfigsF, TaskAndConfigs])
 
-      free.interpret2(mounting,  evalFromRef(evalFsRef, f))
+      val mounting: MountingF ~> TaskAndConfigsM =
+        Coyoneda.liftTF[Mounting, TaskAndConfigsM](free.foldMapNT(mnt) compose mounter)
+
+      free.interpret2(mounting, liftTask compose evalFromRef(evalFsRef, f))
     }
+
+  def configsAsState: TaskAndConfigsM ~> Task = {
+    type ST[A] = StateT[Task, Map[APath, MountConfig2], A]
+
+    val toState: MountConfigs ~> ST =
+      KeyValueStore.toState[StateT[Task, ?, ?]](Lens.id[Map[APath, MountConfig2]])
+
+    val interpret: TaskAndConfigsM ~> ST =
+      free.foldMapNT[TaskAndConfigs, ST](
+        free.interpret2[Task, MountConfigsF, ST](
+          liftMT[Task, StateT[?[_], Map[APath, MountConfig2], ?]],
+          Coyoneda.liftTF(toState)))
+
+    evalNT[Task, Map[APath, MountConfig2]](Map()) compose interpret
+  }
+
+  def configsWithPersistence(ref: TaskRef[WC], loc: Option[FsFile])
+      : TaskAndConfigsM ~> Task =
+    free.foldMapNT[TaskAndConfigs, Task](
+      free.interpret2[Task, MountConfigsF, Task](
+        NaturalTransformation.refl,
+        Coyoneda.liftTF[MountConfigs, Task](writeConfig(configOps)(ref, loc))))
 
   def mountAll(mc: MountingsConfig2): Free[ApiEff, String \/ Unit] = {
     val mnt = Mounting.Ops[ApiEff]
@@ -367,9 +394,14 @@ abstract class ServerOps[WC: CodecJson, SC](
                          .fixedOrElse(defaultWC.point[MainTask])
       port          =  opts.port getOrElse wcPort.get(config)
       api           <- evalApi.liftM[MainErrT]
-      _             <- EitherT(mountAll(mountings.get(config)) foldMap api)
+
+      _             <- EitherT(mountAll(mountings.get(config)) foldMap (configsAsState compose api))
+
+      cfgRef        <- TaskRef(config).liftM[MainErrT]
+      apiWithPersistence = configsWithPersistence(cfgRef, cfgPath) compose api
+
       produceRoutes =  (reload: (Int => Task[Unit])) =>
-                         RestApi(content.toList, redirect, port, reload).AllServices(api)
+                         RestApi(content.toList, redirect, port, reload).AllServices(apiWithPersistence)
       result        <- startServers(port, produceRoutes).liftM[MainErrT]
       (servers, shutdown) = result
       msg           =  stdout("Press Enter to stop.")
