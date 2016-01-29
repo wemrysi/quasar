@@ -78,15 +78,15 @@ class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatch
       import quasar.fs._
 
       Collection.fromPath(Path(List(DirNode("db/\\\"")), Some(FileNode("foo")))) must
-        beRightDisjunction(Collection("db$div$esc$quot", "foo"))
+        beRightDisjunction(Collection("db%div%esc%quot", "foo"))
     }
 
     "escape Windows-only MongoDB-reserved chars in db name" in {
-      Collection.fromPath(Path("db*<>:|?/foo")) must beRightDisjunction(Collection("db$mul$lt$gt$colon$bar$qmark", "foo"))
+      Collection.fromPath(Path("db*<>:|?/foo")) must beRightDisjunction(Collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
     }
 
     "escape escape characters in db name" in {
-      Collection.fromPath(Path("db$+~/foo")) must beRightDisjunction(Collection("db$$$add$tilde", "foo"))
+      Collection.fromPath(Path("db%+~/foo")) must beRightDisjunction(Collection("db%%%add%tilde", "foo"))
     }
 
     "fail with sequence of escapes exceeding maximum length" in {
@@ -169,7 +169,7 @@ class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatch
     }
 
     "ignore unrecognized escape in database name" in {
-      Collection("$foo", "bar").asPath must_== Path("$foo/bar")
+      Collection("%foo", "bar").asPath must_== Path("%foo/bar")
     }
 
     "not explode on empty collection name" in {
@@ -255,17 +255,17 @@ class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatch
 
     "escape MongoDB-reserved chars in db name" in {
       Collection.fromPathy(rootDir </> dir("db/\\\"") </> file("foo")) must
-        beRightDisjunction(Collection("db$div$esc$quot", "foo"))
+        beRightDisjunction(Collection("db%div%esc%quot", "foo"))
     }
 
     "escape Windows-only MongoDB-reserved chars in db name" in {
       Collection.fromPathy(rootDir </> dir("db*<>:|?") </> file("foo")) must
-        beRightDisjunction(Collection("db$mul$lt$gt$colon$bar$qmark", "foo"))
+        beRightDisjunction(Collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
     }
 
     "escape escape characters in db name" in {
-      Collection.fromPathy(rootDir </> dir("db$+~") </> file("foo")) must
-        beRightDisjunction(Collection("db$$$add$tilde", "foo"))
+      Collection.fromPathy(rootDir </> dir("db%+~") </> file("foo")) must
+        beRightDisjunction(Collection("db%%%add%tilde", "foo"))
     }
 
     "fail with sequence of escapes exceeding maximum length" in {
@@ -355,8 +355,8 @@ class CollectionSpec extends Specification with ScalaCheck with DisjunctionMatch
     }
 
     "ignore unrecognized escape in database name" in {
-      Collection("$foo", "bar").asFile must_==
-        rootDir </> dir("$foo") </> file("bar")
+      Collection("%foo", "bar").asFile must_==
+        rootDir </> dir("%foo") </> file("bar")
     }
 
     "not explode on empty collection name" in {
@@ -387,6 +387,6 @@ object PathGen {
 
   def genName: Gen[String] = Gen.nonEmptyListOf(
     Gen.oneOf(
-      Gen.oneOf("$./\\_~ *+-".toList),  // NB: boost the frequency of reserved chars
+      Gen.oneOf("%$./\\_~ *+-".toList),  // NB: boost the frequency of reserved chars
       Arbitrary.arbitrary[Char])).map(_.mkString)
 }
