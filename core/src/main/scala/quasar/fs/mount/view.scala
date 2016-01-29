@@ -177,10 +177,18 @@ object view {
           query.explain(views.rewrite(lp)).run.run
 
         case ListContents(dir) =>
-          query.ls(dir).map(_ ++ views.ls(dir)).run
+          query.ls(dir).run.map(_ match {
+            case  \/-(ps) =>
+              (ps ++ views.ls(dir)).right
+            case -\/(err @ PathError(Case.PathNotFound(_))) =>
+              val vs = views.ls(dir)
+              if (vs.nonEmpty) vs.right
+              else err.left
+            case -\/(v) => v.left
+          })
 
         case FileExists(file) =>
-           query.fileExists(file).map(_ || views.contains(file)).run
+          query.fileExists(file).map(_ || views.contains(file)).run
       }
     }
   }
