@@ -17,7 +17,7 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs._
+import quasar.fs.{Path => QPath, _}
 
 import argonaut.{DecodeResult => _, _}
 import Argonaut._
@@ -33,10 +33,9 @@ import org.http4s.util._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent._
+import pathy.Path, Path._
 
 package object api {
-
-  val versionAndNameInfo = jObjectAssocList(List("version" -> jString(quasar.build.BuildInfo.version), "name" -> jString("Quasar")))
 
   object Destination extends HeaderKey.Singleton {
     type HeaderT = Header
@@ -47,7 +46,7 @@ package object api {
     }
   }
 
-  object FileName extends HeaderKey.Singleton {
+  object XFileName extends HeaderKey.Singleton {
     type HeaderT = Header
     val name = CaseInsensitiveString("X-File-Name")
     override def matchHeader(header: Header): Option[HeaderT] = {
@@ -118,14 +117,30 @@ package object api {
     }
   }
 
-  object AsPath {
-    def unapply(p: HPath): Option[Path] = {
-      Some(Path("/" + p.toList.map(java.net.URLDecoder.decode(_, "UTF-8")).mkString("/")))
+  val UriPathCodec = PathCodec('/',
+    UrlCodingUtils.urlEncode(_, toSkip = HPath.pathUnreserved),
+    UrlCodingUtils.urlDecode(_))
+
+  // NB: oddly, every path is prefixed with '/', except "".
+  private def pathString(p: HPath) =
+    if (p.toString === "") "/" else p.toString
+
+  object AsDirPath {
+    def unapply(p: HPath): Option[ADir] = {
+      UriPathCodec.parseAbsDir(pathString(p)) map sandboxAbs
     }
   }
 
-  object AsDirPath {
-    def unapply(p: HPath): Option[Path] = AsPath.unapply(p).map(_.asDir)
+  object AsFilePath {
+    def unapply(p: HPath): Option[AFile] = {
+      UriPathCodec.parseAbsFile(pathString(p)) map sandboxAbs
+    }
+  }
+
+  object AsPath {
+    def unapply(p: HPath): Option[APath] = {
+      AsDirPath.unapply(p) orElse AsFilePath.unapply(p)
+    }
   }
 
   def staticFileService(basePath: String): HttpService = {
@@ -149,6 +164,7 @@ package object api {
     case GET -> path if path.startsWith(HPath(basePath)) => NotFound()
 
     case GET -> AsPath(path) =>
-      TemporaryRedirect(Uri(path = basePath + path.toString))
+      // TODO: probably need a URL-specific codec here
+      TemporaryRedirect(Uri(path = basePath + posixCodec.printPath(path)))
   }
 }

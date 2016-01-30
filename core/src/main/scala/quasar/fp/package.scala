@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
+import quasar.fp.TaskRef
 
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -337,6 +338,31 @@ trait ProcessOps {
         }
       }
     }
+    def evalScan1(f: (O, O) => F[O])(implicit monad: Monad[F]): Process[F, O] = {
+      self.zipWithPrevious.evalMap {
+        case (None, next) => monad.point(next)
+        case (Some(prev), next) => f(prev, next)
+      }
+    }
+  }
+
+  implicit class ProcessOfTaskOps[O](self: Process[Task,O]) {
+    // Is there a better way to implement this?
+    def onHaltWithLastElement(f: (Option[O], Cause) => Process[Task,O]): Process[Task,O] = {
+      val lastA: TaskRef[Option[O]] = TaskRef[Option[O]](None).run
+      self.observe(Process.constant((a:O) => lastA.write(Some(a)))).onHalt{ cause =>
+        Process.await(lastA.read)( a => f(a,cause))
+      }
+    }
+    def cleanUpWithA(f: Option[O] => Task[Unit]): Process[Task,O] = {
+      self.onHaltWithLastElement((a, cause) => Process.eval_(f(a)).causedBy(cause))
+    }
+  }
+
+  implicit class TaskOps[A](t: Task[A]) {
+    def onSuccess(f: A => Task[Unit]): Task[A] = {
+      t.flatMap(a => f(a).as(a))
+    }
   }
 }
 
@@ -467,6 +493,12 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
   def injectNT[F[_], G[_]](implicit I: F :<: G): F ~> G =
     new (F ~> G) {
       def apply[A](fa: F[A]) = I inj fa
+    }
+
+  def evalNT[F[_]: Functor, S](initial: S): StateT[F, S, ?] ~> F =
+    new (StateT[F, S, ?] ~> F) {
+      def apply[A](sa: StateT[F, S, A]): F[A] =
+        sa.eval(initial)
     }
 
   /** Lift a `State` computation to operate over a "larger" state given a `Lens`.

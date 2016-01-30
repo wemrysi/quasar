@@ -31,6 +31,14 @@ package object mount {
   type MountConfigs[A]  = KeyValueStore[APath, MountConfig2, A]
   type MountConfigsF[A] = Coyoneda[MountConfigs, A]
 
+  type MountingFileSystem[A] = Coproduct[MountingF, FileSystem, A]
+
+  def interpretMountingFileSystem[M[_]: Functor](
+    m: Mounting ~> M,
+    fs: FileSystem ~> M
+  ): MountingFileSystem ~> M =
+    free.interpret2[MountingF, FileSystem, M](Coyoneda.liftTF(m), fs)
+
   //-- Views --
 
   type ViewHandles = Map[

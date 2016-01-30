@@ -17,15 +17,16 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar.Variables
-import quasar.config
+import quasar.{Variables, VarName, VarValue}
 import quasar.fp.prism._
 import quasar.fs.FileSystemType
-import quasar.sql._
+import quasar.sql, sql.{Expr, SQLParser}
 
 import argonaut._, Argonaut._
 import monocle.Prism
 import scalaz._
+import scalaz.syntax.std.option._
+import scalaz.syntax.std.boolean._
 
 /** Configuration for a mount, currently either a view or a filesystem. */
 sealed trait MountConfig2
@@ -43,6 +44,9 @@ object MountConfig2 {
       case _                       => None
     } ((ViewConfig(_, _)).tupled)
 
+  val viewConfigUri: Prism[String, (Expr, Variables)] =
+    Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
+
   val fileSystemConfig: Prism[MountConfig2, (FileSystemType, ConnectionUri)] =
     Prism[MountConfig2, (FileSystemType, ConnectionUri)] {
       case FileSystemConfig(typ, uri) => Some((typ, uri))
@@ -50,7 +54,12 @@ object MountConfig2 {
     } ((FileSystemConfig(_, _)).tupled)
 
   implicit val mountConfigShow: Show[MountConfig2] =
-    Show.showFromToString
+    Show.shows {
+      case ViewConfig(expr, vars) =>
+        viewConfigUri.reverseGet((expr, vars))
+      case FileSystemConfig(typ, uri) =>
+        s"[${typ.value}] ${uri.value}"
+    }
 
 /** TODO: Equal[sql.Expr]
   implicit val mountConfigEqual: Equal[MountConfig2] =
@@ -63,14 +72,18 @@ object MountConfig2 {
   implicit val mountConfigCodecJson: CodecJson[MountConfig2] =
     CodecJson({
       case ViewConfig(query, vars) =>
-        Json("view" := config.ViewConfig(query, vars))
+        Json("view" := Json("connectionUri" := viewCfgAsUri(query, vars)))
 
       case FileSystemConfig(typ, uri) =>
         Json(typ.value := Json("connectionUri" := uri))
     }, c => c.fields match {
       case Some("view" :: Nil) =>
-        (c --\ "view").as[config.ViewConfig]
-          .map(vc => viewConfig(vc.query, vc.variables))
+        val uriCur = (c --\ "view" --\ "connectionUri")
+        uriCur.as[String].flatMap(uri => DecodeResult(
+          viewCfgFromUri(uri).bimap(
+            e => (e.toString, uriCur.history),
+            viewConfig(_))
+        ))
 
       case Some(t :: Nil) =>
         (c --\ t --\ "connectionUri").as[ConnectionUri]
@@ -79,4 +92,50 @@ object MountConfig2 {
       case _ =>
         DecodeResult.fail(s"invalid config: ${c.focus}", c.history)
     })
+
+  ////
+
+  private val VarPrefix = "var."
+
+  private def viewCfgFromUri(uri: String): String \/ (Expr, Variables) = {
+    import org.http4s._, util._, CaseInsensitiveString._
+
+    for {
+      parsed   <- Uri.fromString(uri).leftMap(_.sanitized)
+      scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
+      _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
+      queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
+      query    <- new SQLParser().parse(sql.Query(queryStr)).leftMap(_.message)
+      vars     =  Variables(parsed.multiParams collect {
+                    case (n, vs) if n.startsWith(VarPrefix) => (
+                      VarName(n.substring(VarPrefix.length)),
+                      VarValue(vs.lastOption.getOrElse(""))
+                    )
+                  })
+    } yield (query, vars)
+  }
+
+  private def viewCfgAsUri(query: Expr, vars: Variables): String = {
+    import org.http4s._, util._, CaseInsensitiveString._
+
+    // TODO: Workaround for https://github.com/http4s/http4s/issues/510
+    val urlEncode: String => String =
+      UrlCodingUtils.urlEncode(_, spaceIsPlus = false, toSkip = UrlFormCodec.urlUnreserved)
+
+    val qryMap = vars.value.foldLeft(Map("q" -> List(sql.pprint(query)))) {
+      case (qm, (n, v)) => qm + ((urlEncode(VarPrefix + n.value), List(v.value)))
+    }
+
+    /** NB: host and path are specified here just to force the URI to have
+      * all three slashes, as the documentation shows it. The current parser
+      * will accept any number of slashes, actually, since we're ignoring
+      * the host and path for now.
+      */
+    Uri(
+      scheme    = Some("sql2".ci),
+      authority = Some(Uri.Authority(host = Uri.RegName("".ci))),
+      path      = "/",
+      query     = Query.fromMap(qryMap)
+    ).renderString
+  }
 }

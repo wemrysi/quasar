@@ -239,13 +239,14 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
       }
 
       "fails when using a dir for a view" >>* {
-        mnt.mount(rootDir, viewCfgA)
-          .run map (dj => maybeInvalid(dj) must beSome(rootDir[Sandboxed]))
+        mnt.mount(rootDir, viewCfgA) .run map (_ must_==
+          \/-(-\/(Mounting.PathTypeMismatch(rootDir))))
       }
 
       "fails when using a file for a filesystem" >>* {
         val f = rootDir </> file("foo")
-        mnt.mount(f, fsCfgA).run map (dj => maybeInvalid(dj) must beSome(f))
+        mnt.mount(f, fsCfgA) .run map (_ must_==
+          \/-(-\/(Mounting.PathTypeMismatch(f))))
       }
     }
 
@@ -313,8 +314,8 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
         val f = rootDir </> file("f1")
         val r = mountViewNoVars(f, exprA) *> replace(f, fsCfgB)
 
-        r.run.tuple(lookup(f).run) map { case (dj, cfg) =>
-          maybeInvalid(dj).tuple(cfg) must beSome((f, viewCfgA))
+        r.run.tuple(lookup(f).run) map { _ must_==(
+          (\/-(-\/(Mounting.PathTypeMismatch(f))), Some(viewCfgA)))
         }
       }
     }

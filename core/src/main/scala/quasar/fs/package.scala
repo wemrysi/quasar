@@ -20,8 +20,6 @@ import quasar.Predef._
 import quasar.fp.free._
 
 import pathy.{Path => PPath}, PPath._
-import quasar.recursionschemes.Fix, Fix._
-import quasar.recursionschemes.Recursive.ops._
 import scalaz._, Scalaz._
 
 package object fs {
@@ -44,6 +42,8 @@ package object fs {
   type RFile = RelFile[Sandboxed]
   type APath = AbsPath[_]
   type RPath = RelPath[_]
+
+  type PathName = DirName \/ FileName
 
   type PathErr2T[F[_], A] = EitherT[F, PathError2, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
@@ -73,10 +73,19 @@ package object fs {
         apath.relativeTo(prefix).fold(apath)(rootDir </> _)
     }
 
-  def paths(lp: Fix[LogicalPlan]): Set[Path] =
-    lp.foldMap(_.cata[Set[Path]] {
-      case quasar.LogicalPlan.ReadF(p) => Set(p)
-      case other    => other.fold
-    })
+  /** Returns the first named segment of the given relative path. */
+  def firstSegmentName(f: RPath): Option[PathName] =
+    flatten(none, none, none,
+      n => DirName(n).left.some,
+      n => FileName(n).right.some,
+      f).toIList.unite.headOption
 
+  /** Sandboxes an absolute path, needed due to parsing functions producing
+    * unsandboxed paths.
+    *
+    * TODO: We know this can't fail, remove once Pathy is refactored to be more precise
+    */
+  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
+  def sandboxAbs[T, S](apath: PPath[Abs,T,S]): PPath[Abs,T,Sandboxed] =
+    rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
 }

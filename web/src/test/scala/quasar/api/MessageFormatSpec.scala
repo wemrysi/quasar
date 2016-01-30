@@ -1,40 +1,46 @@
 package quasar.api
 
+import quasar.Data
 import quasar.Predef._
 
-class ResponseFormatSpecs extends org.specs2.mutable.Specification {
+import scalaz.concurrent.Task
+import scalaz.stream.Process
+
+class MessageFormatSpec extends org.specs2.mutable.Specification {
   import org.http4s._, QValue._
   import org.http4s.headers.{Accept}
 
   import MessageFormat._
+  import JsonPrecision._
+  import JsonFormat._
 
   "fromAccept" should {
-    "be Readable by default" in {
-      fromAccept(None) must_== JsonStream.Readable
+    "use default if no accept provided" in {
+      fromAccept(None) must_== MessageFormat.Default
     }
 
     "choose precise" in {
       val accept = Accept(
         new MediaType("application", "ldjson").withExtensions(Map("mode" -> "precise")))
-      fromAccept(Some(accept)) must_== JsonStream.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose streaming via boundary extension" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("boundary" -> "NL")))
-      fromAccept(Some(accept)) must_== JsonStream.Readable
+      fromAccept(Some(accept)) must_== JsonContentType(Readable, LineDelimited)
     }
 
     "choose precise list" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("mode" -> "precise")))
-      fromAccept(Some(accept)) must_== JsonArray.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, SingleArray)
     }
 
     "choose streaming and precise via extensions" in {
       val accept = Accept(
         new MediaType("application", "json").withExtensions(Map("mode" -> "precise", "boundary" -> "NL")))
-      fromAccept(Some(accept)) must_== JsonStream.Precise
+      fromAccept(Some(accept)) must_== JsonContentType(Precise, LineDelimited)
     }
 
     "choose CSV" in {
@@ -64,7 +70,7 @@ class ResponseFormatSpecs extends org.specs2.mutable.Specification {
       val accept = Accept(
         new MediaType("text", "csv").withQValue(q(0.9)),
         new MediaType("application", "ldjson"))
-      fromAccept(Some(accept)) must_== JsonStream.Readable
+      fromAccept(Some(accept)) must_== JsonContentType(Readable, LineDelimited)
     }
   }
 
@@ -85,6 +91,39 @@ class ResponseFormatSpecs extends org.specs2.mutable.Specification {
 
     """not affect \"""" in {
       Csv.escapeNewlines("""\"""") must_== """\""""
+    }
+  }
+
+  "encoding" should {
+    "csv" >> {
+      val simpleData = List(
+        Data.Obj(ListMap("a" -> Data.Int(1))),
+        Data.Obj(ListMap("b" -> Data.Int(2))),
+        Data.Obj(ListMap("c" -> Data.Set(List(Data.Int(3))))))
+      val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
+      def test(data: List[Data], expectedEncoding: String, format: Csv) =
+        format.encode(Process.emitAll(data): Process[Task,Data]).runLog.run.mkString("") must_== expectedEncoding
+      "simple" >> test(
+        data = simpleData,
+        expectedEncoding = simpleExpected,
+        format = Csv.Default
+      )
+      "with quoting" >> test(
+        data = List(
+          Data.Obj(ListMap(
+            "a" -> Data.Str("\"Hey\""),
+            "b" -> Data.Str("a, b, c")))),
+        expectedEncoding = List("a,b", "\"\"\"Hey\"\"\",\"a, b, c\"").mkString("", "\r\n", "\r\n"),
+        format = Csv.Default
+      )
+      "alternative delimiters" >> {
+        val alternative = Csv(columnDelimiter = '\t', rowDelimiter = ";", quoteChar = '\'', escapeChar = '\\', None)
+        test(
+          data = simpleData,
+          expectedEncoding = "a\tb\tc[0];1\t\t;\t2\t;\t\t3;",
+          format = alternative
+        )
+      }
     }
   }
 }

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.fp
-package free
+package quasar.fp.free
 
 import quasar.Predef._
+import quasar.fp._
 
 import scalaz._
 import scalaz.stream.Process

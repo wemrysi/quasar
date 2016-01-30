@@ -439,7 +439,7 @@ Deletes an existing mount point, if any exists at the given path. If no such mou
 
 ### PUT /server/port
 
-Takes a port number in the body, and restarts the server on that port, shutting down the running instance.
+Takes a port number in the body, and attempts to restart the server on that port, shutting down the current instance which is running on the port used to make this http request.
 
 ### DELETE /server/port
 

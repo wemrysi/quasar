@@ -26,10 +26,7 @@ import quasar.sql._
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import pathy._, Path._
-import scalaz._
-import scalaz.syntax.std.option._
-import scalaz.syntax.apply._
-import scalaz.syntax.monadError._
+import scalaz._, Scalaz._
 
 sealed trait Mounting[A]
 
@@ -45,6 +42,19 @@ object Mounting {
 
   final case class Unmount(path: APath)
     extends Mounting[MountingError \/ Unit]
+
+  /** Indicates the wrong type of path (file vs. dir) was supplied to the `mount`
+    * convenience function.
+    */
+  final case class PathTypeMismatch(path: APath) extends scala.AnyVal
+
+  object PathTypeMismatch {
+    implicit val pathTypeMismatchShow: Show[PathTypeMismatch] =
+      Show.shows { v =>
+        val expectedType = refineType(v.path).fold(κ("file"), κ("directory"))
+        s"Expected ${expectedType} path instead of '${posixCodec.printPath(v.path)}'"
+      }
+  }
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
@@ -71,31 +81,29 @@ object Mounting {
     /** Attempt to create a mount described by the given configuration at the
       * given location.
       */
-    def mount(loc: APath, config: MountConfig2): M[Unit] =
+    def mount(loc: APath, config: MountConfig2): M[PathTypeMismatch \/ Unit] =
       config match {
         case ViewConfig(query, vars) =>
-          D.right.getOption(refineType(loc)) cata (file =>
-              mountView(file, query, vars),
-              invalidPath(loc, "view mount location must be a file")
-                .raiseError[E, Unit])
+          D.right.getOption(refineType(loc)) cata (
+            file => mountView(file, query, vars).map(_.right),
+            PathTypeMismatch(loc).left.point[M])
 
         case FileSystemConfig(typ, uri) =>
-          D.left.getOption(refineType(loc)) cata (dir =>
-            mountFileSystem(dir, typ, uri),
-            invalidPath(loc, "filesytem mount location must be a directory")
-              .raiseError[E, Unit])
+          D.left.getOption(refineType(loc)) cata (
+            dir => mountFileSystem(dir, typ, uri).map(_.right),
+            PathTypeMismatch(loc).left.point[M])
       }
 
     /** Remount `src` at `dst`, results in an error if there is no mount at
       * `src`.
       */
     def remount[T](src: Path[Abs,T,Sandboxed], dst: Path[Abs,T,Sandboxed]): M[Unit] =
-      modify(src, dst, ι)
+      modify(src, dst, ι).void
 
     /** Replace the mount at the given path with one described by the
       * provided config.
       */
-    def replace(loc: APath, config: MountConfig2): M[Unit] =
+    def replace(loc: APath, config: MountConfig2): M[PathTypeMismatch \/ Unit] =
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
@@ -104,10 +112,16 @@ object Mounting {
 
     ////
 
-    private type E[A, B] = EitherT[F, A, B]
+    private type ErrF[A, B] = EitherT[F, A, B]
 
-    private val mErr: MonadError[E, MountingError] =
-      MonadError[E, MountingError]
+    private def bifold[G[_]: Functor, E, A, EE, AA](v: EitherT[G,E,A])(e: E => EE \/ AA, a: A => EE \/ AA): EitherT[G, EE, AA] =
+      EitherT[G,EE,AA](v.run.map(_.fold(e, a)))
+
+    private def toLeft[G[_]: Functor, E1, E2, A](v: EitherT[G, E1, E2 \/ A]): EitherT[G, E1 \/ E2, A] =
+      bifold(v)(_.left.left, _.fold(_.right.left, _.right))
+
+    private def toRight[G[_]: Functor, E1, E2, A](v: EitherT[G, E1 \/ E2, A]): EitherT[G, E1, E2 \/ A] =
+      bifold(v)(_.fold(_.left, _.left.right), _.right.right)
 
     private val notFound: Prism[MountingError, APath] =
       MountingError.pathError composePrism PathError2.pathNotFound
@@ -119,16 +133,17 @@ object Mounting {
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],
       f: MountConfig2 => MountConfig2
-    ): M[Unit] = {
+    ): M[PathTypeMismatch \/ Unit] = {
+      val mErr = MonadError[ErrF, MountingError \/ PathTypeMismatch]
       import mErr._
 
       for {
         cfg <- lookup(src) toRight notFound(src)
         _   <- unmount(src)
-        _   <- handleError(mount(dst, f(cfg))) { err =>
-                 mount(src, cfg) *> raiseError(err)
-               }
-      } yield ()
+        rez <- toRight(handleError(toLeft(mount(dst, f(cfg)))) { err =>
+                 toLeft(mount(src, cfg)) *> raiseError(err)
+               })
+      } yield rez
     }
   }
 

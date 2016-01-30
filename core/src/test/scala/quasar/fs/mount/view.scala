@@ -14,7 +14,7 @@ import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz.{Node => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import org.scalacheck.{Arbitrary, Gen}
 
 class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
@@ -36,16 +36,16 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   type TraceS[S, A] = StateT[Trace, S, A]
   type VST[A]       = TraceS[VS, A]
 
-  def traceViewFs(nodes: Map[ADir, Set[Node]]): ViewFileSystem ~> VST =
+  def traceViewFs(paths: Map[ADir, Set[PathName]]): ViewFileSystem ~> VST =
     interpretViewFileSystem[VST](
       KeyValueStore.toState[TraceS](_handles),
       MonotonicSeq.toState[TraceS](_seq),
       liftMT[Trace, VSF] compose
-        interpretFileSystem[Trace](qfTrace(nodes), rfTrace, wfTrace, mfTrace))
+        interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
 
-  def viewInterp[A](views: Views, nodes: Map[ADir, Set[Node]], t: Free[FileSystem, A]): (Vector[RenderedTree], A) =
+  def viewInterp[A](views: Views, paths: Map[ADir, Set[PathName]], t: Free[FileSystem, A]): (Vector[RenderedTree], A) =
     (t flatMapSuspension view.fileSystem[ViewFileSystem](views))
-      .foldMap(traceViewFs(nodes))
+      .foldMap(traceViewFs(paths))
       .eval(VS(0, Map.empty)).run
 
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
@@ -256,9 +256,8 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   }
 
   "QueryFile.ls" should {
-    def twoNodes(aDir: ADir) = Map(aDir -> Set[Node](
-        Node.Plain(currentDir </> file("afile")),
-        Node.Plain(currentDir </> dir("adir"))))
+    def twoNodes(aDir: ADir) =
+      Map(aDir -> Set[PathName](FileName("afile").right, DirName("adir").left))
 
     "preserve files and dirs in the presence of non-conflicting views" ! prop { (aDir: ADir) =>
       val views = Views(Map(
@@ -270,10 +269,10 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       viewInterp(views, twoNodes(aDir), f) must_==(
         (traceInterp(f, twoNodes(aDir))._1,
           \/-(Set(
-            Node.Plain(currentDir </> file("afile")),
-            Node.Plain(currentDir </> dir("adir")),
-            Node.View(currentDir </> file("view1")),
-            Node.Plain(currentDir </> dir("views"))))))
+            FileName("afile").right,
+            DirName("adir").left,
+            FileName("view1").right,
+            DirName("views").left))))
     }
 
     "overlay files and dirs with conflicting paths" ! prop { (aDir: ADir) =>
@@ -286,8 +285,40 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       viewInterp(views, twoNodes(aDir), f) must_==(
         (traceInterp(f, twoNodes(aDir))._1,
           \/-(Set(
-            Node.View(currentDir </> file("afile")),    // hides the regular file
-            Node.Plain(currentDir </> dir("adir"))))))  // no conflict with same dir
+            FileName("afile").right,  // hides the regular file
+            DirName("adir").left))))  // no conflict with same dir
+    }
+
+    "preserve empty dir result" ! prop { (aDir: ADir) =>
+      val views = Views(Map())
+
+      val f = query.ls(aDir).run
+
+      viewInterp(views, Map(aDir -> Set()), f) must_==(
+        (traceInterp(f, Map(aDir -> Set()))._1,
+          \/-(Set())))
+    }
+
+    "preserve error for non-existent dir" ! prop { (aDir: ADir) =>
+      (aDir =/= rootDir) ==> {
+        val views = Views(Map())
+
+        val f = query.ls(aDir).run
+
+        viewInterp(views, Map(), f) must_==(
+          (traceInterp(f, Map())._1,
+            -\/(FileSystemError.pathError(PathError2.PathNotFound(aDir)))))
+      }
+    }
+
+    "preserve empty dir result at root" in {
+      val views = Views(Map())
+
+      val f = query.ls(rootDir).run
+
+      viewInterp(views, Map(), f) must_==(
+        (traceInterp(f, Map())._1,
+          \/-(Set())))
     }
   }
 
@@ -298,9 +329,9 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       val ops = traceInterp(program, Map())._1
 
       val hasFile = {
-        val nodes = Map(fileParent(file) -> Set(Node.Plain(file1(fileName(file)))))
+        val paths = Map(fileParent(file) -> Set(fileName(file).right[DirName]))
         val expected = (ops, true.right)
-        viewInterp(Views.empty, nodes, program) must_== expected
+        viewInterp(Views.empty, paths, program) must_== expected
       }
       val noFile = {
         val expected = (ops, false.right)

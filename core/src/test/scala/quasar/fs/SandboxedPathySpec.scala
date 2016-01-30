@@ -41,7 +41,7 @@ class SandboxedPathySpec extends Specification with DisjunctionMatchers with Sca
 
   "segAt" should {
     "segment at specified index" ! prop { (d: ADir, dirName: String, p: RPath) =>
-      segAt(depth(d), d </> dir(dirName) </> p) ==== DirName(dirName).right.some
+      segAt(depth(d), d </> dir(dirName) </> p) ==== DirName(dirName).left.some
     }
   }
 

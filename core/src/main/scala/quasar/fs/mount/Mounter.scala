@@ -89,6 +89,19 @@ object Mounter {
     }
   }
 
+  /** A mounter where all mount requests succeed trivially.
+    *
+    * Useful in scenarios where only the bookkeeping of mounts is needed.
+    */
+  def trivial[S[_]: Functor](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
+    new (Mounting ~> Free[S, ?]) {
+      type F[A] = Coproduct[Id, S, A]
+      type M[A] = Free[S, A]
+      val mnt = Mounter[Id, F](κ(().right), κ(()))
+      def apply[A](m: Mounting[A]) =
+        mnt(m).foldMap[M](free.interpret2[Id, S, M](pointNT[M], liftFT[S]))
+    }
+
   ////
 
   private val pathNotFound = MountingError.pathError composePrism PathError2.pathNotFound

@@ -7,8 +7,9 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary.{arbitrary => arb}
 
 trait VariablesArbitrary {
+  implicit val arbitraryVarName: Arbitrary[VarName] =
+    Arbitrary(arb[String].map(VarName(_)))
 
-  implicit val arbitraryVarName: Arbitrary[VarName] = Arbitrary(arb[String].map(VarName(_)))
   implicit val arbitraryVarValue: Arbitrary[VarValue] =
     Arbitrary(ExprArbitrary.constExprGen.map(expr => VarValue(expr.toString)))
 

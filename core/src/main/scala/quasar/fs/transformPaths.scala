@@ -170,7 +170,7 @@ object transformPaths {
 
         case ListContents(d) =>
           Coyoneda.lift(ListContents(inPath(d)))
-            .map(_.bimap(transformErrorPath(outPath), _ map transformNodePath(outPathR)))
+            .map(_ leftMap transformErrorPath(outPath))
 
         case FileExists(f) =>
           Coyoneda.lift(FileExists(inPath(f)))
@@ -239,10 +239,4 @@ object transformPaths {
         case _        => lp
       }
     }
-
-  private def transformNodePath(f: RelPath ~> RelPath): Node => Node =
-    _.fold(
-      Node.Mount compose (f(_)),
-      Node.Plain compose (f(_)),
-      Node.View  compose (f(_)))
 }

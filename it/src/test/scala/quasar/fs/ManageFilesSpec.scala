@@ -45,7 +45,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
       "moving a file to an existing path using FailIfExists semantics should fail with PathExists" >> {
         val f1 = managePrefix </> dir("failifexists") </> file("f1")
         val f2 = managePrefix </> dir("failifexists") </> file("f2")
-        val expectedFiles = List(Node.Plain(file("f1")), Node.Plain(file("f2")))
+        val expectedFiles = List[PathName](FileName("f1").right, FileName("f2").right)
         val ls = query.ls(managePrefix </> dir("failifexists"))
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, oneDoc.toProcess).drain ++
@@ -75,7 +75,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val d = managePrefix </> dir("dnetoexists")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
-        val expectedFiles = List(Node.Plain(file("f2")))
+        val expectedFiles = List[PathName](FileName("f2").right)
         val ls = query.ls(d)
         val p = write.save(f2, oneDoc.toProcess).drain ++
                 manage.moveFile(f1, f2, MoveSemantics.Overwrite)
@@ -106,7 +106,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val d = managePrefix </> dir("existstodne")
         val f1 = d </> file("f1")
         val f2 = d </> file("f2")
-        val expectedFiles = List(Node.Plain(file("f1")))
+        val expectedFiles = List[PathName](FileName("f1").right)
         val p  = write.save(f1, oneDoc.toProcess).drain ++
                  manage.moveFile(f1, f2, MoveSemantics.FailIfMissing).liftM[Process]
 
@@ -121,7 +121,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val f1 = d1 </> file("f1")
         val f2 = d1 </> file("f2")
 
-        val expectedFiles = List(Node.Plain(file("f1")), Node.Plain(file("f2")))
+        val expectedFiles = List[PathName](FileName("f1").right, FileName("f2").right)
 
         val p = write.save(f1, oneDoc.toProcess).drain ++
                 write.save(f2, anotherDoc.toProcess).drain ++

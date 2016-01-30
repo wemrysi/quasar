@@ -22,6 +22,7 @@ import quasar.fs._
 
 import monocle.Prism
 import scalaz.NonEmptyList
+import scalaz._, Scalaz._
 
 sealed trait MountingError
 
@@ -52,4 +53,14 @@ object MountingError {
       case InvalidConfig(cfg, reasons) => Some((cfg, reasons))
       case _ => None
     } ((InvalidConfig(_, _)).tupled)
+
+  implicit def mountingErrorShow: Show[MountingError] =
+    Show.shows {
+      case PathError(e) =>
+        e.shows
+      case EnvironmentError(e) =>
+        e.shows
+      case InvalidConfig(cfg, rsns) =>
+        s"Invalid mount config, '${cfg.shows}', because: ${rsns.list.mkString("; ")}"
+    }
 }

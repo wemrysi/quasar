@@ -7,6 +7,7 @@ import org.scalacheck.Gen
 trait Arbitraries extends
   NumericArbitrary with
   FileSystemTypeArbitrary with
+  NonEmptyStringArbitrary with
   PathArbitrary with
   InMemoryArbitrary with
   MoveSemanticsArbitrary

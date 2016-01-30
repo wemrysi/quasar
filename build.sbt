@@ -95,8 +95,8 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion.value % "compile, test",
     "com.github.scopt"  %% "scopt"                     % "3.3.0"              % "compile, test",
     "org.threeten"      %  "threetenbp"                % "1.2"                % "compile, test",
-    "org.mongodb"       %  "mongo-java-driver"         % "3.1.0"              % "compile, test",
-    "org.mongodb"       %  "mongodb-driver-async"      % "3.1.0"              % "compile, test",
+    "org.mongodb"       %  "mongo-java-driver"         % "3.2.1"              % "compile, test",
+    "org.mongodb"       %  "mongodb-driver-async"      % "3.2.1"              % "compile, test",
     "io.argonaut"       %% "argonaut"                  % "6.1"                % "compile, test",
     "org.jboss.aesh"    %  "aesh"                      % "0.55"               % "compile, test",
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion.value     % "compile, test",
@@ -109,8 +109,7 @@ lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     "org.specs2"        %% "specs2-core"               % "2.4"                % "test",
     "org.scalacheck"    %% "scalacheck"                % "1.11.6"             % "test" force(),
     "org.typelevel"     %% "scalaz-specs2"             % "0.3.0"              % "test",
-    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion.value     % "test",
-    "net.databinder.dispatch" %% "dispatch-core"       % "0.11.1"             % "test"),
+    "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion.value     % "test"),
 
   licenses += ("Apache 2", url("http://www.apache.org/licenses/LICENSE-2.0")),
 

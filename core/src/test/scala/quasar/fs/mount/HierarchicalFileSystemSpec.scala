@@ -12,7 +12,7 @@ import quasar.std.SetLib.Take
 import monocle.Lens
 import org.specs2.mutable
 import pathy.Path._
-import scalaz.{Lens => _, Failure => _, Node => _, _}, Id.Id
+import scalaz.{Lens => _, Failure => _, _}, Id.Id
 import scalaz.syntax.either._
 import scalaz.std.list._
 
@@ -56,14 +56,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
   val bMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).b)(s => ms => ms.copy(b = s))
   val cMem: Lens[MountedState, InMemState]  = Lens((_: MountedState).c)(s => ms => ms.copy(c = s))
 
-  val interpretH: FileSystem ~> HEffM =
-    hierarchical.fileSystem[MountedFs, HEff](Mounts.fromFoldable(List(
-      (mntA, zoomNT[Id](aMem) compose Mem.interpretTerm),
-      (mntB, zoomNT[Id](bMem) compose Mem.interpretTerm),
-      (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
-    )).toOption.get)
-
-  def runH: F ~> HFSM = {
+  val interpHEff: HEff ~> HFSM = {
     val seqNT: MonotonicSeqF ~> HFSM =
       liftMT[MountedFs, HFSErrT].compose[MonotonicSeqF](
         Coyoneda.liftTF[MonotonicSeq, MountedFs](MonotonicSeq.toState[State](seq)))
@@ -76,10 +69,23 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       liftMT[MountedFs, HFSErrT].compose[MountedResultHF](
         Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.toState[State](handles)))
 
-    val runEff: HEff ~> HFSM =
-      free.interpret4(seqNT, handlesNT, failNT, liftMT[MountedFs, HFSErrT]: (MountedFs ~> HFSM))
+    free.interpret4(seqNT, handlesNT, failNT, liftMT[MountedFs, HFSErrT]: (MountedFs ~> HFSM))
+  }
 
-    hoistFree(hoistFree(runEff).compose[FileSystem](interpretH))
+  val interpretMnted: FileSystem ~> HEffM =
+    hierarchical.fileSystem[MountedFs, HEff](Mounts.fromFoldable(List(
+      (mntA, zoomNT[Id](aMem) compose Mem.interpretTerm),
+      (mntB, zoomNT[Id](bMem) compose Mem.interpretTerm),
+      (mntC, zoomNT[Id](cMem) compose Mem.interpretTerm)
+    )).toOption.get)
+
+  val runMntd: F ~> HFSM =
+    hoistFree(hoistFree(interpHEff).compose[FileSystem](interpretMnted))
+
+  val runEmpty: F ~> HFSM = {
+    val interpEmpty: FileSystem ~> HEffM =
+      hierarchical.fileSystem[MountedFs, HEff](Mounts.empty)
+    hoistFree(hoistFree(interpHEff).compose[FileSystem](interpEmpty))
   }
 
   // NB: Defining these here for a reuse, but also because using `beLike`
@@ -111,13 +117,13 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         .flatMap(expr => queryPlan(expr, Variables(Map())).run.value.toOption)
         .get
 
-      runH(f(lp, mntA </> file("out0")).run.value)
+      runMntd(f(lp, mntA </> file("out0")).run.value)
         .run.eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 
   def failsWhenNoPaths[A](f: Fix[LogicalPlan] => ExecM[A]) =
     "containing no paths fails with HFS error" >> {
-      runH(f(Constant(Data.Obj(Map("0" -> Data.Int(5))))).run.value)
+      runMntd(f(Constant(Data.Obj(Map("0" -> Data.Int(5))))).run.value)
         .run.eval(emptyMS) must failDueToMultipleMnts
     }
 
@@ -134,7 +140,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         InMemState.fromFiles(Map((rootDir </> local) -> Vector(Data.Int(1)))))(
         emptyMS)
 
-      runH(f(lp).run.value).run.eval(fss) must succeedH
+      runMntd(f(lp).run.value).run.eval(fss) must succeedH
     }
 
   "Mounted filesystems" should {
@@ -152,13 +158,13 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
           val fss = bMem.set(InMemState.fromFiles(Map(rd -> Vector(Data.Int(1)))))(emptyMS)
 
-          runH(query.execute(lp, out).run.value)
+          runMntd(query.execute(lp, out).run.value)
             .run.eval(fss) must failDueToInvalidPath(mntB)
         }
 
         "containing no paths succeeds" >> {
           val out = mntC </> file("outfile")
-          runH(query.execute(Constant(Data.Obj(Map("0" -> Data.Int(3)))), out).run.value)
+          runMntd(query.execute(Constant(Data.Obj(Map("0" -> Data.Int(3)))), out).run.value)
             .run.eval(emptyMS) must_== out.right.right
         }
       }
@@ -180,14 +186,18 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       }
 
       "listing children" >> {
-        "of mount ancestor dir should return dir nodes" >> {
-          val dirs = Set(Node.Plain(dir("bar")), Node.Plain(dir("foo")))
-          runH(query.ls(rootDir).run).run.eval(emptyMS) must_== dirs.right.right
+        "of root dir when no mounts should return empty set" >> {
+          runEmpty(query.ls(rootDir).run).run.eval(emptyMS) must_== Set().right.right
         }
 
-        "of mount parent dir should return mounts nodes" >> {
-          val mnts = Set(Node.Mount(dir("mntA")), Node.Mount(dir("mntB")))
-          runH(query.ls(rootDir </> dir("bar")).run)
+        "of mount ancestor dir should return dir names" >> {
+          val dirs = Set(DirName("bar").left, DirName("foo").left)
+          runMntd(query.ls(rootDir).run).run.eval(emptyMS) must_== dirs.right.right
+        }
+
+        "of mount parent dir should return mount names" >> {
+          val mnts = Set(DirName("mntA").left, DirName("mntB").left)
+          runMntd(query.ls(rootDir </> dir("bar")).run)
             .run.eval(emptyMS) must_== mnts.right.right
         }
       }
@@ -200,7 +210,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         val fss = emptyMS.copy(a = InMemState.fromFiles(Map(
           (src </> file("f1")) -> Vector(Data.Str("contents")))))
 
-        runH(manage.moveDir(src, dst, MoveSemantics.Overwrite).run)
+        runMntd(manage.moveDir(src, dst, MoveSemantics.Overwrite).run)
           .run.eval(fss) must failDueToInvalidPath(dst)
       }
 
@@ -210,7 +220,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         val fss = emptyMS.copy(a = InMemState.fromFiles(Map(
           src -> Vector(Data.Str("contents")))))
 
-        runH(manage.moveFile(src, dst, MoveSemantics.Overwrite).run)
+        runMntd(manage.moveFile(src, dst, MoveSemantics.Overwrite).run)
           .run.eval(fss) must failDueToInvalidPath(dst)
       }
 
@@ -222,7 +232,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
           f1 -> Vector(Data.Str("conts1")),
           f2 -> Vector(Data.Int(42)))))
 
-        runH(manage.delete(mntB).run)
+        runMntd(manage.delete(mntB).run)
           .run.exec(fss) must_== emptyMS
       }
 
@@ -240,7 +250,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
             f3 -> Vector(Data.Str("file3")),
             f4 -> Vector(Data.Str("file4")))))
 
-        runH(manage.delete(rootDir </> dir("bar")).run)
+        runMntd(manage.delete(rootDir </> dir("bar")).run)
           .run.exec(fss) must_== emptyMS
       }
     }

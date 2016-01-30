@@ -188,7 +188,7 @@ object InMemory {
           .tuple(queryResponsesL.st map (qrs => executionPlan(lp, qrs).right))
 
       case ListContents(dir) =>
-        ls(dir)
+        ls(dir) map (r => if (dir === rootDir) r.getOrElse(Set()).right else r)
 
       case FileExists(file) =>
         contentsL.st.map(_.contains(file).right)
@@ -245,6 +245,9 @@ object InMemory {
 
       (trans, ref.read)
     }
+
+  def runFs(initial: InMemState): Task[FileSystem ~> Task] =
+    runStatefully(initial).map(_ compose fileSystem)
 
   ////
 
@@ -347,9 +350,9 @@ object InMemory {
   private def resultL(h: ResultHandle): InMemState @> Option[Vector[Data]] =
     Lens.mapVLens(h) <=< resultMapL
 
-  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[Node]] =
+  private def ls(d: ADir): InMemoryFs[FileSystemError \/ Set[PathName]] =
     contentsL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
-        .map(_ foldMap (f => Node.fromFirstSegmentOf(f).toSet))
+        .map(_ foldMap (f => firstSegmentName(f).toSet))
         .toRightDisjunction(pathError(PathNotFound(d))))
 }

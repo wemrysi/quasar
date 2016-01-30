@@ -27,7 +27,7 @@ import quasar.std.StdLib._, set._
 import monocle.Optional
 import monocle.function.Field1
 import pathy.{Path => PPath}, PPath._
-import scalaz.{Node => _, _}, Scalaz._
+import scalaz._, Scalaz._
 
 object view {
   /** Translate reads on view paths to the equivalent queries. */
@@ -177,28 +177,21 @@ object view {
           query.explain(views.rewrite(lp)).run.run
 
         case ListContents(dir) =>
-          val viewNodes = views.ls(dir).map(_.fold(Node.Plain(_), Node.View(_)))
-          query.ls(dir).map(ns => overlay(ns, viewNodes)).run
+          query.ls(dir).run.map(_ match {
+            case  \/-(ps) =>
+              (ps ++ views.ls(dir)).right
+            case -\/(err @ PathError(Case.PathNotFound(_))) =>
+              val vs = views.ls(dir)
+              if (vs.nonEmpty) vs.right
+              else err.left
+            case -\/(v) => v.left
+          })
 
         case FileExists(file) =>
-           query.fileExists(file).map(_ || views.contains(file)).run
+          query.fileExists(file).map(_ || views.contains(file)).run
       }
     }
   }
-
-  def overlay(under: Set[Node], over: Set[Node]): Set[Node] = {
-    def byPath(nodes: Set[Node]) = nodes.map(n => n.path -> n).toMap
-    // NB: actual nodes (including mount directories) take precedence over
-    // view ancestor directories, but view files take precedence over
-    // ordinary files.
-    implicit val BiasedNodeSemigroup = new Semigroup[Node] {
-      def append(n1: Node, n2: => Node) =
-        if (refineType(n1.path).isLeft) n1
-        else n2
-    }
-    (byPath(under) |+| byPath(over)).values.toSet
-  }
-
 
   /** Translates requests which refer to any view path into operations
     * on an underlying filesystem, where references to views have been

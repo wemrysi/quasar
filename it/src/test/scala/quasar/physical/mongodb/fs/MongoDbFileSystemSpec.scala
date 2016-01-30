@@ -114,9 +114,9 @@ class MongoDbFileSystemSpec
               manage.delete(d).liftM[Process]            |@|
               query.ls(rootDir).liftM[Process]
             ) { (before, _, create, _, delete) =>
-              val d0 = d.relativeTo(rootDir) getOrElse currentDir
-              (before must not contain(Node.Plain(d0))) and
-              (create must contain(Node.Plain(d0))) and
+              val pn = d.relativeTo(rootDir).flatMap(firstSegmentName).toSet
+              (before.intersect(pn) must beEmpty) and
+              (create.intersect(pn) must_== pn) and
               (delete must_== before)
             }
           }
@@ -143,11 +143,11 @@ class MongoDbFileSystemSpec
               manage.delete(rootDir).liftM[Process]       |@|
               query.ls(rootDir).liftM[Process]
             ) { (_, _, before, _, after) =>
-              val dA = d1.relativeTo(rootDir) getOrElse currentDir
-              val dB = d2.relativeTo(rootDir) getOrElse currentDir
+              val dA = d1.relativeTo(rootDir).flatMap(firstSegmentName).toSet
+              val dB = d2.relativeTo(rootDir).flatMap(firstSegmentName).toSet
 
-              (before must contain(Node.Plain(dA))) and
-              (before must contain(Node.Plain(dB))) and
+              (before.intersect(dA) must_== dA) and
+              (before.intersect(dB) must_== dB) and
               (after must beEmpty)
             }
           }
@@ -231,6 +231,24 @@ class MongoDbFileSystemSpec
           shouldFailWithPathNotFound { path =>
             s"""SELECT name FROM "$path" WHERE name.field1 > 10"""
           }
+        }
+      }
+
+      "List dirs" >> {
+        "listing the root dir should succeed" >> {
+          runT(run)(query.ls(rootDir)).runEither must beRight
+        }
+
+        "listing a non-empty top dir (i.e. a database) should succeed" >> {
+          val tdir = rootDir </> dir("__topdir__")
+          val tfile = tdir </> file("foobar")
+
+          val p = write.save(tfile, oneDoc.toProcess).drain ++
+                  query.ls(tdir).liftM[Process]
+                    .flatMap(ns => Process.emitAll(ns.toVector))
+
+          (runLogT(run, p) <* runT(run)(manage.delete(tdir)))
+            .runEither must beRight(contain(FileName("foobar").right[DirName]))
         }
       }
     }; ()
