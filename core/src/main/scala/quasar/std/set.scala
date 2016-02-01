@@ -45,6 +45,9 @@ trait SetLib extends Library {
     setTyper(partialTyper {
       case _ :: Type.Const(Data.Int(n)) :: Nil if n == 0 =>
         Type.Const(Data.Set(Nil))
+      case Type.Const(Data.Set(s)) :: Type.Const(Data.Int(n)) :: Nil
+          if n.isValidInt =>
+        Type.Const(Data.Set(s.take(n.intValue)))
       case Type.Set(t) :: _ :: Nil => t
       case t           :: _ :: Nil => t
     }),
@@ -60,6 +63,9 @@ trait SetLib extends Library {
       }
     },
     setTyper(partialTyper {
+      case Type.Const(Data.Set(s)) :: Type.Const(Data.Int(n)) :: Nil
+          if n.isValidInt =>
+        Type.Const(Data.Set(s.drop(n.intValue)))
       case Type.Set(t) :: _ :: Nil => t
       case t           :: _ :: Nil => t
     }),

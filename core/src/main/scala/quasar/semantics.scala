@@ -323,6 +323,7 @@ trait SemanticAnalysis {
 
     case SetLiteralF(_)  => success(Provenance.Value)
     case ArrayLiteralF(_) => success(Provenance.Value)
+    case MapLiteralF(_) => success(Provenance.Value)
     case SpliceF(expr)       => success(expr.getOrElse(Provenance.Empty))
     case VariF(_)        => success(Provenance.Value)
     case BinopF(left, right, _) => success(left & right)
