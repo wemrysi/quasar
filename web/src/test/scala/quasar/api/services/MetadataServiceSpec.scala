@@ -17,17 +17,20 @@
 package quasar.api.services
 
 import quasar.Predef._
+import quasar.api._
 import quasar.{Variables, VariablesArbitrary}
 import quasar.effect.KeyValueStore
-import quasar.fp.free
+import quasar.fp.{liftMT, free}
 import quasar.fp.prism._
 import quasar.fs._
+import quasar.fs.InMemory._
 import quasar.fs.mount._
 import quasar.recursionschemes.Fix
 import quasar.sql._
 
 import argonaut._, Argonaut._
 import monocle.Lens
+import org.http4s
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.server._
@@ -38,11 +41,7 @@ import pathy.scalacheck._
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
 
-class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
-  import InMemory._
-  import metadata.FsNode
-  import VariablesArbitrary._, ExprArbitrary._
-  import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
+object MetadataFixture {
 
   type MetadataEff[A] = Coproduct[QueryFileF, MountingF, A]
 
@@ -62,9 +61,17 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
     }
 
   def service(mem: InMemState, mnts: Map[APath, MountConfig2]): HttpService =
-    metadata.service[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
+    metadata.service[MetadataEff].toHttpService(
+      liftMT[Task, ResponseT].compose[MetadataEff](free.interpret2[QueryFileF, MountingF, Task](
       Coyoneda.liftTF(runQuery(mem)),
-      Coyoneda.liftTF(runMount(mnts))))
+      Coyoneda.liftTF(runMount(mnts)))))
+}
+
+class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
+  import metadata.FsNode
+  import VariablesArbitrary._, ExprArbitrary._
+  import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
+  import MetadataFixture._
 
   import posixCodec.printPath
 
@@ -82,7 +89,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         val path:String = posixCodec.printPath(file.path)
         val response = service(InMemState.empty, Map())(Request(uri = Uri(path = path))).run
         response.status must_== Status.NotFound
-        response.as[Json].run must_== Json("error" := s"File not found: $path")
+        response.as[Json].run must_== Json("error" := s"$path doesn't exist")
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -93,7 +100,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           val path = printPath(fileWithSameName)
           val response = service(s.state, Map())(Request(uri = Uri(path = path))).run
           response.status must_== Status.NotFound
-          response.as[Json].run must_== Json("error" := s"File not found: $path")
+          response.as[Json].run must_== Json("error" := s"$path doesn't exist")
         }
       }
     }

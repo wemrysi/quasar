@@ -20,6 +20,7 @@ import quasar.Predef._
 
 import java.lang.System
 import scalaz.concurrent.Task
+import scalaz._, Scalaz._
 
 object console {
   def stdout(msg: => String): Task[Unit] =
@@ -27,4 +28,10 @@ object console {
 
   def stderr(msg: => String): Task[Unit] =
     Task.delay(System.err.println(msg))
+
+  def logErrors[E:Show](a: quasar.Errors.ETask[E,Unit]) =
+    a.swap
+    .flatMapF(e => stderr(e.shows).map(_.right))
+    .merge
+    .handleWith { case err => stderr(err.getMessage) }
 }
