@@ -26,8 +26,8 @@ lazy val checkHeaders =
 
 lazy val commonSettings = Seq(
   headers := Map(
-    ("scala", Apache2_0("2014 - 2015", "SlamData Inc.")),
-    ("java",  Apache2_0("2014 - 2015", "SlamData Inc."))),
+    ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
+    ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
   scalaVersion := "2.11.7",
   logBuffered in Compile := false,
   logBuffered in Test := false,
