@@ -90,12 +90,12 @@ object Collection {
               else ().right
     } yield Collection(db, coll)
 
-    collResult leftMap (InvalidPath(path, _))
+    collResult leftMap (invalidPath(path, _))
   }
 
   /** Returns the database name determined by the given path. */
   def dbNameFromPath(path: APath): PathError2 \/ String =
-    dbNameAndRest(path) bimap (PathError2.InvalidPath(path, _), _._1)
+    dbNameAndRest(path) bimap (PathError2.invalidPath(path, _), _._1)
 
   private def dbNameAndRest(path: APath): String \/ (String, IList[String]) =
     flatten(None, None, None, Some(_), Some(_), path)

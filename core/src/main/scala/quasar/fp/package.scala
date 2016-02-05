@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp.TaskRef
 
-import monocle.Lens
+import monocle.{Lens, Prism}
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.stream._
 import scalaz.concurrent.Task
@@ -520,4 +520,10 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
         }
     }
   }
+
+  // NB: This should be submitted to mpilquist/monocle
+  /** Create a Prism using an partial function rather than Option.
+    */
+  def pPrism[A, B](out: PartialFunction[A, B])(in: B => A) =
+    Prism[A, B](out.lift)(in)
 }

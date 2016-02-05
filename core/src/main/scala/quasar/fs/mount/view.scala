@@ -180,7 +180,7 @@ object view {
           query.ls(dir).run.map(_ match {
             case  \/-(ps) =>
               (ps ++ views.ls(dir)).right
-            case -\/(err @ PathError(Case.PathNotFound(_))) =>
+            case -\/(err @ PathError(PathNotFound(_))) =>
               val vs = views.ls(dir)
               if (vs.nonEmpty) vs.right
               else err.left

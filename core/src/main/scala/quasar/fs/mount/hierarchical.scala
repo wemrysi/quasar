@@ -359,11 +359,11 @@ object hierarchical {
     val F = MonadState[State, Option[MntA]]
 
     def lookupMnt(p: APath): PathError2 \/ MntA =
-      lookupMounted(mounts, p) toRightDisjunction PathNotFound(p)
+      lookupMounted(mounts, p) toRightDisjunction pathNotFound(p)
 
     def compareToExisting(mnt: ADir): M[Unit] = {
       def errMsg(exMnt: ADir): PathError2 =
-        InvalidPath(mnt, s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'")
+        invalidPath(mnt, s"refers to a different filesystem than '${posixCodec.printPath(exMnt)}'")
 
       EitherT[F, PathError2, Unit](F.gets(exMnt =>
         exMnt map (_._1) filter (_ != mnt) map errMsg toLeftDisjunction (())

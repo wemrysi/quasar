@@ -34,62 +34,48 @@ object FileSystemError {
   import ReadFile.ReadHandle
   import WriteFile.WriteHandle
 
-  final case class PathError private[fs] (e: PathError2)
+  final case class PathError private (e: PathError2)
     extends FileSystemError
-  final case class PlannerError private[fs] (lp: Fix[LogicalPlan], err: PlannerErr)
+  final case class PlannerError private (lp: Fix[LogicalPlan], err: PlannerErr)
     extends FileSystemError
-  final case class UnknownResultHandle private[fs] (h: ResultHandle)
+  final case class UnknownResultHandle private (h: ResultHandle)
     extends FileSystemError
-  final case class UnknownReadHandle private[fs] (h: ReadHandle)
+  final case class UnknownReadHandle private (h: ReadHandle)
     extends FileSystemError
-  final case class UnknownWriteHandle private[fs] (h: WriteHandle)
+  final case class UnknownWriteHandle private (h: WriteHandle)
     extends FileSystemError
-  final case class PartialWrite private[fs] (numFailed: Int)
+  final case class PartialWrite private (numFailed: Int)
     extends FileSystemError
-  final case class WriteFailed private[fs] (data: Data, reason: String)
+  final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
-  val pathError: Prism[FileSystemError, PathError2] =
-    Prism[FileSystemError, PathError2] {
-      case PathError(err) => Some(err)
-      case _ => None
-    } (PathError(_))
+  val pathError = pPrism[FileSystemError, PathError2] {
+    case PathError(err) => err
+  } (PathError)
 
-  val plannerError: Prism[FileSystemError, (Fix[LogicalPlan], PlannerErr)] =
-    Prism[FileSystemError, (Fix[LogicalPlan], PlannerErr)] {
-      case PlannerError(lp, e) => Some((lp, e))
-      case _ => None
-    } ((PlannerError(_, _)).tupled)
+  val plannerError = pPrism[FileSystemError, (Fix[LogicalPlan], PlannerErr)] {
+    case PlannerError(lp, e) => (lp, e)
+  } (PlannerError.tupled)
 
-  val unknownResultHandle: Prism[FileSystemError, ResultHandle] =
-    Prism[FileSystemError, ResultHandle] {
-      case UnknownResultHandle(h) => Some(h)
-      case _ => None
-    } (UnknownResultHandle(_))
+  val unknownResultHandle = pPrism[FileSystemError, ResultHandle] {
+    case UnknownResultHandle(h) => h
+  } (UnknownResultHandle)
 
-  val unknownReadHandle: Prism[FileSystemError, ReadHandle] =
-    Prism[FileSystemError, ReadHandle] {
-      case UnknownReadHandle(h) => Some(h)
-      case _ => None
-    } (UnknownReadHandle(_))
+  val unknownReadHandle = pPrism[FileSystemError, ReadHandle] {
+    case UnknownReadHandle(h) => h
+  } (UnknownReadHandle)
 
-  val unknownWriteHandle: Prism[FileSystemError, WriteHandle] =
-    Prism[FileSystemError, WriteHandle] {
-      case UnknownWriteHandle(h) => Some(h)
-      case _ => None
-    } (UnknownWriteHandle(_))
+  val unknownWriteHandle = pPrism[FileSystemError, WriteHandle] {
+    case UnknownWriteHandle(h) => h
+  } (UnknownWriteHandle)
 
-  val partialWrite: Prism[FileSystemError, Int] =
-    Prism[FileSystemError, Int] {
-      case PartialWrite(n) => Some(n)
-      case _ => None
-    } (PartialWrite(_))
+  val partialWrite = pPrism[FileSystemError, Int] {
+    case PartialWrite(n) => n
+  } (PartialWrite)
 
-  val writeFailed: Prism[FileSystemError, (Data, String)] =
-    Prism[FileSystemError, (Data, String)] {
-      case WriteFailed(d, r) => Some((d, r))
-      case _ => None
-    } ((WriteFailed(_, _)).tupled)
+  val writeFailed = pPrism[FileSystemError, (Data, String)] {
+    case WriteFailed(d, r) => (d, r)
+  } (WriteFailed.tupled)
 
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {

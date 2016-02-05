@@ -81,9 +81,9 @@ object managefile {
   private type R[S, A] = Kleisli[MongoDbIO, S, A]
 
   private val moveToRename: MoveSemantics => RenameSemantics = {
-    case MoveSemantics.Case.Overwrite     => RenameSemantics.Overwrite
-    case MoveSemantics.Case.FailIfExists  => RenameSemantics.FailIfExists
-    case MoveSemantics.Case.FailIfMissing => RenameSemantics.Overwrite
+    case MoveSemantics.Overwrite     => RenameSemantics.Overwrite
+    case MoveSemantics.FailIfExists  => RenameSemantics.FailIfExists
+    case MoveSemantics.FailIfMissing => RenameSemantics.Overwrite
   }
 
   private def moveDir(src: ADir, dst: ADir, sem: MoveSemantics)
@@ -112,16 +112,16 @@ object managefile {
     def reifyMongoErr(m: MongoDbIO[Unit]): MongoFsM[Unit] =
       EitherT(m.attempt flatMap {
         case -\/(e: MongoServerException) if e.getCode == 10026 =>
-          pathError(PathNotFound(src)).left.point[MongoDbIO]
+          pathError(pathNotFound(src)).left.point[MongoDbIO]
 
         case -\/(e: MongoServerException) if e.getCode == 10027 =>
-          pathError(PathExists(dst)).left.point[MongoDbIO]
+          pathError(pathExists(dst)).left.point[MongoDbIO]
 
         case -\/(e: MongoCommandException) if e.getErrorMessage == srcNotFoundErr =>
-          pathError(PathNotFound(src)).left.point[MongoDbIO]
+          pathError(pathNotFound(src)).left.point[MongoDbIO]
 
         case -\/(e: MongoCommandException) if e.getErrorMessage == dstExistsErr =>
-          pathError(PathExists(dst)).left.point[MongoDbIO]
+          pathError(pathExists(dst)).left.point[MongoDbIO]
 
         case -\/(t) =>
           fail(t)
@@ -134,17 +134,17 @@ object managefile {
       EitherT(collectionsIn(dstColl.databaseName)
                 .filter(_ == dstColl)
                 .runLast
-                .map(_.toRightDisjunction(pathError(PathNotFound(dst))).void))
+                .map(_.toRightDisjunction(pathError(pathNotFound(dst))).void))
 
     if (src == dst)
       collFromPathM(src) flatMap (srcColl =>
         collectionExists(srcColl).liftM[FileSystemErrT].ifM(
           if (MoveSemantics.failIfExists isMatching sem)
-            MonadError[MongoE, FileSystemError].raiseError(pathError(PathExists(src)))
+            MonadError[MongoE, FileSystemError].raiseError(pathError(pathExists(src)))
           else
             ().point[MongoFsM]
           ,
-          MonadError[MongoE, FileSystemError].raiseError(pathError(PathNotFound(src)))))
+          MonadError[MongoE, FileSystemError].raiseError(pathError(pathNotFound(src)))))
     else
       for {
         srcColl <- collFromPathM(src)
@@ -180,7 +180,7 @@ object managefile {
     collFromPathM(file) flatMap (c =>
       collectionExists(c).liftM[FileSystemErrT].ifM(
         dropCollection(c).liftM[FileSystemErrT],
-        pathError(PathNotFound(file)).raiseError[MongoE, Unit]))
+        pathError(pathNotFound(file)).raiseError[MongoE, Unit]))
 
   private def freshName: MongoManage[String] =
     for {

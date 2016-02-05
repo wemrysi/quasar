@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.fp.free.injectedNT
+import quasar.fp.prism._
 import quasar.recursionschemes.{FunctorT, Fix}, FunctorT.ops._
 
 import monocle.{Lens, Optional}
@@ -113,8 +114,8 @@ object transformPaths {
         case Move(scn, sem) =>
           Coyoneda.lift(Move(
             scn.fold(
-              (src, dst) => DirToDir(inPath(src), inPath(dst)),
-              (src, dst) => FileToFile(inPath(src), inPath(dst))),
+              (src, dst) => dirToDir(inPath(src), inPath(dst)),
+              (src, dst) => fileToFile(inPath(src), inPath(dst))),
             sem))
             .map(_ leftMap transformErrorPath(outPath))
 

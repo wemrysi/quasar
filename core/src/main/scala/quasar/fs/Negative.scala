@@ -21,15 +21,10 @@ import quasar.Predef._
 
 import scalaz.Equal
 
-final class Negative private (val value: Int) {
-  override def equals(other: scala.Any) = other match {
-    case Negative(a) => value == a
-    case _ => false
-  }
-}
+final class Negative private (val value: Long) extends scala.AnyVal
 
 object Negative {
-  def apply(n: Int): Option[Negative] =
+  def apply(n: Long): Option[Negative] =
     Some(n).filter(_ < 0).map(new Negative(_))
   def unapply(n: Negative) = Some(n.value)
 

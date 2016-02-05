@@ -127,7 +127,7 @@ object WriteFile {
                      : Process[M, FileSystemError] = {
 
       def shouldNotExist: M[FileSystemError] =
-        MonadError[G, FileSystemError].raiseError(PathError(PathExists(dst)))
+        MonadError[G, FileSystemError].raiseError(pathError(pathExists(dst)))
 
       QF.fileExists(dst).liftM[Process].ifM(
         shouldNotExist.liftM[Process],
@@ -148,7 +148,7 @@ object WriteFile {
                       : Process[M, FileSystemError] = {
 
       def shouldExist: M[FileSystemError] =
-        MonadError[G, FileSystemError].raiseError(PathError(PathNotFound(dst)))
+        MonadError[G, FileSystemError].raiseError(pathError(pathNotFound(dst)))
 
       QF.fileExists(dst).liftM[Process].ifM(
         saveChunked0(dst, src, MoveSemantics.FailIfMissing),

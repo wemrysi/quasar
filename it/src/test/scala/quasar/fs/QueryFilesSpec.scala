@@ -64,7 +64,7 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")
-        runT(run)(query.ls(d)).runEither must beLeft(pathError(PathNotFound(d)))
+        runT(run)(query.ls(d)).runEither must beLeft(pathError(pathNotFound(d)))
       }
 
       "listing results should not contain deleted files" >> {

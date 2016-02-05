@@ -68,6 +68,6 @@ object fsops {
     *       scala-pathy has been updated.
     */
   def nonExistentParent[A](dir: ADir): MongoFsM[A] =
-    pathError(InvalidPath(dir, "directory refers to nonexistent parent"))
+    pathError(invalidPath(dir, "directory refers to nonexistent parent"))
       .raiseError[MongoE, A]
 }

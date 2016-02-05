@@ -35,7 +35,7 @@ import scalaz.concurrent.Task
 object mount {
   def mountingErrorResponse(err: MountingError): Task[Response] =
     err match {
-      case MountingError.PathError(e @ PathError2.Case.InvalidPath(path, reason))
+      case MountingError.PathError(e @ PathError2.InvalidPath(path, reason))
                                                     => errorResponse(Conflict, s"cannot mount at ${posixCodec.printPath(path)} because $reason")
       case MountingError.PathError(e)               => pathErrorResponse(e)
       case MountingError.EnvironmentError(e)        => errorResponse(InternalServerError, e.shows)

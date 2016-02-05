@@ -67,7 +67,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
                 write.save(f2, oneDoc.toProcess).drain ++
                 manage.moveFile(f1, f2, MoveSemantics.FailIfExists).liftM[Process]
 
-        (execT(run, p).runOption must beSome(pathError(PathExists(f2)))) and
+        (execT(run, p).runOption must beSome(pathError(pathExists(f2)))) and
         (runT(run)(ls).runEither must beRight(containTheSameElementsAs(expectedFiles)))
       }
 
@@ -97,7 +97,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
                 manage.moveFile(f1, f2, MoveSemantics.Overwrite)
                   .liftM[Process]
 
-        (execT(run, p).runOption must beSome(pathError(PathNotFound(f1)))) and
+        (execT(run, p).runOption must beSome(pathError(pathNotFound(f1)))) and
         (runT(run)(ls).runEither must beRight(containTheSameElementsAs(expectedFiles)))
       }
 
@@ -107,7 +107,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val f2 = d </> file("f2")
 
         runT(run)(manage.moveFile(f1, f2, MoveSemantics.Overwrite))
-          .runOption must beSome(pathError(PathNotFound(f1)))
+          .runOption must beSome(pathError(pathNotFound(f1)))
       }
 
       "moving a file to itself with FailIfExists semantics should fail with PathExists" >> {
@@ -115,7 +115,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val p  = write.save(f1, oneDoc.toProcess).drain ++
                  manage.moveFile(f1, f1, MoveSemantics.FailIfExists).liftM[Process]
 
-        execT(run, p).runOption must beSome(pathError(PathExists(f1)))
+        execT(run, p).runOption must beSome(pathError(pathExists(f1)))
       }
 
       "moving a file to a nonexistent path when using FailIfMissing sematics should fail with dst NotFound" >> {
@@ -126,7 +126,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val p  = write.save(f1, oneDoc.toProcess).drain ++
                  manage.moveFile(f1, f2, MoveSemantics.FailIfMissing).liftM[Process]
 
-        (execT(run, p).runOption must beSome(pathError(PathNotFound(f2)))) and
+        (execT(run, p).runOption must beSome(pathError(pathNotFound(f2)))) and
         (runT(run)(query.ls(d)).runEither must beRight(containTheSameElementsAs(expectedFiles)))
       }
 
@@ -145,7 +145,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
 
         (execT(run, p).runOption must beNone) and
         (runT(run)(query.ls(d2)).runEither must beRight(containTheSameElementsAs(expectedFiles))) and
-        (runT(run)(query.ls(d1)).runEither must beLeft(pathError(PathNotFound(d1))))
+        (runT(run)(query.ls(d1)).runEither must beLeft(pathError(pathNotFound(d1))))
       }
 
       "moving a nonexistent dir to another nonexistent dir fails with src NotFound" >> {
@@ -153,12 +153,12 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val d2 = managePrefix </> dir("dirdnetodirdne") </> dir("d2")
 
         runT(run)(manage.moveDir(d1, d2, MoveSemantics.FailIfExists))
-          .runOption must beSome(pathError(PathNotFound(d1)))
+          .runOption must beSome(pathError(pathNotFound(d1)))
       }
 
       "deleting a nonexistent file returns PathNotFound" >> {
         val f = managePrefix </> file("delfilenotfound")
-        runT(run)(manage.delete(f)).runEither must beLeft(pathError(PathNotFound(f)))
+        runT(run)(manage.delete(f)).runEither must beLeft(pathError(pathNotFound(f)))
       }
 
       "deleting a file makes it no longer accessible" >> {
@@ -166,7 +166,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
         val p  = write.save(f1, oneDoc.toProcess).drain ++ manage.delete(f1).liftM[Process]
 
         (execT(run, p).runOption must beNone) and
-        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(PathNotFound(f1))))
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(pathNotFound(f1))))
       }
 
       "deleting a file with siblings in directory leaves siblings untouched" >> {
@@ -179,7 +179,7 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
                 manage.delete(f1).liftM[Process]
 
         (execT(run, p).runOption must beNone) and
-        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(PathNotFound(f1)))) and
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(pathNotFound(f1)))) and
         (runLogT(run, read.scanAll(f2)).runEither must beRight(anotherDoc))
       }
 
@@ -193,14 +193,14 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
                 manage.delete(d).liftM[Process]
 
         (execT(run, p).runOption must beNone) and
-        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(PathNotFound(f1)))) and
-        (runLogT(run, read.scanAll(f2)).runEither must beLeft(pathError(PathNotFound(f2)))) and
-        (runT(run)(query.ls(d)).runEither must beLeft(pathError(PathNotFound(d))))
+        (runLogT(run, read.scanAll(f1)).runEither must beLeft(pathError(pathNotFound(f1)))) and
+        (runLogT(run, read.scanAll(f2)).runEither must beLeft(pathError(pathNotFound(f2)))) and
+        (runT(run)(query.ls(d)).runEither must beLeft(pathError(pathNotFound(d))))
       }
 
       "deleting a nonexistent directory returns PathNotFound" >> {
         val d = managePrefix </> dir("deldirnotfound")
-        runT(run)(manage.delete(d)).runEither must beLeft(pathError(PathNotFound(d)))
+        runT(run)(manage.delete(d)).runEither must beLeft(pathError(pathNotFound(d)))
       }
 
       "write/read from temp dir near existing" >> {

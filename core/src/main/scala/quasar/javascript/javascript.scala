@@ -109,6 +109,12 @@ object Js {
   implicit val JSRenderTree: RenderTree[Js] = new RenderTree[Js] {
     def render(v: Js) = Terminal("JavaScript" :: Nil, Some(v.pprint(2)))
   }
+
+  /** Smart constructors to construct a Js.Num without worrying about numeric
+    * widening or getting the `float` flag correct.
+    */
+  def num(value: Double) = Num(value,          true)
+  def num(value: Long)   = Num(value.toDouble, false)
 }
 
 private object JavascriptPrinter {

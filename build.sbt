@@ -52,8 +52,12 @@ lazy val commonSettings = Seq(
 
   ScoverageKeys.coverageHighlighting := true,
 
-  // NB: this option needs scalac 2.11 ∴ sbt 0.14 for meta-project
-  scalacOptions ++= BuildInfo.scalacOptions ++ Seq("-Ywarn-unused-import"),
+  // NB: These options need scalac 2.11.7 ∴ sbt > 0.13 for meta-project
+  scalacOptions ++= BuildInfo.scalacOptions ++ Seq(
+    "-target:jvm-1.8",
+    "-Ybackend:GenBCode",
+    "-Ydelambdafy:method",
+    "-Ywarn-unused-import"),
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),

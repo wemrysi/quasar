@@ -36,7 +36,7 @@ object TraceFS {
       paths.get(dir).cata(
         _.right,
         if (dir === rootDir) Set[PathName]().right
-        else FileSystemError.pathError(PathError2.PathNotFound(dir)).left)
+        else FileSystemError.pathError(PathError2.pathNotFound(dir)).left)
 
     def apply[A](qf: QueryFile[A]): Trace[A] =
       WriterT.writer((Vector(qf.render),

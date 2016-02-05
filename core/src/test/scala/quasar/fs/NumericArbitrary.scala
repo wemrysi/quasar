@@ -19,18 +19,20 @@ package quasar.fs
 import quasar.Predef._
 
 import org.scalacheck.{Arbitrary, Gen}
+import scalaz.scalacheck.ScalaCheckBinding._
+import scalaz.syntax.functor._
 
 trait NumericArbitrary {
   import Arbitraries.genOption
 
   implicit val positiveArbitrary: Arbitrary[Positive] =
-    Arbitrary(genOption(Gen.choose(1, Short.MaxValue) map (Positive(_))))
+    Arbitrary(genOption(Gen.choose(1, Short.MaxValue.toLong) ∘ (Positive(_))))
 
   implicit val negativeArbitrary: Arbitrary[Negative] =
-    Arbitrary(genOption(Gen.choose(Int.MinValue, -1) map (Negative(_))))
+    Arbitrary(genOption(Gen.choose(Long.MinValue, -1) ∘ (Negative(_))))
 
   implicit val naturalArbitrary: Arbitrary[Natural] =
-    Arbitrary(genOption(Gen.choose(0, Short.MaxValue) map (Natural(_))))
+    Arbitrary(genOption(Gen.choose(0, Short.MaxValue.toLong) ∘ (Natural(_))))
 }
 
 object NumericArbitrary extends NumericArbitrary
