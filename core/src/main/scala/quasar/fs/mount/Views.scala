@@ -45,7 +45,7 @@ final case class Views(map: Map[AFile, Fix[LogicalPlan]]) {
 
   /** Resolve a path to the query for the view found there if any. */
   def lookup(p: AFile): Option[Fix[LogicalPlan]] =
-    map.get(p).map(rewrite0(_, Set(p)))
+    map.get(p).map(lp => rewrite0(absolutize(lp, fileParent(p)), Set(p)))
 
   /** Resolve view references within a query. */
   def rewrite(lp: Fix[LogicalPlan]): Fix[LogicalPlan] = rewrite0(lp, Set())

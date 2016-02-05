@@ -31,6 +31,17 @@ import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
+  "lookup" should {
+    "trivial read with relative path" in {
+      val vs = Views(Map(
+        (rootDir </> dir("foo") </> file("justZips")) ->
+          Read(Path("zips"))))
+
+      vs.lookup(rootDir </> dir("foo") </> file("justZips")) must beSome(beTree(
+        Read(Path("/foo/zips"))))
+    }
+  }
+
   "rewrite" should {
     "no match" in {
       val vs = Views(Map())
