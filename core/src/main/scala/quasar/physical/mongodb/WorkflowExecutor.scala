@@ -180,7 +180,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     val tempDst: N[Collection] =
       tempDbName cata (
         tempColl,
-        NoDatabase.raiseError[E, Collection].liftM[TempsT])
+        noDatabase(()).raiseError[E, Collection].liftM[TempsT])
 
     val srcResult =
       tempDst flatMap (d => execute0(src, d) strengthL d)
@@ -194,7 +194,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
   private def execute0(wt: WorkflowTask, out: Collection): N[Collection] = {
     def unableToStore[A](bson: Bson): N[A] =
-      InsertFailed(
+      insertFailed(
         bson,
         s"MongoDB is only able to store documents in collections, not `$bson`."
       ).raiseError[E, A].liftM[TempsT]
@@ -239,7 +239,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         } yield out
 
       case FoldLeftTask(rd @ ReadTask(_), _) =>
-        InvalidTask(rd, "FoldLeft from simple read")
+        invalidTask(rd, "FoldLeft from simple read")
           .raiseError[E, Collection].liftM[TempsT]
 
       case FoldLeftTask(head, tail) =>
@@ -252,11 +252,11 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
                    }
 
                  case mrt @ MapReduceTask(_, _, _) =>
-                   InvalidTask(mrt, "no output action specified for mapReduce in FoldLeft")
+                   invalidTask(mrt, "no output action specified for mapReduce in FoldLeft")
                      .raiseError[E, Unit].liftM[TempsT]
 
                  case other =>
-                   InvalidTask(other, "un-mergable FoldLeft input")
+                   invalidTask(other, "un-mergable FoldLeft input")
                      .raiseError[E, Unit].liftM[TempsT]
                }
         } yield h

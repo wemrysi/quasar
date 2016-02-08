@@ -21,10 +21,11 @@ val commonScalacOptions = Seq(
   "-Yno-adapted-args",
   "-Yno-imports",
   "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
   "-Ywarn-value-discard")
 
-// NB: These options trigger issues that need to be fixed in the main project.
-scalacOptions ++= commonScalacOptions ++ Seq("-Xlint", "-Ywarn-numeric-widen")
+// NB: This option triggers issues that need to be fixed in the main project.
+scalacOptions ++= commonScalacOptions ++ Seq("-Xlint")
 
 buildInfoKeys := Seq[BuildInfoKey]("scalacOptions" -> commonScalacOptions)
 

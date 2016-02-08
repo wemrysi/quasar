@@ -48,7 +48,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
     "append should aggregate all `PartialWrite` errors and emit the sum" ! prop {
       (f: AFile, xs: Vector[Data]) => (xs.length > 1) ==> {
-        val wf = WriteFailed(Data.Str("foo"), "b/c reasons")
+        val wf = writeFailed(Data.Str("foo"), "b/c reasons")
         val ws = Vector(wf) +: xs.tail.as(Vector(partialWrite(1)))
 
         MemFixTask.runLogWithWrites(ws.toList, write.append(f, xs.toProcess))
@@ -90,7 +90,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       val p = write.append(f, xs.toProcess) ++ write.create(f, ys.toProcess)
 
-      MemTask.runLogEmpty(p).run.toEither must beLeft(pathError(PathExists(f)))
+      MemTask.runLogEmpty(p).run.toEither must beLeft(pathError(pathExists(f)))
     }
 
     "create should consume all input into a new file" ! prop {
@@ -105,7 +105,7 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
       (f: AFile, xs: Vector[Data]) =>
 
       MemTask.runLogEmpty(write.replace(f, xs.toProcess))
-        .run.toEither must beLeft(pathError(PathNotFound(f)))
+        .run.toEither must beLeft(pathError(pathNotFound(f)))
     }
 
     "replace should leave the existing file untouched on failure" ! prop {

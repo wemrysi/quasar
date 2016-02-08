@@ -236,8 +236,10 @@ trait MongoDbEvaluatorImpl[F[_], C] {
           PipelineTask(
             source,
             $Match((), query) ::
-              skip.map($Skip((), _) :: Nil).getOrElse(Nil) :::
-              limit.map($Limit((), _) :: Nil).getOrElse(Nil)), out, tempCol)
+              skip.map(s => $Skip((), s.toLong) :: Nil).getOrElse(Nil) :::
+              limit.map(l => $Limit((), l.toLong) :: Nil).getOrElse(Nil)),
+          out,
+          tempCol)
 
       case PipelineTask(source, pipeline) => for {
         src <- execSource(source)
@@ -617,8 +619,8 @@ class JSExecutor[F[_]: Monad](nameGen: NameGenerator[F])
 
   def count0(source: Col, count: Count) =
     Call(Select(toJsRef(source.collection), "count"), count.query.toList.map(_.bson.toJs))
-      .app(count.skip)((c, count) => Call(Select(c, "limit"), List(Num(count, false))))
-      .app(count.limit)((c, count) => Call(Select(c, "skip"), List(Num(count, false))))
+      .app(count.skip)((c, count) => Call(Select(c, "limit"), List(num(count))))
+      .app(count.limit)((c, count) => Call(Select(c, "skip"), List(num(count))))
 
   def wrappedCount(field: BsonField.Name, source: Col, count: Count) =
     write(AnonElem(List(AnonObjDecl(List(field.asText -> count0(source, count))))))
@@ -639,8 +641,8 @@ class JSExecutor[F[_]: Monad](nameGen: NameGenerator[F])
           find.projection.foldRight[List[Js.Expr]](Nil)(_.toJs :: _))(
           _.bson.toJs :: _))
         .app(find.sort)((c, keys) => Call(Select(c, "sort"), List($Sort.keyBson(keys).toJs)))
-        .app(find.skip)((c, count) => Call(Select(c, "skip"), List(Num(count, false))))
-        .app(find.limit)((c, count) => Call(Select(c, "limit"), List(Num(count, false)))))
+        .app(find.skip)((c, count) => Call(Select(c, "skip"), List(num(count))))
+        .app(find.limit)((c, count) => Call(Select(c, "limit"), List(num(count)))))
 
   def aggregateCursor(source: Col, pipeline: workflowtask.Pipeline) =
     aggregate(source.collection, pipeline)

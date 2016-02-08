@@ -63,7 +63,7 @@ object Bson {
     case rex:  BsonRegularExpression => Regex(rex.getPattern, rex.getOptions)
     case str:  BsonString            => Text(str.getValue)
     case sym:  BsonSymbol            => Symbol(sym.getSymbol)
-    case tms:  BsonTimestamp         => Timestamp(Instant.ofEpochSecond(tms.getTime), tms.getInc)
+    case tms:  BsonTimestamp         => Timestamp(Instant.ofEpochSecond(tms.getTime.toLong), tms.getInc)
     case _:    BsonUndefined         => Undefined
       // NB: These types we can’t currently translate back to Bson, but we don’t
       //     expect them to appear.
@@ -175,17 +175,17 @@ object Bson {
   }
   final case class Int32(value: Int) extends Bson {
     def repr = new BsonInt32(value)
-    def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.Num(value, false)))
+    def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.num(value.toLong)))
   }
   final case class Int64(value: Long) extends Bson {
     def repr = new BsonInt64(value)
-    def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.Num(value, false)))
+    def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.num(value)))
   }
   final case class Timestamp private (epochSecond: Int, ordinal: Int) extends Bson {
     def repr = new BsonTimestamp(epochSecond, ordinal)
     def toJs = Js.Call(Js.Ident("Timestamp"),
-      List(Js.Num(epochSecond, false), Js.Num(ordinal, false)))
-    override def toString = "Timestamp(" + Instant.ofEpochSecond(epochSecond) + ", " + ordinal + ")"
+      List(Js.num(epochSecond.toLong), Js.num(ordinal.toLong)))
+    override def toString = "Timestamp(" + Instant.ofEpochSecond(epochSecond.toLong) + ", " + ordinal + ")"
   }
   object Timestamp {
     def apply(instant: Instant, ordinal: Int): Timestamp =

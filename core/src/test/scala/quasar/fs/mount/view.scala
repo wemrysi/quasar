@@ -133,7 +133,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
         _ <- read.unsafe.read(h)
       } yield ()).run
 
-      viewInterp(views, Map(), f)._2 must_== -\/(UnknownReadHandle(ReadFile.ReadHandle(p, 0)))
+      viewInterp(views, Map(), f)._2 must_== -\/(unknownReadHandle(ReadFile.ReadHandle(p, 0)))
     }
 
     "double close (no-op)" in {
@@ -163,7 +163,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.PathError(PathError2.InvalidPath(p, "cannot write to view")))))
+          -\/(FileSystemError.pathError(PathError2.invalidPath(p, "cannot write to view")))))
     }
   }
 
@@ -177,11 +177,11 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val views = Views(Map(viewPath -> q))
 
-      val f = manage.move(FileToFile(viewPath, otherPath), Overwrite).run
+      val f = manage.move(fileToFile(viewPath, otherPath), Overwrite).run
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.PathError(PathError2.InvalidPath(viewPath, "cannot move view")))))
+          -\/(FileSystemError.pathError(PathError2.invalidPath(viewPath, "cannot move view")))))
     }
 
     "fail with view destination path" in {
@@ -191,11 +191,11 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       val views = Views(Map(viewPath -> q))
 
-      val f = manage.move(FileToFile(otherPath, viewPath), Overwrite).run
+      val f = manage.move(fileToFile(otherPath, viewPath), Overwrite).run
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.PathError(PathError2.InvalidPath(viewPath, "cannot move file to view location")))))
+          -\/(FileSystemError.pathError(PathError2.invalidPath(viewPath, "cannot move file to view location")))))
     }
   }
 
@@ -210,7 +210,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
       viewInterp(views, Map(), f) must_==(
         (Vector.empty,
-          -\/(FileSystemError.PathError(PathError2.InvalidPath(p, "cannot delete view")))))
+          -\/(FileSystemError.pathError(PathError2.invalidPath(p, "cannot delete view")))))
     }
   }
 
@@ -323,7 +323,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
         viewInterp(views, Map(), f) must_==(
           (traceInterp(f, Map())._1,
-            -\/(FileSystemError.pathError(PathError2.PathNotFound(aDir)))))
+            -\/(FileSystemError.pathError(PathError2.pathNotFound(aDir)))))
       }
     }
 

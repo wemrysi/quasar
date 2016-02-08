@@ -118,7 +118,7 @@ object Empty {
       .strengthL(Vector())
 
   private def fsPathNotFound[F[_]: Applicative, A](p: APath): F[FileSystemError \/ A] =
-    pathError(PathNotFound(p)).left.point[F]
+    pathError(pathNotFound(p)).left.point[F]
 
   private def unsupportedPlan[F[_]: Applicative, A](lp: Fix[LogicalPlan]): F[FileSystemError \/ A] =
     plannerError(lp, UnsupportedPlan(lp.unFix, None)).left.point[F]

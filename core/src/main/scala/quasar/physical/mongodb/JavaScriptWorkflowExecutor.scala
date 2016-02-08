@@ -60,8 +60,8 @@ private[mongodb] final class JavaScriptWorkflowExecutor
 
   protected def count(src: Collection, cfg: Count) = {
     val count0 = List(
-      foldExpr(cfg.limit)((n, js) => Call(Select(js, "limit"), List(Num(n, false)))),
-      foldExpr(cfg.skip)((n, js) => Call(Select(js, "skip"), List(Num(n, false)))))
+      foldExpr(cfg.limit)((n, js) => Call(Select(js, "limit"), List(num(n)))),
+      foldExpr(cfg.skip)((n, js) => Call(Select(js, "skip"), List(num(n)))))
       .sequence_[ExprS, Unit]
       .exec(Call(Select(toJsRef(src), "count"), cfg.query.toList.map(_.bson.toJs)))
 
@@ -88,8 +88,8 @@ private[mongodb] final class JavaScriptWorkflowExecutor
 
     tell(List(
       foldExpr(cfg.sort)((keys, f) => Call(Select(f, "sort"), List($Sort.keyBson(keys).toJs))),
-      foldExpr(cfg.skip)((n, f) => Call(Select(f, "skip"), List(Num(n, false)))),
-      foldExpr(cfg.limit)((n, f) => Call(Select(f, "limit"), List(Num(n, false)))))
+      foldExpr(cfg.skip)((n, f) => Call(Select(f, "skip"), List(num(n)))),
+      foldExpr(cfg.limit)((n, f) => Call(Select(f, "limit"), List(num(n)))))
       .sequence_[ExprS, Unit]
       .exec(find0))
   }

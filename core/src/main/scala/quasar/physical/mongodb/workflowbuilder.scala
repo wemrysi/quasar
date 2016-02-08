@@ -1346,7 +1346,7 @@ object WorkflowBuilder {
           "value is not an array."))
       case _ =>
         jsExpr1(wb, JsFn(jsBase,
-          jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.Num(index, false))))).right
+          jscore.Access(jscore.Ident(jsBase), jscore.Literal(Js.num(index.toLong))))).right
     }
 
   def deleteField(wb: WorkflowBuilder, name: String):

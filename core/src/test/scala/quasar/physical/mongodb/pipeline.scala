@@ -104,11 +104,11 @@ class PipelineSpec extends Specification with ScalaCheck with ArbBsonField with 
     } yield ShapePreservingPipelineOp($Match((), Selector.Doc(BsonField.Name(c.toString) -> Selector.Eq(Bson.Int32(-1)))))
 
     def skipGen = for {
-      i <- Gen.chooseNum(1, 10)
+      i <- Gen.chooseNum(0, Long.MaxValue)
     } yield ShapePreservingPipelineOp($Skip((), i))
 
     def limitGen = for {
-      i <- Gen.chooseNum(1, 10)
+      i <- Gen.chooseNum(1, Long.MaxValue)
     } yield ShapePreservingPipelineOp($Limit((), i))
 
     def sortGen = for {

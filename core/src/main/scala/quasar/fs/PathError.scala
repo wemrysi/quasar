@@ -28,51 +28,33 @@ import scalaz._
 sealed trait PathError2
 
 object PathError2 {
-  object Case {
-    final case class PathExists(path: APath)
+  final case class PathExists private (path: APath)
       extends PathError2
-    final case class PathNotFound(path: APath)
+  final case class PathNotFound private (path: APath)
       extends PathError2
-    final case class InvalidPath(path: APath, reason: String)
+  final case class InvalidPath private (path: APath, reason: String)
       extends PathError2
-  }
 
-  val PathExists: APath => PathError2 =
-    Case.PathExists(_)
+  val pathExists =
+    pPrism[PathError2, APath] { case PathExists(p) => p } (PathExists)
 
-  val PathNotFound: APath => PathError2 =
-    Case.PathNotFound(_)
+  val pathNotFound =
+    pPrism[PathError2, APath] { case PathNotFound(p) => p } (PathNotFound)
 
-  val InvalidPath: (APath, String) => PathError2 =
-    Case.InvalidPath(_, _)
-
-  val pathExists: Prism[PathError2, APath] =
-    Prism[PathError2, APath] {
-      case Case.PathExists(p) => Some(p)
-      case _ => None
-    } (PathExists)
-
-  val pathNotFound: Prism[PathError2, APath] =
-    Prism[PathError2, APath] {
-      case Case.PathNotFound(p) => Some(p)
-      case _ => None
-    } (PathNotFound)
-
-  val invalidPath: Prism[PathError2, (APath, String)] =
-    Prism[PathError2, (APath, String)] {
-      case Case.InvalidPath(p, r) => Some((p, r))
-      case _ => None
+  val invalidPath =
+    pPrism[PathError2, (APath, String)] {
+      case InvalidPath(p, r) => (p, r)
     } (InvalidPath.tupled)
 
   val errorPath: Lens[PathError2, APath] =
     Lens[PathError2, APath] {
-      case Case.PathExists(p)     => p
-      case Case.PathNotFound(p)   => p
-      case Case.InvalidPath(p, _) => p
+      case PathExists(p)     => p
+      case PathNotFound(p)   => p
+      case InvalidPath(p, _) => p
     } { p => {
-      case Case.PathExists(_)     => PathExists(p)
-      case Case.PathNotFound(_)   => PathNotFound(p)
-      case Case.InvalidPath(_, r) => InvalidPath(p, r)
+      case PathExists(_)     => pathExists(p)
+      case PathNotFound(_)   => pathNotFound(p)
+      case InvalidPath(_, r) => invalidPath(p, r)
     }}
 
   implicit val pathErrorShow: Show[PathError2] = {
@@ -80,13 +62,13 @@ object PathError2 {
       p => refineType(p).fold(κ("Dir"), κ("File"))
 
     Show.shows {
-      case Case.PathExists(p) =>
+      case PathExists(p) =>
         s"${typeStr(p)} already exists: ${posixCodec.printPath(p)}"
 
-      case Case.PathNotFound(p) =>
+      case PathNotFound(p) =>
         s"${typeStr(p)} not found: ${posixCodec.printPath(p)}"
 
-      case Case.InvalidPath(p, r) =>
+      case InvalidPath(p, r) =>
         s"${typeStr(p)} ${posixCodec.printPath(p)} is invalid: $r"
     }
   }

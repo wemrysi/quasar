@@ -42,44 +42,32 @@ object ManageFile {
     *     additional primitive operations for the conditional write operations.
     */
   object MoveSemantics {
-    object Case {
-      case object Overwrite extends MoveSemantics
-      case object FailIfExists extends MoveSemantics
-      case object FailIfMissing extends MoveSemantics
-    }
-
     /** Indicates the move operation should overwrite anything at the
       * destination, creating it if it doesn't exist.
       */
-    val Overwrite: MoveSemantics = Case.Overwrite
+    case object Overwrite extends MoveSemantics
 
     /** Indicates the move should (atomically, if possible) fail if the
       * destination exists.
       */
-    val FailIfExists: MoveSemantics = Case.FailIfExists
+    case object FailIfExists extends MoveSemantics
 
     /** Indicates the move should (atomically, if possible) fail unless
       * the destination exists, overwriting it otherwise.
       */
-    val FailIfMissing: MoveSemantics = Case.FailIfMissing
+    case object FailIfMissing extends MoveSemantics
 
-    val overwrite: Prism[MoveSemantics, Unit] =
-      Prism[MoveSemantics, Unit] {
-        case Case.Overwrite => Some(())
-        case _ => None
-      } (κ(Overwrite))
+    val overwrite = pPrism[MoveSemantics, Unit] {
+      case Overwrite => ()
+    } (κ(Overwrite))
 
-    val failIfExists: Prism[MoveSemantics, Unit] =
-      Prism[MoveSemantics, Unit] {
-        case Case.FailIfExists => Some(())
-        case _ => None
-      } (κ(FailIfExists))
+    val failIfExists = pPrism[MoveSemantics, Unit] {
+      case FailIfExists => ()
+    } (κ(FailIfExists))
 
-    val failIfMissing: Prism[MoveSemantics, Unit] =
-      Prism[MoveSemantics, Unit] {
-        case Case.FailIfMissing => Some(())
-        case _ => None
-      } (κ(FailIfMissing))
+    val failIfMissing = pPrism[MoveSemantics, Unit] {
+      case FailIfMissing => ()
+    } (κ(FailIfMissing))
   }
 
   sealed trait MoveScenario {
@@ -90,8 +78,8 @@ object ManageFile {
       f2f: (AFile, AFile) => X
     ): X =
       this match {
-        case Case.DirToDir(sd, dd)   => d2d(sd, dd)
-        case Case.FileToFile(sf, df) => f2f(sf, df)
+        case DirToDir(sd, dd)   => d2d(sd, dd)
+        case FileToFile(sf, df) => f2f(sf, df)
       }
 
     def src: APath
@@ -100,18 +88,10 @@ object ManageFile {
   }
 
   object MoveScenario {
-    object Case {
-      final case class DirToDir(src: ADir, dst: ADir)
+    final case class DirToDir private (src: ADir, dst: ADir)
         extends MoveScenario
-      final case class FileToFile(src: AFile, dst: AFile)
+    final case class FileToFile private (src: AFile, dst: AFile)
         extends MoveScenario
-    }
-
-    val DirToDir: (ADir, ADir) => MoveScenario =
-      Case.DirToDir(_, _)
-
-    val FileToFile: (AFile, AFile) => MoveScenario =
-      Case.FileToFile(_, _)
 
     val dirToDir: Prism[MoveScenario, (ADir, ADir)] =
       Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ(none)))(DirToDir.tupled)
@@ -145,11 +125,11 @@ object ManageFile {
 
     /** Move the `src` dir to `dst` dir, requesting the semantics described by `sem`. */
     def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): M[Unit] =
-      move(MoveScenario.DirToDir(src, dst), sem)
+      move(MoveScenario.dirToDir(src, dst), sem)
 
     /** Move the `src` file to `dst` file, requesting the semantics described by `sem`. */
     def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): M[Unit] =
-      move(MoveScenario.FileToFile(src, dst), sem)
+      move(MoveScenario.fileToFile(src, dst), sem)
 
     /** Rename the `src` file in the same directory. */
     def renameFile(src: AFile, name: String): M[AFile] = {

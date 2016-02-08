@@ -64,7 +64,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
       "open returns PathNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
         read.unsafe.open(dne, Natural._0, None).run map { r =>
-          r.toEither must beLeft(pathError(PathNotFound(dne)))
+          r.toEither must beLeft(pathError(pathNotFound(dne)))
         }
       }
 

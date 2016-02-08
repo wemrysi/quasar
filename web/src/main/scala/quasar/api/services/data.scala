@@ -96,9 +96,9 @@ object data {
         requiredHeader(Destination, req).map { destPathString =>
             val scenarioOrProblem = refineType(path).fold(
               src => parseAbsDir(destPathString.value).map(sandboxAbs).map(
-                dest => MoveScenario.DirToDir(src, dest)) \/> "Cannot move directory into a file",
+                dest => MoveScenario.dirToDir(src, dest)) \/> "Cannot move directory into a file",
               src => parseAbsFile(destPathString.value).map(sandboxAbs).map(
-                dest => MoveScenario.FileToFile(src, dest)) \/> "Cannot move a file into a directory, must specify destination precisely"
+                dest => MoveScenario.fileToFile(src, dest)) \/> "Cannot move a file into a directory, must specify destination precisely"
             )
             scenarioOrProblem.map{ scenario =>
               val response = M.move(scenario, MoveSemantics.FailIfExists).fold(fileSystemErrorResponse,_ => Created(""))

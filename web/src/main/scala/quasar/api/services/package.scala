@@ -46,9 +46,9 @@ package object services {
 
   def pathErrorResponse(error: PathError2): Task[Response] =
     error match {
-      case PathError2.Case.PathExists(path) => errorResponse(Conflict, s"${posixCodec.printPath(path)} already exists")
-      case PathError2.Case.PathNotFound(path) => errorResponse(NotFound, s"${posixCodec.printPath(path)} doesn't exist")
-      case PathError2.Case.InvalidPath(path, reason) => errorResponse(BadRequest, s"${posixCodec.printPath(path)} is an invalid path because $reason")
+      case PathError2.PathExists(path) => errorResponse(Conflict, s"${posixCodec.printPath(path)} already exists")
+      case PathError2.PathNotFound(path) => errorResponse(NotFound, s"${posixCodec.printPath(path)} doesn't exist")
+      case PathError2.InvalidPath(path, reason) => errorResponse(BadRequest, s"${posixCodec.printPath(path)} is an invalid path because $reason")
     }
 
   def errorResponse(

@@ -299,10 +299,10 @@ object InMemory {
   //----
 
   private def fsPathNotFound[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
-    pathError(PathNotFound(f)).left.point[InMemoryFs]
+    pathError(pathNotFound(f)).left.point[InMemoryFs]
 
   private def fsPathExists[A](f: AFile): InMemoryFs[FileSystemError \/ A] =
-    pathError(PathExists(f)).left.point[InMemoryFs]
+    pathError(pathExists(f)).left.point[InMemoryFs]
 
   private def moveDir(src: ADir, dst: ADir, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] =
     for {
@@ -310,11 +310,11 @@ object InMemory {
       sufxs =  m.keys.toStream.map(_ relativeTo src).unite
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
       r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
-      r1    =  r0 flatMap (_.nonEmpty either (()) or pathError(PathNotFound(src)))
+      r1    =  r0 flatMap (_.nonEmpty either (()) or pathError(pathNotFound(src)))
     } yield r1
 
   private def moveFile(src: AFile, dst: AFile, s: MoveSemantics): InMemoryFs[FileSystemError \/ Unit] = {
-    import MoveSemantics.Case._
+    import MoveSemantics._
 
     val move0: InMemoryFs[FileSystemError \/ Unit] = for {
       v <- fileL(src) <:= None
@@ -336,11 +336,11 @@ object InMemory {
       m  <- contentsL.st
       ss =  m.keys.toStream.map(_ relativeTo d).unite
       r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
-      r1 =  r0 flatMap (_.nonEmpty either (()) or pathError(PathNotFound(d)))
+      r1 =  r0 flatMap (_.nonEmpty either (()) or pathError(pathNotFound(d)))
     } yield r1
 
   private def deleteFile(f: AFile): InMemoryFs[FileSystemError \/ Unit] =
-    (fileL(f) <:= None) map (_.void \/> pathError(PathNotFound(f)))
+    (fileL(f) <:= None) map (_.void \/> pathError(pathNotFound(f)))
 
   //----
 
@@ -354,5 +354,5 @@ object InMemory {
     contentsL.st map (
       _.keys.toList.map(_ relativeTo d).unite.toNel
         .map(_ foldMap (f => firstSegmentName(f).toSet))
-        .toRightDisjunction(pathError(PathNotFound(d))))
+        .toRightDisjunction(pathError(pathNotFound(d))))
 }

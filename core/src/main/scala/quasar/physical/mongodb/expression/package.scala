@@ -198,9 +198,9 @@ package object expression {
     def const(bson: Bson): PlannerError \/ JsCore = {
       def js(l: Js.Lit) = \/-(jscore.Literal(l))
       bson match {
-        case Bson.Int64(n)        => js(Js.Num(n, false))
-        case Bson.Int32(n)        => js(Js.Num(n, false))
-        case Bson.Dec(x)          => js(Js.Num(x, true))
+        case Bson.Int64(n)        => js(Js.num(n))
+        case Bson.Int32(n)        => js(Js.num(n.toLong))
+        case Bson.Dec(x)          => js(Js.num(x))
         case Bson.Bool(v)         => js(Js.Bool(v))
         case Bson.Text(v)         => js(Js.Str(v))
         case Bson.Null            => js(Js.Null)

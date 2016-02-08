@@ -74,16 +74,15 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # NB: We cannot do this at the end because it would require us to clean the
   #     project which would remove the coverage information that Jenkins expects
   #     to find in the workspace after the build.
-  "$SBT" clean oneJar
+  "$SBT" clean oneJar doc
 
   # Save a copy of the "clean" oneJar, since running code coverage
   # will produce a "dirty" version:
   cp "$QUASAR_WEB_JAR_PATH" "$QUASAR_TEMP_JAR"
 
   # Build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} coverage doc test exclusive:test
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean coverage test exclusive:test
   "$SBT" coverageReport
-  "$SBT" coverageAggregate
 
   # Build completed, copy oneJar to right location:
   mkdir -p $QUASAR_WEB_JAR_DIR

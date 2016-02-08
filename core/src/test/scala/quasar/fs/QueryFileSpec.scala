@@ -48,7 +48,7 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
 
       "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
         Mem.interpret(query.descendantFiles(d)).eval(emptyMem)
-          .toEither must beLeft(pathError(PathNotFound(d)))
+          .toEither must beLeft(pathError(pathNotFound(d)))
       }}
     }
 

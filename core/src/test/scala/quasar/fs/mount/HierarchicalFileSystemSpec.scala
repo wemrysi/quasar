@@ -113,7 +113,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
   def failDueToInvalidPath[A](p: APath) =
     beLike[HierarchicalFileSystemError \/ (FileSystemError \/ A)] {
-      case \/-(-\/(PathError(Case.InvalidPath(p0, _)))) => p0 must_== p
+      case \/-(-\/(PathError(InvalidPath(p0, _)))) => p0 must_== p
     }
 
   def failDueToMultipleMnts[A] =

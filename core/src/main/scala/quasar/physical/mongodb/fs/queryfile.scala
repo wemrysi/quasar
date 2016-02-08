@@ -256,9 +256,9 @@ private final class QueryFileInterpreter[C](
   private def checkPathsExist(lp: Fix[LogicalPlan]): MongoLogWFR[Unit] = {
     def checkPathExists(p: QPath): MongoFsM[Unit] = for {
       coll <- EitherT.fromDisjunction[MongoDbIO](Collection.fromPath(p))
-                .leftMap(e => pathError(InvalidPath(p.asAPath, e.message)))
+                .leftMap(e => pathError(invalidPath(p.asAPath, e.message)))
       _    <- EitherT(MongoDbIO.collectionExists(coll)
-                .map(_ either (()) or pathError(PathNotFound(p.asAPath))))
+                .map(_ either (()) or pathError(pathNotFound(p.asAPath))))
     } yield ()
 
     EitherT[MongoLogWF, FileSystemError, Unit](

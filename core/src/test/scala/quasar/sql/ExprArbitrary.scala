@@ -172,8 +172,9 @@ trait ExprArbitrary {
 
   def constExprGen: Gen[Expr] =
     Gen.oneOf(
-      Gen.chooseNum(0, 100).flatMap(IntLiteral(_)),       // Note: negative numbers are parsed as Unop(-, _)
-      Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),  // Note: negative numbers are parsed as Unop(-, _)
+      // NB: negative numbers are parsed as Unop(-, _)
+      Gen.chooseNum(0, Long.MaxValue).flatMap(IntLiteral(_)),
+      Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),
       Gen.alphaStr.flatMap(StringLiteral(_)),
       // Note: only `'` gets special encoding; the rest should be accepted as is.
       for {
@@ -189,7 +190,7 @@ trait ExprArbitrary {
     * exponentially big.
     */
   private def smallNonEmptyListOf[A](gen: Gen[A]): Gen[List[A]] = {
-    def log2(x: Int): Int = (java.lang.Math.log(x)/java.lang.Math.log(2)).toInt
+    def log2(x: Int): Int = (java.lang.Math.log(x.toDouble)/java.lang.Math.log(2)).toInt
     for {
       sz <- Gen.size
       n  <- Gen.choose(1, log2(sz))
