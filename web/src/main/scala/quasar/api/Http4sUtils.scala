@@ -41,7 +41,7 @@ object Http4sUtils {
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
   //     will run indefinitely when started from a script.
-  private def waitForInput: Task[Unit] = {
+  def waitForInput: Task[Unit] = {
     import java.lang.System
     for {
       _    <- Task.delay(java.lang.Thread.sleep(250))
