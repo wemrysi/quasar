@@ -44,7 +44,7 @@ object Optimizer {
       case x => x.map(_._2)
     }
 
-  def simplifyƒ[T[_[_]]: Recursive: FunctorT]:
+  def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
       LogicalPlan[T[LogicalPlan]] => Option[LogicalPlan[T[LogicalPlan]]] = {
     case inv @ InvokeF(func, _) => func.simplify(inv)
     case LetF(ident, form, in) => form.project match {

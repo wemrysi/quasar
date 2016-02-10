@@ -18,7 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._
+import quasar.recursionschemes._, Recursive.ops._
 import quasar._, LogicalPlan._
 
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
@@ -56,7 +56,7 @@ trait SetLib extends Library {
   val Drop = Sifting("(OFFSET)", "Drops the first N elements from a set",
     Type.Top, Type.Top :: Type.Int :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
         case IsInvoke(_, List(set, ConstantF(Data.Int(n)))) if n == 0 =>
           set.some
         case _ => None
@@ -80,7 +80,7 @@ trait SetLib extends Library {
   val Filter = Sifting("WHERE", "Filters a set to include only elements where a projection is true",
     Type.Top, Type.Top :: Type.Bool :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(set, ConstantF(Data.True))) => set.some
           case _                                            => None
@@ -195,7 +195,7 @@ trait SetLib extends Library {
     "Removes the elements of the second set from the first set.",
     Type.Top, Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
         case IsInvoke(_, List(set, ConstantF(Data.Set(Nil)))) => set.some
         case _                                                => None
       }
@@ -203,16 +203,46 @@ trait SetLib extends Library {
     setTyper(partialTyper { case List(s1, _) => s1 }),
     setUntyper(t => success(t :: Type.Top :: Nil)))
 
+  // TODO: Handle “normal” functions without creating Funcs. They should be in
+  //       a separate functor and inlined prior to getting this far. It will
+  //       also allow us to make simplification non-Corecursive and ∴ operate
+  //       on Cofree.
   val In = Mapping(
     "(in)",
     "Determines whether a value is in a given set.",
     Type.Bool, Type.Top :: Type.AnySet :: Nil,
-    noSimplification,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive](orig: LogicalPlan[T[LogicalPlan]])(implicit T: Corecursive[T]) =
+        orig match {
+          case InvokeF(_, List(item, set)) => set.project match {
+            case ConstantF(Data.Set(_)) => Within(item, T.embed(StructuralLib.UnshiftArray(set))).some
+            case ConstantF(_)           => RelationsLib.Eq(item, set).some
+            case _                      => None
+          }
+          case _ => None
+        }
+    },
     partialTyper {
       case List(_,             Type.Const(Data.Set(Nil))) =>
         Type.Const(Data.Bool(false))
       case List(Type.Const(x), Type.Const(Data.Set(set))) =>
         Type.Const(Data.Bool(set.contains(x)))
+      case List(Type.Const(x), Type.Const(y))             =>
+        Type.Const(Data.Bool(x == y))
+      case List(_,             _)                         => Type.Bool
+    },
+    basicUntyper)
+
+  val Within = Mapping(
+    "within",
+    "Determines whether a value is in a given array.",
+    Type.Bool, Type.Top :: Type.AnyArray :: Nil,
+    noSimplification,
+    partialTyper {
+      case List(_,             Type.Const(Data.Arr(Nil))) =>
+        Type.Const(Data.Bool(false))
+      case List(Type.Const(x), Type.Const(Data.Arr(arr))) =>
+        Type.Const(Data.Bool(arr.contains(x)))
       case List(_,             _)                         => Type.Bool
     },
     basicUntyper)

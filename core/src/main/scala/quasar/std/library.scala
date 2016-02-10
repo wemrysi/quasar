@@ -25,7 +25,7 @@ import scalaz._, Scalaz._, Validation.{success, failure}
 
 trait Library {
   protected val noSimplification: Func.Simplifier = new Func.Simplifier {
-    def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
       None
   }
 

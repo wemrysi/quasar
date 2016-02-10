@@ -189,7 +189,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
         case Not => makeSimpleUnop(jscore.Not)
         case IsNull =>
           Arity1(BinOp(jscore.Eq, _, Literal(Js.Null)))
-        case In  =>
+        case In | Within =>
           Arity2((value, array) =>
             BinOp(jscore.Neq,
               Literal(Js.Num(-1, false)),
@@ -486,7 +486,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           List(there(0, here))))
         case (IsNull, _) => -\/(UnsupportedPlan(node, None))
 
-        case (In, _)  =>
+        case (In | Within, _)  =>
           relop(
             Selector.In.apply _,
             x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))

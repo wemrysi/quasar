@@ -83,7 +83,7 @@ trait MathLib extends Library {
   val Add = Mapping("(+)", "Adds two numeric or temporal values",
     MathAbs, MathAbs :: MathRel :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(x, ZeroF())) => x.some
           case IsInvoke(_, List(ZeroF(), x)) => x.some
@@ -112,7 +112,7 @@ trait MathLib extends Library {
   val Multiply = Mapping("(*)", "Multiplies two numeric values or one interval and one numeric value",
     MathRel, MathRel :: Type.Numeric :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(x, OneF())) => x.some
           case IsInvoke(_, List(OneF(), x)) => x.some
@@ -135,7 +135,7 @@ trait MathLib extends Library {
   val Power = Mapping("(^)", "Raises the first argument to the power of the second",
     Type.Numeric, Type.Numeric :: Type.Numeric :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(x, OneF())) => x.some
           case _                            => None
@@ -160,7 +160,7 @@ trait MathLib extends Library {
   val Subtract = Mapping("(-)", "Subtracts two numeric or temporal values",
     MathAbs, MathAbs :: MathAbs :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(x, ZeroF())) => x.some
           case InvokeF(_, List(c, x)) => c.project match {
@@ -194,7 +194,7 @@ trait MathLib extends Library {
   val Divide = Mapping("(/)", "Divides one numeric or interval value by another (non-zero) numeric value",
     MathRel, MathAbs :: MathRel :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(x, OneF())) => x.some
           case _                            => None
