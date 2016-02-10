@@ -18,7 +18,6 @@ package quasar.api
 
 import quasar.Predef._
 import quasar.Data
-import quasar.Errors.flatten
 import quasar.fs.{Path => QPath, _}
 
 import org.http4s._
