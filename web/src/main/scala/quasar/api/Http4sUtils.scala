@@ -36,13 +36,8 @@ import shapeless.nat._
 
 object Http4sUtils {
 
-//  sealed trait BindingType
-//  case object HTTP extends BindingType
-//  case object Local extends BindingType
-
   final case class ServerBlueprint(port: Int,
                                    idleTimeout: Duration,
-                                   //bindingType: BindingType,
                                    svcs: Map[String, HttpService])
 
   // Lifted from unfiltered.
