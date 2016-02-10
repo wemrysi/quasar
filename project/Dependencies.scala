@@ -5,7 +5,7 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
-  private val scalazVersion  = "7.1.7"
+  private val scalazVersion  = "7.1.4"
   private val slcVersion     = "0.4"
   private val monocleVersion = "1.1.1"
   private val pathyVersion   = "0.0.3"

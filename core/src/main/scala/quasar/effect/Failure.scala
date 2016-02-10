@@ -27,11 +27,6 @@ import scalaz.syntax.show._
   *
   * @tparam E the reason/error describing why the computation failed
   */
-
-/** Provides the ability to indicate a computation has failed.
-  *
-  * @tparam E the reason/error describing why the computation failed
-  */
 sealed trait Failure[E, A]
 
 object Failure {
@@ -57,6 +52,10 @@ object Failure {
 
     def unattempt[A](fa: F[E \/ A]): F[A] =
       fa.flatMap(_.fold(fail, _.point[F]))
+
+    val unattemptT: EitherT[F, E, ?] ~> F = new (EitherT[F, E, ?] ~> F) {
+      def apply[A](v: EitherT[F, E, A]): F[A] = unattempt(v.run)
+    }
 
     ////
 

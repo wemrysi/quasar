@@ -18,14 +18,15 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.SKI._
-import quasar.api.AsPath
+import quasar.api._
+import quasar.fp.prism._
 import quasar.fs._
 import quasar.fs.mount._
 
 import scala.math.Ordering
 
 import argonaut._, Argonaut._
-import org.http4s._, argonaut._, dsl._
+import org.http4s._, dsl._
 import org.http4s.server.HttpService
 import pathy.Path._
 import scalaz._, concurrent.Task
@@ -64,7 +65,7 @@ object metadata {
       jdecode3L(FsNode.apply)("name", "type", "mount")
   }
 
-  def service[S[_]: Functor](f: S ~> Task)(implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): HttpService = {
+  def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: Mounting.Ops[S]): QHttpService[S] = {
     val mountType: MountConfig2 => String = {
       case ViewConfig(_, _)         => "view"
       case FileSystemConfig(typ, _) => typ.value
@@ -75,19 +76,20 @@ object metadata {
         .run.map(cfg => FsNode(name, cfg map mountType))
         .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Q.F[Task[Response]] =
-      Q.ls(d).flatMap(_.toList.traverse(mkNode(d, _))).fold(
-        fileSystemErrorResponse,
-        nodes => Ok(Json.obj("children" := nodes.sorted)))
+    def dirMetadata(d: ADir): Free[S, QuasarResponse[S]] = respond(
+      Q.ls(d)
+        .flatMap(_.toList.traverse(mkNode(d, _)))
+        .map(nodes => Json.obj("children" := nodes.toList.sorted))
+        .run)
 
-    def fileMetadata(f: AFile): Q.F[Task[Response]] =
-      Q.fileExists(f).fold(
-        fileSystemErrorResponse,
-        _ ? Ok(Json.obj()) | NotFound(Json("error" := s"File not found: ${posixCodec.printPath(f)}")))
+    def fileMetadata(f: AFile): Free[S, QuasarResponse[S]] = respond(
+      Q.fileExists(f)
+        .map(_ either Json() or PathError2.pathNotFound(f))
+        .run)
 
-    HttpService {
+    QHttpService {
       case GET -> AsPath(path) =>
-        refineType(path).fold(dirMetadata, fileMetadata).foldMap(f).join
+        refineType(path).fold(dirMetadata, fileMetadata)
     }
   }
 }

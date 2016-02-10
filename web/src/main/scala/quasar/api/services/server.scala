@@ -41,11 +41,12 @@ object server {
   def service(defaultPort: Int, restart: Int => Task[Unit]): HttpService = HttpService {
     case GET -> Root / "info" =>
       Ok(nameAndVersionInfo)
+
     case req @ PUT -> Root / "port" =>
       req.as[String].flatMap(body =>
         body.parseInt.fold(
           e => BadRequest(e.getMessage),
-          portNum => Server.unavailableReason(portNum).run.flatMap { possibleReason =>
+          portNum => Http4sUtils.unavailableReason(portNum).run.flatMap { possibleReason =>
             possibleReason.map{ reason =>
               PreconditionFailed(s"Could not restart server on new port because $reason")
             }.getOrElse {
@@ -56,6 +57,7 @@ object server {
           }
         )
       )
+
     case DELETE -> Root / "port" =>
       restart(defaultPort) *> Ok("Reverted to default port " + defaultPort)
   }
