@@ -36,9 +36,7 @@ import shapeless.nat._
 
 object Http4sUtils {
 
-  final case class ServerBlueprint(port: Int,
-                                   idleTimeout: Duration,
-                                   svcs: Map[String, HttpService])
+  final case class ServerBlueprint(port: Int, idleTimeout: Duration, svc: HttpService)
 
   // Lifted from unfiltered.
   // NB: available() returns 0 when the stream is closed, meaning the server
@@ -90,24 +88,12 @@ object Http4sUtils {
     * @param flexibleOnPort Whether or not to choose an alternative port if requested port is not available
     * @return Server that has been started along with the port on which it was started
     */
-  def startServerFromBlueprint(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
+  def startServer(blueprint: ServerBlueprint, flexibleOnPort: Boolean): Task[(Http4sServer, Int)] = {
     for {
       actualPort <- if (flexibleOnPort) choosePort(blueprint.port) else Task.now(blueprint.port)
-      builder = BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0")
-      server <- startServer(blueprint.svcs, builder)
+      builder    =  BlazeBuilder.withIdleTimeout(blueprint.idleTimeout).bindHttp(actualPort, "0.0.0.0")
+      server     <- builder.mountService(blueprint.svc).start
     } yield (server, actualPort)
-  }
-
-  /** Start `Server` of services with supplied `ServerBuilder`
-    * @param services Map of `HttpService` indexed by where to mount them
-    * @return A running `org.http4s.server.Server`
-    */
-  def startServer(services: Map[String, HttpService], builder: ServerBuilder): Task[Http4sServer] = {
-    val builderAll = services.toList.reverse.foldLeft(builder) {
-      // TODO: Consider getting rid of Prefix in favor of http4s prefix
-      case (b, (path, svc)) => b.mountService(Prefix(path)(svc))
-    }
-    Task.delay(builderAll.run)
   }
 
   /** Given a `Process` of [[ServerBlueprint]], returns a `Process` of `Server`.
@@ -123,7 +109,7 @@ object Http4sUtils {
   def servers(configurations: Process[Task, ServerBlueprint], flexibleOnPort: Boolean): Process[Task, (Http4sServer,Int)] = {
 
     val serversAndPort = configurations.evalMap(conf =>
-      startServerFromBlueprint(conf, flexibleOnPort).onSuccess { case (_, port) =>
+      startServer(conf, flexibleOnPort).onSuccess { case (_, port) =>
         stdout("Server started listening on port " + port) })
 
     serversAndPort.evalScan1 { case ((oldServer, oldPort), newServerAndPort) =>
@@ -138,18 +124,20 @@ object Http4sUtils {
 
   /** Produce a stream of servers that can be restarted on a supplied port
     * @param initialPort The port on which to start the initial server
-    * @param produceRoutes A function that given a function to restart a server on a new port, supplies a server mapping
-    *                      from path to `Server`
+    * @param produceService A function that given a function to restart a server on a new port,
+    *                       returns an `HttpService`
     * @return The `Task` will start the first server and provide a function to shutdown the active server.
     *         It will also return a process of servers and ports. This `Process` must be run in order for servers
     *         to actually be started and stopped. The `Process` must be run to completion in order for appropriate
     *         clean up to occur.
     */
-  def startServers(initialPort: Int,
-                   produceRoutes: (Int => Task[Unit]) => Map[String, HttpService]): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
+  def startServers(
+    initialPort: Int,
+    produceService: (Int => Task[Unit]) => HttpService
+  ): Task[(Process[Task, (Http4sServer,Int)], Task[Unit])] = {
     val configQ = async.boundedQueue[ServerBlueprint](1)
     def startNew(port: Int): Task[Unit] = {
-      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceRoutes(startNew))
+      val conf = ServerBlueprint(port, idleTimeout = Duration.Inf, produceService(startNew))
       configQ.enqueueOne(conf)
     }
     startNew(initialPort).flatMap(_ => servers(configQ.dequeue, false).unconsOption.map {
@@ -158,8 +146,8 @@ object Http4sUtils {
     })
   }
 
-  def startAndWait(port: Int, routes: (Int => Task[Unit]) => Map[String, HttpService], openClient: Boolean): Task[Unit] = for {
-    result <- startServers(port, routes)
+  def startAndWait(port: Int, service: (Int => Task[Unit]) => HttpService, openClient: Boolean): Task[Unit] = for {
+    result <- startServers(port, service)
     (servers, shutdown) = result
     _ <- if(openClient) openBrowser(port) else Task.now(())
     _ <- stdout("Press Enter to stop.")

@@ -38,15 +38,7 @@ class RestApiSpecs extends Specification {
   type Eff0[A] = Coproduct[FileSystemFailureF, MountingFileSystem, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
 
-  def compositeService(serviceMap: Map[String,HttpService]) = HttpService {
-    case req =>
-      serviceMap.keys.find{req.uri.renderString.startsWith(_)}.map{key =>
-        serviceMap(key)(req)
-      }.getOrElse(NotFound())
-  }
-
   "OPTIONS" should {
-    val restApi = RestApi(8888,_ => Task.now(()))
     val mount = new (Mounting ~> Task) {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
@@ -55,8 +47,9 @@ class RestApiSpecs extends Specification {
       NaturalTransformation.refl,
       Coyoneda.liftTF[FileSystemFailure, Task](Failure.toTaskFailure[FileSystemError]),
       fs)
-    val serviceMap = restApi.httpServices(liftMT[Task, ResponseT].compose[Eff](eff))
-    val service = compositeService(serviceMap)
+    val service = RestApi.finalizeServices[Eff](
+      liftMT[Task, ResponseT].compose[Eff](eff))(
+      RestApi.coreServices[Eff], Map())
 
     def testAdvertise(path: String,
                       additionalHeaders: List[Header],
