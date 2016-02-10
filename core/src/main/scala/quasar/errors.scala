@@ -22,7 +22,6 @@ import quasar.fp._
 import scalaz._
 import scalaz.concurrent._
 import scalaz.syntax.monad._
-import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 object Errors {
@@ -50,12 +49,6 @@ object Errors {
   def liftE[E]: (Task ~> ETask[E, ?]) = {
     type G[F[_], A] = EitherT[F, E, A]
     liftMT[Task, G]
-  }
-
-  /** Flatten by inserting the `E` into the failure case of `Task` */
-  def flatten[E:Show] = new (ETask[E,?] ~> Task) {
-    def apply[A](t: ETask[E,A]): Task[A] =
-      t.fold(e => Task.fail(new RuntimeException(e.shows)), Task.now).join
   }
 
   /** Given a function A => B, returns a natural transformation from
