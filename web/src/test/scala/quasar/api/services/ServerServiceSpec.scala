@@ -40,7 +40,7 @@ class ServerServiceSpec extends Specification {
                                       (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
     val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
-    val servers = Http4sUtils.startServers(initialPort, reload => ListMap("" -> server.service(defaultPort,reload)))
+    val servers = Http4sUtils.startServers(initialPort, reload => server.service(defaultPort, reload))
 
     (for {
       result <- servers

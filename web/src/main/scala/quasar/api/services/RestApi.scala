@@ -29,16 +29,14 @@ import scala.collection.immutable.ListMap
 import org.http4s
 import org.http4s.Request
 import org.http4s.dsl._
-import org.http4s.server.{middleware, HttpService}
-import org.http4s.server.middleware.{CORS, GZip}
-import org.http4s.server.syntax.ServiceOps
+import org.http4s.server.{HttpService, HttpMiddleware}
+import org.http4s.server.middleware.{CORS, CORSConfig, GZip}
+import org.http4s.server.syntax._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
-  import RestApi._
-
-  def httpServices[S[_]: Functor](f: S ~> ResponseOr)
+object RestApi {
+  def coreServices[S[_]: Functor]
       (implicit
         S0: Task :<: S,
         S1: ReadFileF :<: S,
@@ -47,44 +45,61 @@ final case class RestApi(defaultPort: Int, restart: Int => Task[Unit]) {
         S4: MountingF :<: S,
         S5: QueryFileF :<: S,
         S6: FileSystemFailureF :<: S
-      ): Map[String, HttpService] =
-    AllServices[S].mapValues(qsvc =>
-      qsvc.toHttpService(f)
-    ) ++ ListMap(
+      ): Map[String, QHttpService[S]] =
+    ListMap(
+      "/compile/fs"  -> query.compile.service[S],
+      "/data/fs"     -> data.service[S],
+      "/metadata/fs" -> metadata.service[S],
+      "/mount/fs"    -> mount.service[S],
+      "/query/fs"    -> query.execute.service[S]
+    )
+
+  def additionalServices(
+    defaultPort: Int,
+    restart: Int => Task[Unit]
+  ): Map[String, HttpService] =
+    ListMap(
       "/server"  -> server.service(defaultPort, restart),
       "/welcome" -> welcome.service
-    ) mapValues withDefaultMiddleware
-
-  def AllServices[S[_]: Functor]
-      (implicit
-        S0: Task :<: S,
-        S1: ReadFileF :<: S,
-        S2: WriteFileF :<: S,
-        S3: ManageFileF :<: S,
-        S4: MountingF :<: S,
-        S5: QueryFileF :<: S,
-        S6: FileSystemFailureF :<: S
-      ): ListMap[String, QHttpService[S]] =
-    ListMap(
-      "/compile/fs"   -> query.compile.service[S],
-      "/data/fs"      -> data.service[S],
-      "/metadata/fs"  -> metadata.service[S],
-      "/mount/fs"     -> mount.service[S],
-      "/query/fs"     -> query.execute.service[S]
     )
-}
 
-object RestApi {
-  def withDefaultMiddleware(service: HttpService): HttpService =
-    cors(GZip(HeaderParam(service orElse HttpService {
-      case req if req.method == OPTIONS => Ok()
-    })))
+  /** Converts `QHttpService`s into `HttpService`s and mounts them along with
+    * any additional `HttpService`s provided, applying the default middleware
+    * to the result.
+    *
+    * TODO: Is using `Prefix` necessary? Can we replace with
+    *       `org.http4s.server.Router` instead?
+    */
+  def finalizeServices[S[_]: Functor](
+    f: S ~> ResponseOr)(
+    qsvcs: Map[String, QHttpService[S]],
+    hsvcs: Map[String, HttpService]
+  ): HttpService = {
+    val allSvcs = qsvcs.mapValues(_.toHttpService(f)) ++ hsvcs
+    // Sort by prefix length so that foldLeft results in routes procesed in
+    // descending order (longest first), this ensures that something mounted
+    // at `/a/b/c` is consulted before a mount at `/a/b`.
+    defaultMiddleware(allSvcs.toList.sortBy(_._1.length).foldLeft(HttpService.empty) {
+      case (acc, (path, svc)) => Prefix(path)(svc) orElse acc
+    })
+  }
 
-  def cors(svc: HttpService): HttpService =
-    CORS(svc, middleware.CORSConfig(
+  def defaultMiddleware: HttpMiddleware =
+    cors <<< gzip <<< HeaderParam <<< passOptions
+
+  val cors: HttpMiddleware =
+    CORS(_, CORSConfig(
       anyOrigin = true,
       allowCredentials = false,
       maxAge = 20.days.toSeconds,
       allowedMethods = Some(Set("GET", "PUT", "POST", "DELETE", "MOVE", "OPTIONS")),
       allowedHeaders = Some(Set(Destination.name.value)))) // NB: actually needed for POST only
+
+  val gzip: HttpMiddleware =
+    GZip(_)
+
+  val passOptions: HttpMiddleware =
+    _ orElse HttpService {
+      case req if req.method == OPTIONS => Ok()
+    }
 }

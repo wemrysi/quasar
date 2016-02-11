@@ -412,8 +412,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
             }
             def service: HttpService = data.service[Eff].toHttpService(effRespOr(failInter))
-            val serverBlueprint = Http4sUtils.ServerBlueprint(port, scala.concurrent.duration.Duration.Inf,ListMap("" -> service))
-            val (server, _) = Http4sUtils.startServerFromBlueprint(serverBlueprint,true).run
+            val serverBlueprint = Http4sUtils.ServerBlueprint(port, scala.concurrent.duration.Duration.Inf, service)
+            val (server, _) = Http4sUtils.startServer(serverBlueprint, true).run
             val client = org.http4s.client.blaze.defaultClient
             val response = client(request).onFinish(_ => server.shutdown.void).run
             response.status must_== Status.InternalServerError

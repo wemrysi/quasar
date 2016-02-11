@@ -35,7 +35,8 @@ import java.lang.System
 import argonaut.{CodecJson, EncodeJson}
 import monocle.Lens
 import org.http4s
-import org.http4s.server.{Server => Http4sServer, HttpService}
+import org.http4s.server.{Server => Http4sServer, HttpService, Router}
+import org.http4s.server.syntax._
 import org.http4s.server.blaze.BlazeBuilder
 import scalaz.{Failure => _, Lens => _, _}
 import scalaz.syntax.monad._
@@ -289,22 +290,35 @@ object Server {
                     .map(some))
   } yield QuasarConfig(content.toList, redirect, opts.port, cfgPath, opts.openClient)
 
-  def startWebServer(initialPort: Int,
-                     staticContent: List[StaticContent],
-                     redirect: Option[String],
-                     openClient: Boolean,
-                     eval: ApiEff ~> ResponseOr) = {
-    val produceRoutes = (reload: (Int => Task[Unit])) =>
-                      fullServer(RestApi(initialPort, reload).httpServices(eval), staticContent, redirect)
-    startAndWait(initialPort, produceRoutes, openClient)
+  def nonApiService(
+    staticContent: List[StaticContent],
+    redirect: Option[String]
+  ): HttpService = {
+    val redirSvc = redirectService(redirect getOrElse "/welcome")
+
+    val staticRoutes = staticContent map {
+      case StaticContent(loc, path) => loc -> staticFileService(path)
+    }
+
+    Router(staticRoutes ::: List("/" -> redirSvc): _*)
   }
 
-  def fullServer(services: Map[String, HttpService],
-                 staticContent: List[StaticContent],
-                 redirect: Option[String]): Map[String, HttpService] = {
-    services ++
-    staticContent.map { case StaticContent(loc, path) => loc -> staticFileService(path) }.toListMap ++
-    ListMap("/" -> redirectService(redirect.getOrElse("/welcome")))
+  def startWebServer(
+    initialPort: Int,
+    staticContent: List[StaticContent],
+    redirect: Option[String],
+    openClient: Boolean,
+    eval: ApiEff ~> ResponseOr
+  ): Task[Unit] = {
+    import RestApi._
+
+    val produceSvc = (reload: Int => Task[Unit]) =>
+      finalizeServices(eval)(
+        coreServices[ApiEff],
+        additionalServices(initialPort, reload)
+      ) orElse nonApiService(staticContent, redirect)
+
+    startAndWait(initialPort, produceSvc, openClient)
   }
 
   def main(args: Array[String]): Unit = {
@@ -318,7 +332,13 @@ object Server {
       cfgRef      <- TaskRef(config).liftM[MainErrT]
       apiWithPersistence = configsWithPersistence(cfgRef, qConfig.configPath) compose api
       _           <- EitherT(mountAll(config.mountings) foldMap (configsAsState compose api))
-      _           <- startWebServer(updConfig.server.port, qConfig.staticContent, qConfig.redirect, qConfig.openClient, liftMT[Task, ResponseT] compose apiWithPersistence).liftM[MainErrT]
+      _           <- startWebServer(
+                       updConfig.server.port,
+                       qConfig.staticContent,
+                       qConfig.redirect,
+                       qConfig.openClient,
+                       liftMT[Task, ResponseT] compose apiWithPersistence
+                     ).liftM[MainErrT]
     } yield ()
 
     logErrors(exec).run
