@@ -2,7 +2,7 @@
     "mountings": {
         "/": {
             "mongodb": {
-                "connectionUri": "mongodb://slamengine:slamengine@ds045089.mongolab.com:45089/slamengine-test-01"
+                "connectionUri": "mongodb://localhost:27018"
             }
         }
     },
