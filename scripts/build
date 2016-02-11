@@ -13,7 +13,6 @@ source "$(dirname $0)/constants"
 
 echo "Script Path:   $SCRIPT_DIR"
 echo "Root Path:     $WS_DIR"
-echo "Temp Path:     $TEMP_DIR"
 echo "Version:       $QUASAR_VERSION"
 echo "Web Jar:       $QUASAR_WEB_JAR"
 echo "Web Jar Dir:   $QUASAR_WEB_JAR_DIR"
@@ -21,8 +20,6 @@ echo "Web Jar Path:  $QUASAR_WEB_JAR_PATH"
 echo "REPL Jar:      $QUASAR_REPL_JAR"
 echo "REPL Jar Dir:  $QUASAR_REPL_JAR_DIR"
 echo "REPL Jar Path: $QUASAR_REPL_JAR_PATH"
-
-QUASAR_TEMP_JAR="$TEMP_DIR/$QUASAR_WEB_JAR"
 
 QUASAR_MONGODB_TESTDB="quasar-test"
 QUASAR_MONGODB_HOST_2_6="localhost:27018"
@@ -64,29 +61,10 @@ if [[ ${LOCAL_MONGODB:-} == "true" ]] ; then
 fi
 
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
-  rm -rf "$TEMP_DIR"
-  mkdir -p "$TEMP_DIR"
-
-  # Require that all header comments are present before proceeding:
-  "$SBT" checkHeaders
-
-  # Build the pristine JAR without coverage:
-  # NB: We cannot do this at the end because it would require us to clean the
-  #     project which would remove the coverage information that Jenkins expects
-  #     to find in the workspace after the build.
-  "$SBT" clean oneJar doc
-
-  # Save a copy of the "clean" oneJar, since running code coverage
-  # will produce a "dirty" version:
-  cp "$QUASAR_WEB_JAR_PATH" "$QUASAR_TEMP_JAR"
-
-  # Build and run all tests everywhere (including integration)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean coverage test exclusive:test
-  "$SBT" coverageReport
-
-  # Build completed, copy oneJar to right location:
-  mkdir -p $QUASAR_WEB_JAR_DIR
-  cp $QUASAR_TEMP_JAR $QUASAR_WEB_JAR_PATH
+  # Require that all header comments are present before proceeding, then
+  # build and run all tests everywhere (including integration) and then re-compile without coverage
+  # in order to get a jar that does not contain instrumentation. Generate doc.
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean checkHeaders coverage test exclusive:test coverageReport "set coverageEnabled := false" oneJar doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -96,5 +74,6 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 
   exit $TEST_STATUS
 else
+  # Not the first job in Travis (no sense generating a jar and doc on all of them)
   "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} test exclusive:test
 fi
