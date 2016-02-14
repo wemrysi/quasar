@@ -146,7 +146,20 @@ class SQLParser extends StandardTokenParsers {
       Select(SelectAll, List(Proj(Splice(None), None)), r, Not(f).some, None, None)
     }
 
-  def query = delete | select
+  def insert: Parser[Expr] =
+    keyword("insert") ~> keyword("into") ~> relations ~ (
+      keyword("values") ~> rep1sep(or_expr, op(",")) ^^ (SetLiteral(_)) |
+        set_list ~ keyword("values") ~ rep1sep(set_list, op(",")) ^^ {
+          case keys ~ _ ~ valueses =>
+            SetLiteral(valueses ∘ (vs => MapLiteral(keys zip vs)))
+        }) ^^ {
+      case orig ~ inserted =>
+        Union(
+          inserted,
+          Select(SelectAll, List(Proj(Splice(None), None)), orig, None, None, None))
+    }
+
+  def query = delete | insert | select
 
   def projections: Parser[List[Proj[Expr]]] =
     repsep(projection, op(",")).map(_.toList)
@@ -297,10 +310,12 @@ class SQLParser extends StandardTokenParsers {
 
   def wildcard: Parser[Expr] = op("*") ^^^ Splice(None)
 
+  def set_list: Parser[List[Expr]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
+
   def primary_expr: Parser[Expr] =
     case_expr |
     unshift_expr |
-    op("(") ~> repsep(expr, op(",")) <~ op(")") ^^ {
+    set_list ^^ {
       case Nil      => SetLiteral(Nil)
       case x :: Nil => x
       case xs       => SetLiteral(xs)

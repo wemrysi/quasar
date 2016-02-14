@@ -218,6 +218,32 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       parser.parse("""SELECT * FROM zips WHERE zips.isNormalized = TRUE AND zips.isFruityFlavored = FALSE""").toOption should beSome
     }
 
+    "parse “full-value” insert expression" in {
+      parser.parse("insert into zips values 1, 2, 3") should
+      beRightDisjOrDiff(
+        Union(
+          SetLiteral(List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
+          Select(
+            SelectAll,
+            List(Proj(Splice(None), None)),
+            Some(TableRelationAST("zips",None)),
+            None, None, None)))
+    }
+
+    "parse “keyed” insert expression" in {
+      parser.parse("insert into zips ('a', 'b') values (1, 2), (3, 4)") should
+      beRightDisjOrDiff(
+        Union(
+          SetLiteral(List(
+            MapLiteral(List(StringLiteral("a") -> IntLiteral(1), StringLiteral("b") -> IntLiteral(2))),
+            MapLiteral(List(StringLiteral("a") -> IntLiteral(3), StringLiteral("b") -> IntLiteral(4))))),
+          Select(
+            SelectAll,
+            List(Proj(Splice(None), None)),
+            Some(TableRelationAST("zips",None)),
+            None, None, None)))
+    }
+
     "parse numeric literals" in {
       parser.parse("select 1, 2.0, 3000000, 2.998e8, -1.602E-19, 1e+6") should beRightDisjunction
     }
