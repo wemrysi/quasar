@@ -47,6 +47,9 @@ class SQLParser extends StandardTokenParsers {
   class SqlLexical extends StdLexical with RegexParsers {
     override type Elem = super.Elem
 
+    case class QuotedIdentifier(chars: String) extends Token {
+      override def toString = chars
+    }
     case class FloatLit(chars: String) extends Token {
       override def toString = chars
     }
@@ -55,9 +58,6 @@ class SQLParser extends StandardTokenParsers {
     }
 
     override def token: Parser[Token] = variParser | numLitParser | charLitParser | stringLitParser | quotedIdentParser | super.token
-
-    override protected def processIdent(name: String) =
-      if (reserved contains name.toLowerCase) Keyword(name.toLowerCase) else Identifier(name)
 
     def identifierString: Parser[String] =
       ((letter | elem('_')) ~ rep(digit | letter | elem('_'))) ^^ {
@@ -90,32 +90,22 @@ class SQLParser extends StandardTokenParsers {
     def stringLitParser: Parser[Token] = delimitedString('"') ^^ (StringLit(_))
 
     def quotedIdentParser: Parser[Token] =
-      delimitedString('`') ^^ (Identifier(_))
+      delimitedString('`') ^^ (QuotedIdentifier(_))
 
     override def whitespace: Parser[Any] = rep(
       whitespaceChar |
       '/' ~ '*' ~ comment |
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
-      '/' ~ '*' ~ failure("unclosed comment")
-    )
+      '/' ~ '*' ~ failure("unclosed comment"))
 
     override protected def comment: Parser[Any] = (
       '*' ~ '/'  ^^ κ(' ') |
-      chrExcept(EofCh) ~ comment
-    )
+      chrExcept(EofCh) ~ comment)
   }
 
   override val lexical = new SqlLexical
 
   def floatLit: Parser[String] = elem("decimal", _.isInstanceOf[lexical.FloatLit]) ^^ (_.chars)
-
-  ignore(lexical.reserved += (
-    "all", "and", "as", "asc", "between", "by", "case", "cross", "date", "delete", "desc", "distinct",
-    "else", "end", "escape", "except", "exists", "false", "for", "from", "full", "group", "having", "in",
-    "inner", "insert", "intersect", "interval", "into", "is", "join", "left", "like", "limit", "not", "null",
-    "offset", "oid", "on", "or", "order", "outer", "right", "select", "then", "time",
-    "timestamp", "true", "union", "update", "when", "where"
-  ))
 
   ignore(lexical.delimiters += (
     "*", "+", "-", "%", "^", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
@@ -124,9 +114,10 @@ class SQLParser extends StandardTokenParsers {
     "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]"))
 
   override def keyword(name: String): Parser[String] =
-    if (lexical.reserved.contains(name))
-      elem("keyword '" + name + "'", v => v.chars == name && v.isInstanceOf[lexical.Keyword]) ^^ (_.chars)
-    else failure("You are trying to parse \""+name+"\" as a keyword, but it is not contained in the reserved keywords list")
+    elem("keyword '" + name + "'", v => v.isInstanceOf[lexical.Identifier] && v.chars.toLowerCase == name) ^^ (κ(name))
+
+  override def ident: Parser[String] =
+    super.ident | elem("quotedIdent", _.isInstanceOf[lexical.QuotedIdentifier]) ^^ (_.chars)
 
   def op(op : String): Parser[String] =
     if (lexical.delimiters.contains(op)) elem("operator '" + op + "'", v => v.chars == op && v.isInstanceOf[lexical.Keyword]) ^^ (_.chars)
@@ -290,27 +281,14 @@ class SQLParser extends StandardTokenParsers {
   }
 
   def unary_operator: Parser[UnaryOperator] =
-    op("+")              ^^^ Positive |
-    op("-")              ^^^ Negative |
-    keyword("distinct")  ^^^ Distinct |
-    keyword("date")      ^^^ ToDate |
-    keyword("time")      ^^^ ToTime |
-    keyword("timestamp") ^^^ ToTimestamp |
-    keyword("interval")  ^^^ ToInterval |
-    keyword("oid")       ^^^ ToId
+    op("+")           ^^^ Positive |
+    op("-")           ^^^ Negative |
+    keyword("distinct") ^^^ Distinct
 
   def wildcard: Parser[Expr] = op("*") ^^^ Splice(None)
 
   def primary_expr: Parser[Expr] =
-    variable |
-    literal |
-    wildcard |
-    ident ~ (op("(") ~> repsep(expr, op(",")) <~ op(")")) ^^ {
-      case a ~ xs => InvokeFunction(a, xs)
-    } |
-    ident ^^ (Ident(_)) |
-    array_literal |
-    map_literal |
+    case_expr |
     unshift_expr |
     op("(") ~> repsep(expr, op(",")) <~ op(")") ^^ {
       case Nil      => SetLiteral(Nil)
@@ -322,22 +300,34 @@ class SQLParser extends StandardTokenParsers {
     } |
     keyword("not")        ~> cmp_expr ^^ Not |
     keyword("exists")     ~> cmp_expr ^^ Exists |
-    case_expr
+    ident ~ (op("(") ~> repsep(expr, op(",")) <~ op(")")) ^^ {
+      case a ~ xs => InvokeFunction(a, xs)
+    } |
+    variable |
+    literal |
+    wildcard |
+    array_literal |
+    map_literal |
+    ident ^^ (Ident(_))
+
+  def cases: Parser[List[Case[Expr]] ~ Option[Expr]] =
+    rep1(keyword("when") ~> expr ~ keyword("then") ~ expr ^^ { case a ~ _ ~ b => Case(a, b) }) ~
+      opt(keyword("else") ~> expr) <~ keyword("end")
 
   def case_expr: Parser[Expr] =
-    keyword("case") ~>
-      opt(expr) ~ rep1(keyword("when") ~> expr ~ keyword("then") ~ expr ^^ { case a ~ _ ~ b => Case(a, b) }) ~
-      opt(keyword("else") ~> expr) <~ keyword("end") ^^ {
-      case Some(e) ~ cases ~ default => Match(e, cases, default)
-      case None ~ cases ~ default => Switch(cases, default)
-    }
+    keyword("case") ~> cases ^^ {
+      case cases ~ default => Switch(cases, default)
+    } |
+      keyword("case") ~> expr ~ cases ^^ {
+        case e ~ (cases ~ default) => Match(e, cases, default)
+      }
 
   def literal: Parser[Expr] =
-    numericLit ^^ { case i => IntLiteral(i.toLong) } |
-    floatLit ^^ { case f => FloatLiteral(f.toDouble) } |
-    stringLit ^^ { case s => StringLiteral(s) } |
-    keyword("null") ^^^ NullLiteral() |
-    keyword("true") ^^^ BoolLiteral(true) |
+    numericLit        ^^ (i => IntLiteral(i.toLong) ) |
+    floatLit          ^^ (f => FloatLiteral(f.toDouble) ) |
+    stringLit         ^^ (StringLiteral(_)) |
+    keyword("null")  ^^^ NullLiteral() |
+    keyword("true")  ^^^ BoolLiteral(true) |
     keyword("false") ^^^ BoolLiteral(false)
 
   def from: Parser[Option[SqlRelation[Expr]]] =
@@ -371,11 +361,11 @@ class SQLParser extends StandardTokenParsers {
     } | keyword("inner") ^^^ (InnerJoin)
 
   def simple_relation: Parser[SqlRelation[Expr]] =
-    ident ~ opt(keyword("as")) ~ opt(ident) ^^ {
-      case ident ~ _ ~ alias => TableRelationAST[Expr](ident, alias)
+    ident ~ opt(keyword("as") ~> ident) ^^ {
+      case ident ~ alias => TableRelationAST[Expr](ident, alias)
     } |
     op("(") ~> (
-      (expr ~ op(")") ~ opt(keyword("as")) ~ ident ^^ {
+      (expr ~ op(")") ~ keyword("as") ~ ident ^^ {
         case expr ~ _ ~ _ ~ alias => ExprRelationAST(expr, alias)
       }) |
       relation <~ op(")"))
@@ -394,7 +384,7 @@ class SQLParser extends StandardTokenParsers {
     }, op(",")) ^^ (OrderBy(_))
 
   def expr: Parser[Expr] =
-    (or_expr | query) * (
+    (query | or_expr) * (
       keyword("limit")                        ^^^ Limit        |
         keyword("offset")                     ^^^ Offset       |
         keyword("union") ~ keyword("all")     ^^^ UnionAll     |
