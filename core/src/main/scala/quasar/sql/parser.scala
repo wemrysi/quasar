@@ -94,11 +94,11 @@ class SQLParser extends StandardTokenParsers {
   def floatLit: Parser[String] = elem("decimal", _.isInstanceOf[lexical.FloatLit]) ^^ (_.chars)
 
   ignore(lexical.reserved += (
-    "all", "and", "as", "asc", "between", "by", "case", "cross", "date", "desc", "distinct",
+    "all", "and", "as", "asc", "between", "by", "case", "cross", "date", "delete", "desc", "distinct",
     "else", "end", "escape", "except", "exists", "false", "for", "from", "full", "group", "having", "in",
-    "inner", "intersect", "interval", "is", "join", "left", "like", "limit", "not", "null",
+    "inner", "insert", "intersect", "interval", "into", "is", "join", "left", "like", "limit", "not", "null",
     "offset", "oid", "on", "or", "order", "outer", "right", "select", "then", "time",
-    "timestamp", "true", "union", "when", "where"
+    "timestamp", "true", "union", "update", "when", "where"
   ))
 
   ignore(lexical.delimiters += (
@@ -118,11 +118,18 @@ class SQLParser extends StandardTokenParsers {
 
   def select: Parser[Expr] =
     keyword("select") ~> opt(keyword("distinct")) ~ projections ~
-      opt(relations) ~ opt(filter) ~
+      opt(from) ~ opt(filter) ~
       opt(group_by) ~ opt(order_by) ^^ {
         case d ~ p ~ r ~ f ~ g ~ o =>
           Select(d.map(κ(SelectDistinct)).getOrElse(SelectAll), p, r.join, f, g, o)
       }
+
+  def delete: Parser[Expr] =
+    keyword("delete") ~> from ~ filter ^^ { case r ~ f =>
+      Select(SelectAll, List(Proj(Splice(None), None)), r, Not(f).some, None, None)
+    }
+
+  def query = delete | select
 
   def projections: Parser[List[Proj[Expr]]] =
     repsep(projection, op(",")).map(_.toList)
@@ -317,8 +324,11 @@ class SQLParser extends StandardTokenParsers {
     keyword("true") ^^^ BoolLiteral(true) |
     keyword("false") ^^^ BoolLiteral(false)
 
+  def from: Parser[Option[SqlRelation[Expr]]] =
+    keyword("from") ~> relations
+
   def relations: Parser[Option[SqlRelation[Expr]]] =
-    keyword("from") ~> rep1sep(relation, op(",")).map(_.foldLeft[Option[SqlRelation[Expr]]](None) {
+    rep1sep(relation, op(",")).map(_.foldLeft[Option[SqlRelation[Expr]]](None) {
       case (None, traverse) => Some(traverse)
       case (Some(acc), traverse) => Some(CrossRelation(acc, traverse))
     })
@@ -368,7 +378,7 @@ class SQLParser extends StandardTokenParsers {
     }, op(",")) ^^ (OrderBy(_))
 
   def expr: Parser[Expr] =
-    (or_expr | select) * (
+    (or_expr | query) * (
       keyword("limit")                        ^^^ Limit        |
         keyword("offset")                     ^^^ Offset       |
         keyword("union") ~ keyword("all")     ^^^ UnionAll     |

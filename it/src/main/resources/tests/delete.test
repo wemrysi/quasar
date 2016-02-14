@@ -1,0 +1,11 @@
+{
+    "name": "delete",
+    "data": "zips.data",
+    "query": "delete from zips where pop < 100000",
+    "predicate": "equalsExactly",
+    "expected": [
+        { "city": "NEW YORK", "state": "NY", "pop": 106564, "loc": [-73.958805, 40.768476] },
+        { "city": "NEW YORK", "state": "NY", "pop": 100027, "loc": [-73.968312, 40.797466] },
+        { "city": "BROOKLYN", "state": "NY", "pop": 111396, "loc": [-73.956985, 40.646694] },
+        { "city": "CHICAGO",  "state": "IL", "pop": 112047, "loc": [-87.7157,   41.849015] }]
+}
