@@ -37,7 +37,7 @@ trait StringLib extends Library {
   val Concat = Mapping("concat", "Concatenates two (or more) string values",
     Type.Str, Type.Str :: Type.Str :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(ConstantF(Data.Str("")), second)) => second.some
           case IsInvoke(_, List(first, ConstantF(Data.Str(""))))  => first.some
@@ -116,7 +116,7 @@ trait StringLib extends Library {
     "Extracts a portion of the string",
     Type.Str, Type.Str :: Type.Int :: Type.Int :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case InvokeF(f, List(str0, from0, for0)) => (str0.project, from0.project) match {
             case (ConstantF(Data.Str(str)), ConstantF(Data.Int(from))) if 0 < from =>

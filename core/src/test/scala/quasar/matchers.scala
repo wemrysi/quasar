@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import RenderTree.ops._
 import quasar.fp._
-import quasar.recursionschemes._, cofree._, Fix._
+import quasar.recursionschemes._, Fix._, FunctorT.ops._
 
 import scala.reflect.ClassTag
 
@@ -40,13 +40,13 @@ trait TermLogicalPlanMatchers {
   case class equalToPlan(expected: Fix[LogicalPlan])
       extends Matcher[Fix[LogicalPlan]] {
     def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
-      val normed = FunctorT[Cofree[?[_], Fix[LogicalPlan]]].transCata(Recursive[Fix].cata(s.value)(attrSelf))(repeatedly(Optimizer.simplifyƒ[Cofree[?[_], Fix[LogicalPlan]]]))
-      val diff = (Recursive[Cofree[?[_], Fix[LogicalPlan]]].convertTo(normed).render diff expected.render).shows
+      val normed = s.value.transCata(repeatedly(Optimizer.simplifyƒ))
+      val diff = (normed.render diff expected.render).shows
       result(
-        expected ≟ Recursive[Cofree[?[_], Fix[LogicalPlan]]].convertTo(normed),
+        expected ≟ normed,
         "\ntrees are equal:\n" + diff,
         "\ntrees are not equal:\n" + diff +
-          "\noriginal was:\n" + normed.head.render.shows,
+          "\noriginal was:\n" + normed.render.shows,
         s)
     }
   }

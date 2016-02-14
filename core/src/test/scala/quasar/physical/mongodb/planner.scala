@@ -695,7 +695,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Regex("^Z.*$", false, true, false, false)))))))
     }
 
-    "plan filter with field in constant array" in {
+    "plan filter with field in constant set" in {
       plan("select * from zips where state in ('AZ', 'CO')") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
@@ -703,7 +703,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             Selector.In(Bson.Arr(List(Bson.Text("AZ"), Bson.Text("CO"))))))))
     }
 
-    "plan filter with field in empty array" in {
+    "plan filter with field in empty set" in {
       plan("select * from zips where state in ()") must
         beWorkflow($pure(Bson.Arr(Nil)))
     }
@@ -716,6 +716,22 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             If(Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
               BinOp(Neq, jscore.Literal(Js.Num(-1, false)), Call(Select(Select(ident("this"), "loc"), "indexOf"), List(jscore.Literal(Js.Num(43.058514, true))))),
             ident("undefined")).toJs))))
+    }
+
+    "filter field in single-element set" in {
+      plan("select * from zips where state in ('NV')") must
+        beWorkflow(chain(
+          $read(Collection("db", "zips")),
+          $match(Selector.Doc(BsonField.Name("state") ->
+            Selector.Eq(Bson.Text("NV"))))))
+    }
+
+    "filter field “in” a bare value" in {
+      plan("select * from zips where state in 'PA'") must
+        beWorkflow(chain(
+          $read(Collection("db", "zips")),
+          $match(Selector.Doc(BsonField.Name("state") ->
+            Selector.Eq(Bson.Text("PA"))))))
     }
 
     "plan filter with field containing other field" in {

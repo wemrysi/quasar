@@ -119,7 +119,7 @@ trait RelationsLib extends Library {
   val And = Mapping("(AND)", "Performs a logical AND of two boolean values",
     Type.Bool, Type.Bool :: Type.Bool :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(ConstantF(Data.True), r)) => r.some
           case IsInvoke(_, List(l, ConstantF(Data.True))) => l.some
@@ -139,7 +139,7 @@ trait RelationsLib extends Library {
   val Or = Mapping("(OR)", "Performs a logical OR of two boolean values",
     Type.Bool, Type.Bool :: Type.Bool :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(ConstantF(Data.False), r)) => r.some
           case IsInvoke(_, List(l, ConstantF(Data.False))) => l.some
@@ -168,7 +168,7 @@ trait RelationsLib extends Library {
   val Cond = Mapping("(IF_THEN_ELSE)", "Chooses between one of two cases based on the value of a boolean expression",
     Type.Bottom, Type.Bool :: Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(ConstantF(Data.True),  c, _)) => c.some
           case IsInvoke(_, List(ConstantF(Data.False), _, a)) => a.some
@@ -187,7 +187,7 @@ trait RelationsLib extends Library {
     "Returns the first of its arguments that isn't null.",
     Type.Bottom, Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case IsInvoke(_, List(ConstantF(Data.Null), second)) => second.some
           case IsInvoke(_, List(first, ConstantF(Data.Null)))  => first.some

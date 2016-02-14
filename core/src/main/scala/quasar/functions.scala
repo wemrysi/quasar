@@ -70,7 +70,7 @@ trait FuncInstances {
 
 object Func extends FuncInstances {
   trait Simplifier {
-    def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]):
+    def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]):
         Option[LogicalPlan[T[LogicalPlan]]]
   }
   type Typer      = List[Type] => ValidationNel[SemanticError, Type]

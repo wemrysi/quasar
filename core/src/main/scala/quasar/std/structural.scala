@@ -165,7 +165,7 @@ trait StructuralLib extends Library {
     "Extracts a specified field of an object",
     Top, AnyObject :: Str :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: FunctorT](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
         case IsInvoke(_, List(MakeObjectN(obj), field)) =>
           obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
         case _ => None
@@ -310,7 +310,12 @@ trait StructuralLib extends Library {
     "Unshifts an integral dimension from the set identity, creating an array with the dimensional values as the indices.",
     AnyArray, Set(Top) :: Nil,
     noSimplification,
-    partialTyper { case List(tpe) => FlexArr(0, None, tpe) },
+    partialTyper {
+      case List(Const(Data.Set(vs))) => Const(Data.Arr(vs))
+      case List(Const(v))            => Const(Data.Arr(List(v)))
+      case List(Set(tpe))            => FlexArr(0, None, tpe)
+      case List(tpe)                 => FlexArr(0, None, tpe)
+    },
     partialUntyperV { case tpe if tpe.arrayLike =>
       tpe.arrayType.fold[ValidationNel[SemanticError, List[Type]]](
         failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
