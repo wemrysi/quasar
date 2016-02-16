@@ -92,13 +92,13 @@ trait ExprArbitrary {
       10 -> Gen.oneOf(
         Gen.alphaChar.map(_.toString),
         Gen.const("name, address"),
-        Gen.const("q: `a`")) ∘
+        Gen.const("q: \"a\"")) ∘
         (Ident(_)),
-      1 -> Unop(StringLiteral(Instant.now.toString), ToTimestamp),
-      1 -> Gen.choose(0L, 10000000000L).map(millis => Unop(StringLiteral(Duration.ofMillis(millis).toString), ToInterval)),
-      1 -> Unop(StringLiteral("2014-11-17"), ToDate),
-      1 -> Unop(StringLiteral("12:00:00"), ToTime),
-      1 -> Unop(StringLiteral("123456"), ToId)
+      1 -> InvokeFunction(date.Timestamp.name, List(StringLiteral(Instant.now.toString))),
+      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunction(date.Interval.name, List(StringLiteral(Duration.ofMillis(millis).toString)))),
+      1 -> InvokeFunction(date.Date.name, List(StringLiteral("2014-11-17"))),
+      1 -> InvokeFunction(date.Time.name, List(StringLiteral("12:00:00"))),
+      1 -> InvokeFunction(identity.ToId.name, List(StringLiteral("123456")))
     )
 
   private def complexExprGen(depth: Int): Gen[Expr] =
@@ -117,7 +117,6 @@ trait ExprArbitrary {
       2 -> (exprGen(depth) ⊛
         Gen.oneOf(
           Not, Exists, Positive, Negative, Distinct,
-          ToDate, ToInterval,
           FlattenMapKeys,   FlattenArrayIndices,
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
