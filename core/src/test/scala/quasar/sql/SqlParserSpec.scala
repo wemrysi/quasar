@@ -138,12 +138,53 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       r should beSome
     }
 
+    "parse keywords as identifiers" in {
+      parser.parse("select as as as from from as from where where group by group order by order") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("as"), "as".some)),
+            TableRelationAST("from", "from".some).some,
+            Ident("where").some,
+            GroupBy(List(Ident("group")), None).some,
+            OrderBy(List((ASC, Ident("order")))).some))
+    }
+
+    "parse ambiguous keyword as identifier" in {
+      parser.parse("""select `false` from zips""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("false"), None)),
+            TableRelationAST("zips", None).some,
+            None, None, None))
+    }
+
+    "parse ambiguous expression as expression" in {
+      parser.parse("""select case from when where then and end""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Match(Ident("from"), List(Case(Ident("where"), Ident("and"))), None), None)),
+            None, None, None, None))
+    }
+
+    "parse partially-disambiguated expression" in {
+      parser.parse("""select `case` from when where then and end""") should
+        beRightDisjOrDiff(
+          Select(
+            SelectAll,
+            List(Proj(Ident("case"), None)),
+            TableRelationAST("when", None).some,
+            Binop(Ident("then"), Ident("end"), And).some,
+            None, None))
+    }
     "parse quoted literal" in {
-      parser.parse("select * from foo where bar = 'abc'").toOption should beSome
+      parser.parse("select * from foo where bar = \"abc\"").toOption should beSome
     }
 
     "parse quoted literal with escaped quote" in {
-      parser.parse("select * from foo where bar = 'that''s it!'").toOption should beSome
+      parser.parse("""select * from foo where bar = "that\"s it!"""").toOption should beSome
     }
 
     "parse literal that’s too big for an Int" in {
@@ -158,11 +199,11 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "parse quoted identifier" in {
-      parser.parse("""select * from "tmp/foo" """).toOption should beSome
+      parser.parse("""select * from `tmp/foo` """).toOption should beSome
     }
 
     "parse quoted identifier with escaped quote" in {
-      parser.parse("""select * from "tmp/foo[""bar""]" """).toOption should beSome
+      parser.parse("""select * from `tmp/foo[\`bar\`]` """).toOption should beSome
     }
 
     "parse simple query with two variables" in {
@@ -179,10 +220,10 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse date, time, timestamp, and id literals" in {
       val q = """select * from foo
-                  where dt < date '2014-11-16'
-                  and tm < time '03:00:00'
-                  and ts < timestamp '2014-11-16T03:00:00Z' + interval 'PT1H'
-                  and _id != oid 'abc123'"""
+                  where dt < date("2014-11-16")
+                  and tm < time("03:00:00")
+                  and ts < timestamp("2014-11-16T03:00:00Z") + interval("PT1H")
+                  and _id != oid("abc123")"""
 
       parser.parse(q) must beRightDisjunction
     }
@@ -290,13 +331,32 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       )
     }
 
+    "should parse a single-quoted character" in {
+      val q = "'c'"
+      parser.parse(q) must beRightDisjunction(StringLiteral("c"))
+    }
+
+    "should parse escaped characters" in {
+      val q = "select '\\'', '\\\\', '\u1234'"
+      parser.parse(q) must beRightDisjunction(
+        Select(SelectAll, List(
+          Proj(StringLiteral("'"), None),
+          Proj(StringLiteral("\\"), None),
+          Proj(StringLiteral("ሴ"), None)),
+          None, None, None, None))
+    }
+    "should parse escaped characters in a string" in {
+      val q = """"\'\\\u1234""""
+      parser.parse(q) must beRightDisjunction(StringLiteral("'\\ሴ"))
+    }
+
     "should not parse multiple expressions seperated incorrectly" in {
       val q = "select foo from bar limit 6 select biz from baz"
       parser.parse(q) must beLeftDisjunction
     }
 
     "parse array literal at top level" in {
-      parser.parse("['X', 'Y']") must beRightDisjunction(
+      parser.parse("[\"X\", \"Y\"]") must beRightDisjunction(
         ArrayLiteral(List(StringLiteral("X"), StringLiteral("Y"))))
     }
 
@@ -319,7 +379,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       // NB: Just a stress-test that the parser can handle a deeply
       // left-recursive expression with many unneeded parenes, which
       // happens to be exactly what pprint produces.
-      val q = """(select distinct topArr, topObj from "/demo/demo/nested" where (((((((((((((((search((((topArr)[:*])[:*])[:*], '^.*$', true)) or (search((((topArr)[:*])[:*]).a, '^.*$', true))) or (search((((topArr)[:*])[:*]).b, '^.*$', true))) or (search((((topArr)[:*])[:*]).c, '^.*$', true))) or (search((((topArr)[:*]).botObj).a, '^.*$', true))) or (search((((topArr)[:*]).botObj).b, '^.*$', true))) or (search((((topArr)[:*]).botObj).c, '^.*$', true))) or (search((((topArr)[:*]).botArr)[:*], '^.*$', true))) or (search((((topObj).midArr)[:*])[:*], '^.*$', true))) or (search((((topObj).midArr)[:*]).a, '^.*$', true))) or (search((((topObj).midArr)[:*]).b, '^.*$', true))) or (search((((topObj).midArr)[:*]).c, '^.*$', true))) or (search((((topObj).midObj).botArr)[:*], '^.*$', true))) or (search((((topObj).midObj).botObj).a, '^.*$', true))) or (search((((topObj).midObj).botObj).b, '^.*$', true))) or (search((((topObj).midObj).botObj).c, '^.*$', true)))"""
+      val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
       parser.parse(q).map(pprint) must beRightDisjunction(q)
     }
 
