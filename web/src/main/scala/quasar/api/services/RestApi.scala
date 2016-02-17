@@ -18,7 +18,6 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
-import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
 import quasar.fs._
 import quasar.fs.mount._

@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.server
 
 import quasar.Predef._
 import quasar.{Mounter => _, _}
+import quasar.api._, Http4sUtils._
 import quasar.api.services.RestApi
 import quasar.console._
 import quasar.config._
@@ -25,7 +26,6 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fs._
 import quasar.fs.mount._
-import Http4sUtils._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.fs.mongoDbFileSystemDef
 
@@ -48,79 +48,16 @@ import scalaz.std.option._
 import scalaz.std.list._
 import scalaz.concurrent.Task
 
-object ServerOps {
-  type Builders = List[(Int, BlazeBuilder)]
-  type Servers = List[(Int, Http4sServer)]
-  type ServersErrors = List[(Int, Throwable \/ Http4sServer)]
-  type Services = List[(String, HttpService)]
-
-  final case class Options(
-    config: Option[String],
-    contentLoc: Option[String],
-    contentPath: Option[String],
-    contentPathRelative: Boolean,
-    openClient: Boolean,
-    port: Option[Int])
-
-  final case class StaticContent(loc: String, path: String)
-}
-
 object Server {
-
-  import ServerOps._
   import QueryFile.ResultHandle
   import FileSystemDef.DefinitionResult
   import hierarchical._
   import Mounting.PathTypeMismatch
 
-  type MainErrT[F[_], A] = EitherT[F, String, A]
-  type MainTask[A]       = MainErrT[Task, A]
-
-  val mainTask = MonadError[EitherT[Task,?,?], String]
-
-  // NB: This is a terrible thing.
-  //     Is there a better way to find the path to a jar?
-  val jarPath: Task[String] =
-    Task.delay {
-      val uri = getClass.getProtectionDomain.getCodeSource.getLocation.toURI
-      val path0 = uri.getPath
-      val path =
-        java.net.URLDecoder.decode(
-          Option(uri.getPath)
-            .getOrElse(uri.toURL.openConnection.asInstanceOf[java.net.JarURLConnection].getJarFileURL.getPath),
-          "UTF-8")
-      (new java.io.File(path)).getParentFile().getPath() + "/"
-    }
-
-  // scopt's recommended OptionParser construction involves side effects
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  val optionParser = new scopt.OptionParser[Options]("quasar") {
-    head("quasar")
-    opt[String]('c', "config") action { (x, c) => c.copy(config = Some(x)) } text("path to the config file to use")
-    opt[String]('L', "content-location") action { (x, c) => c.copy(contentLoc = Some(x)) } text("location where static content is hosted")
-    opt[String]('C', "content-path") action { (x, c) => c.copy(contentPath = Some(x)) } text("path where static content lives")
-    opt[Unit]('r', "content-path-relative") action { (_, c) => c.copy(contentPathRelative = true) } text("specifies that the content-path is relative to the install directory (not the current dir)")
-    opt[Unit]('o', "open-client") action { (_, c) => c.copy(openClient = true) } text("opens a browser window to the client on startup")
-    opt[Int]('p', "port") action { (x, c) => c.copy(port = Some(x)) } text("the port to run Quasar on")
-    help("help") text("prints this usage text")
-  }
-
-  def interpretPaths(options: Options): MainTask[Option[StaticContent]] = {
-    val defaultLoc = "/files"
-
-    def path(p: String): Task[String] =
-      if (options.contentPathRelative) jarPath.map(_ + p)
-      else p.point[Task]
-
-    (options.contentLoc, options.contentPath) match {
-      case (None, None) =>
-        none.point[MainTask]
-      case (Some(_), None) =>
-        mainTask.raiseError("content-location specified but not content-path")
-      case (loc, Some(p)) =>
-        path(p).map(p => some(StaticContent(loc.getOrElse(defaultLoc), p))).liftM[MainErrT]
-    }
-  }
+  type Builders = List[(Int, BlazeBuilder)]
+  type Servers = List[(Int, Http4sServer)]
+  type ServersErrors = List[(Int, Throwable \/ Http4sServer)]
+  type Services = List[(String, HttpService)]
 
   /** Effect for FileSystemDefs */
   type FsDefEff[A]  = Coproduct[WorkflowExecErrF, Task, A]
@@ -333,9 +270,9 @@ object Server {
   }
 
   def configuration(args: Array[String]): MainTask[QuasarConfig] = for {
-    opts <- optionParser.parse(args, Options(None, None, None, false, false, None))
-              .cata(_.point[MainTask], mainTask.raiseError("couldn't parse options"))
-    content <- interpretPaths(opts)
+    opts    <- CliOptions.parser.parse(args, CliOptions.default)
+                .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
+    content <- StaticContent.fromCliOptions("/files", opts)
     redirect = content.map(_.loc)
     cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
                   FsPath.parseSystemFile(cfg)
