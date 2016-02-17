@@ -27,7 +27,8 @@ import quasar.api.MessageFormatGen._
 import quasar.effect.Failure
 import quasar.fs.{Path => _, _}
 import quasar.fs.NumericArbitrary._
-import quasar.fp.{free, liftMT}
+import quasar.fp.{evalNT, free, liftMT}
+import quasar.fp.prism._
 
 import argonaut.Json
 import argonaut.Argonaut._
@@ -50,6 +51,7 @@ import scalaz.stream.Process
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
+  import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
 
   type Eff0[A] = Coproduct[FileSystemFailureF, FileSystem, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
@@ -74,6 +76,22 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         .apply(req))
 
     (svc, ref)
+  }
+
+  def serviceErrs(mem: InMemState, writeErrors: FileSystemError*): HttpService = {
+    type RW[A] = ReadWriteT[ResponseOr, A]
+    implicit val injWF = Inject[WriteFileF, Eff]
+    HttpService.lift(req => runFs(mem) flatMap { fs =>
+      val fs0: Eff ~> ResponseOr = effRespOr(fs)
+      val g: WriteFile ~> ResponseOr = free.restrict[ResponseOr, WriteFile, Eff](fs0)
+      val wf: WriteFileF ~> RW = Coyoneda.liftTF[WriteFile, RW](amendWrites[ResponseOr](g))
+      val f: Eff ~> RW = liftMT[ResponseOr, ReadWriteT] compose fs0
+
+      val fsErrs: Eff ~> ResponseOr =
+        evalNT[ResponseOr, ReadWrites]((Nil, List(writeErrors.toVector))) compose free.transformIn(wf, f)
+
+      data.service[Eff].toHttpService(fsErrs).apply(req)
+    })
   }
 
   implicit val arbFileName: Arbitrary[FileName] = Arbitrary(Gen.alphaStr.filter(_.nonEmpty).map(FileName(_)))
@@ -401,23 +419,16 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             }
           }
         }
-        "be 500 with server side error" ! prop {
+        "be 500 when error during writing" ! prop {
           (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
-            val port = quasar.api.Http4sUtils.anyAvailablePort.run
             val destination = rootDir[Sandboxed] </> file1(fileName)
-            val request = Request(
-              uri = Uri(path = printPath(destination), authority = Some(Authority(port = Some(port)))),
-              method = method).withBody(body.list).run
-            val failInter = new (FileSystem ~> Task) {
-              def apply[A](a: FileSystem[A]): Task[Nothing] = Task.fail(new RuntimeException(failureMsg))
-            }
-            def service: HttpService = data.service[Eff].toHttpService(effRespOr(failInter))
-            val serverBlueprint = Http4sUtils.ServerBlueprint(port, scala.concurrent.duration.Duration.Inf, service)
-            val (server, _) = Http4sUtils.startServer(serverBlueprint, true).run
-            val client = org.http4s.client.blaze.defaultClient
-            val response = client(request).onFinish(_ => server.shutdown.void).run
+            val request = Request(uri = Uri(path = printPath(destination)), method = method).withBody(body.list)
+            def service: HttpService = serviceErrs(
+              InMemState.empty,
+              FileSystemError.writeFailed(Data.Int(4), "anything but 4"))
+            val response = request.flatMap(service(_)).run
             response.status must_== Status.InternalServerError
-            response.as[String].run must_== ""
+            response.as[String].run must contain("anything but 4")
         }
         () // Required for testBoth (not required with specs2 3.x)
       }

@@ -281,16 +281,20 @@ object Server {
   } yield QuasarConfig(content.toList, redirect, opts.port, cfgPath, opts.openClient)
 
   def nonApiService(
+    initialPort: Int,
+    reload: Int => Task[Unit],
     staticContent: List[StaticContent],
     redirect: Option[String]
   ): HttpService = {
-    val redirSvc = redirectService(redirect getOrElse "/welcome")
-
     val staticRoutes = staticContent map {
       case StaticContent(loc, path) => loc -> staticFileService(path)
     }
 
-    Router(staticRoutes ::: List("/" -> redirSvc): _*)
+    Router(staticRoutes ::: List(
+      "/"            -> redirectService(redirect getOrElse "/welcome"),
+      "/server/info" -> info.service,
+      "/server/port" -> control.service(initialPort, reload)
+    ): _*)
   }
 
   def startWebServer(
@@ -305,8 +309,8 @@ object Server {
     val produceSvc = (reload: Int => Task[Unit]) =>
       finalizeServices(eval)(
         coreServices[ApiEff],
-        additionalServices(initialPort, reload)
-      ) orElse nonApiService(staticContent, redirect)
+        additionalServices
+      ) orElse nonApiService(initialPort, reload, staticContent, redirect)
 
     startAndWait(initialPort, produceSvc, openClient)
   }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.api
+package quasar.server
 
 import quasar.Predef._
 import quasar.console._

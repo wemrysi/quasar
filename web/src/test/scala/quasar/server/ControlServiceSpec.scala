@@ -14,25 +14,21 @@
  * limitations under the License.
  */
 
-package quasar
-package api
-package services
+package quasar.server
 
-import Predef._
-import fp._
-import argonaut.Json
+import quasar.Predef._
+import quasar.fp._
 
 import org.http4s.Uri.Authority
 import org.http4s.{Status, Method, Uri, Request}
-import org.http4s.argonaut._
-import org.specs2.mutable.Specification
+import org.specs2.mutable
 
+import argonaut.Json
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 
-import scalaz._, Scalaz._
-
-class ServerServiceSpec extends Specification {
+class ControlServiceSpec extends mutable.Specification {
 
   val client = org.http4s.client.blaze.defaultClient
 
@@ -40,7 +36,7 @@ class ServerServiceSpec extends Specification {
                                       (causeRestart: Uri => Task[Unit])(afterRestart: Task[B]): B = {
     val uri = Uri(authority = Some(Authority(port = Some(initialPort))))
 
-    val servers = Http4sUtils.startServers(initialPort, reload => server.service(defaultPort, reload))
+    val servers = Http4sUtils.startServers(initialPort, reload => control.service(defaultPort, reload))
 
     (for {
       result <- servers
@@ -58,31 +54,25 @@ class ServerServiceSpec extends Specification {
     } yield b).runFor(timeoutMillis)
   }
 
-  "Server Service" should {
-    "be capable of providing it's name and version" in {
-      val request = Request(uri = Uri(path = "info"), method = Method.GET)
-      val response = server.service(Http4sUtils.anyAvailablePort.run, _ => Task.now(()))(request).run
-      response.as[Json].run must_== server.nameAndVersionInfo
-      response.status must_== Status.Ok
-    }
+  "Control Service" should {
     def checkRunningOn(port: Int) = {
-      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))) / "info", method = Method.GET)
-      client(req).map(response => response.status must_== Status.Ok)
+      val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))) / "foobar", method = Method.GET)
+      client(req).map(response => response.status must_== Status.NotFound)
     }
-    "restart on new port when PUT /port succeeds" in {
+    "restart on new port when PUT succeeds" in {
       val newPort = 8889
 
       withServerExpectingRestart(){ baseUri: Uri =>
         for {
-          req <- Request(uri = baseUri / "port", method = Method.PUT).withBody(newPort.toString)
+          req <- Request(uri = baseUri, method = Method.PUT).withBody(newPort.toString)
           _   <- client(req)
         } yield ()
       }{ checkRunningOn(newPort) }
     }
-    "restart on default port when DELETE /port succeeds" in {
+    "restart on default port when DELETE succeeds" in {
       val defaultPort = 9001
       withServerExpectingRestart(initialPort = 9000, defaultPort = defaultPort){ baseUri: Uri =>
-        val req = Request(uri = baseUri / "port", method = Method.DELETE)
+        val req = Request(uri = baseUri, method = Method.DELETE)
         client(req).void
       }{ checkRunningOn(defaultPort) }
     }
