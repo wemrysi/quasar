@@ -28,6 +28,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object queryFixture {
+  import quasar.api.PathUtils.pathUri
 
   type File = pathy.Path[_,pathy.Path.File,Sandboxed]
 
@@ -47,7 +48,7 @@ object queryFixture {
             response: A => MatchResult[scala.Any]) = {
     val offset = query.flatMap(_.offset.map(_.shows))
     val limit = query.flatMap(_.limit.map(_.shows))
-    val baseUri = Uri(path = printPath(path))
+    val baseUri = pathUri(path)
       .+??("q", query.map(_.q))
       .+??("offset", offset)
       .+??("limit", limit)

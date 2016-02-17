@@ -18,6 +18,9 @@ package quasar.api
 
 import quasar.Predef._
 
+import quasar.fs.{APath}
+
+import org.http4s.{Uri}
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 
@@ -26,6 +29,8 @@ trait PathUtils {
   // See https://github.com/slamdata/scala-pathy/issues/23.
   def hasDot(p: Path[_, _, _]): Boolean =
     flatten(false, false, false, d => d == "." || d == "..", f => f == "." || f == "..", p).toList.contains(true)
+
+  def pathUri(path: APath): Uri = Uri(path = UriPathCodec.printPath(path))
 }
 
 object PathUtils extends PathUtils

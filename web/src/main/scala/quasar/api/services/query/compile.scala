@@ -50,7 +50,7 @@ object compile {
             }))
 
     QHttpService {
-      case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
+      case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
         offsetOrInvalid[S](offset).tuple(limitOrInvalid[S](limit))
           .traverse[Free[S, ?], QuasarResponse[S], ParsingError \/ QuasarResponse[S]] { case (offset, limit) =>
             SQLParser.parseInContext(query, QPath.fromAPath(path))
