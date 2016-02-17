@@ -20,6 +20,8 @@ import quasar.Predef._
 import quasar.{EnvironmentError2, Planner, SemanticErrors}
 import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
+import quasar.fs.mount.hierarchical.HierarchicalFileSystemError
+import quasar.physical.mongodb.WorkflowExecutionError
 import quasar.SKI._
 import quasar.sql.ParsingError
 
@@ -73,6 +75,15 @@ sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstance
     }
   }
 
+  implicit def hierarchicalFileSystemErrorToQuasarResponse[S[_]]: ToQuasarResponse[HierarchicalFileSystemError, S] = {
+    import HierarchicalFileSystemError._
+
+    response {
+      case MultipleMountsApply(_, _) =>
+        QuasarResponse.error(BadRequest, "The request could not be handled by a unique mounted filesystem.")
+    }
+  }
+
   implicit def mountingErrorResponse[S[_]]: ToQuasarResponse[MountingError, S] = {
     import MountingError._, PathError2.InvalidPath
 
@@ -115,6 +126,21 @@ sealed abstract class ToQuasarResponseInstances extends ToQuasarResponseInstance
 
   implicit def semanticErrorQuasarResponse[S[_]]: ToQuasarResponse[SemanticErrors, S] =
     response(se => QuasarResponse.error(BadRequest, se.shows))
+
+  implicit def workflowExecutionError[S[_]]: ToQuasarResponse[WorkflowExecutionError, S] = {
+    import WorkflowExecutionError._
+
+    response(err => err match {
+      case InvalidTask(_, _) =>
+        QuasarResponse.error(InternalServerError, err.shows)
+
+      case InsertFailed(_, _) =>
+        QuasarResponse.error(BadRequest, err.shows)
+
+      case NoDatabase =>
+        QuasarResponse.error(InternalServerError, err.shows)
+    })
+  }
 
   implicit def quasarResponseToQuasarResponse[S[_]]: ToQuasarResponse[QuasarResponse[S], S] =
     response(ι)
