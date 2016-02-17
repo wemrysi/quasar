@@ -50,7 +50,7 @@ object execute {
     val Q = QueryFile.Ops[S]
 
     QHttpService {
-      case req @ GET -> AsDirPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
+      case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
         (offsetOrInvalid[S](offset) |@| limitOrInvalid[S](limit)) { (offset, limit) =>
           SQLParser.parseInContext(query, QPath.fromAPath(path)).map(
             expr => queryPlan(addOffsetLimit(expr, offset, limit), vars(req)).run.value.map(

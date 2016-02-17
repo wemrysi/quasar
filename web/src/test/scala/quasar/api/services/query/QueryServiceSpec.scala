@@ -18,6 +18,7 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._, fs._
+import quasar.api.PathUtils
 import quasar.fs.InMemory._
 
 import argonaut._, Argonaut._
@@ -26,11 +27,12 @@ import org.http4s.server.HttpService
 import org.http4s.argonaut._
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
+import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemFixture with ScalaCheck {
+class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemFixture with PathUtils with ScalaCheck {
   import queryFixture._
 
   "Execute and Compile Services" should {
@@ -54,6 +56,7 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             response = (a: String) => a must_== "???"
           )
         }.pendingUntilFixed("SD-773")
+
         "be 400 for missing query" ! prop { filesystem: SingleFileMemState =>
           get(service)(
             path = filesystem.parent,
@@ -63,14 +66,34 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             response = (_: Json) must_== Json("error" := "The request must contain a query")
           )
         }
+
         "be 400 for query error" ! prop { filesystem: SingleFileMemState =>
-          get(compileService)(
+          get(service)(
             path = filesystem.parent,
             query = Some(Query("select date where")),
             state = filesystem.state,
             status = Status.BadRequest,
             response = (_: Json) must_== Json("error" := "end of input; ErrorToken(illegal character)")
           )
+        }
+
+        def asFile[B, S](dir: Path[B, Dir, S]): Option[Path[B, Path.File, S]] =
+          peel(dir).flatMap {
+            case (p, -\/(d)) => (p </> file(d.value)).some
+            case _ => None
+          }
+
+        "be 400 for bad path (file instead of dir)" ! prop { filesystem: SingleFileMemState =>
+          filesystem.parent =/= rootDir ==> {
+
+            val parentAsFile = asFile(filesystem.parent).get
+
+            val req = Request(
+                uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
+            val resp = service(filesystem.state)(req).run
+            resp.status must_== Status.BadRequest
+            resp.as[Json].run must_== Json("error" := s"${posixCodec.printPath(parentAsFile)}: invalid workingDir (not a directory)")
+          }
         }
       }
 

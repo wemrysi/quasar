@@ -41,8 +41,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
   val StubFs = FileSystemType("stub")
 
-  def pathUri(path: APath): Uri = Uri(path = UriPathCodec.printPath(path))
-
   def viewConfig(q: String, vars: (String, String)*): (Expr, Variables) =
     ((new quasar.sql.SQLParser).parse(quasar.sql.Query(q)).toOption.get,
       Variables(Map(vars.map { case (n, v) =>
