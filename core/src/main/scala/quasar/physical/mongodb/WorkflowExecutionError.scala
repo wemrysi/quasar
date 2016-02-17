@@ -58,7 +58,7 @@ object WorkflowExecutionError {
         case InsertFailed(b, r) =>
           s"Failed to insert BSON, `$b`, $r"
         case NoDatabase =>
-          "No database"
+          "Unable to determine a database in which to store temporary collections"
       }
 
       s"Error executing workflow: $msg"
