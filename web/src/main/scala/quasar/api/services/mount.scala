@@ -32,18 +32,18 @@ import scalaz.concurrent.Task
 
 object mount {
   import Mounting.PathTypeMismatch
-  import ToQuasarResponse.ops._
+  import ToQResponse.ops._
   import posixCodec._
 
   def service[S[_]: Functor](implicit M: Mounting.Ops[S], S0: Task :<: S): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
         def err = s"There is no mount point at ${printPath(path)}"
-        respond(M.lookup(path).toRight(QuasarResponse.error[S](NotFound, err)).run)
+        respond(M.lookup(path).toRight(QResponse.error[S](NotFound, err)).run)
 
       case req @ MOVE -> AsPath(src) =>
         requiredHeader(Destination, req).map(_.value).fold(
-          (_: QuasarResponse[S]).point[Free[S, ?]],
+          (_: QResponse[S]).point[Free[S, ?]],
           dst => refineType(src).fold(
             srcDir  => move(srcDir,  dst, parseAbsDir,  "directory"),
             srcFile => move(srcFile, dst, parseAbsFile, "file")))
@@ -55,7 +55,7 @@ object mount {
                 (parseRelDir(fn) orElse parseRelFile(fn))
                   .flatMap(sandbox(currentDir, _))
                   .map(parent </> _)
-                  .toRightDisjunction(QuasarResponse.error[S](BadRequest, s"Not a relative path: $fn")))
+                  .toRightDisjunction(QResponse.error[S](BadRequest, s"Not a relative path: $fn")))
         _   <- mount[S](dst, req, replaceIfExists = false)
       } yield s"added ${printPath(dst)}").run)
 
@@ -78,10 +78,10 @@ object mount {
     typeStr: String
   )(implicit
     M: Mounting.Ops[S]
-  ): Free[S, QuasarResponse[F]] =
+  ): Free[S, QResponse[F]] =
     parse(dstStr).map(sandboxAbs).cata(dst =>
       respond(M.remount[T](src, dst).as(s"moved ${printPath(src)} to $dstStr").run),
-      QuasarResponse.error(BadRequest, s"Not an absolute $typeStr path: $dstStr").point[M.F])
+      QResponse.error(BadRequest, s"Not an absolute $typeStr path: $dstStr").point[M.F])
 
   private def mount[S[_]: Functor](
     path: APath,
@@ -90,16 +90,16 @@ object mount {
   )(implicit
     M: Mounting.Ops[S],
     S0: Task :<: S
-  ): EitherT[Free[S, ?], QuasarResponse[S], Boolean] = {
+  ): EitherT[Free[S, ?], QResponse[S], Boolean] = {
     type FreeS[A] = Free[S, A]
 
     for {
       body  <- EitherT.right(injectFT[Task, S].apply(EntityDecoder.decodeString(req)): FreeS[String])
       bConf <- EitherT.fromDisjunction[FreeS](Parse.decodeWith(
                   body,
-                  (_: MountConfig2).right[QuasarResponse[S]],
-                  parseErrorMsg => QuasarResponse.error[S](BadRequest, s"input error: $parseErrorMsg").left,
-                  (msg, _) => QuasarResponse.error[S](BadRequest, msg).left))
+                  (_: MountConfig2).right[QResponse[S]],
+                  parseErrorMsg => QResponse.error[S](BadRequest, s"input error: $parseErrorMsg").left,
+                  (msg, _) => QResponse.error[S](BadRequest, msg).left))
       exists <- EitherT.right(M.lookup(path).isDefined)
       mnt    =  if (replaceIfExists && exists) M.replace(path, bConf) else M.mount(path, bConf)
       r      <- mnt.leftMap(_.toResponse[S])

@@ -76,13 +76,13 @@ object metadata {
         .run.map(cfg => FsNode(name, cfg map mountType))
         .liftM[FileSystemErrT]
 
-    def dirMetadata(d: ADir): Free[S, QuasarResponse[S]] = respond(
+    def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(
       Q.ls(d)
         .flatMap(_.toList.traverse(mkNode(d, _)))
         .map(nodes => Json.obj("children" := nodes.toList.sorted))
         .run)
 
-    def fileMetadata(f: AFile): Free[S, QuasarResponse[S]] = respond(
+    def fileMetadata(f: AFile): Free[S, QResponse[S]] = respond(
       Q.fileExists(f)
         .map(_ either Json() or PathError2.pathNotFound(f))
         .run)

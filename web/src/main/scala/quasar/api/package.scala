@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.Errors.{ETask, convertError}
-import quasar.api.ToQuasarResponse.ops._
+import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
 import quasar.fs.{Path => QPath, _}
 
@@ -41,9 +41,9 @@ package object api {
   type ResponseOr[A] = ResponseT[Task, A]
 
   /** Interpret a `Failure` effect into `ResponseOr` given evidence the
-    * failure type can be converted to a `QuasarResponse`.
+    * failure type can be converted to a `QResponse`.
     */
-  def failureResponseOr[E](implicit E: ToQuasarResponse[E, ResponseOr])
+  def failureResponseOr[E](implicit E: ToQResponse[E, ResponseOr])
                           : Failure[E, ?] ~> ResponseOr = {
 
     def errToResp(e: E): Task[Response] =

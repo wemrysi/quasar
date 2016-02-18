@@ -19,7 +19,7 @@ package quasar.api.services.query
 import quasar.Predef._
 import quasar._, api._, fs._
 import quasar.api.services._
-import quasar.api.ToQuasarResponse.ops._
+import quasar.api.ToQResponse.ops._
 import quasar.fs.{Path => QPath}
 import quasar.fp.numeric._
 import quasar.recursionschemes.Fix
@@ -32,20 +32,20 @@ import scalaz._, Scalaz._
 object compile {
 
   def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]): QHttpService[S] = {
-    def phaseResultsResponse(prs: PhaseResults): Option[QuasarResponse[S]] =
+    def phaseResultsResponse(prs: PhaseResults): Option[QResponse[S]] =
       prs.lastOption map {
         case PhaseResult.Tree(name, value)   => Json(name := value).toResponse
-        case PhaseResult.Detail(name, value) => QuasarResponse.string(Ok, name + "\n" + value)
+        case PhaseResult.Detail(name, value) => QResponse.string(Ok, name + "\n" + value)
       }
 
     def explainQuery(
-      expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Free[S, QuasarResponse[S]] = respond(
+      expr: sql.Expr, offset: Option[Natural], limit: Option[Positive], vars: Variables): Free[S, QResponse[S]] = respond(
         queryPlan(addOffsetLimit(expr, offset, limit), vars).run.value
-          .traverse[Free[S, ?], SemanticErrors, QuasarResponse[S]](lp =>
+          .traverse[Free[S, ?], SemanticErrors, QResponse[S]](lp =>
             Q.explain(lp).run.run.map {
               case (phases, \/-(_)) =>
                 phaseResultsResponse(phases)
-                  .getOrElse(QuasarResponse.error(InternalServerError,
+                  .getOrElse(QResponse.error(InternalServerError,
                     s"No explain output for plan: \n\n" + RenderTree[Fix[LogicalPlan]].render(lp).shows))
               case (_, -\/(fsErr)) => fsErr.toResponse[S]
             }))
@@ -53,9 +53,9 @@ object compile {
     QHttpService {
       case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
         offsetOrInvalid[S](offset).tuple(limitOrInvalid[S](limit))
-          .traverse[Free[S, ?], QuasarResponse[S], ParsingError \/ QuasarResponse[S]] { case (offset, limit) =>
+          .traverse[Free[S, ?], QResponse[S], ParsingError \/ QResponse[S]] { case (offset, limit) =>
             SQLParser.parseInContext(query, QPath.fromAPath(path))
-              .traverse[Free[S, ?], ParsingError, QuasarResponse[S]](expr =>
+              .traverse[Free[S, ?], ParsingError, QResponse[S]](expr =>
                 explainQuery(expr, offset, limit, vars(req)))
         })
       case GET -> _ => queryParameterMustContainQuery
