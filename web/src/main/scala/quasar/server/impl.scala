@@ -1,0 +1,305 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package quasar.server
+
+import quasar.Predef._
+import quasar.api.{failureResponseOr, ResponseOr, ResponseT}
+import quasar.config.{writeConfig, ConfigOps, FsFile}
+import quasar.effect._
+import quasar.fp._
+import quasar.fs._
+import quasar.fs.mount._
+import quasar.fs.mount.hierarchical._
+import quasar.physical.mongodb._
+import quasar.physical.mongodb.fs.mongoDbFileSystemDef
+
+import argonaut.EncodeJson
+import monocle.Lens
+import scalaz.{Failure => _, Lens => _, _}
+import scalaz.concurrent.Task
+
+/** Concrete effect types and their interpreters that implement the quasar
+  * functionality.
+  */
+object impl {
+  import FileSystemDef.DefinitionResult
+  import QueryFile.ResultHandle
+
+  /** Effects that physical filesystems require.
+    *
+    * WorkflowExecErrF \/ Task
+    */
+  type PhysFsEff[A]  = Coproduct[WorkflowExecErrF, Task, A]
+  type PhysFsEffM[A] = Free[PhysFsEff, A]
+
+  object PhysFsEff {
+    // Lift into FsErrsIOM
+    val toFsErrsIOM: PhysFsEff ~> FsErrsIOM =
+      free.interpret2[WorkflowExecErrF, Task, FsErrsIOM](
+        injectFT[WorkflowExecErrF, FsErrsIO],
+        injectFT[Task, FsErrsIO])
+  }
+
+  /** The physical filesystems currently supported.
+    *
+    * NB: Will eventually be the lcd of all physical filesystems, or we limit
+    * to a fixed set of effects that filesystems must interpret into.
+    */
+  val physicalFileSystems: FileSystemDef[PhysFsEffM] =
+    mongoDbFileSystemDef[PhysFsEff]
+
+  /** The intermediate effect FileSystem operations are intepreted into.
+    *
+    * PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF \/ HFSFailureF
+    */
+  type FsEff0[A] = Coproduct[MountedResultHF, HFSFailureF, A]
+  type FsEff1[A] = Coproduct[ViewStateF, FsEff0, A]
+  type FsEff2[A] = Coproduct[MonotonicSeqF, FsEff1, A]
+  type FsEff[A]  = Coproduct[PhysFsEffM, FsEff2, A]
+  type FsEffM[A] = Free[FsEff, A]
+
+  object FsEff {
+    /** Interpret all effects except failures. */
+    def toFsErrsIOM(
+      seqRef: TaskRef[Long],
+      viewHandlesRef: TaskRef[ViewHandles],
+      mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
+    ): FsEff ~> FsErrsIOM = {
+      def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
+        injectFT[Task, FsErrsIO].compose[E](f)
+
+      free.interpret5[PhysFsEffM, MonotonicSeqF, ViewStateF, MountedResultHF, HFSFailureF, FsErrsIOM](
+        hoistFree(PhysFsEff.toFsErrsIOM),
+        injTask[MonotonicSeqF](Coyoneda.liftTF(MonotonicSeq.fromTaskRef(seqRef))),
+        injTask[ViewStateF](Coyoneda.liftTF[ViewState, Task](KeyValueStore.fromTaskRef(viewHandlesRef))),
+        injTask[MountedResultHF](Coyoneda.liftTF[MountedResultH, Task](KeyValueStore.fromTaskRef(mntResRef))),
+        injectFT[HFSFailureF, FsErrsIO])
+    }
+
+    /** A dynamic `FileSystem` evaluator formed by internally fetching an
+      * interpreter from a `TaskRef`, allowing for the behavior to change over
+      * time as the ref is updated.
+      */
+    def evalFSFromRef[S[_]: Functor](
+      ref: TaskRef[FileSystem ~> FsEffM],
+      f: FsEff ~> Free[S, ?]
+    )(implicit S: Task :<: S): FileSystem ~> Free[S, ?] = {
+      type F[A] = Free[S, A]
+      new (FileSystem ~> F) {
+        def apply[A](fs: FileSystem[A]) =
+          injectFT[Task, S].apply(ref.read.map(free.foldMapNT[FsEff, F](f) compose _))
+            .flatMap(_.apply(fs))
+      }
+    }
+  }
+
+  /** The error effects invovled in FileSystem evaluation.
+    *
+    * We interpret into this effect to defer error handling based on the
+    * final context of interpretation (i.e. web service vs cmd line).
+    *
+    * HFSFailureF \/ WorkflowExecErrF \/ Task
+    */
+  type FsErrsIO0[A] = Coproduct[WorkflowExecErrF, Task, A]
+  type FsErrsIO[A]  = Coproduct[HFSFailureF, FsErrsIO0, A]
+  type FsErrsIOM[A] = Free[FsErrsIO, A]
+
+
+  //--- Composite FileSystem ---
+
+  /** Provides the mount handlers to update the composite
+    * (view + hierarchical + physical) filesystem whenever a mount is added
+    * or removed.
+    */
+  val mountHandler = EvaluatorMounter[PhysFsEffM, FsEff](physicalFileSystems)
+  import mountHandler.{EvalFSRef, EvalFSRefF}
+
+  /** An atomic reference holding the mapping between mount points and
+    * physical filesystem interpreters.
+    */
+  type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
+  type MountedFsF[A] = Coyoneda[MountedFs, A]
+
+  /** Effect required by the composite (view + hierarchical + physical)
+    * filesystem.
+    *
+    * EvalFSRefF \/ PhysFsEffM \/ MountedFsF \/ MountedViewsF
+    */
+  type CompFsEff0[A] = Coproduct[MountedFsF, MountedViewsF, A]
+  type CompFsEff1[A] = Coproduct[PhysFsEffM, CompFsEff0, A]
+  type CompFsEff[A]  = Coproduct[EvalFSRefF, CompFsEff1, A]
+  type CompFsEffM[A] = Free[CompFsEff, A]
+
+  object CompFsEff {
+    def toFsErrsIOM(
+      evalRef: TaskRef[FileSystem ~> FsEffM],
+      mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]],
+      viewsRef: TaskRef[Views]
+    ): CompFsEff ~> FsErrsIOM = {
+      def injTask[E[_]](f: E ~> Task): E ~> FsErrsIOM =
+        injectFT[Task, FsErrsIO].compose[E](f)
+
+      free.interpret4[EvalFSRefF, PhysFsEffM, MountedFsF, MountedViewsF, FsErrsIOM](
+        injTask[EvalFSRefF](Coyoneda.liftTF[EvalFSRef, Task](AtomicRef.fromTaskRef(evalRef))),
+        hoistFree(PhysFsEff.toFsErrsIOM),
+        injTask[MountedFsF](Coyoneda.liftTF[MountedFs, Task](AtomicRef.fromTaskRef(mntsRef))),
+        injTask[MountedViewsF](Coyoneda.liftTF[MountedViews, Task](AtomicRef.fromTaskRef(viewsRef))))
+    }
+  }
+
+  /** Effect required by the "complete" filesystem supporting modifying mounts,
+    * views, hierarchical mounts and physical implementations.
+    *
+    * MountConfigsF \/ CompFsEffM
+    */
+  type CompleteFsEff[A]  = Coproduct[MountConfigsF, CompFsEffM, A]
+  type CompleteFsEffM[A] = Free[CompleteFsEff, A]
+
+  // TODO: For some reason, scalac complains of a diverging implicits when
+  //       attempting to resolve this.
+  implicit val completeFsEffFunctor: Functor[CompleteFsEff] =
+    Coproduct.coproductFunctor[MountConfigsF, CompFsEffM](implicitly, implicitly)
+
+  val mounter: Mounting ~> CompleteFsEffM =
+    Mounter[CompFsEffM, CompleteFsEff](
+      mountHandler.mount[CompFsEff](_),
+      mountHandler.unmount[CompFsEff](_))
+
+  /** Effect representing fully interpreting everything but `MountConfigs` to
+    * allow for multiple implementations.
+    *
+    * MountConfigsF \/ Task
+    */
+  type MntCfgsIO[A]  = Coproduct[MountConfigsF, Task, A]
+  type MntCfgsIOM[A] = Free[MntCfgsIO, A]
+
+  object MntCfgsIO {
+    /** Interprets `MountConfigsF` in memory, without any persistence to a
+      * backing store.
+      */
+    val ephemeral: MntCfgsIO ~> Task = {
+      type ST[A] = StateT[Task, Map[APath, MountConfig2], A]
+
+      val toState: MountConfigs ~> ST =
+        KeyValueStore.toState[StateT[Task, ?, ?]](Lens.id[Map[APath, MountConfig2]])
+
+      val interpret: MntCfgsIO ~> ST =
+        free.interpret2[MountConfigsF, Task, ST](
+          Coyoneda.liftTF(toState),
+          liftMT[Task, StateT[?[_], Map[APath, MountConfig2], ?]])
+
+      evalNT[Task, Map[APath, MountConfig2]](Map()) compose interpret
+    }
+
+    /** Interprets `MountConfigsF`, persisting changes to a config file. */
+    def durableFile[C: EncodeJson](
+      ref: TaskRef[C],
+      loc: Option[FsFile]
+    )(implicit configOps: ConfigOps[C]): MntCfgsIO ~> Task =
+      free.interpret2[MountConfigsF, Task, Task](
+        Coyoneda.liftTF[MountConfigs, Task](writeConfig(configOps)(ref, loc)),
+        NaturalTransformation.refl)
+  }
+
+  /** Encompasses all the failure effects and mount config effect, all of
+    * which we need to evaluate using more than one implementation.
+    *
+    * FileSystemFailureF \/ WorkflowExecErrF \/ HFSFailureF \/ MntCfgsIO
+    */
+  type CfgsErrsIO0[A] = Coproduct[HFSFailureF, MntCfgsIO, A]
+  type CfgsErrsIO1[A] = Coproduct[WorkflowExecErrF, CfgsErrsIO0, A]
+  type CfgsErrsIO[A]  = Coproduct[FileSystemFailureF, CfgsErrsIO1, A]
+  type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
+
+  object CfgsErrsIO {
+    /** Inteprets errors into strings. */
+    def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
+      val f = free.interpret4[FileSystemFailureF, WorkflowExecErrF, HFSFailureF, MntCfgsIO, Task](
+        Coyoneda.liftTF[FileSystemFailure, Task](Failure.toTaskFailure[FileSystemError]),
+        Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toTaskFailure[WorkflowExecutionError]),
+        Coyoneda.liftTF[HFSFailure, Task](Failure.toTaskFailure[HierarchicalFileSystemError]),
+        evalCfgsIO)
+
+      val g = new (CfgsErrsIO ~> MainTask) {
+        def apply[A](a: CfgsErrsIO[A]) =
+          EitherT(f(a).attempt).leftMap(_.getMessage)
+      }
+
+      hoistFree(g)
+    }
+
+    /** Interpretes errors into `Response`s, for use in web services. */
+    def toResponseOr(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> ResponseOr = {
+      val f = free.interpret4[FileSystemFailureF, WorkflowExecErrF, HFSFailureF, MntCfgsIO, ResponseOr](
+        Coyoneda.liftTF[FileSystemFailure, ResponseOr](failureResponseOr[FileSystemError]),
+        Coyoneda.liftTF[WorkflowExecErr, ResponseOr](failureResponseOr[WorkflowExecutionError]),
+        Coyoneda.liftTF[HFSFailure, ResponseOr](failureResponseOr[HierarchicalFileSystemError]),
+        liftMT[Task, ResponseT] compose evalCfgsIO)
+
+      hoistFree(f: CfgsErrsIO ~> ResponseOr)
+    }
+  }
+
+  /** Effect required by the core Quasar services
+    *
+    * Task \/ FileSystemFailureF \/ MountingF \/ FileSystem
+    */
+  type CoreEff0[A] = Coproduct[MountingF, FileSystem, A]
+  type CoreEff1[A] = Coproduct[FileSystemFailureF, CoreEff0, A]
+  type CoreEff[A]  = Coproduct[Task, CoreEff1, A]
+  type CoreEffM[A] = Free[CoreEff, A]
+
+  object CoreEff {
+    val interpreter: Task[CoreEff ~> CfgsErrsIOM] =
+      for {
+        startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
+        seqRef     <- TaskRef(startSeq)
+        viewHRef   <- TaskRef[ViewHandles](Map())
+        mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
+        evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
+        mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
+        viewsRef   <- TaskRef(Views.empty)
+      } yield {
+        val f: FsEff ~> FsErrsIOM = FsEff.toFsErrsIOM(seqRef, viewHRef, mntedRHRef)
+        val g: CompFsEff ~> FsErrsIOM = CompFsEff.toFsErrsIOM(evalFsRef, mntsRef, viewsRef)
+
+        val liftTask: Task ~> CfgsErrsIOM =
+          injectFT[Task, CfgsErrsIO]
+
+        val translateFsErrs: FsErrsIOM ~> CfgsErrsIOM =
+          free.foldMapNT[FsErrsIO, CfgsErrsIOM](
+            free.interpret3[HFSFailureF, WorkflowExecErrF, Task, CfgsErrsIOM](
+              injectFT[HFSFailureF, CfgsErrsIO],
+              injectFT[WorkflowExecErrF, CfgsErrsIO],
+              liftTask))
+
+        val mnt: CompleteFsEff ~> CfgsErrsIOM =
+          free.interpret2[MountConfigsF, CompFsEffM, CfgsErrsIOM](
+            injectFT[MountConfigsF, CfgsErrsIO],
+            translateFsErrs.compose[CompFsEffM](free.foldMapNT(g)))
+
+        val mounting: MountingF ~> CfgsErrsIOM =
+          Coyoneda.liftTF[Mounting, CfgsErrsIOM](free.foldMapNT(mnt) compose mounter)
+
+        free.interpret4[Task, FileSystemFailureF, MountingF, FileSystem, CfgsErrsIOM](
+          liftTask,
+          injectFT[FileSystemFailureF, CfgsErrsIO],
+          mounting,
+          translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
+      }
+  }
+}
