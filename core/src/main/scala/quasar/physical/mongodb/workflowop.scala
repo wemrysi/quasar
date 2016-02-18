@@ -179,7 +179,7 @@ object Workflow {
     }
     case p @ $Project(src, shape, id) => src.unFix match {
       case $Project(src0, shape0, id0) =>
-        $Project(src0, inlineProject(p, List(shape0)), id0 |+| id).some
+        inlineProject(p, List(shape0)).map($Project(src0, _, id0 |+| id))
       // Would like to inline a $project into a preceding $simpleMap, but
       // This is not safe, because sometimes a $project is inserted after
       // $simpleMap specifically to pull fields out of `value`, and those

@@ -451,6 +451,50 @@ class WorkflowBuilderSpec
           IgnoreId)))
     }
 
+    "not flatten with nested exprs" in {
+      val read    = WorkflowBuilder.read(Collection("db", "zips"))
+      val op = (for {
+        check0 <- expr1(read)($cond($literal(Bson.Bool(true)), _, $literal(Bson.Int32(0))))
+        loc    <- lift(projectField(check0, "loc"))
+        check1 <- expr1(loc)($cond($literal(Bson.Bool(true)), _, $literal(Bson.Int32(1))))
+        flat   =  flattenArray(check1)
+
+        city   <- lift(projectField(read, "city"))
+        filtered = filter(city, List(flat), { case p :: Nil => Selector.Doc(p -> Selector.Lt(Bson.Int32(1000))) })
+
+        _=println(filtered.show)
+
+        rez    <- build(filtered)
+      } yield rez).evalZero
+
+      op must beRightDisjOrDiff(
+        chain(
+          $read(Collection("db", "zips")),
+          $project(
+            Reshape(ListMap(
+              BsonField.Name("__tmp0") -> $cond($literal(Bson.Bool(true)), $$ROOT, $literal(Bson.Int32(0))).right,
+              BsonField.Name("__tmp1") -> $$ROOT.right)),
+            IgnoreId),
+          $project(
+            Reshape(ListMap(
+              BsonField.Name("__tmp2") -> $cond($literal(Bson.Bool(true)), $field("__tmp0", "loc"), $literal(Bson.Int32(1))).right,
+              BsonField.Name("__tmp3") -> $field("__tmp1").right)),
+            IgnoreId),
+          $unwind(DocField(BsonField.Name("__tmp2"))),
+          $project(
+            Reshape(ListMap(
+              BsonField.Name("__tmp4") -> $field("__tmp3", "city").right,
+              BsonField.Name("__tmp5") -> $field("__tmp2").right)),
+            IgnoreId),
+          $match(
+            Selector.Doc(
+              BsonField.Name("__tmp5") -> Selector.Lt(Bson.Int32(1000)))),
+          $project(
+            Reshape(ListMap(
+              BsonField.Name("value") -> $field("__tmp4").right)),
+            ExcludeId)))
+    }
+
     "normalize" should {
       val readFoo = CollectionBuilder($read(Collection("db", "foo")), Root(), None)
 
