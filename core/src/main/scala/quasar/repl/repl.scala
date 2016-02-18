@@ -401,7 +401,9 @@ object Repl {
           new RuntimeException(s"Invalid path to config file: $s")))
 
       def configFromPath(fsPath: Option[FsPath[File, Sandboxed]]): Task[CoreConfig] =
-        CoreConfig.get(fsPath)
+        CoreConfig.fromFileOrDefaultIfUnspecified(fsPath).run flatMap (_.fold(
+          cfgErr => Task.fail(new RuntimeException(cfgErr.shows)),
+          cfg    => Task.now(cfg)))
 
       def backendFromConfig(config: CoreConfig): Task[Backend] =
         Mounter.defaultMount(MountingsConfig.fromMC2(config.mountings))
@@ -409,8 +411,8 @@ object Repl {
           .join
 
       for {
-        fsPath <- args.headOption.map(parsePath).sequence
-        cfg <- configFromPath(fsPath)
+        fsPath  <- args.headOption traverse parsePath
+        cfg     <- configFromPath(fsPath)
         backend <- backendFromConfig(cfg)
       } yield backend
     }

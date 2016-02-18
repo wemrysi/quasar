@@ -20,11 +20,12 @@ import quasar.Predef._
 import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr}
 import quasar.config._
-import quasar.console.logErrors
+import quasar.console.{logErrors, stderr}
 import quasar.fs.mount._
 import quasar.fp.TaskRef
 import quasar.server.impl._
 
+import argonaut.DecodeJson
 import org.http4s.server._
 import org.http4s.server.syntax._
 import scalaz._
@@ -59,6 +60,27 @@ object Server {
                       .toRight(s"Invalid path to config file: $cfg")
                       .map(some))
     } yield QuasarConfig(content.toList, redirect, opts.port, cfgPath, opts.openClient)
+  }
+
+  /** Attempts to load the specified config file or one found at any of the
+    * default paths. If an error occurs, it is logged to STDERR and the
+    * default configuration is returned.
+    */
+  def loadConfigFile[C: DecodeJson](configOps: ConfigOps[C], configFile: Option[FsFile]): Task[C] = {
+    import ConfigError._
+    configFile.fold(configOps.fromDefaultPaths)(configOps.fromFile).run flatMap {
+      case \/-(c) => c.point[Task]
+
+      case -\/(FileNotFound(f)) => for {
+        codec <- FsPath.systemCodec
+        fstr  =  FsPath.printFsPath(codec, f)
+        _     <- stderr(s"Configuration file '$fstr' not found, using default configuration.")
+      } yield configOps.default
+
+      case -\/(MalformedConfig(_, rsn)) =>
+        stderr(s"Error in configuration file, using default configuration: $rsn")
+          .as(configOps.default)
+    }
   }
 
   def nonApiService(
@@ -116,10 +138,9 @@ object Server {
 
     val main0: MainTask[Unit] = for {
       qConfig      <- QuasarConfig.fromArgs(args)
-      // TODO Fix loading in separate commit
-      config       <- WebConfig.get(qConfig.configPath).liftM[MainErrT]
+      config       <- loadConfigFile(WebConfig, qConfig.configPath).liftM[MainErrT]
                     // TODO: Find better way to do this
-      updConfig    = config.copy(server = config.server.copy(qConfig.port.getOrElse(config.server.port)))
+      updConfig    =  config.copy(server = config.server.copy(qConfig.port.getOrElse(config.server.port)))
       coreApi      <- CoreEff.interpreter.liftM[MainErrT]
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- mountAll[CoreEff](config.mountings) foldMap ephemeralApi
