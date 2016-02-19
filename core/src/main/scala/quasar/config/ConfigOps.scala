@@ -18,6 +18,7 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.config.FsPath._
+import quasar.Errors.ETask
 import quasar.fp._
 import quasar.fs.{Path => _, _}
 import quasar.fs.mount.MountingsConfig2
@@ -62,15 +63,33 @@ trait ConfigOps[C] {
     } yield config
   }
 
-  def fromFileOrDefaultPaths(path: Option[FsFile])(implicit D: DecodeJson[C]): CfgTask[C] = {
+  /** Loads configuration from one of the OS-specific default paths. */
+  def fromDefaultPaths(implicit D: DecodeJson[C]): CfgTask[C] = {
     def load(path: Task[FsFile]): CfgTask[C] =
       path.liftM[CfgErrT] flatMap fromFile
 
-    path.cata(fromFile,load(defaultPath) orElse_bug_free load(alternatePath))
+    merr.handleError(load(defaultPath)) {
+      case fnf @ FileNotFound(_) =>
+        merr.handleError(load(legacyDefaultPath)) {
+          // Because we only want to expose the current 'default' path, not the
+          // legacy one, if both fail.
+          case FileNotFound(_) => merr.raiseError(fnf)
+          case err             => merr.raiseError(err)
+        }
+      case err => merr.raiseError(err)
+    }
   }
 
-  def get(path: Option[FsFile])(implicit D: DecodeJson[C]): Task[C] =
-    fromFileOrDefaultPaths(path) getOrElse default
+  /** Loads the configuration from the specified file or OS-specific default
+    * paths. If no configuration file is found, and one was not specified, the
+    * default configuration is returned.
+    */
+  def fromFileOrDefaultIfUnspecified(configFile: Option[FsFile])(implicit D: DecodeJson[C]): CfgTask[C] = {
+    merr.handleError(configFile.cata(fromFile, fromDefaultPaths)) {
+      case FileNotFound(_) if configFile.isEmpty => merr.point(default)
+      case err                                   => merr.raiseError(err)
+    }
+  }
 
   def toFile(config: C, path: Option[FsFile])(implicit E: EncodeJson[C]): Task[Unit] =
     for {
@@ -92,20 +111,23 @@ trait ConfigOps[C] {
 
   ////
 
+  private def merr = MonadError[ETask, ConfigError]
   private val malformedRsn = malformedConfig composeLens _2
 
-  /**
-   * The default path to the configuration file for the current operating system.
-   * NB: Paths read from environment/props are assumed to be absolute.
-   */
+  /** The default path to the configuration file for the current operating system. */
   private def defaultPath: Task[FsFile] =
     OS.currentOS >>= defaultPathForOS(dir("quasar") </> file("quasar-config.json"))
 
-  private def alternatePath: Task[FsFile] =
+  /**
+   * The default path in a previous version of the software, used to ease the
+   * transition to the new location.
+   */
+  private def legacyDefaultPath: Task[FsFile] =
     OS.currentOS >>= defaultPathForOS(dir("SlamData") </> file("slamengine-config.json"))
 }
 
 object ConfigOps {
+  /** NB: Paths read from environment/props are assumed to be absolute. */
   def defaultPathForOS(file: RFile)(os: OS): Task[FsFile] = {
     def localAppData: OptionT[Task, FsPath.Aux[Abs, Dir, Sandboxed]] =
       OptionT(Task.delay(envOrNone("LOCALAPPDATA")))

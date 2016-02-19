@@ -91,11 +91,11 @@ abstract class ConfigSpec[Config: CodecJson] extends Specification with Disjunct
     }
   }
 
-  "fromFileOrDefaultPaths" should {
+  "fromFile" should {
     "result in error when file not found" in {
       val (p, r) =
         withTestConfigFile(fp =>
-          configOps.fromFileOrDefaultPaths(Some(fp)).run.map((fp, _))
+          configOps.fromFile(fp).run.map((fp, _))
         ).run
       r must beLeftDisjunction(fileNotFound(p))
     }

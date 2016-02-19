@@ -18,7 +18,6 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar.api._
-import quasar.api.ServerOps.StaticContent
 import quasar.api.{Destination, HeaderParam}
 import quasar.fs._
 import quasar.fs.mount._
@@ -54,12 +53,8 @@ object RestApi {
       "/query/fs"    -> query.execute.service[S]
     )
 
-  def additionalServices(
-    defaultPort: Int,
-    restart: Int => Task[Unit]
-  ): Map[String, HttpService] =
+  val additionalServices: Map[String, HttpService] =
     ListMap(
-      "/server"  -> server.service(defaultPort, restart),
       "/welcome" -> welcome.service
     )
 

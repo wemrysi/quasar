@@ -21,7 +21,7 @@ import quasar.Predef.{String, StringContext, Some, None}
 import monocle.Prism
 import scalaz.Show
 
-trait ConfigError
+sealed trait ConfigError
 
 object ConfigError {
   final case class MalformedConfig private[config] (src: String, reason: String)
