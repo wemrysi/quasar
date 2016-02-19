@@ -16,8 +16,6 @@
 
 package quasar.fp.numeric
 
-import quasar.Predef._
-
 import eu.timepit.refined.scalacheck.numeric.Bounded
 import org.scalacheck.Gen
 import org.scalacheck.Gen.Choose
@@ -25,7 +23,7 @@ import org.scalacheck.Gen.Choose
 object SafeIntForVectorArbitrary {
   implicit val chooseSafeIntForVector: Choose[SafeIntForVector] = new Choose[SafeIntForVector] {
     def choose(low: SafeIntForVector, high: SafeIntForVector) =
-      Gen.choose(Int.MinValue, SafeIntForVector.maxValue).map(SafeIntForVector.unsafe)
+      Gen.choose(low.value, high.value).map(SafeIntForVector.unsafe)
   }
 
   implicit val SafeIntForVectorBounded: Bounded[SafeIntForVector] =
