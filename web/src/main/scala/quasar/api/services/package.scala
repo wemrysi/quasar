@@ -19,6 +19,7 @@ package quasar.api
 import quasar.Predef._
 import quasar.Data
 import quasar.fs.{Path => QPath, _}
+import quasar.fp.numeric._
 
 import org.http4s._
 import org.http4s.dsl.{Path => HPath, _}

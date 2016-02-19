@@ -17,7 +17,8 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar._, api._, fs._
+import quasar._, api._
+import quasar.fp.numeric._
 import quasar.sql.Query
 
 import org.http4s._, dsl._
@@ -45,8 +46,8 @@ package object query {
     case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
 
   def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
-    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.value), sql.Offset))
-    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.value), sql.Limit))
+    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.get), sql.Offset))
+    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.get), sql.Limit))
   }
 
 }

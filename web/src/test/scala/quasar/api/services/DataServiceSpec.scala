@@ -26,8 +26,9 @@ import quasar.api.MessageFormat.JsonContentType
 import quasar.api.MessageFormatGen._
 import quasar.effect.Failure
 import quasar.fs.{Path => _, _}
-import quasar.fs.NumericArbitrary._
 import quasar.fp.{evalNT, free, liftMT}
+import quasar.fp.numeric._
+import quasar.fp.numeric.SafeIntForVectorArbitrary._
 import quasar.fp.prism._
 
 import argonaut.Json
@@ -48,6 +49,15 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.stream.Process
+
+import quasar.api.MessageFormatGen._
+
+import org.scalacheck.{Arbitrary, Gen}
+
+import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
+import eu.timepit.refined.auto._
+import eu.timepit.refined.scalacheck.numeric._
+import shapeless.tag.@@
 
 class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
@@ -182,37 +192,34 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
         "support offset and limit" >> {
           "return expected result if user supplies valid values" ! prop {
-            (filesystem: SingleFileMemState, offset: Natural, limit: Positive, format: MessageFormat) =>
-            // Not sure why this precondition is necessary...
-            (offset.value < Int.MaxValue && limit.value < Int.MaxValue) ==> {
+            (filesystem: SingleFileMemState, offset: Int @@ NonNegative, limit: SafeIntForVector @@ RPositive, format: MessageFormat) =>
               val request = Request(
-                uri = Uri(path = filesystem.path).+?("offset", offset.value.toString).+?("limit", limit.value.toString),
+                uri = Uri(path = filesystem.path).+?("offset", offset.toString).+?("limit", limit.value.toString),
                 headers = Headers(Accept(format.mediaType)))
               val response = service(filesystem.state)(request).run
-              isExpectedResponse(filesystem.contents.drop(offset.value.toInt).take(limit.value.toInt), response, format)
-            }
+              isExpectedResponse(filesystem.contents.drop(offset).take(limit.value), response, format)
           }
           "return 400 if provided with" >> {
             "a non-positive limit (0 is invalid)" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit: Int) =>
               (limit < 1) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.toString))
+                  uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[Json].run must_== Json("error" := s"invalid limit: $limit (must be >= 1)")
               }
             }
-            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Negative, limit: Positive) =>
+            "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
               val request = Request(
-                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limit.value.toString))
+                uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limit.shows))
               val response = service(InMemState.empty)(request).run
               response.status must_== Status.BadRequest
-              response.as[Json].run must_== Json("error" := s"invalid offset: ${offset.value} (must be >= 0)")
+              response.as[Json].run must_== Json("error" := s"invalid offset: $offset (must be >= 0)")
             }
             "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
               val limits = limit1 :: limit2 :: otherLimits
               val request = Request(
-                uri = Uri(path = printPath(path)).+?("offset", offset.value.toString).+?("limit", limits.map(_.value.toString)))
+                uri = Uri(path = printPath(path)).+?("offset", offset.shows).+?("limit", limits.map(_.shows)))
               val response = service(InMemState.empty)(request).run
               response.status must_== Status.BadRequest
               response.as[Json].run must_== Json("error" := s"Two limits were provided, only supply one limit")
@@ -220,7 +227,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
               (offsets.length >= 2) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.value.toString)).+?("limit", limit.value.toString))
+                  uri = Uri(path = printPath(path)).+?("offset", offsets.map(_.shows)).+?("limit", limit.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
                 response.as[Json].run must_== Json("error" := s"Two limits were provided, only supply one limit")
@@ -235,13 +242,13 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               response.status must_== Status.BadRequest
               response.as[Json].run must_== Json("error" := s"""invalid limit: Query decoding Long failed (For input string: "a")""")
             }
-            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Negative) =>
+            "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
               (limit < 1) ==> {
                 val request = Request(
-                  uri = Uri(path = printPath(path)).+?("limit", limit.toString).+?("offset", offset.value.toString))
+                  uri = Uri(path = printPath(path)).+?("limit", limit.shows).+?("offset", offset.shows))
                 val response = service(InMemState.empty)(request).run
                 response.status must_== Status.BadRequest
-                response.as[Json].run must_== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: ${offset.value} (must be >= 0)")
+                response.as[Json].run must_== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)")
               }
             }.pendingUntilFixed("SD-1083")
           }

@@ -18,7 +18,7 @@ package quasar.api.services
 
 import quasar.{DataCodec, Data}
 import quasar.api._, ToQuasarResponse.ops._
-import quasar.fp._
+import quasar.fp._, numeric._
 import quasar.fs._
 import quasar.Predef._
 import quasar.repl.Prettify
@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets
 
 import argonaut.Argonaut._
 import argonaut.Json
+import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.{`Content-Type`, Accept}
@@ -51,7 +52,7 @@ object data {
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
       (offsetOrInvalid[S](offsetParam) |@| limitOrInvalid[S](limitParam)) { (offset, limit) =>
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-        download[S](requestedFormat, path, offset.getOrElse(Natural._0), limit)
+        download[S](requestedFormat, path, offset.getOrElse(0L), limit)
       }.merge.point[R.F]
 
     case req @ POST -> AsFilePath(path) =>

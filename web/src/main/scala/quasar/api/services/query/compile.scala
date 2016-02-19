@@ -21,6 +21,7 @@ import quasar._, api._, fs._
 import quasar.api.services._
 import quasar.api.ToQuasarResponse.ops._
 import quasar.fs.{Path => QPath}
+import quasar.fp.numeric._
 import quasar.recursionschemes.Fix
 import quasar.sql.{ParsingError, SQLParser}
 

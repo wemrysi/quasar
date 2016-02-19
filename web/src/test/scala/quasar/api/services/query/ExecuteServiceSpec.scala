@@ -18,14 +18,18 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._, fp._
+import quasar.fp.numeric._
+import quasar.fp.numeric.SafeIntForVectorArbitrary._
 import quasar.api.services.Fixture._
 import quasar.fs.{Path => QPath, _}
 import quasar.fs.InMemory._
-import quasar.fs.NumericArbitrary._
 import quasar.recursionschemes.Fix
 import quasar.std.IdentityLib
 
 import argonaut._, Argonaut._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
+import eu.timepit.refined.scalacheck.numeric._
 import org.http4s._
 import org.http4s.server.HttpService
 import org.scalacheck.Arbitrary
@@ -127,17 +131,25 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         val lp = toLP(inlineQuery, Variables.fromMap(Map(varName.value -> var_.toString)))
         (query,lp)
       }
-      "GET" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive) =>
-        val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
-        get(executeService)(
-          path = filesystem.parent,
-          query = Some(Query(query, offset = Some(offset), limit = Some(limit), varNameAndValue = Some((varName.value,var_.toString)))),
-          state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
-          status = Status.Ok,
-          response = (a: String) => a must_==
-            jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
-              .drop(offset.value.toInt).take(limit.value.toInt).mkString("")
-        )
+      "GET" ! prop { (
+        filesystem: SingleFileMemState,
+        varName: AlphaCharacters,
+        var_ : Int,
+        offset: Int Refined NonNegative,
+        limit: SafeIntForVector Refined RPositive) =>
+          val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
+          get(executeService)(
+            path = filesystem.parent,
+            query = Some(Query(
+              query,
+              offset = Some(offset),
+              limit = Some(Positive(limit.get.value.toLong).get),
+              varNameAndValue = Some((varName.value, var_.toString)))),
+            state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
+            status = Status.Ok,
+            response = (a: String) => a must_==
+              jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
+                .drop(offset.get).take(limit.get.value).mkString(""))
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FileOf[AlphaCharacters]) =>
         val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
