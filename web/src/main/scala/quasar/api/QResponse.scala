@@ -39,6 +39,12 @@ import scodec.bits.ByteVector
 final case class QResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
 
+  def flatMapS[T[_]](f: S ~> Free[T, ?])(implicit S: Functor[S]): QResponse[T] =
+    copy[T](body = body.translate[Free[T, ?]](free.flatMapSNT(f)))
+
+  def mapS[T[_]: Functor](f: S ~> T)(implicit S: Functor[S]): QResponse[T] =
+    copy[T](body = body.translate[Free[T, ?]](free.mapSNT(f)))
+
   def modifyHeaders(f: Headers => Headers): QResponse[S] =
     QResponse.headers.modify(f)(this)
 
