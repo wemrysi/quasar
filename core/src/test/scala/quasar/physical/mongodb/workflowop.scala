@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.TreeMatchers
 import quasar.fp._
+import quasar.recursionschemes.Fix
 import quasar.javascript._
 
 import org.scalacheck._
@@ -206,6 +207,73 @@ class WorkflowSpec extends Specification with TreeMatchers {
           BsonField.Name("bar") ->
             \/-($field("bar")))),
           ExcludeId))
+    }
+
+    "inline $project with field reference" in {
+      chain(
+        $read(Collection("db", "zips")),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp0") -> \/-($$ROOT))),
+          IgnoreId),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp1") -> \/-($field("__tmp0", "foo")))),
+          IgnoreId)) must_==
+      chain(
+        $read(Collection("db", "zips")),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp1") -> \/-($field("foo")))),
+          IgnoreId))
+    }
+
+    "not inline $projects with nesting" in {
+      // NB: simulates a pair of type-checks, which cannot be inlined in a simple way
+      // because the second digs into the structure created by the first.
+
+      val op = chain(
+        $read(Collection("db", "zips")),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp0") -> \/-(
+              $cond($literal(Bson.Bool(true)), $$ROOT, $literal(Bson.Int32(0)))))),
+          IgnoreId),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp1") -> \/-(
+              $cond($literal(Bson.Bool(true)), $field("__tmp0", "foo"), $literal(Bson.Int32(1)))))),
+          IgnoreId))
+
+      (op.unFix match {
+        case $Project(Fix($Project(_, Reshape(s1), _)), Reshape(s2), _) =>
+          s1.keys must_== Set(BsonField.Name("__tmp0"))
+          s2.keys must_== Set(BsonField.Name("__tmp1"))
+        case _ => failure
+      }): org.specs2.execute.Result
+    }
+
+    "not inline $project with a bad reference" in {
+      // NB: in a case like this, the original structure is preserved so it
+      // can be debugged more easily.
+
+      val op = chain(
+        $read(Collection("db", "zips")),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp0") -> \/-($$ROOT))),
+          IgnoreId),
+        $project(
+          Reshape(ListMap(
+            BsonField.Name("__tmp1") -> \/-($field("foo")))),
+          IgnoreId))
+
+      (op.unFix match {
+        case $Project(Fix($Project(_, Reshape(s1), _)), Reshape(s2), _) =>
+          s1.keys must_== Set(BsonField.Name("__tmp0"))
+          s2.keys must_== Set(BsonField.Name("__tmp1"))
+        case _ => failure
+      }): org.specs2.execute.Result
     }
   }
 

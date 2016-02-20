@@ -74,11 +74,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       e => scala.sys.error("parsing error: " + e.message),
       expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run._2).toEither
 
-  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] =
-    (for {
-      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical)))
+  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] = {
+    val (log, wf) = (for {
+      _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
+      simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
+      _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
       phys       <- MongoDbPlanner.plan(simplified)
-    } yield phys).run._2.toEither
+    } yield phys).run
+
+    wf.toEither
+  }
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
@@ -3729,6 +3734,88 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             ObjectProject(Free('right), Constant(Data.Str("bar"))),
             ObjectProject(Free('left), Constant(Data.Str("baz")))),
           ObjectProject(Free('left), Constant(Data.Str("foo"))))))
+    }
+
+    "plan with extra squash and flattening" in {
+      // NB: this case occurs when a view's LP is embedded in a larger query (See SD-1403),
+      // because type-checks are inserted into the inner and outer queries separately.
+
+      val lp =
+        LogicalPlan.Let(
+          'tmp0,
+          LogicalPlan.Let(
+            'check0,
+            identity.Squash(read("db/zips")),
+            LogicalPlan.Typecheck(
+              Free('check0),
+              Type.Obj(Map(), Some(Type.Top)),
+              Free('check0),
+              Constant(Data.NA))),
+          s.Distinct[FLP](
+            identity.Squash[FLP](
+              makeObj(
+                "city" ->
+                ObjectProject[FLP](
+                  s.Filter[FLP](
+                    Free('tmp0),
+                    string.Search[FLP](
+                      FlattenArray[FLP](
+                        LogicalPlan.Let(
+                          'check1,
+                          ObjectProject(Free('tmp0), Constant(Data.Str("loc"))),
+                          LogicalPlan.Typecheck(
+                            Free('check1),
+                            Type.FlexArr(0, None, Type.Str),
+                            Free('check1),
+                            Constant(Data.Arr(List(Data.NA)))))),
+                      Constant(Data.Str("^.*MONT.*$")),
+                      Constant(Data.Bool(false)))),
+                  Constant(Data.Str("city")))))))
+
+      plan(lp) must beWorkflow(chain(
+        $read(Collection("db", "zips")),
+        $project(
+          reshape(
+            "__tmp12" -> $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $$ROOT),
+                $lt($$ROOT, $literal(Bson.Arr(List())))),
+              $$ROOT,
+              $literal(Bson.Undefined)),
+            "__tmp13" -> $$ROOT),
+          IgnoreId),
+        $project(
+          reshape(
+            "__tmp14" -> $cond(
+              $and(
+                $lte($literal(Bson.Arr(List())), $field("__tmp12", "loc")),
+                $lt($field("__tmp12", "loc"), $literal(Bson.Binary(Array[Byte]())))),
+              $field("__tmp12", "loc"),
+              $literal(Bson.Arr(List(Bson.Undefined)))),
+            "__tmp15" -> $field("__tmp13")),
+          IgnoreId),
+        $unwind(DocField("__tmp14")),
+        $match(
+          Selector.Doc(
+            BsonField.Name("__tmp14") -> Selector.Regex("^.*MONT.*$", false, true, false, false))),
+        $project(
+          reshape(
+            "__tmp16" -> $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("__tmp15")),
+                $lt($field("__tmp15"), $literal(Bson.Arr(List())))),
+              $field("__tmp15"),
+              $literal(Bson.Undefined))),
+          IgnoreId),
+        $project(
+          reshape("city" -> $field("__tmp16", "city")),
+          IgnoreId),
+        $group(
+          grouped(),
+          -\/(reshape("0" -> $field("city")))),
+        $project(
+          reshape("city" -> $field("_id", "0")),
+          IgnoreId)))
     }
   }
 
