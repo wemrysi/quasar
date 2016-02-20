@@ -8,8 +8,6 @@
 
 Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a growing range of data sources and databases, including MongoDB.
 
-**This is the open source site for Quasar, a NoSQL analytics engine. If you are looking for the SlamData application (which is built on Quasar), please visit the [official SlamData website](http://slamdata.com) for pre-built installers.**
-
 ## Using the Pre-Built JARs
 
 In [Github Releases](http://github.com/quasar-analytics/quasar/releases), you can find pre-built JARs for all the subprojects in this repository.
