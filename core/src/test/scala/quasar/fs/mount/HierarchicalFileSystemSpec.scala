@@ -21,10 +21,10 @@ import quasar.{Data, LogicalPlan}
 import quasar.effect._
 import quasar.fp.{hoistFree, liftMT, free, zoomNT}
 import quasar.fs._
-import quasar.recursionschemes.Fix
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 
+import matryoshka.Fix
 import monocle.Lens
 import org.specs2.mutable
 import pathy.Path._

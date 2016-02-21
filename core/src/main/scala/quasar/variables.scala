@@ -17,10 +17,10 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.SemanticError._
 import quasar.sql._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
 final case class Variables(value: Map[VarName, VarValue])

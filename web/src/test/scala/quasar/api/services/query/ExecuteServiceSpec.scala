@@ -23,13 +23,13 @@ import quasar.fp.numeric.SafeIntForVectorArbitrary._
 import quasar.api.services.Fixture._
 import quasar.fs.{Path => QPath, _}
 import quasar.fs.InMemory._
-import quasar.recursionschemes.Fix
 import quasar.std.IdentityLib
 
 import argonaut._, Argonaut._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
+import matryoshka.Fix
 import org.http4s._
 import org.http4s.server.HttpService
 import org.scalacheck.Arbitrary

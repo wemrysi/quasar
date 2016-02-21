@@ -19,11 +19,11 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.RenderTree
 import quasar.fp._
-import quasar.recursionschemes._, FunctorT.ops._
 import quasar._; import Planner._
 import quasar.javascript._
 import quasar.specs2._
 
+import matryoshka._, FunctorT.ops._
 import org.specs2.execute.{Result}
 import org.specs2.mutable._
 import scalaz._, Scalaz._
@@ -654,12 +654,12 @@ class WorkflowBuilderSpec
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $Read(db; zips)
           |│  │  ╰─ Schema(None)
-          |│  ╰─ ExprOp($varF(DocField(BsonField.Name("pop"))))
+          |│  ╰─ ExprOp(Fix($varF(DocField(BsonField.Name("pop")))))
           |├─ By
           |│  ╰─ ValueBuilder(Int32(1))
           |╰─ Content
           |   ╰─ -\/
-          |      ╰─ AccumOp($sum($varF(DocVar.ROOT())))""".stripMargin)
+          |      ╰─ AccumOp($sum(Fix($varF(DocVar.ROOT()))))""".stripMargin)
     }
 
   }

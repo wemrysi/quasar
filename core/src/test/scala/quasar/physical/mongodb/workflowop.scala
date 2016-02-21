@@ -20,9 +20,9 @@ import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.TreeMatchers
 import quasar.fp._
-import quasar.recursionschemes.Fix
 import quasar.javascript._
 
+import matryoshka.Fix
 import org.scalacheck._
 import org.scalacheck.Arbitrary
 import org.specs2.mutable._

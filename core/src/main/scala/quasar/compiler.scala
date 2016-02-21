@@ -17,13 +17,14 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, cofree._, Recursive.ops._, FunctorT.ops._
 import quasar.fp._
+import quasar.fp.binder._
 import quasar.fs.Path
 import quasar.sql._
 import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
+import matryoshka.{ToIdOps => toAllOps, _}, Fix._, Recursive.ops._, FunctorT.ops._
 import org.threeten.bp.{Instant, LocalDate, LocalTime, Duration}
 import scalaz.{Tree => _, _}, Scalaz._
 
@@ -531,17 +532,17 @@ object Compiler {
       (Fix(t.map(_._1)),
         groupedKeys(t.map(_._1), Fix(t.map(_._1))).getOrElse(t.foldMap(_._2)))
     }
-    val keys: List[Fix[LogicalPlan]] = tree.boundCata(keysƒ)._2
+    val keys: List[Fix[LogicalPlan]] = boundCata(tree)(keysƒ)._2
 
     // Step 1: annotate nodes containing the keys.
     val ann: Cofree[LogicalPlan, Boolean] = boundAttribute(tree)(keys.contains)
 
     // Step 2: transform from the top, inserting Arbitrary where a key is not
     // otherwise reduced.
-    def rewriteƒ(t: Cofree[LogicalPlan, Boolean]): LogicalPlan[Cofree[LogicalPlan, Boolean]] = {
+    def rewriteƒ: Coalgebra[LogicalPlan, Cofree[LogicalPlan, Boolean]] = {
       def strip(v: Cofree[LogicalPlan, Boolean]) = Cofree(false, v.tail)
 
-      t.tail match {
+      t => t.tail match {
         case InvokeF(func @ Reduction(_, _, _, _, _, _, _), arg :: Nil) =>
           InvokeF(func, List(strip(arg)))
 

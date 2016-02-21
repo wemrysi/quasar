@@ -19,11 +19,11 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.fp._
-import quasar.recursionschemes._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.IdHandling._
 import quasar.physical.mongodb.Workflow._
 
+import matryoshka._
 import scalaz._, Scalaz._
 
 package object workflowtask {

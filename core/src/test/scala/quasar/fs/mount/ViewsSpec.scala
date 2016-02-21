@@ -21,9 +21,9 @@ import quasar.Predef._
 import quasar._, LogicalPlan.{Free => LPFree, _}
 import quasar.fp._
 import quasar.fs._
-import quasar.recursionschemes._
 import quasar.std.StdLib._, set._, structural._
 
+import matryoshka._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import pathy.{Path => PPath}, PPath._

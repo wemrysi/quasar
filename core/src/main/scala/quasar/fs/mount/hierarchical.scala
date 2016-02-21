@@ -21,8 +21,8 @@ import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults}
 import quasar.effect._
 import quasar.fp._
 import quasar.fs._
-import quasar.recursionschemes.{free => _, _}, Recursive.ops._
 
+import matryoshka.{free => _, _}, Recursive.ops._
 import monocle.{Iso, Prism}
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._

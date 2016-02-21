@@ -22,10 +22,10 @@ import quasar._, LogicalPlan.{Free => LPFree, _}
 import quasar.effect._
 import quasar.fp._
 import quasar.fs._
-import quasar.recursionschemes._
 import quasar.std.StdLib._, set._
 
 import eu.timepit.refined.auto._
+import matryoshka._
 import monocle.macros.GenLens
 import org.specs2.mutable._
 import org.specs2.ScalaCheck

@@ -18,8 +18,8 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.TreeMatchers
-import quasar.recursionschemes._, FunctorT.ops._
 
+import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import scalaz._, Scalaz._
 

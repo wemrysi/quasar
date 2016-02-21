@@ -17,9 +17,9 @@
 import quasar.Predef.{Long, String, Vector}
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.recursionschemes._, Fix._
 import quasar.sql._
 
+import matryoshka._
 import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.either._

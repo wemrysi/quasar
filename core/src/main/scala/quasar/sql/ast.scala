@@ -20,6 +20,8 @@ import quasar.Predef._
 
 import scala.Any
 
+import matryoshka._
+
 trait IsDistinct
 final case object SelectDistinct extends IsDistinct
 final case object SelectAll extends IsDistinct
@@ -57,6 +59,9 @@ object ExprF {
   final case class StringLiteralF[A](v: String) extends ExprF[A]
   final case class NullLiteralF[A]() extends ExprF[A]
   final case class BoolLiteralF[A](value: Boolean) extends ExprF[A]
+
+  implicit def ToExprAlgebraOps[A](a: Algebra[ExprF, A]): AlgebraOps[ExprF, A] =
+    ToAlgebraOps[ExprF, A](a)
 }
 
 // TODO: Change to extend `(A, A) => ExprF[A]`

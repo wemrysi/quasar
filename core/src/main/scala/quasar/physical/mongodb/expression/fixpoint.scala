@@ -17,8 +17,9 @@
 package quasar.physical.mongodb.expression
 
 import quasar.Predef._
-import quasar.recursionschemes.Fix
 import quasar.physical.mongodb.Bson
+
+import matryoshka.Fix
 
 object $include {
   def apply(): Expression = Fix($includeF())

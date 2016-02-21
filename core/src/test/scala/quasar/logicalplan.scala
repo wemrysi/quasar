@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fs._
 
+import matryoshka.Fix
 import org.scalacheck._
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
@@ -65,7 +66,6 @@ class LogicalPlanSpecs extends Spec {
 
   checkAll(traverse.laws[LogicalPlan])
 
-  import quasar.recursionschemes.Fix
   import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._
 
   "normalizeTempNames" should {

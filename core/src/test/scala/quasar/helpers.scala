@@ -17,11 +17,11 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._
+import quasar.fs._
 import quasar.sql.{SQLParser, Query}
 import quasar.std._
-import quasar.fs._
 
+import matryoshka._
 import org.specs2.mutable._
 import org.specs2.matcher.{Matcher, Expectable}
 import scalaz._, Scalaz._

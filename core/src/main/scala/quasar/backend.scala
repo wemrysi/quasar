@@ -18,13 +18,13 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.Errors._
 import quasar.Evaluator._
 import quasar.Planner._
 import quasar.config._
 import quasar.fs._, Path._
 
+import matryoshka._, Recursive.ops._
 import scalaz.{Tree => _, _}, Scalaz._
 import scalaz.concurrent._
 import scalaz.stream.{Writer => _, _}

@@ -18,9 +18,9 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, NonEmptyList.nel, Scalaz._, Validation.{success, failure}
 
 trait MathLib extends Library {

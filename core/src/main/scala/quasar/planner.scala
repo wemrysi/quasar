@@ -19,9 +19,9 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 import quasar.fs.Path._
-import quasar.recursionschemes._, Fix._
 import quasar.sql._
 
+import matryoshka._
 import scalaz._, Scalaz._
 
 trait Planner[PhysicalPlan] {

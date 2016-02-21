@@ -5,7 +5,7 @@ import scala.collection.Seq
 import sbt._, Keys._
 
 object Dependencies {
-  private val scalazVersion  = "7.1.4"
+  private val scalazVersion  = "7.1.6"
   private val slcVersion     = "0.4"
   private val monocleVersion = "1.1.1"
   private val pathyVersion   = "0.0.3"
@@ -14,7 +14,10 @@ object Dependencies {
   private val refinedVersion = "0.3.4"
 
   val core = Seq(
-    "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test",
+    // NB: This version is forced because there seems to be some difference
+    //     with `Free` or `Catchable` in 7.1.7 that affects our implementation
+    //     of `CatchableFree`.
+    "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test" force(),
     "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion  % "compile, test",
     "org.scalaz.stream" %% "scalaz-stream"             % "0.7.3a"       % "compile, test",
     "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion % "compile, test",
@@ -27,8 +30,9 @@ object Dependencies {
     "io.argonaut"       %% "argonaut"                  % "6.1"          % "compile, test",
     "org.jboss.aesh"    %  "aesh"                      % "0.55"         % "compile, test",
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion     % "compile, test",
+    "com.slamdata"      %% "matryoshka-core"           % "0.1.0"        % "compile",
     "com.slamdata"      %% "pathy-core"                % pathyVersion   % "compile",
-    "com.github.mpilquist" %% "simulacrum"             % "0.4.0"        % "compile, test",
+    "com.github.mpilquist" %% "simulacrum"             % "0.7.0"        % "compile, test",
     "org.http4s"        %% "http4s-core"               % http4sVersion  % "compile",
     "com.slamdata"      %% "pathy-scalacheck"          % pathyVersion   % "test",
     "org.scalaz"        %% "scalaz-scalacheck-binding" % scalazVersion  % "test",

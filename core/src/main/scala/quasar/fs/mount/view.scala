@@ -22,9 +22,9 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError2._
-import quasar.recursionschemes._
 import quasar.std.StdLib._, set._
 
+import matryoshka._
 import monocle.Optional
 import monocle.function.Field1
 import pathy.{Path => PPath}, PPath._

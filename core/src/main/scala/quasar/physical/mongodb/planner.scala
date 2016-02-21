@@ -17,18 +17,17 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar._
 import quasar.fp._
+import quasar.fs.Path
+import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
-
-import quasar._
-import quasar.fs.Path
 import quasar.std.StdLib._
-import quasar.javascript._
 import Type._
 import Workflow._
 
+import matryoshka._, Fix._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.{Duration, Instant}
 import scalaz._, Scalaz._
 
@@ -36,9 +35,6 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
   import LogicalPlan._
   import Planner._
   import WorkflowBuilder._
-
-  import quasar.recursionschemes._, cofree._, Fix._
-  import Recursive.ops._, TraverseT.ops._
 
   import agg._
   import array._
@@ -90,7 +86,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           Some(_))
 
 
-  def jsExprƒ[B]: LogicalPlan[OutputM[PartialJs[B]]] => OutputM[PartialJs[B]] = {
+  def jsExprƒ[B]: Algebra[LogicalPlan, OutputM[PartialJs[B]]] = {
     type Output = OutputM[PartialJs[B]]
 
     import jscore.{
@@ -208,65 +204,65 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
               List(field)))
         case Extract =>
           args match {
-          case a1 :: a2 :: Nil => (HasStr(a1) |@| HasJs(a2)) {
-            case (field, source) => ((field match {
-              case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-              case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
-              case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-              // Note: MongoDB's Date's getDay (during filtering at least) seems to be monday=0 ... sunday=6,
-              // apparently in violation of the JavaScript convention.
-              case "dow"          =>
-                \/-(x => If(BinOp(jscore.Eq,
-                  Call(Select(x, "getDay"), Nil),
-                  Literal(Js.Num(6, false))),
-                  Literal(Js.Num(0, false)),
-                  BinOp(jscore.Add,
+            case a1 :: a2 :: Nil => (HasStr(a1) |@| HasJs(a2)) {
+              case (field, source) => ((field match {
+                case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
+                case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
+                case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
+                // Note: MongoDB's Date's getDay (during filtering at least) seems to be monday=0 ... sunday=6,
+                // apparently in violation of the JavaScript convention.
+                case "dow"          =>
+                  \/-(x => If(BinOp(jscore.Eq,
                     Call(Select(x, "getDay"), Nil),
-                    Literal(Js.Num(1, false)))))
-              // TODO: case "doy"          => \/- (???)
-              // TODO: epoch
-              case "hour"         => \/-(x => Call(Select(x, "getHours"), Nil))
-              case "isodow"       =>
-                \/-(x => BinOp(jscore.Add,
-                  Call(Select(x, "getDay"), Nil),
-                  Literal(Js.Num(1, false))))
-              // TODO: isoyear
-              case "microseconds" =>
-                \/-(x => BinOp(Mult,
-                  BinOp(jscore.Add,
+                    Literal(Js.Num(6, false))),
+                    Literal(Js.Num(0, false)),
+                    BinOp(jscore.Add,
+                      Call(Select(x, "getDay"), Nil),
+                      Literal(Js.Num(1, false)))))
+                // TODO: case "doy"          => \/- (???)
+                // TODO: epoch
+                case "hour"         => \/-(x => Call(Select(x, "getHours"), Nil))
+                case "isodow"       =>
+                  \/-(x => BinOp(jscore.Add,
+                    Call(Select(x, "getDay"), Nil),
+                    Literal(Js.Num(1, false))))
+                // TODO: isoyear
+                case "microseconds" =>
+                  \/-(x => BinOp(Mult,
+                    BinOp(jscore.Add,
+                      Call(Select(x, "getMilliseconds"), Nil),
+                      BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
+                    Literal(Js.Num(1000, false))))
+                case "millennium"   => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
+                case "milliseconds" =>
+                  \/-(x => BinOp(jscore.Add,
                     Call(Select(x, "getMilliseconds"), Nil),
-                    BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-                  Literal(Js.Num(1000, false))))
-              case "millennium"   => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-              case "milliseconds" =>
-                \/-(x => BinOp(jscore.Add,
-                  Call(Select(x, "getMilliseconds"), Nil),
-                  BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-              case "minute"       => \/-(x => Call(Select(x, "getMinutes"), Nil))
-              case "month"        =>
-                \/-(x => BinOp(jscore.Add,
-                  Call(Select(x, "getMonth"), Nil),
-                  Literal(Js.Num(1, false))))
-              case "quarter"      =>
-                \/-(x => BinOp(jscore.Add,
-                  BinOp(BitOr,
-                    BinOp(Div,
-                      Call(Select(x, "getMonth"), Nil),
-                      Literal(Js.Num(3, false))),
-                    Literal(Js.Num(0, false))),
-                  Literal(Js.Num(1, false))))
-              case "second"       => \/-(x => Call(Select(x, "getSeconds"), Nil))
-              // TODO: timezone, timezone_hour, timezone_minute
-              // case "week"         => \/- (???)
-              case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
+                    BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
+                case "minute"       => \/-(x => Call(Select(x, "getMinutes"), Nil))
+                case "month"        =>
+                  \/-(x => BinOp(jscore.Add,
+                    Call(Select(x, "getMonth"), Nil),
+                    Literal(Js.Num(1, false))))
+                case "quarter"      =>
+                  \/-(x => BinOp(jscore.Add,
+                    BinOp(BitOr,
+                      BinOp(Div,
+                        Call(Select(x, "getMonth"), Nil),
+                        Literal(Js.Num(3, false))),
+                      Literal(Js.Num(0, false))),
+                    Literal(Js.Num(1, false))))
+                case "second"       => \/-(x => Call(Select(x, "getSeconds"), Nil))
+                // TODO: timezone, timezone_hour, timezone_minute
+                // case "week"         => \/- (???)
+                case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
 
-              case _ => -\/(FuncApply(func, "valid time period", field))
-            }): PlannerError \/ (JsCore => JsCore)).map(x => source.bimap[PartialFunction[List[JsFn], JsFn], List[InputFinder[B]]](
-              f1 => { case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(f1(list)(Ident(JsFn.defaultName)))) },
-              _.map(there(1, _))))
-          }.join
-          case _               => -\/(FuncArity(func, args.length))
-        }
+                case _ => -\/(FuncApply(func, "valid time period", field))
+              }): PlannerError \/ (JsCore => JsCore)).map(x => source.bimap[PartialFunction[List[JsFn], JsFn], List[InputFinder[B]]](
+                f1 => { case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(f1(list)(Ident(JsFn.defaultName)))) },
+                _.map(there(1, _))))
+            }.join
+            case _               => -\/(FuncArity(func, args.length))
+          }
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
         case Between =>
           Arity3((value, min, max) =>
@@ -354,7 +350,7 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
    * for conversion using \$where.
    */
   def selectorƒ[B]:
-      LogicalPlan[(Fix[LogicalPlan], OutputM[PartialSelector[B]])] => OutputM[PartialSelector[B]] = { node =>
+      GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, OutputM[PartialSelector[B]]] = { node =>
     type Output = OutputM[PartialSelector[B]]
 
     object IsBson {
@@ -1011,9 +1007,10 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
 
   import Planner._
 
-  val annotateƒ = zipAlgebras[LogicalPlan, (Fix[LogicalPlan], ?)](
-    selectorƒ[OutputM[WorkflowBuilder]],
-    generalizeAlgebra[(Fix[LogicalPlan], ?)](jsExprƒ[OutputM[WorkflowBuilder]]))
+  val annotateƒ =
+    GAlgebraZip[(Fix[LogicalPlan], ?), LogicalPlan].zip(
+      selectorƒ[OutputM[WorkflowBuilder]],
+      jsExprƒ[OutputM[WorkflowBuilder]].generalize[(Fix[LogicalPlan], ?)])
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.

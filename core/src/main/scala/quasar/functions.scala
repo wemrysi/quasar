@@ -17,8 +17,8 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._
 
+import matryoshka._
 import scalaz._
 
 sealed trait Func {

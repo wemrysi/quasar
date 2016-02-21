@@ -21,8 +21,8 @@ import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fs.{Path => QPath}
-import quasar.recursionschemes._
 
+import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
@@ -260,7 +260,7 @@ object QueryFile {
   }
 
 
-  implicit def RenderQueryFile[A](implicit RLP: RenderTree[Fix[LogicalPlan]], RAF: RenderTree[AFile], RAD: RenderTree[ADir]) =
+  implicit def RenderQueryFile[A]: RenderTree[QueryFile[A]] =
     new RenderTree[QueryFile[A]] {
       def render(qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) => NonTerminal(List("ExecutePlan"), None, List(lp.render, out.render))

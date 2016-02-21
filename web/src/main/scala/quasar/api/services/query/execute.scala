@@ -24,10 +24,10 @@ import quasar.api.ToQuasarResponse.ops._
 import quasar.{Variables, fs}
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}
-import quasar.recursionschemes.Fix
 import quasar.sql.{ParsingPathError, ParsingError, SQLParser, Query}
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import org.http4s.headers.Accept
 import org.http4s._
 import org.http4s.dsl._

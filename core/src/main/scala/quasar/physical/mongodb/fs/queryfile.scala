@@ -22,9 +22,9 @@ import quasar.fp._
 import quasar.fs.{Path => QPath, _}
 import quasar.javascript._
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
-import quasar.recursionschemes.{Fix, Recursive}
 
 import com.mongodb.async.client.MongoClient
+import matryoshka.{Fix, Recursive}
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._

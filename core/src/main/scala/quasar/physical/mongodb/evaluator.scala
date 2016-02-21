@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar._, Errors._, Evaluator._
 import quasar.fs.Path, Path.PathError.NonexistentPathError
 import quasar.javascript._
@@ -28,6 +27,7 @@ import Workflow._
 import scala.Predef.classOf
 
 import com.mongodb._
+import matryoshka._, Recursive.ops._
 import org.bson.{BsonDocument, BsonValue}
 import scalaz.{Free => FreeM, _}, Scalaz._
 import scalaz.concurrent._

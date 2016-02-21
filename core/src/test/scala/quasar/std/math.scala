@@ -18,9 +18,9 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.TypeArbitrary
-import quasar.recursionschemes.Fix
 import quasar.specs2.PendingWithAccurateCoverage
 
+import matryoshka.Fix
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
 import org.specs2.matcher.Matcher
 import org.specs2.mutable._
