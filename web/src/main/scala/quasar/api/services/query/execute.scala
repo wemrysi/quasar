@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.api._
 import quasar.api.services._
-import quasar.api.ToQuasarResponse.ops._
+import quasar.api.ToQResponse.ops._
 import quasar.{Variables, fs}
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}
@@ -70,20 +70,20 @@ object execute {
           if (query == "") postContentMustContainQuery[S]
           else {
             respond(requiredHeader[S](Destination, req)
-              .traverse[Free[S, ?], QuasarResponse[S], QuasarResponse[S]] { destination =>
+              .traverse[Free[S, ?], QResponse[S], QResponse[S]] { destination =>
                 val parseRes = SQLParser.parseInContext(Query(query), QPath.fromAPath(path))
                   .leftMap(_.toResponse[S])
                 val destinationFile = posixCodec.parsePath(
                   relFile => \/-(\/-(relFile)),
                   absFile => \/-(-\/(absFile)),
-                  relDir => -\/(QuasarResponse.error[S](BadRequest, "Destination must be a file")),
-                  absDir => -\/(QuasarResponse.error[S](BadRequest, "Destination must be a file")))(destination.value)
+                  relDir => -\/(QResponse.error[S](BadRequest, "Destination must be a file")),
+                  absDir => -\/(QResponse.error[S](BadRequest, "Destination must be a file")))(destination.value)
                 // Add path of query if destination is a relative file or else just jump through Sandbox hoop
-                val absDestination: QuasarResponse[S] \/ AFile = destinationFile.flatMap(f =>
+                val absDestination: QResponse[S] \/ AFile = destinationFile.flatMap(f =>
                   sandbox(rootDir, f.fold(ι, relFile => unsandbox(path) </> relFile)).map(rootDir </> _) \/>
-                    QuasarResponse.error[S](BadRequest, "Destination file is invalid"))
+                    QResponse.error[S](BadRequest, "Destination file is invalid"))
                 respond(parseRes.tuple(absDestination)
-                  .traverse[Free[S, ?], QuasarResponse[S], SemanticErrors \/ (FileSystemError \/ Json)] {
+                  .traverse[Free[S, ?], QResponse[S], SemanticErrors \/ (FileSystemError \/ Json)] {
                     case (expr, out) =>
                       Q.executeQuery(expr, vars(req), out).run.run.run map { case (phases, result) =>
                         result.map(_.map(rfile => Json(

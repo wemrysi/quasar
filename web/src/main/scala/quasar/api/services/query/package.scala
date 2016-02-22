@@ -36,10 +36,10 @@ package object query {
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
 
   def queryParameterMustContainQuery[S[_]] =
-    Free.pure[S, QuasarResponse[S]](QuasarResponse.error(BadRequest, "The request must contain a query"))
+    Free.pure[S, QResponse[S]](QResponse.error(BadRequest, "The request must contain a query"))
 
   def postContentMustContainQuery[S[_]] =
-    Free.pure[S, QuasarResponse[S]](QuasarResponse.error(BadRequest, "The body of the POST must contain a query"))
+    Free.pure[S, QResponse[S]](QResponse.error(BadRequest, "The body of the POST must contain a query"))
 
   private val VarPrefix = "var."
   def vars(req: Request) = Variables(req.params.collect {

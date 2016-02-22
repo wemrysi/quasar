@@ -41,10 +41,20 @@ package object free {
       def apply[A](fa: S[A]): M[A] = f(S.inj(Coyoneda.lift(fa)))
     }
 
+  def flatMapSNT[S[_]: Functor, T[_]](f: S ~> Free[T, ?]): Free[S, ?] ~> Free[T, ?] =
+    new (Free[S, ?] ~> Free[T, ?]) {
+      def apply[A](fa: Free[S, A]) = fa.flatMapSuspension(f)
+    }
+
   def foldMapNT[F[_]: Functor, G[_]: Monad](f: F ~> G) = new (Free[F, ?] ~> G) {
     def apply[A](fa: Free[F, A]): G[A] =
       fa.foldMap(f)
   }
+
+  def mapSNT[S[_]: Functor, T[_]: Functor](f: S ~> T): Free[S, ?] ~> Free[T, ?] =
+    new (Free[S, ?] ~> Free[T, ?]) {
+      def apply[A](fa: Free[S, A]) = fa.mapSuspension(f)
+    }
 
   /** Given `F[_]` and `S[_]` such that `F :<: S`, returns a natural
     * transformation, `S ~> G`, where `f` is used to transform an `F[_]` and `g`

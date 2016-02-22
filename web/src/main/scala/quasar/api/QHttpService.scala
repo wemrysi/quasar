@@ -23,12 +23,21 @@ import org.http4s.server.HttpService
 import scalaz._
 import scalaz.concurrent.Task
 
-final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QuasarResponse[S]]]) {
-  def apply(req: Request)(implicit S: Functor[S]): Free[S, QuasarResponse[S]] =
-    f.applyOrElse(req, κ(Free.pure(QuasarResponse.empty[S].withStatus(Status.NotFound))))
+final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QResponse[S]]]) {
+  def apply(req: Request): Free[S, QResponse[S]] =
+    f.applyOrElse(req, κ(Free.pure(QResponse.empty[S].withStatus(Status.NotFound))))
+
+  def flatMapS[T[_]](g: S ~> Free[T, ?])(implicit S: Functor[S]): QHttpService[T] =
+    QHttpService(f.andThen(_.map(_.flatMapS(g)).flatMapSuspension(g)))
+
+  def mapS[T[_]: Functor](g: S ~> T)(implicit S: Functor[S]): QHttpService[T] =
+    QHttpService(f.andThen(_.map(_.mapS(g)).mapSuspension(g)))
+
+  def orElse(other: QHttpService[S]): QHttpService[S] =
+    QHttpService(f orElse other.f)
 
   def toHttpService(i: S ~> ResponseOr)(implicit S: Functor[S]): HttpService = {
-    def mkResponse(prg: Free[S, QuasarResponse[S]]) =
+    def mkResponse(prg: Free[S, QResponse[S]]) =
       prg.foldMap(i).flatMap(r => EitherT.right(r.toHttpResponse(i))).merge
 
     HttpService(f andThen mkResponse)

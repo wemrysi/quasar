@@ -37,27 +37,27 @@ package object services {
   )(implicit
     S0: FileSystemFailureF :<: S,
     S1: Task :<: S
-  ): QuasarResponse[S] = {
+  ): QResponse[S] = {
     val ctype = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))
-    QuasarResponse.headers.modify(
+    QResponse.headers.modify(
       _.put(ctype) ++ format.disposition.toList
-    )(QuasarResponse.streaming(format.encode[FileSystemErrT[Free[S,?],?]](data)))
+    )(QResponse.streaming(format.encode[FileSystemErrT[Free[S,?],?]](data)))
   }
 
   def limitOrInvalid[S[_]](
     limitParam: Option[ValidationNel[ParseFailure, Positive]]
-  ): QuasarResponse[S] \/ Option[Positive] =
+  ): QResponse[S] \/ Option[Positive] =
     valueOrInvalid("limit", limitParam)
 
   def offsetOrInvalid[S[_]](
     offsetParam: Option[ValidationNel[ParseFailure, Natural]]
-  ): QuasarResponse[S] \/ Option[Natural] =
+  ): QResponse[S] \/ Option[Natural] =
     valueOrInvalid("offset", offsetParam)
 
   def valueOrInvalid[S[_], F[_]: Traverse, A](
     paramName: String,
     paramResult: F[ValidationNel[ParseFailure, A]]
-  ): QuasarResponse[S] \/ F[A] =
+  ): QResponse[S] \/ F[A] =
     orBadRequest(paramResult, nel =>
       s"invalid ${paramName}: ${nel.head.sanitized} (${nel.head.details})")
 
@@ -68,14 +68,14 @@ package object services {
   def orBadRequest[S[_], F[_]: Traverse, A](
     param: F[ValidationNel[ParseFailure, A]],
     msg: NonEmptyList[ParseFailure] => String
-  ): QuasarResponse[S] \/ F[A] =
+  ): QResponse[S] \/ F[A] =
     param.traverseU(_.disjunction.leftMap(nel =>
-      QuasarResponse.error[S](BadRequest, msg(nel))))
+      QResponse.error[S](BadRequest, msg(nel))))
 
-  def requiredHeader[F[_]](key: HeaderKey.Extractable, request: Request): QuasarResponse[F] \/ key.HeaderT =
-    request.headers.get(key) \/> QuasarResponse.error(BadRequest, s"The '${key.name}' header must be specified")
+  def requiredHeader[F[_]](key: HeaderKey.Extractable, request: Request): QResponse[F] \/ key.HeaderT =
+    request.headers.get(key) \/> QResponse.error(BadRequest, s"The '${key.name}' header must be specified")
 
-  def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQuasarResponse[A, F]): Free[S, QuasarResponse[F]] =
+  def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQResponse[A, F]): Free[S, QResponse[F]] =
     a.map(ev.toResponse)
 
   // https://github.com/puffnfresh/wartremover/issues/149

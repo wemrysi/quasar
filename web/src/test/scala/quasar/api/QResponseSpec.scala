@@ -30,9 +30,9 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 
-class QuasarResponseSpec extends mutable.Specification {
-  import QuasarResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
-  import QuasarResponseSpec._
+class QResponseSpec extends mutable.Specification {
+  import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
+  import QResponseSpec._
 
   type StrIO[A]  = Coproduct[Str, Task, A]
   type StrIOM[A] = Free[StrIO, A]
@@ -60,18 +60,18 @@ class QuasarResponseSpec extends mutable.Specification {
   "toHttpResponse" should {
     "sucessful evaluation" >> {
       "has same status" >> {
-        val res = QuasarResponse.empty[StrIO].toHttpResponse(evalStr())
+        val res = QResponse.empty[StrIO].toHttpResponse(evalStr())
         res.run.status must_== NoContent
       }
 
       "has same headers" >> {
-        val qr = QuasarResponse.json[String, StrIO](Ok, "foo")
+        val qr = QResponse.json[String, StrIO](Ok, "foo")
         val res = qr.toHttpResponse(evalStr())
         res.run.headers.toList must_== qr.headers.toList
       }
 
       "has body of interpreted values" >> {
-        val qr = QuasarResponse.streaming[StrIO, String](
+        val qr = QResponse.streaming[StrIO, String](
           strs("a", "b", "c", "d", "e"))
         val res = qr.toHttpResponse(evalStr())
         res.as[String].run must_== "abcde"
@@ -80,7 +80,7 @@ class QuasarResponseSpec extends mutable.Specification {
 
     "failed evaluation" >> {
       val failStream =
-        QuasarResponse.streaming[StrIO, String](strs("one", "two", "three"))
+        QResponse.streaming[StrIO, String](strs("one", "two", "three"))
 
       "has alternate response status" >> {
         failStream.toHttpResponse(evalStr("one"))
@@ -122,7 +122,7 @@ class QuasarResponseSpec extends mutable.Specification {
   }
 }
 
-object QuasarResponseSpec {
+object QResponseSpec {
   final case class Str[A](s: String, k: String => A)
 
   object Str {

@@ -36,11 +36,17 @@ import scalaz.stream.Process
 import scodec.bits.ByteVector
 
 @Lenses
-final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
-  import QuasarResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
+final case class QResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
+  import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
 
-  def modifyHeaders(f: Headers => Headers): QuasarResponse[S] =
-    QuasarResponse.headers.modify(f)(this)
+  def flatMapS[T[_]](f: S ~> Free[T, ?])(implicit S: Functor[S]): QResponse[T] =
+    copy[T](body = body.translate[Free[T, ?]](free.flatMapSNT(f)))
+
+  def mapS[T[_]: Functor](f: S ~> T)(implicit S: Functor[S]): QResponse[T] =
+    copy[T](body = body.translate[Free[T, ?]](free.mapSNT(f)))
+
+  def modifyHeaders(f: Headers => Headers): QResponse[S] =
+    QResponse.headers.modify(f)(this)
 
   def toHttpResponse(i: S ~> ResponseOr)(implicit S: Functor[S]): Task[Response] = {
     val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
@@ -59,14 +65,14 @@ final case class QuasarResponse[S[_]](status: Status, headers: Headers, body: Pr
       .merge
   }
 
-  def withHeaders(hdrs: Headers): QuasarResponse[S] =
-    QuasarResponse.headers.set(hdrs)(this)
+  def withHeaders(hdrs: Headers): QResponse[S] =
+    QResponse.headers.set(hdrs)(this)
 
-  def withStatus(s: Status): QuasarResponse[S] =
-    QuasarResponse.status.set(s)(this)
+  def withStatus(s: Status): QResponse[S] =
+    QResponse.status.set(s)(this)
 }
 
-object QuasarResponse {
+object QResponse {
   /** Producing this many bytes from a `Process[F, ByteVector]` should require
     * at least one `F` effect.
     *
@@ -101,29 +107,29 @@ object QuasarResponse {
   final class HttpResponseStreamFailureException(alternate: Response)
     extends java.lang.Exception
 
-  def empty[S[_]]: QuasarResponse[S] =
-    QuasarResponse(NoContent, Headers.empty, Process.halt)
+  def empty[S[_]]: QResponse[S] =
+    QResponse(NoContent, Headers.empty, Process.halt)
 
-  def ok[S[_]]: QuasarResponse[S] =
+  def ok[S[_]]: QResponse[S] =
     empty[S].withStatus(Ok)
 
-  def header[S[_]](key: HeaderKey.Extractable): Optional[QuasarResponse[S], key.HeaderT] =
-    Optional[QuasarResponse[S], key.HeaderT](
+  def header[S[_]](key: HeaderKey.Extractable): Optional[QResponse[S], key.HeaderT] =
+    Optional[QResponse[S], key.HeaderT](
       qr => qr.headers.get(key))(
       h  => _.modifyHeaders(_.put(h)))
 
-  def error[S[_]](status: Status, s: String): QuasarResponse[S] =
+  def error[S[_]](status: Status, s: String): QResponse[S] =
     json(status, Json("error" := s))
 
-  def json[A: EncodeJson, S[_]](status: Status, a: A): QuasarResponse[S] =
+  def json[A: EncodeJson, S[_]](status: Status, a: A): QResponse[S] =
     string[S](status, a.asJson.pretty(minspace)).modifyHeaders(_.put(
       `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
 
   def response[S[_]: Functor, A]
       (status: Status, a: A)
       (implicit E: EntityEncoder[A], S0: Task :<: S)
-      : QuasarResponse[S] =
-    QuasarResponse(
+      : QResponse[S] =
+    QResponse(
       status,
       E.headers,
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT))
@@ -131,8 +137,8 @@ object QuasarResponse {
   def streaming[S[_]: Functor, A]
       (p: Process[Free[S, ?], A])
       (implicit E: EntityEncoder[A], S0: Task :<: S)
-      : QuasarResponse[S] =
-    QuasarResponse(
+      : QResponse[S] =
+    QResponse(
       Ok,
       E.headers,
       p.flatMap[Free[S, ?], ByteVector](a =>
@@ -141,13 +147,13 @@ object QuasarResponse {
   def streaming[S[_]: Functor, A, E]
       (p: Process[EitherT[Free[S, ?], E, ?], A])
       (implicit A: EntityEncoder[A], S0: Task :<: S, S1: FailureF[E, ?] :<: S)
-      : QuasarResponse[S] = {
+      : QResponse[S] = {
     val failure = Failure.Ops[E, S]
     streaming(p.translate(failure.unattemptT))
   }
 
-  def string[S[_]](status: Status, s: String): QuasarResponse[S] =
-    QuasarResponse(
+  def string[S[_]](status: Status, s: String): QResponse[S] =
+    QResponse(
       status,
       Headers(`Content-Type`(MediaType.`text/plain`, Some(Charset.`UTF-8`))),
       Process.emit(ByteVector.view(s.getBytes(Charset.`UTF-8`.nioCharset))))

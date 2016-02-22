@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import quasar.{DataCodec, Data}
-import quasar.api._, ToQuasarResponse.ops._
+import quasar.api._, ToQResponse.ops._
 import quasar.fp._, numeric._
 import quasar.fs._
 import quasar.Predef._
@@ -66,10 +66,10 @@ object data {
         dst <- EitherT.fromDisjunction[M.F](
                  requiredHeader[S](Destination, req) map (_.value))
         scn <- EitherT.fromDisjunction[M.F](moveScenario(path, dst))
-                 .leftMap(QuasarResponse.error[S](BadRequest, _))
+                 .leftMap(QResponse.error[S](BadRequest, _))
         _   <- M.move(scn, MoveSemantics.FailIfExists)
                  .leftMap(_.toResponse[S])
-      } yield QuasarResponse.empty[S].withStatus(Created)).merge
+      } yield QResponse.empty[S].withStatus(Created)).merge
 
     case DELETE -> AsPath(path) =>
       respond(M.delete(path).run)
@@ -90,12 +90,12 @@ object data {
     Q: QueryFile.Ops[S],
     S0: FileSystemFailureF :<: S,
     S1: Task :<: S
-  ): QuasarResponse[S] =
+  ): QResponse[S] =
     refineType(path).fold(
       dirPath => {
         val p = zippedContents[S](dirPath, format, offset, limit)
         val headers = `Content-Type`(MediaType.`application/zip`) :: format.disposition.toList
-        QuasarResponse.headers.modify(_ ++ headers)(QuasarResponse.streaming(p))
+        QResponse.headers.modify(_ ++ headers)(QResponse.streaming(p))
       },
       filePath => formattedDataResponse(format, R.scan(filePath, offset, limit)))
 
@@ -117,32 +117,32 @@ object data {
   private def upload[S[_]: Functor](
     req: Request,
     by: Process[Free[S,?], Data] => Process[FileSystemErrT[Free[S,?],?], FileSystemError]
-  )(implicit S0: Task :<: S): Free[S, QuasarResponse[S]] = {
+  )(implicit S0: Task :<: S): Free[S, QResponse[S]] = {
     import free._
 
     type FreeS[A] = Free[S, A]
     type FreeFS[A] = FileSystemErrT[FreeS, A]
-    type QRespT[F[_], A] = EitherT[F, QuasarResponse[S], A]
+    type QRespT[F[_], A] = EitherT[F, QResponse[S], A]
 
-    def dataError[A: Show](status: Status, errs: IndexedSeq[A]): QuasarResponse[S] =
-      QuasarResponse.json(status, Json(
+    def dataError[A: Show](status: Status, errs: IndexedSeq[A]): QResponse[S] =
+      QResponse.json(status, Json(
         "error"   := "some uploaded value(s) could not be processed",
         "details" := Json.array(errs.map(e => jString(e.shows)): _*)))
 
     def errorsResponse(
       decodeErrors: IndexedSeq[DecodeError],
       persistErrors: Process[FreeFS, FileSystemError]
-    ): Free[S, QuasarResponse[S]] =
+    ): Free[S, QResponse[S]] =
       if (decodeErrors.nonEmpty)
         dataError(BadRequest, decodeErrors).point[FreeS]
       else
         persistErrors.runLog.fold(_.toResponse[S], errs =>
-          if (errs.isEmpty) QuasarResponse.ok[S]
+          if (errs.isEmpty) QResponse.ok[S]
           else dataError(InternalServerError, errs))
 
-    def write(xs: IndexedSeq[(DecodeError \/ Data)]): Free[S, QuasarResponse[S]] =
+    def write(xs: IndexedSeq[(DecodeError \/ Data)]): Free[S, QResponse[S]] =
       if (xs.isEmpty) {
-        QuasarResponse.error(BadRequest, "Request has no body").point[FreeS]
+        QResponse.error(BadRequest, "Request has no body").point[FreeS]
       } else {
         val (errors, data) = xs.toVector.separate
         errorsResponse(errors, by(Process.emitAll(data)))
@@ -154,7 +154,7 @@ object data {
         .flatMap(_.runLog.liftM[QRespT])
         .run handleWith {
           case MessageFormat.UnsupportedContentType =>
-            QuasarResponse.error[S](
+            QResponse.error[S](
               UnsupportedMediaType,
               "No media-type is specified in Content-Type header"
             ).left.point[Task]
