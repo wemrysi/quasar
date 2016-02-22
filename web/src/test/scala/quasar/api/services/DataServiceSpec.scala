@@ -36,7 +36,6 @@ import argonaut.Json
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
-import org.http4s.server._
 import org.http4s.server.middleware.GZip
 import org.http4s.Uri.Authority
 import org.scalacheck.{Arbitrary, Gen}
@@ -298,14 +297,35 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
       }
       testBoth { method =>
-        "be 415 if media-type is missing" ! prop { file: Path[Abs,File,Sandboxed] =>
-          val path = printPath(file)
-          val request = Request(
-            uri = Uri(path = path),
-            method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run
-          val response = service(emptyMem)(request).run
-          response.status must_== Status.UnsupportedMediaType
-          response.as[Json].run must_== Json("error" := "No media-type is specified in Content-Type header")
+        "be 415 if media-type is" >> {
+          val supportedMediaTypesMsg =
+            "Please specify a media type in the following ranges: " +
+            "text/csv, " +
+            "application/json; mode=\"precise\", " +
+            "application/json; mode=\"readable\", " +
+            "application/ldjson; mode=\"precise\", " +
+            "application/ldjson; mode=\"readable\""
+          "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
+            val path = printPath(file)
+            val request = Request(
+              uri = Uri(path = path),
+              method = method).withBody("zip code: 34561 and zip code: 78932").run
+            val response = service(emptyMem)(request).run
+            response.status must_== Status.UnsupportedMediaType
+            val errorMsg = s"text/plain is not a supported media type. $supportedMediaTypesMsg"
+
+            response.as[Json].run must_== Json("error" := errorMsg)
+          }
+          "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
+            val path = printPath(file)
+            val request = Request(
+              uri = Uri(path = path),
+              method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run.replaceAllHeaders(Headers.empty)
+            val response = service(emptyMem)(request).run
+            response.status must_== Status.UnsupportedMediaType
+            val errorMsg = s"Request has no media type. $supportedMediaTypesMsg"
+            response.as[Json].run must_== Json("error" := errorMsg)
+          }
         }
         "be 400 with" >> {
           def be400[A: EntityDecoder](body: String, expectedBody: A, mediaType: MediaType = jsonReadableLine.mediaType) = {

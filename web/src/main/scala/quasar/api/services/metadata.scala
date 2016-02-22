@@ -27,7 +27,6 @@ import scala.math.Ordering
 
 import argonaut._, Argonaut._
 import org.http4s._, dsl._
-import org.http4s.server.HttpService
 import pathy.Path._
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._

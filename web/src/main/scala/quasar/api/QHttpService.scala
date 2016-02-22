@@ -18,8 +18,7 @@ package quasar.api
 
 import quasar.Predef.PartialFunction
 import quasar.SKI._
-import org.http4s.{Request, Response, Status}
-import org.http4s.server.HttpService
+import org.http4s.{Request, Response, Status, HttpService}
 import scalaz._
 import scalaz.concurrent.Task
 

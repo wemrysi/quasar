@@ -46,23 +46,23 @@ class Interpreter[F[_]: Functor, M[_]: Monad](val interpretTerm: F ~> M) {
   def interpretT3[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist, T3[_[_],_]: Hoist]: T1[T2[T3[Program,?],?],?] ~> T1[T2[T3[M,?],?],?] =
     Hoist[T1].hoist[T2[T3[Program,?],?], T2[T3[M,?],?]](interpretT2[T2,T3])(Hoist[T2].apply[T3[Program,?]](Hoist[T3].apply[Program]))
 
-  def runLog[A](p: Process[Program,A])(implicit catchable: Catchable[M]): M[IndexedSeq[A]] =
+  def runLog[A](p: Process[Program,A])(implicit catchable: Catchable[M]): M[Vector[A]] =
     p.translate(interpret).runLog
 
-  def runLogT[T[_[_],_]:Hoist,A](p: Process[T[Program,?],A])(implicit catchable: Catchable[T[M,?]]): T[M,IndexedSeq[A]] = {
+  def runLogT[T[_[_],_]:Hoist,A](p: Process[T[Program,?],A])(implicit catchable: Catchable[T[M,?]]): T[M,Vector[A]] = {
     type ResultT[A] = T[M,A]
     val monadR: Monad[ResultT] = Hoist[T].apply
     p.translate[T[M,?]](interpretT[T]).runLog[ResultT,A](monadR, catchable)
   }
 
-  def runLogT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist,A](p: Process[T1[T2[Program,?],?],A])(implicit catchable: Catchable[T1[T2[M,?],?]]): T1[T2[M,?],IndexedSeq[A]] = {
+  def runLogT2[T1[_[_],_]: Hoist, T2[_[_],_]: Hoist,A](p: Process[T1[T2[Program,?],?],A])(implicit catchable: Catchable[T1[T2[M,?],?]]): T1[T2[M,?],Vector[A]] = {
     type ResultT[A] = T1[T2[M,?],A]
     val monadR: Monad[ResultT] = Hoist[T1].apply[T2[M,?]](Hoist[T2].apply)
     p.translate[ResultT](interpretT2[T1,T2]).runLog[ResultT,A](monadR,catchable)
   }
 
   def runLogT3[T1[_[_],_]:Hoist, T2[_[_],_]: Hoist, T3[_[_],_]: Hoist ,A](p: Process[T1[T2[T3[Program,?],?],?],A])(implicit catchable: Catchable[T1[T2[T3[M,?],?],?]])
-  : T1[T2[T3[M,?],?],IndexedSeq[A]] = {
+  : T1[T2[T3[M,?],?],Vector[A]] = {
     type ResultT[A] = T1[T2[T3[M,?],?],A]
     val monadR: Monad[ResultT] = Hoist[T1].apply[T2[T3[M,?],?]](Hoist[T2].apply[T3[M,?]](Hoist[T3].apply))
     p.translate[ResultT](interpretT3[T1,T2,T3]).runLog[ResultT,A](monadR,catchable)
@@ -78,11 +78,11 @@ class Interpreter[F[_]: Functor, M[_]: Monad](val interpretTerm: F ~> M) {
 // https://github.com/puffnfresh/wartremover/issues/149
 @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 class SpecializedInterpreter[F[_]: Functor, M[_]: Monad](interpretTerm: F ~> M) extends Interpreter(interpretTerm) {
-  def runLog[E,A](p: Process[EitherT[Program,E,?],A])(implicit catchable: Catchable[M]): EitherT[M,E,IndexedSeq[A]] = {
+  def runLog[E,A](p: Process[EitherT[Program,E,?],A])(implicit catchable: Catchable[M]): EitherT[M,E,Vector[A]] = {
     type T[Program[_],A] = EitherT[Program,E,A]
     runLogT[T,A](p)
   }
-  def runLog[E,L:Monoid,A](p: Process[EitherT[WriterT[Program,L,?],E,?],A])(implicit catchable: Catchable[M]): EitherT[WriterT[M,L,?],E,IndexedSeq[A]] = {
+  def runLog[E,L:Monoid,A](p: Process[EitherT[WriterT[Program,L,?],E,?],A])(implicit catchable: Catchable[M]): EitherT[WriterT[M,L,?],E,Vector[A]] = {
     type T1[M[_],A] = EitherT[M,E,A]
     type T2[M[_],A] = WriterT[M,L,A]
     type WriterResult[A] = T2[M,A]

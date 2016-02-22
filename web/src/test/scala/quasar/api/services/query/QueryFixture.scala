@@ -22,7 +22,6 @@ import quasar.fp.numeric._
 import quasar.fs.InMemory._
 
 import org.http4s._
-import org.http4s.server.HttpService
 import org.specs2.matcher._, MustMatchers._
 import pathy.Path._, posixCodec._
 import scalaz._, Scalaz._

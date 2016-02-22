@@ -26,9 +26,9 @@ import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
 
 import org.http4s
-import org.http4s.Request
+import org.http4s.{Request, HttpService}
 import org.http4s.dsl._
-import org.http4s.server.{HttpService, HttpMiddleware}
+import org.http4s.server.HttpMiddleware
 import org.http4s.server.middleware.{CORS, CORSConfig, GZip}
 import org.http4s.server.syntax._
 import scalaz._, Scalaz._

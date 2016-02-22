@@ -21,8 +21,8 @@ import org.http4s.parser.HttpHeaderParser
 import quasar.Predef._
 import quasar.fp._
 
-import org.http4s.{ParseFailure, EntityDecoder, MediaType}
-import org.http4s.headers.{Accept, `Content-Disposition`}
+import org.http4s._
+import org.http4s.headers._
 import quasar.repl.Prettify
 
 import quasar.{DataEncodingError, Data, DataCodec}
@@ -190,19 +190,54 @@ object MessageFormat {
     }
   }
 
-  case object UnsupportedContentType extends scala.Exception
+  // TODO: Delete once http4s PR #531 has been merged and released
+  // Same as http4s OrDec but remembers all supported content types when notifying
+  // user of incorrect or missing content type
+  private class OrDec[T](a: EntityDecoder[T], b: EntityDecoder[T]) extends EntityDecoder[T] {
+
+    // This is not a real media type but will still be matched by `*/*`
+    private val UndefinedMediaType = new MediaType("UNKNOWN","UNKNOWN")
+
+    override def decode(msg: Message, strict: Boolean): DecodeResult[T] = {
+      msg.headers.get(`Content-Type`) match {
+        case Some(contentType) =>
+          if (a.matchesMediaType(contentType.mediaType)) a.decode(msg, strict)
+          else b.decode(msg, strict).leftMap{
+            case MediaTypeMismatch(actual, expected) =>
+              MediaTypeMismatch(actual, expected ++ a.consumes)
+            case other => other
+          }
+
+        case None =>
+          if (a.matchesMediaType(UndefinedMediaType)) a.decode(msg, strict)
+          else b.decode(msg, strict).leftMap{
+            case MediaTypeMissing(expected) =>
+              MediaTypeMissing(expected ++ a.consumes)
+            case other => other
+          }
+      }
+    }
+
+    override val consumes: Set[MediaRange] = a.consumes ++ b.consumes
+  }
+
+  // TODO: Delete once http4s PR #531 has been merged and released
+  private implicit class AugementedEntityDecoder[T](a: EntityDecoder[T]) {
+    /** Same as orElse but provides a better decoding failure message when no media type matches
+      * supported content types */
+    def orElse_BetterErrorMessage(b: EntityDecoder[T]): EntityDecoder[T] = new OrDec(a,b)
+  }
 
   val decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = {
     val json = {
       import JsonPrecision._
       import JsonFormat._
-      JsonContentType(Readable,LineDelimited).decoder orElse
-      JsonContentType(Precise,LineDelimited).decoder orElse
-      JsonContentType(Readable,SingleArray).decoder orElse
+      JsonContentType(Readable,LineDelimited).decoder orElse_BetterErrorMessage
+      JsonContentType(Precise,LineDelimited).decoder orElse_BetterErrorMessage
+      JsonContentType(Readable,SingleArray).decoder orElse_BetterErrorMessage
       JsonContentType(Precise,SingleArray).decoder
     }
-    Csv.decoder orElse json
-
+    Csv.decoder orElse_BetterErrorMessage json
   }
 
   def fromAccept(accept: Option[Accept]): MessageFormat = {

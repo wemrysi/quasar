@@ -9,7 +9,7 @@ object Dependencies {
   private val slcVersion     = "0.4"
   private val monocleVersion = "1.1.1"
   private val pathyVersion   = "0.0.3"
-  private val http4sVersion  = "0.10.1"
+  private val http4sVersion  = "0.12.1"
   private val mongoVersion   = "3.2.1"
   private val refinedVersion = "0.3.6"
 
@@ -19,7 +19,7 @@ object Dependencies {
     //     of `CatchableFree`.
     "org.scalaz"        %% "scalaz-core"               % scalazVersion  % "compile, test" force(),
     "org.scalaz"        %% "scalaz-concurrent"         % scalazVersion  % "compile, test",
-    "org.scalaz.stream" %% "scalaz-stream"             % "0.7.3a"       % "compile, test",
+    "org.scalaz.stream" %% "scalaz-stream"             % "0.8"          % "compile, test",
     "com.github.julien-truffaut" %% "monocle-core"     % monocleVersion % "compile, test",
     "com.github.julien-truffaut" %% "monocle-generic"  % monocleVersion % "compile, test",
     "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion % "compile, test",

@@ -19,10 +19,9 @@ package api.services
 
 import Predef._
 
-import org.http4s.{StaticFile, MediaType}
+import org.http4s.{StaticFile, MediaType, HttpService}
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
-import org.http4s.server.HttpService
 
 import scalaz.concurrent.Task
 
