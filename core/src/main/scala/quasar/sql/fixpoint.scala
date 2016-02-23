@@ -17,7 +17,8 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.recursionschemes._
+
+import matryoshka._
 
 object Select {
   def apply(

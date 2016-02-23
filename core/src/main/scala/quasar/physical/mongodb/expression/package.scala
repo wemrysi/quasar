@@ -18,12 +18,12 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.RenderTree
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.fp._
 import quasar._, Planner._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 
+import matryoshka._, Recursive.ops._
 import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
@@ -178,6 +178,7 @@ package object expression {
       }
   }
 
+  // TODO: This should at least use Show.
   implicit val ExprOpRenderTree: RenderTree[Expression] =
     RenderTree.fromToString[Expression]("ExprOp")
 

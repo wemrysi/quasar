@@ -20,12 +20,12 @@ import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.fp._
 import numeric._
-import quasar.recursionschemes.{Fix, Recursive}
 import quasar.Planner.UnsupportedPlan
 
+import matryoshka.{Fix, Recursive}
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import pathy.Path._
 
 /** In-Memory FileSystem interpreters, useful for testing/stubbing
   * when a "real" interpreter isn't needed or desired.

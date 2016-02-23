@@ -21,9 +21,9 @@ import quasar.{LogicalPlan, Variables}
 import quasar.effect.AtomicRef
 import quasar.fp.TaskRef
 import quasar.fs.{Path => QPath}
-import quasar.recursionschemes.Fix
 import quasar.sql
 
+import matryoshka.Fix
 import org.specs2.mutable
 import pathy.Path._
 import scalaz._

@@ -17,12 +17,12 @@
 package quasar
 
 import quasar.Predef._
-import RenderTree.ops._
+import quasar.RenderTree.ops._
 import quasar.fp._
-import quasar.recursionschemes._, Fix._, FunctorT.ops._
 
 import scala.reflect.ClassTag
 
+import matryoshka._, Fix._, FunctorT.ops._
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 

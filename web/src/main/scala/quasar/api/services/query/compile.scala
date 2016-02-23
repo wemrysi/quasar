@@ -21,11 +21,12 @@ import quasar._, api._, fs._
 import quasar.api.services._
 import quasar.api.ToQResponse.ops._
 import quasar.fs.{Path => QPath}
+import quasar.fp._
 import quasar.fp.numeric._
-import quasar.recursionschemes.Fix
 import quasar.sql.{ParsingError, SQLParser}
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import org.http4s.dsl._
 import scalaz._, Scalaz._
 

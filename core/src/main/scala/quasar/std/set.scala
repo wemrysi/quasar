@@ -18,9 +18,9 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar._, LogicalPlan._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 trait SetLib extends Library {
@@ -212,10 +212,10 @@ trait SetLib extends Library {
     "Determines whether a value is in a given set.",
     Type.Bool, Type.Top :: Type.AnySet :: Nil,
     new Func.Simplifier {
-      def apply[T[_[_]]: Recursive](orig: LogicalPlan[T[LogicalPlan]])(implicit T: Corecursive[T]) =
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
           case InvokeF(_, List(item, set)) => set.project match {
-            case ConstantF(Data.Set(_)) => Within(item, T.embed(StructuralLib.UnshiftArray(set))).some
+            case ConstantF(Data.Set(_)) => Within(item, StructuralLib.UnshiftArray(set).embed).some
             case ConstantF(_)           => RelationsLib.Eq(item, set).some
             case _                      => None
           }

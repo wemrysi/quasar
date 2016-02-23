@@ -18,9 +18,9 @@ package quasar
 
 import quasar.Predef._
 import quasar.sql.SQLParser
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.specs2._
 
+import matryoshka._, Recursive.ops._
 import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.mutable._
 

@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar.{Data, LogicalPlan}
 import quasar.Planner.{PlannerError => PlannerErr}
 import quasar.fp._
-import quasar.recursionschemes._
 
+import matryoshka._
 import monocle.Prism
 import pathy.Path.posixCodec
 import scalaz._

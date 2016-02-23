@@ -19,8 +19,8 @@ package quasar.std
 import quasar.Predef._
 import quasar.fp._
 import quasar.{Func, LogicalPlan, Type, SemanticError}
-import quasar.recursionschemes._, Recursive.ops._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, Validation.{success, failure}
 
 trait Library {

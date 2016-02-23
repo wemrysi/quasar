@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar._
 import quasar.fp._
 import quasar.fs.{AFile, ADir, Path, PathName, firstSegmentName}
-import quasar.recursionschemes._, FunctorT.ops._
 
+import matryoshka._, FunctorT.ops._
 import monocle.Optional
 import monocle.function.Field1
 import pathy.{Path => PPath}, PPath._

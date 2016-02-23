@@ -20,8 +20,8 @@ import quasar.Predef.{Vector, None, Set}
 import quasar.Planner.UnsupportedPlan
 import quasar.{LogicalPlan, PhaseResults}
 import quasar.fp.prism._
-import quasar.recursionschemes.Fix
 
+import matryoshka.Fix
 import pathy.Path._
 import scalaz.{~>, \/, Applicative}
 import scalaz.syntax.equal._

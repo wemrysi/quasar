@@ -18,12 +18,12 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes.Recursive.ops._
 import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 
+import matryoshka.Recursive.ops._
 import scalaz._, Scalaz._
 
 final case class Grouped(value: ListMap[BsonField.Name, Accumulator]) {

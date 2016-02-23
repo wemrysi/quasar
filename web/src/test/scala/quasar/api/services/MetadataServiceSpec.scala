@@ -25,10 +25,10 @@ import quasar.fp.prism._
 import quasar.fs._
 import quasar.fs.InMemory._
 import quasar.fs.mount._
-import quasar.recursionschemes.Fix
 import quasar.sql._
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import monocle.Lens
 import org.http4s
 import org.http4s._

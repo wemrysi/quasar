@@ -17,11 +17,11 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, Recursive.ops._
 import quasar.sql._
 
 import scala.AnyRef
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless.contrib.scalaz._
 
@@ -140,8 +140,7 @@ trait SemanticAnalysis {
     case node => Fix(node)
   }
 
-  private val identifySyntheticsƒ:
-      ExprF[List[Option[Synthetic]]] => List[Option[Synthetic]] = {
+  private val identifySyntheticsƒ: Algebra[ExprF, List[Option[Synthetic]]] = {
     case SelectF(_, projections, _, _, _, _) =>
       projections.map(_.alias match {
         case Some(name) if name.startsWith(syntheticPrefix) =>
@@ -166,8 +165,8 @@ trait SemanticAnalysis {
     * then because this leads to an ambiguity, an error is produced containing
     * details on the duplicate name.
     */
-  val scopeTablesƒ: (TableScope, Expr) => ValidSem[ExprF[(TableScope, Expr)]] =
-    (parentScope, expr) => expr.unFix match {
+  val scopeTablesƒ: CoalgebraM[ValidSem, ExprF, (TableScope, Expr)] =
+    p => p._2.unFix match {
       case sel @ SelectF(_, _, relations, _, _, _) =>
         def findRelations(r: SqlRelation[Expr]): ValidSem[Map[String, SqlRelation[Expr]]] =
           r match {
@@ -189,7 +188,7 @@ trait SemanticAnalysis {
           success(Map[String, SqlRelation[Expr]]()))(
           findRelations)
           .map(m => sel.map((TableScope(m), _)))
-      case x => success(x.map((parentScope, _)))
+      case x => success(x.map((p._1, _)))
     }
 
   sealed trait Provenance {
@@ -316,55 +315,54 @@ trait SemanticAnalysis {
     * if identifiers are used with unknown provenance. The phase requires
     * TableScope annotations on the tree.
     */
-  val inferProvenanceƒ:
-      (TableScope, ExprF[Provenance]) => ValidSem[Provenance] = (tableScope, expr) => expr match {
-    case SelectF(_, projections, _, _, _, _) =>
-      success(Provenance.allOf(projections.map(_.expr)))
+  val inferProvenanceƒ: ElgotAlgebraM[ValidSem, ExprF, TableScope, Provenance] =
+    (tableScope, expr) => expr match {
+      case SelectF(_, projections, _, _, _, _) =>
+        success(Provenance.allOf(projections.map(_.expr)))
 
-    case SetLiteralF(_)  => success(Provenance.Value)
-    case ArrayLiteralF(_) => success(Provenance.Value)
-    case MapLiteralF(_) => success(Provenance.Value)
-    case SpliceF(expr)       => success(expr.getOrElse(Provenance.Empty))
-    case VariF(_)        => success(Provenance.Value)
-    case BinopF(left, right, _) => success(left & right)
-    case UnopF(expr, _) => success(expr)
-    case IdentF(name) =>
-      tableScope.scope.get(name).fold(
-        Provenance.anyOf[Map[String, ?]](tableScope.scope ∘ (Provenance.Relation(_))) match {
-          case Provenance.Empty => fail(NoTableDefined(Ident(name)))
-          case x                => success(x)
-        })(
-        (Provenance.Relation(_)) ⋙ success)
-    case InvokeFunctionF(_, args) => success(Provenance.allOf(args))
-    case MatchF(_, cases, _)      =>
-      success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
-    case SwitchF(cases, _)        =>
-      success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
-    case IntLiteralF(_)           => success(Provenance.Value)
-    case FloatLiteralF(_)         => success(Provenance.Value)
-    case StringLiteralF(_)        => success(Provenance.Value)
-    case BoolLiteralF(_)          => success(Provenance.Value)
-    case NullLiteralF()           => success(Provenance.Value)
-  }
+      case SetLiteralF(_)  => success(Provenance.Value)
+      case ArrayLiteralF(_) => success(Provenance.Value)
+      case MapLiteralF(_) => success(Provenance.Value)
+      case SpliceF(expr)       => success(expr.getOrElse(Provenance.Empty))
+      case VariF(_)        => success(Provenance.Value)
+      case BinopF(left, right, _) => success(left & right)
+      case UnopF(expr, _) => success(expr)
+      case IdentF(name) =>
+        tableScope.scope.get(name).fold(
+          Provenance.anyOf[Map[String, ?]](tableScope.scope ∘ (Provenance.Relation(_))) match {
+            case Provenance.Empty => fail(NoTableDefined(Ident(name)))
+            case x                => success(x)
+          })(
+          (Provenance.Relation(_)) ⋙ success)
+      case InvokeFunctionF(_, args) => success(Provenance.allOf(args))
+      case MatchF(_, cases, _)      =>
+        success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
+      case SwitchF(cases, _)        =>
+        success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
+      case IntLiteralF(_)           => success(Provenance.Value)
+      case FloatLiteralF(_)         => success(Provenance.Value)
+      case StringLiteralF(_)        => success(Provenance.Value)
+      case BoolLiteralF(_)          => success(Provenance.Value)
+      case NullLiteralF()           => success(Provenance.Value)
+    }
 
   type Annotations = (List[Option[Synthetic]], Provenance)
 
   // NB: converts identifySyntheticsƒ from a cata to a coelgotM, for zipping
   val synthCoEƒ:
       (TableScope, ExprF[List[Option[Synthetic]]]) => ValidSem[List[Option[Synthetic]]] =
-    generalizeCoelgot(identifySyntheticsƒ)(_, _).point[ValidSem]
+    identifySyntheticsƒ.generalizeElgot[TableScope](_, _).point[ValidSem]
 
-  def projectSortKeys(expr: Expr) = expr.cata(projectSortKeysƒ)
-  def scopeTables(a: (TableScope, Expr)) = (scopeTablesƒ).tupled(a).disjunction
   def addAnnotations(a: (TableScope, Expr), node: ExprF[Cofree[ExprF, Annotations]]) =
-    attributeCoelgotM(
-      zipCoelgotM(synthCoEƒ, inferProvenanceƒ)).apply(a._1, node).disjunction
+    attributeCoelgotM(ElgotAlgebraMZip[ValidSem, ExprF, TableScope].zip(
+      synthCoEƒ,
+      inferProvenanceƒ)).apply(a._1, node).disjunction
 
   // NB: projectSortKeys >>> (identifySynthetics &&& (scopeTables >>> inferProvenance))
   def AllPhases(expr: Expr) =
-    coelgotM[NonEmptyList[SemanticError] \/ ?](
-      (TableScope(Map()), projectSortKeys(expr)))(
-      addAnnotations, scopeTables)
+    (TableScope(Map()), expr.cata(projectSortKeysƒ))
+      .coelgotM[NonEmptyList[SemanticError] \/ ?](
+      addAnnotations, scopeTablesƒ(_).disjunction)
 }
 
 object SemanticAnalysis extends SemanticAnalysis

@@ -24,8 +24,8 @@ import quasar.fs.DataCursor
 import quasar.javascript._
 import quasar.physical.mongodb.workflowtask._
 import quasar.physical.mongodb.execution._
-import quasar.recursionschemes._, Recursive.ops._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
 /** Implements the necessary operations for executing a `Workflow` against

@@ -18,8 +18,8 @@ package quasar.physical.mongodb.workflowtask
 
 import quasar.Predef._
 import quasar.physical.mongodb._
-import quasar.recursionschemes._
 
+import matryoshka._
 import scalaz._
 
 object PureTask {

@@ -20,10 +20,10 @@ import quasar.Predef._
 import quasar.Variables
 import quasar.fp.prism._
 import quasar.fs.{APath, ADir, AFile, PathError2, FileSystemType}
-import quasar.recursionschemes.Fix
 import quasar.specs2.DisjunctionMatchers
 import quasar.sql
 
+import matryoshka.Fix
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
 import monocle.std.tuple2._

@@ -18,10 +18,9 @@ package quasar.std
 
 import quasar.Predef._
 import quasar._, LogicalPlan._, SemanticError._
-import quasar.recursionschemes._, cofree._, Recursive.ops._
 import quasar.fp._
-import quasar.recursionschemes._, Recursive.ops._
 
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 trait StructuralLib extends Library {
@@ -340,9 +339,7 @@ trait StructuralLib extends Library {
         case Nil      => ConstantF(Data.Obj(Map()))
         case x :: xs  =>
           xs.foldLeft(MakeObject(x._1, x._2))((a, b) =>
-            ObjectConcat(
-              Corecursive[T].embed(a),
-              Corecursive[T].embed(MakeObject(b._1, b._2))))
+            ObjectConcat(a.embed, MakeObject(b._1, b._2).embed))
       }
 
     // Note: signature does not match VirtualFunc
@@ -360,8 +357,7 @@ trait StructuralLib extends Library {
       args.map(MakeArray(_)) match {
         case Nil      => ConstantF(Data.Arr(Nil))
         case t :: Nil => t
-        case mas      => mas.reduce((t, ma) =>
-          ArrayConcat(Corecursive[T].embed(t), Corecursive[T].embed(ma)))
+        case mas      => mas.reduce((t, ma) => ArrayConcat(t.embed, ma.embed))
       }
 
     def unapply[T[_[_]]: Recursive](t: T[LogicalPlan]): Option[List[T[LogicalPlan]]] =

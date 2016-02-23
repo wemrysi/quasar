@@ -22,8 +22,9 @@ import quasar.fp._
 import java.lang.{Object, Runnable}
 import scala.Any
 
-import argonaut._; import Argonaut._
-import scalaz._; import Scalaz._
+import argonaut._, Argonaut._
+import matryoshka._
+import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 final case class RenderedTree(nodeType: List[String], label: Option[String], children: List[RenderedTree]) {
@@ -156,6 +157,8 @@ object NonTerminal {
   def render(a: A): RenderedTree
 }
 object RenderTree extends RenderTreeInstances {
+  import RenderTree.ops._
+
   def fromToString[A](simpleType: String) = new RenderTree[A] {
     val nodeType = simpleType :: Nil
     def render(v: A) = Terminal(nodeType, Some(v.toString))
@@ -340,6 +343,24 @@ object RenderTree extends RenderTreeInstances {
   }
 
   val windowCount = new java.util.concurrent.atomic.AtomicInteger()
+
+  implicit def fixRenderTree[F[_]](implicit RF: RenderTree ~> λ[α => RenderTree[F[α]]]):
+      RenderTree[Fix[F]] =
+    new RenderTree[Fix[F]] {
+      def render(v: Fix[F]) =
+        RF(fixRenderTree[F]).render(v.unFix).retype {
+          case h :: t => ("Fix:" + h) :: t
+          case Nil    => "Fix" :: Nil
+        }
+    }
+
+  implicit def cofreeRenderTree[F[_], A: RenderTree](implicit RF: RenderTree ~> λ[α => RenderTree[F[α]]]):
+      RenderTree[Cofree[F, A]] =
+    new RenderTree[Cofree[F, A]] {
+      def render(t: Cofree[F, A]) = {
+        NonTerminal(List("Cofree"), None, List(t.head.render, RF(cofreeRenderTree[F, A]).render(t.tail)))
+      }
+    }
 }
 
 sealed abstract class RenderTreeInstances {

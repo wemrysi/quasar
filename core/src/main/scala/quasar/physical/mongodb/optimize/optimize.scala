@@ -18,9 +18,9 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.jscore._
-import quasar.recursionschemes._, Recursive.ops._, FunctorT.ops._
 import quasar.fp._
 
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
 
 package object optimize {

@@ -17,9 +17,9 @@
 package quasar.jscore
 
 import quasar.Predef._
-
 import quasar.javascript.Js
-import quasar.recursionschemes.Fix
+
+import matryoshka.Fix
 
 object Literal {
   def apply(value: Js.Lit): JsCore = Fix(LiteralF(value))

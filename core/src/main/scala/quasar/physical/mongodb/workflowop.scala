@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.{RenderTree, RenderedTree, Terminal, NonTerminal}, RenderTree.ops._
-import quasar.recursionschemes._, Recursive.ops._, FunctorT.ops._
 import quasar.fp._
 import quasar.fs.Path
 import optimize.pipeline._
@@ -26,6 +25,7 @@ import quasar.javascript._, Js._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.workflowtask._
 
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import monocle.syntax._
 import scalaz._, Scalaz._
 import shapeless.contrib.scalaz._
@@ -535,7 +535,7 @@ object Workflow {
       case x                       => Fix(x)
     }
 
-    val crystallizeƒ: Workflow => WorkflowF[Workflow] = _.unFix match {
+    val crystallizeƒ: WorkflowF[Workflow] => WorkflowF[Workflow] = {
       case mr: MapReduceF[Workflow] => mr.src.unFix match {
         case $Project(src, shape, _)  =>
           shape.toJs.fold(
@@ -580,7 +580,7 @@ object Workflow {
     }
 
     Crystallized(
-      promoteKnownShape(finished).ana(crystallizeƒ).transCata[WorkflowF](coalesce)
+      promoteKnownShape(finished).transAna(crystallizeƒ).transCata[WorkflowF](coalesce)
         // TODO: this can coalesce more cases, but hasn’t been done thus far and
         //       requires rewriting many tests in a much less readable way.
         // .cata[Workflow](x => coalesce(uncleanƒ(x).unFix))

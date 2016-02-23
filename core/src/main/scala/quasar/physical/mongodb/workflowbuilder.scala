@@ -21,12 +21,12 @@ import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
 import quasar.fp._
 import quasar.namegen._
 import quasar._, Planner._
-import quasar.recursionschemes._, Recursive.ops._, FunctorT.ops._
 import quasar.fs.Path
 import quasar.javascript._
 import quasar.std.StdLib._
 import quasar.jscore, jscore.{JsCore, JsFn}
 
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
 import shapeless.contrib.scalaz.instances.deriveEqual
 
@@ -342,7 +342,7 @@ object WorkflowBuilder {
             xs <- inner.map { case (n, x) =>
                     jscore.Select(jscore.Ident(js.param), n.value) -> exprToJs(x)
                   }.sequenceU.toOption
-            expr1 <- js.expr.apoM[jscore.JsCoreF, Option] {
+            expr1 <- js.expr.apoM[Fix, jscore.JsCoreF, Option] {
                     case t @ jscore.Access(b, _) if b == jscore.Ident(js.param) =>
                       xs.get(t).map(_(jscore.Ident(js.param)).unFix.map(_.left))
                     case t => t.unFix.map(_.right[JsCore]).some

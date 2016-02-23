@@ -17,11 +17,11 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes.Fix
 import quasar.sql.SQLParser
 import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
 
+import matryoshka.Fix
 import org.specs2.mutable._
 import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.scalaz._

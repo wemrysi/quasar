@@ -18,17 +18,16 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.recursionschemes._, FunctorT.ops._
 import quasar.fs._, Path._
 import quasar.std._
 
-import scala.Any
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.input.CharArrayReader.EofCh
 
+import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
 
 sealed trait ParsingError { def message: String}
@@ -92,13 +91,13 @@ class SQLParser extends StandardTokenParsers {
     def quotedIdentParser: Parser[Token] =
       delimitedString('`') ^^ (QuotedIdentifier(_))
 
-    override def whitespace: Parser[Any] = rep(
+    override def whitespace: Parser[scala.Any] = rep(
       whitespaceChar |
       '/' ~ '*' ~ comment |
       '-' ~ '-' ~ rep(chrExcept(EofCh, '\n')) |
       '/' ~ '*' ~ failure("unclosed comment"))
 
-    override protected def comment: Parser[Any] = (
+    override protected def comment: Parser[scala.Any] = (
       '*' ~ '/'  ^^ κ(' ') |
       chrExcept(EofCh) ~ comment)
   }

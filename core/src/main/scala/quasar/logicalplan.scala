@@ -17,11 +17,12 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, cofree._, Recursive.ops._, FunctorT.ops._
 import quasar.fp._
+import quasar.fp.binder._
 import quasar.fs.Path
 import quasar.namegen._
 
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, Validation.{success, failure}, Validation.FlatMap._
 import shapeless.contrib.scalaz.instances.deriveEqual
 

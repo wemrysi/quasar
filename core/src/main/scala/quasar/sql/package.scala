@@ -17,10 +17,10 @@
 package quasar
 
 import quasar.Predef._
-import quasar.recursionschemes._, Recursive.ops._, TraverseT.ops._
 import quasar.fp._
 import quasar.fs._
 
+import matryoshka._, Recursive.ops._, TraverseT.ops._
 import scalaz._, Scalaz._
 
 package object sql {
@@ -198,9 +198,9 @@ package object sql {
   def normalizeƒ[T[_[_]]: Corecursive]:
       ExprF[T[ExprF]] => Option[ExprF[T[ExprF]]] = {
     case BinopF(l, r, Union) =>
-      UnopF(Corecursive[T].embed(BinopF(l, r, UnionAll)), Distinct).some
+      UnopF(BinopF(l, r, UnionAll).embed, Distinct).some
     case BinopF(l, r, Intersect) =>
-      UnopF(Corecursive[T].embed(BinopF(l, r, IntersectAll)), Distinct).some
+      UnopF(BinopF(l, r, IntersectAll).embed, Distinct).some
     case _ => None
   }
 

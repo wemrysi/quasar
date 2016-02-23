@@ -17,9 +17,9 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.recursionschemes._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._
 
+import matryoshka._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 // TODO: Cleanup!

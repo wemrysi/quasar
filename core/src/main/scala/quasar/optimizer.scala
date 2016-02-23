@@ -17,9 +17,10 @@
 package quasar
 
 import quasar.Predef._
+import quasar.fp.binder._
 import quasar.namegen._
-import quasar.recursionschemes._, Fix._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 
+import matryoshka._, Fix._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._
 
 object Optimizer {
@@ -29,7 +30,7 @@ object Optimizer {
   import structural._
   import Planner._
 
-  private def countUsageƒ(target: Symbol): LogicalPlan[Int] => Int = {
+  private def countUsageƒ(target: Symbol): Algebra[LogicalPlan, Int] = {
     case FreeF(symbol) if symbol == target => 1
     case LetF(ident, form, _) if ident == target => form
     case x => x.fold
@@ -37,12 +38,12 @@ object Optimizer {
 
   private def inlineƒ[T[_[_]], A](target: Symbol, repl: LogicalPlan[T[LogicalPlan]]):
       LogicalPlan[(T[LogicalPlan], T[LogicalPlan])] => LogicalPlan[T[LogicalPlan]] =
-    {
-      case FreeF(symbol) if symbol == target => repl
-      case LetF(ident, form, body) if ident == target =>
-        LetF(ident, form._2, body._1)
-      case x => x.map(_._2)
-    }
+  {
+    case FreeF(symbol) if symbol == target => repl
+    case LetF(ident, form, body) if ident == target =>
+      LetF(ident, form._2, body._1)
+    case x => x.map(_._2)
+  }
 
   def simplifyƒ[T[_[_]]: Recursive: Corecursive]:
       LogicalPlan[T[LogicalPlan]] => Option[LogicalPlan[T[LogicalPlan]]] = {
@@ -60,7 +61,7 @@ object Optimizer {
 
   def simplify(t: Fix[LogicalPlan]): Fix[LogicalPlan] = t.transCata(repeatedly(simplifyƒ))
 
-  val namesƒ: LogicalPlan[Set[Symbol]] => Set[Symbol] = {
+  val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {
     case FreeF(name) => Set(name)
     case x           => x.fold
   }
@@ -77,7 +78,7 @@ object Optimizer {
     loop(prefix)
   }
 
-  val shapeƒ: LogicalPlan[(Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]])] => Option[List[Fix[LogicalPlan]]] = {
+  val shapeƒ: GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, Option[List[Fix[LogicalPlan]]]] = {
     case LetF(_, _, body) => body._2
     case ConstantF(Data.Obj(map)) =>
       Some(map.keys.map(n => Constant(Data.Str(n))).toList)
@@ -111,10 +112,10 @@ object Optimizer {
   //       efficient deletes. Even better, a single function that takes a
   //       function parameter deciding which way each case should be converted.
   private val preferProjectionsƒ:
-      LogicalPlan[(
-        Fix[LogicalPlan],
-        (Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]]))] =>
-  (Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]]) = { node =>
+      GAlgebra[
+        (Fix[LogicalPlan], ?),
+        LogicalPlan,
+        (Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]])] = { node =>
 
     def preserveFree(x: (Fix[LogicalPlan], (Fix[LogicalPlan], Option[List[Fix[LogicalPlan]]]))) =
       preserveFree0(x)(_._1)
@@ -135,9 +136,9 @@ object Optimizer {
   }
 
   def preferProjections(t: Fix[LogicalPlan]): Fix[LogicalPlan] =
-    t.boundPara(preferProjectionsƒ)._1.transCata(repeatedly(simplifyƒ))
+    boundPara(t)(preferProjectionsƒ)._1.transCata(repeatedly(simplifyƒ))
 
-  val elideTypeCheckƒ: LogicalPlan[Fix[LogicalPlan]] => Fix[LogicalPlan] = {
+  val elideTypeCheckƒ: Algebra[LogicalPlan, Fix[LogicalPlan]] = {
     case LetF(n, b, Fix(TypecheckF(Fix(FreeF(nf)), _, cont, _)))
         if n == nf =>
       Let(n, b, cont)
@@ -150,7 +151,7 @@ object Optimizer {
     * incompatible.
     */
   def assumeReadObjƒ:
-      LogicalPlan[Fix[LogicalPlan]] => PlannerError \/ Fix[LogicalPlan] = {
+      AlgebraM[PlannerError \/ ?, LogicalPlan, Fix[LogicalPlan]] = {
     case x @ LetF(n, r @ Fix(ReadF(_)),
       Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
         if n == nf =>
@@ -295,7 +296,7 @@ object Optimizer {
     */
   def optimize(t: Fix[LogicalPlan]): Fix[LogicalPlan] = {
     val t1 = t.transCata(repeatedly(simplifyƒ))
-    val t2 = t1.boundParaS(rewriteCrossJoinsƒ).evalZero
+    val t2 = boundParaS(t1)(rewriteCrossJoinsƒ).evalZero
     val t3 = t2.transCata(repeatedly(simplifyƒ))
     val t4 = (normalizeLets _ >>> normalizeTempNames _)(t3)
     t4

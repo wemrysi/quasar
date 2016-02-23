@@ -17,8 +17,8 @@
 package quasar.physical.mongodb.expression
 
 import quasar.Predef._
-import quasar.recursionschemes.Recursive.ops._
 
+import matryoshka.Recursive.ops._
 import org.scalacheck._
 import org.scalacheck.Arbitrary
 import org.specs2.mutable._
