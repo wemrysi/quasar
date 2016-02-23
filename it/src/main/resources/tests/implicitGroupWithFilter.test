@@ -3,7 +3,7 @@
 
   "data": "zips.data",
 
-  "query": "select avg(pop), sum(pop) from zips where city = 'BOULDER' and state = 'CO'",
+  "query": "select avg(pop), sum(pop) from zips where city = \"BOULDER\" and state = \"CO\"",
 
   "predicate": "containsExactly",
   "expected": [

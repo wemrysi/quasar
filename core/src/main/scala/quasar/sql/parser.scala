@@ -57,11 +57,22 @@ class SQLParser extends StandardTokenParsers {
       override def toString = ":" + chars
     }
 
-    override def token: Parser[Token] = variParser | numLitParser | charLitParser | stringLitParser | quotedIdentParser | super.token
+    override def token: Parser[Token] =
+      variParser |
+      numLitParser |
+      charLitParser |
+      stringLitParser |
+      quotedIdentParser |
+      identifierString ^^ processIdent |
+      EofCh ^^^ EOF |
+      '\'' ~> failure("unclosed character literal") |
+      '"'  ~> failure("unclosed string literal") |
+      '`'  ~> failure("unclosed quoted identifier") |
+      delim
 
     def identifierString: Parser[String] =
       ((letter | elem('_')) ~ rep(digit | letter | elem('_'))) ^^ {
-        case x ~ xs => x.toString + xs.mkString
+        case x ~ xs => (x :: xs).mkString
       }
 
     def variParser: Parser[Token] = ':' ~> identifierString ^^ (Variable(_))

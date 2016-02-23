@@ -187,6 +187,10 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       parser.parse("""select * from foo where bar = "that\"s it!"""").toOption should beSome
     }
 
+    "don’t parse multi-character char literal" in {
+      parser.parse("""select * from foo where bar = 'it!'""").toOption should beNone
+    }
+
     "parse literal that’s too big for an Int" in {
       parser.parse("select * from users where add_date > 1425460451000") should
         beRightDisjOrDiff(

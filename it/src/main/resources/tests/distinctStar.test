@@ -2,7 +2,7 @@
     "name": "distinct *",
     "backends": { "mongodb_read_only": "pending" },
     "data": "cities.data",
-    "query": "select distinct * from cities where city = 'BOSTON'",
+    "query": "select distinct * from cities where city = \"BOSTON\"",
     "predicate": "equalsExactly",
     "expected": [{ "value": { "city": "BOSTON" } }]
 }

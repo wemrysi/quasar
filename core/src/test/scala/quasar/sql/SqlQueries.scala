@@ -32,7 +32,7 @@ select
 from
   lineitem
 where
-  l_shipdate <= date('1998-12-01') - interval('5 day')
+  l_shipdate <= date("1998-12-01") - interval("5 day")
 group by
   l_returnflag,
   l_linestatus
@@ -60,10 +60,10 @@ where
   p_partkey = ps_partkey
   and s_suppkey = ps_suppkey
   and p_size = 10
-  and p_type like '%foo'
+  and p_type like "%foo"
   and s_nationkey = n_nationkey
   and n_regionkey = r_regionkey
-  and r_name = 'somename'
+  and r_name = "somename"
   and ps_supplycost = (
     select
       min(ps_supplycost)
@@ -77,7 +77,7 @@ where
       and s_suppkey = ps_suppkey
       and s_nationkey = n_nationkey
       and n_regionkey = r_regionkey
-      and r_name = 'somename'
+      and r_name = "somename"
   )
 order by
   s_acctbal desc,
@@ -98,11 +98,11 @@ from
   orders,
   lineitem
 where
-  c_mktsegment = 'somesegment'
+  c_mktsegment = "somesegment"
   and c_custkey = o_custkey
   and l_orderkey = o_orderkey
-  and o_orderdate < date('1999-01-01')
-  and l_shipdate > date('1999-01-01')
+  and o_orderdate < date("1999-01-01")
+  and l_shipdate > date("1999-01-01")
 group by
   l_orderkey,
   o_orderdate,
@@ -120,8 +120,8 @@ select
 from
   orders
 where
-  o_orderdate >= date('1999-01-01')
-  and o_orderdate < date('1999-01-01') + interval('3 month')
+  o_orderdate >= date("1999-01-01")
+  and o_orderdate < date("1999-01-01") + interval("3 month")
   and exists (
     select
       *
@@ -155,9 +155,9 @@ where
   and c_nationkey = s_nationkey
   and s_nationkey = n_nationkey
   and n_regionkey = r_regionkey
-  and r_name = 'foo'
-  and o_orderdate >= date('1999-01-01')
-  and o_orderdate < date('1999-01-01') + interval('1 day')
+  and r_name = "foo"
+  and o_orderdate >= date("1999-01-01")
+  and o_orderdate < date("1999-01-01") + interval("1 day")
 group by
   n_name
 order by
@@ -170,8 +170,8 @@ select
 from
   lineitem
 where
-  l_shipdate >= date('1999-01-01')
-  and l_shipdate < date('1999-01-01') + interval('1 day')
+  l_shipdate >= date("1999-01-01")
+  and l_shipdate < date("1999-01-01") + interval("1 day")
   and l_discount between 2 - 0.01 and 2 + 0.01
   and l_quantity < 3;
 """
@@ -187,7 +187,7 @@ from
     select
       n1.n_name as supp_nation,
       n2.n_name as cust_nation,
-      date_part('year', l_shipdate) as l_year,
+      date_part("year", l_shipdate) as l_year,
       l_extendedprice * (1 - l_discount) as volume
     from
       supplier,
@@ -203,10 +203,10 @@ from
       and s_nationkey = n1.n_nationkey
       and c_nationkey = n2.n_nationkey
       and (
-        (n1.n_name = 'a' and n2.n_name = 'b')
-        or (n1.n_name = 'b' and n2.n_name = 'a')
+        (n1.n_name = "a" and n2.n_name = "b")
+        or (n1.n_name = "b" and n2.n_name = "a")
       )
-      and l_shipdate between date('1995-01-01') and date('1996-12-31')
+      and l_shipdate between date("1995-01-01") and date("1996-12-31")
   ) as shipping
 group by
   supp_nation,
@@ -222,13 +222,13 @@ order by
 select
   o_year,
   sum(case
-    when nation = 'nation' then volume
+    when nation = "nation" then volume
     else 0
   end) / sum(volume) as mkt_share
 from
   (
     select
-      date_part('year', o_orderdate) as o_year,
+      date_part("year", o_orderdate) as o_year,
       l_extendedprice * (1 - l_discount) as volume,
       n2.n_name as nation
     from
@@ -247,10 +247,10 @@ from
       and o_custkey = c_custkey
       and c_nationkey = n1.n_nationkey
       and n1.n_regionkey = r_regionkey
-      and r_name = 'rname'
+      and r_name = "rname"
       and s_nationkey = n2.n_nationkey
-      and o_orderdate between date('1995-01-01') and date('1996-12-31')
-      and p_type = 'ptype'
+      and o_orderdate between date("1995-01-01") and date("1996-12-31")
+      and p_type = "ptype"
   ) as all_nations
 group by
   o_year
@@ -267,7 +267,7 @@ from
   (
     select
       n_name as nation,
-      date_part('year', o_orderdate) as o_year,
+      date_part("year", o_orderdate) as o_year,
       l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
     from
       part,
@@ -283,7 +283,7 @@ from
       and p_partkey = l_partkey
       and o_orderkey = l_orderkey
       and s_nationkey = n_nationkey
-      and p_name like '%sky%'
+      and p_name like "%sky%"
   ) as profit
 group by
   nation,
@@ -311,9 +311,9 @@ from
 where
   c_custkey = o_custkey
   and l_orderkey = o_orderkey
-  and o_orderdate >= date('1999-01-01')
-  and o_orderdate < date('1999-01-01') + interval('3 month')
-  and l_returnflag = 'R'
+  and o_orderdate >= date("1999-01-01")
+  and o_orderdate < date("1999-01-01") + interval("3 month")
+  and l_returnflag = "R"
   and c_nationkey = n_nationkey
 group by
   c_custkey,
@@ -338,7 +338,7 @@ from
 where
   ps_suppkey = s_suppkey
   and s_nationkey = n_nationkey
-  and n_name = 'nnation'
+  and n_name = "nnation"
 group by
   ps_partkey having
     sum(ps_supplycost * ps_availqty) > (
@@ -351,7 +351,7 @@ group by
       where
         ps_suppkey = s_suppkey
         and s_nationkey = n_nationkey
-        and n_name = 'name'
+        and n_name = "name"
     )
 order by
   value desc;
@@ -361,14 +361,14 @@ order by
 select
   l_shipmode,
   sum(case
-    when o_orderpriority = '1-URGENT'
-      or o_orderpriority = '2-HIGH'
+    when o_orderpriority = "1-URGENT"
+      or o_orderpriority = "2-HIGH"
       then 1
     else 0
   end) as high_line_count,
   sum(case
-    when o_orderpriority <> '1-URGENT'
-      and o_orderpriority <> '2-HIGH'
+    when o_orderpriority <> "1-URGENT"
+      and o_orderpriority <> "2-HIGH"
       then 1
     else 0
   end) as low_line_count
@@ -377,11 +377,11 @@ from
   lineitem
 where
   o_orderkey = l_orderkey
-  and l_shipmode in ('mode0', 'mode1')
+  and l_shipmode in ("mode0", "mode1")
   and l_commitdate < l_receiptdate
   and l_shipdate < l_commitdate
-  and l_receiptdate >= date('1998-01-01')
-  and l_receiptdate < date('1998-01-01') + interval('1 year')
+  and l_receiptdate >= date("1998-01-01")
+  and l_receiptdate < date("1998-01-01") + interval("1 year")
 group by
   l_shipmode
 order by
@@ -400,7 +400,7 @@ from
     from
       customer left outer join orders on
         c_custkey = o_custkey
-        and o_comment not like '%:1%:2%'
+        and o_comment not like "%:1%:2%"
     group by
       c_custkey
   ) as c_orders
@@ -414,7 +414,7 @@ order by
   val q14 = """
 select
   100.00 * sum(case
-    when p_type like 'PROMO%'
+    when p_type like "PROMO%"
       then l_extendedprice * (1 - l_discount)
     else 0
   end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue
@@ -423,8 +423,8 @@ from
   part
 where
   l_partkey = p_partkey
-  and l_shipdate >= date('1999-01-01')
-  and l_shipdate < date('1999-01-01') + interval('1 month');
+  and l_shipdate >= date("1999-01-01")
+  and l_shipdate < date("1999-01-01") + interval("1 month");
 """
 
   val q16 = """
@@ -438,8 +438,8 @@ from
   part
 where
   p_partkey = ps_partkey
-  and p_brand <> 'foo'
-  and p_type not like 'bar%'
+  and p_brand <> "foo"
+  and p_type not like "bar%"
   and p_size in (3, 4, 5, 6, 7, 8, 9, 10)
   and ps_suppkey not in (
     select
@@ -447,7 +447,7 @@ where
     from
       supplier
     where
-      s_comment like '%Customer%Complaints%'
+      s_comment like "%Customer%Complaints%"
   )
 group by
   p_brand,
@@ -468,8 +468,8 @@ from
   part
 where
   p_partkey = l_partkey
-  and p_brand = 'a'
-  and p_container = 'b'
+  and p_brand = "a"
+  and p_container = "b"
   and l_quantity < (
     select
       0.2 * avg(l_quantity)
@@ -525,32 +525,32 @@ from
 where
   (
     p_partkey = l_partkey
-    and p_brand = 'foo'
-    and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+    and p_brand = "foo"
+    and p_container in ("SM CASE", "SM BOX", "SM PACK", "SM PKG")
     and l_quantity >= 4 and l_quantity <= 4 + 10
     and p_size between 1 and 5
-    and l_shipmode in ('AIR', 'AIR REG')
-    and l_shipinstruct = 'DELIVER IN PERSON'
+    and l_shipmode in ("AIR", "AIR REG")
+    and l_shipinstruct = "DELIVER IN PERSON"
   )
   or
   (
     p_partkey = l_partkey
-    and p_brand = 'bar'
-    and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+    and p_brand = "bar"
+    and p_container in ("MED BAG", "MED BOX", "MED PKG", "MED PACK")
     and l_quantity >= 5 and l_quantity <= 5 + 10
     and p_size between 1 and 10
-    and l_shipmode in ('AIR', 'AIR REG')
-    and l_shipinstruct = 'DELIVER IN PERSON'
+    and l_shipmode in ("AIR", "AIR REG")
+    and l_shipinstruct = "DELIVER IN PERSON"
   )
   or
   (
     p_partkey = l_partkey
-    and p_brand = 'baz'
-    and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+    and p_brand = "baz"
+    and p_container in ("LG CASE", "LG BOX", "LG PACK", "LG PKG")
     and l_quantity >= 6 and l_quantity <= 6 + 10
     and p_size between 1 and 15
-    and l_shipmode in ('AIR', 'AIR REG')
-    and l_shipinstruct = 'DELIVER IN PERSON'
+    and l_shipmode in ("AIR", "AIR REG")
+    and l_shipinstruct = "DELIVER IN PERSON"
   );
 """
 
@@ -574,7 +574,7 @@ where
         from
           part
         where
-          p_name like 'foo%'
+          p_name like "foo%"
       )
       and ps_availqty > (
         select
@@ -584,12 +584,12 @@ where
         where
           l_partkey = ps_partkey
           and l_suppkey = ps_suppkey
-          and l_shipdate >= date('1999-01-01')
-          and l_shipdate < date('1999-01-01') + interval('1 year')
+          and l_shipdate >= date("1999-01-01")
+          and l_shipdate < date("1999-01-01") + interval("1 year")
       )
   )
   and s_nationkey = n_nationkey
-  and n_name = 'foo'
+  and n_name = "foo"
 order by
   s_name;
 """
@@ -606,7 +606,7 @@ from
 where
   s_suppkey = l1.l_suppkey
   and o_orderkey = l1.l_orderkey
-  and o_orderstatus = 'F'
+  and o_orderstatus = "F"
   and l1.l_receiptdate > l1.l_commitdate
   and exists (
     select
@@ -628,7 +628,7 @@ where
       and l3.l_receiptdate > l3.l_commitdate
   )
   and s_nationkey = n_nationkey
-  and n_name = 'foo'
+  and n_name = "foo"
 group by
   s_name
 order by
@@ -651,7 +651,7 @@ from
       customer
     where
       substring(c_phone, 1, 2) in
-        ('11', '22', '33', '44', '55', '66', '77')
+        ("11", "22", "33", "44", "55", "66", "77")
       and c_acctbal > (
         select
           avg(c_acctbal)
@@ -660,7 +660,7 @@ from
         where
           c_acctbal > 0.00
           and substring(c_phone, 1, 2) in
-            ('11', '22', '33', '44', '55', '66', '77')
+            ("11", "22", "33", "44", "55", "66", "77")
       )
       and not exists (
         select

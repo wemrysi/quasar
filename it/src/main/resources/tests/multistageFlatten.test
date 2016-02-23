@@ -2,12 +2,12 @@
     "name": "multi-flatten with fields at various depths",
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (
-                foo              LIKE '%zap%' OR
-                foo[*]           LIKE '%15%' OR
-                foo[*][*]        LIKE '%meh%' OR
-                foo[*][*].baz    LIKE '%moo%' OR
-                foo[*][*].baz[*] LIKE '%quu%' OR
-                a                LIKE '%13%')",
+                foo              LIKE \"%zap%\" OR
+                foo[*]           LIKE \"%15%\" OR
+                foo[*][*]        LIKE \"%meh%\" OR
+                foo[*][*].baz    LIKE \"%moo%\" OR
+                foo[*][*].baz[*] LIKE \"%quu%\" OR
+                a                LIKE \"%13%\")",
     "FIXME": "Should use `containsExactly`, but see issue #732.",
     "predicate": "equalsExactly",
     "expected": [
