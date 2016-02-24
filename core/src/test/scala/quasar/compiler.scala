@@ -26,7 +26,6 @@ import org.specs2.mutable._
 import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.scalaz._
 
-
 class CompilerSpec extends Specification with CompilerHelpers with PendingWithAccurateCoverage with DisjunctionMatchers {
   import StdLib._
   import agg._
@@ -538,31 +537,36 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     "compile union" in {
       testLogicalPlanCompile(
         "select loc, pop from zips union select city from zips",
-        Distinct[FLP](Union[FLP](setA, setB)))
+          normalizeLets(normalizeLets(
+            Distinct[FLP](Union[FLP](setA, setB)))))
     }
 
     "compile union all" in {
       testLogicalPlanCompile(
         "select loc, pop from zips union all select city from zips",
-        Union[FLP](setA, setB))
+        normalizeLets(normalizeLets(
+          Union[FLP](setA, setB))))
     }
 
     "compile intersect" in {
       testLogicalPlanCompile(
         "select loc, pop from zips intersect select city from zips",
-        Distinct[FLP](Intersect[FLP](setA, setB)))
+        normalizeLets(normalizeLets(
+          Distinct[FLP](Intersect[FLP](setA, setB)))))
     }
 
     "compile intersect all" in {
       testLogicalPlanCompile(
         "select loc, pop from zips intersect all select city from zips",
-        Intersect[FLP](setA, setB))
+        normalizeLets(normalizeLets(
+          Intersect[FLP](setA, setB))))
     }
 
     "compile except" in {
       testLogicalPlanCompile(
         "select loc, pop from zips except select city from zips",
-        Except[FLP](setA, setB))
+        normalizeLets(normalizeLets(
+          Except[FLP](setA, setB))))
     }
 
     "have {*} as alias for {:*}" in {
@@ -878,41 +882,41 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
           " order by cm" +
           " offset 10" +
           " limit 5",
-        Take[FLP](
-          Drop(
-            Let('__tmp0, read("person"), // from person
-              Let('__tmp1,    // where height > 60
-                Filter[FLP](
-                  Free('__tmp0),
-                  Gt[FLP](
-                    ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
-                    Constant(Data.Int(60)))),
-                Let('__tmp2,    // group by gender, height
-                  GroupBy[FLP](
-                    Free('__tmp1),
-                    MakeArrayN[Fix](
-                      ObjectProject(Free('__tmp1), Constant(Data.Str("gender"))),
-                      ObjectProject(Free('__tmp1), Constant(Data.Str("height"))))),
-                  Let('__tmp3,
-                    Squash(    // select height*2.54 as cm
-                      makeObj(
-                        "cm" ->
-                          Multiply[FLP](
-                            Arbitrary[FLP](
-                              ObjectProject[FLP](
-                                Filter[FLP](  // having count(*) > 10
-                                  Free('__tmp2),
-                                  Gt[FLP](Count(Free('__tmp2)), Constant(Data.Int(10)))),
-                                Constant(Data.Str("height")))),
-                            Constant(Data.Dec(2.54))))),
+        Let('__tmp0, read("person"), // from person
+          Let('__tmp1,    // where height > 60
+            Filter[FLP](
+              Free('__tmp0),
+              Gt[FLP](
+                ObjectProject(Free('__tmp0), Constant(Data.Str("height"))),
+                Constant(Data.Int(60)))),
+            Let('__tmp2,    // group by gender, height
+              GroupBy[FLP](
+                Free('__tmp1),
+                MakeArrayN[Fix](
+                  ObjectProject(Free('__tmp1), Constant(Data.Str("gender"))),
+                  ObjectProject(Free('__tmp1), Constant(Data.Str("height"))))),
+              Let('__tmp3,
+                Squash(    // select height*2.54 as cm
+                  makeObj(
+                    "cm" ->
+                      Multiply[FLP](
+                        Arbitrary[FLP](
+                          ObjectProject[FLP](
+                            Filter[FLP](  // having count(*) > 10
+                              Free('__tmp2),
+                              Gt[FLP](Count(Free('__tmp2)), Constant(Data.Int(10)))),
+                            Constant(Data.Str("height")))),
+                        Constant(Data.Dec(2.54))))),
+                Take[FLP](
+                  Drop[FLP](
                     OrderBy[FLP](  // order by cm
                       Free('__tmp3),
                       MakeArrayN[Fix](
                         ObjectProject(Free('__tmp3), Constant(Data.Str("cm")))),
                       MakeArrayN(
-                        Constant(Data.Str("ASC")))))))),
-            Constant(Data.Int(10))), // offset 10
-          Constant(Data.Int(5))))    // limit 5
+                        Constant(Data.Str("ASC")))),
+                  Constant(Data.Int(10))), // offset 10
+                Constant(Data.Int(5))))))))    // limit 5
     }
 
     "compile simple sum" in {
@@ -958,7 +962,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       val equiv = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id and foo.x = bar.y"
 
       testLogicalPlanCompile(query, compileExp(equiv))
-    }.pendingUntilFixed("SD-1190")
+    }
 
     "compile inner non-equi join to the equivalent cross join" in {
       val query = "select foo.name, bar.address from foo join bar on foo.x < bar.y"
@@ -974,7 +978,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       testLogicalPlanCompile(query, compileExp(equiv))
     }.pendingUntilFixed("SD-1190")
 
-    "compile filtered join with one-sided conditions" in {
+    "compile filtered cross join with one-sided conditions" in {
       val query = "select foo.name, bar.address from foo, bar where foo.id = bar.foo_id and foo.x < 10 and bar.y = 20"
 
       // NB: this query produces what we want but currently doesn't match due to spurious SQUASHes
@@ -1010,6 +1014,42 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
                            Constant(Data.Str("address"))))))))))))
     }
 
+    "compile filtered join with one-sided conditions" in {
+      val query = "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where foo.x < 10 and bar.y = 20"
+
+      // NB: this should be identical to the same query written as a cross join
+      // (but cannot be written as in "must compile to the equivalent ..." style
+      // because both require optimization)
+
+      testLogicalPlanCompile(query,
+        Let('__tmp0, read("foo"),
+          Let('__tmp1,
+             Fix(Filter(
+               Free('__tmp0),
+               Fix(Lt(
+                 ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
+                 Constant(Data.Int(10)))))),
+             Let('__tmp2, read("bar"),
+               Let('__tmp3,
+                 Fix(Filter(
+                   Free('__tmp2),
+                   Fix(Eq(
+                     ObjectProject(Free('__tmp2), Constant(Data.Str("y"))),
+                     Constant(Data.Int(20)))))),
+                  Let('__tmp4,
+                    Fix(InnerJoin(Free('__tmp1), Free('__tmp3),
+                      Fix(Eq(
+                        ObjectProject(Free('__tmp1), Constant(Data.Str("id"))),
+                        ObjectProject(Free('__tmp3), Constant(Data.Str("foo_id"))))))),
+                    Fix(Squash(
+                       makeObj(
+                         "name" -> ObjectProject[FLP](
+                           ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
+                           Constant(Data.Str("name"))),
+                         "address" -> ObjectProject[FLP](
+                           ObjectProject(Free('__tmp4), Constant(Data.Str("right"))),
+                           Constant(Data.Str("address"))))))))))))
+    }
 
     "compile simple left ineq-join" in {
       testLogicalPlanCompile(

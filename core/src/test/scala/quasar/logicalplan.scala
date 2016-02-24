@@ -66,7 +66,7 @@ class LogicalPlanSpecs extends Spec {
 
   checkAll(traverse.laws[LogicalPlan])
 
-  import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._
+  import quasar.std.StdLib._, relations._, quasar.std.StdLib.set._, structural._, math._
 
   "normalizeTempNames" should {
     "rename simple nested lets" in {
@@ -131,6 +131,33 @@ class LogicalPlanSpecs extends Spec {
               Fix(Filter(Free('bar), Fix(Eq(Fix(ObjectProject(Free('foo), Constant(Data.Str("y")))), Constant(Data.Int(1)))))),
               Fix(MakeObjectN(
                 Constant(Data.Str("z")) -> Fix(ObjectProject(Free('bar), Constant(Data.Str("z")))))))))
+    }
+
+    "hoist multiple Lets" in {
+      LogicalPlan.normalizeLets(
+        Fix(Add(
+          Let('x, Constant(Data.Int(0)), Fix(Add(Free('x), Constant(Data.Int(1))))),
+          Let('y, Constant(Data.Int(2)), Fix(Add(Free('y), Constant(Data.Int(3)))))))) must_==
+        Let('x, Constant(Data.Int(0)),
+          Let('y, Constant(Data.Int(2)),
+            Fix(Add(
+              Fix(Add(Free('x), Constant(Data.Int(1)))),
+              Fix(Add(Free('y), Constant(Data.Int(3))))))))
+    }
+
+    "hoist deep Let by one level" in {
+      LogicalPlan.normalizeLets(
+        Fix(Add(
+          Constant(Data.Int(0)),
+          Fix(Add(
+            Let('x, Constant(Data.Int(1)), Fix(Add(Free('x), Constant(Data.Int(2))))),
+            Constant(Data.Int(3))))))) must_==
+        Fix(Add(
+          Constant(Data.Int(0)),
+          Let('x, Constant(Data.Int(1)),
+            Fix(Add(
+              Fix(Add(Free('x), Constant(Data.Int(2)))),
+              Constant(Data.Int(3)))))))
     }
   }
 }

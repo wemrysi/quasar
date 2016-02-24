@@ -227,8 +227,40 @@ object LogicalPlan {
   def normalizeTempNames(t: Fix[LogicalPlan]) =
     rename[State[NameGen, ?]](κ(freshName("tmp")))(t).evalZero
 
+  /** Finds the first element matching a predicate, if any, and returns it
+    * along with the preceding and following elements. */
+  private def splitAtFirstMatch[A](as: List[A])(p: A => Boolean): Option[(List[A], A, List[A])] = {
+    val x = as.prefixLength(!p(_))
+    (x < as.length).option((as.take(x), as(x), as.drop(x+1)))
+  }
+
+  /** Per the following:
+    * 1. Successive Lets are re-associated to the right:
+    *    (let a = (let b = x1 in x2) in x3) becomes
+    *    (let b = x1 in (let a = x2 in x3))
+    * 2. Lets are "hoisted" outside of Invoke and Typecheck nodes:
+    *    (add (let a = x1 in x2) (let b = x3 in x4)) becomes
+    *    (let a = x1 in (let b = x3 in (add x2 x4))
+    * Note that this is safe only if all bound names are unique; otherwise
+    * it could create spurious shadowing. normalizeTempNames is recommended.
+    * NB: at the moment, Lets are only hoisted one level.
+    */
   val normalizeLetsƒ: LogicalPlan[Fix[LogicalPlan]] => Option[LogicalPlan[Fix[LogicalPlan]]] = {
       case LetF(b, Fix(LetF(a, x1, x2)), x3) => LetF(a, x1, Let(b, x2, x3)).some
+
+      case InvokeF(func, xs) =>
+        splitAtFirstMatch(xs) { case Fix(LetF(_, _, _)) => true; case _ => false }.map {
+          case (prefix, Fix(LetF(a, x1, x2)), suffix) =>
+            LetF(a, x1, Invoke(func, prefix ++ (x2 :: suffix)))
+        }
+
+      case TypecheckF(Fix(LetF(a, x1, x2)), typ, cont, fallback) =>
+        LetF(a, x1, Fix(TypecheckF(x2, typ, cont, fallback))).some
+      case TypecheckF(expr, typ, Fix(LetF(a, x1, x2)), fallback) =>
+        LetF(a, x1, Fix(TypecheckF(expr, typ, x2, fallback))).some
+      case TypecheckF(expr, typ, cont, Fix(LetF(a, x1, x2))) =>
+        LetF(a, x1, Fix(TypecheckF(expr, typ, cont, x2))).some
+
       case t => None
   }
 
