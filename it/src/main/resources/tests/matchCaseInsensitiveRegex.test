@@ -1,7 +1,7 @@
 {
     "name": "match on case-insensitive string",
     "data": "zips.data",
-    "query": "select * from zips where city ~* '^bOu'",
+    "query": "select * from zips where city ~* \"^bOu\"",
     "predicate": "containsAtLeast",
     "expected": [
         { "city": "BOUND BROOK",      "state": "NJ", "pop": 11275, "loc": [ -74.539735, 40.568115] },

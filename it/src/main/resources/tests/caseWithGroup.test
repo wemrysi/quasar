@@ -7,10 +7,10 @@
                 state as abbr,
                 count(pop) as quantity,
                 case
-                  when state = 'CO' then 1
-                  when state = 'WA' then 2
-                  when state = 'PA' then 3
-                  when state = 'VA' then 4
+                  when state = \"CO\" then 1
+                  when state = \"WA\" then 2
+                  when state = \"PA\" then 3
+                  when state = \"VA\" then 4
                   else 100
                 end as funnel
                 from zips

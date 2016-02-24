@@ -724,7 +724,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "filter field in single-element set" in {
-      plan("select * from zips where state in ('NV')") must
+      plan("""select * from zips where state in ("NV")""") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
@@ -732,7 +732,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "filter field “in” a bare value" in {
-      plan("select * from zips where state in 'PA'") must
+      plan("""select * from zips where state in "PA"""") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
@@ -3845,7 +3845,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "include correct phases with planner error" in {
-      planLog("select date_part('foo', bar) from zips").map(_.map(_.name)) must
+      planLog("""select date_part("foo", bar) from zips""").map(_.map(_.name)) must
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Annotated Tree",
           "Logical Plan", "Optimized", "Typechecked",

@@ -3,7 +3,7 @@
     "backends": { "mongodb_read_only": "pending" },
 
     "query": "select _id as zip from largeZips
-              where not (city not like 'BOULD%' or state != 'CO' or (pop between 20000 and 40000 and loc[1] != 40.017235))",
+              where not (city not like \"BOULD%\" or state != \"CO\" or (pop between 20000 and 40000 and loc[1] != 40.017235))",
 
     "predicate": "containsExactly",
     "expected": [{ "zip": "80301" },

@@ -4,7 +4,7 @@
   "data": "zips.data",
 
   "variables": {
-    "state": "'CO'"
+    "state": "\"CO\""
   },
 
   "query": "select :state as state, count(*) as `count` from zips where state = :state",

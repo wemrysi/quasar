@@ -1,7 +1,7 @@
 {
   "name": "select wildcard with group by",
 
-  "query": "select * from zips where _id like '8030%' group by city",
+  "query": "select * from zips where _id like \"8030%\" group by city",
 
   "predicate": "containsExactly",
 

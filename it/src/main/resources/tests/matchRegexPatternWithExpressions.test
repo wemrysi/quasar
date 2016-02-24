@@ -5,9 +5,9 @@
   "data": "largeZips.data",
 
   "query":
-    "select distinct city, city ~ 'OUL', 'some text with BOULDER in it' ~ city
+    "select distinct city, city ~ \"OUL\", \"some text with BOULDER in it\" ~ city
       from largeZips
-      where city ~ '^B[^ ]+ER$' and 'BOULDER or BEELER' ~ city",
+      where city ~ \"^B[^ ]+ER$\" and \"BOULDER or BEELER\" ~ city",
 
   "predicate": "containsExactly",
 

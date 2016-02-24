@@ -4,7 +4,7 @@
     "data": "largeZips.data",
     "query": "select length(city) as len, count(*) as cnt
                 from largeZips
-                where state != 'MI'
+                where state != \"MI\"
                 group by length(city)",
     "predicate": "containsExactly",
     "expected": [{ "cnt":   2, "len":  3 },

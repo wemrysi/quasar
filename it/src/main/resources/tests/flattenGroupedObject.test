@@ -2,7 +2,7 @@
     "name": "flatten a grouped object with filter",
     "backends": { "mongodb_read_only": "pending" },
     "data": "slamengine_commits.data",
-    "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like 'http%' group by committer.login",
+    "query": "select distinct commit{*}, count(*) from slamengine_commits where commit{*} like \"http%\" group by committer.login",
     "predicate": "containsAtLeast",
     "expected": [
         { "commit": "https://api.github.com/repos/slamdata/slamengine/git/commits/859f02befb7774aae6f7526a5a7d0a083697e4ea", "1": 9 },
