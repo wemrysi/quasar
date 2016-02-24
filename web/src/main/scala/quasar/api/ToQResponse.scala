@@ -156,15 +156,19 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
     response{
       case MediaTypeMissing(expectedMediaTypes) =>
         val expected = expectedMediaTypes.map(_.renderString).mkString(", ")
-        QResponse.error(
+        QResponse.json(
           UnsupportedMediaType,
-          s"Request has no media type. Please specify a media type in the following ranges: $expected")
+          Json(
+            "error" := s"Request has no media type. Please specify a media type in the following ranges: $expected",
+            "supported media types" := jArray(expectedMediaTypes.map(m => jString(m.renderString)).toList)))
       case MediaTypeMismatch(messageType, expectedMediaTypes) =>
         val actual = messageType.renderString
         val expected = expectedMediaTypes.map(_.renderString).mkString(", ")
-        QResponse.error(
+        QResponse.json(
           UnsupportedMediaType,
-          s"$actual is not a supported media type. Please specify a media type in the following ranges: $expected")
+          Json(
+            "error" := s"Request has an unsupported media type. Please specify a media type in the following ranges: $expected",
+            "supported media types" := jArray(expectedMediaTypes.map(m => jString(m.renderString)).toList)))
       case other =>
         QResponse.error(BadRequest, other.msg)
     }

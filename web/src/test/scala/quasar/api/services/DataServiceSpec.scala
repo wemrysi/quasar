@@ -300,21 +300,36 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         "be 415 if media-type is" >> {
           val supportedMediaTypesMsg =
             "Please specify a media type in the following ranges: " +
-            "text/csv, " +
+              "text/csv, " +
             "application/json; mode=\"precise\", " +
             "application/json; mode=\"readable\", " +
             "application/ldjson; mode=\"precise\", " +
             "application/ldjson; mode=\"readable\""
+
+          def beExpected(response: Response, errorMsg: String) = {
+            val expectedSupportedMediaTypes = List(
+              jString("application/ldjson; mode=\"readable\""),
+              jString("text/csv"),
+              jString("application/json; mode=\"precise\""),
+              jString("application/ldjson; mode=\"precise\""),
+              jString("application/json; mode=\"readable\""))
+            val jsonResponse = response.as[Json].run
+            jsonResponse -| "error" must_== Some(jString(errorMsg))
+            jsonResponse -| "supported media types" must beLike { case Some(json) =>
+              json.array must beLike { case Some(elems) =>
+                elems must containTheSameElementsAs(expectedSupportedMediaTypes)
+              }
+            }
+            response.status must_== Status.UnsupportedMediaType
+          }
           "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
             val path = printPath(file)
             val request = Request(
               uri = Uri(path = path),
               method = method).withBody("zip code: 34561 and zip code: 78932").run
             val response = service(emptyMem)(request).run
-            response.status must_== Status.UnsupportedMediaType
-            val errorMsg = s"text/plain is not a supported media type. $supportedMediaTypesMsg"
-
-            response.as[Json].run must_== Json("error" := errorMsg)
+            val errorMsg = s"Request has an unsupported media type. $supportedMediaTypesMsg"
+            beExpected(response, errorMsg)
           }
           "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
             val path = printPath(file)
@@ -322,9 +337,8 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               uri = Uri(path = path),
               method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run.replaceAllHeaders(Headers.empty)
             val response = service(emptyMem)(request).run
-            response.status must_== Status.UnsupportedMediaType
             val errorMsg = s"Request has no media type. $supportedMediaTypesMsg"
-            response.as[Json].run must_== Json("error" := errorMsg)
+            beExpected(response, errorMsg)
           }
         }
         "be 400 with" >> {
