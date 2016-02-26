@@ -11,7 +11,7 @@ object Dependencies {
   private val pathyVersion   = "0.0.3"
   private val http4sVersion  = "0.10.1"
   private val mongoVersion   = "3.2.1"
-  private val refinedVersion = "0.3.4"
+  private val refinedVersion = "0.3.6"
 
   val core = Seq(
     // NB: This version is forced because there seems to be some difference

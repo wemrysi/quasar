@@ -20,17 +20,19 @@ import quasar.Predef._
 import quasar.Data
 import quasar.fp._
 import quasar.fp.numeric._
+import quasar.fp.numeric.NumericArbitrary._
 
 import java.lang.RuntimeException
 import scala.annotation.tailrec
 
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{Positive => RPositive,_}
-import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.scalacheck.numeric.chooseRefinedNum
 import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import monocle.std.{disjunction => D}
 import org.scalacheck.Arbitrary
+import org.scalacheck.Prop
 import org.specs2.ScalaCheck
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
@@ -134,16 +136,17 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         r.runEither must beRight(smallFile.data.take(j.get).toIndexedSeq)
       }.set(minTestsOk = 10)
 
-      "scan with offset k and limit j takes j data, starting from k" ! prop { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
+      "scan with offset k and limit j takes j data, starting from k" ! Prop.forAll(
+        chooseRefinedNum[Refined, Int, RPositive](1, 200),
+        chooseRefinedNum[Refined, Int, NonNegative](0, 200)
+      ) { (j: Int Refined RPositive, k: Int Refined NonNegative) =>
         val r = runLogT(run, read.scan(largeFile.file, k, Some(j)))
         val d = largeFile.data.zip(EStream.iterate(0)(_ + 1))
                   .dropWhile(_._2 < k.get).map(_._1)
                   .take(j.get)
 
         r.runEither must beRight(d.toIndexedSeq)
-      }(implicitly, // In order to keep test execution relatively fast
-        Arbitrary(chooseRefinedNum[Refined, Int, RPositive](1, 200)), implicitly,
-        Arbitrary(chooseRefinedNum[Refined, Int, NonNegative](1, 200)), implicitly).set(minTestsOk = 5)
+      }.set(minTestsOk = 5)
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[SmallFileSize] =>
           val limit = Some(Positive(j.get.toLong).get) // Not ideal, but simplest solution for now
