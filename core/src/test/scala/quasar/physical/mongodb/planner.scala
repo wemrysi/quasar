@@ -3278,30 +3278,29 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $unwind(DocField(BsonField.Name("right"))),
             $project(
               reshape(
-                "city"   ->
+                "__tmp11"   ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
                       $lt($field("right"), $literal(Bson.Arr(Nil)))),
-                    $field("right", "city"),
+                    $field("right"),
                     $literal(Bson.Undefined)),
-                "__tmp11" -> $field("right"),
-                "__tmp12" -> $field("right", "pop"),
-                "__tmp13" -> $field("left"),
-                "__tmp14" -> $field("left", "pop"),
-                "__tmp15" -> $lt($field("left", "pop"), $field("right", "pop"))),
+                "__tmp12" -> $$ROOT),
+              IgnoreId),
+            $project(
+              reshape(
+                "city"    -> $field("__tmp11", "city"),
+                "__tmp13" -> $field("__tmp12", "right"),
+                "__tmp14" -> $field("__tmp12", "right", "pop"),
+                "__tmp15" -> $field("__tmp12", "left"),
+                "__tmp16" -> $field("__tmp12", "left", "pop"),
+                "__tmp17" ->
+                  $lt(
+                    $field("__tmp12", "left", "pop"),
+                    $field("__tmp12", "right", "pop"))),
               IgnoreId),
             $match(Selector.And(
-              Selector.Doc(BsonField.Name("__tmp11") -> Selector.Type(BsonType.Doc)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Int32)),
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Int64)),
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Text)),
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp12") -> Selector.Type(BsonType.Bool))),
-              Selector.Doc(
-                BsonField.Name("__tmp13") -> Selector.Type(BsonType.Doc)),
+              Selector.Doc(BsonField.Name("__tmp13") -> Selector.Type(BsonType.Doc)),
               Selector.Or(
                 Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int32)),
                 Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Int64)),
@@ -3310,7 +3309,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Date)),
                 Selector.Doc(BsonField.Name("__tmp14") -> Selector.Type(BsonType.Bool))),
               Selector.Doc(
-                BsonField.Name("__tmp15") -> Selector.Eq(Bson.Bool(true))))),
+                BsonField.Name("__tmp15") -> Selector.Type(BsonType.Doc)),
+              Selector.Or(
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Int32)),
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Int64)),
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Dec)),
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Text)),
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Date)),
+                Selector.Doc(BsonField.Name("__tmp16") -> Selector.Type(BsonType.Bool))),
+              Selector.Doc(
+                BsonField.Name("__tmp17") -> Selector.Eq(Bson.Bool(true))))),
             $project(
               reshape("city" -> $field("city")),
               ExcludeId)),

@@ -137,7 +137,20 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         var_ : Int,
         offset: Int Refined NonNegative,
         limit: SafeIntForVector Refined RPositive) =>
+          import quasar.std.StdLib.set._
+
           val (query, lp) = queryAndExpectedLP(filesystem.file, varName, var_)
+          val limitedLp =
+            Fix(Take(
+              Fix(Drop(
+                lp,
+                LogicalPlan.Constant(Data.Int(offset.get)))),
+              LogicalPlan.Constant(Data.Int(limit.get.value))))
+          val limitedContents =
+            filesystem.contents
+              .drop(offset.get)
+              .take(limit.get.value)
+
           get(executeService)(
             path = filesystem.parent,
             query = Some(Query(
@@ -145,7 +158,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
               offset = Some(offset),
               limit = Some(Positive(limit.get.value.toLong).get),
               varNameAndValue = Some((varName.value, var_.toString)))),
-            state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
+            state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
             status = Status.Ok,
             response = (a: String) => a must_==
               jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run

@@ -20,9 +20,10 @@ import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
 import quasar.fp._
 import numeric._
+import quasar.Optimizer
 import quasar.Planner.UnsupportedPlan
 
-import matryoshka.{Fix, Recursive}
+import matryoshka.{Fix, Recursive}, Recursive.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -209,20 +210,22 @@ object InMemory {
     private def executionPlan(lp: Fix[LogicalPlan], queries: QueryResponses): ExecutionPlan =
       ExecutionPlan(FileSystemType("in-memory"), s"Lookup $lp in $queries")
 
-    private def simpleEvaluation(lp: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
+    private def simpleEvaluation(lp0: Fix[LogicalPlan]): FileSystemErrT[InMemoryFs, Vector[Data]] = {
+      val optLp = Optimizer.optimize(lp0)
       EitherT[InMemoryFs, FileSystemError, Vector[Data]](State.gets { mem =>
         import quasar.LogicalPlan._
         import quasar.std.StdLib.set.{Drop, Take}
         import quasar.std.StdLib.identity.Squash
-        Recursive[Fix].para[LogicalPlan, FileSystemError \/ Vector[Data]](lp) {
-          case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem)).toRightDisjunction(unsupported(lp))
+        optLp.para[FileSystemError \/ Vector[Data]] {
+          case ReadF(path) => path.asAFile.flatMap(pathyPath => fileL(pathyPath).get(mem)).toRightDisjunction(unsupported(optLp))
           case InvokeF(Drop, (_,src) :: (Fix(ConstantF(Data.Int(skip))),_) :: Nil) =>
-            src.flatMap(s => if (skip <= Int.MaxValue) s.drop(skip.toInt).right else unsupported(lp).left)
+            src.flatMap(s => if (skip <= Int.MaxValue) s.drop(skip.toInt).right else unsupported(optLp).left)
           case InvokeF(Take, (_,src) :: (Fix(ConstantF(Data.Int(limit))),_) :: Nil) =>
-            src.flatMap(s => SafeIntForVector(limit).map(i => s.take(i.value)).toRightDisjunction(unsupported(lp)))
+            src.flatMap(s => SafeIntForVector(limit).map(i => s.take(i.value)).toRightDisjunction(unsupported(optLp)))
           case InvokeF(Squash,(_,src) :: Nil) => src
           case ConstantF(data) => Vector(data).right
-          case other => queryResponsesL.get(mem).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(lp))
+          case other =>
+            queryResponsesL.get(mem).mapKeys(Optimizer.optimize).get(Fix(other.map(_._1))).toRightDisjunction(unsupported(optLp))
         }
       })
     }

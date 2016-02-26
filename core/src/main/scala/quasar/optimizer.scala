@@ -294,11 +294,28 @@ object Optimizer {
     * input is expected to come straight from the SQL^2 compiler or
     * another source of un-optimized queries.
     */
-  def optimize(t: Fix[LogicalPlan]): Fix[LogicalPlan] = {
-    val t1 = t.transCata(repeatedly(simplifyƒ))
-    val t2 = boundParaS(t1)(rewriteCrossJoinsƒ).evalZero
-    val t3 = t2.transCata(repeatedly(simplifyƒ))
-    val t4 = (normalizeLets _ >>> normalizeTempNames _)(t3)
-    t4
-  }
+  val optimize: Fix[LogicalPlan] => Fix[LogicalPlan] =
+    NonEmptyList[Fix[LogicalPlan] => Fix[LogicalPlan]](
+      // Eliminate extraneous constants, etc.:
+      _.transCata(repeatedly(simplifyƒ)),
+
+      // NB: must precede normalizeLets to eliminate possibility of shadowing:
+      normalizeTempNames,
+
+      // NB: must precede rewriteCrossJoins to normalize Filter/Join shapes:
+      normalizeLets,
+
+      // Now for the big one:
+      boundParaS(_)(rewriteCrossJoinsƒ).evalZero,
+
+      // Eliminate trivial bindings introduced in rewriteCrossJoins:
+      _.transCata(repeatedly(simplifyƒ)),
+
+      // Final pass to normalize the resulting plans for better matching in tests:
+      normalizeLets,
+
+      // This time, fix the names last so they will read naturally:
+      normalizeTempNames
+
+    ).foldLeft1(_ >>> _)
 }
