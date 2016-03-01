@@ -75,8 +75,9 @@ object ReadFile {
             Process.emitAll(data) ++ readUntilEmpty(h)
         }
 
-      Process.await(unsafe.open(file, offset, limit))(h =>
-        readUntilEmpty(h) onComplete Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT]))
+      Process.bracket(unsafe.open(file, offset, limit))(h => Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])) { h =>
+        readUntilEmpty(h)
+      }
     }
 
     /** Returns a process that produces all the data contained in the

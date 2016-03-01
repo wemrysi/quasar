@@ -68,9 +68,9 @@ object WriteFile {
       def writeChunk(h: WriteHandle): Vector[Data] => M[Vector[FileSystemError]] =
         xs => unsafe.write(h, xs).liftM[FileSystemErrT]
 
-      Process.await(unsafe.open(dst))(h =>
+      Process.bracket(unsafe.open(dst))(h => Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])) { h =>
         channel.lift(writeChunk(h))
-          .onComplete(Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])))
+      }
     }
 
     /** Same as `append` but accepts chunked [[Data]]. */

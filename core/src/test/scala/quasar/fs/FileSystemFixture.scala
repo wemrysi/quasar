@@ -125,13 +125,13 @@ trait FileSystemFixture {
   object MemFixTask extends SpecializedInterpreter[FileSystem, MemStateFix](
     interpretTerm = hoistFix compose readWrite
   ) {
-    def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+    def runLogWithRW[E,A](rs: Reads, ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       EitherT(runLog(p).run.eval((rs, ws)))
 
-    def runLogWithReads[E,A](rs: Reads, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+    def runLogWithReads[E,A](rs: Reads, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       runLogWithRW(rs, List(), p)
 
-    def runLogWithWrites[E,A](ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,IndexedSeq[A]] =
+    def runLogWithWrites[E,A](ws: Writes, p: Process[EitherT[F,E, ?], A]): EitherT[MemStateTask,E,Vector[A]] =
       runLogWithRW(List(), ws, p)
   }
 }

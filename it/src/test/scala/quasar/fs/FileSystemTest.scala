@@ -65,10 +65,10 @@ abstract class FileSystemTest[S[_]: Functor](
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
 
-  def runLog[A](run: Run, p: Process[F, A]): Task[IndexedSeq[A]] =
+  def runLog[A](run: Run, p: Process[F, A]): Task[Vector[A]] =
     p.translate[Task](run).runLog
 
-  def runLogT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[IndexedSeq[A]] =
+  def runLogT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Vector[A]] =
     p.translate[FsTask](runT(run)).runLog
 
   def execT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Unit] =

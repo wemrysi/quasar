@@ -23,7 +23,6 @@ import quasar.fs.InMemory._
 
 import argonaut._, Argonaut._
 import org.http4s._
-import org.http4s.server.HttpService
 import org.http4s.argonaut._
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck

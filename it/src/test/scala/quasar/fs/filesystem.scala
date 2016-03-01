@@ -491,7 +491,7 @@ class FileSystemSpecs extends BackendTest with DisjunctionMatchers with SkippedO
         liftE[ProcessingError](SQLParser.parseInContext(Query(query), TestDir).fold(
           e => Task.fail(new RuntimeException(e.message)),
           Task.now))
-      def eval(fs: Backend, query: Expr): ProcessingTask[IndexedSeq[Data]] =
+      def eval(fs: Backend, query: Expr): ProcessingTask[Vector[Data]] =
         fs.eval(QueryRequest(query, Variables(Map()))).run._2.fold(
           e => liftE(Task.fail(new RuntimeException(e.message))),
           _.runLog)

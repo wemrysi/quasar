@@ -24,7 +24,6 @@ import quasar.fs._
 import quasar.fs.mount._
 
 import org.http4s._, Method.MOVE
-import org.http4s.server.HttpService
 import org.http4s.dsl._
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.headers._

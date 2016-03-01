@@ -108,8 +108,9 @@ object QueryFile {
       def close(h: ResultHandle): ExecM[Unit] =
         toExec(unsafe.close(h))
 
-      Process.await(unsafe.eval(plan))(h =>
-        moreUntilEmpty(h).translate(f) onComplete Process.eval_(close(h)))
+      Process.bracket(unsafe.eval(plan))(h => Process.eval_(close(h))) { h =>
+        moreUntilEmpty(h).translate(f)
+      }
     }
 
     /** Returns a description of how the the given logical plan will be

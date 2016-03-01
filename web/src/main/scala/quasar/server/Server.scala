@@ -26,6 +26,7 @@ import quasar.fp.TaskRef
 import quasar.server.impl._
 
 import argonaut.DecodeJson
+import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
 import scalaz._

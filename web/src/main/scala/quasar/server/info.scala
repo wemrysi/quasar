@@ -22,7 +22,7 @@ import quasar.build.BuildInfo
 import argonaut._, Argonaut._
 import org.http4s.dsl._
 import org.http4s.argonaut._
-import org.http4s.server.HttpService
+import org.http4s.HttpService
 
 object info {
   val nameAndVersionInfo = Json("name" := "Quasar", "version" := BuildInfo.version)

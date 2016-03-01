@@ -36,7 +36,6 @@ import argonaut.Json
 import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
-import org.http4s.server._
 import org.http4s.server.middleware.GZip
 import org.http4s.Uri.Authority
 import org.scalacheck.{Arbitrary, Gen}
@@ -298,14 +297,49 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         }
       }
       testBoth { method =>
-        "be 415 if media-type is missing" ! prop { file: Path[Abs,File,Sandboxed] =>
-          val path = printPath(file)
-          val request = Request(
-            uri = Uri(path = path),
-            method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run
-          val response = service(emptyMem)(request).run
-          response.status must_== Status.UnsupportedMediaType
-          response.as[Json].run must_== Json("error" := "No media-type is specified in Content-Type header")
+        "be 415 if media-type is" >> {
+          val supportedMediaTypesMsg =
+            "Please specify a media type in the following ranges: " +
+              "text/csv, " +
+            "application/json; mode=\"precise\", " +
+            "application/json; mode=\"readable\", " +
+            "application/ldjson; mode=\"precise\", " +
+            "application/ldjson; mode=\"readable\""
+
+          def beExpected(response: Response, errorMsg: String) = {
+            val expectedSupportedMediaTypes = List(
+              jString("application/ldjson; mode=\"readable\""),
+              jString("text/csv"),
+              jString("application/json; mode=\"precise\""),
+              jString("application/ldjson; mode=\"precise\""),
+              jString("application/json; mode=\"readable\""))
+            val jsonResponse = response.as[Json].run
+            jsonResponse -| "error" must_== Some(jString(errorMsg))
+            jsonResponse -| "supported media types" must beLike { case Some(json) =>
+              json.array must beLike { case Some(elems) =>
+                elems must containTheSameElementsAs(expectedSupportedMediaTypes)
+              }
+            }
+            response.status must_== Status.UnsupportedMediaType
+          }
+          "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
+            val path = printPath(file)
+            val request = Request(
+              uri = Uri(path = path),
+              method = method).withBody("zip code: 34561 and zip code: 78932").run
+            val response = service(emptyMem)(request).run
+            val errorMsg = s"Request has an unsupported media type. $supportedMediaTypesMsg"
+            beExpected(response, errorMsg)
+          }
+          "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
+            val path = printPath(file)
+            val request = Request(
+              uri = Uri(path = path),
+              method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run.replaceAllHeaders(Headers.empty)
+            val response = service(emptyMem)(request).run
+            val errorMsg = s"Request has no media type. $supportedMediaTypesMsg"
+            beExpected(response, errorMsg)
+          }
         }
         "be 400 with" >> {
           def be400[A: EntityDecoder](body: String, expectedBody: A, mediaType: MediaType = jsonReadableLine.mediaType) = {

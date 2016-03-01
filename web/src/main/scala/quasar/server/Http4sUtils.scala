@@ -20,10 +20,9 @@ import quasar.Predef._
 import quasar.console._
 import quasar.fp._
 
-import org.http4s.server.HttpService
-import org.http4s.server.ServerBuilder
+import org.http4s.HttpService
 import org.http4s.server.blaze.BlazeBuilder
-import org.http4s.server.{Server => Http4sServer}
+import org.http4s.server.{Server => Http4sServer, ServerBuilder}
 import scalaz.concurrent.Task
 import scalaz._, Scalaz._
 import scala.concurrent.duration.Duration

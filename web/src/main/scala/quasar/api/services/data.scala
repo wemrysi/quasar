@@ -77,9 +77,6 @@ object data {
 
   ////
 
-  private val dataDecoder: EntityDecoder[Process[Task, DecodeError \/ Data]] =
-    MessageFormat.decoder orElse EntityDecoder.error(MessageFormat.UnsupportedContentType)
-
   private def download[S[_]: Functor](
     format: MessageFormat,
     path: APath,
@@ -148,18 +145,12 @@ object data {
         errorsResponse(errors, by(Process.emitAll(data)))
       }
 
-    injectFT[Task, S].apply(
-      dataDecoder.decode(req)
-        .leftMap(_.toResponse[S])
-        .flatMap(_.runLog.liftM[QRespT])
-        .run handleWith {
-          case MessageFormat.UnsupportedContentType =>
-            QResponse.error[S](
-              UnsupportedMediaType,
-              "No media-type is specified in Content-Type header"
-            ).left.point[Task]
-        })
-      .flatMap(_.fold(_.point[FreeS], write(_)))
+      injectFT[Task,S].apply(
+        MessageFormat.decoder.decode(req,true)
+          .leftMap(_.toResponse[S].point[FreeS])
+          .flatMap(dataStream => EitherT.right(dataStream.runLog.map(write)))
+          .merge
+      ).flatMap(ι)
   }
 
   private def zippedContents[S[_]: Functor](

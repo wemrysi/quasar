@@ -17,10 +17,9 @@
 package quasar.server
 
 import quasar.Predef._
-import quasar.fp._
 
 import org.http4s.Uri.Authority
-import org.http4s.{Status, Method, Uri, Request}
+import org.http4s.{Status, Method, Uri, Request, Response}
 import org.specs2.mutable
 
 import argonaut.Json
@@ -57,7 +56,7 @@ class ControlServiceSpec extends mutable.Specification {
   "Control Service" should {
     def checkRunningOn(port: Int) = {
       val req = Request(uri = Uri(authority = Some(Authority(port = Some(port)))) / "foobar", method = Method.GET)
-      client(req).map(response => response.status must_== Status.NotFound)
+      client.fetch(req)(response => Task.now(response.status must_== Status.NotFound))
     }
     "restart on new port when PUT succeeds" in {
       val newPort = 8889
@@ -65,7 +64,7 @@ class ControlServiceSpec extends mutable.Specification {
       withServerExpectingRestart(){ baseUri: Uri =>
         for {
           req <- Request(uri = baseUri, method = Method.PUT).withBody(newPort.toString)
-          _   <- client(req)
+          _   <- client.fetch(req)(Task.now)
         } yield ()
       }{ checkRunningOn(newPort) }
     }
@@ -73,7 +72,7 @@ class ControlServiceSpec extends mutable.Specification {
       val defaultPort = 9001
       withServerExpectingRestart(initialPort = 9000, defaultPort = defaultPort){ baseUri: Uri =>
         val req = Request(uri = baseUri, method = Method.DELETE)
-        client(req).void
+        client.fetch(req)(Task.now).void
       }{ checkRunningOn(defaultPort) }
     }
   }

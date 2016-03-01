@@ -33,7 +33,6 @@ import monocle.Lens
 import org.http4s
 import org.http4s._
 import org.http4s.argonaut._
-import org.http4s.server._
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import pathy.Path._
