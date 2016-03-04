@@ -64,15 +64,17 @@ object managefile {
     }
   }
 
-  /** Run [[MongoManage]], given a `MongoClient` and the name of a database
-    * to use as a default location for temp collections when no other database
-    * can be deduced.
-    */
-  def run(client: MongoClient): Task[MongoManage ~> Task] =
+  /** Run [[MongoManage]] with the given `MongoClient`. */
+  def run[S[_]: Functor](
+    client: MongoClient
+  )(implicit
+    S0: Task :<: S,
+    S1: MongoErrF :<: S
+  ): Task[MongoManage ~> Free[S, ?]] =
     (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
-      new (MongoManage ~> Task) {
+      new (MongoManage ~> Free[S, ?]) {
         def apply[A](fs: MongoManage[A]) =
-          fs.run((prefix, ref)).run(client)
+          fs.run((prefix, ref)).runF(client)
       }
     }
 

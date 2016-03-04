@@ -17,14 +17,15 @@
 package quasar.physical.mongodb
 
 import quasar.{EnvironmentError2, rethrow}
+import quasar.effect.Failure
 import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.mongodb.fs._
 import quasar.regression._
 
-import com.mongodb.ConnectionString
+import com.mongodb.{ConnectionString, MongoException}
 import com.mongodb.async.client.MongoClients
-import scalaz._
+import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 object filesystems {
@@ -34,8 +35,8 @@ object filesystems {
   ): Task[FileSystem ~> Task] = for {
     client   <- Task.delay(MongoClients create cs)
     mongofs0 <- rethrow[Task, EnvironmentError2]
-                  .apply(mongoDbFileSystem(client, DefaultDb fromPath prefix))
-    mongofs  =  rethrow[Task, WorkflowExecutionError] compose mongofs0
+                  .apply(mongoDbFileSystem[MongoEff](client, DefaultDb fromPath prefix))
+    mongofs  =  foldMapNT(mongoEffToTask) compose mongofs0
   } yield mongofs
 
   def testFileSystemIO(
@@ -44,4 +45,15 @@ object filesystems {
   ): Task[FileSystemIO ~> Task] =
     testFileSystem(cs, prefix)
       .map(interpret2(NaturalTransformation.refl[Task], _))
+
+  ////
+
+  private type MongoEff0[A] = Coproduct[MongoErrF, Task, A]
+  private type MongoEff[A]  = Coproduct[WorkflowExecErrF, MongoEff0, A]
+
+  private val mongoEffToTask: MongoEff ~> Task =
+    interpret3[WorkflowExecErrF, MongoErrF, Task, Task](
+      Coyoneda.liftTF[WorkflowExecErr, Task](Failure.toRuntimeError[WorkflowExecutionError]),
+      Coyoneda.liftTF[MongoErr, Task](Failure.toTaskFailure[MongoException]),
+      NaturalTransformation.refl)
 }
