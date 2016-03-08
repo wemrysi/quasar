@@ -11,6 +11,7 @@ object Dependencies {
   private val pathyVersion   = "0.0.3"
   private val http4sVersion  = "0.12.1"
   private val mongoVersion   = "3.2.1"
+  private val nettyVersion   = "4.0.26.Final"
   private val refinedVersion = "0.3.6"
 
   val core = Seq(
@@ -26,6 +27,9 @@ object Dependencies {
     "com.github.scopt"  %% "scopt"                     % "3.3.0"        % "compile, test",
     "org.threeten"      %  "threetenbp"                % "1.2"          % "compile, test",
     "org.mongodb"       %  "mongodb-driver-async"      % mongoVersion   % "compile, test",
+    "io.netty"          %  "netty-buffer"              % nettyVersion   % "compile, test",
+    "io.netty"          %  "netty-transport"           % nettyVersion   % "compile, test",
+    "io.netty"          %  "netty-handler"             % nettyVersion   % "compile, test",
     "io.argonaut"       %% "argonaut"                  % "6.1"          % "compile, test",
     "org.jboss.aesh"    %  "aesh"                      % "0.55"         % "compile, test",
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion     % "compile, test",

@@ -84,14 +84,64 @@ object util {
             Task.now(())
         }
 
-    def createClient(cs: ConnectionString) =
+    val InvalidHostNameAllowedProp = "invalidHostNameAllowed"
+
+    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+    def settings(cs: ConnectionString, invalidHostNameAllowed: Boolean): Task[MongoClientSettings] = Task.delay {
+      import com.mongodb.connection._
+
+      // NB: this is apparently the only way to get from a ConnectionString to a
+      // MongoClient while also inspecting/modifying anything in the settings.
+      // This is following `MongoClients.create(ConnectionString)`, and will have
+      // to be revisited if a driver release adds additional settings objects.
+      val settings = MongoClientSettings.builder
+
+      settings.clusterSettings(ClusterSettings.builder
+        .applyConnectionString(cs)
+        .build)
+
+      settings.connectionPoolSettings(ConnectionPoolSettings.builder
+        .applyConnectionString(cs)
+        .build)
+
+      settings.credentialList(cs.getCredentialList)
+
+      settings.serverSettings(ServerSettings.builder
+        .build)
+
+      settings.socketSettings(SocketSettings.builder
+        .applyConnectionString(cs)
+        .build)
+
+      val sslSettings = SslSettings.builder
+        .applyConnectionString(cs)
+        .invalidHostNameAllowed(invalidHostNameAllowed)
+        .build
+      settings.sslSettings(sslSettings)
+
+      // NB: Netty _must_ be used if SSL is required, but we do not use it by default
+      // mostly because it seems to cause the REPL to fail to exit cleanly. If necessary,
+      // it can also be forced using a system property (see MongoDB docs).
+      if (sslSettings.isEnabled) {
+        settings.streamFactoryFactory(new com.mongodb.connection.netty.NettyStreamFactoryFactory())
+      }
+
+      settings.build
+    }
+
+    def createClient(cs: ConnectionString) = {
+      import quasar.console.booleanProp
+
       liftAndHandle(for {
-        client <- Task.delay(MongoClients.create(cs))
+        invalidHostNameAllowed <- booleanProp(InvalidHostNameAllowedProp)
+        stngs  <- settings(cs, invalidHostNameAllowed)
+        client <- Task.delay(MongoClients.create(stngs))
         _      <- testConnection(client) onFinish {
                     case Some(_) => Task.delay(client.close())
                     case None    => Task.now(())
                   }
       } yield client)(t => envErr.fail(connectionFailed(t.getMessage)))
+    }
 
     disableLogging *> connString >>= createClient
   }
