@@ -24,14 +24,14 @@ import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
 import quasar.physical.mongodb.fs.MongoDBFsType
 import quasar.sql, sql.{Expr, Query}
 
-import java.io.{File, FileInputStream}
+import java.io.{File => JFile, FileInputStream}
 import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
 import org.specs2.specification._
 import org.specs2.execute._
-import pathy.Path._
+import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{merge => pmerge, _}
@@ -55,11 +55,18 @@ abstract class QueryRegressionTest[S[_]: Functor](
   val injectTask: Task ~> F =
     liftFT[S].compose(injectNT[Task, S])
 
-  val TestsRoot = new File("it/src/main/resources/tests")
+  val TestsRoot = currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
   val DataDir: ADir = rootDir </> dir("regression")
 
-  def dataFile(fileName: String): AFile =
-    DataDir </> file1(FileName(fileName).dropExtension)
+  /** Location on the (host) file system of the data file referred to from a
+    * test, if it's a relative path pointing into the test directory. */
+  def resolveData(test: RFile, data: RelFile[Unsandboxed]): String \/ RFile =
+    sandbox(currentDir, unsandbox(fileParent(test)) </> data) \/>
+      s"Can't sandbox data file to test dir: ${data.shows}"
+
+  /** Location in the (Quasar) filesystem where a test dataset will be stored. */
+  def dataFile(file: RFile): AFile =
+    renameFile(DataDir </> file, _.dropExtension)
 
   val query  = QueryFile.Ops[S]
   val write  = WriteFile.Ops[S]
@@ -91,19 +98,24 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   /** Returns an `Example` verifying the given `RegressionTest`. */
   def regressionExample(
-    loc: File,
+    loc: RFile,
     test: RegressionTest,
     backendName: BackendName,
     run: Run
   ): Example = {
     def runTest = (for {
       _    <- Task.delay(println(test.query))
-      _    <- run(test.data.cata(verifyDataExists, success.point[F]))
-      data =  testQuery(test.query, test.variables)
+      _    <- run(test.data.cata(
+                fn => injectTask(resolveData(loc, fn).fold(
+                          err => Task.fail(new RuntimeException(err)),
+                          Task.now)) >>=
+                        (p => verifyDataExists(dataFile(p))),
+                success.point[F]))
+      data =  testQuery(DataDir </> fileParent(loc), test.query, test.variables)
       res  <- verifyResults(test.expected, data, run)
     } yield res).run
 
-    s"${test.name} [${loc.getPath}]" >> {
+    s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
         case Some(SkipDirective.Skip)    => skipped
         case Some(SkipDirective.Pending) => runTest.pendingUntilFixed
@@ -113,8 +125,10 @@ abstract class QueryRegressionTest[S[_]: Functor](
   }
 
   /** Verify that the given data file exists in the filesystem. */
-  def verifyDataExists(dataFileName: String): F[Result] =
-    query.fileExists(dataFile(dataFileName)) map (_ ==== true)
+  def verifyDataExists(file: AFile): F[Result] =
+    query.fileExists(file).map(exists =>
+      if (exists) success(s"data file exists: ${fileName(file).value}")
+      else failure(s"data file does not exist: ${fileName(file).value}"))
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
@@ -149,6 +163,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   /** Parse and execute the given query, returning a stream of results. */
   def testQuery(
+    loc: ADir,
     qry: String,
     vars: Map[String, String]
   ): Process[CompExecM, Data] = {
@@ -156,24 +171,25 @@ abstract class QueryRegressionTest[S[_]: Functor](
       toCompExec compose injectTask
 
     val parseTask: Task[Expr] =
-      sql.parseInContext(Query(qry), DataDir)
+      sql.parseInContext(Query(qry), loc)
         .fold(e => Task.fail(new RuntimeException(e.message)), _.point[Task])
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars)))
   }
 
   /** Loads all the test data needed by the given tests into the filesystem. */
-  def prepareTestData(tests: Map[File, RegressionTest], run: Run): Task[Unit] = {
+  def prepareTestData(tests: Map[RFile, RegressionTest], run: Run): Task[Unit] = {
     val throwFsError = rethrow[Task, FileSystemError]
 
-    val dataLoc: ((File, RegressionTest)) => Set[File] = {
-      case (f, t) => t.data.map(new File(f.getParent, _)).toSet
+    val dataLoc: ((RFile, RegressionTest)) => Set[RFile] = {
+      case (f, t) =>
+        t.data.flatMap(resolveData(f, _).toOption).toSet
     }
 
     val loads: Process[Task, Process[Task, FileSystemError]] =
       Process.emitAll(tests.toList.foldMap(dataLoc).toVector) map { file =>
-        write.saveChunked(
-          dataFile(file.getName),
+        write.createChunked(
+          dataFile(file),
           testData(file).chunk(500).translate(injectTask)
         ).translate[Task](throwFsError.compose[FsErr](runT(run)))
       }
@@ -182,7 +198,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   }
 
   /** Returns a stream of `Data` representing the lines of the given data file. */
-  def testData(file: File): Process[Task, Data] = {
+  def testData(file: RFile): Process[Task, Data] = {
     def parse(line: String): Process0[Data] =
       DataCodec.parse(line)(DataCodec.Precise).fold(
         err => Process.fail(new RuntimeException(
@@ -190,19 +206,23 @@ abstract class QueryRegressionTest[S[_]: Functor](
                )),
         Process.emit(_))
 
-    io.linesR(new FileInputStream(file)) flatMap parse
+    val jf = jFile(TestsRoot </> file)
+    Task.delay(jf.exists).liftM[Process].ifM(
+      io.linesR(new FileInputStream(jf)) flatMap parse,
+      Process.fail(new java.io.FileNotFoundException(jf.getPath)))
   }
 
   /** Returns all the `RegressionTest`s found in the given directory, keyed by
     * file path.
     */
   def regressionTests(
-    testDir: File,
+    testDir: RDir,
     knownBackends: Set[BackendName]
-  ): Task[Map[File, RegressionTest]] =
+  ): Task[Map[RFile, RegressionTest]] =
     descendantsMatching(testDir, """.*\.test"""r)
       .map(f =>
-        (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL f)
+        (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL
+          (f relativeTo testDir).get)
       .gather(4)
       .runLog
       .map(_.toMap)
@@ -219,28 +239,31 @@ abstract class QueryRegressionTest[S[_]: Functor](
   }
 
   /** Loads a `RegressionTest` from the given file. */
-  def loadRegressionTest: File => Task[RegressionTest] =
-    file => textContents(file) flatMap { text =>
+  def loadRegressionTest(file: RFile): Task[RegressionTest] =
+    textContents(file) flatMap { text =>
       decodeJson[RegressionTest](text) fold (
-        err => Task.fail(new RuntimeException(file.getName + ": " + err)),
+        err => Task.fail(new RuntimeException(file.shows + ": " + err)),
         Task.now(_))
     }
 
   /** Returns all descendant files in the given dir matching `pattern`. */
-  def descendantsMatching(dir: File, pattern: Regex): Process[Task, File] =
-    Process.eval(Task.delay(dir.listFiles.toVector))
+  def descendantsMatching(d: RDir, pattern: Regex): Process[Task, RFile] =
+    Process.eval(Task.delay(jFile(d).listFiles.toVector))
       .flatMap(Process.emitAll(_))
       .flatMap(f =>
         if (f.isDirectory)
-          descendantsMatching(f, pattern)
+          descendantsMatching(d </> dir(f.getName), pattern)
         else if (pattern.findFirstIn(f.getName).isDefined)
-          Process.emit(f)
+          Process.emit(d </> file(f.getName))
         else
           Process.halt)
 
   /** Returns the contents of the file as a `String`. */
-  def textContents(file: File): Task[String] =
-    Task.delay(Source.fromInputStream(new FileInputStream(file)).mkString)
+  def textContents(file: RFile): Task[String] =
+    Task.delay(Source.fromInputStream(new FileInputStream(jFile(file))).mkString)
+
+  private def jFile(path: Path[_, _, Sandboxed]): JFile =
+    new JFile(posixCodec.printPath(path))
 }
 
 object QueryRegressionTest {
@@ -248,7 +271,7 @@ object QueryRegressionTest {
 
   lazy val knownFileSystems = TestConfig.backendNames.toSet
 
-  def externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
+  val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
     val extFs = TestConfig.externalFileSystems {
       case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
         lazy val f = mongofs.testFileSystemIO(uri, dir).run

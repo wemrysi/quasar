@@ -69,33 +69,45 @@ object TestConfig {
     * to select an interpreter for a given config.
     */
   def externalFileSystems[S[_]](
-    pf: PartialFunction[(MountConfig, ADir), Task[S ~> Task]]
+    pf: PartialFunction[(MountConfig, ADir), Task[(S ~> Task, Task[Unit])]]
   ): Task[IList[FileSystemUT[S]]] = {
     def fs(
       envName: String,
       p: ADir
-    ): OptionT[Task, S ~> Task] =
-      TestConfig.loadConfig(envName) flatMapF(c =>
+    ): OptionT[Task, Task[(S ~> Task, Task[Unit])]] =
+      TestConfig.loadConfig(envName) map (c =>
         pf.lift((c, p)) getOrElse Task.fail(new RuntimeException(
           s"Unsupported filesystem config: $c"
         )))
 
-    def fileSystemNamed(n: BackendName, p: ADir): OptionT[Task, FileSystemUT[S]] =
+    def fileSystemNamed(n: BackendName, p: ADir): OptionT[Task, FileSystemUT[S]] = {
+      def rsrc(connect: Task[(S ~> Task, Task[Unit])]): Task[TaskResource[(S ~> Task, Task[Unit])]] =
+        TaskResource(connect, Strategy.DefaultStrategy)(_._2)
+
+      // Put the evaluation of a Task to produce an interpreter _into_ the interpreter:
+      def embed(t: Task[S ~> Task]): S ~> Task = new (S ~> Task) {
+        def apply[A](a: S[A]): Task[A] =
+          t.flatMap(_(a))
+      }
+
       for {
-        test  <- fs(backendEnvName(n), p)
-        setup <- fs(insertEnvName(n), p).run.liftM[OptionT]
-        s     <- NameGenerator.salt.liftM[OptionT]
-      } yield FileSystemUT(n, test, setup.getOrElse(test), p </> dir(s))
+        test     <- fs(backendEnvName(n), p)
+        setup    <- fs(insertEnvName(n), p).run.liftM[OptionT]
+        s        <- NameGenerator.salt.liftM[OptionT]
+        testRef  <- rsrc(test).liftM[OptionT]
+        setupRef <- setup.cata(rsrc, Task.now(testRef)).liftM[OptionT]
+      } yield FileSystemUT(n,
+          embed(testRef.get.map(_._1)),
+          embed(setupRef.get.map(_._1)),
+          p </> dir(s),
+          testRef.release *> setupRef.release)
+    }
 
     def noBackendsFound: Throwable = new RuntimeException(
       "No external backends to test. Consider setting one of these environment variables: " +
       TestConfig.backendNames.map(TestConfig.backendEnvName).mkString(", ")
     )
 
-    /** NB: We only fail if no backends are found, regardless if they're RW
-      * or RO, even though we currently only use RW ones here as, if
-      * the RW were omitted but a RO is specified, it was likely intentional.
-      */
     TestConfig.testDataPrefix flatMap { prefix =>
       if (TestConfig.backendNames.isEmpty)
         Task.fail(noBackendsFound)

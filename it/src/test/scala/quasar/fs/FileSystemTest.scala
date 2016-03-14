@@ -59,7 +59,11 @@ abstract class FileSystemTest[S[_]: Functor](
 
   def fileSystemShould(examples: FileSystemUT[S] => Unit): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
-      s"${fs.name.name} FileSystem" should examples(fs); ()
+      s"${fs.name.name} FileSystem" should examples(fs)
+
+      step(fs.close.run)
+
+      ()
     }).run
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
@@ -141,7 +145,7 @@ object FileSystemTest {
 
       val fs = foldMapNT(memPlus) compose view.fileSystem[ViewFileSystem](Views(Map.empty))
 
-      FileSystemUT(BackendName("No-view"), fs, fs, mem.testDir)
+      FileSystemUT(BackendName("No-view"), fs, fs, mem.testDir, mem.close)
     }
 
   def hierarchicalUT: Task[FileSystemUT[FileSystem]] = {
@@ -156,12 +160,13 @@ object FileSystemTest {
         BackendName("hierarchical"),
         fs(f, mem.testInterp),
         fs(f, mem.setupInterp),
-        mntDir))
+        mntDir,
+        mem.close))
   }
 
   def inMemUT: Task[FileSystemUT[FileSystem]] = {
     InMemory.runStatefully(InMemory.InMemState.empty)
       .map(_ compose InMemory.fileSystem)
-      .map(f => FileSystemUT(BackendName("in-memory"), f, f, rootDir))
+      .map(f => FileSystemUT(BackendName("in-memory"), f, f, rootDir, ().point[Task]))
   }
 }

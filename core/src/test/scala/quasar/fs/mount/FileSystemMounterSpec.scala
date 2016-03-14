@@ -79,7 +79,7 @@ class FileSystemMounterSpec extends mutable.Specification {
     }
 
   def fsResult(sig: String): DefinitionResult[AbortM] =
-    (abortFs, abort.fail(sig))
+    DefinitionResult[AbortM](abortFs, abort.fail(sig))
 
   val fsDef = FileSystemDef.fromPF {
     case (typ, _) if typ == testType =>

@@ -91,7 +91,7 @@ package object fs {
                       .run
                   ).into[S])
         close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
-      } yield (fs, close)
+      } yield FileSystemDef.DefinitionResult[M](fs, close)
   }
 
   ////

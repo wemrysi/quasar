@@ -21,19 +21,17 @@ import quasar.EnvironmentError
 import quasar.fs.{FileSystem, FileSystemType}
 
 import scala.StringContext
-
 import scalaz._
-import scalaz.syntax.bifunctor._
-import scalaz.std.tuple._
 
 import FileSystemDef._
 
 final case class FileSystemDef[F[_]](run: FsCfg => DefErrT[F, DefinitionResult[F]]) {
+
   def apply(typ: FileSystemType, uri: ConnectionUri): DefErrT[F, DefinitionResult[F]] =
     run((typ, uri))
 
   def translate[G[_]: Functor](f: F ~> G): FileSystemDef[G] =
-    FileSystemDef(c => EitherT(f(run(c).run)).map(_.bimap(f compose _, f(_))))
+    FileSystemDef(c => EitherT(f(run(c).run)).map(_.translate(f)))
 }
 
 object FileSystemDef {
@@ -41,7 +39,11 @@ object FileSystemDef {
   /** Reasons why the configuration is invalid or an environment error. */
   type DefinitionError        = NonEmptyList[String] \/ EnvironmentError
   type DefErrT[F[_], A]       = EitherT[F, DefinitionError, A]
-  type DefinitionResult[F[_]] = (FileSystem ~> F, F[Unit])
+
+  final case class DefinitionResult[F[_]](run: FileSystem ~> F, close: F[Unit]) {
+    def translate[G[_]: Functor](f: F ~> G): DefinitionResult[G] =
+      DefinitionResult(f compose run, f(close))
+  }
 
   def fromPF[F[_]: Monad](
     pf: PartialFunction[FsCfg, DefErrT[F, DefinitionResult[F]]]
