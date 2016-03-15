@@ -1397,7 +1397,7 @@ object WorkflowBuilder {
   // TODO: This is an approximation. If we could postpone this decision until
   //      `Workflow.crush`, when we actually have a task (whether aggregation or
   //       mapReduce) in hand, we would know for sure.
-  def requiresMapReduce(wb: WorkflowBuilder): Boolean = {
+  def preferMapReduce(wb: WorkflowBuilder): Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
     def checkTask(wt: workflowtask.WorkflowTask): Boolean = wt match {
       case workflowtask.FoldLeftTask(_, _)     => true
@@ -1413,8 +1413,8 @@ object WorkflowBuilder {
 
   def join(left0: WorkflowBuilder, right0: WorkflowBuilder,
     tpe: Func,
-    leftKey0: List[WorkflowBuilder], leftJs0: List[JsFn],
-    rightKey0: List[WorkflowBuilder], rightJs0: List[JsFn]):
+    leftKey0: List[WorkflowBuilder], leftJs0: Option[List[JsFn]],
+    rightKey0: List[WorkflowBuilder], rightJs0: Option[List[JsFn]]):
       M[WorkflowBuilder] = {
 
     import Js._
@@ -1425,11 +1425,55 @@ object WorkflowBuilder {
     val leftField0: BsonField.Name = BsonField.Name("left")
     val rightField0: BsonField.Name = BsonField.Name("right")
 
-    val (left, right, leftKey, rightKey, leftField, rightField) =
-      if (requiresMapReduce(left0) && !requiresMapReduce(right0))
-        (right0, left0, rightKey0, leftJs0, rightField0, leftField0)
-      else
-        (left0, right0, leftKey0, rightJs0, leftField0, rightField0)
+    def keyMap(keyExpr: List[JsFn], rootField: BsonField.Name, otherField: BsonField.Name): AnonFunDecl =
+      $Map.mapKeyVal(("key", "value"),
+        keyExpr match {
+          case Nil => Js.Null
+          case _   =>
+            jscore.Obj(keyExpr.map(_(jscore.ident("value"))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
+              case (acc, (j, i)) => acc + (jscore.Name(i.toString) -> j)
+            }).toJs
+        },
+        AnonObjDecl(List(
+          (otherField.asText, AnonElem(Nil)),
+          (rootField.asText, AnonElem(List(Ident("value")))))))
+
+    def jsReduce(src: WorkflowBuilder, key: List[JsFn],
+                 rootField: BsonField.Name, otherField: BsonField.Name):
+        (WorkflowBuilder, WorkflowOp) =
+      (src, $map(keyMap(key, rootField, otherField), ListMap()))
+
+    def wbReduce(src: WorkflowBuilder, key: List[WorkflowBuilder],
+                 rootField: BsonField.Name, otherField: BsonField.Name):
+        (WorkflowBuilder, WorkflowOp) =
+      (DocBuilder(
+        reduce(groupBy(src, key))($push(_)),
+        ListMap(
+          rootField             -> \/-($$ROOT),
+          otherField            -> \/-($literal(Bson.Arr(Nil))),
+          BsonField.Name("_id") -> \/-($include()))),
+        ι)
+
+    val (left, right, leftField, rightField) =
+      (leftJs0, rightJs0) match {
+        case (Some(js), _)
+            if preferMapReduce(left0) && !preferMapReduce(right0) =>
+          (wbReduce(right0, rightKey0, rightField0, leftField0),
+            jsReduce(left0, js, leftField0, rightField0),
+            rightField0, leftField0)
+        case (_, Some(js)) =>
+          (wbReduce(left0, leftKey0, leftField0, rightField0),
+            jsReduce(right0, js, rightField0, leftField0),
+            leftField0, rightField0)
+        case (Some(js), _) =>
+          (wbReduce(right0, rightKey0, rightField0, leftField0),
+            jsReduce(left0, js, leftField0, rightField0),
+            rightField0, leftField0)
+        case (None, None) =>
+          (wbReduce(left0, leftKey0, leftField0, rightField0),
+            wbReduce(right0, rightKey0, rightField0, leftField0),
+            leftField0, rightField0)
+      }
 
     val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
 
@@ -1466,19 +1510,6 @@ object WorkflowBuilder {
         case _ => scala.sys.error("How did this get here?")
       }
 
-    def rightMap(keyExpr: List[JsFn]): AnonFunDecl =
-      $Map.mapKeyVal(("key", "value"),
-        keyExpr match {
-          case Nil => Js.Null
-          case _   =>
-            jscore.Obj(keyExpr.map(_(jscore.ident("value"))).zipWithIndex.foldLeft[ListMap[jscore.Name, JsCore]](ListMap[jscore.Name, JsCore]()) {
-              case (acc, (j, i)) => acc + (jscore.Name(i.toString) -> j)
-            }).toJs
-        },
-        AnonObjDecl(List(
-          (leftField.asText, AnonElem(Nil)),
-          (rightField.asText, AnonElem(List(Ident("value")))))))
-
     val rightReduce =
       AnonFunDecl(List("key", "values"),
         List(
@@ -1501,25 +1532,17 @@ object WorkflowBuilder {
                     List(Select(Ident("value"), rightField.asText)))))))),
           Return(Ident("result"))))
 
-    (workflow(DocBuilder(
-      reduce(groupBy(left, leftKey))($push(_)),
-      ListMap(
-        leftField             -> \/-($$ROOT),
-        rightField            -> \/-($literal(Bson.Arr(Nil))),
-        BsonField.Name("_id") -> \/-($include())))) |@|
-      workflow(right)) { case ((l, _), (r, _)) =>
-        CollectionBuilder(
-          chain(
-            $foldLeft(
-              l,
-              chain(r,
-                $map(rightMap(rightKey), ListMap()),
-                $reduce(rightReduce, ListMap()))),
-            buildJoin(_, tpe),
-            $unwind(DocField(leftField)),
-            $unwind(DocField(rightField))),
-          Root(),
-          None)
+    (workflow(left._1) |@| workflow(right._1)) { case ((l, _), (r, _)) =>
+      CollectionBuilder(
+        chain(
+          $foldLeft(
+            left._2(l),
+            chain(r, right._2, $reduce(rightReduce, ListMap()))),
+          buildJoin(_, tpe),
+          $unwind(DocField(leftField)),
+          $unwind(DocField(rightField))),
+        Root(),
+        None)
     }
   }
 

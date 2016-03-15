@@ -2815,34 +2815,38 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     def joinStructure0(
-      left: Workflow, leftName: String, base: Expression, right: Workflow,
-      leftKey: Reshape.Shape, rightKey: JsCore,
+      left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
+      leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
       fin: WorkflowOp,
       swapped: Boolean) = {
 
       val (leftLabel, rightLabel) =
         if (swapped) ("right", "left") else ("left", "right")
-      def initialPipeOps(src: Workflow): Workflow =
+      def initialPipeOps(
+        src: Workflow, name: String, base: Expression, key: Reshape.Shape, mainLabel: String, otherLabel: String):
+          Workflow =
         chain(
           src,
-          $group(grouped(leftName -> $push(base)), leftKey),
+          $group(grouped(name -> $push(base)), key),
           $project(
             reshape(
-              leftLabel  -> $field(leftName),
-              rightLabel -> $literal(Bson.Arr(List())),
+              mainLabel  -> $field(name),
+              otherLabel -> $literal(Bson.Arr(List())),
               "_id"      -> $include()),
             IncludeId))
       fin(
         $foldLeft(
-          initialPipeOps(left),
+          initialPipeOps(left, leftName, leftBase, leftKey, leftLabel, rightLabel),
           chain(
             right,
-            $map($Map.mapKeyVal(("key", "value"),
-              rightKey.toJs,
-              Js.AnonObjDecl(List(
-                (leftLabel, Js.AnonElem(List())),
-                (rightLabel, Js.AnonElem(List(Js.Ident("value"))))))),
-              ListMap()),
+            rightKey.fold(
+              rk => initialPipeOps(_, rk._1, rk._2, rk._3, rightLabel, leftLabel),
+              rk => $map($Map.mapKeyVal(("key", "value"),
+                rk.toJs,
+                Js.AnonObjDecl(List(
+                  (leftLabel, Js.AnonElem(List())),
+                  (rightLabel, Js.AnonElem(List(Js.Ident("value"))))))),
+                ListMap())),
             $reduce(
               Js.AnonFunDecl(List("key", "values"),
                 List(
@@ -2868,11 +2872,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     def joinStructure(
-        left: Workflow, leftName: String, base: Expression, right: Workflow,
-        leftKey: Reshape.Shape, rightKey: JsCore,
+        left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
+        leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
         fin: WorkflowOp,
         swapped: Boolean) =
-      crystallize(joinStructure0(left, leftName, base, right, leftKey, rightKey, fin, swapped))
+      crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 
     "plan simple join" in {
       plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
@@ -2881,7 +2885,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $read(Collection("db", "zips")), "__tmp0", $$ROOT,
             $read(Collection("db", "zips2")),
             reshape("0" -> $field("_id")),
-            Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))),
+            Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
             chain(_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                 BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
@@ -2912,7 +2916,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "foo")), "__tmp0", $$ROOT,
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))),
+          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain(_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
@@ -2946,7 +2950,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "foo")), "__tmp0", $$ROOT,
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))),
+          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain(_,
             $project(
               reshape(
@@ -2997,7 +3001,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "foo")), "__tmp0", $$ROOT,
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
-          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))),
+          Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
           chain(_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3043,7 +3047,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $read(Collection("db", "foo")), "__tmp0", $$ROOT,
             $read(Collection("db", "bar")),
             reshape("0" -> $field("id")),
-            Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))),
+            Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
             chain(_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                 BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
@@ -3052,7 +3056,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               $unwind(DocField(BsonField.Name("right")))),
             false),
           reshape("0" -> $field("bar_id")),
-          Obj(ListMap(Name("0") -> Select(Select(ident("value"), "right"), "id"))),
+          Obj(ListMap(Name("0") -> Select(Select(ident("value"), "right"), "id"))).right,
           chain(_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3122,7 +3126,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "1" -> $field("__tmp6")),
           obj(
             "0" -> Select(ident("value"), "sha"),
-            "1" -> Select(Select(ident("value"), "author"), "login")),
+            "1" -> Select(Select(ident("value"), "author"), "login")).right,
           chain(_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
@@ -3173,6 +3177,69 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         false).op)
     }
 
+    "plan join with non-JS-able condition" in {
+      plan("select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
+      beWorkflow(
+        joinStructure(
+          chain(
+            $read(Collection("db", "zips")),
+            $project(
+              reshape(
+                "__tmp0" -> $field("loc"),
+                "__tmp1" -> $$ROOT),
+              IgnoreId),
+            $unwind(DocField(BsonField.Name("__tmp0")))),
+          "__tmp2", $field("__tmp1"),
+          chain(
+            $read(Collection("db", "zips")),
+            $project(
+              reshape(
+                "__tmp3" -> $field("loc"),
+                "__tmp4" -> $$ROOT),
+              IgnoreId),
+            $unwind(DocField(BsonField.Name("__tmp3")))),
+          reshape("0" -> $field("__tmp0")),
+          ("__tmp5", $field("__tmp4"), reshape("0" -> $field("__tmp3")).left).left,
+          chain(_,
+            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
+              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
+              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(BsonField.Name("left"))),
+            $unwind(DocField(BsonField.Name("right"))),
+            $project(
+              reshape(
+                "city1" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $field("left", "city"),
+                    $literal(Bson.Undefined)),
+                "loc" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                    $field("left", "loc"),
+                    $literal(Bson.Undefined)),
+                "city2" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $field("right", "city"),
+                    $literal(Bson.Undefined)),
+                "pop" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $field("right", "pop"),
+                    $literal(Bson.Undefined))),
+              IgnoreId)),
+          false).op)
+    }
+
     "plan simple cross" in {
       plan("select zips2.city from zips, zips2 where zips.pop < zips2.pop") must
       beWorkflow(
@@ -3180,7 +3247,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "zips")), "__tmp0", $$ROOT,
           $read(Collection("db", "zips2")),
           $literal(Bson.Null),
-          jscore.Literal(Js.Null),
+          jscore.Literal(Js.Null).right,
           chain(_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
