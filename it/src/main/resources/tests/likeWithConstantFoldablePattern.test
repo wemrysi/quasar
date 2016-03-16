@@ -1,0 +1,18 @@
+{
+    "name": "LIKE with constant-foldable pattern",
+    "data": "zips.data",
+    "variables": { "substr": "\"ULDER\"" },
+    "query": "select * from zips where city like (\"%\" || :substr || \"%\")",
+    "predicate": "containsExactly",
+    "expected": [
+        { "city": "BOULDER JUNCTION", "state": "WI", "pop": 563,   "loc": [ -89.632454, 46.111183] },
+        { "city": "BOULDER",          "state": "MT", "pop": 1737,  "loc": [-112.113757, 46.230647] },
+        { "city": "BOULDER",          "state": "CO", "pop": 18174, "loc": [-105.21426,  40.049733] },
+        { "city": "BOULDER",          "state": "CO", "pop": 29384, "loc": [-105.285131, 40.017235] },
+        { "city": "BOULDER",          "state": "CO", "pop": 39860, "loc": [-105.239178, 39.991381] },
+        { "city": "BOULDER",          "state": "CO", "pop": 21550, "loc": [-105.277073, 40.037482] },
+        { "city": "BOULDER",          "state": "WY", "pop": 112,   "loc": [-109.540105, 42.688146] },
+        { "city": "BOULDER",          "state": "UT", "pop": 131,   "loc": [-111.426646, 37.916606] },
+        { "city": "BOULDER CITY",     "state": "NV", "pop": 12920, "loc": [-114.834413, 35.972711] },
+        { "city": "BOULDER CREEK",    "state": "CA", "pop": 9434,  "loc": [-122.133053, 37.149934] }]
+}

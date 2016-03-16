@@ -399,7 +399,7 @@ object LogicalPlan {
           val (types, constraints, terms) = args.foldMap(a =>
             (List(a.inferred), a.constraints, List(a.plan)))
           lift(ConcatOp.apply(types).disjunction).flatMap[NameGen, ConstrainedPlan](poss => poss match {
-            case Type.Str         => unifyOrCheck(inf, poss, Invoke(string.Concat, terms))
+            case t if Type.Str.contains(t) => unifyOrCheck(inf, poss, Invoke(string.Concat, terms))
             case t if t.arrayLike => unifyOrCheck(inf, poss, Invoke(ArrayConcat, terms))
             case _                => lift(-\/(NonEmptyList(SemanticError.GenericError("can't concat mixed/unknown types"))))
           }).map(cp =>

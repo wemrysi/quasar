@@ -30,7 +30,6 @@ import scalaz.{Tree => _, _}, Scalaz._
 trait Compiler[F[_]] {
   import identity._
   import set._
-  import string._
   import structural._
   import JoinDir._
 
@@ -149,35 +148,6 @@ trait Compiler[F[_]] {
       cases.traverseU(f).map(_.foldRight(default) {
         case ((cond, expr), default) => Fix(relations.Cond(cond, expr, default))
       })
-
-    def regexForLikePattern(pattern: String, escapeChar: Option[Char]):
-        String = {
-      def sansEscape(pat: List[Char]): List[Char] = pat match {
-        case '_' :: t =>         '.' +: escape(t)
-        case '%' :: t => ".*".toList ⊹ escape(t)
-        case c   :: t =>
-          if ("\\^$.|?*+()[{".contains(c))
-            '\\' +: c +: escape(t)
-          else c +: escape(t)
-        case Nil      => Nil
-      }
-
-      def escape(pat: List[Char]): List[Char] =
-        escapeChar match {
-          case None => sansEscape(pat)
-          case Some(esc) =>
-            pat match {
-              // NB: We only handle the escape char when it’s before a special
-              //     char, otherwise you run into weird behavior when the escape
-              //     char _is_ a special char. Will change if someone can find
-              //     an actual definition of SQL’s semantics.
-              case `esc` :: '%' :: t => '%' +: escape(t)
-              case `esc` :: '_' :: t => '_' +: escape(t)
-              case l                 => sansEscape(l)
-            }
-        }
-      "^" + escape(pattern.toList).mkString + "$"
-    }
 
     def flattenJoins(term: Fix[LogicalPlan], relations: SqlRelation[CoExpr]):
         Fix[LogicalPlan] = relations match {
@@ -438,20 +408,6 @@ trait Compiler[F[_]] {
             } yield
               if (Path(rName).filename ≟ name) table
               else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
-
-      case InvokeFunctionF(Like.name, List(expr, pattern, escape)) =>
-        (pattern.tail, escape.tail) match {
-          case (StringLiteralF(str), StringLiteralF(esc)) =>
-            if (esc.length > 1)
-              fail(GenericError("escape character is not a single character"))
-            else
-              compile0(expr).map(exp =>
-                Fix(Search(exp,
-                  LogicalPlan.Constant(Data.Str(regexForLikePattern(str, esc.headOption))),
-                  LogicalPlan.Constant(Data.Bool(false)))))
-          case (x, StringLiteralF(_)) => fail(ExpectedLiteral(Fix(x.map((x: CoExpr) => x.convertTo[Fix]))))
-          case (_, x)                 => fail(ExpectedLiteral(Fix(x.map((x: CoExpr) => x.convertTo[Fix]))))
-        }
 
       case InvokeFunctionF(name, args) =>
         findFunction(name).flatMap(compileFunction(_, args))
