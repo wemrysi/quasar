@@ -4,5 +4,5 @@
     "query": "select * from zips where state in (\"MA\") and pop < 10",
     "predicate": "containsExactly",
     "expected": [
-        { "city": "CAMBRIDGE", "state": "MA", "pop": 0, "loc": [-71.141879, 42.364005] }]
+        { "city": "CAMBRIDGE", "loc": [-71.141879, 42.364005], "pop": 0, "state": "MA" }]
 }
