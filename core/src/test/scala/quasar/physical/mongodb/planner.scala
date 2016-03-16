@@ -850,25 +850,10 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                  Selector.Doc(BsonField.Name("baz") ->
                    Selector.Type(BsonType.Bool)))),
              Selector.And(
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Int32)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Int64)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Dec)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Text)),
-                 Selector.Or(
-                   Selector.Doc(BsonField.Name("bar") ->
-                     Selector.Type(BsonType.Date)),
-                   Selector.Doc(BsonField.Name("bar") ->
-                     Selector.Type(BsonType.Bool)))),
-               Selector.And(
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Neq(Bson.Int64(-10))),
-                 Selector.Doc(BsonField.Name("baz") ->
-                   Selector.Gt(Bson.Dec(-1.0)))))))))
+               Selector.Doc(BsonField.Name("bar") ->
+                 Selector.Neq(Bson.Int64(-10))),
+               Selector.Doc(BsonField.Name("baz") ->
+                 Selector.Gt(Bson.Dec(-1.0))))))))
     }
 
     "plan complex filter" in {
@@ -1043,43 +1028,14 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "zips")),
         $project(
           reshape(
-            "__tmp4" -> $neq($field("city"), $field("state")),
-            "__tmp5" -> $$ROOT),
+            "__tmp0" -> $neq($field("city"), $field("state")),
+            "__tmp1" -> $$ROOT),
           IgnoreId),
-        $match(Selector.And(
-          Selector.Or(
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-              Selector.Type(BsonType.Int32)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-              Selector.Type(BsonType.Int64)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-              Selector.Type(BsonType.Dec)),
-            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-              Selector.Type(BsonType.Text)),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Bool)))),
-          Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Bool)))),
-            Selector.Doc(
-              BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))))),
+        $match(
+          Selector.Doc(
+            BsonField.Name("__tmp0") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("__tmp5")),
+          reshape("value" -> $field("__tmp1")),
           ExcludeId)))
     }
 
@@ -1089,61 +1045,32 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "zips")),
         $project(
           reshape(
-            "__tmp8" -> $neq($field("city"), $field("state")),
-            "__tmp9" -> $$ROOT,
-            "__tmp10" -> $field("pop")),
+            "__tmp4" -> $neq($field("city"), $field("state")),
+            "__tmp5" -> $$ROOT,
+            "__tmp6" -> $field("pop")),
           IgnoreId),
         $match(Selector.And(
           Selector.Or(
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
               Selector.Type(BsonType.Int32)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
               Selector.Type(BsonType.Int64)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
               Selector.Type(BsonType.Dec)),
-            Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+            Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
               Selector.Type(BsonType.Text)),
             Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("pop") ->
+              Selector.Doc(BsonField.Name("__tmp5") \ BsonField.Name("pop") ->
                 Selector.Type(BsonType.Bool)))),
           Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("state") ->
-                  Selector.Type(BsonType.Bool)))),
-            Selector.And(Selector.Or(
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("__tmp9") \ BsonField.Name("city") ->
-                  Selector.Type(BsonType.Bool)))),
-              Selector.And(
-                Selector.Doc(
-                  BsonField.Name("__tmp8") -> Selector.Eq(Bson.Bool(true))),
-                Selector.Doc(
-                  BsonField.Name("__tmp10") -> Selector.Lt(Bson.Int64(10000)))))))),
+            Selector.Doc(
+              BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true))),
+            Selector.Doc(
+              BsonField.Name("__tmp6") -> Selector.Lt(Bson.Int64(10000)))))),
         $project(
-          reshape("value" -> $field("__tmp9")),
+          reshape("value" -> $field("__tmp5")),
           ExcludeId)))
     }
 
@@ -2794,31 +2721,16 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                     Selector.Doc(BsonField.Name("ts") ->
                       Selector.Type(BsonType.Bool)))),
                 Selector.And(
-                  Selector.Or(
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Int32)),
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Int64)),
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Dec)),
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Text)),
-                    Selector.Or(
-                      Selector.Doc(BsonField.Name("ts") ->
-                        Selector.Type(BsonType.Date)),
-                      Selector.Doc(BsonField.Name("ts") ->
-                        Selector.Type(BsonType.Bool)))),
                   Selector.And(
-                    Selector.And(
-                      Selector.Doc(
-                        BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-23T00:00:00Z")))),
-                      Selector.Doc(
-                        BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-28T00:00:00Z"))))),
-                    Selector.Or(
-                      Selector.Doc(
-                        BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-25T00:00:00Z")))),
-                      Selector.Doc(
-                        BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-26T00:00:00Z"))))))))),
+                    Selector.Doc(
+                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-23T00:00:00Z")))),
+                    Selector.Doc(
+                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-28T00:00:00Z"))))),
+                  Selector.Or(
+                    Selector.Doc(
+                      BsonField.Name("ts") -> Selector.Lt(Bson.Date(Instant.parse("2015-01-25T00:00:00Z")))),
+                    Selector.Doc(
+                      BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-26T00:00:00Z")))))))),
             Selector.And(
               Selector.Doc(
                 BsonField.Name("ts") -> Selector.Gte(Bson.Date(Instant.parse("2015-01-29T00:00:00Z")))),
