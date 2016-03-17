@@ -22,9 +22,7 @@ import quasar.Predef._
 import argonaut._, Argonaut._
 import org.specs2.execute._
 import org.specs2.matcher._
-import scalaz.{Failure => _, _}
-import scalaz.syntax.apply._
-import scalaz.std.option._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.stream._
 
 sealed trait Predicate {
@@ -50,7 +48,7 @@ object Predicate {
               failure(s"$actual matches $expected, but order differs", s)
             else failure(s"$actual does not match $expected", s)
           } getOrElse result(actual == expected, s"matches $expected", s"$actual does not match $expected", s)
-        case (Some(_), None)  => failure(s"ran out before expected", s)
+        case (Some(v), None)  => failure(s"ran out before expected; missing: ${v}", s)
         case (None, Some(v))  => failure(s"had more than expected: ${v}", s)
         case (None, None)     => success(s"matches (empty)", s)
         case _                => failure(s"scalac is weird", s)
@@ -58,40 +56,59 @@ object Predicate {
     }
   }
 
-  /** Must contain ALL the elements in some order. */
+  /** Must contain ALL the elements in any order. */
   final case object ContainsAtLeast extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected: Vector[Json],
       actual: Process[F, Json]
     ): F[Result] =
-      actual.scan(expected.toSet) { case (expected, e) =>
-        expected.filterNot(jsonMatches(_, e))
+      actual.scan((expected.toSet, Set.empty[Json])) {
+        case ((expected, wrongOrder), e) =>
+          expected.find(_ == e) match {
+            case Some(e1) if jsonMatches(e1, e) =>
+              (expected.filterNot(_ == e), wrongOrder)
+            case Some(_) =>
+              (expected.filterNot(_ == e), wrongOrder + e)
+            case None =>
+              (expected, wrongOrder)
+          }
       }
-      .dropWhile(_.size > 0).take(1)
-      .map(xs => xs aka "unmatched expected values" must beEmpty : Result)
-      .runLastOr(Failure("no results matched any expected value"))
+        .runLast
+        .map {
+          case Some((exp, wrongOrder)) =>
+            (exp aka "unmatched expected values" must beEmpty) and
+            (wrongOrder aka "matched but field order differs" must beEmpty): Result
+          case None =>
+            failure
+        }
   }
 
-  /** Must contain ALL and ONLY the elements in some order. */
+  /** Must contain ALL and ONLY the elements in any order. */
   final case object ContainsExactly extends Predicate {
     def apply[F[_]: Catchable: Monad](
       expected: Vector[Json],
       actual: Process[F, Json]
     ): F[Result] =
-      actual.scan((expected.toSet, Set.empty[Json])) {
-        case ((expected, extra), e) =>
-          if (expected.contains(e))
-            (expected.filterNot(jsonMatches(_, e)), extra)
-          else
-            (expected, extra + e)
+      actual.scan((expected.toSet, Set.empty[Json], None: Option[Json])) {
+        case ((expected, wrongOrder, extra), e) =>
+          expected.find(_ == e) match {
+            case Some(e1) if jsonMatches(e1, e) =>
+              (expected.filterNot(_ == e), wrongOrder, extra)
+            case Some(_) =>
+              (expected.filterNot(_ == e), wrongOrder + e, extra)
+            case None =>
+              (expected, wrongOrder, extra.orElse(e.some))
+          }
+      }
+        .runLast
+        .map {
+          case Some((exp, wrongOrder, extra)) =>
+            (extra aka "unexpected value" must beNone) and
+            (wrongOrder aka "matched but field order differs" must beEmpty) and
+            (exp aka "unmatched expected values" must beEmpty): Result
+          case None =>
+            failure
         }
-        .dropWhile(t => t._1.size > 0 && t._2.size == 0)
-        .take(1)
-        .map { case (exp, extra) =>
-          (extra aka "unexpected values" must beEmpty) and
-          (exp aka "unmatched expected values" must beEmpty): Result
-        }
-        .runLastOr(Failure("no results"))
   }
 
   /** Must EXACTLY match the elements, in order. */
@@ -102,14 +119,15 @@ object Predicate {
     ): F[Result] = {
       val actual   = actual0.map(Some(_))
       val expected = Process.emitAll(expected0).map(Some(_))
-      val zipped   = actual.tee(expected)(tee.zipAll(None, None))
 
-      zipped flatMap { case ((a, e)) =>
-        if (jsonMatches(a, e))
-          Process.halt
-        else
-          Process.emit(a must matchJson(e) : Result)
-      } take 1 runLastOr success
+      (actual tee expected)(tee.zipAll(None, None))
+        .flatMap { case ((a, e)) =>
+          if (jsonMatches(a, e))
+            Process.halt
+          else
+            Process.emit(a must matchJson(e) : Result)
+        }
+        .runLog.map(_.foldMap()(Result.ResultMonoid))
     }
   }
 
@@ -121,13 +139,14 @@ object Predicate {
     ): F[Result] = {
       val actual   = actual0.map(Some(_))
       val expected = Process.emitAll(expected0).map(Some(_))
-      val zipped   = actual.tee(expected)(tee.zipAll(None, None))
 
-      zipped flatMap {
-        case (a, None) => Process.halt
-        case (a, e) if (jsonMatches(a, e)) => Process.halt
-        case (a, e) => Process.emit(a must matchJson(e) : Result)
-      } take 1 runLastOr success
+      (actual tee expected)(tee.zipAll(None, None))
+        .flatMap {
+          case (a, None) => Process.halt
+          case (a, e) if (jsonMatches(a, e)) => Process.halt
+          case (a, e) => Process.emit(a must matchJson(e) : Result)
+        }
+        .runLog.map(_.foldMap()(Result.ResultMonoid))
     }
   }
 
@@ -139,13 +158,17 @@ object Predicate {
     ): F[Result] = {
       val expected = expected0.toSet
 
-      actual.scan(expected) { case (exp, e) =>
-        exp.filterNot(jsonMatches(_, e))
-      }
-      .dropWhile(_.size == expected.size)
-      .take(1)
-      .map(_ must_== expected : Result)
-      .runLastOr(failure)
+      if (expected.isEmpty)
+        actual.drain.run.as(failure)
+      else
+        actual.scan(expected) { case (exp, e) =>
+          // NB: want to ignore field-order here
+          exp.filterNot(_ == e)
+        }
+        .dropWhile(_.size == expected.size)
+        .take(1)
+        .map(unseen => expected.filterNot(unseen contains _) aka "prohibited values" must beEmpty : Result)
+        .runLastOr(success)
     }
   }
 

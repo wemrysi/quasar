@@ -223,8 +223,8 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
 
     import DataArbitrary._
 
-    def representable(data: Data) = data match {
-      case Data.Int(x)    => x.isValidLong
+    def representable(data: Data): Boolean = data match {
+      case Data.Str("")   => false
       case Data.Obj(_)    => false
       case Data.Arr(_)    => false
       case Data.Set(_)    => false
@@ -248,9 +248,9 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
       case _ => true
     }
 
-    "round-trip all rendered values" ! prop { (data: Data) =>
-      isFlat(data) ==> {
-        val r = render(data).value
+    "round-trip all flat rendered values that aren't \"\"" ! prop { (data: Data) =>
+      val r = render(data).value
+      (isFlat(data) && r != "") ==> {
         parse(r).map(render(_).value) must beSome(r)
       }
     }

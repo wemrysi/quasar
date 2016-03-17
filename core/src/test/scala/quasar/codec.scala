@@ -115,13 +115,15 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
     // such a way that the parser recovers the original type.
     // NB: this does not account for Str values that will be confused with
     // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
-    def representable(data: Data) = data match {
-      case Data.Int(x)    => x.isValidLong
-      case Data.Set(_)    => false
-      case Data.Binary(_) => false
-      case Data.Id(_)     => false
-      case Data.NA        => false
-      case _              => true
+    def representable(data: Data): Boolean = data match {
+      case Data.Int(x)     => x.isValidLong
+      case Data.Set(_)     => false
+      case Data.Binary(_)  => false
+      case Data.Id(_)      => false
+      case Data.NA         => false
+      case Data.Arr(value) => value.forall(representable)
+      case Data.Obj(value) => value.values.forall(representable)
+      case _               => true
     }
 
     "render" should {
@@ -149,6 +151,7 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
       "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
       "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
+      "encode empty binary" in { DataCodec.render(Data.Binary(Array[Byte]())) must beRightDisjunction("\"\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("\"abc\"") }
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("null") }
     }

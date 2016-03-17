@@ -44,6 +44,9 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   import QueryRegressionTest._
 
+  // NB: forcing the examples to not overlap seems to avoid some errors in Travis
+  sequential
+
   type FsErr[A] = FileSystemErrT[F, A]
 
   val qfTransforms = QueryFile.Transforms[F]

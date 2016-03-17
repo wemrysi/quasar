@@ -2,7 +2,7 @@
     "name": "filter field in single-element set",
     "data": "zips.data",
     "query": "select * from zips where state in (\"MA\") and pop < 10",
-    "predicate": "equalsExactly",
+    "predicate": "containsExactly",
     "expected": [
         { "city": "CAMBRIDGE", "state": "MA", "pop": 0, "loc": [-71.141879, 42.364005] }]
 }

@@ -51,16 +51,18 @@ class BsonCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
 
       import Data._
 
-      val preserved = data match {
+      def preserved(d: Data): Boolean = d match {
         case Int(x)      => x.isValidLong
         case Interval(_) => false
         case Date(_)     => false
         case Time(_)     => false
         case Set(_)      => false
+        case Arr(value)  => value.forall(preserved)
+        case Obj(value)  => value.values.forall(preserved)
         case _ => true
       }
 
-      preserved ==> {
+      preserved(data) ==> {
         fromData(data).map(toData) must beRightDisjunction(data)
       }
     }
