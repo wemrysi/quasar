@@ -16,15 +16,21 @@
 
 package quasar.fp
 
+import quasar.Predef.Unit
+
 import monocle.Prism
 import scalaz._
 
 trait PrismInstances {
-  import Liskov.<~<
+  import Liskov.<~<, Leibniz.===
 
   // TODO: See if we can implement this once for all tuples using shapeless.
   implicit class PrismOps[A, B](prism: Prism[A, B]) {
-    def apply(b: B): A = prism.reverseGet(b)
+    def apply()(implicit ev: B === Unit): A =
+      ev.subst[Prism[A, ?]](prism).reverseGet(())
+
+    def apply(b: B): A =
+      prism.reverseGet(b)
 
     def apply[C, D](c: C, d: D)(implicit ev: (C, D) <~< B): A =
       apply(ev((c, d)))

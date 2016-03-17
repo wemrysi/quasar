@@ -79,8 +79,8 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
     import HierarchicalFileSystemError._
 
     response {
-      case MultipleMountsApply(_, _) =>
-        QResponse.error(BadRequest, "The request could not be handled by a unique mounted filesystem.")
+      case NoMountsDefined =>
+        QResponse.error(BadRequest, "No mounts defined.")
     }
   }
 

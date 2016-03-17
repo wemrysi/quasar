@@ -116,9 +116,9 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       case \/-(-\/(PathErr(InvalidPath(p0, _)))) => p0 must_== p
     }
 
-  def failDueToMultipleMnts[A] =
+  def failDueToNoMnts[A] =
     beLike[HierarchicalFileSystemError \/ (FileSystemError \/ A)] {
-      case -\/(HierarchicalFileSystemError.MultipleMountsApply(_, _)) => ok
+      case -\/(HierarchicalFileSystemError.NoMountsDefined) => ok
     }
 
   def failsForDifferentFs[A](f: (Fix[LogicalPlan], AFile) => ExecM[A]) =
@@ -138,7 +138,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
     }
 
   def succeedsForNoPaths[A](f: Fix[LogicalPlan] => ExecM[A]) =
-    "containing no paths succeeds" >> {
+    "containing no paths succeeds when at least one mount" >> {
       runMntd(f(Constant(Data.Int(0))).run.value)
         .run.eval(emptyMS) must succeedH
     }
@@ -157,6 +157,12 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         emptyMS)
 
       runMntd(f(lp).run.value).run.eval(fss) must succeedH
+    }
+
+  def failsWhenNoPathsAndNoMounts[A](f: Fix[LogicalPlan] => ExecM[A]) =
+    "containing no paths fails when no mounts defined" >> {
+      runEmpty(f(Constant(Data.Int(0))).run.value)
+        .run.eval(emptyMS) must failDueToNoMnts
     }
 
   "Mounted filesystems" should {
@@ -188,6 +194,8 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       "evaluating a plan" >> {
         failsForDifferentFs((lp, _) => unsafeq.eval(lp))
 
+        failsWhenNoPathsAndNoMounts(unsafeq.eval)
+
         succeedsForNoPaths(unsafeq.eval)
 
         succeedsForMountedPath(unsafeq.eval)
@@ -195,6 +203,8 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
       "explaining a plan" >> {
         failsForDifferentFs((lp, _) => query.explain(lp))
+
+        failsWhenNoPathsAndNoMounts(query.explain)
 
         succeedsForNoPaths(query.explain)
 
