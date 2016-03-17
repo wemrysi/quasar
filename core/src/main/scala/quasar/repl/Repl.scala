@@ -231,7 +231,7 @@ object Repl {
     P: ConsoleIO.Ops[S]
   ): Free[S, Unit] = {
     def formatJson(codec: DataCodec)(data: Data) =
-      DataCodec.Precise.encode(data).fold(
+      codec.encode(data).fold(
         err => "error: " + err.shows,
         _.pretty(minspace))
 
