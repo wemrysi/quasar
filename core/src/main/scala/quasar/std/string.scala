@@ -47,17 +47,53 @@ trait StringLib extends Library {
     stringApply(_ + _),
     basicUntyper)
 
+  private def regexForLikePattern(pattern: String, escapeChar: Option[Char]):
+      String = {
+    def sansEscape(pat: List[Char]): List[Char] = pat match {
+      case '_' :: t =>         '.' +: escape(t)
+      case '%' :: t => ".*".toList ⊹ escape(t)
+      case c   :: t =>
+        if ("\\^$.|?*+()[{".contains(c))
+          '\\' +: c +: escape(t)
+        else c +: escape(t)
+      case Nil      => Nil
+    }
+
+    def escape(pat: List[Char]): List[Char] =
+      escapeChar match {
+        case None => sansEscape(pat)
+        case Some(esc) =>
+          pat match {
+            // NB: We only handle the escape char when it’s before a special
+            //     char, otherwise you run into weird behavior when the escape
+            //     char _is_ a special char. Will change if someone can find
+            //     an actual definition of SQL’s semantics.
+            case `esc` :: '%' :: t => '%' +: escape(t)
+            case `esc` :: '_' :: t => '_' +: escape(t)
+            case l                 => sansEscape(l)
+          }
+      }
+    "^" + escape(pattern.toList).mkString + "$"
+  }
+
   val Like = Mapping(
     "(like)",
     "Determines if a string value matches a pattern.",
     Type.Bool, Type.Str :: Type.Str :: Type.Str :: Nil,
-    noSimplification,
-    partialTyperV {
-      case List(Type.Str, Type.Const(Data.Str(_)), Type.Const(Data.Str(_))) =>
-        success(Type.Bool)
-      case Type.Str :: _ :: _ :: Nil =>
-        failure(nel(GenericError("expected string constant for LIKE"), Nil))
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+        orig match {
+          case IsInvoke(_, List(str, ConstantF(Data.Str(pat)), ConstantF(Data.Str(esc)))) =>
+            if (esc.length > 1)
+              None
+            else
+              Search(str.embed,
+                ConstantF[T[LogicalPlan]](Data.Str(regexForLikePattern(pat, esc.headOption))).embed,
+                ConstantF[T[LogicalPlan]](Data.Bool(false)).embed).some
+          case _ => None
+        }
     },
+    constTyper(Type.Bool),
     basicUntyper)
 
   def matchAnywhere(str: String, pattern: String, insen: Boolean) =
