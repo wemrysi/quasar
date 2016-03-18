@@ -63,15 +63,12 @@ trait TypeArbitrary {
     right <- complexGen(depth-1, gen)
   } yield left ⨿ right
 
-  def simpleGen: Gen[Type] = Gen.oneOf(terminalGen, simpleConstGen, setGen)
+  def simpleGen: Gen[Type] = Gen.oneOf(terminalGen, simpleConstGen)
 
   def terminalGen: Gen[Type] = Gen.oneOf(Null, Str, Type.Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval)
 
   def simpleConstGen: Gen[Type] = DataArbitrary.simpleData.map(Const(_))
   def constGen: Gen[Type] = Arbitrary.arbitrary[Data].map(Const(_))
-
-  // TODO: can a Set contain constants? objects? arrays?
-  def setGen: Gen[Type] = terminalGen.map(Set(_))
 
   def fieldGen: Gen[(String, Type)] = for {
     c <- Gen.alphaChar

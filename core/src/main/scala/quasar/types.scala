@@ -105,13 +105,6 @@ sealed trait Type { self =>
     case _ => None
   }
 
-  final def setLike: Boolean = this match {
-    case Const(value)        => value.dataType.setLike
-    case Set(_)              => true
-    case x @ Coproduct(_, _) => x.flatten.toList.forall(_.setLike)
-    case _                   => false
-  }
-
   final def objectField(field: Type): ValidationNel[SemanticError, Type] = {
     if (Type.lub(field, Str) != Str) failure(nel(TypeError(Str, field, None), Nil))
     else (field, this) match {
@@ -288,8 +281,6 @@ final case object Type extends TypeInstances {
               (subMap -- supMap.keySet).foldMap(typecheck(p, _)))(
               typecheck(p, _)))
 
-      case (Set(superType), Set(subType)) => typecheck(superType, subType)
-
       case (superType, subType @ Coproduct(_, _)) =>
         typecheckPC(superType, subType.flatten)
 
@@ -316,7 +307,6 @@ final case object Type extends TypeInstances {
     case Time => Nil
     case Interval => Nil
     case Id => Nil
-    case Set(value) => value :: Nil
     case Arr(value) => value
     case FlexArr(_, _, value) => value :: Nil
     case Obj(map, uk) => uk.toList ++ map.values.toList
@@ -343,7 +333,6 @@ final case object Type extends TypeInstances {
                       else f(v)
         } yield newType2
 
-      case Set(value)               => wrap(value, Set)
       case FlexArr(min, max, value) => wrap(value, FlexArr(min, max, _))
       case Arr(value)               => value.map(f).sequence.map(Arr)
       case Obj(map, uk)             =>
@@ -383,8 +372,6 @@ final case object Type extends TypeInstances {
   final case object Time              extends Type
   final case object Interval          extends Type
   final case object Id                extends Type
-
-  final case class Set(value: Type) extends Type
 
   final case class Arr(value: List[Type]) extends Type
   final case class FlexArr(minSize: Int, maxSize: Option[Int], value: Type)
@@ -440,7 +427,6 @@ final case object Type extends TypeInstances {
 
   val AnyArray = FlexArr(0, None, Top)
   val AnyObject = Obj(Map(), Some(Top))
-  val AnySet = Set(Top)
   val Numeric = Int ⨿ Dec
   val Temporal = Timestamp ⨿ Date ⨿ Time
   val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool

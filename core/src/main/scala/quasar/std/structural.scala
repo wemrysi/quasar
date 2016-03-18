@@ -200,7 +200,7 @@ trait StructuralLib extends Library {
   val FlattenMap = Expansion(
     "FLATTEN_MAP",
     "Zooms in on the values of a map, extending the current dimension with the keys",
-    Set(Top), AnyObject :: Nil,
+    Top, AnyObject :: Nil,
     noSimplification,
     partialTyperV {
       case List(Const(Data.Obj(map))) =>
@@ -215,7 +215,7 @@ trait StructuralLib extends Library {
   val FlattenArray = Expansion(
     "FLATTEN_ARRAY",
     "Zooms in on the elements of an array, extending the current dimension with the indices",
-    Set(Top), AnyArray :: Nil,
+    Top, AnyArray :: Nil,
     noSimplification,
     partialTyperV {
       case List(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
@@ -229,7 +229,7 @@ trait StructuralLib extends Library {
   val FlattenMapKeys = Expansion(
     "{*:}",
     "Zooms in on the keys of a map, also extending the current dimension with the keys",
-    Set(Top), AnyObject :: Nil,
+    Top, AnyObject :: Nil,
     noSimplification,
     partialTyper {
       case List(Const(Data.Obj(map))) =>
@@ -241,18 +241,21 @@ trait StructuralLib extends Library {
   val FlattenArrayIndices = Expansion(
     "[*:]",
     "Zooms in on the indices of an array, also extending the current dimension with the indices",
-    Set(Int), AnyArray :: Nil,
+    Int, AnyArray :: Nil,
     noSimplification,
     partialTyper { case List(x) if x.arrayLike => Int },
-    partialUntyper {
-      case Set(Int) | Int => List(FlexArr(0, None, Top))
-    })
+    partialUntyper { case Int => List(FlexArr(0, None, Top)) })
 
   val ShiftMap = Expansion(
     "SHIFT_MAP",
     "Zooms in on the values of a map, adding the keys as a new dimension",
-    Set(Top), AnyObject :: Nil,
-    noSimplification,
+    Top, AnyObject :: Nil,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+        case IsInvoke(_, List(UnshiftMap(List(set)))) => set.project.some
+        case _                                        => None
+      }
+    },
     partialTyperV {
       case List(x) if x.objectLike =>
         x.objectType.fold[ValidationNel[SemanticError, Type]](
@@ -264,9 +267,15 @@ trait StructuralLib extends Library {
   val ShiftArray = Expansion(
     "SHIFT_ARRAY",
     "Zooms in on the elements of an array, adding the indices as a new dimension",
-    Set(Top), AnyArray :: Nil,
-    noSimplification,
+    Top, AnyArray :: Nil,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+        case IsInvoke(_, List(UnshiftArray(List(set)))) => set.project.some
+        case _                                          => None
+      }
+    },
     partialTyperV {
+      case List(Const(Data.Arr(elems))) => success(Const(Data.Set(elems)))
       case List(x) if x.arrayLike =>
         x.arrayType.fold[ValidationNel[SemanticError, Type]](
           failure(NonEmptyList(GenericError("internal error: arrayLike, but no arrayType"))))(
@@ -277,7 +286,7 @@ trait StructuralLib extends Library {
   val ShiftMapKeys = Expansion(
     "{_:}",
     "Zooms in on the keys of a map, also adding the keys as a new dimension",
-    Set(Top), AnyObject :: Nil,
+    Top, AnyObject :: Nil,
     noSimplification,
     partialTyper { case List(x) if x.objectLike => Str },
     untyper(tpe => success(List(Obj(Map(), Some(Top))))))
@@ -285,18 +294,21 @@ trait StructuralLib extends Library {
   val ShiftArrayIndices = Expansion(
     "[_:]",
     "Zooms in on the indices of an array, also adding the keys as a new dimension",
-    Set(Int), AnyArray :: Nil,
+    Int, AnyArray :: Nil,
     noSimplification,
     partialTyper { case List(x) if x.arrayLike => Int },
-    partialUntyper {
-      case Set(Int) | Int => List(FlexArr(0, None, Top))
-    })
+    partialUntyper { case Int => List(FlexArr(0, None, Top)) })
 
-  val UnshiftMap = Reduction(
+  val UnshiftMap: Func = Reduction(
     "{...}",
     "Unshifts a dimension from the set identity, creating a map with the dimensional values as the keys.",
-    AnyObject, Set(Top) :: Nil,
-    noSimplification,
+    AnyObject, Top :: Nil,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+        case IsInvoke(_, List(ShiftMap(List(map)))) => map.project.some
+        case _                                          => None
+      }
+    },
     partialTyper { case List(tpe) => Obj(Map(), Some(tpe)) },
     partialUntyperV { case tpe if tpe.objectLike =>
       tpe.objectType.fold[ValidationNel[SemanticError, List[Type]]](
@@ -304,15 +316,19 @@ trait StructuralLib extends Library {
         x => success(List(x)))
     })
 
-  val UnshiftArray = Reduction(
+  val UnshiftArray: Func = Reduction(
     "[...]",
     "Unshifts an integral dimension from the set identity, creating an array with the dimensional values as the indices.",
-    AnyArray, Set(Top) :: Nil,
-    noSimplification,
+    AnyArray, Top :: Nil,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+        case IsInvoke(_, List(ShiftArray(List(array)))) => array.project.some
+        case _                                          => None
+      }
+    },
     partialTyper {
       case List(Const(Data.Set(vs))) => Const(Data.Arr(vs))
       case List(Const(v))            => Const(Data.Arr(List(v)))
-      case List(Set(tpe))            => FlexArr(0, None, tpe)
       case List(tpe)                 => FlexArr(0, None, tpe)
     },
     partialUntyperV { case tpe if tpe.arrayLike =>

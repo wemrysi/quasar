@@ -57,12 +57,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
       Type => Option[In => Out] =
         typ => f.lift(typ).fold(
           typ match {
-            case Type.Interval =>
-              generateTypeCheck(or)(f)(Type.Dec)
-            case Type.Arr(_)
-               | Type.Set(_)
-               | Type.FlexArr(_, _, _) ⨿ Type.Set(_)  =>
-              generateTypeCheck(or)(f)(Type.AnyArray)
+            case Type.Interval => generateTypeCheck(or)(f)(Type.Dec)
+            case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
             case Type.Timestamp
                | Type.Timestamp ⨿ Type.Date
                | Type.Timestamp ⨿ Type.Date ⨿ Type.Time =>

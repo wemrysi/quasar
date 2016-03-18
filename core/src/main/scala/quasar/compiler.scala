@@ -298,9 +298,9 @@ trait Compiler[F[_]] {
               case (_, _) => Nil
             }
 
-          relations.fold(
+          relations.foldRight(
             projs.traverseU(compile0).map(buildRecord(names, _)))(
-            relations => {
+            (relations, select) => {
               val stepBuilder = step(relations)
               stepBuilder(compileRelation(relations).some) {
                 val filtered = filter.map(filter =>
@@ -319,15 +319,6 @@ trait Compiler[F[_]] {
                         Fix(Filter(set, filt))))
 
                     stepBuilder(having) {
-                      val select =
-                        (CompilerState.rootTableReq ⊛ projs.traverseU(compile0)) ((t, projs) =>
-                          buildRecord(
-                            names,
-                            projs.map(p => p.unFix match {
-                              case LogicalPlan.ConstantF(_) => Fix(Constantly(p, t))
-                              case _ => p
-                            })))
-
                       val squashed = select.map(set => Fix(Squash(set)))
 
                       stepBuilder(squashed.some) {
@@ -369,14 +360,8 @@ trait Compiler[F[_]] {
         })
 
       case SetLiteralF(values0) =>
-        val values = values0.map(_.tail).traverseU {
-          case IntLiteralF(v) => emit[Data](Data.Int(v))
-          case FloatLiteralF(v) => emit[Data](Data.Dec(v))
-          case StringLiteralF(v) => emit[Data](Data.Str(v))
-          case x => fail[Data](ExpectedLiteral(Fix(x.map((x: CoExpr) => x.convertTo[Fix]))))
-        }
-
-        values.map(arr => LogicalPlan.Constant(Data.Set(arr)))
+        values0.traverse(compile0).map(vs =>
+          ShiftArray(MakeArrayN(vs: _*).embed).embed)
 
       case ArrayLiteralF(exprs) =>
         exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))

@@ -157,10 +157,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
       typecheck(FlexArr(0, None, t1), Arr(List(t2))) must
         beEqualIfSuccess(typecheck(t1, t2))
     }
-
-    "match under Set" ! prop { (t1: Type, t2: Type) =>
-      typecheck(Set(t1), Set(t2)) must beEqualIfSuccess(typecheck(t1, t2))
-    }
   }
 
   "objectField" should {
@@ -264,10 +260,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
       foldMap(intToStr)(Const(Data.True)) should_== Const(Data.True) ⨿ Bool
     }
 
-    "cast int to str in set" in {
-      foldMap(intToStr)(Set(Int)) should_== Set(Int) ⨿ Str
-    }
-
     "cast int to str in unknown Obj" in {
       foldMap(intToStr)(Obj(Map(), Some(Int))) should_== Obj(Map(), Some(Int)) ⨿ Str
     }
@@ -293,14 +285,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     "collect non-int" in {
       foldMap(skipInt)(Bool) should_== Bool :: Nil
     }
-
-    "collect set and its child" in {
-      foldMap(skipInt)(Set(Str)) should_== Set(Str) :: Str :: Nil
-    }
-
-    "collect set but skip child" in {
-      foldMap(skipInt)(Set(Int)) should_== Set(Int) :: Nil
-    }
   }
 
   "mapUp" should {
@@ -324,10 +308,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
 
     "preserve other const" in {
       mapUp(Const(Data.True))(intToStr) should_== Const(Data.True)
-    }
-
-    "cast int to str in set" in {
-      mapUp(Set(Int))(intToStr) should_== Set(Str)
     }
 
     "cast int to str in product/coproduct" in {
@@ -366,10 +346,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
 
     "preserve other const" in {
       mapUpM[Id](Const(Data.True))(intToStr) should_== Const(Data.True)
-    }
-
-    "cast int to str in set" in {
-      mapUpM[Id](Set(Int))(intToStr) should_== Set(Str)
     }
 
     "cast int to str in product/coproduct" in {
@@ -628,13 +604,12 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     val exConstObj = Const(Data.Obj(Map("a" -> Data.Int(0))))
     val exElem = FlexArr(0, None, Int)
     val exIndexed = Arr(List(Int))
-    val exSet = Set(Int)
 
     val examples =
       List(Top, Bottom, Null, Str, Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval,
           Const(Data.Int(0)),
           Int ⨯ Str, Int ⨿ Str,
-          exField, exNamed, exConstObj, exElem, exIndexed, exSet)
+          exField, exNamed, exConstObj, exElem, exIndexed)
 
     "only fields and objects are objectLike" in {
       examples.filter(_.objectLike) should_== List(exField, exNamed, exConstObj)
@@ -642,10 +617,6 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
 
     "only elems are arrayLike" in {
       examples.filter(_.arrayLike) should_== List(exElem, exIndexed)
-    }
-
-    "only sets are setLike" in {
-      examples.filter(_.setLike) should_== List(exSet)
     }
 
     "empty array constant is arrayLike" in {

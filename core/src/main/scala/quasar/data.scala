@@ -84,9 +84,7 @@ object Data {
 
   final case class Set(value: List[Data]) extends Data {
     def dataType =
-      Type.Set(value.foldLeft[Type](
-        Type.Bottom)(
-        (acc, d) => Type.lub(acc, d.dataType)))
+      value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
     def toJs = jscore.Arr(value.map(_.toJs))
   }
 
