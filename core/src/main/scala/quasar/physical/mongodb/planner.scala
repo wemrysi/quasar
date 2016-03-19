@@ -668,6 +668,11 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
           }
         }
 
+      def makeKeys(k: List[Ann], comp: Ann):
+          Option[List[JsFn]] =
+        k.traverse(HasJs).flatMap(k =>
+          findArgs(k, comp).map(applyPartials(k, _))).toOption
+
       func match {
         case MakeArray => lift(Arity1(HasWorkflow).map(makeArray))
         case MakeObject =>
@@ -704,12 +709,9 @@ object MongoDbPlanner extends Planner[Crystallized] with JsConversions {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
                     HasWorkflow(right) |@|
-                    leftKeys.map(HasWorkflow).sequenceU |@|
-                    leftKeys.map(HasJs).sequenceU |@|
-                    rightKeys.map(HasWorkflow).sequenceU |@|
-                    rightKeys.map(HasJs).sequenceU)((l, r, lk, lj, rk, rj) =>
-                    lift((findArgs(lj, comp) |@| findArgs(rj, comp))((largs, rargs) =>
-                      join(l, r, func, lk, applyPartials(lj, largs), rk, applyPartials(rj, rargs)))).join)).join
+                    leftKeys.traverseU(HasWorkflow) |@|
+                    rightKeys.traverseU(HasWorkflow))((l, r, lk, rk) =>
+                    join(l, r, func, lk, makeKeys(leftKeys, comp), rk, makeKeys(rightKeys, comp)))).join
                 })
             case _ => fail(FuncArity(func, args.length))
           }
