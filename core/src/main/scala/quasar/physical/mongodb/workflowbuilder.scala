@@ -1133,6 +1133,22 @@ object WorkflowBuilder {
           }
         case (CollectionBuilderF(_, _, _), DocBuilderF(_, _)) => delegate
 
+        case (ValueBuilderF(Bson.Doc(map1)), CollectionBuilderF(_, base, _)) =>
+          emit(SpliceBuilder(wb2,
+            combine(
+              Doc(map1.map { case (k, v) => BsonField.Name(k) -> \/-($literal(v)) }),
+              Expr(\/-($$ROOT)))(List(_, _))))
+        case (CollectionBuilderF(_, _, _), ValueBuilderF(Bson.Doc(_))) =>
+          delegate
+
+        case (ValueBuilderF(Bson.Doc(map1)), SpliceBuilderF(src, structure)) =>
+          emit(SpliceBuilder(src,
+            combine(
+              List(Doc(map1.map { case (k, v) => BsonField.Name(k) -> \/-($literal(v)) })),
+              structure)(_ ++ _)))
+        case (SpliceBuilderF(_, _), ValueBuilderF(Bson.Doc(_))) =>
+          delegate
+
         case (
           DocBuilderF(s1 @ Fix(
             ArraySpliceBuilderF(_, _)),

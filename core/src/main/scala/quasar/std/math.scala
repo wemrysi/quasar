@@ -77,9 +77,9 @@ trait MathLib extends Library {
     case t             => success(t          :: t          :: Nil)
   }
 
-  /**
-   * Adds two numeric values, promoting to decimal if either operand is decimal.
-   */
+  /** Adds two numeric values, promoting to decimal if either operand is
+    * decimal.
+    */
   val Add = Mapping("(+)", "Adds two numeric or temporal values",
     MathAbs, MathAbs :: MathRel :: Nil,
     new Func.Simplifier {

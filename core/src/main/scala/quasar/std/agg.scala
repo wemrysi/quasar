@@ -48,17 +48,17 @@ trait AggLib extends Library {
       case List(Type.Const(Data.Set(Nil))) =>
         success(Type.Const(Data.Int(0)))
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Set(Type.Int) =>
+      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Int =>
         intSet(xs)
           .map(ys => Type.Const(Data.Int(ys.sum)))
           .validationNel
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Set(Type.Dec) =>
+      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Dec =>
         decSet(xs)
           .map(ys => Type.Const(Data.Dec(ys.sum)))
           .validationNel
 
-      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Set(Type.Interval) =>
+      case List(Type.Const(s @ Data.Set(xs))) if s.dataType == Type.Interval =>
         ivlSet(xs)
           .map(ys => Type.Const(Data.Interval(ys.foldLeft(Duration.ZERO)(_ plus _))))
           .validationNel

@@ -117,11 +117,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
     "plan simple constant from collection" in {
       plan("select 1 from zips") must
-        beWorkflow(chain(
-          $read(Collection("db", "zips")),
-          $project(
-            reshape("0" -> $literal(Bson.Int64(1))),
-            IgnoreId)))
+        beWorkflow($pure(Bson.Doc(ListMap("0" -> Bson.Int64(1)))))
     }
 
     // TODO: currently, Data.Obj doesn’t maintain order. The result here will
@@ -744,7 +740,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan filter with field containing constant value" in {
-      plan("select * from zips where 43.058514 in loc") must
+      plan("select * from zips where 43.058514 in loc[_]") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Where(
@@ -771,7 +767,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
     "plan filter with field containing other field" in {
       import jscore._
-      plan("select * from zips where pop in loc") must
+      plan("select * from zips where pop in loc[_]") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
           $match(Selector.Where(

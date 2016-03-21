@@ -1,0 +1,7 @@
+{
+    "name": "reduce a literal set with negatives",
+    "data": "zips.data",
+    "query": "select max((0, 1, -2, 5)) from zips",
+    "predicate": "equalsExactly",
+    "expected": [{ "0": 5 }]
+}
