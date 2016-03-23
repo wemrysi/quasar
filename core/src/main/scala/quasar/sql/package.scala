@@ -27,7 +27,7 @@ package object sql {
   type Expr = Fix[ExprF]
 
 
-  private def parser = new SQLParser()
+  private val parser = new SQLParser()
 
   val parse: Query => (ParsingError \/ Expr) = parser.parse
 
