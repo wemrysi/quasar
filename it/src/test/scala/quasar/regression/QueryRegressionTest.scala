@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fs.{Path => QPath, _}
 import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
 import quasar.physical.mongodb.fs.MongoDBFsType
-import quasar.sql._
+import quasar.sql, sql.{Expr, Query}
 
 import java.io.{File, FileInputStream}
 import scala.io.Source
@@ -154,7 +154,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
       toCompExec compose injectTask
 
     val parseTask: Task[Expr] =
-      SQLParser.parseInContext(Query(qry), DataPath)
+      sql.parseInContext(Query(qry), DataPath)
         .fold(e => Task.fail(new RuntimeException(e.message)), _.point[Task])
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars)))

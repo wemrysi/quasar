@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fp.prism._
 import quasar.fs.FileSystemType
-import quasar.sql, sql.{Expr, SQLParser}
+import quasar.sql, sql.{Expr}
 
 import argonaut._, Argonaut._
 import monocle.Prism
@@ -105,7 +105,7 @@ object MountConfig {
       scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
       _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
-      query    <- new SQLParser().parse(sql.Query(queryStr)).leftMap(_.message)
+      query    <- sql.parse(sql.Query(queryStr)).leftMap(_.message)
       vars     =  Variables(parsed.multiParams collect {
                     case (n, vs) if n.startsWith(VarPrefix) => (
                       VarName(n.substring(VarPrefix.length)),

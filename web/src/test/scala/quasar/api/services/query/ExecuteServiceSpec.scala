@@ -91,7 +91,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
   def selectAllLP(file: AFile) = LogicalPlan.Invoke(IdentityLib.Squash,List(LogicalPlan.Read(QPath.fromAPath(file))))
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      (new sql.SQLParser()).parse(sql.Query(q)).toOption.map { ast =>
+      sql.parse(sql.Query(q)).toOption.map { ast =>
         quasar.queryPlan(ast,vars).run.value.toOption.get
       }.getOrElse(scala.sys.error("could not compile: " + q))
 

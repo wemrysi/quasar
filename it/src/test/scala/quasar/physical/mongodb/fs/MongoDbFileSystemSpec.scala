@@ -209,7 +209,6 @@ class MongoDbFileSystemSpec
           val dne = testPrefix map (_ </> file("__DNE__"))
           val q = dne map (p => f(posixCodec.printPath(p)))
           val xform = QueryFile.Transforms[query.F]
-          val parser = new sql.SQLParser()
 
           import xform._
 
@@ -241,7 +240,7 @@ class MongoDbFileSystemSpec
                   .run.value.run
               ) must beSome(file))
 
-            parser.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
+            sql.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
               check0)
           }

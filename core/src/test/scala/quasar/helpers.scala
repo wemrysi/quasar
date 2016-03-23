@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.fs._
-import quasar.sql.{SQLParser, Query}
+import quasar.sql.{Query}
 import quasar.std._
 
 import matryoshka._
@@ -33,7 +33,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
 
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {
-      select <- SQLParser.parseInContext(Query(query), Path("./")).leftMap(_.toString)
+      select <- sql.parseInContext(Query(query), Path("./")).leftMap(_.toString)
       attr   <- AllPhases(select).leftMap(_.toString)
       cld    <- Compiler.compile(attr).leftMap(_.toString)
     } yield cld

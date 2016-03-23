@@ -23,7 +23,7 @@ import quasar.api.services._
 import quasar.api.ToQResponse.ops._
 import quasar.fp._
 import quasar.fs.{Path => QPath, _}
-import quasar.sql.{SQLParser, Query}
+import quasar.sql.{Query}
 
 import argonaut._, Argonaut._
 import org.http4s.headers.Accept
@@ -49,7 +49,7 @@ object execute {
     QHttpService {
       case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
         (offsetOrInvalid[S](offset) |@| limitOrInvalid[S](limit)) { (offset, limit) =>
-          SQLParser.parseInContext(query, QPath.fromAPath(path)).map(
+          sql.parseInContext(query, QPath.fromAPath(path)).map(
             expr => queryPlan(addOffsetLimit(expr, offset, limit), vars(req)).run.value.map(
               logicalPlan => {
                 val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
@@ -68,7 +68,7 @@ object execute {
           else {
             respond(requiredHeader[S](Destination, req)
               .traverse[Free[S, ?], QResponse[S], QResponse[S]] { destination =>
-                val parseRes = SQLParser.parseInContext(Query(query), QPath.fromAPath(path))
+                val parseRes = sql.parseInContext(Query(query), QPath.fromAPath(path))
                   .leftMap(_.toResponse[S])
                 val destinationFile = posixCodec.parsePath(
                   relFile => \/-(\/-(relFile)),

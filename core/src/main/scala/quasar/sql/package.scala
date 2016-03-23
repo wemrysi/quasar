@@ -26,6 +26,19 @@ import scalaz._, Scalaz._
 package object sql {
   type Expr = Fix[ExprF]
 
+
+  private def parser = new SQLParser()
+
+  val parse: Query => (ParsingError \/ Expr) = parser.parse
+
+  def parseInContext(sql: Query, basePath: Path):
+      ParsingError \/ Expr =
+    parser.parse(sql)
+      .flatMap(relativizePaths(_, basePath).bimap(
+        ParsingPathError,
+        _.transAna(repeatedly(normalizeƒ))))
+
+
   def CrossRelation(left: SqlRelation[Expr], right: SqlRelation[Expr]) =
     JoinRelation(left, right, InnerJoin, BoolLiteral(true))
 

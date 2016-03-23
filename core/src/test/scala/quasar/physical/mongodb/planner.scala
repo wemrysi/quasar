@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar._
 import quasar.fs.Path
 import quasar.javascript._
-import quasar.sql.{ParsingError, SQLParser, Query}
+import quasar.sql.{ParsingError, Query}
 import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
 
@@ -70,7 +70,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
 
   def plan(query: String): Either[CompilationError, Crystallized] = {
-    val (log, wf) = SQLParser.parseInContext(Query(query), Path("/db/")).fold(
+    val (log, wf) = sql.parseInContext(Query(query), Path("/db/")).fold(
       e => scala.sys.error("parsing error: " + e.message),
       expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run)
 
@@ -90,7 +90,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- SQLParser.parseInContext(Query(query), Path("/db/"))
+      expr <- sql.parseInContext(Query(query), Path("/db/"))
     } yield queryPlanner(QueryRequest(expr, Variables(Map()))).run._1
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
@@ -3452,7 +3452,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
   }
 
   def columnNames(q: Query): List[String] =
-    (new SQLParser).parse(q).foldMap(sql.namedProjections(_, None).map(_._1))
+    sql.parse(q).foldMap(sql.namedProjections(_, None).map(_._1))
 
   def fieldNames(wf: Workflow): Option[List[String]] =
     Workflow.simpleShape(wf).map(_.map(_.asText))
@@ -3529,7 +3529,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     genReduceStr.flatMap(x => InvokeFunction("length", List(x))))  // requires JS
 
   implicit def shrinkQuery(implicit SS: Shrink[Expr]): Shrink[Query] = Shrink { q =>
-    (new SQLParser).parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+    sql.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**
