@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.SemanticError._
-import quasar.sql._
+import quasar.sql.{Expr, ExprF, Query, VariF}
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
@@ -40,7 +40,7 @@ object Variables {
     case VariF(name) =>
       vars.value.get(VarName(name)).fold[SemanticError \/ Expr](
         UnboundVariable(VarName(name)).left)(
-        varValue => (new SQLParser()).parseExpr(varValue.value)
+        varValue => sql.parse(Query(varValue.value))
           .leftMap(VariableParseError(VarName(name), varValue, _)))
     case x => Fix(x).right
   }

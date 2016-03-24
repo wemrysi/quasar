@@ -19,7 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.{Variables}
 import quasar.api._
-import quasar.sql.{Expr}
+import quasar.sql, sql.{Expr}
 import quasar.effect.{KeyValueStore}
 import quasar.fp._
 import quasar.fs._
@@ -42,7 +42,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
   val StubFs = FileSystemType("stub")
 
   def viewConfig(q: String, vars: (String, String)*): (Expr, Variables) =
-    ((new quasar.sql.SQLParser).parse(quasar.sql.Query(q)).toOption.get,
+    (sql.parse(quasar.sql.Query(q)).toOption.get,
       Variables(Map(vars.map { case (n, v) =>
         quasar.VarName(n) -> quasar.VarValue(v) }: _*)))
 

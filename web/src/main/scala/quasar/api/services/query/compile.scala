@@ -23,7 +23,7 @@ import quasar.api.ToQResponse.ops._
 import quasar.fs.{Path => QPath}
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.sql.{ParsingError, SQLParser}
+import quasar.sql.{ParsingError}
 
 import argonaut._, Argonaut._
 import matryoshka.Fix
@@ -55,7 +55,7 @@ object compile {
       case req @ GET -> AsPath(path) :? QueryParam(query) +& Offset(offset) +& Limit(limit) => respond(
         offsetOrInvalid[S](offset).tuple(limitOrInvalid[S](limit))
           .traverse[Free[S, ?], QResponse[S], ParsingError \/ QResponse[S]] { case (offset, limit) =>
-            SQLParser.parseInContext(query, QPath.fromAPath(path))
+            sql.parseInContext(query, QPath.fromAPath(path))
               .traverse[Free[S, ?], ParsingError, QResponse[S]](expr =>
                 explainQuery(expr, offset, limit, vars(req)))
         })

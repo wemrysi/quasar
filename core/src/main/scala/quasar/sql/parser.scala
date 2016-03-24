@@ -41,7 +41,7 @@ object ParsingError {
 
 final case class Query(value: String)
 
-class SQLParser extends StandardTokenParsers {
+private[sql] class SQLParser extends StandardTokenParsers {
   class SqlLexical extends StdLexical with RegexParsers {
     override type Elem = super.Elem
 
@@ -427,13 +427,4 @@ class SQLParser extends StandardTokenParsers {
     }
 
   def parse(sql: Query): ParsingError \/ Expr = parseExpr(sql.value)
-}
-
-object SQLParser {
-  def parseInContext(sql: Query, basePath: Path):
-      ParsingError \/ Expr =
-    new SQLParser().parse(sql)
-      .flatMap(relativizePaths(_, basePath).bimap(
-        ParsingPathError,
-        _.transAna(repeatedly(normalizeƒ))))
 }
