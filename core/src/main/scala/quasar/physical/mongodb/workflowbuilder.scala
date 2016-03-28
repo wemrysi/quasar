@@ -1000,7 +1000,7 @@ object WorkflowBuilder {
 
         case (ValueBuilderF(Bson.Doc(map1)), GroupBuilderF(s1, k1, Doc(c2))) =>
           val content = combine(
-            map1.map { case (k, v) => BsonField.Name(k) -> \/-($literal(v)) },
+            map1.map { case (k, v) => BsonField.Name(k) -> -\/($first($literal(v))) },
             c2)(_ ++ _)
           emit(GroupBuilder(s1, k1, Doc(content)))
         case (GroupBuilderF(_, _, Doc(_)), ValueBuilderF(_)) => delegate

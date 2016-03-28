@@ -21,10 +21,8 @@ import quasar.fs._
 import quasar.regression._
 import quasar.sql._
 
-import scalaz.{~>, Hoist}
+import scalaz._, Scalaz._
 import scalaz.stream.Process
-import scalaz.std.vector._
-import scalaz.syntax.monad._
 
 class ResultFileQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](
@@ -45,7 +43,7 @@ class ResultFileQueryRegressionSpec
     for {
       tmpFile <- hoistM(manage.tempFile(DataDir)).liftM[Process]
       outFile <- query.executeQuery(expr, vars, tmpFile).liftM[Process]
-      cleanup =  hoistM(manage.delete(tmpFile))
+      cleanup =  hoistM(manage.delete(tmpFile)).whenM(outFile ≟ tmpFile)
       data    <- read.scanAll(outFile)
                    .translate(hoistM)
                    .onComplete(Process.eval_(cleanup))
