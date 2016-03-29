@@ -229,13 +229,8 @@ trait Compiler[F[_]] {
         case (None, value) => value
       }
 
-      // TODO: If we had an optimization pass that included eliding an
-      //       ObjectConcat with an empty map on one side, this could be done
-      //       in a single foldLeft.
-      fields match {
-        case Nil     => LogicalPlan.Constant(Data.Obj(ListMap()))
-        case x :: xs => xs.foldLeft(x)((a, b) => Fix(ObjectConcat(a, b)))
-      }
+      fields.reduceOption((a,b) => Fix(ObjectConcat(a, b)))
+        .getOrElse(LogicalPlan.Constant(Data.Obj(ListMap())))
     }
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LogicalPlan]] =
@@ -283,84 +278,82 @@ trait Compiler[F[_]] {
 
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
-        val names: List[Option[String]] =
-          namedProjections(node.convertTo[Fix], relationName(node).toOption).map {
-            case (_,    Splice(_)) => None
-            case (name, _)         => Some(name)
-          }
+        val namesOrError: SemanticError \/ List[Option[String]] =
+          projectionNames[CoAnn](projections, relationName(node).toOption).map(_.map {
+            case (name, expr) => if (expr.project.isInstanceOf[ExprF.SpliceF[_]]) None else Some(name)
+          })
 
-        (names.flatten(Option.option2Iterable) diff names.flatten(Option.option2Iterable).distinct).headOption.cata(
-          duplicateFieldName =>
-            EitherT.left[F, SemanticError,Fix[LogicalPlan]]((SemanticError.DuplicateFieldName(duplicateFieldName):SemanticError).point[F]).liftM[CompilerStateT],
-        {
+        namesOrError.fold(
+          err => EitherT.left[F, SemanticError, Fix[LogicalPlan]](err.point[F]).liftM[CompilerStateT],
+          names => {
 
-          val projs = projections.map(_.expr)
+            val projs = projections.map(_.expr)
 
-          val syntheticNames: List[String] =
-            names.zip(syntheticOf(node)).flatMap {
-              case (Some(name), Some(_)) => List(name)
-              case (_, _) => Nil
-            }
+            val syntheticNames: List[String] =
+              names.zip(syntheticOf(node)).flatMap {
+                case (Some(name), Some(_)) => List(name)
+                case (_, _) => Nil
+              }
 
-          relations.foldRight(
-            projs.traverseU(compile0).map(buildRecord(names, _)))(
-            (relations, select) => {
-              val stepBuilder = step(relations)
-              stepBuilder(compileRelation(relations).some) {
-                val filtered = filter.map(filter =>
-                  (CompilerState.rootTableReq ⊛ compile0(filter)) ((set, filt) =>
-                    Fix(Filter(set, filt))))
+            relations.foldRight(
+              projs.traverseU(compile0).map(buildRecord(names, _)))(
+              (relations, select) => {
+                val stepBuilder = step(relations)
+                stepBuilder(compileRelation(relations).some) {
+                  val filtered = filter.map(filter =>
+                    (CompilerState.rootTableReq ⊛ compile0(filter)) ((set, filt) =>
+                      Fix(Filter(set, filt))))
 
-                stepBuilder(filtered) {
-                  val grouped = groupBy.map(groupBy =>
-                    (CompilerState.rootTableReq ⊛
-                      groupBy.keys.traverseU(compile0)) ((src, keys) =>
-                      Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
+                  stepBuilder(filtered) {
+                    val grouped = groupBy.map(groupBy =>
+                      (CompilerState.rootTableReq ⊛
+                        groupBy.keys.traverseU(compile0)) ((src, keys) =>
+                        Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
 
-                  stepBuilder(grouped) {
-                    val having = groupBy.flatMap(_.having).map(having =>
-                      (CompilerState.rootTableReq ⊛ compile0(having)) ((set, filt) =>
-                        Fix(Filter(set, filt))))
+                    stepBuilder(grouped) {
+                      val having = groupBy.flatMap(_.having).map(having =>
+                        (CompilerState.rootTableReq ⊛ compile0(having)) ((set, filt) =>
+                          Fix(Filter(set, filt))))
 
-                    stepBuilder(having) {
-                      val squashed = select.map(set => Fix(Squash(set)))
+                      stepBuilder(having) {
+                        val squashed = select.map(set => Fix(Squash(set)))
 
-                      stepBuilder(squashed.some) {
-                        val sort = orderBy.map(orderBy =>
-                          for {
-                            t <- CompilerState.rootTableReq
-                            flat = names.foldMap(_.toList)
-                            keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
-                            orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
-                          } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
+                        stepBuilder(squashed.some) {
+                          val sort = orderBy.map(orderBy =>
+                            for {
+                              t <- CompilerState.rootTableReq
+                              flat = names.foldMap(_.toList)
+                              keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
+                              orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
+                            } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
 
-                        stepBuilder(sort) {
-                          val distincted = isDistinct match {
-                            case SelectDistinct =>
-                              CompilerState.rootTableReq.map(t =>
-                                if (syntheticNames.nonEmpty)
-                                  Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
-                                    Fix(DeleteField(acc, LogicalPlan.Constant(Data.Str(field)))))))
-                                else Fix(Distinct(t))).some
-                            case _ => None
-                          }
+                          stepBuilder(sort) {
+                            val distincted = isDistinct match {
+                              case SelectDistinct =>
+                                CompilerState.rootTableReq.map(t =>
+                                  if (syntheticNames.nonEmpty)
+                                    Fix(DistinctBy(t, syntheticNames.foldLeft(t)((acc, field) =>
+                                      Fix(DeleteField(acc, LogicalPlan.Constant(Data.Str(field)))))))
+                                  else Fix(Distinct(t))).some
+                              case _ => None
+                            }
 
-                          stepBuilder(distincted) {
-                            val pruned =
-                              CompilerState.rootTableReq.map(
-                                syntheticNames.foldLeft(_)((acc, field) =>
-                                  Fix(DeleteField(acc,
-                                    LogicalPlan.Constant(Data.Str(field))))))
+                            stepBuilder(distincted) {
+                              val pruned =
+                                CompilerState.rootTableReq.map(
+                                  syntheticNames.foldLeft(_)((acc, field) =>
+                                    Fix(DeleteField(acc,
+                                      LogicalPlan.Constant(Data.Str(field))))))
 
-                            pruned
+                              pruned
+                            }
                           }
                         }
                       }
                     }
                   }
                 }
-              }
-            })
+              })
         })
 
       case SetLiteralF(values0) =>

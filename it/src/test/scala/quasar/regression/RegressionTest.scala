@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 case class RegressionTest(
   name:      String,
   backends:  Map[BackendName, SkipDirective],
-  data:      Option[RelFile[Unsandboxed]],
+  data:      List[RelFile[Unsandboxed]],
   query:     String,
   variables: Map[String, String],
   expected:  ExpectedResult
@@ -43,9 +43,7 @@ object RegressionTest {
                           (c --\ "backends").as[Map[String, SkipDirective]]
                             .map(_ mapKeys (BackendName(_)))
                         else ok(Map[BackendName, SkipDirective]())
-      data          <-  optional[String](c --\ "data").flatMap(_.cata[DecodeResult[Option[RelFile[Unsandboxed]]]](
-        s => posixCodec.parseRelFile(s).cata(p => ok(p.some), fail(s"not a relative file path: $s", c.history)),
-        ok(None)))
+      data          <-  (c --\ "data").as[List[RelFile[Unsandboxed]]] ||| optional[RelFile[Unsandboxed]](c--\ "data").map(_.toList)
       query         <-  (c --\ "query").as[String]
       variables     <-  orElse(c --\ "variables", Map.empty[String, String])
       ignoredFields <-  orElse(c --\ "ignoredFields", List.empty[String])

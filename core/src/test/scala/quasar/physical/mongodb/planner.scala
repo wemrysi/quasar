@@ -3447,8 +3447,17 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }.set(maxSize = 10)
   }
 
+  /**
+    * @param q A selection query
+    * @return The list of expected names for the projections of the selection
+    * @throws AssertionError If the `Query` is not a selection
+    */
   def columnNames(q: Query): List[String] =
-    sql.parse(q).foldMap(sql.namedProjections(_, None).map(_._1))
+    sql.parse(q).toOption.get.project match {
+      case select: sql.ExprF.SelectF[sql.Expr] =>
+        sql.projectionNames(select.projections, None).toOption.get.map(_._1)
+      case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
+    }
 
   def fieldNames(wf: Workflow): Option[List[String]] =
     Workflow.simpleShape(wf).map(_.map(_.asText))

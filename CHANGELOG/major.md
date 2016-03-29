@@ -1,0 +1,1 @@
+Quasar will now disambiguate between projections of duplicate field names by appending index based suffixes to the output field names (SD-1503)
