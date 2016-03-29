@@ -120,7 +120,7 @@ object Js {
 private object JavascriptPrinter {
   import Js._
 
-  private[this] val substitutions = Map("\\\"".r -> "\\\\\"", "\\n".r -> "\\\\n", "\\r".r -> "\\\\r", "\\t".r -> "\\\\t")
+  private[this] val substitutions = Map("\\\"".r -> "\\\\\"", "\\n".r -> "\\\\n", "\\r".r -> "\\\\r", "\\t".r -> "\\\\t", "\\\\".r -> "\\\\\\\\")
   private[this] def simplify(ast: Js): Js = ast match {
     case Block(stmts) => Block(stmts.filter(_ != Unit))
     case Case(const, Block(List(stmt))) => Case(const, stmt)

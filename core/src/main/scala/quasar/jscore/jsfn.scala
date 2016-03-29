@@ -18,6 +18,8 @@ package quasar.jscore
 
 import quasar.RenderTree, RenderTree.ops._
 
+import scalaz._, Scalaz._
+
 /** Arbitrary javascript expression which is applied inline at compile time
   * (kinda like a macro)
   * @param param The free parameter to the expression
@@ -32,24 +34,23 @@ final case class JsFn(param: Name, expr: JsCore) {
 
   override def toString = apply(ident("_")).toJs.pprint(0)
 
-  val commonBase = Name("$")
+  // NB: Hanging around because other types lack an explicit equality.
   override def equals(obj: scala.Any) = obj match {
-    case that @ JsFn(_, _) =>
-      apply(Ident(commonBase)).simplify == that.apply(Ident(commonBase)).simplify
-    case _ => false
+    case that @ JsFn(_, _) => this ≟ that
+    case _                 => false
   }
-  override def hashCode = apply(Ident(commonBase)).simplify.hashCode
 }
 object JsFn {
   val defaultName = Name("__val")
 
-  val identity = {
-    JsFn(defaultName, Ident(defaultName))
-  }
+  val identity = JsFn(defaultName, Ident(defaultName))
 
-  def const(x: JsCore) = JsFn(Name("__unused"), x)
+  val const: JsCore => JsFn = JsFn(Name("__unused"), _)
 
-  implicit val JsFnRenderTree: RenderTree[JsFn] = new RenderTree[JsFn] {
+  implicit val equal: Equal[JsFn] =
+    Equal.equal(_(ident("_")).simplify == _(ident("_")).simplify)
+
+  implicit val renderTree: RenderTree[JsFn] = new RenderTree[JsFn] {
     def render(v: JsFn) = v(ident("_")).render
   }
 }

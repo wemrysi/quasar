@@ -21,7 +21,7 @@ import quasar.{Data, Type, Mapping, SemanticError}, SemanticError._
 import quasar.fp._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
-import scalaz._
+import scalaz._, Validation.success
 
 trait DateLib extends Library {
   def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
@@ -59,51 +59,53 @@ trait DateLib extends Library {
   //     with commas.
   val Extract = Mapping(
     "date_part",
-    "Pulls out a part of the date.",
+    "Pulls out a part of the date. The first argument is one of the strings defined for Postgres’ `date_type function. This is a partial function – using an unsupported string has undefined results.",
     Type.Numeric, Type.Str :: Type.Temporal :: Nil,
     noSimplification,
-    partialTyper {
-      case Type.Const(Data.Str(_)) :: Type.Temporal :: Nil => Type.Numeric
-    },
+    constTyper(Type.Numeric),
     basicUntyper)
 
   val Date = Mapping(
     "date",
-    "Converts a string literal (YYYY-MM-DD) to a date constant.",
+    "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Date, Type.Str :: Nil,
     noSimplification,
     partialTyperV {
       case Type.Const(Data.Str(str)) :: Nil => parseDate(str).map(Type.Const(_)).validation.toValidationNel
+      case Type.Str                  :: Nil => success(Type.Date)
     },
     basicUntyper)
 
   val Time = Mapping(
     "time",
-    "Converts a string literal (HH:MM:SS[.SSS]) to a time constant.",
+    "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Time, Type.Str :: Nil,
     noSimplification,
     partialTyperV {
       case Type.Const(Data.Str(str)) :: Nil => parseTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Type.Str                  :: Nil => success(Type.Time)
     },
     basicUntyper)
 
   val Timestamp = Mapping(
     "timestamp",
-    "Converts a string literal (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp constant.",
+    "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Timestamp, Type.Str :: Nil,
     noSimplification,
     partialTyperV {
       case Type.Const(Data.Str(str)) :: Nil => parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
+      case Type.Str                  :: Nil => success(Type.Timestamp)
     },
     basicUntyper)
 
   val Interval = Mapping(
     "interval",
-    "Converts a string literal (ISO 8601, e.g. P3DT12H30M15.0S) to an interval constant. Note: year/month not currently supported.",
+    "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval, Type.Str :: Nil,
     noSimplification,
     partialTyperV {
       case Type.Const(Data.Str(str)) :: Nil => parseInterval(str).map(Type.Const(_)).validation.toValidationNel
+      case Type.Str                  :: Nil => success(Type.Interval)
     },
     basicUntyper)
 

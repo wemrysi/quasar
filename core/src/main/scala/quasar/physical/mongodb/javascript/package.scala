@@ -35,9 +35,11 @@ package object javascript {
     BinOp(Eq, Literal(Js.Null), expr)
 
   def isAnyNumber(expr: JsCore): JsCore =
-    BinOp(Or, BinOp(Or,
-      isDec(expr),
-      BinOp(Instance, expr, ident("NumberInt"))),
+    BinOp(Or, isDec(expr), isInt(expr))
+
+  def isInt(expr: JsCore): JsCore =
+    BinOp(Or,
+      BinOp(Instance, expr, ident("NumberInt")),
       BinOp(Instance, expr, ident("NumberLong")))
 
   def isDec(expr: JsCore): JsCore =

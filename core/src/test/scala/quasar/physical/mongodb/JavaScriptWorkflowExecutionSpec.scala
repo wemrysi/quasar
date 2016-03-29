@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
-package physical
-package mongodb
+package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.javascript._
@@ -65,7 +63,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
-        """db.zips.find({ "pop": { "$gte": NumberLong(1000) } });
+        """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
 
@@ -106,7 +104,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find(
-          |  { "pop": { "$lt": NumberLong(1000) } },
+          |  { "pop": { "$lt": NumberLong("1000") } },
           |  { "city": true, "_id": false }).limit(
           |  10);
           |""".stripMargin)
@@ -123,7 +121,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           $literal(Bson.Null).right))
 
       toJS(wf) must beRightDisjunction(
-        """db.zips.count({ "pop": { "$gte": NumberLong(1000) } });
+        """db.zips.count({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
 
@@ -159,7 +157,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           IdHandling.ExcludeId))
 
       toJS(wf) must beRightDisjunction(
-        """db.zips.distinct("city").filter({ "pop": { "$gte": NumberLong(1000) } }).map(
+        """db.zips.distinct("city").filter({ "pop": { "$gte": NumberLong("1000") } }).map(
           |  function (elem) { return { "c": elem } });
           |""".stripMargin)
     }
@@ -171,7 +169,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
       toJS(wf) must beRightDisjunction(
-        """db.zips.find({ "pop": { "$gte": NumberLong(1000) } });
+        """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
 
@@ -188,10 +186,10 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
         """db.zips.find(
           |  {
           |    "$and": [
-          |      { "pop": { "$lte": NumberLong(1000) } },
-          |      { "pop": { "$gte": NumberLong(100) } }]
+          |      { "pop": { "$lte": NumberLong("1000") } },
+          |      { "pop": { "$gte": NumberLong("100") } }]
           |  }).sort(
-          |  { "city": NumberInt(1) });
+          |  { "city": NumberInt("1") });
           |""".stripMargin)
     }
 
@@ -214,12 +212,12 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           |    {
           |      "$match": {
           |        "$and": [
-          |          { "pop": { "$lte": NumberLong(1000) } },
-          |          { "pop": { "$gte": NumberLong(100) } }]
+          |          { "pop": { "$lte": NumberLong("1000") } },
+          |          { "pop": { "$gte": NumberLong("100") } }]
           |      }
           |    },
           |    { "$group": { "pop": { "$sum": "$pop" }, "_id": "$city" } },
-          |    { "$sort": { "_id": NumberInt(1) } }],
+          |    { "$sort": { "_id": NumberInt("1") } }],
           |  { "allowDiskUse": true });
           |""".stripMargin)
     }
@@ -247,7 +245,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           |        this))
           |  },
           |  function (key, values) { return Array.sum(values) },
-          |  { "out": { "inline": NumberLong(1) } });
+          |  { "out": { "inline": NumberLong("1") } });
           |""".stripMargin)
     }
 
@@ -265,7 +263,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           |  },
           |  function (key, values) { return values[0] },
           |  {
-          |    "out": { "inline": NumberLong(1) },
+          |    "out": { "inline": NumberLong("1") },
           |    "query": { "$where": function () { return foo } }
           |  });
           |""".stripMargin)
@@ -310,7 +308,7 @@ class JavaScriptWorkflowExecutionSpec extends Specification with DisjunctionMatc
           |  function (key, values) { return Array.sum(values) },
           |  {
           |    "out": { "reduce": "tmp.gen_0", "db": "db", "nonAtomic": true },
-          |    "query": { "pop": { "$lte": NumberLong(1000) } }
+          |    "query": { "pop": { "$lte": NumberLong("1000") } }
           |  });
           |db.tmp.gen_0.find();
           |""".stripMargin)

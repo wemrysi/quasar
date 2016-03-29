@@ -1,0 +1,8 @@
+{
+    "name": "convert null to/from strings",
+    "backends": { "mongodb_read_only": "pending" },
+    "data": "nulls.data",
+    "query": "select null(name), to_string(val) from nulls where name = \"null\"",
+    "predicate": "containsExactly",
+    "expected": [{ "0": null, "1": "null" }]
+}

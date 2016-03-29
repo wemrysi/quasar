@@ -113,8 +113,8 @@ sealed trait Type { self =>
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
         val rez = x.flatten.map(_.objectField(field))
         rez.foldMap(_.getOrElse(Bottom)) match {
-          case x if simplify(x) == Bottom => rez.concatenate
-          case x                          => success(x)
+          case x if simplify(x) ≟ Bottom => rez.concatenate
+          case x                         => success(x)
         }
       }
 
@@ -256,7 +256,7 @@ trait TypeInstances {
     }
 }
 
-final case object Type extends TypeInstances {
+object Type extends TypeInstances {
   private def fail[A](expected: Type, actual: Type, message: Option[String]): ValidationNel[TypeError, A] =
     Validation.failure(NonEmptyList(TypeError(expected, actual, message)))
 
@@ -275,14 +275,14 @@ final case object Type extends TypeInstances {
   }
 
   def glb(left: Type, right: Type): Type = {
-    if (left == right) left
+    if (left ≟ right) left
     else if (left contains right) right
     else if (right contains left) left
     else Bottom
   }
 
   def lub(left: Type, right: Type): Type = (left, right) match {
-    case _ if left == right       => left
+    case _ if left ≟ right        => left
     case _ if left contains right => left
     case _ if right contains left => right
     case (Const(l), Const(r))     => lub(l.dataType, r.dataType)
@@ -292,7 +292,7 @@ final case object Type extends TypeInstances {
   def typecheck(superType: Type, subType: Type):
       ValidationNel[TypeError, Unit] =
     (superType, subType) match {
-      case (superType, subType) if (superType == subType) => succeed(())
+      case (superType, subType) if (superType ≟ subType) => succeed(())
 
       case (Top, _)    => succeed(())
       case (_, Bottom) => succeed(())
@@ -482,4 +482,30 @@ final case object Type extends TypeInstances {
   val Numeric = Int ⨿ Dec
   val Temporal = Timestamp ⨿ Date ⨿ Time
   val Comparable = Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
+  val Syntaxed = Type.Null ⨿ Type.Comparable
+
+  implicit val equal: Equal[Type] = Equal.equal((a, b) => (a, b) match {
+    case (Top,       Top)
+       | (Bottom,    Bottom)
+       | (Null,      Null)
+       | (Str,       Str)
+       | (Int,       Int)
+       | (Dec,       Dec)
+       | (Bool,      Bool)
+       | (Binary,    Binary)
+       | (Timestamp, Timestamp)
+       | (Date,      Date)
+       | (Time,      Time)
+       | (Interval,  Interval)
+       | (Id,        Id) =>
+      true
+    case (Const(a), Const(b)) => a == b
+    case (Arr(as), Arr(bs)) => as ≟ bs
+    case (FlexArr(min1, max1, t1), FlexArr(min2, max2, t2)) =>
+      min1 ≟ min2 && max1 ≟ max2 && t1 ≟ t2
+    case (Obj(v1, u1), Obj(v2, u2)) => v1 ≟ v2 && u1 ≟ u2
+    case (a @ Coproduct(_, _), b @ Coproduct(_, _)) =>
+      a.flatten.toSet == b.flatten.toSet
+    case (_, _) => false
+  })
 }

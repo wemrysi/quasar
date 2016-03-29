@@ -22,9 +22,10 @@ import quasar.fp._
 import quasar.TreeMatchers
 
 import org.specs2.mutable._
+import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
-class JsCoreSpecs extends Specification with TreeMatchers {
+class JsCoreSpecs extends Specification with TreeMatchers with ScalazMatchers {
   "toJs" should {
     "de-sugar Let as AnonFunDecl" in {
       val let =
@@ -189,10 +190,9 @@ class JsCoreSpecs extends Specification with TreeMatchers {
           Name("a") -> Select(ident("val"), "x"),
           Name("b") -> Select(ident("val"), "y"))))
 
-        js.toString must beEqualTo("""{ "a": _.x, "b": _.y }""").ignoreSpace
+        js.toString must equal("""{ "a": _.x, "b": _.y }""")
 
-        js(ident("_")).toJs.pprint(0) must beEqualTo(
-          """{ "a": _.x, "b": _.y }""").ignoreSpace
+        js(ident("_")).toJs.pprint(0) must equal("""{ "a": _.x, "b": _.y }""")
       }
     }
 
