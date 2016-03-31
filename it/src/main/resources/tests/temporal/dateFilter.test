@@ -1,9 +1,9 @@
 {
   "name": "filter on date part",
 
-  "data": "days.data",
+  "data": "../days.data",
 
-  "query": "select `day` from days where date_part(\"dow\", ts) >= 3",
+  "query": "select `day` from `../days` where date_part(\"dow\", ts) >= 3",
 
   "predicate": "containsExactly",
 
