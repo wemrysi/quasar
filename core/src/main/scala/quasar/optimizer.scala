@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp.binder._
 import quasar.namegen._
 
-import matryoshka._, Fix._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
+import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._
 
 object Optimizer {

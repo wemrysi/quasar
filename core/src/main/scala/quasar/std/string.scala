@@ -18,9 +18,8 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
-import quasar.fp._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
 
 trait StringLib extends Library {
@@ -39,9 +38,11 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(ConstantF(Data.Str("")), second)) => second.some
-          case IsInvoke(_, List(first, ConstantF(Data.Str(""))))  => first.some
-          case _                                                  => None
+          case InvokeF(_, List(Embed(ConstantF(Data.Str(""))), Embed(second))) =>
+            second.some
+          case InvokeF(_, List(Embed(first), Embed(ConstantF(Data.Str(""))))) =>
+            first.some
+          case _ => None
         }
     },
     stringApply(_ + _),
@@ -83,7 +84,7 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(str, ConstantF(Data.Str(pat)), ConstantF(Data.Str(esc)))) =>
+          case InvokeF(_, List(Embed(str), Embed(ConstantF(Data.Str(pat))), Embed(ConstantF(Data.Str(esc))))) =>
             if (esc.length > 1)
               None
             else
@@ -154,14 +155,15 @@ trait StringLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case InvokeF(f, List(str0, from0, for0)) => (str0.project, from0.project) match {
-            case (ConstantF(Data.Str(str)), ConstantF(Data.Int(from))) if 0 < from =>
-              InvokeF(f, List(
-                str0 ∘ κ(ConstantF[T[LogicalPlan]](Data.Str(str.substring(from.intValue)))),
-                from0 ∘ κ(ConstantF[T[LogicalPlan]](Data.Int(0))),
-                for0)).some
-            case _ => None
-          }
+          case InvokeF(f, List(
+            Embed(ConstantF(Data.Str(str))),
+            Embed(ConstantF(Data.Int(from))),
+            for0))
+              if 0 < from =>
+            InvokeF(f, List(
+              ConstantF[T[LogicalPlan]](Data.Str(str.substring(from.intValue))).embed,
+              ConstantF[T[LogicalPlan]](Data.Int(0)).embed,
+              for0)).some
           case _ => None
         }
     },

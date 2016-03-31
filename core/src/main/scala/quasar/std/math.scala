@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
 import scalaz._, Scalaz._, Validation.{success, failure}
 
 trait MathLib extends Library {
@@ -85,9 +85,9 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(x, ZeroF())) => x.some
-          case IsInvoke(_, List(ZeroF(), x)) => x.some
-          case _                             => None
+          case InvokeF(_, List(Embed(x), Embed(ZeroF()))) => x.some
+          case InvokeF(_, List(Embed(ZeroF()), Embed(x))) => x.some
+          case _                                          => None
         }
     },
     (partialTyper {
@@ -114,9 +114,9 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(x, OneF())) => x.some
-          case IsInvoke(_, List(OneF(), x)) => x.some
-          case _                            => None
+          case InvokeF(_, List(Embed(x), Embed(OneF()))) => x.some
+          case InvokeF(_, List(Embed(OneF()), Embed(x))) => x.some
+          case _                                         => None
         }
     },
     (partialTyper {
@@ -137,8 +137,8 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(x, OneF())) => x.some
-          case _                            => None
+          case InvokeF(_, List(Embed(x), Embed(OneF()))) => x.some
+          case _                                         => None
         }
     },
     (partialTyper {
@@ -162,12 +162,9 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(x, ZeroF())) => x.some
-          case InvokeF(_, List(c, x)) => c.project match {
-            case ZeroF() => Negate(x).some
-            case _       => None
-          }
-          case _ => None
+          case InvokeF(_, List(Embed(x),       Embed(ZeroF()))) => x.some
+          case InvokeF(_, List(Embed(ZeroF()), x))              => Negate(x).some
+          case _                                                => None
         }
     },
     (partialTyper {
@@ -196,8 +193,8 @@ trait MathLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(x, OneF())) => x.some
-          case _                            => None
+          case InvokeF(_, List(Embed(x), Embed(OneF()))) => x.some
+          case _                                         => None
         }
     },
     (partialTyperV {

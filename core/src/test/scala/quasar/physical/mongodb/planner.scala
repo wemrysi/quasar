@@ -27,7 +27,7 @@ import quasar.specs2.PendingWithAccurateCoverage
 
 import scala.Either
 
-import matryoshka._, Recursive.ops._, Fix._
+import matryoshka._, Recursive.ops._
 import org.scalacheck._
 import org.specs2.execute.Result
 import org.specs2.mutable._

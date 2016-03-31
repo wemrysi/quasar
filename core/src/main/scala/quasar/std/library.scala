@@ -20,21 +20,13 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.{Func, LogicalPlan, Type, SemanticError}
 
-import matryoshka._, Recursive.ops._
-import scalaz._, Scalaz._, Validation.{success, failure}
+import matryoshka._
+import scalaz._, Validation.{success, failure}
 
 trait Library {
   protected val noSimplification: Func.Simplifier = new Func.Simplifier {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
       None
-  }
-
-  object IsInvoke {
-    def unapply[T[_[_]]: Recursive](lp: LogicalPlan[T[LogicalPlan]]):
-        Option[(Func, List[LogicalPlan[T[LogicalPlan]]])] = lp match {
-      case LogicalPlan.InvokeF(func, args) => (func, args.map(_.project)).some
-      case _                               => None
-    }
   }
 
   protected def constTyper(codomain: Type): Func.Typer = { args =>

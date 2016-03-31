@@ -49,7 +49,8 @@ trait SetLib extends Library {
     Type.Top, Type.Top :: Type.Int :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(set, ConstantF(Data.Int(n)))) if n == 0 =>
+        case InvokeF(_, List(Embed(set), Embed(ConstantF(Data.Int(n)))))
+            if n == 0 =>
           set.some
         case _ => None
       }
@@ -73,8 +74,9 @@ trait SetLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(set, ConstantF(Data.True))) => set.some
-          case _                                            => None
+          case InvokeF(_, List(Embed(set), Embed(ConstantF(Data.True)))) =>
+            set.some
+          case _ => None
         }
     },
     setTyper(partialTyper {
@@ -187,8 +189,9 @@ trait SetLib extends Library {
     Type.Top, Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(set, ConstantF(Data.Set(Nil)))) => set.some
-        case _                                                => None
+        case InvokeF(_, List(Embed(set), Embed(ConstantF(Data.Set(Nil))))) =>
+          set.some
+        case _ => None
       }
     },
     setTyper(partialTyper { case List(s1, _) => s1 }),
