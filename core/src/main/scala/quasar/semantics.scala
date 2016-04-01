@@ -23,6 +23,7 @@ import quasar.fs.prettyPrint
 import scala.AnyRef
 
 import matryoshka._, Recursive.ops._
+import pathy.Path, Path._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless.contrib.scalaz._
 
@@ -83,6 +84,9 @@ object SemanticError {
   }
   final case class DateFormatError(func: Func, str: String, hint: Option[String]) extends SemanticError {
     def message = "Date/time string could not be parsed as " + func.name + ": " + str + hint.map(" (" + _ + ")").getOrElse("")
+  }
+  final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
+    def message = "Invalid path: " + posixCodec.unsafePrintPath(path) + hint.map(" (" + _ + ")").getOrElse("")
   }
 }
 

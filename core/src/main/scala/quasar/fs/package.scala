@@ -89,13 +89,13 @@ package object fs {
       n => FileName(n).right.some,
       f).toIList.unite.headOption
 
-  def prettyPrint(path: Path[_,_,Sandboxed]): String =
+  def prettyPrint(path: Path[_,_,_]): String =
     refineType(path).fold(
-      dir => posixCodec.printPath(dir),
+      dir => posixCodec.unsafePrintPath(dir),
       file => refineTypeAbs(file).fold(
-        abs => posixCodec.printPath(abs),
+        abs => posixCodec.unsafePrintPath(abs),
         // Remove the `./` from the beginning of the string representation of a relative path
-        rel => posixCodec.printPath(rel).drop(2)))
+        rel => posixCodec.unsafePrintPath(rel).drop(2)))
 
   /** Sandboxes an absolute path, needed due to parsing functions producing
     * unsandboxed paths.
@@ -107,11 +107,10 @@ package object fs {
     rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
 
   // TODO[pathy]: Offer clean API in pathy to do this
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
-  def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Path[A,T,Sandboxed] =
+  def sandboxCurrent[A,T](path: Path[A,T,Unsandboxed]): Option[Path[A,T,Sandboxed]] =
     refineTypeAbs(path).fold(
-      abs => (rootDir[Sandboxed] </> abs.relativeTo(rootDir).get).asInstanceOf[Path[A,T,Sandboxed]],
-      rel => (currentDir[Sandboxed] </> rel.relativeTo(currentDir).get).asInstanceOf[Path[A,T,Sandboxed]])
+      abs => (abs relativeTo rootDir).map(p => (rootDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]),
+      rel => (rel relativeTo currentDir).map(p => (currentDir[Sandboxed] </> p).asInstanceOf[Path[A,T,Sandboxed]]))
 
   // TODO[pathy]: Offer clean API in pathy to do this
   def refineTypeAbs[T,S](path: Path[_,T,S]): Path[Abs,T,S] \/ Path[Rel,T,S] = {

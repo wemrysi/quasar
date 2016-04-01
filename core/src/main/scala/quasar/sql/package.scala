@@ -26,6 +26,8 @@ import scalaz._, Scalaz._
 package object sql {
   type Expr = Fix[ExprF]
 
+  // NB: we need to support relative paths, including `../foo`
+  type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
   private val parser = new SQLParser()
 
@@ -57,7 +59,7 @@ package object sql {
     }
   }
 
-  def mapPathsMƒ[F[_]: Monad](f: FPath => F[FPath]): ExprF[Expr] => F[Expr] = {
+  def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): ExprF[Expr] => F[Expr] = {
     case select: ExprF.SelectF[Expr] =>
       select.relations.map(_.mapPathsM(f)).sequence.map(rels => Fix(select.copy(relations = rels)))
     case x => Fix(x).point[F]
@@ -65,7 +67,7 @@ package object sql {
 
   implicit class ExprOps(q: Expr) {
     def mkPathsAbsolute(basePath: ADir): Expr =
-      q.cata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, basePath </> _)))
+      q.cata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
   }
 
   def rewriteRelationsM[F[_]: Monad](q: Expr)(f: SqlRelation[Expr] => OptionT[F, SqlRelation[Expr]]): F[Expr] = {
@@ -94,8 +96,8 @@ package object sql {
   }
 
   private def pprintRelationƒ(r: SqlRelation[(Expr, String)]): String = (r match {
-    case TableRelationAST(name, alias) =>
-      _qq("`", prettyPrint(name)) :: alias.map("as " + _).toList
+    case TableRelationAST(path, alias) =>
+      _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
     case ExprRelationAST(expr, aliasName) =>
       List(expr._2, "as", aliasName)
     case JoinRelation(left, right, tpe, clause) =>

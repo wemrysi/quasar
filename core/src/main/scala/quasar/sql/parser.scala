@@ -389,7 +389,7 @@ private[sql] class SQLParser extends StandardTokenParsers {
     ident ~ opt(keyword("as") ~> ident) ^? Function.unlift {
       case ident ~ alias =>
         val filePath = posixCodec.parsePath(Some(_),Some(_),_ => None, _ => None)(ident)
-        filePath.map(p => TableRelationAST[Expr](sandboxCurrent(p), alias))
+        filePath.map(p => TableRelationAST[Expr](p, alias))
     } |
     op("(") ~> (
       (expr ~ op(")") ~ keyword("as") ~ ident ^^ {

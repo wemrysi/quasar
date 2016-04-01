@@ -54,7 +54,7 @@ trait ExprArbitrary {
     val simple = for {
         n <- Arbitrary.arbitrary[FPath]
         a <- Gen.option(Gen.alphaChar.map(_.toString))
-      } yield TableRelationAST[Expr](n, a)
+      } yield TableRelationAST[Expr](pathy.Path.unsandbox(n), a)
     if (depth <= 0) simple
     else Gen.frequency(
       5 -> simple,

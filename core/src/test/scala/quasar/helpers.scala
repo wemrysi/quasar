@@ -68,7 +68,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
   def testTypedLogicalPlanCompile(query: String, expected: Fix[LogicalPlan]) =
     fullCompile(query).toEither must beRight(equalToPlan(expected))
 
-  def read(file: String): Fix[LogicalPlan] = LogicalPlan.Read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get))
+  def read(file: String): Fix[LogicalPlan] = LogicalPlan.Read(sandboxCurrent(posixCodec.parsePath(Some(_), Some(_), κ(None), κ(None))(file).get).get)
 
   type FLP = Fix[LogicalPlan]
   implicit def toFix[F[_]](unFixed: F[Fix[F]]): Fix[F] = Fix(unFixed)
