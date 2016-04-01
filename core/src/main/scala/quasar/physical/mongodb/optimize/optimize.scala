@@ -168,7 +168,7 @@ package object optimize {
     }
 
     def reorderOps(wf: Workflow): Workflow = {
-      val reordered = wf.transCata(once(reorderOpsƒ))
+      val reordered = wf.transCata(orOriginal(reorderOpsƒ))
       if (reordered == wf) wf else reorderOps(reordered)
     }
 

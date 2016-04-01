@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp._
 
-import matryoshka._, Fix._, FunctorT.ops._
+import matryoshka._, FunctorT.ops._
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
@@ -38,7 +38,7 @@ trait TermLogicalPlanMatchers {
   case class equalToPlan(expected: Fix[LogicalPlan])
       extends Matcher[Fix[LogicalPlan]] {
     def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
-      val normed = s.value.transCata(repeatedly(Optimizer.simplifyƒ))
+      val normed = s.value.transCata(repeatedly(Optimizer.simplifyƒ[Fix]))
       val diff = (normed.render diff expected.render).shows
       result(
         expected ≟ normed,

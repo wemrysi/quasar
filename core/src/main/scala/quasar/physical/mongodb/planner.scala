@@ -28,7 +28,7 @@ import Type._
 import Workflow._
 import javascript._
 
-import matryoshka._, Fix._, Recursive.ops._, TraverseT.ops._
+import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
 import pathy.Path.rootDir
 import scalaz._, Scalaz._
@@ -715,7 +715,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           args match {
             case List(left, right, comp) =>
               splitConditions(comp).fold[M[WorkflowBuilder]](
-                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder])]].convertTo(comp))))(
+                fail(UnsupportedJoinCondition(Recursive[Cofree[?[_], (Input, OutputM[WorkflowBuilder])]].convertTo[LogicalPlan, Fix](comp))))(
                 c => {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
@@ -1096,7 +1096,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
-      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(Optimizer.simplifyƒ))))
+      align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(Optimizer.simplifyƒ[Fix]))))
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
       wf1  <- log("Workflow (raw)")                      (swizzle(build(wb)))

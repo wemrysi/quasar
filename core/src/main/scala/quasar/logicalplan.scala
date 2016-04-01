@@ -355,8 +355,8 @@ object LogicalPlan {
   // TODO: This can perhaps be decomposed into separate folds for annotating
   //       with “found” types, folding constants, and adding runtime checks.
   val checkTypesƒ:
-      (Type, LogicalPlan[ConstrainedPlan]) => NameT[SemDisj, ConstrainedPlan] =
-    (inf, term) => {
+      ((Type, LogicalPlan[ConstrainedPlan])) => NameT[SemDisj, ConstrainedPlan] = {
+    case (inf, term) =>
       def applyConstraints(
         poss: Type, constraints: ConstrainedPlan)
         (f: Fix[LogicalPlan] => Fix[LogicalPlan]) =
@@ -409,14 +409,14 @@ object LogicalPlan {
         // TODO: Get the possible type from the LetF
         case FreeF(v) => emit(ConstrainedPlan(inf, Nil, Free(v)))
       }
-    }
+  }
 
   type SemNames[A] = NameT[SemDisj, A]
 
   def ensureCorrectTypes(term: Fix[LogicalPlan]):
       ValidationNel[SemanticError, Fix[LogicalPlan]] =
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ(_, _)).map(appConst(_, Constant(Data.NA))).evalZero.validation)
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Constant(Data.NA))).evalZero.validation)
 
   // TODO: Generalize this to Binder
   def lpParaZygoHistoM[M[_]: Monad, A, B](

@@ -39,7 +39,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
           Grouped(ListMap(
             BsonField.Name("city") -> $last($field("city")))),
           $field("city").right))
-        .transCata(once(simplifyGroupƒ)) must
+        .transCata(orOriginal(simplifyGroupƒ)) must
       beTree(chain(
         $read(Collection("db", "zips")),
         $group(
@@ -60,7 +60,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right,
             BsonField.Name("1") -> $field("state").right)).left))
-        .transCata(once(simplifyGroupƒ)) must
+        .transCata(orOriginal(simplifyGroupƒ)) must
       beTree(chain(
         $read(Collection("db", "zips")),
         $group(
@@ -83,7 +83,7 @@ class OptimizeSpecs extends Specification with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("0") -> $field("city").right)).left))
 
-      lp.transCata(once(simplifyGroupƒ)) must beTree(lp)
+      lp.transCata(orOriginal(simplifyGroupƒ)) must beTree(lp)
     }
 
   }

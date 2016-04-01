@@ -23,7 +23,7 @@ import quasar.sql._
 import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
-import matryoshka.{ToIdOps => toAllOps, _}, Fix._, Recursive.ops._, FunctorT.ops._
+import matryoshka.{ToIdOps => toAllOps, _}, Recursive.ops._, FunctorT.ops._
 import scalaz.{Tree => _, _}, Scalaz._
 
 trait Compiler[F[_]] {
@@ -501,6 +501,6 @@ object Compiler {
           else t.tail
       }
     }
-    ann.ana(rewriteƒ)
+    ann.ana[Fix, LogicalPlan](rewriteƒ)
   }
 }

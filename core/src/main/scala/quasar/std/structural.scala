@@ -165,7 +165,7 @@ trait StructuralLib extends Library {
     Top, AnyObject :: Str :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(MakeObjectN(obj), field)) =>
+        case InvokeF(_, List(Embed(MakeObjectN(obj)), Embed(field))) =>
           obj.map(_.leftMap(_.project)).toListMap.get(field).map(_.project)
         case _ => None
       }
@@ -252,8 +252,8 @@ trait StructuralLib extends Library {
     Top, AnyObject :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(UnshiftMap(List(set)))) => set.project.some
-        case _                                        => None
+        case InvokeF(_, List(Embed(UnshiftMap(List(Embed(set)))))) => set.some
+        case _                                                     => None
       }
     },
     partialTyperV {
@@ -270,8 +270,8 @@ trait StructuralLib extends Library {
     Top, AnyArray :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(UnshiftArray(List(set)))) => set.project.some
-        case _                                          => None
+        case InvokeF(_, List(Embed(UnshiftArray(List(Embed(set)))))) => set.some
+        case _                                                       => None
       }
     },
     partialTyperV {
@@ -305,8 +305,8 @@ trait StructuralLib extends Library {
     AnyObject, Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(ShiftMap(List(map)))) => map.project.some
-        case _                                          => None
+        case InvokeF(_, List(Embed(ShiftMap(List(Embed(map)))))) => map.some
+        case _                                                   => None
       }
     },
     partialTyper { case List(tpe) => Obj(Map(), Some(tpe)) },
@@ -322,12 +322,18 @@ trait StructuralLib extends Library {
     AnyArray, Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case IsInvoke(_, List(ShiftArray(List(array)))) => array.project.some
-        case _                                          => None
+        case InvokeF(_, List(Embed(ShiftArray(List(Embed(array)))))) => array.some
+        case InvokeF(_, List(Embed(ShiftArrayIndices(List(Embed(ConstantF(Data.Arr(array)))))))) =>
+          ConstantF(Data.Arr((0 until array.length).toList ∘ (Data.Int(_)))).some
+        case InvokeF(_, List(Embed(ShiftMap(List(Embed(ConstantF(Data.Obj(map)))))))) =>
+          ConstantF(Data.Arr(map.values.toList)).some
+        case InvokeF(_, List(Embed(ShiftMapKeys(List(Embed(ConstantF(Data.Obj(map)))))))) =>
+          ConstantF(Data.Arr(map.keys.toList.map(Data.Str(_)))).some
+        case _ => None
       }
     },
     partialTyper {
-      case List(Const(Data.Set(vs))) => Const(Data.Arr(vs))
+      // case List(Const(Data.Set(vs))) => Const(Data.Arr(vs))
       case List(Const(v))            => Const(Data.Arr(List(v)))
       case List(tpe)                 => FlexArr(0, None, tpe)
     },

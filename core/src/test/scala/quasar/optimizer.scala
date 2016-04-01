@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import quasar.std._
 
-import matryoshka._, Fix._, FunctorT.ops._
+import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import pathy.Path._
 
@@ -34,7 +34,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
 
     "inline trivial binding" in {
       Let('tmp0, read("foo"), Free('tmp0))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(read("foo"))
     }
 
@@ -43,7 +43,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
         makeObj(
           "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
           "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Let('tmp0, read("foo"),
             makeObj(
@@ -53,7 +53,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
 
     "completely inline stupid lets" in {
       Let('tmp0, read("foo"), Let('tmp1, Free('tmp0), Free('tmp1)))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(read("foo"))
     }
 
@@ -62,7 +62,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
         Let('tmp0, read("bar"),
           makeObj(
             "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))))))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           makeObj(
             "bar" -> ObjectProject(read("bar"), Constant(Data.Str("bar")))))
@@ -74,7 +74,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
           Let('tmp0, read("bar"),
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar")))))))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Invoke(ObjectProject, List(
             read("foo"),
@@ -89,7 +89,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
             makeObj(
               "bar" -> ObjectProject(Free('tmp0), Constant(Data.Str("bar"))),
               "baz" -> ObjectProject(Free('tmp0), Constant(Data.Str("baz")))))))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Invoke(ObjectProject, List(
             read("foo"),
@@ -110,7 +110,7 @@ class OptimizerSpec extends Specification with CompilerHelpers with TreeMatchers
               MakeArray[FLP](
                 ObjectProject(Free('tmp1), Constant(Data.Str("name"))))),
             Free('tmp2))))
-        .transCata(repeatedly(Optimizer.simplifyƒ)) must
+        .transCata(repeatedly(Optimizer.simplifyƒ[Fix])) must
         beTree(
           Let('tmp1,
             makeObj(

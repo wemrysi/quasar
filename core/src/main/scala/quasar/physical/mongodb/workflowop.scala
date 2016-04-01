@@ -565,7 +565,7 @@ object Workflow {
     }
 
     val finished =
-      deleteUnusedFields(reorderOps(op.transCata(once(simplifyGroupƒ))))
+      deleteUnusedFields(reorderOps(op.transCata(orOriginal(simplifyGroupƒ))))
 
     def fixShape(wf: Workflow) =
       Workflow.simpleShape(wf).fold(

@@ -49,7 +49,7 @@ final case class Views(map: Map[AFile, Fix[LogicalPlan]]) {
   def rewrite(lp: Fix[LogicalPlan]): Fix[LogicalPlan] = rewrite0(lp, Set())
 
   private def rewrite0(lp: Fix[LogicalPlan], expanded: Set[AFile]): Fix[LogicalPlan] = {
-    lp.transCata(once {
+    lp.transCata(orOriginal {
       case LogicalPlan.ReadF(p) =>
         refineTypeAbs(p).swap.toOption.filterNot(expanded contains _).flatMap { file =>
           map.get(file).map { viewLp =>

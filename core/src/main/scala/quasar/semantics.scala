@@ -319,8 +319,8 @@ trait SemanticAnalysis {
     * if identifiers are used with unknown provenance. The phase requires
     * TableScope annotations on the tree.
     */
-  val inferProvenanceƒ: ElgotAlgebraM[ValidSem, ExprF, TableScope, Provenance] =
-    (tableScope, expr) => expr match {
+  val inferProvenanceƒ: ElgotAlgebraM[(TableScope, ?), ValidSem, ExprF, Provenance] = {
+    case (tableScope, expr) => expr match {
       case SelectF(_, projections, _, _, _, _) =>
         success(Provenance.allOf(projections.map(_.expr)))
 
@@ -349,18 +349,24 @@ trait SemanticAnalysis {
       case BoolLiteralF(_)          => success(Provenance.Value)
       case NullLiteralF()           => success(Provenance.Value)
     }
+  }
 
   type Annotations = (List[Option[Synthetic]], Provenance)
 
-  // NB: converts identifySyntheticsƒ from a cata to a coelgotM, for zipping
-  val synthCoEƒ:
-      (TableScope, ExprF[List[Option[Synthetic]]]) => ValidSem[List[Option[Synthetic]]] =
-    identifySyntheticsƒ.generalizeElgot[TableScope](_, _).point[ValidSem]
+  val synthElgotMƒ:
+      ElgotAlgebraM[(TableScope, ?), ValidSem, ExprF, List[Option[Synthetic]]] =
+    identifySyntheticsƒ.generalizeElgot[(TableScope, ?)] >>> (_.point[ValidSem])
 
-  def addAnnotations(a: (TableScope, Expr), node: ExprF[Cofree[ExprF, Annotations]]) =
-    attributeCoelgotM(ElgotAlgebraMZip[ValidSem, ExprF, TableScope].zip(
-      synthCoEƒ,
-      inferProvenanceƒ)).apply(a._1, node).disjunction
+  def addAnnotations:
+      ElgotAlgebraM[
+        ((TableScope, Expr), ?),
+        NonEmptyList[SemanticError] \/ ?,
+        ExprF,
+        Cofree[ExprF, Annotations]] =
+    e => attributeElgotM[(TableScope, ?), ValidSem].apply[ExprF, Annotations](
+      ElgotAlgebraMZip[(TableScope, ?), ValidSem, ExprF].zip(
+        synthElgotMƒ,
+        inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
 
   // NB: projectSortKeys >>> (identifySynthetics &&& (scopeTables >>> inferProvenance))
   def AllPhases(expr: Expr) =

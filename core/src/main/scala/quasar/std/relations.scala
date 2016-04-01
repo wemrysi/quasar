@@ -121,9 +121,9 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(ConstantF(Data.True), r)) => r.some
-          case IsInvoke(_, List(l, ConstantF(Data.True))) => l.some
-          case _                                          => None
+          case InvokeF(_, List(Embed(ConstantF(Data.True)), Embed(r))) => r.some
+          case InvokeF(_, List(Embed(l), Embed(ConstantF(Data.True)))) => l.some
+          case _                                                       => None
         }
     },
     partialTyper {
@@ -141,9 +141,9 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(ConstantF(Data.False), r)) => r.some
-          case IsInvoke(_, List(l, ConstantF(Data.False))) => l.some
-          case _                                           => None
+          case InvokeF(_, List(Embed(ConstantF(Data.False)), Embed(r))) => r.some
+          case InvokeF(_, List(Embed(l), Embed(ConstantF(Data.False)))) => l.some
+          case _                                                        => None
         }
     },
     partialTyper {
@@ -170,9 +170,9 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(ConstantF(Data.True),  c, _)) => c.some
-          case IsInvoke(_, List(ConstantF(Data.False), _, a)) => a.some
-          case _                                              => None
+          case InvokeF(_, List(Embed(ConstantF(Data.True)),  Embed(c), _)) => c.some
+          case InvokeF(_, List(Embed(ConstantF(Data.False)), _, Embed(a))) => a.some
+          case _                                                           => None
         }
     },
     partialTyper {
@@ -189,9 +189,9 @@ trait RelationsLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
         orig match {
-          case IsInvoke(_, List(ConstantF(Data.Null), second)) => second.some
-          case IsInvoke(_, List(first, ConstantF(Data.Null)))  => first.some
-          case _                                               => None
+          case InvokeF(_, List(Embed(ConstantF(Data.Null)), Embed(second))) => second.some
+          case InvokeF(_, List(Embed(first), Embed(ConstantF(Data.Null))))  => first.some
+          case _                                                            => None
         }
     },
     partialTyper {
