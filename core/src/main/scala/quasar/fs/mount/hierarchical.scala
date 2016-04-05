@@ -42,19 +42,17 @@ object hierarchical {
   sealed trait HierarchicalFileSystemError
 
   object HierarchicalFileSystemError {
-    final case class MultipleMountsApply private[fs] (mounts: Set[ADir], lp: Fix[LogicalPlan])
-      extends HierarchicalFileSystemError
+    case object NoMountsDefined extends HierarchicalFileSystemError
 
-    val multipleMountsApply: Prism[HierarchicalFileSystemError, (Set[ADir], Fix[LogicalPlan])] =
-      Prism[HierarchicalFileSystemError, (Set[ADir], Fix[LogicalPlan])] {
-        case MultipleMountsApply(mnts, lp) => Some((mnts, lp))
+    val noMountsDefined: Prism[HierarchicalFileSystemError, Unit] =
+      Prism[HierarchicalFileSystemError, Unit] {
+        case NoMountsDefined => Some(())
         case _ => None
-      } ((MultipleMountsApply(_, _)).tupled)
+      } (κ(NoMountsDefined))
 
     implicit val hierarchicalFSErrorShow: Show[HierarchicalFileSystemError] =
       Show.shows {
-        case MultipleMountsApply(mnts, lp) =>
-          s"""Multiple mounted filesystems can handle the plan; mounts: ${mnts.map(_.shows).mkString(", ")}, plan: ${lp.shows}"""
+        case NoMountsDefined => "No mounts defined."
       }
   }
 
@@ -388,7 +386,7 @@ object hierarchical {
         case (mntA, r) =>
           r.leftMap(_.right[HierarchicalFileSystemError]) *>
             (mntA orElse mounts.toMap.toList.headOption)
-              .toRightDisjunction(multipleMountsApply(mounts.toMap.keySet, lp).left)
+              .toRightDisjunction(noMountsDefined().left)
       })
   }
 
