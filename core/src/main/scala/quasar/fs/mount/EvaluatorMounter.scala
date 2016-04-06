@@ -130,7 +130,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
     for {
       vws    <- views[T].get
       mnts   <- mounts[T].get
-      evals  =  mnts.map(_._1)
+      evals  =  mnts.map(_.run)
       mnted  =  hierarchical.fileSystem[F, S](evals)
       injSeq =  liftFT[S] compose injectNT[MonotonicSeqF, S]
       injVST =  liftFT[S] compose injectNT[ViewStateF, S]

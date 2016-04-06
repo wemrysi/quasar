@@ -21,19 +21,20 @@ import quasar.Predef._
 import quasar.fp._
 
 import argonaut._, Argonaut._
-import scalaz.syntax.std.map._
+import pathy.Path, Path._
+import scalaz._, Scalaz._
 
 case class RegressionTest(
   name:      String,
   backends:  Map[BackendName, SkipDirective],
-  data:      Option[String],
+  data:      Option[RelFile[Unsandboxed]],
   query:     String,
   variables: Map[String, String],
   expected:  ExpectedResult
 )
 
 object RegressionTest {
-  import DecodeResult.ok
+  import DecodeResult._
 
   implicit val RegressionTestDecodeJson: DecodeJson[RegressionTest] =
     DecodeJson(c => for {
@@ -42,7 +43,9 @@ object RegressionTest {
                           (c --\ "backends").as[Map[String, SkipDirective]]
                             .map(_ mapKeys (BackendName(_)))
                         else ok(Map[BackendName, SkipDirective]())
-      data          <-  optional[String](c --\ "data")
+      data          <-  optional[String](c --\ "data").flatMap(_.cata[DecodeResult[Option[RelFile[Unsandboxed]]]](
+        s => posixCodec.parseRelFile(s).cata(p => ok(p.some), fail(s"not a relative file path: $s", c.history)),
+        ok(None)))
       query         <-  (c --\ "query").as[String]
       variables     <-  orElse(c --\ "variables", Map.empty[String, String])
       ignoredFields <-  orElse(c --\ "ignoredFields", List.empty[String])

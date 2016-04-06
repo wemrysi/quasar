@@ -1,9 +1,9 @@
 {
   "name": "dow and isodow",
 
-  "data": "days.data",
+  "data": "../days.data",
 
-  "query": "select day, date_part(\"dow\", ts) as dow, date_part(\"isodow\", ts) as isodow from days",
+  "query": "select day, date_part(\"dow\", ts) as dow, date_part(\"isodow\", ts) as isodow from `../days`",
 
   "predicate": "containsExactly",
 

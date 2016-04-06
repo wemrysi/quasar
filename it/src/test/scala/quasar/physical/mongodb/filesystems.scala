@@ -20,37 +20,40 @@ import quasar.Predef._
 import quasar.{EnvironmentError, EnvErrF, EnvErr}
 import quasar.config.{CfgErr, CfgErrF, ConfigError}
 import quasar.effect.Failure
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount.ConnectionUri
+import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs._
-import quasar.physical.mongodb.util.createAsyncMongoClient
 import quasar.regression._
 
 import com.mongodb.MongoException
-import scalaz.{Failure => _, _}
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object filesystems {
   def testFileSystem(
     uri: ConnectionUri,
     prefix: ADir
-  ): Task[FileSystem ~> Task] = {
-    val prg = for {
-      client   <- createAsyncMongoClient[MongoEff](uri)
-      mongofs0 =  mongoDbFileSystem[MongoEff](client, DefaultDb fromPath prefix)
-      mongofs  <- envErr.unattempt(lift(mongofs0.run).into[MongoEff])
-    } yield mongofs
+  ): Task[(FileSystem ~> Task, Task[Unit])] = {
+    val fsDef = quasar.physical.mongodb.fs.mongoDbFileSystemDef[MongoEff].apply(MongoDBFsType, uri).run
+      .flatMap[FileSystemDef.DefinitionResult[MongoEffM]] {
+        case -\/(-\/(strs)) => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(strs.list.mkString)))
+        case -\/(\/-(err))  => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(err.shows)))
+        case \/-(d)         => d.point[MongoEffM]
+      }
 
-    mongoEffMToTask(prg) map (mongoEffMToTask compose _)
+    mongoEffMToTask(fsDef).map(d =>
+      (mongoEffMToTask compose d.run,
+        mongoEffMToTask(d.close)))
   }
 
   def testFileSystemIO(
     uri: ConnectionUri,
     prefix: ADir
-  ): Task[FileSystemIO ~> Task] =
+  ): Task[(FileSystemIO ~> Task, Task[Unit])] =
     testFileSystem(uri, prefix)
-      .map(interpret2(NaturalTransformation.refl[Task], _))
+      .map { case (run, close) => (interpret2(NaturalTransformation.refl[Task], run), close) }
 
   ////
 

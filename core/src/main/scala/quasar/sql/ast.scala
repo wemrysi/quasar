@@ -18,8 +18,6 @@ package quasar.sql
 
 import quasar.Predef._
 
-import quasar.fs._
-
 import scala.Any
 
 import matryoshka._
@@ -158,7 +156,7 @@ sealed trait SqlRelation[A] {
     collect(this).groupBy(_._1).mapValues(_.map(_._2))
   }
 
-  def mapPathsM[F[_]: Monad](f: FPath => F[FPath]): F[SqlRelation[A]] = this match {
+  def mapPathsM[F[_]: Monad](f: FUPath => F[FUPath]): F[SqlRelation[A]] = this match {
     case TableRelationAST(path, alias) => f(path).map(TableRelationAST(_, alias))
     case rel @ JoinRelation(left, right, _, _) =>
       (left.mapPathsM(f) |@| right.mapPathsM(f))((l,r) => rel.copy(left = l, right = r))
@@ -170,7 +168,7 @@ sealed trait NamedRelation[A] extends SqlRelation[A] {
   def aliasName: String
 }
 
-final case class TableRelationAST[A](tablePath: FPath, alias: Option[String])
+final case class TableRelationAST[A](tablePath: FUPath, alias: Option[String])
     extends NamedRelation[A] {
   def aliasName = alias.getOrElse(fileName(tablePath).value)
 }

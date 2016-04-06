@@ -149,7 +149,7 @@ object util {
   ////
 
   // TODO: Externalize
-  private val defaultTimeoutMillis: Int = 5000
+  private val defaultTimeoutMillis: Int = 10000
 
   private def disableMongoLogging: Task[Unit] = {
     import java.util.logging._

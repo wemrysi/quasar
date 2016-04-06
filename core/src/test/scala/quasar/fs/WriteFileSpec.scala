@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.fp._
+import quasar.specs2.DisjunctionMatchers
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
@@ -28,7 +29,7 @@ import scalaz.std.vector._
 import scalaz.syntax.monad._
 import scalaz.stream._
 
-class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture {
+class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture with DisjunctionMatchers {
   import DataArbitrary._, FileSystemError._, PathError._
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
@@ -74,6 +75,15 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
       }
     }
 
+    "append should fail after writing some when source fails" ! prop {
+      (f: AFile, xs: Vector[Data]) =>
+
+      // TODO: handle the error, and check the contents of the file
+
+      val p = write.append(f, xs.toProcess ++ Process.fail(new RuntimeException("source failed")))
+      MemTask.runLogEmpty(p).attemptRun must beLeftDisjunction
+    }
+
     withDataWriters(("save", write.save), ("saveThese", write.saveThese)) { (n, wt) =>
       s"$n should replace existing file" ! prop {
         (f: AFile, xs: Vector[Data], ys: Vector[Data]) =>
@@ -102,6 +112,15 @@ class WriteFileSpec extends Specification with ScalaCheck with FileSystemFixture
         }
       }
     }
+
+    "save should fail and write nothing when source fails" ! prop {
+      (f: AFile, xs: Vector[Data]) =>
+
+      // TODO: handle the error, and check that the file is not written
+
+      val p = write.save(f, xs.toProcess ++ Process.fail(new RuntimeException("source failed")))
+      MemTask.runLogEmpty(p).attemptRun must beLeftDisjunction
+    }.pendingUntilFixed("SD-1544")
 
     withDataWriters(("create", write.create), ("createThese", write.createThese)) { (n, wt) =>
       s"$n should fail if file exists" ! prop {

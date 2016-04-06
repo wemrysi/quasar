@@ -26,7 +26,7 @@ import scalaz._, Scalaz._
 import scalaz.stream._
 
 class ManageFilesSpec extends FileSystemTest[FileSystem](
-  FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
+    FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
   import FileSystemTest._, FileSystemError._, PathError._
   import ManageFile._
 

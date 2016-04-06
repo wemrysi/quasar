@@ -19,11 +19,13 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 import quasar.fp.binder._
+import quasar.fs._
 import quasar.sql._
 import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
 import matryoshka.{ToIdOps => toAllOps, _}, Recursive.ops._, FunctorT.ops._
+import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
 
 trait Compiler[F[_]] {
@@ -238,11 +240,10 @@ trait Compiler[F[_]] {
 
     def compileRelation(r: SqlRelation[CoExpr]): CompilerM[Fix[LogicalPlan]] =
       r match {
-        case TableRelationAST(file, _) =>
-          // All paths should have been made absolute at this point by calling the `relativeTo` method
-          // on `SqlExpr`, but that is not reflected in the types so we add rootDir to any relative files
-          // we might come accross which seems like a pretty safe operation
-          emit(LogicalPlan.Read(file))
+        case TableRelationAST(path, _) =>
+          sandboxCurrent(canonicalize(path)).cata(
+            p => emit(LogicalPlan.Read(p)),
+            fail(InvalidPathError(path, None)))
         case ExprRelationAST(expr, _) => compile0(expr)
         case JoinRelation(left, right, tpe, clause) =>
           for {

@@ -55,7 +55,7 @@ final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
 
     def addMount(fsr: DefinitionResult[F]): MntErrT[M, Unit] = {
       def cleanupOnError(err: String) =
-        free.lift(fsr._2).into[S] as pathError(invalidPath(loc, err))
+        free.lift(fsr.close).into[S] as pathError(invalidPath(loc, err))
 
       EitherT[M, MountingError, Unit](mounts[S].modifyS(mnts =>
         mnts.add(loc, fsr).fold(
@@ -82,7 +82,7 @@ final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
               (implicit S: F :<: S)
               : Free[S, Unit] = {
 
-    mnts.lookup(loc).map(_._2)
+    mnts.lookup(loc).map(_.close)
       .fold(().point[Free[S, ?]])(free.lift(_).into[S])
   }
 

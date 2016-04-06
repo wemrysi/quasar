@@ -25,7 +25,6 @@ import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
 import quasar.physical.mongodb._
-import quasar.physical.mongodb.fs.mongoDbFileSystemDef
 
 import argonaut.EncodeJson
 import com.mongodb.MongoException
@@ -69,9 +68,9 @@ package object main {
     * to a fixed set of effects that filesystems must interpret into.
     */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] =
-    mongoDbFileSystemDef[PhysFsEff]
+    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff]
 
-  /** The intermediate effect FileSystem operations are intepreted into.
+  /** The intermediate effect FileSystem operations are interpreted into.
     *
     * PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF \/ HFSFailureF
     */

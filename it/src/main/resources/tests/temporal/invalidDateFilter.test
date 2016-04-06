@@ -1,9 +1,9 @@
 {
   "name": "filter on date part, where the field isn't a timestamp",
 
-  "data": "days.data",
+  "data": "../days.data",
 
-  "query": "select day from days where date_part(\"dow\", epoch) >= 3",
+  "query": "select day from `../days` where date_part(\"dow\", epoch) >= 3",
 
   "predicate": "containsExactly",
 

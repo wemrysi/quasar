@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import quasar.Predef._
 import quasar.BackendName
 
 import scalaz._
@@ -28,19 +29,23 @@ import scalaz.concurrent.Task
   * @param setupInterp a second interpreter which has the ability to insert
   *   and otherwise write to the filesystem, even if `testInterp` does not
   * @param testDir a directory in the filesystem tests may use for temp data
+  * @param close an effect to clean up any resources created when the
+  *   interpreters are used. Need not be called if no interpreted effect was
+  *   ever run, but it's safe to call it either way.
   */
 final case class FileSystemUT[S[_]](
   name:        BackendName,
   testInterp:  S ~> Task,
   setupInterp: S ~> Task,
-  testDir:     ADir
+  testDir:     ADir,
+  close:       Task[Unit]
 ) {
   import quasar.fp.hoistFree
 
   type F[A] = Free[S, A]
 
   def contramap[T[_]](f: T ~> S): FileSystemUT[T] =
-    FileSystemUT(name, testInterp compose f, setupInterp compose f, testDir)
+    FileSystemUT(name, testInterp compose f, setupInterp compose f, testDir, close)
 
   def testInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(testInterp)
   def setupInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(setupInterp)

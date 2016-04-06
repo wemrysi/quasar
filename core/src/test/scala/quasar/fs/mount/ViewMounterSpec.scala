@@ -56,7 +56,7 @@ class ViewMounterSpec extends mutable.Specification {
       val selStar = Fix(sql.SelectF(
         sql.SelectAll,
         Nil,
-        Some(sql.TableRelationAST[sql.Expr](rootDir[Sandboxed] </> dir("foo") </> file("bar"), None)),
+        Some(sql.TableRelationAST[sql.Expr](rootDir </> dir("foo") </> file("bar"), None)),
         None, None, None))
 
       val f = rootDir </> dir("mnt") </> file("selectStar")

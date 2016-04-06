@@ -67,6 +67,16 @@ class ViewsSpec extends Specification with ScalaCheck with TreeMatchers {
         Read(rootDir </> dir("foo") </> file("zips")))
     }
 
+    // TODO: Pending SD-1548, but doesn't compile because the path can't be sandboxed
+    // "trivial read with relative path through parent" in {
+    //   val vs = Views(Map(
+    //     (rootDir </> dir("foo") </> file("justZips")) ->
+    //       Read(parentDir1(currentDir) </> file("zips"))))
+    //
+    //   vs.rewrite(Read(rootDir </> dir("foo") </> file("justZips"))) must beTree(
+    //     Read(rootDir </> file("zips")))
+    // }
+
     "non-trivial" in {
       val inner =
         Let('tmp0, Read(rootDir </> file("zips")),

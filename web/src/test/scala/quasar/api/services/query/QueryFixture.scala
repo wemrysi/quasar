@@ -31,8 +31,6 @@ import scalaz.concurrent.Task
 object queryFixture {
   import quasar.api.PathUtils.pathUri
 
-  type File = pathy.Path[_,pathy.Path.File,Sandboxed]
-
   type Eff0[A] = Coproduct[FileSystemFailureF, FileSystem, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
 
@@ -68,19 +66,19 @@ object queryFixture {
   def executeService(state: InMemState): HttpService =
     execute.service[Eff].toHttpService(effRespOr(runFs(state).run))
 
-  def selectAll(from: File) = {
+  def selectAll(from: FPath) = {
     val ast = Select(
       SelectAll,
       List(Proj(Splice(None), None)),
-      Some(TableRelationAST(from, None)),
+      Some(TableRelationAST(unsandbox(from), None)),
       None, None, None)
     pprint(ast)
   }
-  def selectAllWithVar(from: File, varName: String) = {
+  def selectAllWithVar(from: FPath, varName: String) = {
     val ast = Select(
       SelectAll,
       List(Proj(Splice(None), None)),
-      Some(TableRelationAST(from, None)),
+      Some(TableRelationAST(unsandbox(from), None)),
       Some(Binop(Ident("pop"),Vari(varName), Gt)),
       None, None)
     pprint(ast)
