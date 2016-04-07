@@ -40,23 +40,34 @@ package object sql {
   def CrossRelation(left: SqlRelation[Expr], right: SqlRelation[Expr]) =
     JoinRelation(left, right, InnerJoin, BoolLiteral(true))
 
-  def namedProjections(e: Expr, relName: Option[String]):
-      List[(String, Expr)] = {
-    def extractName(expr: Expr): Option[String] = expr match {
-      case Ident(name) if Some(name) != relName      => Some(name)
-      case Binop(_, StringLiteral(name), FieldDeref) => Some(name)
-      case Unop(expr, FlattenMapValues)              => extractName(expr)
-      case Unop(expr, FlattenArrayValues)            => extractName(expr)
-      case _                                         => None
+  def projectionNames[T[_[_]]:Recursive](projections: List[Proj[T[ExprF]]], relName: Option[String]):
+      SemanticError \/ List[(String, T[ExprF])] = {
+    def extractName(expr: T[ExprF]): Option[String] = expr.project match {
+      case IdentF(name) if Some(name) != relName => Some(name)
+      // TODO[matryoshka]: Change to Embed(StringLiteralF(name)
+      case BinopF(_, stringLiteral, FieldDeref)  => stringLiteral.project match {
+        case string: ExprF.StringLiteralF[_] => Some(string.v)
+        case _                               => None
+      }
+      case UnopF(expr, FlattenMapValues)         => extractName(expr)
+      case UnopF(expr, FlattenArrayValues)       => extractName(expr)
+      case _                                     => None
     }
 
-    e.unFix match {
-      case SelectF(_, projections, _, _, _, _) =>
-        projections.zipWithIndex.map {
-          case (Proj(expr, alias), index) =>
-            (alias <+> extractName(expr)).getOrElse(index.toString()) -> expr
-        }
-    }
+    val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}
+
+    (aliases diff aliases.distinct).headOption.cata(
+      duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
+      projections.zipWithIndex.mapAccumLeft1(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
+        alias.cata(
+          a => (used, a -> expr),
+          {
+            val tentativeName = extractName(expr) getOrElse index.toString
+            val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
+            val name = (tentativeName #:: alternatives).dropWhile(used.contains).head
+            (used + name, name -> expr)
+          })
+      }._2.right)
   }
 
   def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): ExprF[Expr] => F[Expr] = {

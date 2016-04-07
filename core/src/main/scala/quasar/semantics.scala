@@ -61,8 +61,8 @@ object SemanticError {
   final case class MissingField(name: String) extends SemanticError {
     def message = "No field named '" + name + "' exists"
   }
-  final case class DuplicateFieldName(name: String) extends SemanticError {
-    def message = s"Field named $name is duplicated"
+  final case class DuplicateAlias(name: String) extends SemanticError {
+    def message = s"Alias `$name` appears twice in projections"
   }
   final case class MissingIndex(index: Int) extends SemanticError {
     def message = "No element exists at array index '" + index

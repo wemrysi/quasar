@@ -478,4 +478,8 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
     */
   def pPrism[A, B](out: PartialFunction[A, B])(in: B => A) =
     Prism[A, B](out.lift)(in)
+
+  implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
+    final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
+  }
 }

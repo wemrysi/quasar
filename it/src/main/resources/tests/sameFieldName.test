@@ -1,0 +1,11 @@
+{
+    "name": "select over fields with same name",
+    "backends": { "mongodb_read_only": "pending" },
+    "data": ["owners.data", "cars.data"],
+    "query": "SELECT owner.name, car.name from owners as owner join cars as car on car._id = owner.carId",
+    "predicate": "containsExactly",
+    "expected": [
+        { "name": "emma",  "name0": "RangeRover-Evoque" },
+        { "name": "scott", "name0": "Honda-civic" },
+        { "name": "scott", "name0": "BMW-X5" }]
+}

@@ -1244,17 +1244,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
     "fail with duplicate alias" in {
       compile("select car.name as name, owner.name as name from owners as owner join cars as car on car._id = owner.carId") must
-        beLeftDisjunction("DuplicateFieldName(name)")
-    }
-
-    "fail when two projections have the same field name" in {
-      compile("select car.name, owner.name from owners as owner join cars as car on car._id = owner.carId") must
-        beLeftDisjunction("DuplicateFieldName(name)")
-    }
-
-    "fail when a field name conflicts with an alias" in {
-      compile("select car.name as name, owner.name from owners as owner join cars as car on car._id = owner.carId") must
-        beLeftDisjunction("DuplicateFieldName(name)")
+        beLeftDisjunction("DuplicateAlias(name)")
     }
 
     "translate free variable" in {
