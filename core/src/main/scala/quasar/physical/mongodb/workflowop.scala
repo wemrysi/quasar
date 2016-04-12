@@ -25,7 +25,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.workflowtask._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
-import monocle.syntax._
+import monocle.syntax.all._
 import scalaz._, Scalaz._
 import shapeless.contrib.scalaz._
 
@@ -790,7 +790,7 @@ object Workflow {
       Fix(coalesce($Sort(src, value)))
 
     def keyBson(value: NonEmptyList[(BsonField, SortType)]) =
-      Bson.Doc(ListMap((value.map { case (k, t) => k.asText -> t.bson }).list: _*))
+      Bson.Doc(ListMap((value.map { case (k, t) => k.asText -> t.bson }).list.toList: _*))
   }
   val $sort = $Sort.make _
 
@@ -952,7 +952,7 @@ object Workflow {
       }
 
       exprs match {
-        case NonEmptyList(MapExpr(expr)) =>
+        case NonEmptyList(MapExpr(expr), INil()) =>
           $SimpleMap(src,
             NonEmptyList(
               MapExpr(JsFn(jscore.Name("base"), loop(expr(jscore.ident("base")), fields.map(_.flatten.toList)).getOrElse(jscore.Literal(Js.Null))))),
@@ -1008,7 +1008,7 @@ object Workflow {
       val funcs = (exprs).map(_.copoint(ident("_")).para(findFunctionsƒ)).foldLeft(Set[String]())(_ ++ _)
 
       exprs match {
-        case NonEmptyList(MapExpr(expr)) =>
+        case NonEmptyList(MapExpr(expr), INil()) =>
           $Map(src,
             Js.AnonFunDecl(List("key", "value"), List(
               Js.Return(Arr(List(
@@ -1182,7 +1182,7 @@ object Workflow {
       Fix(coalesce($FoldLeft(head, tail)))
   }
   def $foldLeft(first: Workflow, second: Workflow, rest: Workflow*) =
-    $FoldLeft.make(first, NonEmptyList.nel(second, rest.toList))
+    $FoldLeft.make(first, NonEmptyList.nel(second, IList.fromList(rest.toList)))
 
   implicit val WorkflowFRenderTree: RenderTree[WorkflowF[Unit]] = new RenderTree[WorkflowF[Unit]] {
     val wfType = "Workflow" :: Nil

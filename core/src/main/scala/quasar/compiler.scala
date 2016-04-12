@@ -111,14 +111,14 @@ trait Compiler[F[_]] {
       StateT[M, A, B] =
     StateT((s: A) => (s, f(s)).point[M])
 
-  private def fail[A](error: SemanticError)(implicit m: Applicative[F]):
+  private def fail[A](error: SemanticError)(implicit m: Monad[F]):
       CompilerM[A] =
     lift(error.left)
 
-  private def emit[A](value: A)(implicit m: Applicative[F]): CompilerM[A] =
+  private def emit[A](value: A)(implicit m: Monad[F]): CompilerM[A] =
     lift(value.right)
 
-  private def lift[A](v: SemanticError \/ A)(implicit m: Applicative[F]):
+  private def lift[A](v: SemanticError \/ A)(implicit m: Monad[F]):
       CompilerM[A] =
     StateT[M, CompilerState, A]((s: CompilerState) =>
       EitherT.eitherT(v.map(s -> _).point[F]))

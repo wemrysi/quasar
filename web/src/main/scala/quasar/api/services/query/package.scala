@@ -21,6 +21,8 @@ import quasar._, api._
 import quasar.fp.numeric._
 import quasar.sql.{Expr, Query}
 
+import scala.collection.Seq
+
 import argonaut._, Argonaut._
 import org.http4s._, dsl._
 import scalaz._, Scalaz._
@@ -37,22 +39,22 @@ package object query {
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
 
-  def queryParam(params: Map[String, scala.collection.Seq[String]]): ApiError \/ Query =
-    params.get("q") flatMap (_.toList.toNel) match {
-      case Some(xs) if xs.tail.isEmpty =>
-        Query(xs.head).right
+  def queryParam(params: Map[String, Seq[String]]): ApiError \/ Query =
+    params.getOrElse("q", Seq.empty) match {
+      case Seq(x) =>
+        Query(x).right
 
-      case Some(xs) =>
+      case Seq() =>
+        ApiError.fromStatus(
+          BadRequest withReason "No SQL^2 query found in URL."
+        ).left
+
+      case xs =>
         val ct = xs.size
         ApiError.fromMsg(
           BadRequest withReason "Multiple SQL^2 queries submitted.",
           s"The request may only contain a single SQL^2 query, found $ct.",
           "queryCount" := ct
-        ).left
-
-      case None =>
-        ApiError.fromStatus(
-          BadRequest withReason "No SQL^2 query found in URL."
         ).left
     }
 

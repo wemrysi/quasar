@@ -31,6 +31,7 @@ import quasar.fs.mount._
 import argonaut._, Argonaut._
 import org.http4s._
 import org.http4s.argonaut._
+import org.specs2.specification.core.Fragments
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.specs2.scalaz.ScalazMatchers._
@@ -59,7 +60,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
   def runTest[R: org.specs2.execute.AsResult](f: HttpSvc => M.F[R]): R = {
     type MEff[A] = Coproduct[Task, MountConfigsF, A]
 
-    TaskRef(Map[APath, MountConfig]()).map { ref =>
+    TaskRef(Map[APath, MountConfig]()).flatMap { ref =>
 
       val mounter: Mounting ~> Free[MEff, ?] = Mounter[Task, MEff](
         {
@@ -86,7 +87,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
       val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
 
       f(service.run andThen (free.lift(_).into[Eff])).foldMap(eff)
-    }.run.run
+    }.unsafePerformSync
   }
 
   def orFail[A](v: MountingError \/ A): Task[A] =
@@ -115,7 +116,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               resp <- service(Request(uri = pathUri(d)))
             } yield {
-              resp.as[Json].run must_== Json("stub" -> Json("connectionUri" := "foo"))
+              resp.as[Json].unsafePerformSync must_== Json("stub" -> Json("connectionUri" := "foo"))
               resp.status must_== Status.Ok
             }
           }
@@ -132,7 +133,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
             resp <- service(Request(uri = pathUri(d)))
           } yield {
-            resp.as[Json].run must_== Json("stub" -> Json("connectionUri" := "foo"))
+            resp.as[Json].unsafePerformSync must_== Json("stub" -> Json("connectionUri" := "foo"))
             resp.status must_== Status.Ok
           }
         }
@@ -149,7 +150,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               resp <- service(Request(uri = pathUri(f)))
             } yield {
-              resp.as[Json].run must_== cfgStr
+              resp.as[Json].unsafePerformSync must_== cfgStr
               resp.status must_== Status.Ok
             }
           }
@@ -161,7 +162,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           for {
             resp <- service(Request(uri = pathUri(d)))
           } yield {
-            resp.as[ApiError].run must beMountNotFoundError(d)
+            resp.as[ApiError].unsafePerformSync must beMountNotFoundError(d)
           }
         }
       }
@@ -175,7 +176,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
             resp <- service(Request(uri = pathUri(fp)))
           } yield {
-            resp.as[ApiError].run must beMountNotFoundError(fp)
+            resp.as[ApiError].unsafePerformSync must beMountNotFoundError(fp)
           }
         }
       }
@@ -204,7 +205,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               srcAfter <- M.lookup(src).run
               dstAfter <- M.lookup(dst).run
             } yield {
-              resp.as[String].run must_== s"moved ${printPath(src)} to ${printPath(dst)}"
+              resp.as[String].unsafePerformSync must_== s"moved ${printPath(src)} to ${printPath(dst)}"
               resp.status must_== Status.Ok
 
               srcAfter must beNone
@@ -222,7 +223,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               uri = pathUri(src),
               headers = Headers(destination(dst))))
           } yield {
-            resp.as[ApiError].run must beApiErrorLike(pathNotFound(src))
+            resp.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(src))
           }
         }
       }
@@ -237,7 +238,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 method = MOVE,
                 uri = pathUri(src)))
             } yield {
-              resp.as[ApiError].run must beHeaderMissingError("Destination")
+              resp.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
             }
           }
         }
@@ -254,7 +255,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 uri = pathUri(src),
                 headers = Headers(destination(dst))))
             } yield {
-              resp.as[ApiError].run must equal(ApiError.apiError(
+              resp.as[ApiError].unsafePerformSync must equal(ApiError.apiError(
                 Status.BadRequest withReason "Expected an absolute directory.",
                 "path" := dst))
             }
@@ -273,7 +274,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 uri = pathUri(src),
                 headers = Headers(destination(dst))))
             } yield {
-              resp.as[ApiError].run must equal(ApiError.apiError(
+              resp.as[ApiError].unsafePerformSync must equal(ApiError.apiError(
                 Status.BadRequest withReason "Expected an absolute directory.",
                 "path" := dst))
             }
@@ -292,7 +293,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]): Request
       }
 
-      def testBoth(test: RequestBuilder => Unit) = {
+      def testBoth(test: RequestBuilder => Fragments) = {
         "POST" should {
           test(new RequestBuilder {
             def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]) =
@@ -300,7 +301,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 method = POST,
                 uri = pathUri(parent),
                 headers = Headers(xFileName(mount)))
-              .withBody(body).run
+              .withBody(body).unsafePerformSync
             })
         }
 
@@ -310,7 +311,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               Request(
                 method = PUT,
                 uri = pathUri(parent </> mount))
-              .withBody(body).run
+              .withBody(body).unsafePerformSync
           })
         }
       }
@@ -324,7 +325,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
                 after <- M.lookup(parent </> fsDir).run
               } yield {
-                resp.as[String].run must_== s"added ${printPath(parent </> fsDir)}"
+                resp.as[String].unsafePerformSync must_== s"added ${printPath(parent </> fsDir)}"
                 resp.status must_== Status.Ok
 
                 after must beSome(MountConfig.fileSystemConfig(StubFs, ConnectionUri("foo")))
@@ -344,7 +345,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
                 after <- M.lookup(parent </> f).run
               } yield {
-                resp.as[String].run must_== s"added ${printPath(parent </> f)}"
+                resp.as[String].unsafePerformSync must_== s"added ${printPath(parent </> f)}"
                 resp.status must_== Status.Ok
 
                 after must beSome(MountConfig.viewConfig(cfg))
@@ -369,7 +370,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 afterFs   <- M.lookup(fs).run
                 afterView <- M.lookup(view).run
               } yield {
-                resp.as[String].run must_== s"added ${printPath(view)}"
+                resp.as[String].unsafePerformSync must_== s"added ${printPath(view)}"
                 resp.status must_== Status.Ok
 
                 afterFs must beSome
@@ -396,7 +397,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
                 after <- M.lookup(d </> view).run
               } yield {
-                resp.as[String].run must_== s"added ${printPath(d </> view)}"
+                resp.as[String].unsafePerformSync must_== s"added ${printPath(d </> view)}"
                 resp.status must_== Status.Ok
 
                 after must beSome(MountConfig.viewConfig(cfg))
@@ -421,7 +422,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
                 after <- M.lookup(d </> fs).run
               } yield {
-                resp.as[Json].run must_== Json("error" := s"cannot mount at ${printPath(d </> fs)} because existing mount below: ${printPath(fs1)}")
+                resp.as[Json].unsafePerformSync must_== Json("error" := s"cannot mount at ${printPath(d </> fs)} because existing mount below: ${printPath(fs1)}")
                 resp.status must_== Status.Conflict
 
                 after must beNone
@@ -437,7 +438,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             for {
               resp <- service(reqBuilder(parent, fsFile, """{ "stub": { "connectionUri": "foo" } }"""))
             } yield {
-              resp.as[ApiError].run must beApiErrorWithMessage(
+              resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Incorrect path type.",
                 "path" := (parent </> fsFile))
             }
@@ -452,7 +453,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             for {
               resp <- service(reqBuilder(parent, viewDir, cfgStr))
             } yield {
-              resp.as[ApiError].run must beApiErrorWithMessage(
+              resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Incorrect path type.",
                 "path" := (parent </> viewDir))
             }
@@ -468,7 +469,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, cfgStr))
               } yield {
-                resp.as[ApiError].run must beInvalidConfigError("unbound variable (simulated)")
+                resp.as[ApiError].unsafePerformSync must beInvalidConfigError("unbound variable (simulated)")
               }
             }
           }
@@ -480,7 +481,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, "{"))
               } yield {
-                resp.as[ApiError].run must beApiErrorWithMessage(
+                resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                   Status.BadRequest withReason "Malformed input.")
               }
             }
@@ -493,7 +494,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, d, """{ "stub": { "connectionUri": "invalid" } }"""))
               } yield {
-                resp.as[ApiError].run must beInvalidConfigError("invalid connectionUri (simulated)")
+                resp.as[ApiError].unsafePerformSync must beInvalidConfigError("invalid connectionUri (simulated)")
               }
             }
           }
@@ -505,13 +506,11 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               for {
                 resp <- service(reqBuilder(parent, f, """{ "view": { "connectionUri": "foo://bar" } }"""))
               } yield {
-                resp.as[ApiError].run must beApiErrorWithMessage(Status.BadRequest)
+                resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(Status.BadRequest)
               }
             }
           }
         }
-
-        () // TODO: Remove after upgrading to specs2 3.x
       }
     }
 
@@ -531,11 +530,11 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                       method = POST,
                       uri = pathUri(parent),
                       headers = Headers(xFileName(fsDir)))
-                    .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
+                    .withBody("""{ "stub": { "connectionUri": "foo" } }""").unsafePerformSync)
 
             after <- M.lookup(mntPath).run
           } yield {
-            resp.as[ApiError].run must beApiErrorLike(pathExists(mntPath))
+            resp.as[ApiError].unsafePerformSync must beApiErrorLike(pathExists(mntPath))
             after must beSome(MountConfig.fileSystemConfig(previousCfg))
           }
         }
@@ -548,9 +547,9 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp <- service(Request(
                         method = POST,
                         uri = pathUri(parent))
-                      .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
+                      .withBody("""{ "stub": { "connectionUri": "foo" } }""").unsafePerformSync)
             } yield {
-              resp.as[ApiError].run must beHeaderMissingError("X-File-Name")
+              resp.as[ApiError].unsafePerformSync must beHeaderMissingError("X-File-Name")
             }
           }
         }
@@ -572,11 +571,11 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               resp <- service(Request(
                         method = PUT,
                         uri = pathUri(fsDir))
-                      .withBody("""{ "stub": { "connectionUri": "foo" } }""").run)
+                      .withBody("""{ "stub": { "connectionUri": "foo" } }""").unsafePerformSync)
 
               after <- M.lookup(fsDir).run
             } yield {
-              resp.as[String].run must_== s"updated ${printPath(fsDir)}"
+              resp.as[String].unsafePerformSync must_== s"updated ${printPath(fsDir)}"
               resp.status must_== Status.Ok
 
               after must beSome(MountConfig.fileSystemConfig(cfg))
@@ -601,7 +600,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               after <- M.lookup(d).run
             } yield {
-              resp.as[String].run must_== s"deleted ${printPath(d)}"
+              resp.as[String].unsafePerformSync must_== s"deleted ${printPath(d)}"
               resp.status must_== Status.Ok
 
               after must beNone
@@ -625,7 +624,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               after <- M.lookup(f).run
             } yield {
               resp.status must_== Status.Ok
-              resp.as[String].run must_== s"deleted ${printPath(f)}"
+              resp.as[String].unsafePerformSync must_== s"deleted ${printPath(f)}"
 
               after must beNone
             }
@@ -638,7 +637,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           for {
             resp <- service(Request(method = DELETE, uri = pathUri(p)))
           } yield {
-            resp.as[ApiError].run must beApiErrorLike(pathNotFound(p))
+            resp.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(p))
           }
         }
       }

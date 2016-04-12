@@ -59,7 +59,7 @@ object MonotonicSeq {
     */
   def fromTaskRef(ref: TaskRef[Long]): MonotonicSeq ~> Task =
     new (MonotonicSeq ~> Task) {
-      val toST = toState[State](Lens.id[Long])
+      val toST = toState[State[Long,?]](Lens.id[Long])
       def apply[A](fa: MonotonicSeq[A]) =
         ref.modifyS(toST(fa).run)
     }
@@ -71,13 +71,13 @@ object MonotonicSeq {
     *   `toState[F](lens)`
     */
   object toState {
-    def apply[F[_, _]]: Aux[F] =
+    def apply[F[_]]: Aux[F] =
       new Aux[F]
 
-    final class Aux[F[_, _]] {
+    final class Aux[F[_]] {
       def apply[S](l: Lens[S, Long])(implicit F: MonadState[F, S])
-                  : MonotonicSeq ~> F[S, ?] =
-        new (MonotonicSeq ~> F[S, ?]) {
+                  : MonotonicSeq ~> F =
+        new (MonotonicSeq ~> F) {
           def apply[A](seq: MonotonicSeq[A]) = seq match {
             case Next => F.gets(l.get) <* F.modify(l.modify(_ + 1))
           }

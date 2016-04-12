@@ -62,12 +62,6 @@ trait PathArbitrary {
   private def peel(dir: ADir): Option[(ADir, DirName)] =
     parentDir(dir).zip(dirName(dir)).headOption
 
-  // TODO[pathy]: Remove when upgrading to latest version
-  implicit val arbitraryFileName: Arbitrary[FileName] = Arbitrary(genSegment.map(FileName(_)))
-
-  // TODO[pathy]: Remove when upgrading to latest version
-  implicit val arbitraryDirName: Arbitrary[DirName] = Arbitrary(genSegment.map(DirName(_)))
-
   private val genSegment: Gen[String] =
     Gen.nonEmptyListOf(Gen.frequency(
       100 -> Gen.alphaNumChar,

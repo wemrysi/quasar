@@ -18,7 +18,8 @@ package quasar
 package specs2
 
 import org.specs2.mutable.Specification
-import org.specs2.specification.{SpecificationStructure, Fragments}
+import org.specs2.specification.core.SpecificationStructure
+import org.specs2.specification.core.Fragments
 
 /** Trait that tags all examples in a spec for exclusive execution. Examples
   * will be executed sequentially and parallel execution will be disabled.

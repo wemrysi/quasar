@@ -24,6 +24,7 @@ import quasar.sql
 import argonaut._, Argonaut._
 import org.specs2.mutable
 import org.specs2.scalaz._
+import scalaz.Scalaz._
 
 import pathy.Path._
 
@@ -55,15 +56,15 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
     "decode" >> {
       "no vars" >> {
         viewJson("sql2:///?q=%28select+*+from+zips%29")
-          .as[MountConfig].toDisjunction must
-            beRightDisjunction(ViewConfig(read, Variables(Map())))
+          .as[MountConfig].toEither must
+            beRight(ViewConfig(read, Variables(Map())))
       }
 
       "decode with var" in {
         // NB: the _last_ value for a given var name is used.
         viewJson("sql2:///?q=%28select+*+from+zips%29&var.a=1&var.b=2&var.b=3")
-          .as[MountConfig].toDisjunction must
-            beRightDisjunction(
+          .as[MountConfig].toEither must
+            beRight(
               ViewConfig(read, Variables(Map(
                 VarName("a") -> VarValue("1"),
                 VarName("b") -> VarValue("3")))))
@@ -71,25 +72,25 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
 
       "decode with missing query" in {
         viewJson("sql2:///?p=foo")
-          .as[MountConfig].toDisjunction.leftMap(_._1) must
-            beLeftDisjunction("missing query: sql2:///?p=foo")
+          .as[MountConfig].toEither.leftMap(_._1) must
+            beLeft("missing query: sql2:///?p=foo")
       }
 
       "decode with bad scheme" in {
         viewJson("foo:///?q=%28select+*+from+zips%29")
-          .as[MountConfig].toDisjunction.leftMap(_._1) must
-            beLeftDisjunction("unrecognized scheme: foo")
+          .as[MountConfig].toEither.leftMap(_._1) must
+            beLeft("unrecognized scheme: foo")
       }
 
       "decode with unparseable URI" in {
         viewJson("?")
-          .as[MountConfig].toDisjunction.leftMap(_._1) must
-            beLeftDisjunction("missing URI scheme: ?")
+          .as[MountConfig].toEither.leftMap(_._1) must
+            beLeft("missing URI scheme: ?")
       }
 
       "decode with bad encoding" in {
         viewJson("sql2:///?q=%F%28select+*+from+zips%29")
-          .as[MountConfig].toDisjunction.leftMap(_._1) must beLeftDisjunction
+          .as[MountConfig].toEither.leftMap(_._1) must beLeft
       }
     }
   }

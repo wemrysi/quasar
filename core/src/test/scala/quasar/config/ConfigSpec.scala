@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fs.mount.ConnectionUri
 
-import argonaut._, Argonaut._
+import argonaut._
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import pathy._, Path._
@@ -83,7 +83,7 @@ abstract class ConfigSpec[Config: CodecJson] extends Specification with Disjunct
       withTestConfigFile(fp =>
         configOps.toFile(TestConfig, Some(fp)) *>
         configOps.fromFile(fp).run
-      ).run must beRightDisjunction(TestConfig)
+      ).unsafePerformSync must beRightDisjunction(TestConfig)
     }
   }
 
@@ -92,7 +92,7 @@ abstract class ConfigSpec[Config: CodecJson] extends Specification with Disjunct
       val (p, r) =
         withTestConfigFile(fp =>
           configOps.fromFile(fp).run.map((fp, _))
-        ).run
+        ).unsafePerformSync
       r must beLeftDisjunction(fileNotFound(p))
     }
   }

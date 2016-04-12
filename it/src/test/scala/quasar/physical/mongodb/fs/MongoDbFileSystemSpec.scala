@@ -34,6 +34,7 @@ import monocle.function.Field1
 import monocle.std.tuple2._
 import org.specs2.ScalaCheck
 import org.specs2.execute.SkipException
+import org.specs2.specification.core.Fragments
 import pathy.Path._
 import scalaz.{Optional => _, _}, Scalaz._
 import scalaz.stream._
@@ -105,21 +106,21 @@ class MongoDbFileSystemSpec
                 .composePrism(writeFailed)
                 .composeLens(Field1.first)
                 .isMatching(errs.toVector)
-            }.run.run.toEither must beRight(true)
+            }.run.unsafePerformSync.toEither must beRight(true)
           }
         }
 
         "fail to save data to DB path" in {
           val path = rootDir </> file("foo")
 
-          runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
+          runLogT(run, write.save(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must_==
             -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
         }
 
         "fail to append data to DB path" in {
           val path = rootDir </> file("foo")
 
-          runLogT(run, write.append(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.run must_==
+          runLogT(run, write.append(path, Process(Data.Obj(ListMap("a" -> Data.Int(1)))))).run.unsafePerformSync must_==
             -\/(FileSystemError.pathErr(PathError.invalidPath(path, "path names a database, but no collection")))
         }
 
@@ -154,7 +155,7 @@ class MongoDbFileSystemSpec
               .apply(runLogT(run, check(d)))
               .handleWith(skipIfUnauthorized)
               .map(_.headOption getOrElse ko)
-          ).run
+          ).unsafePerformSync
         }
 
         "root dir should delete all databases" >> {
@@ -185,10 +186,10 @@ class MongoDbFileSystemSpec
               .apply(runLogT(run, check(d1, d2)))
               .handleWith(skipIfUnauthorized)
               .map(_.headOption getOrElse ko)
-          ).join.run
+          ).join.unsafePerformSync
         }.skippedOnUserEnv("Would destroy user data.")
 
-        step(restoreTestDir(run).run)
+        step(restoreTestDir(run).unsafePerformSync)
       }
 
       /** TODO: Testing this here closes the tests to the existence of
@@ -234,10 +235,10 @@ class MongoDbFileSystemSpec
             val out = renameFile(file, κ(FileName("out")))
 
             def check0(expr: sql.Expr) =
-              (run(query.fileExists(file)).run ==== false) and
+              (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
                 runExec(query.executeQuery(expr, Variables.fromMap(Map()), out))
-                  .run.value.run
+                  .run.value.unsafePerformSync
               ) must beSome(file))
 
             sql.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
@@ -245,7 +246,7 @@ class MongoDbFileSystemSpec
               check0)
           }
 
-          dne.map(check).run
+          dne.map(check).unsafePerformSync
         }
 
         "mapReduce query should fail when file DNE" >> {
@@ -285,7 +286,7 @@ class MongoDbFileSystemSpec
 
           val p = query.fileExists(tfile)
 
-          run(p).run must_== false
+          run(p).unsafePerformSync must_== false
         }
 
         "for missing file not at the root (i.e. a collection path) should succeed" >> {
@@ -293,7 +294,7 @@ class MongoDbFileSystemSpec
 
           val p = query.fileExists(tfile)
 
-          run(p).run must_== false
+          run(p).unsafePerformSync must_== false
         }
       }
 
@@ -323,12 +324,12 @@ class MongoDbFileSystemSpec
                 runT(run)(manage.delete(s) *> manage.delete(d)))
               .handleWith(skipIfUnauthorized)
               .map(_.headOption getOrElse ko)
-          ).join.run
+          ).join.unsafePerformSync
         }
       }
 
       "Temp files" should {
-        Collection.DatabaseNameEscapes foreach { case (esc, _) =>
+        Fragments.foreach(Collection.DatabaseNameEscapes) { case (esc, _) =>
           s"be in the same database when db name contains '$esc'" >> {
             val pdir = rootDir </> dir(s"db${esc}name")
 
@@ -340,7 +341,7 @@ class MongoDbFileSystemSpec
           }
         }
       }
-    }; ()
+    }
   }
 
   ////

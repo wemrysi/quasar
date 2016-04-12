@@ -154,18 +154,18 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
       expr must beFailing
     }
 
-    "typecheck number raised to 0th power" ! arbitraryNumeric { (t: Type) =>
+    "typecheck number raised to 0th power" ! prop { (t: Type) =>
       Power(t, TZero()) should beSuccessful(TOne())
-    }
+    }.setArbitrary(arbitraryNumeric)
 
-    "typecheck 0 raised to any (non-zero) power" ! arbitraryNumeric { (t: Type) =>
+    "typecheck 0 raised to any (non-zero) power" ! prop { (t: Type) =>
       (t != TZero()) ==>
         (Power(TZero(), t) should beSuccessful(TZero()))
-    }
+    }.setArbitrary(arbitraryNumeric)
 
-    "typecheck any number raised to 1st power" ! arbitraryNumeric { (t: Type) =>
+    "typecheck any number raised to 1st power" ! prop { (t: Type) =>
       Power(t, TOne()) should beSuccessful(t)
-    }
+    }.setArbitrary(arbitraryNumeric)
 
     "typecheck constant raised to int constant" in {
       Power(Const(Dec(7.2)), Const(Int(2))) should beSuccessful(Const(Dec(51.84)))
@@ -208,14 +208,6 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
       expr should beSuccessful(Type.Const(Timestamp(Instant.parse("2015-01-21T09:00:00Z"))))
     }
 
-    "add with const and non-const Ints" in {
-      permute(Add(_), TOne(), Const(Int(2)))(Const(Int(3)), Type.Int)
-    }
-
-    "add with const and non-const Int and Dec" in {
-      permute(Add(_), TOne(), Const(Dec(2.0)))(Const(Dec(3.0)), Type.Dec)
-    }
-
     def permute(f: List[Type] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
       f(t1 :: t2 :: Nil) should beSuccessful(exp1)
       f(t1 :: t2.value.dataType :: Nil) should beSuccessful(exp2)
@@ -226,6 +218,14 @@ class MathSpec extends Specification with ScalaCheck with TypeArbitrary with Val
       f(t2.value.dataType :: t1 :: Nil) should beSuccessful(exp2)
       f(t2 :: t1.value.dataType :: Nil) should beSuccessful(exp2)
       f(t2.value.dataType :: t1.value.dataType :: Nil) should beSuccessful(exp2)
+    }
+
+    "add with const and non-const Ints" in {
+      permute(Add(_), TOne(), Const(Int(2)))(Const(Int(3)), Type.Int)
+    }
+
+    "add with const and non-const Int and Dec" in {
+      permute(Add(_), TOne(), Const(Dec(2.0)))(Const(Dec(3.0)), Type.Dec)
     }
 
     // TODO: tests for unapply() in general

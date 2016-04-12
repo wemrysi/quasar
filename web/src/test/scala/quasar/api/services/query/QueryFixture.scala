@@ -55,16 +55,16 @@ object queryFixture {
       baseUri.+?("var."+varName,value)
     }.getOrElse(baseUri)
     val req = Request(uri = uriWithVar)
-    val actualResponse = service(state)(req).run
-    response(actualResponse.as[A].run)
+    val actualResponse = service(state)(req).unsafePerformSync
+    response(actualResponse.as[A].unsafePerformSync)
     actualResponse.status must_== status
   }
 
   def compileService(state: InMemState): HttpService = compile.service[FileSystem].toHttpService(
-      liftMT[Task, ResponseT].compose(runFs(state).run))
+      liftMT[Task, ResponseT].compose(runFs(state).unsafePerformSync))
 
   def executeService(state: InMemState): HttpService =
-    execute.service[Eff].toHttpService(effRespOr(runFs(state).run))
+    execute.service[Eff].toHttpService(effRespOr(runFs(state).unsafePerformSync))
 
   def selectAll(from: FPath) = {
     val ast = Select(

@@ -65,7 +65,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
 
     def unzip[A](f: java.io.InputStream => A)(p: Process[Task, ByteVector]): Task[List[(RelFile[Sandboxed], A)]] =
       Task.delay {
-        val bytes = p.runLog.run.toList.concatenate  // FIXME: this means we can't use this to test anything big
+        val bytes = p.runLog.unsafePerformSync.toList.concatenate  // FIXME: this means we can't use this to test anything big
         val is = new java.io.ByteArrayInputStream(bytes.toArray)
         val zis = new java.util.zip.ZipInputStream(is)
         Stream.continually(zis.getNextEntry).takeWhile(_ != null).map { entry =>
@@ -100,7 +100,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(byte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must_== filesAndSize.toList
+      counts(z).unsafePerformSync must_== filesAndSize.toList
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip files of random bytes" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
@@ -108,7 +108,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      counts(z).run must_== filesAndSize.toList
+      counts(z).unsafePerformSync must_== filesAndSize.toList
     }.set(minTestsOk = 10) // This test is relatively slow
 
     "zip many large files of random bytes (100 MB)" in {
@@ -122,7 +122,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
       val z = zipFiles(paths.map(_ -> f4))
 
       // NB: can't use my naive `list` function on a large file
-      z.map(_.size).sum.runLog.run(0) must beBetween(MinExpectedSize, MaxExpectedSize)
+      z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
     "zip many large files of random bytes (10 GB)" in {
@@ -138,7 +138,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
       val z = zipFiles(paths.map(_ -> f4))
 
       // NB: can't use my naive `list` function on a large file
-      z.map(_.size).sum.runLog.run(0) must beBetween(MinExpectedSize, MaxExpectedSize)
+      z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
     "read twice without conflict" ! prop { filesAndSize: Map[RelFile[Sandboxed], Positive] =>
@@ -146,7 +146,7 @@ class ZipSpecs extends Specification with ScalaCheck with ScalazMatchers {
         Process.emit(ByteVector.view(Array.fill(size.toInt)(rand.nextInt.toByte)))
       val bytesMapping = filesAndSize.mapValues(byteStream)
       val z = zipFiles(bytesMapping.toList)
-      bytes(z).run must equal(bytes(z).run)
+      bytes(z).unsafePerformSync must equal(bytes(z).unsafePerformSync)
     }.set(minTestsOk = 10) // This test is relatively slow
   }
 }

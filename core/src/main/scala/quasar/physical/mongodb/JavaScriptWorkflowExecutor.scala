@@ -46,7 +46,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
     WriterT.tell(Vector(stmt))
 
   private def foldExpr[F[_]: Foldable, A](fa: F[A])(f: (A, Expr) => Expr): ExprS[Unit] =
-    fa.traverse_[ExprS](a => MonadState[State, Expr].modify(f(a, _)))
+    fa.traverse_[ExprS](a => MonadState[ExprS, Expr].modify(f(a, _)))
 
   protected def aggregate(src: Collection, pipeline: Pipeline) =
     tell(Call(

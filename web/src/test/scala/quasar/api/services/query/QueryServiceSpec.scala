@@ -27,6 +27,7 @@ import quasar.fs.InMemory._
 
 import argonaut._, Argonaut._
 import org.http4s._
+import org.specs2.specification.core.Fragments
 import org.specs2.ScalaCheck
 import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
@@ -37,7 +38,7 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](test: (InMemState => HttpService) => Unit) = {
+    def testBoth[A](test: (InMemState => HttpService) => Fragments) = {
       "Compile" should {
         test(compileService)
       }
@@ -92,16 +93,14 @@ class QueryServiceSpec extends org.specs2.mutable.Specification with FileSystemF
             val parentAsFile = asFile(filesystem.parent).get
 
             val req = Request(uri = pathUri(parentAsFile).+??("q", selectAll(filesystem.file).some))
-            val resp = service(filesystem.state)(req).run
+            val resp = service(filesystem.state)(req).unsafePerformSync
             resp.status must_== Status.BadRequest
-            resp.as[ApiError].run must beApiErrorWithMessage(
+            resp.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
               Status.BadRequest withReason "Directory path expected.",
               "path" := parentAsFile)
           }
         }
       }
-
-      () // TODO: Remove after upgrading to specs2 3.x
     }
   }
 

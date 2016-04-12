@@ -1089,6 +1089,11 @@ object MongoDbPlanner extends Planner[Crystallized] {
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
+    // Needed in order to resolve an ambiguous instances for monadMTMAB
+    // I think either one of them would be fine, so just picking one
+    // so that it compiles
+    import Monad.monadMTMAB
+
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
         val result = PhaseResult.Tree(label, RenderTree[A].render(a))

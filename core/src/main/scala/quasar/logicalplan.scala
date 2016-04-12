@@ -287,7 +287,7 @@ object LogicalPlan {
         args0 <- types.align(args).traverseU(_.onlyBoth match {
           case Some((t, arg)) => inferTypes(t, arg).disjunction
           case None =>
-            SemanticError.WrongArgumentCount(func, types.length, args.length)
+            (SemanticError.wrongArgumentCount(func, types.length, args.length))
               .wrapNel.left
         }).validation
       } yield InvokeF[Typed[LogicalPlan]](func, args0)
@@ -330,7 +330,7 @@ object LogicalPlan {
       emitName(freshName("check").map(name =>
         ConstrainedPlan(inf, List(NamedConstraint(name, inf, term)), Free(name))))
     }
-    else lift(SemanticError.GenericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term").wrapNel.left)
+    else lift((SemanticError.genericError(s"couldn’t unify inferred (${inf}) and possible (${poss}) types in $term")).wrapNel.left)
   }
 
   private def appConst(constraints: ConstrainedPlan, fallback: Fix[LogicalPlan]) =
@@ -416,7 +416,7 @@ object LogicalPlan {
   def ensureCorrectTypes(term: Fix[LogicalPlan]):
       ValidationNel[SemanticError, Fix[LogicalPlan]] =
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Constant(Data.NA))).evalZero.validation)
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ)(implicitly, Monad.monadMTMAB).map(appConst(_, Constant(Data.NA))).evalZero.validation)
 
   // TODO: Generalize this to Binder
   def lpParaZygoHistoM[M[_]: Monad, A, B](

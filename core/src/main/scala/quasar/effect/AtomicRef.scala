@@ -97,9 +97,9 @@ object AtomicRef {
       }
     }
 
-  def toState[F[_, _], S](implicit F: MonadState[F, S])
-                         : AtomicRef[S, ?] ~> F[S, ?] =
-    new (AtomicRef[S, ?] ~> F[S, ?]) {
+  def toState[F[_], S](implicit F: MonadState[F, S])
+                         : AtomicRef[S, ?] ~> F =
+    new (AtomicRef[S, ?] ~> F) {
       def apply[A](fa: AtomicRef[S, A]) = fa match {
         case Get(f) =>
           F.gets(f)

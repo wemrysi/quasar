@@ -45,7 +45,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
   val fullCompile: String => String \/ Fix[LogicalPlan] =
     q => compile(q).map(Optimizer.optimize).flatMap(lp =>
       LogicalPlan.ensureCorrectTypes(lp)
-        .disjunction.leftMap(_.list.mkString(";")))
+        .disjunction.leftMap(_.list.toList.mkString(";")))
 
   // NB: this plan is simplified and normalized, but not optimized. That allows
   // the expected result to be controlled more precisely. Assuming you know

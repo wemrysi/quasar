@@ -92,6 +92,6 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
       }
 
       step(deleteForQuery(fs.setupInterpM).runVoid)
-    }; ()
+    }
   }
 }

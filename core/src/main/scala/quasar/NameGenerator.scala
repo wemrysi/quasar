@@ -46,7 +46,7 @@ object NameGenerator {
 
   implicit def sequenceNameGenerator[F[_]: Monad]: NameGenerator[SeqNameGeneratorT[F, ?]] =
     new NameGenerator[SeqNameGeneratorT[F, ?]] {
-      val ms = MonadState[StateT[F, ?, ?], Long]
+      val ms = MonadState[StateT[F, Long, ?], Long]
       def freshName = ms.get flatMap (n => ms.put(n + 1) as n.toString)
     }
 

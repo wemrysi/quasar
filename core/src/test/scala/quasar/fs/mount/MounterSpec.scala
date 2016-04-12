@@ -43,7 +43,7 @@ class MounterSpec extends MountingSpec[MountingF] {
 
   def interpret = {
     val mm = Mounter[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
-    val cfgRef = TaskRef(Map.empty[APath, MountConfig]).run
+    val cfgRef = TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync
 
     val interpMnts: MountConfigsF ~> Task =
       Coyoneda.liftTF[MountConfigs, Task](KeyValueStore.fromTaskRef(cfgRef))

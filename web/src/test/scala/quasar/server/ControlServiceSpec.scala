@@ -26,13 +26,12 @@ import org.http4s.client.middleware.Retry
 import org.http4s.{Method, Request, Status, Uri}
 import org.http4s.server.syntax._
 import org.specs2.mutable
-import org.specs2.time.NoTimeConversions
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 import shapeless.nat._
 
-class ControlServiceSpec extends mutable.Specification with NoTimeConversions {
+class ControlServiceSpec extends mutable.Specification {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 
@@ -54,8 +53,8 @@ class ControlServiceSpec extends mutable.Specification with NoTimeConversions {
         b <- afterRestart
         _ <- shutdown
         _ <- others2.run
-      } yield b).timed(timeoutMillis)(DefaultTimeoutScheduler).onFinish(_ => shutdown)
-    } yield b).runFor(timeoutMillis)
+      } yield b).unsafePerformTimed(timeoutMillis)(DefaultTimeoutScheduler).onFinish(_ => shutdown)
+    } yield b).unsafePerformSyncFor(timeoutMillis)
   }
 
   "Control Service" should {
@@ -66,7 +65,7 @@ class ControlServiceSpec extends mutable.Specification with NoTimeConversions {
     "restart on new port when PUT succeeds" in {
       skipped("still failing in Travis -- see SD-1532")
 
-      val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].run.unsized
+      val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
       withServerExpectingRestart(initialPort = startPort){ baseUri: Uri =>
         for {
@@ -78,7 +77,7 @@ class ControlServiceSpec extends mutable.Specification with NoTimeConversions {
     "restart on default port when DELETE succeeds" in {
       skipped("still failing in Travis -- see SD-1532")
 
-      val Seq(startPort, defaultPort) = Http4sUtils.anyAvailablePorts[_2].run.unsized
+      val Seq(startPort, defaultPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
       withServerExpectingRestart(initialPort = startPort, defaultPort = defaultPort){ baseUri: Uri =>
         val req = Request(uri = baseUri, method = Method.DELETE)

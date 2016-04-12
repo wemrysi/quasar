@@ -80,8 +80,6 @@ object managefile {
 
   ////
 
-  private type R[S, A] = Kleisli[MongoDbIO, S, A]
-
   private val moveToRename: MoveSemantics => RenameSemantics = {
     case MoveSemantics.Overwrite     => RenameSemantics.Overwrite
     case MoveSemantics.FailIfExists  => RenameSemantics.FailIfExists
@@ -150,11 +148,11 @@ object managefile {
       collFromPathM(src) flatMap (srcColl =>
         collectionExists(srcColl).liftM[FileSystemErrT].ifM(
           if (MoveSemantics.failIfExists isMatching sem)
-            MonadError[MongoE, FileSystemError].raiseError(pathErr(pathExists(src)))
+            MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathExists(src)))
           else
             ().point[MongoFsM]
           ,
-          MonadError[MongoE, FileSystemError].raiseError(pathErr(pathNotFound(src)))))
+          MonadError[MongoFsM, FileSystemError].raiseError(pathErr(pathNotFound(src)))))
     else
       for {
         srcColl <- collFromPathM(src)
@@ -190,11 +188,11 @@ object managefile {
     collFromPathM(file) flatMap (c =>
       collectionExists(c).liftM[FileSystemErrT].ifM(
         dropCollection(c).liftM[FileSystemErrT],
-        pathErr(pathNotFound(file)).raiseError[MongoE, Unit]))
+        pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
   private def freshName: MongoManage[String] =
     for {
-      in <- MonadReader[R, ManageIn].ask
+      in <- MonadReader[MongoManage, ManageIn].ask
       (prefix, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
     } yield prefix.run + n

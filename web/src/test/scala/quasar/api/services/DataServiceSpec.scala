@@ -26,9 +26,8 @@ import quasar.api.MessageFormatGen._
 import quasar.api.matchers._
 import quasar.fs._
 import quasar.fs.PathArbitrary._
-import quasar.fp.{evalNT, free, liftMT}
+import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fp.prism._
 import quasar.fp.PathyCodecJson._
 
 import argonaut.Json
@@ -36,6 +35,8 @@ import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
+import org.scalacheck.Arbitrary
+import org.specs2.specification.core.Fragments
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
@@ -76,7 +77,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       data.service[Eff].toHttpService(effRespOr(fs)).apply(req)))
 
   def serviceRef(mem: InMemState): (HttpService, Task[InMemState]) = {
-    val (inter, ref) = runInspect(mem).run
+    val (inter, ref) = runInspect(mem).unsafePerformSync
     val svc = HttpService.lift(req =>
       data.service[Eff]
         .toHttpService(effRespOr(inter compose fileSystem))
@@ -107,21 +108,21 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
     "GET" >> {
       "respond with NotFound" >> {
         "if file does not exist" ! prop { file: AFile =>
-          val response = service(InMemState.empty)(Request(uri = pathUri(file))).run
+          val response = service(InMemState.empty)(Request(uri = pathUri(file))).unsafePerformSync
           response.status must_== Status.NotFound
-          response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
+          response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
         }
       }
       "respond with file data" >> {
         def isExpectedResponse(data: Vector[Data], response: Response, format: MessageFormat) = {
           val expectedBody: Process[Task, String] = format.encode(Process.emitAll(data))
-          response.as[String].run must_== expectedBody.runLog.run.mkString("")
+          response.as[String].unsafePerformSync must_== expectedBody.runLog.unsafePerformSync.mkString("")
           response.status must_== Status.Ok
           response.contentType must_== Some(`Content-Type`(format.mediaType, Charset.`UTF-8`))
         }
         "in correct format" >> {
           "readable and line delimited json by default" ! prop { filesystem: SingleFileMemState =>
-            val response = service(filesystem.state)(Request(uri = pathUri(filesystem.file))).run
+            val response = service(filesystem.state)(Request(uri = pathUri(filesystem.file))).unsafePerformSync
             isExpectedResponse(filesystem.contents, response, MessageFormat.Default)
           }
           "in any supported format if specified" >> {
@@ -131,7 +132,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 val request = Request(
                   uri = pathUri(filesystem.file),
                   headers = Headers(Accept(format.mediaType)))
-                val response = service(filesystem.state)(request).run
+                val response = service(filesystem.state)(request).unsafePerformSync
                 isExpectedResponse(filesystem.contents, response, format)
               }
               "json" >> {
@@ -153,7 +154,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
                 val request = Request(
                   uri = pathUri(filesystem.file),
                   headers = Headers(Header("Accept", "application/ldjson;q=0.9;mode=readable,application/json;boundary=NL;mode=precise")))
-                val response = service(filesystem.state)(request).run
+                val response = service(filesystem.state)(request).unsafePerformSync
                 isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
               }
             }
@@ -161,7 +162,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               val contentType = JsonContentType(Precise, LineDelimited)
               val request = Request(
                 uri = pathUri(filesystem.file).+?("request-headers", s"""{"Accept": "application/ldjson; mode=precise" }"""))
-              val response = HeaderParam(service(filesystem.state))(request).run
+              val response = HeaderParam(service(filesystem.state))(request).unsafePerformSync
               isExpectedResponse(filesystem.contents, response, JsonContentType(Precise, LineDelimited))
             }
           }
@@ -170,7 +171,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           val request = Request(
             uri = pathUri(filesystem.file),
             headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
-          val response = GZip(service(filesystem.state))(request).run
+          val response = GZip(service(filesystem.state))(request).unsafePerformSync
           response.headers.get(headers.`Content-Encoding`) must_== Some(`Content-Encoding`(ContentCoding.gzip))
           response.status must_== Status.Ok
         }
@@ -179,7 +180,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           val request = Request(
             uri = pathUri(filesystem.file),
             headers = Headers(Accept(jsonReadableLine.copy(disposition = Some(disposition)).mediaType)))
-          val response = service(filesystem.state)(request).run
+          val response = service(filesystem.state)(request).unsafePerformSync
           response.headers.get(`Content-Disposition`) must_== Some(disposition)
         }
         "support offset and limit" >> {
@@ -188,7 +189,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               val request = Request(
                 uri = pathUri(filesystem.file).+?("offset", offset.toString).+?("limit", limit.toString),
                 headers = Headers(Accept(format.mediaType)))
-              val response = service(filesystem.state)(request).run
+              val response = service(filesystem.state)(request).unsafePerformSync
               isExpectedResponse(filesystem.contents.drop(offset).take(limit), response, format)
           }
           "return 400 if provided with" >> {
@@ -196,49 +197,49 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               (limit < 1) ==> {
                 val request = Request(
                   uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
-                val response = service(InMemState.empty)(request).run
-                response.as[ApiError].run must beApiErrorWithMessage(
+                val response = service(InMemState.empty)(request).unsafePerformSync
+                response.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                   Status.BadRequest withReason "Invalid query parameter.")
               }
             }
             "a negative offset" ! prop { (path: AbsFile[Sandboxed], offset: Long @@ Negative, limit: Positive) =>
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limit.shows))
-              val response = service(InMemState.empty)(request).run
-              response.as[ApiError].run must beApiErrorWithMessage(
+              val response = service(InMemState.empty)(request).unsafePerformSync
+              response.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Invalid query parameter.")
             }
             "if provided with multiple limits?" ! prop { (path: AbsFile[Sandboxed], offset: Natural, limit1: Positive, limit2: Positive, otherLimits: List[Positive]) =>
               val limits = limit1 :: limit2 :: otherLimits
               val request = Request(
                 uri = pathUri(path).+?("offset", offset.shows).+?("limit", limits.map(_.shows)))
-              val response = service(InMemState.empty)(request).run
+              val response = service(InMemState.empty)(request).unsafePerformSync
               response.status must_== Status.BadRequest
-              response.as[Json].run must_== Json("error" := s"Two limits were provided, only supply one limit")
+              response.as[Json].unsafePerformSync must_== Json("error" := s"Two limits were provided, only supply one limit")
             }.pendingUntilFixed("SD-1082")
             "if provided with multiple offsets?" ! prop { (path: AbsFile[Sandboxed], limit: Positive, offsets: List[Natural]) =>
               (offsets.length >= 2) ==> {
                 val request = Request(
                   uri = pathUri(path).+?("offset", offsets.map(_.shows)).+?("limit", limit.shows))
-                val response = service(InMemState.empty)(request).run
+                val response = service(InMemState.empty)(request).unsafePerformSync
                 response.status must_== Status.BadRequest
-                response.as[Json].run must_== Json("error" := s"Two limits were provided, only supply one limit")
+                response.as[Json].unsafePerformSync must_== Json("error" := s"Two limits were provided, only supply one limit")
                 todo // Confirm this is the expected behavior because http4s defaults to just grabbing the first one
                      // and going against that default behavior would be more work
               }
             }.pendingUntilFixed("SD-1082")
             "an unparsable limit" ! prop { path: AbsFile[Sandboxed] =>
               val request = Request(uri = pathUri(path).+?("limit", "a"))
-              val response = service(InMemState.empty)(request).run
-              response.as[ApiError].run must beApiErrorWithMessage(
+              val response = service(InMemState.empty)(request).unsafePerformSync
+              response.as[ApiError].unsafePerformSync must beApiErrorWithMessage(
                 Status.BadRequest withReason "Invalid query parameter.")
             }
             "if provided with both an invalid offset and limit" ! prop { (path: AbsFile[Sandboxed], limit: Int, offset: Long @@ Negative) =>
               (limit < 1) ==> {
                 val request = Request(uri = pathUri(path).+?("limit", limit.shows).+?("offset", offset.shows))
-                val response = service(InMemState.empty)(request).run
+                val response = service(InMemState.empty)(request).unsafePerformSync
                 response.status must_== Status.BadRequest
-                response.as[Json].run must_== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)")
+                response.as[Json].unsafePerformSync must_== Json("error" := s"invalid limit: $limit (must be >= 1), invalid offset: $offset (must be >= 0)")
               }
             }.pendingUntilFixed("SD-1083")
           }
@@ -249,14 +250,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           val data = (0 until 100*1000).map(n => Data.Obj(ListMap("n" -> Data.Int(n)))).toVector
           "plain text" >> {
             val request = Request(uri = pathUri(sampleFile))
-            val response = service(fileSystemWithSampleFile(data))(request).run
+            val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             isExpectedResponse(data, response, MessageFormat.Default)
           }
           "gziped" >> {
             val request = Request(
               uri = pathUri(sampleFile),
               headers = Headers(`Accept-Encoding`(org.http4s.ContentCoding.gzip)))
-            val response = service(fileSystemWithSampleFile(data))(request).run
+            val response = service(fileSystemWithSampleFile(data))(request).unsafePerformSync
             isExpectedResponse(data, response, MessageFormat.Default)
           }
         }
@@ -267,15 +268,15 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         val request = Request(
           uri = pathUri(filesystem.dir),
           headers = Headers(Accept(requestMediaType)))
-        val response = service(filesystem.state)(request).run
+        val response = service(filesystem.state)(request).unsafePerformSync
         response.status must_== Status.Ok
         response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
         response.headers.get(`Content-Disposition`) must_== Some(disposition)
-      }.set(minTestsOk = 1) // This test is relatively slow
+      }.set(minTestsOk = 1).setGen(Arbitrary.arbitrary[NonEmptyDir].retryUntil(κ(true))) // This test is relatively slow TODO[scalacheck]: Remove retryUnit once upgrade to 0.13.0 as it should no longer be necessary
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {
-      def testBoth[A](test: org.http4s.Method => Unit) = {
+      def testBoth[A](test: org.http4s.Method => Fragments) = {
         "POST" should {
           test(org.http4s.Method.POST)
         }
@@ -288,17 +289,17 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           "not supported" ! prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
-              method = method).withBody("zip code: 34561 and zip code: 78932").run
-            val response = service(emptyMem)(request).run
-            response.as[ApiError].run must beApiErrorLike[DecodeFailure](
+              method = method).withBody("zip code: 34561 and zip code: 78932").unsafePerformSync
+            val response = service(emptyMem)(request).unsafePerformSync
+            response.as[ApiError].unsafePerformSync must beApiErrorLike[DecodeFailure](
               MediaTypeMismatch(MediaType.`text/plain`, MessageFormat.supportedMediaTypes))
           }
           "not supplied" ! prop { file: Path[Abs, File, Sandboxed] =>
             val request = Request(
               uri = pathUri(file),
-              method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").run.replaceAllHeaders(Headers.empty)
-            val response = service(emptyMem)(request).run
-            response.as[ApiError].run must beApiErrorLike[DecodeFailure](
+              method = method).withBody("{\"a\": 1}\n{\"b\": \"12:34:56\"}").unsafePerformSync.replaceAllHeaders(Headers.empty)
+            val response = service(emptyMem)(request).unsafePerformSync
+            response.as[ApiError].unsafePerformSync must beApiErrorLike[DecodeFailure](
               MediaTypeMissing(MessageFormat.supportedMediaTypes))
           }
         }
@@ -312,11 +313,11 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
               val request = Request(
                 uri = pathUri(file),             // We do it this way becuase withBody sets the content-type
                 method = method
-              ).withBody(reqBody).run.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
+              ).withBody(reqBody).unsafePerformSync.replaceAllHeaders(`Content-Type`(mediaType, Charset.`UTF-8`))
               val (service, ref) = serviceRef(emptyMem)
-              val response = service(request).run
-              expectBody(response.as[A].run)
-              ref.run must_== emptyMem
+              val response = service(request).unsafePerformSync
+              expectBody(response.as[A].unsafePerformSync)
+              ref.unsafePerformSync must_== emptyMem
             }
           }
           "invalid body" >> {
@@ -374,17 +375,17 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           def accept[A: EntityEncoder](body: A, expected: List[Data]) =
             prop { (fileName: FileName, preExistingContent: Vector[Data]) =>
               val sampleFile = rootDir[Sandboxed] </> file1(fileName)
-              val request = Request(uri = pathUri(sampleFile), method = method).withBody(body).run
+              val request = Request(uri = pathUri(sampleFile), method = method).withBody(body).unsafePerformSync
               val (service, ref) = serviceRef(InMemState.fromFiles(Map(sampleFile -> preExistingContent)))
-              val response = service(request).run
-              response.as[String].run must_== ""
+              val response = service(request).unsafePerformSync
+              response.as[String].unsafePerformSync must_== ""
               response.status must_== Status.Ok
               val expectedWithPreExisting =
                 // PUT has override semantics
                 if (method == Method.PUT) Map(sampleFile -> expected.toVector)
                 // POST has append semantics
                 else /*method == Method.POST*/ Map(sampleFile -> (preExistingContent ++ expected.toVector))
-              ref.run.contents must_== expectedWithPreExisting
+              ref.unsafePerformSync.contents must_== expectedWithPreExisting
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
@@ -435,15 +436,14 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
         "be 500 when error during writing" ! prop {
           (fileName: FileName, body: NonEmptyList[ReadableJson], failureMsg: String) =>
             val destination = rootDir[Sandboxed] </> file1(fileName)
-            val request = Request(uri = pathUri(destination), method = method).withBody(body.list)
+            val request = Request(uri = pathUri(destination), method = method).withBody(body.list.toList)
             def service: HttpService = serviceErrs(
               InMemState.empty,
               FileSystemError.writeFailed(Data.Int(4), "anything but 4"))
-            val response = request.flatMap(service(_)).run
+            val response = request.flatMap(service(_)).unsafePerformSync
             response.status must_== Status.InternalServerError
-            response.as[String].run must contain("anything but 4")
+            response.as[String].unsafePerformSync must contain("anything but 4")
         }
-        () // Required for testBoth (not required with specs2 3.x)
       }
     }
     "MOVE" >> {
@@ -464,19 +464,19 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
           headers = Headers(Header("Destination", posixCodec.printPath(to))),
           method = Method.MOVE)
         val (service, ref) = serviceRef(state)
-        val response = service(request).run
-        response.status must_== status
-        body(response.as[A].run)
+        val response = service(request).unsafePerformSync
+        response.status must_=== status
+        body(response.as[A].unsafePerformSync)
         val expectedNewContents = newState match {
           case Unchanged => state.contents
           case Changed(newContents) => newContents
         }
-        ref.run.contents must_== expectedNewContents
+        ref.unsafePerformSync.contents must_=== expectedNewContents
       }
       "be 400 for missing Destination header" ! prop { path: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(path), method = Method.MOVE)
-        val response = service(emptyMem)(request).run
-        response.as[ApiError].run must beHeaderMissingError("Destination")
+        val response = service(emptyMem)(request).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beHeaderMissingError("Destination")
       }
       "be 404 for missing source file" ! prop { (file: AFile, destFile: AFile) =>
         testMove(
@@ -529,7 +529,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
             state = fs.state,
             status = Status.Created,
             body = (str: String) => str must_== "",
-            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toMap))
+            newState = Changed(fs.filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}.list.toList.toMap))
       }
       "be 409 with file to same location" ! prop {(fs: SingleFileMemState) =>
         testMove(
@@ -557,26 +557,26 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
       "be 204 with existing file" ! prop { filesystem: SingleFileMemState =>
         val request = Request(uri = pathUri(filesystem.file), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
-        val response = service(request).run
+        val response = service(request).unsafePerformSync
         response.status must_== Status.NoContent
-        ref.run.contents must_== Map() // The filesystem no longer contains that file
+        ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that file
       }
       "be 204 with existing dir" ! prop { filesystem: NonEmptyDir =>
         val request = Request(uri = pathUri(filesystem.dir), method = Method.DELETE)
         val (service, ref) = serviceRef(filesystem.state)
-        val response = service(request).run
+        val response = service(request).unsafePerformSync
         response.status must_== Status.NoContent
-        ref.run.contents must_== Map() // The filesystem no longer contains that folder
+        ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
       }
       "be 404 with missing file" ! prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
-        val response = service(emptyMem)(request).run
-        response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
+        val response = service(emptyMem)(request).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
       }
       "be 404 with missing dir" ! prop { dir: AbsDir[Sandboxed] =>
         val request = Request(uri = pathUri(dir), method = Method.DELETE)
-        val response = service(emptyMem)(request).run
-        response.as[ApiError].run must beApiErrorLike(pathNotFound(dir))
+        val response = service(emptyMem)(request).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(dir))
       }
     }
   }

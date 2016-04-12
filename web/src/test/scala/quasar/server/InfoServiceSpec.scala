@@ -28,9 +28,9 @@ class InfoServiceSpec extends mutable.Specification {
 
   "Info Service" should {
     "be capable of providing it's name and version" in {
-      val response = info.service(Request(method = Method.GET)).run
+      val response = info.service(Request(method = Method.GET)).unsafePerformSync
       response.status must_== Status.Ok
-      response.as[Json].run must_== info.nameAndVersionInfo
+      response.as[Json].unsafePerformSync must_== info.nameAndVersionInfo
     }
   }
 }

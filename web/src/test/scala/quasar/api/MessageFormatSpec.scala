@@ -75,11 +75,11 @@ class MessageFormatSpec extends org.specs2.mutable.Specification {
       fromAccept(Some(accept)) must_== Csv('\t', ";", '\'', '\\', None)
     }
 
-    "choose CSV over JSON" in {
+    "choose format with highest QValue" in {
       val accept = Accept(
         new MediaType("text", "csv").withQValue(q(1.0)),
         new MediaType("application", "ldjson").withQValue(q(0.9)))
-      fromAccept(Some(accept)) must_== Csv.Default
+      fromAccept(Some(accept)) must_=== Csv.Default
     }
 
     "choose JSON over CSV" in {
@@ -118,7 +118,7 @@ class MessageFormatSpec extends org.specs2.mutable.Specification {
         Data.Obj(ListMap("c" -> Data.Set(List(Data.Int(3))))))
       val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
       def test(data: List[Data], expectedEncoding: String, format: Csv) =
-        format.encode(Process.emitAll(data): Process[Task,Data]).runLog.run.mkString("") must_== expectedEncoding
+        format.encode(Process.emitAll(data): Process[Task,Data]).runLog.unsafePerformSync.mkString("") must_== expectedEncoding
       "simple" >> test(
         data = simpleData,
         expectedEncoding = simpleExpected,

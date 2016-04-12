@@ -43,7 +43,12 @@ import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
 import pathy.scalacheck.PathyArbitrary._
-import rapture.json._, jsonBackends.argonaut._
+// Would like to use the argonaut backend, but that's not possible
+// yet because rapture is still on argonaut 6.1 and we are using
+// 6.2-M1. So using another rapture "backend" and printing/parsing
+// in order to do conversions without depending on the argonaut backend
+// that rapture provides.
+import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -63,7 +68,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
     mem: InMemState,
     f: FileSystem ~> InMemoryFs
   ): (HttpService, Task[InMemState]) = {
-    val (inter, ref) = runInspect(mem).run
+    val (inter, ref) = runInspect(mem).unsafePerformSync
     val svc = HttpService.lift(req =>
       execute.service[Eff]
         .toHttpService(effRespOr(inter compose f))
@@ -107,15 +112,15 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
     val req = query.map { query =>
       val uri = baseURI.+??("offset", query.offset.map(_.shows)).+??("limit", query.limit.map(_.shows))
       val uri1 = query.varNameAndValue.map{ case (name, value) => uri.+?("var."+name,value)}.getOrElse(uri)
-      baseReq.copy(uri = uri1).withBody(query.q).run
+      baseReq.copy(uri = uri1).withBody(query.q).unsafePerformSync
     }.getOrElse(baseReq)
     val req1 = destination.map(destination =>
       req.copy(headers = Headers(Header("Destination", destination)))
     ).getOrElse(req)
     val (service, ref) = executeServiceRef(state, eval)
-    val actualResponse = service(req1).run
+    val actualResponse = service(req1).unsafePerformSync
     val stateCheck0 = stateCheck.getOrElse((_: InMemState) ==== state)
-    response(actualResponse.as[A].run) and (actualResponse.status must_== status) and stateCheck0(ref.run)
+    response(actualResponse.as[A].unsafePerformSync) and (actualResponse.status must_== status) and stateCheck0(ref.unsafePerformSync)
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
@@ -132,7 +137,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           query = Some(Query(query)),
           state = filesystem.state,
           status = Status.Ok,
-          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run.mkString("")
+          response = (a: String) => a must_== jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync.mkString("")
         )
       }
       "POST" ! prop { (filesystem: SingleFileMemState, destination: FPath) => {
@@ -144,7 +149,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           destination = Some(destinationPath),
           state = filesystem.state,
           status = Status.Ok,
-          response = json => Json(json) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
+          response = json => Json.parse(json.nospaces) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
             outValue.as[String] must_== printPath(expectedDestinationPath)
           },
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))
@@ -187,7 +192,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
             state = filesystem.state.copy(queryResps = Map(limitedLp -> limitedContents)),
             status = Status.Ok,
             response = (a: String) => a must_==
-              jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.run
+              jsonReadableLine.encode(Process.emitAll(filesystem.contents): Process[Task, Data]).runLog.unsafePerformSync
                 .drop(offset.get).take(limit.get).mkString(""))
       }
       "POST" ! prop { (filesystem: SingleFileMemState, varName: AlphaCharacters, var_ : Int, offset: Natural, limit: Positive, destination: FPath) =>
@@ -200,7 +205,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
           destination = Some(destinationPath),
           state = filesystem.state.copy(queryResps = Map(lp -> filesystem.contents)),
           status = Status.Ok,
-          response = json => Json(json) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
+          response = json => Json.parse(json.nospaces) must beLike { case json""" { "out": $outValue, "phases": $outPhases }""" =>
             outValue.as[String] must_== printPath(expectedDestinationPath)
           },
           stateCheck = Some(s => s.contents.keys must contain(expectedDestinationPath)))

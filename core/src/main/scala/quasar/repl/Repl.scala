@@ -116,7 +116,7 @@ object Repl {
         ((log, v), elapsed) = t
         _ <- printLog[S](state.debugLevel, log)
         _ <- v match {
-          case -\/ (semErr)      => DF.fail(semErr.list.map(_.shows).mkString("; "))
+          case -\/ (semErr)      => DF.fail(semErr.list.map(_.shows).toList.mkString("; "))
           case  \/-(-\/ (fsErr)) => DF.fail(fsErr.shows)
           case  \/-( \/-(a))     =>
             P.println(f"Query time: ${elapsed.toMillis/1000.0}%.1fs") *>

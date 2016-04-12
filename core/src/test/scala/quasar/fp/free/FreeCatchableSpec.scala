@@ -37,7 +37,7 @@ final class FreeCatchableSpec extends mutable.Specification {
           effm.foldMap(interpret2[Task, CounterF, Task](
             NaturalTransformation.refl,
             Coyoneda.liftTF(runCounter(ref))))
-        ).run
+        ).unsafePerformSync
     }
 
   case class IntError(n: Int) extends scala.Exception
@@ -50,20 +50,6 @@ final class FreeCatchableSpec extends mutable.Specification {
         n <- next[Eff]
         _ <- catchable.fail[String](IntError(5))
       } yield n)).toEither must beLeft(IntError(5))
-    }
-
-    "catch ambient exceptions in map" >> {
-      runEff(catchable.attempt(
-        next[Eff].map(n => throw IntError(7))
-      )).toEither must beLeft(IntError(7))
-    }
-
-    "catch ambient exceptions in flatMap" >> {
-      runEff(catchable.attempt(for {
-        i <- next[Eff]
-        j <- next[Eff]
-        k <- if ((i + j) > 0) throw IntError(23) else next[Eff]
-      } yield k)).toEither must beLeft(IntError(23))
     }
   }
 }

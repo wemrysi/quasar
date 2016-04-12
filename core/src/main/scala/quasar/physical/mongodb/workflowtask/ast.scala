@@ -118,7 +118,7 @@ object WorkflowTaskF {
               RJ.render(reduce),
               selectorOpt.fold(Terminal("None" :: Nil, None))(RS.render(_)),
               sortOpt.fold(Terminal("None" :: Nil, None))(keys =>
-                NonTerminal("Sort" :: nt, None, keys.list map { case (expr, ot) =>
+                NonTerminal("Sort" :: nt, None, keys.list.toList map { case (expr, ot) =>
                   Terminal("Key" :: "Sort" :: nt, Some(expr.toString + " -> " + ot))
                 })),
               Terminal("Limit" :: nt, Some(limitOpt.toString)),

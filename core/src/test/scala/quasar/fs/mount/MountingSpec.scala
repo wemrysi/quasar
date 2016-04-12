@@ -47,8 +47,8 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
   import mnt.{F, M, lookup, mountView, mountFileSystem, remount, replace, unmount}
 
   implicit class StrOps(s: String) {
-    def >>*[A: AsResult](a: => F[A]): Example =
-      s >> a.foldMap(interpret).run
+    def >>*[A: AsResult](a: => F[A]) =
+      s >> a.foldMap(interpret).unsafePerformSync
   }
 
   val noVars   = Variables.fromMap(Map.empty)

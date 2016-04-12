@@ -93,7 +93,7 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
         val p = write.append(f, Process.empty).drain ++
                 (query.fileExistsM(f)).liftM[Process]
 
-        runLogT(run, p).run.run must_== \/.right(Vector(true))
+        runLogT(run, p).run.unsafePerformSync must_== \/.right(Vector(true))
       }
 
       "append two files, one in subdir of the other's parent, should succeed" >> {
@@ -111,6 +111,6 @@ class WriteFilesSpec extends FileSystemTest[FileSystem](
       }
 
       step(deleteForWriting(fs.setupInterpM).runVoid)
-    }; ()
+    }
   }
 }

@@ -26,6 +26,7 @@ import quasar.fp._, PathyCodecJson._
 import quasar.sql._
 
 import argonaut._, Argonaut._
+import argonaut.ArgonautScalaz._
 import com.mongodb.MongoException
 import org.http4s._, Status._
 import pathy.Path._
@@ -72,7 +73,7 @@ sealed abstract class ToApiErrorInstances {
       case other =>
         fromMsg_(
           BadRequest withReason "Unable to decode request body.",
-          other.msg)
+          other.message)
     }
 
   implicit def environmentErrorQResponse: ToApiError[EnvironmentError] = {

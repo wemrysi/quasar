@@ -37,14 +37,14 @@ package object namegen {
   type NameDisj[E, A] = NameT[E \/ ?, A]
 
   class LiftHelper[F[_]] {
-    def apply[A](v: F[A])(implicit F: Functor[F]) =
+    def apply[A](v: F[A])(implicit F: Monad[F]) =
       StateT[F, NameGen, A](s => F.map(v)(s -> _))
   }
 
   def lift[F[_]] = new LiftHelper[F]
 
-  def emit[F[_]: Applicative, A](v: A): NameT[F, A] =
+  def emit[F[_]: Monad, A](v: A): NameT[F, A] =
     lift(v.point[F])
-  def emitName[F[_]: Applicative, A](v: State[NameGen, A]): NameT[F, A] =
+  def emitName[F[_]: Monad, A](v: State[NameGen, A]): NameT[F, A] =
     StateT[F, NameGen, A](s => v.run(s).point[F])
 }

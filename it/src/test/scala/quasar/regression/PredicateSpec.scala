@@ -51,7 +51,7 @@ class PredicateSpec extends Specification with ScalaCheck {
     Process.emitAll(results) ++ Process.eval(Task.fail(new RuntimeException()))
 
   def run(p: Predicate, expected: Vector[Json], result: Vector[Json]): Result =
-    p(expected, Process.emitAll(result): Process[Task, Json]).run
+    p(expected, Process.emitAll(result): Process[Task, Json]).unsafePerformSync
 
   "containsAtLeast" should {
     val pred = ContainsAtLeast
@@ -63,7 +63,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "match shuffled result with no dupes" ! prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).run
+      val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled) must beLike { case Success(_, _) => ok }
@@ -72,7 +72,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled fields" ! prop { (json: List[Json]) =>
       val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-      val shuffledPairs = shuffle(pairs).run
+      val shuffledPairs = shuffle(pairs).unsafePerformSync
 
       pairs != shuffledPairs ==> {
         val result = Vector(Json(pairs: _*))
@@ -84,14 +84,14 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "fail if the process fails" ! prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
       val expected = (a ++ b).distinct
-      val partialResult = shuffle(a ++ c).run
+      val partialResult = shuffle(a ++ c).unsafePerformSync
 
-      pred(expected, partial(partialResult)).attemptRun.toOption must beNone
+      pred(expected, partial(partialResult)).unsafePerformSyncAttempt.toOption must beNone
     }
 
     "match with any additional (no dupes)" ! prop { (a: Vector[Json], b: Vector[Json]) =>
       val expected = a.distinct
-      val result = shuffle(a ++ b).run
+      val result = shuffle(a ++ b).unsafePerformSync
 
       b.nonEmpty ==> {
         run(pred, expected, result) must beLike { case Success(_, _) => ok }
@@ -103,7 +103,7 @@ class PredicateSpec extends Specification with ScalaCheck {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val result = shuffle(result0).run
+        val result = shuffle(result0).unsafePerformSync
 
         run(pred, expected, result) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unmatched expected values")
@@ -122,7 +122,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "match shuffled result with no dupes" ! prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).run
+      val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled) must beLike { case Success(_, _) => ok }
@@ -131,7 +131,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled fields" ! prop { (json: List[Json]) =>
       val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-      val shuffledPairs = shuffle(pairs).run
+      val shuffledPairs = shuffle(pairs).unsafePerformSync
 
       pairs != shuffledPairs ==> {
         val result = Vector(Json(pairs: _*))
@@ -146,9 +146,9 @@ class PredicateSpec extends Specification with ScalaCheck {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val partialResult = shuffle(result0).run
+        val partialResult = shuffle(result0).unsafePerformSync
 
-        pred(expected, partial(partialResult)).attemptRun.toOption must beNone
+        pred(expected, partial(partialResult)).unsafePerformSyncAttempt.toOption must beNone
       }
     }
 
@@ -157,7 +157,7 @@ class PredicateSpec extends Specification with ScalaCheck {
       val result0 = (a ++ b).distinct
 
       expected != result0 ==> {
-        val result = shuffle(result0).run
+        val result = shuffle(result0).unsafePerformSync
 
         run(pred, expected, result) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unexpected value")
@@ -170,7 +170,7 @@ class PredicateSpec extends Specification with ScalaCheck {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val result = shuffle(a.distinct).run
+        val result = shuffle(a.distinct).unsafePerformSync
 
         run(pred, expected, result) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unmatched expected values")
@@ -187,7 +187,7 @@ class PredicateSpec extends Specification with ScalaCheck {
     }
 
     "reject shuffled result" ! prop { (expected: Vector[Json]) =>
-      val shuffled = shuffle(expected).run
+      val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled) must beLike { case Failure(_, _, _, _) => ok }
@@ -196,7 +196,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled fields" ! prop { (json: List[Json]) =>
       val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-      val shuffledPairs = shuffle(pairs).run
+      val shuffledPairs = shuffle(pairs).unsafePerformSync
 
       pairs != shuffledPairs ==> {
         val result = Vector(Json(pairs: _*))
@@ -210,7 +210,7 @@ class PredicateSpec extends Specification with ScalaCheck {
       val expected = a ++ b
       val partialResult = a
 
-      pred(expected, partial(partialResult)).attemptRun.toOption must beNone
+      pred(expected, partial(partialResult)).unsafePerformSyncAttempt.toOption must beNone
     }
 
     "reject with any additional" ! prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
@@ -248,7 +248,7 @@ class PredicateSpec extends Specification with ScalaCheck {
     }
 
     "reject shuffled result" ! prop { (expected: Vector[Json]) =>
-      val shuffled = shuffle(expected).run
+      val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled) must beLike { case Failure(msg, _, _, _) => msg must contain("does not match") }
@@ -257,7 +257,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled fields" ! prop { (json: List[Json]) =>
       val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-      val shuffledPairs = shuffle(pairs).run
+      val shuffledPairs = shuffle(pairs).unsafePerformSync
 
       pairs != shuffledPairs ==> {
         val result = Vector(Json(pairs: _*))
@@ -271,7 +271,7 @@ class PredicateSpec extends Specification with ScalaCheck {
       val expected = a ++ b
       val partialResult = partial(a)
 
-      pred(expected, partialResult).attemptRun.toOption must beNone
+      pred(expected, partialResult).unsafePerformSyncAttempt.toOption must beNone
     }
 
     "match with any following" ! prop { (a: Vector[Json], b: Vector[Json]) =>
@@ -301,7 +301,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled result with no dupes" ! prop { (a: Vector[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).run
+      val shuffled = shuffle(expected).unsafePerformSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled) must beLike { case Failure(msg, _, _, _) => msg must contain("prohibited values") }
@@ -310,7 +310,7 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "reject shuffled fields" ! prop { (json: List[Json]) =>
       val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-      val shuffledPairs = shuffle(pairs).run
+      val shuffledPairs = shuffle(pairs).unsafePerformSync
 
       pairs != shuffledPairs ==> {
         val result = Vector(Json(pairs: _*))
@@ -322,14 +322,14 @@ class PredicateSpec extends Specification with ScalaCheck {
 
     "fail if the process fails" ! prop { (result: Vector[Json], expected: Vector[Json]) =>
       (result.toSet intersect expected.toSet).isEmpty ==> {
-        pred(expected, partial(result)).attemptRun.toOption must beNone
+        pred(expected, partial(result)).unsafePerformSyncAttempt.toOption must beNone
       }
     }.set(maxSize = 10)
 
     "reject any subset" ! prop { (a: Vector[Json], b: Vector[Json], c: Vector[Json]) =>
       b.nonEmpty ==> {
-        val expected = shuffle(b ++ c).run
-        val result = shuffle(a ++ b).run
+        val expected = shuffle(b ++ c).unsafePerformSync
+        val result = shuffle(a ++ b).unsafePerformSync
 
         run(pred, expected, result) must beLike { case Failure(_, _, _, _) => ok }
       }

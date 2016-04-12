@@ -72,10 +72,10 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
 
   val interpHEff: HEff ~> MountedFs = {
     val seqNT: MonotonicSeqF ~> MountedFs =
-      Coyoneda.liftTF[MonotonicSeq, MountedFs](MonotonicSeq.toState[State](seq))
+      Coyoneda.liftTF[MonotonicSeq, MountedFs](MonotonicSeq.toState[MountedFs](seq))
 
     val handlesNT: MountedResultHF ~> MountedFs =
-      Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.toState[State](handles))
+      Coyoneda.liftTF[MountedResultH, MountedFs](KeyValueStore.toState[MountedFs](handles))
 
     free.interpret3(seqNT, handlesNT, NaturalTransformation.refl)
   }

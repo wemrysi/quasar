@@ -55,8 +55,8 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
   def traceViewFs(paths: Map[ADir, Set[PathSegment]]): ViewFileSystem ~> VST =
     interpretViewFileSystem[VST](
-      KeyValueStore.toState[TraceS](_handles),
-      MonotonicSeq.toState[TraceS](_seq),
+      KeyValueStore.toState[VST](_handles),
+      MonotonicSeq.toState[VST](_seq),
       liftMT[Trace, VSF] compose
         interpretFileSystem[Trace](qfTrace(paths), rfTrace, wfTrace, mfTrace))
 

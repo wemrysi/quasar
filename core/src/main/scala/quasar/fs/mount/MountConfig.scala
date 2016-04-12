@@ -82,7 +82,7 @@ object MountConfig {
         uriCur.as[String].flatMap(uri => DecodeResult(
           viewCfgFromUri(uri).bimap(
             e => (e.toString, uriCur.history),
-            viewConfig(_))
+            viewConfig(_)).toEither
         ))
 
       case Some(t :: Nil) =>

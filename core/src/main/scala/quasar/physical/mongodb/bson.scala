@@ -245,7 +245,7 @@ sealed trait BsonField {
   def \\ (tail: List[BsonField]): BsonField =
     if (tail.isEmpty) this
     else {
-      val t = tail.flatMap(_.flatten.toList)
+      val t = IList.fromList(tail.flatMap(_.flatten.toList))
       this match {
         case Path(p)     => Path(p :::> t)
         case l @ Name(_) => Path(NonEmptyList.nel(l, t))
@@ -291,7 +291,7 @@ object BsonField {
   final case object Root extends Root
 
   def apply(v: NonEmptyList[BsonField.Name]): BsonField = v match {
-    case NonEmptyList(head) => head
+    case NonEmptyList(head, INil()) => head
     case _ => Path(v)
   }
 
@@ -314,8 +314,8 @@ object BsonField {
     def asText = (values.list.zipWithIndex.map {
       case (Name(value), 0) => value
       case (Name(value), _) => "." + value
-    }).mkString("")
+    }).toList.mkString("")
 
-    override def toString = values.list.mkString(" \\ ")
+    override def toString = values.list.toList.mkString(" \\ ")
   }
 }

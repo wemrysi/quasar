@@ -25,6 +25,7 @@ import quasar.Predef._
 import java.nio.charset.StandardCharsets
 
 import argonaut.Argonaut._
+import argonaut.ArgonautScalaz._
 import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._

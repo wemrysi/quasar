@@ -142,7 +142,7 @@ trait AggLib extends Library {
       xs.traverse(Data.Comparable(_))
         .flatMap(ys => ys.tail.foldLeftM(ys.head)(f))
         .toSuccessNel(SemanticError.DomainError(
-          Data.Set(xs.list),
+          Data.Set(xs.list.toList),
           some("Expected Set of comparable values"))))
 
   private val numSet: List[Data] => SemanticError \/ List[BigDecimal] =

@@ -23,7 +23,7 @@ import quasar.fp.PathyCodecJson._
 
 import scala.AnyVal
 
-import argonaut._, Argonaut._
+import argonaut._, Argonaut._, DecodeResultScalaz._
 import monocle.Iso
 import pathy.Path._
 import scalaz.syntax.bifunctor._

@@ -34,7 +34,7 @@ class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture 
 
       val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
 
-      MemTask.runLogEmpty(p).run must_== \/-(xs)
+      MemTask.runLogEmpty(p).unsafePerformSync must_== \/-(xs)
     }
 
     "scan should automatically close the read handle when terminated early" ! prop {
@@ -43,7 +43,7 @@ class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture 
         val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f).take(n)
 
         MemTask.runLog(p).run.run(emptyMem)
-          .run.leftMap(_.rm) must_== ((Map.empty, \/.right(xs take n)))
+          .unsafePerformSync.leftMap(_.rm) must_== ((Map.empty, \/.right(xs take n)))
       }
     }
 
@@ -54,7 +54,7 @@ class ReadFileSpec extends Specification with ScalaCheck with FileSystemFixture 
         MemFixTask.runLogWithReads(reads, read.scanAll(f)).run
           .leftMap(_.rm)
           .run(emptyMem)
-          .run must_== ((Map.empty, \/.left(pathErr(pathNotFound(f)))))
+          .unsafePerformSync must_== ((Map.empty, \/.left(pathErr(pathNotFound(f)))))
       }
     }
   }

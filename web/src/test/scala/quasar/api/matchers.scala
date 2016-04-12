@@ -19,11 +19,11 @@ package quasar.api
 import quasar.Predef._
 
 import argonaut._, Argonaut._
+import argonaut.ArgonautScalaz._
 import org.http4s.Status, Status._
 import org.specs2.matcher._
 import org.specs2.scalaz._
 import scalaz.std.anyVal._
-import scalaz.std.list._
 import scalaz.std.string._
 
 object matchers {
@@ -36,7 +36,7 @@ object matchers {
 
   def beApiErrorWithMessage(status: Status, otherFields: JsonAssoc*): Matcher[ApiError] =
     (haveSameCodeAndReason(status) ^^ { (_: ApiError).status }) and
-    (equal(JsonObject.from(otherFields.toList)) ^^ { (_: ApiError).detail - "message" }) and
+    (equal(JsonObject.fromTraversableOnce(otherFields.toList)) ^^ { (_: ApiError).detail - "message" }) and
     (haveFields("message" :: otherFields.map(_._1).toList : _*) ^^ { (_: ApiError).detail })
 
   def beHeaderMissingError(name: String): Matcher[ApiError] =

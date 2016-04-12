@@ -26,6 +26,7 @@ import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
+import scalaz.scalacheck.ScalazArbitrary._
 
 class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._, query._
@@ -38,12 +39,12 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
           val outsideOfTarget = others.filterNot(_.relativeTo(target).isDefined)
           val insideOfTarget = descendants.list.map(target </> _)
 
-          val state = InMemState fromFiles (insideOfTarget ++ outsideOfTarget).map((_,data)).toMap
-          val expected = descendants.list
+          val state = InMemState fromFiles (insideOfTarget.toList ++ outsideOfTarget).map((_,data)).toMap
+          val expected = descendants.list.toList
 
           Mem.interpret(query.descendantFiles(target)).eval(state).toEither must
             beRight(containTheSameElementsAs(expected))
-      }(implicitly,implicitly,implicitly,nonEmptyListSmallerThan(10),implicitly,listSmallerThan(5),implicitly) // Use better syntax once specs2 3.x
+      }.setArbitrary2(nonEmptyListSmallerThan(10)).setArbitrary3(listSmallerThan(5))
         .set(workers = java.lang.Runtime.getRuntime.availableProcessors)
 
       "returns not found when dir does not exist" ! prop { d: ADir => (d =/= rootDir) ==> {
@@ -76,7 +77,7 @@ class QueryFileSpec extends Specification with ScalaCheck with FileSystemFixture
         val query = LogicalPlan.Read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
         val result = MemTask.runLog[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
-        result.run._2.toEither must beRight(s.contents)
+        result.unsafePerformSync._2.toEither must beRight(s.contents)
       }
     }
   }

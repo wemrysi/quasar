@@ -134,6 +134,6 @@ object Server {
                       ).liftM[MainErrT]
     } yield ()
 
-    logErrors(main0).run
+    logErrors(main0).unsafePerformSync
   }
 }

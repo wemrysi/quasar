@@ -53,7 +53,7 @@ object FileSystemDef {
   implicit def fileSystemDefMonoid[F[_]](implicit F: Monad[F]): Monoid[FileSystemDef[F]] =
     new Monoid[FileSystemDef[F]] {
       def zero = FileSystemDef { case (typ, uri) =>
-        MonadError[EitherT[F,?,?], DefinitionError]
+        MonadError[EitherT[F,DefinitionError,?], DefinitionError]
           .raiseError(\/.left(NonEmptyList(s"Unsupported filesystem type: ${typ.value}")))
       }
 

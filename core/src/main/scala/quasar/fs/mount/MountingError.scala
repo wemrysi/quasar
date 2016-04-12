@@ -61,6 +61,6 @@ object MountingError {
       case EError(e) =>
         e.shows
       case InvalidConfig(cfg, rsns) =>
-        s"Invalid mount config, '${cfg.shows}', because: ${rsns.list.mkString("; ")}"
+        s"Invalid mount config, '${cfg.shows}', because: ${rsns.list.toList.mkString("; ")}"
     }
 }

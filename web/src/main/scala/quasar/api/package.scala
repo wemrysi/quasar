@@ -52,7 +52,7 @@ package object api {
 
     joinResponseOr.compose[Failure[E, ?]](
       convertError[Task](errToResp).compose[Failure[E, ?]](
-        Failure.toError[ETask, E]))
+        Failure.toError[ETask[E,?], E]))
   }
 
   /** Sequences the `Response` on the left with the outer `Task`. */
@@ -72,6 +72,8 @@ package object api {
       if (header.name == name) Some(header)
       else None
     }
+    override def parse(s: String): ParseResult[Header] =
+      ParseResult.success(Header.Raw(name, s))
   }
 
   object XFileName extends HeaderKey.Singleton {
@@ -81,6 +83,8 @@ package object api {
       if (header.name == name) Some(header)
       else None
     }
+    override def parse(s: String): ParseResult[Header] =
+      ParseResult.success(Header.Raw(name, s))
   }
 
   object HeaderParam extends HttpMiddleware {
@@ -94,7 +98,7 @@ package object api {
           }.getOrElse(-\/("expected a string or array of strings; found: " + json)))
 
       for {
-        json <- Parse.parse(param).leftMap("parse error (" + _ + ")")
+        json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
         obj <- json.obj \/> ("expected a JSON object; found: " + json.toString)
         values <- obj.toList.map { case (k, v) =>
           strings(v).map(CaseInsensitiveString(k) -> _)

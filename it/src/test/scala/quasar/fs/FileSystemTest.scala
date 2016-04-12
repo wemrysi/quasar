@@ -31,9 +31,9 @@ import scala.Either
 import monocle.Optional
 import monocle.function.Index
 import monocle.std.vector._
+import org.specs2.specification.core.Fragments
 import org.specs2.mutable.Specification
 import org.specs2.execute.{Failure => _, _}
-import org.specs2.specification._
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -57,14 +57,14 @@ abstract class FileSystemTest[S[_]: Functor](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Unit): Unit =
+  def fileSystemShould(examples: FileSystemUT[S] => Fragments): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
       s"${fs.name.name} FileSystem" should examples(fs)
 
-      step(fs.close.run)
+      step(fs.close.unsafePerformSync)
 
       ()
-    }).run
+    }).unsafePerformSync
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
@@ -81,21 +81,21 @@ abstract class FileSystemTest[S[_]: Functor](
   ////
 
   implicit class FSExample(s: String) {
-    def >>*[A: AsResult](fa: => F[A])(implicit run: Run): Example =
-      s >> run(fa).run
+    def >>*[A: AsResult](fa: => F[A])(implicit run: Run) =
+      s >> run(fa).unsafePerformSync
   }
 
   implicit class RunFsTask[A](fst: FsTask[A]) {
     import Leibniz.===
 
     def runEither: Either[FileSystemError, A] =
-      fst.run.run.toEither
+      fst.run.unsafePerformSync.toEither
 
     def runOption(implicit ev: A === Unit): Option[FileSystemError] =
-      fst.run.run.swap.toOption
+      fst.run.unsafePerformSync.swap.toOption
 
     def runVoid(implicit ev: A === Unit): Unit =
-      fst.run.void.run
+      fst.run.void.unsafePerformSync
   }
 }
 
@@ -122,7 +122,7 @@ object FileSystemTest {
 
   def externalFsUT = TestConfig.externalFileSystems {
     case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
-      lazy val f = mongofs.testFileSystem(uri, dir).run
+      lazy val f = mongofs.testFileSystem(uri, dir).unsafePerformSync
       Task.delay(f)
   }
 

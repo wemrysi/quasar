@@ -36,7 +36,7 @@ class ViewMounterSpec extends mutable.Specification {
   def eval(vs: Views): F ~> Res =
     new (F ~> Res) {
       def apply[A](fa: F[A]) = {
-        val f = AtomicRef.toState[State, Views]
+        val f = AtomicRef.toState[ViewsS, Views]
         fa.foldMap(Coyoneda.liftTF[MountedViews, ViewsS](f)).run(vs)
       }
     }

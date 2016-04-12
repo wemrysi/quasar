@@ -61,20 +61,20 @@ class QResponseSpec extends mutable.Specification {
     "sucessful evaluation" >> {
       "has same status" >> {
         val res = QResponse.empty[StrIO].toHttpResponse(evalStr())
-        res.run.status must_== NoContent
+        res.unsafePerformSync.status must_== NoContent
       }
 
       "has same headers" >> {
         val qr = QResponse.json[String, StrIO](Ok, "foo")
         val res = qr.toHttpResponse(evalStr())
-        res.run.headers.toList must_== qr.headers.toList
+        res.unsafePerformSync.headers.toList must_== qr.headers.toList
       }
 
       "has body of interpreted values" >> {
         val qr = QResponse.streaming[StrIO, String](
           strs("a", "b", "c", "d", "e"))
         val res = qr.toHttpResponse(evalStr())
-        res.as[String].run must_== "abcde"
+        res.as[String].unsafePerformSync must_== "abcde"
       }
     }
 
@@ -84,23 +84,23 @@ class QResponseSpec extends mutable.Specification {
 
       "has alternate response status" >> {
         failStream.toHttpResponse(evalStr("one"))
-          .run.status must_== BadRequest
+          .unsafePerformSync.status must_== BadRequest
       }
 
       "has alternate response headers" >> {
         failStream.toHttpResponse(evalStr("one"))
-          .run.headers.get(Host) must beSome(errHost)
+          .unsafePerformSync.headers.get(Host) must beSome(errHost)
       }
 
       "has alternate response body" >> {
         failStream.toHttpResponse(evalStr("one"))
-          .as[String].run must_== "FAIL"
+          .as[String].unsafePerformSync must_== "FAIL"
       }
 
       "responds with alternate response when a small amount of data before first effect" >> {
         val pad = Process.emit(ByteVector.low(0 max (PROCESS_EFFECT_THRESHOLD_BYTES - 1)))
         val padStream = failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
-        padStream.toHttpResponse(evalStr("one")).as[String].run must_== "FAIL"
+        padStream.toHttpResponse(evalStr("one")).as[String].unsafePerformSync must_== "FAIL"
       }
 
       "responds with alternate response when other internal effects before first effect" >> {
@@ -109,14 +109,14 @@ class QResponseSpec extends mutable.Specification {
         val stm = pad.append[StrIOM, ByteVector](failStream.body intersperse hi)
 
         failStream.copy(body = stm).toHttpResponse(evalStr("one"))
-          .as[String].run must_== "FAIL"
+          .as[String].unsafePerformSync must_== "FAIL"
       }
 
       "results in response stream failure exception when fails in middle of stream" >> {
         val pad = Process.emit(ByteVector.low(PROCESS_EFFECT_THRESHOLD_BYTES))
         failStream.copy(body = pad.append[StrIOM, ByteVector](failStream.body))
           .toHttpResponse(evalStr("two"))
-          .as[String].run must throwA[HttpResponseStreamFailureException]
+          .as[String].unsafePerformSync must throwA[HttpResponseStreamFailureException]
       }
     }
   }

@@ -66,7 +66,7 @@ final case class MapReduce(
 
   private def toBson(out: Bson): Bson.Doc = {
     def sortBson(xs: NonEmptyList[(BsonField, SortType)]): Bson.Doc =
-      Bson.Doc(ListMap(xs.list.map(_ bimap (_.asText, _.bson)): _*))
+      Bson.Doc(ListMap(xs.list.toList.map(_ bimap (_.asText, _.bson)): _*))
 
     Bson.Doc(ListMap(("out" -> out) :: List(
       selection        map  ("query"    -> _.bson),

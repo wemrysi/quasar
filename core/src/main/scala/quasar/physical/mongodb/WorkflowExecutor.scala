@@ -81,7 +81,6 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
   type G0[A]  = SeqNameGeneratorT[F, A]
   type G[A]   = ReaderT[G0, String, A]
-  type E[A,B] = EitherT[G, A, B]
   type M[A]   = WorkflowExecErrT[G, A]
 
   import WorkflowExecutionError._
@@ -180,7 +179,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     val tempDst: N[Collection] =
       tempDbName cata (
         tempColl,
-        noDatabase(()).raiseError[E, Collection].liftM[TempsT])
+        noDatabase(()).raiseError[M, Collection].liftM[TempsT])
 
     val srcResult =
       tempDst flatMap (d => execute0(src, d) strengthL d)
@@ -197,7 +196,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
       insertFailed(
         bson,
         s"MongoDB is only able to store documents in collections, not `$bson`."
-      ).raiseError[E, A].liftM[TempsT]
+      ).raiseError[M, A].liftM[TempsT]
 
     wt match {
       case PureTask(doc @ Bson.Doc(_)) =>
@@ -240,7 +239,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
       case FoldLeftTask(rd @ ReadTask(_), _) =>
         invalidTask(rd, "FoldLeft from simple read")
-          .raiseError[E, Collection].liftM[TempsT]
+          .raiseError[M, Collection].liftM[TempsT]
 
       case FoldLeftTask(head, tail) =>
         for {
@@ -253,11 +252,11 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
                  case mrt @ MapReduceTask(_, _, _) =>
                    invalidTask(mrt, "no output action specified for mapReduce in FoldLeft")
-                     .raiseError[E, Unit].liftM[TempsT]
+                     .raiseError[M, Unit].liftM[TempsT]
 
                  case other =>
                    invalidTask(other, "un-mergable FoldLeft input")
-                     .raiseError[E, Unit].liftM[TempsT]
+                     .raiseError[M, Unit].liftM[TempsT]
                }
         } yield h
     }
@@ -352,7 +351,6 @@ object WorkflowExecutor {
     import MongoDbIOWorkflowExecutor._
     import EnvironmentError._
 
-    type E[A, B] = EitherT[MongoDbIO, A, B]
     type M[A]    = EnvErrT[MongoDbIO, A]
     type WFExec  = WorkflowExecutor[MongoDbIO, BsonCursor]
 
@@ -360,7 +358,7 @@ object WorkflowExecutor {
       if (v >= MinMongoDbVersion)
         (new MongoDbIOWorkflowExecutor: WFExec).point[M]
       else
-        unsupportedVersion("MongoDB", v).raiseError[E, WFExec]
+        unsupportedVersion("MongoDB", v).raiseError[M, WFExec]
     }
   }
 

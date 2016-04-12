@@ -193,7 +193,7 @@ trait OptionTInstances {
 }
 
 trait StateTInstances {
-  implicit def stateTCatchable[F[_]: Catchable : Functor, S]: Catchable[StateT[F, S, ?]] =
+  implicit def stateTCatchable[F[_]: Catchable : Monad, S]: Catchable[StateT[F, S, ?]] =
     new Catchable[StateT[F, S, ?]] {
       def attempt[A](fa: StateT[F, S, A]) =
         StateT[F, S, Throwable \/ A](s =>
@@ -266,19 +266,19 @@ trait JsonOps {
 
   def optional[A: DecodeJson](cur: ACursor): DecodeResult[Option[A]] =
     cur.either.fold(
-      κ(DecodeResult(\/- (None))),
+      κ(DecodeResult(scala.util.Right(None))),
       v => v.as[A].map(Some(_)))
 
   def orElse[A: DecodeJson](cur: ACursor, default: => A): DecodeResult[A] =
     cur.either.fold(
-      κ(DecodeResult(\/- (default))),
+      κ(DecodeResult(scala.util.Right(default))),
       v => v.as[A]
     )
 
-  def decodeJson[A](text: String)(implicit DA: DecodeJson[A]): String \/ A = for {
+  def decodeJson[A](text: String)(implicit DA: DecodeJson[A]): String \/ A = \/.fromEither(for {
     json <- Parse.parse(text)
     a <- DA.decode(json.hcursor).result.leftMap { case (exp, hist) => "expected: " + exp + "; " + hist }
-  } yield a
+  } yield a)
 
 
   /* Nicely formatted, order-preserving, single-line. */
@@ -447,7 +447,7 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
   def injectFT[F[_], S[_]: Functor](implicit S: F :<: S): F ~> Free[S, ?] =
     liftFT[S] compose injectNT[F, S]
 
-  def evalNT[F[_]: Functor, S](initial: S): StateT[F, S, ?] ~> F =
+  def evalNT[F[_]: Monad, S](initial: S): StateT[F, S, ?] ~> F =
     new (StateT[F, S, ?] ~> F) {
       def apply[A](sa: StateT[F, S, A]): F[A] =
         sa.eval(initial)
@@ -465,7 +465,7 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
 
     final class Aux[F[_]] {
       type ST[S, A] = StateT[F, S, A]
-      def apply[A, B](lens: Lens[A, B])(implicit F: Functor[F]): ST[B, ?] ~> ST[A, ?] =
+      def apply[A, B](lens: Lens[A, B])(implicit M: Monad[F]): ST[B, ?] ~> ST[A, ?] =
         new (ST[B, ?] ~> ST[A, ?]) {
           def apply[C](s: ST[B, C]) =
             StateT((a: A) => s.run(lens.get(a)).map(_.leftMap(lens.set(_)(a))))

@@ -26,12 +26,11 @@ import matryoshka.Fix
 import org.scalacheck._
 import org.scalacheck.Arbitrary
 import org.specs2.mutable._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 import shapeless.contrib.scalaz.instances._
 
-class WorkflowFSpec extends Spec {
+class WorkflowFSpec extends org.specs2.scalaz.Spec {
   import Workflow._
   import IdHandling._
 
@@ -287,7 +286,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
           IncludeId),
-        $simpleMap(MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), Select(ident("x"), "value")))).wrapNel, ListMap()))
+        $simpleMap((MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), Select(ident("x"), "value")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
 
       val expected = chain(
         readZips,
@@ -307,7 +306,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
           BsonField.Name("value") -> \/-($$ROOT))),
           IncludeId),
         $simpleMap(
-          FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo"))).wrapNel,
+          (FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()))
 
       val expected = chain(
@@ -333,7 +332,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
       val expected = chain(
         readZips,
         $simpleMap(
-          MapExpr(JsFn(Name("x"), Obj(ListMap(Name("value") -> ident("x"))))).wrapNel,
+          (MapExpr(JsFn(Name("x"), Obj(ListMap(Name("value") -> ident("x"))))):CardinalExpr[JsFn]).wrapNel,
           ListMap()),
         $reduce($Reduce.reduceNOP, ListMap()))
 
@@ -345,8 +344,8 @@ class WorkflowSpec extends Specification with TreeMatchers {
       val given = chain(
         readZips,
         $unwind(DocVar.ROOT(BsonField.Name("loc"))),
-        $simpleMap(MapExpr(JsFn(Name("x"),
-          BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x")))).wrapNel, ListMap()))
+        $simpleMap((MapExpr(JsFn(Name("x"),
+          BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
 
       val expected = chain(
         readZips,
@@ -366,7 +365,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
         readZips,
         $unwind(DocVar.ROOT(BsonField.Name("loc"))),
         $simpleMap(
-          FlatExpr(JsFn(Name("x"), Select(ident("x"), "lat"))).wrapNel,
+          (FlatExpr(JsFn(Name("x"), Select(ident("x"), "lat"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()))
 
       val expected = chain(
@@ -390,7 +389,7 @@ class WorkflowSpec extends Specification with TreeMatchers {
       val expected = chain(
         readZips,
         $simpleMap(
-          FlatExpr(JsFn(Name("x"), Select(ident("x"), "loc"))).wrapNel,
+          (FlatExpr(JsFn(Name("x"), Select(ident("x"), "loc"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()),
         $reduce($Reduce.reduceNOP, ListMap()))
 

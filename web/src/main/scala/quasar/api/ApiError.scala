@@ -19,10 +19,10 @@ package quasar.api
 import quasar.Predef._
 
 import argonaut._, Argonaut._
+import argonaut.JsonObjectScalaz._
 import org.http4s.Status
 import scalaz.{Equal, Show}
 import scalaz.std.anyVal._
-import scalaz.std.list._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.std.boolean._
@@ -43,7 +43,7 @@ final case class ApiError(status: Status, detail: JsonObject) {
 
 object ApiError {
   def apiError(status: Status, details: JsonAssoc*): ApiError =
-    apply(status, JsonObject.from(details.toList))
+    apply(status, JsonObject.fromTraversableOnce(details.toList))
 
   def fromStatus(status: Status): ApiError =
     apiError(status)

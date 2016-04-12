@@ -42,7 +42,7 @@ class ManageFileSpec extends Specification with ScalaCheck with FileSystemFixtur
           MemTask.runLogT(rename.drain ++ existsAndData)
             .map(_.unzip.leftMap(_ exists ι))
             .run.eval(s.state)
-            .run.toEither must beRight((false, s.contents))
+            .unsafePerformSync.toEither must beRight((false, s.contents))
         }
       }
     }

@@ -27,7 +27,7 @@ import java.nio.file.{Path => _, _}
 import java.nio.charset._
 import scala.util.Properties._
 
-import argonaut._, Argonaut._
+import argonaut._
 import monocle.Lens
 import monocle.syntax.fields._
 import monocle.std.tuple2._
@@ -104,14 +104,14 @@ trait ConfigOps[C] {
     } yield ()
 
   def fromString(value: String)(implicit D: DecodeJson[C]): ConfigError \/ C =
-    Parse.decodeEither[C](value).leftMap(malformedConfig(value, _))
+    \/.fromEither(Parse.decodeEither[C](value).leftMap(malformedConfig(value, _)))
 
   def asString(config: C)(implicit E: EncodeJson[C]): String =
     E.encode(config).pretty(quasar.fp.multiline)
 
   ////
 
-  private def merr = MonadError[ETask, ConfigError]
+  private def merr = MonadError[ETask[ConfigError,?], ConfigError]
   private val malformedRsn = malformedConfig composeLens _2
 
   /** The default path to the configuration file for the current operating system. */

@@ -30,27 +30,27 @@ class StaticContentSpec extends Specification with DisjunctionMatchers {
 
   "fromCliOptions" should {
     "be empty with defaults" in {
-      fromCliOptions(defLoc, CliOptions.default).run.run must beRightDisjunction(None)
+      fromCliOptions(defLoc, CliOptions.default).run.unsafePerformSync must beRightDisjunction(None)
     }
 
     "fail with loc and no path" in {
       val opts = CliOptions.default.copy(contentLoc = Some("foo"))
-      fromCliOptions(defLoc, opts).run.run must beLeftDisjunction
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beLeftDisjunction
     }
 
     "use supplied default location when none specified" in {
       val opts = CliOptions.default.copy(contentPath = Some("foo"))
-      fromCliOptions(defLoc, opts).run.run must beRightDisjunction(Some(StaticContent("/static", "foo")))
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(Some(StaticContent("/static", "foo")))
     }
 
     "handle loc and path" in {
       val opts = CliOptions.default.copy(contentLoc = Some("/foo"), contentPath = Some("bar"))
-      fromCliOptions(defLoc, opts).run.run must beRightDisjunction(Some(StaticContent("/foo", "bar")))
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beRightDisjunction(Some(StaticContent("/foo", "bar")))
     }
 
     "relative" in {
       val opts = CliOptions.default.copy(contentPath = Some("foo"), contentPathRelative = true)
-      fromCliOptions(defLoc, opts).run.run must beLike {
+      fromCliOptions(defLoc, opts).run.unsafePerformSync must beLike {
         case \/-(Some(StaticContent(_, path))) => path must endWith("/foo")
       }
     }

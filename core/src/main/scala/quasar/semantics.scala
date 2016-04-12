@@ -23,6 +23,7 @@ import quasar.fs.prettyPrint
 import scala.AnyRef
 
 import matryoshka._, Recursive.ops._
+import monocle._
 import pathy.Path, Path._
 import scalaz._, Scalaz._, Validation.{success, failure}
 import shapeless.contrib.scalaz._
@@ -91,6 +92,19 @@ object SemanticError {
   final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
     def message = "Invalid path: " + posixCodec.unsafePrintPath(path) + hint.map(" (" + _ + ")").getOrElse("")
   }
+
+  // TODO: Add other prisms when necessary (unless we enable the "No Any" wart first)
+  val genericError: Prism[SemanticError, String] =
+    Prism[SemanticError, String] {
+      case GenericError(msg) => Some(msg)
+      case _ => None
+    } (GenericError(_))
+
+  val wrongArgumentCount: Prism[SemanticError, (Func, Int, Int)] =
+    Prism[SemanticError, (Func, Int, Int)] {
+      case WrongArgumentCount(func, expected, actual) => Some((func, expected, actual))
+      case _ => None
+    } ((WrongArgumentCount(_,_,_)).tupled)
 }
 
 trait SemanticAnalysis {
@@ -184,11 +198,9 @@ trait SemanticAnalysis {
             case JoinRelation(l, r, _, _) => for {
               rels <- findRelations(l) tuple findRelations(r)
               (left, right) = rels
-              rez <- (left.keySet intersect right.keySet).toList match {
-                case Nil           => success(left ++ right)
-                case con :: flicts =>
-                  failure(NonEmptyList.nel(con, flicts).map(DuplicateRelationName(_)))
-              }
+              rez <- (left.keySet intersect right.keySet).toList.toNel.cata(
+                nel => failure(nel.map(DuplicateRelationName(_):SemanticError)),
+                success(left ++ right))
             } yield rez
           }
 

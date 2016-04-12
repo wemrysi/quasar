@@ -19,7 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Data, Type, Mapping, SemanticError}, SemanticError._
 
-import scalaz._, NonEmptyList.nel, Validation.{success, failure}
+import scalaz._, NonEmptyList.nels, Validation.{success, failure}
 
 trait ArrayLib extends Library {
   val ArrayLength = Mapping(
@@ -29,7 +29,7 @@ trait ArrayLib extends Library {
     noSimplification,
     partialTyperV {
       case _ :: Type.Const(Data.Int(dim)) :: Nil if (dim < 1) =>
-        failure(nel(GenericError("array dimension out of range"), Nil))
+        failure(nels(GenericError("array dimension out of range")))
       case Type.Const(Data.Arr(arr)) :: Type.Const(Data.Int(i)) :: Nil
           if (i == 1) =>
         // TODO: we should support dims other than 1, but it's work

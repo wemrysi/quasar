@@ -153,7 +153,7 @@ object Http4sUtils {
     (servers, shutdown) = result
     _ <- openBrowser(port).whenM(openClient)
     _ <- stdout("Press Enter to stop.")
-    _ <- Task.delay(Task.fork(waitForInput).runAsync(_ => shutdown.run))
+    _ <- Task.delay(Task.fork(waitForInput).unsafePerformAsync(_ => shutdown.unsafePerformSync))
     _ <- servers.run // We need to run the servers in order to make sure everything is cleaned up properly
   } yield ()
 }

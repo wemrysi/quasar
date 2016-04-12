@@ -29,8 +29,8 @@ import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
-import org.specs2.specification._
 import org.specs2.execute._
+import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -80,18 +80,18 @@ abstract class QueryRegressionTest[S[_]: Functor](
 
   ////
 
-  lazy val tests = regressionTests(TestsRoot, knownFileSystems).run
+  lazy val tests = regressionTests(TestsRoot, knownFileSystems).unsafePerformSync
 
   fileSystemShould { fs =>
     suiteName should {
-      step(prepareTestData(tests, fs.setupInterpM).run)
+      step(prepareTestData(tests, fs.setupInterpM).unsafePerformSync)
 
       tests.toList foreach { case (f, t) =>
         regressionExample(f, t, fs.name, fs.testInterpM)
       }
 
       step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
-    }; ()
+    }
   }
 
   ////
@@ -102,7 +102,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
     test: RegressionTest,
     backendName: BackendName,
     run: Run
-  ): Example = {
+  ): Fragment = {
     def runTest = (for {
       _    <- Task.delay(println(test.query))
       _    <- run(test.data.traverse[F,Result](
@@ -112,7 +112,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
                         (p => verifyDataExists(dataFile(p)))))
       data =  testQuery(DataDir </> fileParent(loc), test.query, test.variables)
       res  <- verifyResults(test.expected, data, run)
-    } yield res).run
+    } yield res).unsafePerformSync
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
@@ -273,7 +273,7 @@ object QueryRegressionTest {
   val externalFS: Task[IList[FileSystemUT[FileSystemIO]]] = {
     val extFs = TestConfig.externalFileSystems {
       case (MountConfig.FileSystemConfig(MongoDBFsType, uri), dir) =>
-        lazy val f = mongofs.testFileSystemIO(uri, dir).run
+        lazy val f = mongofs.testFileSystemIO(uri, dir).unsafePerformSync
         Task.delay(f)
     }
 

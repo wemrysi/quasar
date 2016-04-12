@@ -134,7 +134,7 @@ object Prettify {
       json => json.fold(
         "null",
         _.toString,
-        _.asJsonOrString.pretty(minspace),
+        _.asJson.pretty(minspace),
         ι,
         // NB: the non-atomic types never appear here because the Data has been
         // flattened.

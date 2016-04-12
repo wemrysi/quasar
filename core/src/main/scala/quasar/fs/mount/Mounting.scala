@@ -112,7 +112,7 @@ object Mounting {
 
     ////
 
-    private type ErrF[A, B] = EitherT[F, A, B]
+    private type ErrFM[A] = EitherT[F, MountingError \/ PathTypeMismatch, A]
 
     private def bifold[G[_]: Functor, E, A, EE, AA](v: EitherT[G,E,A])(e: E => EE \/ AA, a: A => EE \/ AA): EitherT[G, EE, AA] =
       EitherT[G,EE,AA](v.run.map(_.fold(e, a)))
@@ -134,7 +134,7 @@ object Mounting {
       dst: Path[Abs,T,Sandboxed],
       f: MountConfig => MountConfig
     ): M[PathTypeMismatch \/ Unit] = {
-      val mErr = MonadError[ErrF, MountingError \/ PathTypeMismatch]
+      val mErr = MonadError[ErrFM, MountingError \/ PathTypeMismatch]
       import mErr._
 
       for {

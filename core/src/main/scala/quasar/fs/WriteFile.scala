@@ -203,11 +203,13 @@ object WriteFile {
 
     ////
 
+    type GE[A] = G[FileSystemError,A]
+
     private def shouldNotExist(dst: AFile): M[FileSystemError] =
-      MonadError[G, FileSystemError].raiseError(pathErr(pathExists(dst)))
+      MonadError[GE, FileSystemError].raiseError(pathErr(pathExists(dst)))
 
     private def shouldExist(dst: AFile): M[FileSystemError] =
-      MonadError[G, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
+      MonadError[GE, FileSystemError].raiseError(pathErr(pathNotFound(dst)))
 
     private def saveChunked0(dst: AFile, src: Process[F, Vector[Data]], sem: MoveSemantics)
                             (implicit MF: ManageFile.Ops[S])

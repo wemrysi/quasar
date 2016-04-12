@@ -68,7 +68,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
 
     "Reading Files" should {
       // Load read-only data
-      step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).run)
+      step((deleteForReading(fs.setupInterpM).run.void *> loadForReading(fs.setupInterpM).run.void).unsafePerformSync)
 
       "open returns PathNotFound when file DNE" >>* {
         val dne = rootDir </> dir("doesnt") </> file("exist")
@@ -103,7 +103,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
 
       "scan with offset zero and no limit reads entire file" >> {
         val r = runLogT(run, read.scan(smallFile.file, 0L, None))
-        r.runEither must beRight(smallFile.data.toIndexedSeq)
+        r.runEither must beRight(smallFile.data.toList)
       }
 
       "scan with offset = |file| and no limit yields no data" >> {
@@ -125,14 +125,14 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
         val d = smallFile.data.zip(EStream.iterate(0)(_ + 1))
                   .dropWhile(_._2 < k.get).map(_._1)
 
-        r.runEither must beRight(d.toIndexedSeq)
+        r.runEither must beRight(d.toList)
       }.set(minTestsOk = 10)
 
       "scan with offset zero and limit j stops after j data" ! prop { j: Int Refined Interval.Open[W.`1`.T, SmallFileSize] =>
         val limit = Positive(j.get.toLong).get // Not ideal, but simplest solution for now
         val r = runLogT(run, read.scan(smallFile.file, 0L, Some(limit)))
 
-        r.runEither must beRight(smallFile.data.take(j.get).toIndexedSeq)
+        r.runEither must beRight(smallFile.data.take(j.get).toList)
       }.set(minTestsOk = 10)
 
       "scan with offset k and limit j takes j data, starting from k" ! Prop.forAll(
@@ -144,7 +144,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
                   .dropWhile(_._2 < k.get).map(_._1)
                   .take(j.get)
 
-        r.runEither must beRight(d.toIndexedSeq)
+        r.runEither must beRight(d.toList)
       }.set(minTestsOk = 5)
 
       "scan with offset zero and limit j, where j > |file|, stops at end of file" ! prop { j: Int Refined Greater[SmallFileSize] =>
@@ -152,7 +152,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
           val r = runLogT(run, read.scan(smallFile.file, 0L, limit))
 
           (j.get must beGreaterThan(smallFile.data.length)) and
-            (r.runEither must beRight(smallFile.data.toIndexedSeq))
+            (r.runEither must beRight(smallFile.data.toList))
       }.set(minTestsOk = 10)
 
       "scan very long file is stack-safe" >> {
@@ -169,7 +169,7 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) w
       }
 
       step(deleteForReading(fs.setupInterpM).runVoid)
-    }; ()
+    }
   }
 }
 

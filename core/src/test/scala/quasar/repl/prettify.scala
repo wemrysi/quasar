@@ -319,7 +319,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
     "empty stream" in {
       val values: Process[Task, Data] = Process.halt
       val rows = renderStream(values, 100)
-      rows.runLog.run must_== Vector(
+      rows.runLog.unsafePerformSync must_== Vector(
         List("<empty>"))
     }
 
@@ -328,7 +328,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
         Data.Obj(ListMap()),
         Data.Obj(ListMap())))
       val rows = renderStream(values, 100)
-      rows.runLog.run must_== Vector(
+      rows.runLog.unsafePerformSync must_== Vector(
         List("<empty>"),
         List(""),
         List(""))
@@ -338,7 +338,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
       val values: Process[Task, Data] = Process.emitAll(List(
         Data.Obj(ListMap("a" -> Data.Int(1)))))
       val rows = renderStream(values, 100)
-      rows.runLog.run must_== Vector(
+      rows.runLog.unsafePerformSync must_== Vector(
         List("a"),
         List("1"))
     }
@@ -353,7 +353,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
           "a" -> Data.Int(3),
           "b" -> Data.Int(4)))))
       val rows = renderStream(values, 2)
-      rows.runLog.run must_== Vector(
+      rows.runLog.unsafePerformSync must_== Vector(
         List("a", "b"),
         List("1", ""),
         List("", "2"),
@@ -371,7 +371,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
           "b" -> Data.Int(4),
           "c" -> Data.Int(5)))))
       val rows = renderStream(values, 2)
-      rows.runLog.run must_== Vector(
+      rows.runLog.unsafePerformSync must_== Vector(
         List("a", "b"),
         List("1", ""),
         List("", "2"),
@@ -388,7 +388,7 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
       val rows = renderStream(values, 1)
 
       // Run the process once:
-      val rez = rows.runLog.run
+      val rez = rows.runLog.unsafePerformSync
 
       rez must_== Vector(
         List("n"),

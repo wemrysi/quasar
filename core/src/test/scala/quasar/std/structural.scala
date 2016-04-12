@@ -38,40 +38,40 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
     // else is known about it.
     val unknown = AnyArray ⨿ Str
 
-    "type combination of arbitrary strs as str" ! (arbStrType, arbStrType) { (st1: Type, st2: Type) =>
+    "type combination of arbitrary strs as str" ! prop { (st1: Type, st2: Type) =>
       ConcatOp(st1, st2).map(Str contains _) must beSuccessful(true)
       ConcatOp(st2, st1).map(Str contains _) must beSuccessful(true)
-    }
+    }.setArbitrary1(arbStrType).setArbitrary2(arbStrType)
 
-    "type arbitrary str || unknown as Str" ! arbStrType { (st: Type) =>
+    "type arbitrary str || unknown as Str" ! prop { (st: Type) =>
       ConcatOp(st, unknown) must beSuccessful(Str)
       ConcatOp(unknown, st) must beSuccessful(Str)
-    }
+    }.setArbitrary(arbStrType)
 
     "fold constant Strings" ! prop { (s1: String, s2: String) =>
       ConcatOp(Const(Data.Str(s1)), Const(Data.Str(s2))) must
         beSuccessful(Const(Data.Str(s1 + s2)))
     }
 
-    "type combination of arbitrary arrays as array" ! (arbArrayType, arbArrayType) { (at1: Type, at2: Type) =>
+    "type combination of arbitrary arrays as array" ! prop { (at1: Type, at2: Type) =>
       ConcatOp(at1, at2).map(_.arrayLike) must beSuccessful(true)
       ConcatOp(at2, at1).map(_.arrayLike) must beSuccessful(true)
-    }
+    }.setArbitrary1(arbArrayType).setArbitrary2(arbArrayType)
 
-    "type arbitrary array || unknown as array" ! arbArrayType { (at: Type) =>
+    "type arbitrary array || unknown as array" ! prop { (at: Type) =>
       ConcatOp(at, unknown).map(_.arrayLike) must beSuccessful(true)
       ConcatOp(unknown, at).map(_.arrayLike) must beSuccessful(true)
-    }
+    }.setArbitrary(arbArrayType)
 
     "fold constant arrays" ! prop { (ds1: List[Data], ds2: List[Data]) =>
       ConcatOp(Const(Data.Arr(ds1)), Const(Data.Arr(ds2))) must
         beSuccessful(Const(Data.Arr(ds1 ++ ds2)))
     }
 
-    "fail with mixed Str and array args" ! (arbStrType, arbArrayType) { (st: Type, at: Type) =>
+    "fail with mixed Str and array args" ! prop { (st: Type, at: Type) =>
       ConcatOp(st, at) must beFailing
       ConcatOp(at, st) must beFailing
-    }
+    }.setArbitrary1(arbStrType).setArbitrary2(arbArrayType)
 
     "propagate unknown types" in {
       ConcatOp(unknown, unknown) must beSuccessful(unknown)
@@ -79,9 +79,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "FlattenMap" should {
-    "only accept maps" ! arbArrayType { (nonMap: Type) =>
+    "only accept maps" ! prop { (nonMap: Type) =>
       FlattenMap(nonMap) must beFailing
-    }
+    }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its values" in {
       FlattenMap(Obj(Map(), Str.some)) must beSuccessful(Str)
@@ -93,9 +93,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "FlattenMapKeys" should {
-    "only accept maps" ! arbArrayType { (nonMap: Type) =>
+    "only accept maps" ! prop { (nonMap: Type) =>
       FlattenMapKeys(nonMap) must beFailing
-    }
+    }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its keys" in {
       FlattenMapKeys(Obj(Map(), Int.some)) must beSuccessful(Str)
@@ -107,9 +107,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "FlattenArray" should {
-    "only accept arrays" ! arbStrType { (nonArr: Type) =>
+    "only accept arrays" ! prop { (nonArr: Type) =>
       FlattenArray(nonArr) must beFailing
-    }
+    }.setArbitrary(arbStrType)
 
     "convert from an array type to the type of its values" in {
       FlattenArray(FlexArr(0, None, Str)) must beSuccessful(Str)
@@ -121,9 +121,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "FlattenArrayIndices" should {
-    "only accept arrays" ! arbStrType { (nonArr: Type) =>
+    "only accept arrays" ! prop { (nonArr: Type) =>
       FlattenArrayIndices(nonArr) must beFailing
-    }
+    }.setArbitrary(arbStrType)
 
     "convert from an array type to int" in {
       FlattenArrayIndices(FlexArr(0, None, Str)) must beSuccessful(Int)
@@ -134,15 +134,15 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" ! arbStrType { (nonInt: Type) =>
+    "only untype from ints" ! prop { (nonInt: Type) =>
       FlattenArrayIndices.untype(nonInt) must beFailing
-    }
+    }.setArbitrary(arbStrType)
   }
 
   "ShiftMap" should {
-    "only accept maps" ! arbArrayType { (nonMap: Type) =>
+    "only accept maps" ! prop { (nonMap: Type) =>
       ShiftMap(nonMap) must beFailing
-    }
+    }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its values" in {
       ShiftMap(Obj(Map(), Str.some)) must beSuccessful(Str)
@@ -154,9 +154,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "ShiftMapKeys" should {
-    "only accept maps" ! arbArrayType { (nonMap: Type) =>
+    "only accept maps" ! prop { (nonMap: Type) =>
       ShiftMapKeys(nonMap) must beFailing
-    }
+    }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its keys" in {
       ShiftMapKeys(Obj(Map(), Int.some)) must beSuccessful(Str)
@@ -168,9 +168,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "ShiftArray" should {
-    "only accept arrays" ! arbStrType { (nonArr: Type) =>
+    "only accept arrays" ! prop { (nonArr: Type) =>
       ShiftArray(nonArr) must beFailing
-    }
+    }.setArbitrary(arbStrType)
 
     "convert from an array type to the type of its values" in {
       ShiftArray(FlexArr(0, None, Str)) must beSuccessful(Str)
@@ -182,9 +182,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
   }
 
   "ShiftArrayIndices" should {
-    "only accept arrays" ! arbStrType { (nonArr: Type) =>
+    "only accept arrays" ! prop { (nonArr: Type) =>
       ShiftArrayIndices(nonArr) must beFailing
-    }
+    }.setArbitrary(arbStrType)
 
     "convert from an array type to int" in {
       ShiftArrayIndices(FlexArr(0, None, Str)) must beSuccessful(Int)
@@ -195,9 +195,9 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
         beSuccessful(List(FlexArr(0, None, Top)))
     }
 
-    "only untype from ints" ! arbStrType { (nonInt: Type) =>
+    "only untype from ints" ! prop { (nonInt: Type) =>
       ShiftArrayIndices.untype(nonInt) must beFailing
-    }
+    }.setArbitrary(arbStrType)
   }
 
   "UnshiftMap" should {
@@ -222,11 +222,11 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
 
   import org.scalacheck.Gen, Gen._
   import org.scalacheck.Arbitrary, Arbitrary._
-  lazy val arbStrType = Arbitrary(Gen.oneOf(
+  lazy val arbStrType: Arbitrary[Type] = Arbitrary(Gen.oneOf(
     const(Str),
     arbitrary[String].map(s => Const(Data.Str(s)))))
 
-  lazy val arbArrayType = Arbitrary(simpleArrayGen)
+  lazy val arbArrayType: Arbitrary[Type] = Arbitrary(simpleArrayGen)
   lazy val simpleArrayGen = Gen.oneOf(
     for {
       i <- arbitrary[Int]

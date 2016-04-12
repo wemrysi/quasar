@@ -112,17 +112,19 @@ package object fs {
     import quasar.Errors.convertError
     type M[A] = Free[S, A]
     type ME[A, B] = EitherT[M, A, B]
+    type MEEnvErr[A] = ME[EnvironmentError,A]
+    type MEConfigErr[A] = ME[ConfigError,A]
     type DefM[A] = DefErrT[M, A]
 
     val evalEnvErr: EnvErrF ~> DefM =
       Coyoneda.liftTF[EnvErr, DefM](
         convertError[M]((_: EnvironmentError).right[NonEmptyList[String]])
-          .compose[EnvErr](Failure.toError[ME, EnvironmentError]))
+          .compose[EnvErr](Failure.toError[MEEnvErr, EnvironmentError]))
 
     val evalCfgErr: CfgErrF ~> DefM =
       Coyoneda.liftTF[CfgErr, DefM](
         convertError[M]((_: ConfigError).shows.wrapNel.left[EnvironmentError])
-          .compose[CfgErr](Failure.toError[ME, ConfigError]))
+          .compose[CfgErr](Failure.toError[MEConfigErr, ConfigError]))
 
     val liftTask: Task ~> DefM =
       liftMT[M, DefErrT] compose liftFT[S] compose injectNT[Task, S]

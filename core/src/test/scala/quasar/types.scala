@@ -23,8 +23,8 @@ import quasar.specs2._
 import scala.Right
 
 import argonaut._, Argonaut._
-import org.specs2.ScalaCheck
 import org.specs2.mutable._
+import org.specs2.ScalaCheck
 
 class TypesSpec extends Specification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
   import Type._
@@ -102,29 +102,29 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
       typecheck(Top, t).toOption should beSome
     }
 
-    "succeed with widening of product" ! (arbitrarySimpleType, arbitrarySimpleType) { (t1: Type, t2: Type) =>
+    "succeed with widening of product" ! prop { (t1: Type, t2: Type) =>
       typecheck(t1, t1 ⨯ t2).toOption should beSome
-    }
+    }.setArbitrary1(arbitrarySimpleType).setArbitrary2(arbitrarySimpleType)
 
-    "fail with narrowing to product" ! (arbitraryNonnestedType, arbitraryNonnestedType) { (t1: Type, t2: Type) =>
+    "fail with narrowing to product" ! prop { (t1: Type, t2: Type) =>
       // Note: using only non-product/coproduct input types here because otherwise this test
       // rejects many large inputs and the test is very slow.
       typecheck(t2, t1).isFailure ==> {
         typecheck(t1 ⨯ t2, t1).toOption should beNone
       }
-    }
+    }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
-    "succeed with widening to coproduct" ! (arbitrarySimpleType, arbitrarySimpleType) { (t1: Type, t2: Type) =>
+    "succeed with widening to coproduct" ! prop { (t1: Type, t2: Type) =>
       typecheck(t1 ⨿ t2, t1).toOption should beSome
-    }
+    }.setArbitrary1(arbitrarySimpleType).setArbitrary2(arbitrarySimpleType)
 
-    "fail with narrowing from coproduct" ! (arbitraryNonnestedType, arbitraryNonnestedType) { (t1: Type, t2: Type) =>
+    "fail with narrowing from coproduct" ! prop { (t1: Type, t2: Type) =>
       // Note: using only non-product/coproduct input types here because otherwise this test
       // rejects many large inputs and the test is very slow.
       typecheck(t1, t2).isFailure ==> {
         typecheck(t1, t1 ⨿ t2).toOption should beNone
       }
-    }
+    }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
     "match under Obj with matching field name" ! prop { (t1: Type, t2: Type) =>
       typecheck(Obj(Map("a" -> t1), None), Obj(Map("a" -> t2), None)) must
@@ -162,9 +162,9 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
   }
 
   "objectField" should {
-    "reject arbitrary simple type" ! arbitrarySimpleType { (t: Type) =>
+    "reject arbitrary simple type" ! prop { (t: Type) =>
       t.objectField(const("a")).toOption should beNone
-    }
+    }.setArbitrary(arbitrarySimpleType)
 
     "reject simple type" in {
       Int.objectField(const("a")).toOption should beNone
@@ -225,13 +225,13 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
   }
 
   "children" should {
-    "be Nil for arbitrary simple type" ! arbitraryTerminal { (t: Type) =>
+    "be Nil for arbitrary simple type" ! prop { (t: Type) =>
       children(t) should_== Nil
-    }
+    }.setArbitrary(arbitraryTerminal)
 
-    "be list of one for arbitrary const type" ! arbitraryConst { (t: Type) =>
+    "be list of one for arbitrary const type" ! prop { (t: Type) =>
       children(t).length should_== 1
-    }
+    }.setArbitrary(arbitraryConst)
 
     "be flattened for |" in {
       children(Int ⨿ Int ⨿ Str) should_== List(Int, Str)
@@ -577,9 +577,9 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
       lub(t, Bottom) should_== t
     }
 
-    "lub symmetric for nonnested" ! (arbitraryNonnestedType, arbitraryNonnestedType) { (t1: Type, t2: Type) =>
+    "lub symmetric for nonnested" ! prop { (t1: Type, t2: Type) =>
       lub(t1, t2) should_== lub(t2, t1)
-    }
+    }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
     "lub symmetric" ! prop { (t1: Type, t2: Type) =>
       lub(t1, t2) should_== lub(t2, t1)
@@ -593,9 +593,9 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
       glb(t, Bottom) should_== Bottom
     }
 
-    "glb symmetric for non-nested" ! (arbitraryNonnestedType, arbitraryNonnestedType) { (t1: Type, t2: Type) =>
+    "glb symmetric for non-nested" ! prop { (t1: Type, t2: Type) =>
       glb(t1, t2) should_== glb(t2, t1)
-    }
+    }.setArbitrary1(arbitraryNonnestedType).setArbitrary2(arbitraryNonnestedType)
 
     "glb symmetric" ! prop { (t1: Type, t2: Type) =>
       glb(t1, t2) should_== glb(t2, t1)
@@ -647,17 +647,17 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
   }
 
   "arrayElem" should {
-    "fail for non-array type" ! arbitrarySimpleType { (t: Type) =>
+    "fail for non-array type" ! prop { (t: Type) =>
       t.arrayElem(Const(Data.Int(0))) should beFailing//WithClass[TypeError]
-    }
+    }.setArbitrary(arbitrarySimpleType)
 
-    "fail for non-int index"  ! arbitrarySimpleType { (t: Type) =>
+    "fail for non-int index"  ! prop { (t: Type) =>
       // TODO: this occasionally get stuck... maybe lub() is diverging?
       lub(t, Int) != Int ==> {
         val arr = Const(Data.Arr(Nil))
         arr.arrayElem(t) should beFailing
       }
-    }
+    }.setArbitrary(arbitrarySimpleType)
 
     "descend into const array with const index" in {
       val arr = Const(Data.Arr(List(Data.Int(0), Data.Str("a"), Data.True)))

@@ -63,7 +63,7 @@ private[mongodb] object execution {
             (by, field) match {
               case (\/-($var(DocField(origField @ BsonField.Name(_)))), (newField, \/-($var(DocField(IdName))))) =>
                 (origField, newField).some
-              case (-\/(Reshape(map)), (newField, \/-($var(DocField(BsonField.Path(NonEmptyList(IdName, x))))))) if map.size ≟ 1 =>
+              case (-\/(Reshape(map)), (newField, \/-($var(DocField(BsonField.Path(NonEmptyList(IdName, ICons(x, INil())))))))) if map.size ≟ 1 =>
                 map.get(x).flatMap {
                   case \/-($var(DocField(origField @ BsonField.Name(_)))) => (origField, newField).some
                   case _ => None

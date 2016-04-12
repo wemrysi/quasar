@@ -19,26 +19,25 @@ package quasar.api
 import quasar.Predef._
 
 import argonaut._, Argonaut._
+import argonaut.ArgonautScalaz._
 import org.http4s.{DecodeResult => _, _}
 import org.http4s.argonaut._
-import scalaz.EitherT
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.syntax.applicative._
 
 object ApiErrorEntityDecoder {
   implicit val apiErrorEntityDecoder: EntityDecoder[ApiError] =
     EntityDecoder.decodeBy(MediaType.`application/json`) {
       case res @ Response(status, _, _, _, _) =>
         res.attemptAs[Json] flatMap { json =>
-          EitherT.fromDisjunction[Task](fromJson(status, json.hcursor).toDisjunction)
-            .leftMap { case (msg, _) => ParseFailure(
-              "Failed to decode JSON as an ApiError",
-              s"JSON: $json, reason: $msg")
+          EitherT.fromDisjunction[Task](fromJson(status, json.hcursor).toEither.disjunction)
+            .leftMap { case (msg, _) => InvalidMessageBodyFailure(
+              s"Failed to decode JSON as an ApiError. JSON: $json, reason: $msg")
             }
         }
 
       case Request(_, _, _, _, _, _) =>
-        EitherT.left(ParseFailure("ApiError is only decodable from a Response.", "").point[Task])
+        EitherT.left(MalformedMessageBodyFailure("ApiError is only decodable from a Response.").point[Task])
     }
 
   private def fromJson(status: Status, hc: HCursor): DecodeResult[ApiError] =

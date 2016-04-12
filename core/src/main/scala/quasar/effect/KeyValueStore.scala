@@ -109,7 +109,7 @@ object KeyValueStore {
     */
   def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
     new (KeyValueStore[K, V, ?] ~> Task) {
-      val toST = toState[State](Lens.id[Map[K,V]])
+      val toST = toState[State[Map[K,V],?]](Lens.id[Map[K,V]])
       def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
         ref.modifyS(toST(fa).run)
     }
@@ -154,14 +154,14 @@ object KeyValueStore {
     *   `toState[F](lens)`
     */
   object toState {
-    def apply[F[_, _]]: Aux[F] =
+    def apply[F[_]]: Aux[F] =
       new Aux[F]
 
-    final class Aux[F[_, _]] {
+    final class Aux[F[_]] {
       def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
-                        : KeyValueStore[K, V, ?] ~> F[S, ?] =
-        new(KeyValueStore[K, V, ?] ~> F[S, ?]) {
-          def apply[A](fa: KeyValueStore[K, V, A]): F[S, A] = fa match {
+                        : KeyValueStore[K, V, ?] ~> F =
+        new(KeyValueStore[K, V, ?] ~> F) {
+          def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {
             case CompareAndPut(k, expect, update) =>
               lookup(k) flatMap { cur =>
                 if (cur == expect)
@@ -180,12 +180,10 @@ object KeyValueStore {
               modify(_ + (key -> value))
           }
 
-          type M[A] = F[S, A]
-
-          def lookup(k: K): M[Option[V]] =
+          def lookup(k: K): F[Option[V]] =
             F.gets(s => l.get(s).get(k))
 
-          def modify(f: Map[K, V] => Map[K, V]): M[Unit] =
+          def modify(f: Map[K, V] => Map[K, V]): F[Unit] =
             F.modify(l.modify(f))
         }
     }

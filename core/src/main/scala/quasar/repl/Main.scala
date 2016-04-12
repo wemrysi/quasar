@@ -18,7 +18,6 @@ package quasar.repl
 
 import quasar.Predef._
 
-import quasar.Errors.ETask
 import quasar.config.{CoreConfig, FsPath, FsFile}
 import quasar.console._
 import quasar.effect._
@@ -63,7 +62,7 @@ object Main {
     console.setPrompt(new Prompt("💪 $ "))
 
     val i: DriverEff ~> MainTask = free.interpret3[ReplFailF, ConsoleIOF, Task, MainTask](
-      Coyoneda.liftTF[ReplFail, MainTask](Failure.toError[ETask, String]),
+      Coyoneda.liftTF[ReplFail, MainTask](Failure.toError[MainTask, String]),
       liftMT[Task, MainErrT].compose[ConsoleIOF](Coyoneda.liftTF(consoleIO(console))),
       liftMT[Task, MainErrT])
 
@@ -74,7 +73,7 @@ object Main {
           case Command.Exit =>
             console.stop()
           case _            =>
-            f(command).foldMap(i).run.run.valueOr(
+            f(command).foldMap(i).run.unsafePerformSync.valueOr(
               err => console.getShell.out.println("Quasar error: " + err))
         }
         0
@@ -145,7 +144,7 @@ object Main {
       _            <- EitherT.right(driver(r))
     } yield ()
 
-    logErrors(main0).run
+    logErrors(main0).unsafePerformSync
   }
 
 }

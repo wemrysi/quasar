@@ -233,6 +233,6 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
       }
 
       step(deleteForManage(fs.setupInterpM).runVoid)
-    }; ()
+    }
   }
 }

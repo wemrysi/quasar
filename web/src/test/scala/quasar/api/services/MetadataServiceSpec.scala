@@ -55,7 +55,7 @@ object MetadataFixture {
     new (Mounting ~> Task) {
       type F[A] = State[Map[APath, MountConfig], A]
       val mntr = Mounter.trivial[MountConfigsF]
-      val kvf = KeyValueStore.toState[State](Lens.id[Map[APath, MountConfig]])
+      val kvf = KeyValueStore.toState[F](Lens.id[Map[APath, MountConfig]])
       def apply[A](ma: Mounting[A]) =
         Task.now(mntr(ma).foldMap(Coyoneda.liftTF[MountConfigs, F](kvf)).eval(mnts))
     }
@@ -78,13 +78,13 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
     "respond with NotFound" >> {
       // TODO: escaped paths do not survive being embedded in error messages
       "if directory does not exist" ! prop { dir: ADir => (dir != rootDir) ==> {
-        val response = service(InMemState.empty, Map())(Request(uri = pathUri(dir))).run
-        response.as[ApiError].run must beApiErrorLike(pathNotFound(dir))
+        val response = service(InMemState.empty, Map())(Request(uri = pathUri(dir))).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(dir))
       }}
 
       "file does not exist" ! prop { file: AFile =>
-        val response = service(InMemState.empty, Map())(Request(uri = pathUri(file))).run
-        response.as[ApiError].run must beApiErrorLike(pathNotFound(file))
+        val response = service(InMemState.empty, Map())(Request(uri = pathUri(file))).unsafePerformSync
+        response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(file))
       }
 
       "if file with same name as existing directory (without trailing slash)" ! prop { s: SingleFileMemState =>
@@ -92,8 +92,8 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           val parent = fileParent(s.file)
           // .get here is because we know thanks to the property guard, that the parent directory has a name
           val fileWithSameName = parentDir(parent).get </> file(dirName(parent).get.value)
-          val response = service(s.state, Map())(Request(uri = pathUri(fileWithSameName))).run
-          response.as[ApiError].run must beApiErrorLike(pathNotFound(fileWithSameName))
+          val response = service(s.state, Map())(Request(uri = pathUri(fileWithSameName))).unsafePerformSync
+          response.as[ApiError].unsafePerformSync must beApiErrorLike(pathNotFound(fileWithSameName))
         }
       }
     }
@@ -101,14 +101,14 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
     "respond with OK" >> {
       "and empty list for existing empty directory" >> {
         service(InMemState.empty, Map())(Request(uri = Uri(path = "/")))
-          .as[Json].run must_== Json("children" := List[FsNode]())
+          .as[Json].unsafePerformSync must_== Json("children" := List[FsNode]())
       }
 
       "and list of children for existing nonempty directory" ! prop { s: NonEmptyDir =>
         val childNodes = s.ls.map(FsNode(_, None))
 
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
-          .as[Json].run must_== Json("children" := childNodes.sorted)
+          .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
       }
 
       "and mounts when any children happen to be mount points" ! prop { (
@@ -130,7 +130,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
           (parent </> dir(mName.value) </> file("bar"), Vector()))
 
         service(mem, mnts)(Request(uri = pathUri(parent)))
-          .as[Json].run must_== Json("children" := List(
+          .as[Json].unsafePerformSync must_=== Json("children" := List(
             FsNode(fName.value, "file", None),
             FsNode(dName.value, "directory", None),
             FsNode(vName.value, "file", Some("view")),
@@ -140,7 +140,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
 
       "and empty object for existing file" ! prop { s: SingleFileMemState =>
         service(s.state, Map())(Request(uri = pathUri(s.file)))
-          .as[Json].run must_== Json.obj()
+          .as[Json].unsafePerformSync must_=== Json.obj()
       }
     }
   }

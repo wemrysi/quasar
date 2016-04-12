@@ -23,7 +23,7 @@ import SemanticError.{TypeError, MissingField, MissingIndex}
 import scala.Any
 
 import argonaut._, Argonaut._
-import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
+import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
 
 sealed trait Type { self =>
   import Type._
@@ -107,7 +107,7 @@ sealed trait Type { self =>
   }
 
   final def objectField(field: Type): ValidationNel[SemanticError, Type] = {
-    if (Type.lub(field, Str) != Str) failure(nel(TypeError(Str, field, None), Nil))
+    if (Type.lub(field, Str) != Str) failureNel(TypeError(Str, field, None))
     else (field, this) match {
       case (_, x @ Coproduct (_, _)) => {
         implicit val or: Monoid[Type] = Type.TypeOrMonoid
@@ -120,29 +120,29 @@ sealed trait Type { self =>
 
       case (Str, t) =>
         t.objectType.fold[ValidationNel[SemanticError, Type]](
-          failure(nel(TypeError(AnyObject, this, None), Nil)))(
+          failureNel(TypeError(AnyObject, this, None)))(
           success)
 
       case (Const(Data.Str(field)), Const(Data.Obj(map))) =>
         // TODO: import toSuccess as method on Option (via ToOptionOps)?
-        toSuccess(map.get(field).map(Const(_)))(nel(MissingField(field), Nil))
+        toSuccess(map.get(field).map(Const(_)))(nels(MissingField(field)))
 
       case (Const(Data.Str(field)), Obj(map, uk)) =>
         map.get(field).fold(
           uk.fold[ValidationNel[SemanticError, Type]](
-            failure(nel(MissingField(field), Nil)))(
+            failureNel(MissingField(field)))(
             success))(
           success)
 
-      case _ => failure(nel(TypeError(AnyObject, this, None), Nil))
+      case _ => failureNel(TypeError(AnyObject, this, None))
     }
   }
 
   final def arrayElem(index: Type): ValidationNel[SemanticError, Type] = {
-    if (Type.lub(index, Int) != Int) failure(nel(TypeError(Int, index, None), Nil))
+    if (Type.lub(index, Int) != Int) failureNel(TypeError(Int, index, None))
     else (index, this) match {
       case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
-        arr.lift(index.toInt).map(data => success(Const(data))).getOrElse(failure(nel(MissingIndex(index.toInt), Nil)))
+        arr.lift(index.toInt).map(data => success(Const(data))).getOrElse(failureNel(MissingIndex(index.toInt)))
 
       case (_, x @ Coproduct(_, _)) =>
         implicit val lub: Monoid[Type] = Type.TypeLubMonoid
@@ -150,7 +150,7 @@ sealed trait Type { self =>
 
       case (Int, t) =>
         t.arrayType.fold[ValidationNel[SemanticError, Type]](
-          failure(nel(TypeError(AnyArray, this, None), Nil)))(
+          failureNel(TypeError(AnyArray, this, None)))(
           success)
 
       case (Const(Data.Int(index)), FlexArr(min, max, value)) =>
@@ -158,14 +158,14 @@ sealed trait Type { self =>
           success(value)
         max.fold[ValidationNel[SemanticError, Type]](
           succ)(
-          max => if (index < max) succ else failure(nel(MissingIndex(index.toInt), Nil)))
+          max => if (index < max) succ else failureNel(MissingIndex(index.toInt)))
 
       case (Const(Data.Int(index)), Arr(value)) =>
         if (index < value.length)
           success(value(index.toInt))
-        else failure(nel(MissingIndex(index.toInt), Nil))
+        else failureNel(MissingIndex(index.toInt))
 
-      case _ => failure(nel(TypeError(AnyArray, this, None), Nil))
+      case _ => failureNel(TypeError(AnyArray, this, None))
     }
   }
 }

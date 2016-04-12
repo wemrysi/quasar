@@ -77,8 +77,8 @@ trait FileSystemFixture {
       val fileMapping = filesInDir.map{ case (relFile,data) => (dir </> relFile, data)}
       InMemState fromFiles fileMapping.toList.toMap
     }
-    def relFiles = filesInDir.unzip._1
-    def ls = relFiles.map(segAt(0,_)).list.flatten.distinct
+    def relFiles: NonEmptyList[RFile] = filesInDir.unzip._1
+    def ls = relFiles.map(segAt(0,_)).list.toList.flatten.distinct
       .sortBy((pname: PathSegment) => posixCodec.printPath(pname.fold(dir1, file1)))
   }
 

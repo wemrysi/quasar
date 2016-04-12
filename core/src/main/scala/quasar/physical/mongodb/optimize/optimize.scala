@@ -131,12 +131,12 @@ package object optimize {
       {
         case $Skip(Fix($Project(src0, shape, id)), count) =>
           $Project(Fix($Skip(src0, count)), shape, id).some
-        case $Skip(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_)), scope)), count) =>
+        case $Skip(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
           $SimpleMap(Fix($Skip(src0, count)), fn, scope).some
 
         case $Limit(Fix($Project(src0, shape, id)), count) =>
           $Project(Fix($Limit(src0, count)), shape, id).some
-        case $Limit(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_)), scope)), count) =>
+        case $Limit(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(_), INil()), scope)), count) =>
           $SimpleMap(Fix($Limit(src0, count)), fn, scope).some
 
         case $Match(Fix(p @ $Project(src0, shape, id)), sel) =>
@@ -147,7 +147,7 @@ package object optimize {
           rewriteSelector(sel, defs).map(sel =>
             $Project(Fix($Match(src0, sel)), shape, id))
 
-        case $Match(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(jsFn)), scope)), sel) => {
+        case $Match(Fix($SimpleMap(src0, fn @ NonEmptyList(MapExpr(jsFn), INil()), scope)), sel) => {
           import quasar.javascript._
           def defs(expr: JsCore): Map[DocVar, DocVar] =
             expr.simplify match {

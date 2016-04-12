@@ -20,8 +20,6 @@ import quasar.Predef._
 import quasar.RenderTree, RenderTree.ops._
 import quasar.fp._
 
-import scala.reflect.ClassTag
-
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
@@ -72,18 +70,6 @@ trait ValidationMatchers {
   def beSuccessful[E, A](a: => A) = validationWith[E, A](Success(a))
 
   def beFailing[E, A](e: => E) = validationWith[E, A](Failure(e))
-
-  def beFailureWithClass[E: ClassTag, A] = new Matcher[ValidationNel[E, A]] {
-    def apply[S <: ValidationNel[E, A]](s: Expectable[S]) = {
-      val v = s.value
-
-      val requiredType = implicitly[ClassTag[E]].runtimeClass
-
-      val rez = v match { case Failure(NonEmptyList(e)) => e.getClass == requiredType }
-
-      result(rez, "v is a failure of " + requiredType, "v is not a failure of " + requiredType, s)
-    }
-  }
 
   private def validationWith[E, A](f: => Validation[E, A]): Matcher[Validation[E, A]] = new Matcher[Validation[E, A]] {
     def apply[S <: Validation[E, A]](s: Expectable[S]) = {

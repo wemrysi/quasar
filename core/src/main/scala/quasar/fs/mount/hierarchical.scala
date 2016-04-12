@@ -134,7 +134,7 @@ object hierarchical {
     import ManageFile._
 
     type M[A] = Free[S, A]
-    type ME[A, B] = EitherT[M, A, B]
+    type MES[A] = EitherT[M, FileSystemError, A]
 
     val mountedMfs = mfs mapWithDir { case (d, f) =>
       f compose mounted.manageFile[ManageFileF](d)
@@ -165,7 +165,7 @@ object hierarchical {
               pathErr(invalidPath(
                 scn.dst,
                 s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
-              )).raiseError[ME, Unit]
+              )).raiseError[MES, Unit]
           }.run
 
         case Delete(path) =>
@@ -325,7 +325,7 @@ object hierarchical {
     type F[A] = State[Option[MntA], A]
     type M[A] = FileSystemErrT[F, A]
 
-    val F = MonadState[State, Option[MntA]]
+    val F = MonadState[F, Option[MntA]]
 
     def lookupMnt(p: APath): FileSystemError \/ MntA =
       lookupMounted(mounts, p) toRightDisjunction pathErr(pathNotFound(p))
@@ -352,7 +352,7 @@ object hierarchical {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         case ReadF(p) => mountFor(mkAbsolute(rootDir, p))
         case _        => ().point[M]
-      }.run.run(initMnt) match {
+      }(implicitly,Monad.monadMTMAB).run.run(initMnt) match {
         // NB: If mnt is empty, then there were no `ReadF`, so we should
         // be able to get a result without needing an actual filesystem,
         // and we just pass it to an arbitrary mount, if there is at

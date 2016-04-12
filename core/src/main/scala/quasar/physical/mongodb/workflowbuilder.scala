@@ -350,11 +350,11 @@ object WorkflowBuilder {
           rewriteExpr(expr) {
             case $varF(DocVar(_, Some(f))) =>
               f.flatten match {
-                case NonEmptyList(h @ BsonField.Name(_)) => inner.get(h)
+                case NonEmptyList(h @ BsonField.Name(_), INil()) => inner.get(h)
                 case ls =>
                   ls.head match {
                     case n @ BsonField.Name(_) => inner.get(n).flatMap {
-                      case \/-($var(DocVar(b, None))) => BsonField(ls.tail).map(f => \/-($var(DocVar(b, Some(f)))))
+                      case \/-($var(DocVar(b, None))) => BsonField(ls.tail.toList).map(f => \/-($var(DocVar(b, Some(f)))))
                       case \/-($var(DocVar(b, Some(f)))) => \/-($var(DocVar(b, Some(BsonField(f.flatten :::> ls.tail))))).some
                       case _ => None
                     }
@@ -1406,8 +1406,10 @@ object WorkflowBuilder {
     ShapePreservingBuilder(
       src,
       keys,
+      // TODO[ASP]: This pattern match is non total!
+      // possible solution: make sortTypes and the argument to this partial function NonEmpty
       _.zip(sortTypes) match {
-        case x :: xs => $sort(NonEmptyList.nel(x, xs))
+        case x :: xs => $sort(NonEmptyList.nel(x, IList.fromList(xs)))
       })
 
   // TODO: This is an approximation. If we could postpone this decision until

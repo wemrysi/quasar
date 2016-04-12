@@ -65,7 +65,7 @@ package object mount {
       TaskRef(initial) map KeyValueStore.fromTaskRef
 
     def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
-      KeyValueStore.toState[State](l)
+      KeyValueStore.toState[State[S,?]](l)
   }
 
   type ViewFileSystem0[A] = Coproduct[MonotonicSeqF, FileSystem, A]

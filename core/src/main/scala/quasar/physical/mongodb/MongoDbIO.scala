@@ -214,7 +214,7 @@ object MongoDbIO {
     import MapReduce._, Action._
 
     type F[A] = State[MapReduceIterable[BsonDocument], A]
-    val ms = MonadState[State, MapReduceIterable[BsonDocument]]
+    val ms = MonadState[F, MapReduceIterable[BsonDocument]]
 
     def withAction(actOut: ActionedOutput): F[Unit] =
       actOut.databaseName.traverse_[F](n => ms.modify(_.databaseName(n)))     *>
@@ -313,7 +313,7 @@ object MongoDbIO {
   ): MongoDbIO[MapReduceIterable[BsonDocument]] = {
     type IT       = MapReduceIterable[BsonDocument]
     type CfgIt[A] = State[IT, A]
-    val ms = MonadState[State, IT]
+    val ms = MonadState[CfgIt, IT]
 
     def foldIt[A](a: Option[A])(f: (IT, A) => IT): CfgIt[Unit] =
       ms.modify(a.foldLeft(_)(f))
@@ -324,7 +324,7 @@ object MongoDbIO {
     val sortRepr =
       cfg.inputSort map (ts =>
         Bson.Doc(ListMap(
-          ts.list.map(_.bimap(_.asText, _.bson)): _*
+          ts.list.toList.map(_.bimap(_.asText, _.bson)): _*
         )).repr)
 
     val configuredIt =

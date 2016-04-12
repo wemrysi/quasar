@@ -40,7 +40,7 @@ class RestApiSpecs extends Specification {
     val mount = new (Mounting ~> Task) {
       def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
     }
-    val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).run
+    val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).unsafePerformSync
     val eff = free.interpret3[Task, FileSystemFailureF, MountingFileSystem, Task](
       NaturalTransformation.refl,
       Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[FileSystemError]),
@@ -57,7 +57,7 @@ class RestApiSpecs extends Specification {
         uri = Uri(path = path),
         method = OPTIONS,
         headers = Headers(Header("Origin", "") :: additionalHeaders))
-      val response = service(req).run
+      val response = service(req).unsafePerformSync
       response.headers.get(resultHeaderKey).get.value.split(", ").toList must contain(allOf(expected: _*))
     }
 

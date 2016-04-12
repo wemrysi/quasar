@@ -69,7 +69,7 @@ trait Decoder {
   def decode(txtStream: Process[Task,String]): Task[DecodeError \/ Process[Task, DecodeError \/ Data]] =
     txtStream.runLog.map(_.mkString).map(decode(_))
   def decoder: EntityDecoder[Process[Task, DecodeError \/ Data]] = EntityDecoder.decodeBy(mediaType) { msg =>
-    EitherT(decode(msg.bodyAsText).map(_.leftMap(err => ParseFailure(err.msg, ""))))
+    EitherT(decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
   }
 }
 
@@ -192,7 +192,7 @@ object MessageFormat {
       override def decode(msg: Message, strict: Boolean): DecodeResult[Result] = {
         msg.headers.get(`Content-Type`).map { contentType =>
           fromMediaType(contentType.mediaType).map { format =>
-            EitherT[Task, DecodeFailure, Result](format.decode(msg.bodyAsText).map(_.leftMap(err => ParseFailure(err.msg, ""))))
+            EitherT[Task, DecodeFailure, Result](format.decode(msg.bodyAsText).map(_.leftMap(err => InvalidMessageBodyFailure(err.msg))))
           }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMismatch(contentType.mediaType, consumes).point[Task]))
         }.getOrElse(EitherT.left[Task, DecodeFailure, Result](MediaTypeMissing(consumes).point[Task]))
       }
@@ -239,6 +239,6 @@ object MessageFormat {
     // TODO: MediaRange needs an Order instance – combining QValue ordering
     //       with specificity (EG, application/json sorts before
     //       application/* if they have the same q-value).
-    accept.flatMap(_.values.sortBy(_.qValue).list.map(fromMediaType).flatten(Option.option2Iterable).headOption)
+    accept.flatMap(_.values.sortBy(_.qValue).list.map(_.mediaRange).map(fromMediaType).flatten(Option.option2Iterable).lastOption)
       .getOrElse(MessageFormat.Default)
 }

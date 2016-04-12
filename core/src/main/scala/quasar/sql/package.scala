@@ -97,7 +97,7 @@ package object sql {
 
   def pprint(sql: Expr) = sql.para(pprintƒ)
 
-  private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9$]*".r
+  private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9]*".r
 
   private def _q(s: String): String = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 

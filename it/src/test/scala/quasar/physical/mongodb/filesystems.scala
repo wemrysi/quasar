@@ -38,7 +38,7 @@ object filesystems {
   ): Task[(FileSystem ~> Task, Task[Unit])] = {
     val fsDef = quasar.physical.mongodb.fs.mongoDbFileSystemDef[MongoEff].apply(MongoDBFsType, uri).run
       .flatMap[FileSystemDef.DefinitionResult[MongoEffM]] {
-        case -\/(-\/(strs)) => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(strs.list.mkString)))
+        case -\/(-\/(strs)) => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
         case -\/(\/-(err))  => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(err.shows)))
         case \/-(d)         => d.point[MongoEffM]
       }

@@ -43,10 +43,9 @@ object Mounter {
 
     type FreeS[A]  = Free[S, A]
     type MntE[A]   = MntErrT[FreeS, A]
-    type Err[E, A] = EitherT[FreeS, E, A]
 
     val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
-    val merr = MonadError[Err, MountingError]
+    val merr = MonadError[MntE, MountingError]
 
     def mount0(req: MountRequest): MntE[Unit] =
       EitherT[FreeS, MountingError, Unit](free.lift(mount(req)).into[S])

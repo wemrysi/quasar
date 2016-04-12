@@ -57,7 +57,7 @@ object DataCodec {
   import DataEncodingError._
 
   def parse(str: String)(implicit C: DataCodec): DataEncodingError \/ Data =
-    Parse.parse(str).leftMap(ParseError.apply).flatMap(C.decode(_))
+    \/.fromEither(Parse.parse(str)).leftMap(ParseError.apply).flatMap(C.decode(_))
 
   def render(data: Data)(implicit C: DataCodec): DataEncodingError \/ String =
     C.encode(data).map(_.pretty(minspace))

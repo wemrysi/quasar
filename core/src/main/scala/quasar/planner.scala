@@ -145,7 +145,7 @@ object Planner {
     }
     final case class ManyErrors(errors: NonEmptyList[SemanticError])
         extends CompilationError {
-      def message = errors.map(_.message).list.mkString("[", "\n", "]")
+      def message = errors.map(_.message).list.toList.mkString("[", "\n", "]")
     }
   }
 

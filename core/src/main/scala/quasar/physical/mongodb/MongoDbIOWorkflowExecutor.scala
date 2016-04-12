@@ -43,7 +43,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
   import Workflow.$Sort
 
   private def foldS[F[_]: Foldable, S, A](fa: F[A])(f: (A, S) => S): State[S, Unit] =
-    fa.traverseS_[S, Unit](a => MonadState[State, S].modify(f(a, _)))
+    fa.traverseS_[S, Unit](a => MonadState[State[S,?], S].modify(f(a, _)))
 
   protected def aggregate(src: Collection, pipeline: Pipeline) =
     MongoDbIO.aggregate(src, pipeline map (_.bson), true)
