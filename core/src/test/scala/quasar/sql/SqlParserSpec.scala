@@ -269,6 +269,24 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       parser.parse(q) must beRightDisjunction
     }
 
+    "parse is (not) as (!)=" in {
+      val q1 = "select * from zips where pop is 1000 and city is not \"BOULDER\""
+      val q2 = "select * from zips where pop = 1000 and city != \"BOULDER\""
+      parser.parse(q1) must_== parser.parse(q2)
+    }
+
+    "parse `in` and `like` with optional `is`" in {
+      val q1 = "select * from zips where pop is in (1000, 2000) and city is like \"BOU%\""
+      val q2 = "select * from zips where pop in (1000, 2000) and city like \"BOU%\""
+      parser.parse(q1) must_== parser.parse(q2)
+    }
+
+    "parse `not in` and `not like` with optional `is`" in {
+      val q1 = "select * from zips where pop is not in (1000, 2000) and city is not like \"BOU%\""
+      val q2 = "select * from zips where pop not in (1000, 2000) and city not like \"BOU%\""
+      parser.parse(q1) must_== parser.parse(q2)
+    }
+
     "parse nested joins left to right" in {
       val q1 = "select * from a cross join b cross join c"
       val q2 = "select * from (a cross join b) cross join c"

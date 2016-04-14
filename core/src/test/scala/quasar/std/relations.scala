@@ -76,20 +76,6 @@ class RelationsSpec extends Specification with ScalaCheck with TypeArbitrary wit
       expr should beSuccessful(Const(Bool(true)))
     }
 
-    "fold isNull with null" in {
-      val expr = IsNull(Const(Null))
-      expr should beSuccessful(Const(Bool(true)))
-    }
-
-    "fold isNull" ! prop { (t1 : Type) =>
-      val expr = IsNull(t1)
-      expr must beSuccessful(t1 match {
-        case Const(Null) => Const(Bool(true))
-        case Const(_)    => Const(Bool(false))
-        case _           => Type.Bool
-      })
-    }
-
     // TODO: similar for the rest of the simple relations
 
     "fold cond with true" ! prop { (t1 : Type, t2 : Type) =>

@@ -106,16 +106,6 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val IsNull = Mapping("IS_NULL", "Determines if a value is the special value Null. May or may not be equivalent to applying Eq to the value and Null.",
-    Type.Bool, Type.Top :: Nil,
-    noSimplification,
-    partialTyper {
-      case List(Type.Const(Data.Null)) => Type.Const(Data.Bool(true))
-      case List(Type.Const(_))         => Type.Const(Data.Bool(false))
-      case List(_)                     => Type.Bool
-    },
-    basicUntyper)
-
   val And = Mapping("(AND)", "Performs a logical AND of two boolean values",
     Type.Bool, Type.Bool :: Type.Bool :: Nil,
     new Func.Simplifier {
@@ -207,7 +197,7 @@ trait RelationsLib extends Library {
       case t         => success(t ⨿ Type.Null :: Type.Top :: Nil)
     })
 
-  def functions = Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: Between :: IsNull :: And :: Or :: Not :: Cond :: Coalesce :: Nil
+  def functions = Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: Between :: And :: Or :: Not :: Cond :: Coalesce :: Nil
 
   def flip(f: Mapping): Option[Mapping] = f match {
     case Eq  => Some(Eq)

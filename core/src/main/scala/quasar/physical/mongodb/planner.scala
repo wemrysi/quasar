@@ -162,8 +162,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case And => makeSimpleBinop(jscore.And)
         case Or  => makeSimpleBinop(jscore.Or)
         case Not => makeSimpleUnop(jscore.Not)
-        case IsNull =>
-          Arity1(BinOp(jscore.Eq, _, Literal(Js.Null)))
         case In | Within =>
           Arity2((value, array) =>
             BinOp(jscore.Neq,
@@ -509,11 +507,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case (Gt, _)  => reversibleRelop(Gt)
         case (Gte, _) => reversibleRelop(Gte)
 
-        case (IsNull, _ :: Nil) => \/-((
-          { case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Null)) },
-          List(There(0, Here))))
-        case (IsNull, _) => -\/(UnsupportedPlan(node, None))
-
         case (In | Within, _)  =>
           relop(
             Selector.In.apply _,
@@ -798,10 +791,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case Lte        => expr2($lte(_, _))
         case Gt         => expr2($gt(_, _))
         case Gte        => expr2($gte(_, _))
-
-        case IsNull     =>
-          lift(Arity1(HasWorkflow)).flatMap(
-            mapExpr(_)($eq(_, $literal(Bson.Null))))
 
         case Coalesce   => expr2($ifNull(_, _))
 
