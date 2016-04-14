@@ -967,7 +967,7 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
       val equiv = "select foo.name, bar.address from foo, bar where foo.x < bar.y"
 
       testLogicalPlanCompile(query, compileExp(equiv))
-    }.pendingUntilFixed("SD-1190")
+    }
 
     "compile nested cross join to the equivalent inner equi-join" in {
       val query = "select a.x, b.y, c.z from a, b, c where a.id = b.a_id and b._id = c.b_id"
@@ -1021,32 +1021,32 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
 
       testLogicalPlanCompile(query,
         Let('__tmp0, read("foo"),
-          Let('__tmp1,
-             Fix(Filter(
-               Free('__tmp0),
-               Fix(Lt(
-                 ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
-                 Constant(Data.Int(10)))))),
-             Let('__tmp2, read("bar"),
-               Let('__tmp3,
-                 Fix(Filter(
-                   Free('__tmp2),
-                   Fix(Eq(
-                     ObjectProject(Free('__tmp2), Constant(Data.Str("y"))),
-                     Constant(Data.Int(20)))))),
-                  Let('__tmp4,
-                    Fix(InnerJoin(Free('__tmp1), Free('__tmp3),
-                      Fix(Eq(
-                        ObjectProject(Free('__tmp1), Constant(Data.Str("id"))),
-                        ObjectProject(Free('__tmp3), Constant(Data.Str("foo_id"))))))),
-                    Fix(Squash(
-                       makeObj(
-                         "name" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
-                           Constant(Data.Str("name"))),
-                         "address" -> ObjectProject[FLP](
-                           ObjectProject(Free('__tmp4), Constant(Data.Str("right"))),
-                           Constant(Data.Str("address"))))))))))))
+          Let('__tmp1, read("bar"),
+            Let('__tmp2,
+              Fix(Filter(
+                Free('__tmp0),
+                Fix(Lt(
+                  ObjectProject(Free('__tmp0), Constant(Data.Str("x"))),
+                  Constant(Data.Int(10)))))),
+              Let('__tmp3,
+                Fix(Filter(
+                  Free('__tmp1),
+                  Fix(Eq(
+                    ObjectProject(Free('__tmp1), Constant(Data.Str("y"))),
+                    Constant(Data.Int(20)))))),
+                Let('__tmp4,
+                  Fix(InnerJoin(Free('__tmp2), Free('__tmp3),
+                    Fix(Eq(
+                      ObjectProject(Free('__tmp2), Constant(Data.Str("id"))),
+                      ObjectProject(Free('__tmp3), Constant(Data.Str("foo_id"))))))),
+                  Fix(Squash(
+                    makeObj(
+                      "name" -> ObjectProject[FLP](
+                        ObjectProject(Free('__tmp4), Constant(Data.Str("left"))),
+                        Constant(Data.Str("name"))),
+                      "address" -> ObjectProject[FLP](
+                        ObjectProject(Free('__tmp4), Constant(Data.Str("right"))),
+                        Constant(Data.Str("address"))))))))))))
     }
 
     "compile simple left ineq-join" in {

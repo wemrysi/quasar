@@ -2912,7 +2912,71 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
 
     "plan non-equi join" in {
-      plan("select zips2.city from zips join zips2 on zips._id < zips2._id") must beLeft
+      plan("select zips2.city from zips join zips2 on zips._id < zips2._id") must
+      beWorkflow(
+        joinStructure(
+          $read(Collection("db", "zips")), "__tmp0", $$ROOT,
+          $read(Collection("db", "zips2")),
+          $literal(Bson.Null),
+          jscore.Literal(Js.Null).right,
+          chain(_,
+            $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
+              BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
+              BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
+            $unwind(DocField(BsonField.Name("left"))),
+            $unwind(DocField(BsonField.Name("right"))),
+            $project(
+              reshape(
+                "__tmp11"   ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                    $field("right"),
+                    $literal(Bson.Undefined)),
+                "__tmp12" -> $$ROOT),
+              IgnoreId),
+            $project(
+              reshape(
+                "city"    -> $field("__tmp11", "city"),
+                "__tmp13" ->
+                  $cond(
+                    $and(
+                      $lte($literal(Bson.Doc(ListMap())), $field("__tmp12", "right")),
+                      $lt($field("__tmp12", "right"), $literal(Bson.Arr(List())))),
+                    $cond(
+                      $or(
+                        $and(
+                          $lt($literal(Bson.Null), $field("__tmp12", "right", "_id")),
+                          $lt($field("__tmp12", "right", "_id"), $literal(Bson.Doc(ListMap())))),
+                        $and(
+                          $lte($literal(Bson.Bool(false)), $field("__tmp12", "right", "_id")),
+                          $lt($field("__tmp12", "right", "_id"), $literal(Bson.Regex("", ""))))),
+                      $cond(
+                        $and(
+                          $lte($literal(Bson.Doc(ListMap())), $field("__tmp12", "left")),
+                          $lt($field("__tmp12", "left"), $literal(Bson.Arr(List())))),
+                        $cond(
+                          $or(
+                            $and(
+                              $lt($literal(Bson.Null), $field("__tmp12", "left", "_id")),
+                              $lt($field("__tmp12", "left", "_id"), $literal(Bson.Doc(ListMap())))),
+                            $and(
+                              $lte($literal(Bson.Bool(false)), $field("__tmp12", "left", "_id")),
+                              $lt($field("__tmp12", "left", "_id"), $literal(Bson.Regex("", ""))))),
+                          $lt($field("__tmp12", "left", "_id"), $field("__tmp12", "right", "_id")),
+                          $literal(Bson.Undefined)),
+                        $literal(Bson.Undefined)),
+                      $literal(Bson.Undefined)),
+                    $literal(Bson.Undefined))),
+              IgnoreId),
+            $match(
+              Selector.Doc(
+                BsonField.Name("__tmp13") -> Selector.Eq(Bson.Bool(true)))),
+            $project(
+              reshape("city" -> $field("city")),
+              ExcludeId)),
+          false).op)
     }
 
     "plan simple inner equi-join" in {
@@ -3864,14 +3928,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         beRightDisjunction(Vector(
           "SQL AST", "Variables Substituted", "Annotated Tree", "Logical Plan", "Optimized"))
     }.pendingUntilFixed("SD-1249")
-
-    "include correct phases with alignment error" in {
-      planLog("select * from a join b on a.foo + b.bar < b.baz").map(_.map(_.name)) must
-        beRightDisjunction(Vector(
-          "SQL AST", "Variables Substituted", "Annotated Tree",
-          "Logical Plan", "Optimized", "Typechecked",
-          "Logical Plan (reduced typechecks)"))
-    }
 
     "include correct phases with planner error" in {
       planLog("""select date_part("foo", bar) from zips""").map(_.map(_.name)) must

@@ -49,7 +49,8 @@ object Optimizer {
       LogicalPlan[T[LogicalPlan]] => Option[LogicalPlan[T[LogicalPlan]]] = {
     case inv @ InvokeF(func, _) => func.simplify(inv)
     case LetF(ident, form, in) => form.project match {
-      case ConstantF(_) => in.transPara(inlineƒ(ident, form.project)).project.some
+      case ConstantF(_)
+         | FreeF(_) => in.transPara(inlineƒ(ident, form.project)).project.some
       case _ => in.cata(countUsageƒ(ident)) match {
         case 0 => in.project.some
         case 1 => in.transPara(inlineƒ(ident, form.project)).project.some
@@ -291,14 +292,8 @@ object Optimizer {
         val comps = flattenAnd(joinCond).map(toComp(joinL, joinR)) ++
                     flattenAnd(cond).map(toComp(JoinDir.Left.projectFrom(src), JoinDir.Right.projectFrom(src)))
         newJoin(joinL, joinR, comps)
-
-      // TODO: enable this when it can be made to not conflict (see tests pending SD-1190).
-      // Currently, the rewritten join/filter's shape is not matched by the other case,
-      // resulting in un-collapsed Filter steps.
-      // case InnerJoin((srcL, _) :: (srcR, _) :: (_, joinCond) :: Nil) =>
-      //   val comps = flattenAnd(joinCond).map(toComp(srcL, srcR))
-      //   newJoin(srcL, srcR, comps)
-
+      case InnerJoin((srcL, _) :: (srcR, _) :: (_, joinCond) :: Nil) =>
+        newJoin(srcL, srcR, flattenAnd(joinCond).map(toComp(srcL, srcR)))
       case _ => State.state(Fix(node.map(preserveFree)))
     }
   }
