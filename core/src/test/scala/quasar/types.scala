@@ -23,9 +23,8 @@ import quasar.specs2._
 import scala.Right
 
 import argonaut._, Argonaut._
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
-import org.specs2.scalaz.ScalazMatchers._
+import org.specs2.mutable._
 
 class TypesSpec extends Specification with ScalaCheck with ValidationMatchers with PendingWithAccurateCoverage {
   import Type._
@@ -718,19 +717,19 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     def typJson(typ: Type): Json = typ.asJson
 
     "encode simple types as their name" in {
-      (typJson(Top)       must equal(jString("Top")))       and
-      (typJson(Bottom)    must equal(jString("Bottom")))    and
-      (typJson(Null)      must equal(jString("Null")))      and
-      (typJson(Str)       must equal(jString("Str")))       and
-      (typJson(Int)       must equal(jString("Int")))       and
-      (typJson(Dec)       must equal(jString("Dec")))       and
-      (typJson(Bool)      must equal(jString("Bool")))      and
-      (typJson(Binary)    must equal(jString("Binary")))    and
-      (typJson(Timestamp) must equal(jString("Timestamp"))) and
-      (typJson(Date)      must equal(jString("Date")))      and
-      (typJson(Time)      must equal(jString("Time")))      and
-      (typJson(Interval)  must equal(jString("Interval")))  and
-      (typJson(Id)        must equal(jString("Id")))
+      (typJson(Top)       must_== jString("Top"))       and
+      (typJson(Bottom)    must_== jString("Bottom"))    and
+      (typJson(Null)      must_== jString("Null"))      and
+      (typJson(Str)       must_== jString("Str"))       and
+      (typJson(Int)       must_== jString("Int"))       and
+      (typJson(Dec)       must_== jString("Dec"))       and
+      (typJson(Bool)      must_== jString("Bool"))      and
+      (typJson(Binary)    must_== jString("Binary"))    and
+      (typJson(Timestamp) must_== jString("Timestamp")) and
+      (typJson(Date)      must_== jString("Date"))      and
+      (typJson(Time)      must_== jString("Time"))      and
+      (typJson(Interval)  must_== jString("Interval"))  and
+      (typJson(Id)        must_== jString("Id"))
     }
 
     "encode constant types as their data encoding" ! prop { data: Data =>
@@ -739,29 +738,29 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     }
 
     "encode arrays as an array of types" ! prop { types: List[Type] =>
-      typJson(Arr(types)) must equal(Json("Array" := types))
+      typJson(Arr(types)) must_== Json("Array" := types)
     }
 
     "encode flex arrays as components" ! prop { (min: Int, max: Option[Int], mbr: Type) =>
-      typJson(FlexArr(min, max, mbr)) must equal(
+      typJson(FlexArr(min, max, mbr)) must_==
         Json("FlexArr" := (
           ("minSize" := min)  ->:
           ("maxSize" :?= max) ->?:
           ("members" := mbr)  ->:
-          jEmptyObject)))
+          jEmptyObject))
     }
 
     "encode objects" ! prop { (assocs: Map[String, Type], unks: Option[Type]) =>
-      typJson(Obj(assocs, unks)) must equal(
+      typJson(Obj(assocs, unks)) must_==
         Json("Obj" := (
           ("associations" := assocs) ->:
           ("unknownKeys"  :?= unks)  ->?:
-          jEmptyObject)))
+          jEmptyObject))
     }
 
     "encode coproducts as an array of types" ! prop { (t1: Type, t2: Type, ts: List[Type]) =>
       val coprod = ts.foldLeft(Coproduct(t1, t2))(Coproduct(_, _))
-      typJson(coprod) must equal(Json("Coproduct" := coprod.flatten))
+      typJson(coprod) must_== Json("Coproduct" := coprod.flatten)
     }
   }
 }

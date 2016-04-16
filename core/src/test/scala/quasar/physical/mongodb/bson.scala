@@ -25,6 +25,7 @@ import quasar.jscore
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.threeten.bp._
+import scalaz._, Scalaz._
 
 class BsonSpecs extends Specification with ScalaCheck {
   import Bson._
@@ -82,8 +83,8 @@ class BsonSpecs extends Specification with ScalaCheck {
         data match {
           case Data.Int(x) =>
             // NB: encoding int as Data loses size info
-            (bson.toJs must_== jscore.Call(jscore.ident("NumberInt"), List(data.toJs)).toJs) or
-              (bson.toJs must_== jscore.Call(jscore.ident("NumberLong"), List(data.toJs)).toJs)
+            (bson.toJs must_== jscore.Call(jscore.ident("NumberInt"), List(jscore.Literal(Js.Str(x.shows)))).toJs) or
+              (bson.toJs must_== jscore.Call(jscore.ident("NumberLong"), List(jscore.Literal(Js.Str(x.shows)))).toJs)
           case _ =>
             bson.toJs must_== data.toJs.toJs
         }

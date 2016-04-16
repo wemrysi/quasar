@@ -18,6 +18,7 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Data, Func, LogicalPlan, Type, Mapping, SemanticError}, LogicalPlan._, SemanticError._
+import quasar.fp._
 
 import matryoshka._
 import scalaz._, Scalaz._, NonEmptyList.nel, Validation.{success, failure}
@@ -197,6 +198,105 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  def functions = Concat :: Like :: Search :: Length :: Lower :: Upper :: Substring :: Nil
+  val Boolean = Mapping(
+    "boolean",
+    "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.Bool, Type.Str :: Nil,
+    noSimplification,
+    partialTyperV {
+      case Type.Const(Data.Str("true"))  :: Nil =>
+        success(Type.Const(Data.Bool(true)))
+      case Type.Const(Data.Str("false")) :: Nil =>
+        success(Type.Const(Data.Bool(false)))
+      case Type.Const(Data.Str(str))     :: Nil =>
+        failure(nel(InvalidStringCoercion(str, List("true", "false").right), Nil))
+      case Type.Str                      :: Nil => success(Type.Bool)
+    },
+    untyper(x => ToString(List(x)).map(List(_))))
+
+  val intRegex = "[+-]?\\d+"
+  val floatRegex = intRegex + "(?:.\\d+)?(?:[eE]" + intRegex + ")?"
+  val dateRegex = "(?:\\d{4}-\\d{2}-\\d{2}|\\d{8})"
+  val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
+  val timestampRegex = dateRegex + "T" + timeRegex
+
+  val Integer = Mapping(
+    "integer",
+    "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.Int, Type.Str :: Nil,
+    noSimplification,
+    partialTyperV {
+      case Type.Const(Data.Str(str))   :: Nil =>
+        str.parseInt.fold(
+          κ(failure(nel(InvalidStringCoercion(str, "a string containing an integer".left), Nil))),
+          i => success(Type.Const(Data.Int(i))))
+      case Type.Str                    :: Nil => success(Type.Int)
+    },
+    untyper(x => ToString(List(x)).map(List(_))))
+
+  val Decimal = Mapping(
+    "decimal",
+    "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.Dec, Type.Str :: Nil,
+    noSimplification,
+    partialTyperV {
+      case Type.Const(Data.Str(str))   :: Nil =>
+        str.parseDouble.fold(
+          κ(failure(nel(InvalidStringCoercion(str, "a string containing an decimal number".left), Nil))),
+          i => success(Type.Const(Data.Dec(i))))
+      case Type.Str                    :: Nil => success(Type.Int)
+    },
+    untyper(x => ToString(List(x)).map(List(_))))
+
+  val Null = Mapping(
+    "null",
+    "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.Null, Type.Str :: Nil,
+    noSimplification,
+    partialTyperV {
+      case Type.Const(Data.Str("null"))  :: Nil => success(Type.Const(Data.Null))
+      case Type.Const(Data.Str(str))     :: Nil =>
+        failure(nel(InvalidStringCoercion(str, List("null").right), Nil))
+      case Type.Str                      :: Nil => success(Type.Null)
+    },
+    untyper(x => ToString(List(x)).map(List(_))))
+
+  val ToString: Func = Mapping(
+    "to_string",
+    "Converts any primitive type to a string.",
+    Type.Str, Type.Syntaxed :: Nil,
+    noSimplification,
+    partialTyperV {
+      case List(Type.Const(data)) => (data match {
+        case Data.Str(str)     => success(str)
+        case Data.Null         => success("null")
+        case Data.Bool(b)      => success(b.shows)
+        case Data.Int(i)       => success(i.shows)
+        case Data.Dec(d)       => success(d.shows)
+        case Data.Timestamp(t) => success(t.toString)
+        case Data.Date(d)      => success(d.toString)
+        case Data.Time(t)      => success(t.toString)
+        case Data.Interval(i)  => success(i.toString)
+        // NB: Should not be able to hit this case, because of the domain.
+        case other             =>
+          failure(nel(
+            TypeError(
+              Type.Syntaxed,
+              other.dataType,
+              "can not convert aggregate types to String".some),
+            Nil))
+      }).map(s => Type.Const(Data.Str(s)))
+      case List(_) => success(Type.Str)
+    },
+    partialUntyperV {
+      case x @ Type.Const(_) =>
+        (Null(List(x)) <+> Boolean(List(x)) <+>
+          Integer(List(x)) <+> Decimal(List(x)) <+>
+          DateLib.Date(List(x)) <+> DateLib.Time(List(x)) <+>
+          DateLib.Timestamp(List(x)) <+> DateLib.Interval(List(x)))
+          .map(List(_))
+    })
+
+  def functions = Concat :: Like :: Search :: Length :: Lower :: Upper :: Substring :: Boolean :: Integer :: Decimal :: Null :: ToString :: Nil
 }
 object StringLib extends StringLib

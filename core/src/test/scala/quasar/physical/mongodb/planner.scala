@@ -413,10 +413,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
               BinOp(Or,
                 BinOp(Or,
-                  BinOp(jscore.Or, BinOp(jscore.Or,
+                  BinOp(jscore.Or,
                     Call(ident("isNumber"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))))),
-                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberInt"))),
-                    BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong"))),
+                    BinOp(jscore.Or,
+                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberInt")),
+                      BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("NumberLong")))),
                   Call(ident("isString"), List(Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false)))))),
                 BinOp(Or,
                   BinOp(Instance, Access(Select(ident("this"), "loc"), Literal(Js.Num(0, false))), ident("Date")),
@@ -609,7 +610,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "__tmp4" ->
+          "__tmp2" ->
           If(
             isString(Select(ident("x"), "city")),
             BinOp(Lt,
@@ -617,13 +618,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 List(Select(Select(ident("x"), "city"), "length"))),
                 Literal(Js.Num(4, false))),
             ident(Js.Undefined.ident)),
-          "__tmp5" -> ident("x"))))),
+          "__tmp3" -> ident("x"))))),
           ListMap()),
         $match(
           Selector.Doc(
-            BsonField.Name("__tmp4") -> Selector.Eq(Bson.Bool(true)))),
+            BsonField.Name("__tmp2") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("__tmp5")),
+          reshape("value" -> $field("__tmp3")),
           ExcludeId)))
     }
 
@@ -635,7 +636,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "__tmp8" ->
+          "__tmp6" ->
             If(
               BinOp(And,
                 binop(Or,
@@ -650,18 +651,18 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 BinOp(Lt,
                   Call(ident("NumberLong"),
                     List(Select(Select(ident("x"), "city"), "length"))),
-                    Literal(Js.Num(4, false))),
+                  Literal(Js.Num(4, false))),
                 BinOp(Lt,
                   Select(ident("x"), "pop"),
                   Literal(Js.Num(20000, false)))),
             ident(Js.Undefined.ident)),
-          "__tmp9" -> ident("x"))))),
+          "__tmp7" -> ident("x"))))),
           ListMap()),
         $match(
           Selector.Doc(
-            BsonField.Name("__tmp8") -> Selector.Eq(Bson.Bool(true)))),
+            BsonField.Name("__tmp6") -> Selector.Eq(Bson.Bool(true)))),
         $project(
-          reshape("value" -> $field("__tmp9")),
+          reshape("value" -> $field("__tmp7")),
           ExcludeId)))
     }
 
@@ -820,13 +821,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       plan("select * from a where \"foo\" ~ pattern or target ~ pattern") must beWorkflow(chain(
         $read(Collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
-          "__tmp10" -> Call(
+          "__tmp8" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(jscore.Literal(Js.Str("foo")))),
-          "__tmp11" -> ident("x"),
-          "__tmp12" -> Select(ident("x"), "pattern"),
-          "__tmp13" -> Select(ident("x"), "target"),
-          "__tmp14" -> Call(
+          "__tmp9" -> ident("x"),
+          "__tmp10" -> Select(ident("x"), "pattern"),
+          "__tmp11" -> Select(ident("x"), "target"),
+          "__tmp12" -> Call(
             Select(New(Name("RegExp"), List(Select(ident("x"), "pattern"), jscore.Literal(Js.Str("m")))), "test"),
             List(Select(ident("x"), "target"))))))),
           ListMap()),
@@ -834,20 +835,20 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           Selector.Or(
             Selector.And(
               Selector.Doc(
-                BsonField.Name("__tmp11") \ BsonField.Name("pattern") ->
+                BsonField.Name("__tmp9") \ BsonField.Name("pattern") ->
                   Selector.Type(BsonType.Text)),
               Selector.Doc(
-                BsonField.Name("__tmp10") -> Selector.Eq(Bson.Bool(true)))),
+                BsonField.Name("__tmp8") -> Selector.Eq(Bson.Bool(true)))),
             Selector.And(
               Selector.Doc(
-                BsonField.Name("__tmp12") -> Selector.Type(BsonType.Text)),
+                BsonField.Name("__tmp10") -> Selector.Type(BsonType.Text)),
               Selector.And(
                 Selector.Doc(
-                  BsonField.Name("__tmp13") -> Selector.Type(BsonType.Text)),
+                  BsonField.Name("__tmp11") -> Selector.Type(BsonType.Text)),
                 Selector.Doc(
-                  BsonField.Name("__tmp14") -> Selector.Eq(Bson.Bool(true))))))),
+                  BsonField.Name("__tmp12") -> Selector.Eq(Bson.Bool(true))))))),
         $project(
-          reshape("value" -> $field("__tmp11")),
+          reshape("value" -> $field("__tmp9")),
           ExcludeId)))
     }
 
@@ -1279,10 +1280,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               obj(
                 "__sd__0" ->
                   jscore.If(
-                    BinOp(jscore.Or, BinOp(jscore.Or, BinOp(jscore.Or,
+                    BinOp(jscore.Or, BinOp(jscore.Or,
                       Call(ident("isNumber"), List(Select(ident("__val"), "pop"))),
-                      BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberInt"))),
-                      BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberLong"))),
+                      BinOp(jscore.Or,
+                        BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberInt")),
+                        BinOp(Instance, Select(ident("__val"), "pop"), ident("NumberLong")))),
                       BinOp(jscore.Or,
                         BinOp(Instance, Select(ident("__val"), "pop"), ident("Date")),
                         BinOp(Instance, Select(ident("__val"), "pop"), ident("Timestamp")))),
@@ -1890,7 +1892,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
               obj(
-                "__tmp10" ->
+                "__tmp6" ->
                   If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                     Call(ident("NumberLong"),
                       List(Select(Select(ident("x"), "city"), "length"))),
@@ -1899,7 +1901,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $group(
             grouped(
               "cnt" -> $sum($literal(Bson.Int32(1)))),
-            -\/(reshape("0" -> $field("__tmp10")))),
+            -\/(reshape("0" -> $field("__tmp6")))),
           $project(
             reshape(
               "len" -> $field("_id", "0"),
@@ -2189,38 +2191,38 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "user_comments")),
         $project(
           reshape(
-            "__tmp16" ->
+            "__tmp14" ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr(List())), $field("comments")),
                   $lt($field("comments"), $literal(Bson.Binary(scala.Array[Byte]())))),
                 $field("comments"),
                 $literal(Bson.Arr(List(Bson.Undefined)))),
-            "__tmp17" -> $$ROOT),
+            "__tmp15" -> $$ROOT),
           IgnoreId),
-        $unwind(DocField(BsonField.Name("__tmp16"))),
+        $unwind(DocField(BsonField.Name("__tmp14"))),
         $project(
           reshape(
-            "__tmp20" ->
+            "__tmp18" ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Arr(List())), $field("__tmp16", "replyTo")),
-                  $lt($field("__tmp16", "replyTo"), $literal(Bson.Binary(scala.Array[Byte]())))),
-                $field("__tmp16", "replyTo"),
+                  $lte($literal(Bson.Arr(List())), $field("__tmp14", "replyTo")),
+                  $lt($field("__tmp14", "replyTo"), $literal(Bson.Binary(scala.Array[Byte]())))),
+                $field("__tmp14", "replyTo"),
                 $literal(Bson.Arr(List(Bson.Undefined)))),
-            "__tmp21" -> $$ROOT),
+            "__tmp19" -> $$ROOT),
           IgnoreId),
-        $unwind(DocField(BsonField.Name("__tmp20"))),
+        $unwind(DocField(BsonField.Name("__tmp18"))),
         $match(Selector.Or(
           Selector.And(
             Selector.Doc(
-              BsonField.Name("__tmp21") \ BsonField.Name("__tmp16") \ BsonField.Name("id") -> Selector.Type(BsonType.Text)),
+              BsonField.Name("__tmp19") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Type(BsonType.Text)),
             Selector.Doc(
-              BsonField.Name("__tmp21") \ BsonField.Name("__tmp16") \ BsonField.Name("id") -> Selector.Regex("^.*Dr.*$", false, true, false, false))),
+              BsonField.Name("__tmp19") \ BsonField.Name("__tmp14") \ BsonField.Name("id") -> Selector.Regex("^.*Dr.*$", false, true, false, false))),
           Selector.Doc(
-            BsonField.Name("__tmp20") -> Selector.Regex("^.*Dr.*$", false, true, false, false)))),
+            BsonField.Name("__tmp18") -> Selector.Regex("^.*Dr.*$", false, true, false, false)))),
         $project(
-          reshape("value" -> $field("__tmp21", "__tmp17")),
+          reshape("value" -> $field("__tmp19", "__tmp15")),
           ExcludeId)))
     }
 
@@ -2573,13 +2575,13 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
             "city"   -> Select(ident("x"), "city"),
             "pop"    -> Select(ident("x"), "pop"),
-            "__tmp6" ->
+            "__tmp4" ->
               If(Call(ident("isString"), List(Select(ident("x"), "city"))),
                 Call(ident("NumberLong"),
                   List(Select(Select(ident("x"), "city"), "length"))),
                 ident("undefined")))))),
             ListMap()),
-          $sort(NonEmptyList(BsonField.Name("__tmp6") -> Ascending)),
+          $sort(NonEmptyList(BsonField.Name("__tmp4") -> Ascending)),
           $project(
             reshape(
               "city" -> $field("city"),
@@ -2806,10 +2808,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   ident("undefined")),
               "1" ->
                 If(
-                  BinOp(jscore.Or, BinOp(jscore.Or,
+                  BinOp(jscore.Or,
                     Call(ident("isNumber"), List(Select(ident("x"), "epoch"))),
-                    BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberInt"))),
-                    BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberLong"))),
+                    BinOp(jscore.Or,
+                      BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberInt")),
+                      BinOp(Instance, Select(ident("x"), "epoch"), ident("NumberLong")))),
                   New(Name("Date"), List(Select(ident("x"), "epoch"))),
                   ident("undefined")))))),
             ListMap()),

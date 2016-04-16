@@ -70,8 +70,11 @@ object SemanticError {
   final case class WrongArgumentCount(func: Func, expected: Int, actual: Int) extends SemanticError {
     def message = "Wrong number of arguments for function '" + func.name + "': expected " + expected + " but found " + actual
   }
-  final case class ExpectedLiteral(node: Expr) extends SemanticError {
-    def message = "Expected literal but found '" + pprint(node) + "'"
+  final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
+    def message =
+      "Expected " +
+        expected.fold("“" + _ + "”", "one of " + _.mkString("“", "”", ", ")) +
+        " but found “" + str + "”"
   }
   final case class AmbiguousReference(node: Expr, relations: List[SqlRelation[Expr]]) extends SemanticError {
     def message = "The expression '" + pprint(node) + "' is ambiguous and might refer to any of the tables " + relations.mkString(", ")

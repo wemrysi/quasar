@@ -80,7 +80,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           Some(_))
 
 
-  def jsExprƒ[B]: Algebra[LogicalPlan, OutputM[PartialJs]] = {
+  val jsExprƒ: Algebra[LogicalPlan, OutputM[PartialJs]] = {
     type Output = OutputM[PartialJs]
 
     import jscore.{
@@ -144,23 +144,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
       func match {
         case Constantly => Arity1(ι)
-        case Count =>
-          Arity1(expr => Call(ident("NumberLong"), List(Select(expr, "count"))))
         case Length =>
           Arity1(expr => Call(ident("NumberLong"), List(Select(expr, "length"))))
-        case Sum =>
-          Arity1(x =>
-            Call(Select(x, "reduce"), List(ident("+"))))
-        case Min  =>
-          Arity1(x =>
-            Call(
-              Select(Select(ident("Math"), "min"), "apply"),
-              List(Literal(Js.Null), x)))
-        case Max  =>
-          Arity1(x =>
-            Call(
-              Select(Select(ident("Math"), "max"), "apply"),
-              List(Literal(Js.Null), x)))
         case Add      => makeSimpleBinop(jscore.Add)
         case Multiply => makeSimpleBinop(Mult)
         case Subtract => makeSimpleBinop(Sub)
@@ -196,6 +181,42 @@ object MongoDbPlanner extends Planner[Crystallized] {
                   If(insen, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
                 "test"),
               List(field)))
+        case Null => Arity1(str => If(BinOp(jscore.Eq, str, Literal(Js.Str("null"))), Literal(Js.Null), ident("undefined")))
+        case Boolean => Arity1(str => If(BinOp(jscore.Eq, str, Literal(Js.Str("true"))), Literal(Js.Bool(true)), If(BinOp(jscore.Eq, str, Literal(Js.Str("false"))), Literal(Js.Bool(false)), ident("undefined"))))
+        case Integer => Arity1(str =>
+          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + intRegex + "$")))), "test"), List(str)),
+            Call(ident("NumberLong"), List(str)),
+            ident("undefined")))
+        case Decimal =>
+          Arity1(str =>
+            If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + floatRegex + "$")))), "test"), List(str)),
+              Call(ident("parseFloat"), List(str)),
+              ident("undefined")))
+        case Date => Arity1(str =>
+          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + dateRegex + "$")))), "test"), List(str)),
+            Call(ident("ISODate"), List(str)),
+            ident("undefined")))
+        case Time => Arity1(str =>
+          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + timeRegex + "$")))), "test"), List(str)),
+            str,
+            ident("undefined")))
+        case Timestamp => Arity1(str =>
+          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + timestampRegex + "$")))), "test"), List(str)),
+            Call(ident("ISODate"), List(str)),
+            ident("undefined")))
+        case ToString => Arity1(value =>
+          If(isInt(value),
+            // NB: This is a terrible way to turn an int into a string, but the
+            //     only one that doesn’t involve converting to a decimal and
+            //     losing precision.
+            Call(Select(Call(ident("String"), List(value)), "replace"), List(
+              Call(ident("RegExp"), List(
+                Literal(Js.Str("[^-0-9]+")),
+                Literal(Js.Str("g")))),
+              Literal(Js.Str("")))),
+            If(binop(jscore.Or, isTimestamp(value), isDate(value)),
+              Call(Select(value, "toISOString"), Nil),
+              Call(ident("String"), List(value)))))
         case Extract =>
           args match {
             case a1 :: a2 :: Nil => (HasStr(a1) |@| HasJs(a2)) {
@@ -257,6 +278,35 @@ object MongoDbPlanner extends Planner[Crystallized] {
             }.join
             case _               => -\/(FuncArity(func, args.length))
           }
+
+        case TimeOfDay    => {
+          def pad2(x: JsCore) =
+            Let(Name("x"), x,
+              If(
+                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
+                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
+                ident("x")))
+          def pad3(x: JsCore) =
+            Let(Name("x"), x,
+              If(
+                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
+                BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
+                If(
+                  BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
+                  BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
+                  ident("x"))))
+          Arity1(date =>
+            Let(Name("t"), date,
+              binop(jscore.Add,
+                pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
+                Literal(Js.Str(":")),
+                pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
+                Literal(Js.Str(":")),
+                pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
+                Literal(Js.Str(".")),
+                pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))))
+        }
+
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
         case Between =>
           Arity3((value, min, max) =>
@@ -272,7 +322,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
       }
     }
 
-    _ match {
+    {
       case ConstantF(x)     => \/-(({ case Nil => JsFn.const(x.toJs) }, Nil))
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
@@ -330,7 +380,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
    * expressions which can be turned into selectors, factoring out the leftovers
    * for conversion using \$where.
    */
-  def selectorƒ[B]:
+  val selectorƒ:
       GAlgebra[(Fix[LogicalPlan], ?), LogicalPlan, OutputM[PartialSelector]] = { node =>
     type Output = OutputM[PartialSelector]
 
@@ -819,42 +869,33 @@ object MongoDbPlanner extends Planner[Crystallized] {
               }
           }
 
-        case TimeOfDay    => {
-          def pad2(x: JsCore) =
-            jscore.Let(jscore.Name("x"), x,
-              jscore.If(
-                jscore.BinOp(jscore.Lt, jscore.ident("x"), jscore.Literal(Js.Num(10, false))),
-                jscore.BinOp(jscore.Add, jscore.Literal(Js.Str("0")), jscore.ident("x")),
-                jscore.ident("x")))
-          def pad3(x: JsCore) =
-            jscore.Let(jscore.Name("x"), x,
-              jscore.If(
-                jscore.BinOp(jscore.Lt, jscore.ident("x"), jscore.Literal(Js.Num(100, false))),
-                jscore.BinOp(jscore.Add, jscore.Literal(Js.Str("00")), jscore.ident("x")),
-                jscore.If(
-                  jscore.BinOp(jscore.Lt, jscore.ident("x"), jscore.Literal(Js.Num(10, false))),
-                  jscore.BinOp(jscore.Add, jscore.Literal(Js.Str("0")), jscore.ident("x")),
-                  jscore.ident("x"))))
-          lift(Arity1(HasWorkflow).map(jsExpr1(_, JsFn(JsFn.defaultName,
-            jscore.Let(jscore.Name("t"), jscore.Ident(JsFn.defaultName),
-              jscore.binop(jscore.Add,
-                pad2(jscore.Call(jscore.Select(jscore.ident("t"), "getUTCHours"), Nil)),
-                jscore.Literal(Js.Str(":")),
-                pad2(jscore.Call(jscore.Select(jscore.ident("t"), "getUTCMinutes"), Nil)),
-                jscore.Literal(Js.Str(":")),
-                pad2(jscore.Call(jscore.Select(jscore.ident("t"), "getUTCSeconds"), Nil)),
-                jscore.Literal(Js.Str(".")),
-                pad3(jscore.Call(jscore.Select(jscore.ident("t"), "getUTCMilliseconds"), Nil))))))))
-        }
+        case Null => expr1(str =>
+          $cond($eq(str, $literal(Bson.Text("null"))),
+            $literal(Bson.Null),
+            $literal(Bson.Undefined)))
+
+        case Boolean => expr1(str =>
+          $cond($eq(str, $literal(Bson.Text("true"))),
+            $literal(Bson.Bool(true)),
+            $cond($eq(str, $literal(Bson.Text("false"))),
+              $literal(Bson.Bool(false)),
+              $literal(Bson.Undefined))))
+
+        // TODO: If we had the type available, this could be more efficient in
+        //       cases where we have a more restricted type. And right now we
+        //       can’t use this, because it doesn’t cover every type.
+        // case ToString => expr1(value =>
+        //   $cond(Check.isNull(value), $literal(Bson.Text("null")),
+        //     $cond(Check.isString(value), value,
+        //       $cond($eq(value, $literal(Bson.Bool(true))), $literal(Bson.Text("true")),
+        //         $cond($eq(value, $literal(Bson.Bool(false))), $literal(Bson.Text("false")),
+        //           $literal(Bson.Undefined))))))
 
         case ToTimestamp => expr1($add($literal(Bson.Date(Instant.ofEpochMilli(0))), _))
 
-        case ToId         => lift(args match {
-          case a1 :: Nil =>
-            HasText(a1).flatMap(str => BsonCodec.fromData(Data.Id(str)).map(WorkflowBuilder.pure)) <+>
-              HasWorkflow(a1).map(src => jsExpr1(src, JsFn(JsFn.defaultName, jscore.Call(jscore.ident("ObjectId"), List(jscore.Ident(JsFn.defaultName))))))
-          case _ => -\/(FuncArity(func, args.length))
-        })
+        case ToId        =>
+          lift(Arity1(HasText).flatMap(str =>
+            BsonCodec.fromData(Data.Id(str)).map(WorkflowBuilder.pure)))
 
         case Between       => expr3((x, l, u) => $and($lte(l, x), $lte(x, u)))
 
@@ -874,22 +915,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case DistinctBy   =>
           lift(Arity2(HasWorkflow, HasKeys)).flatMap((distinctBy(_, _)).tupled)
 
-        case Length       =>
-          lift(Arity1(HasWorkflow).map(jsExpr1(_, JsFn(JsFn.defaultName, jscore.Call(jscore.ident("NumberLong"), List(jscore.Select(jscore.Ident(JsFn.defaultName), "length")))))))
-
-        case Search       => lift(Arity3(HasWorkflow, HasWorkflow, HasWorkflow)).flatMap {
-          case (value, pattern, insen) =>
-            jsExpr(List(value, pattern, insen), { case List(v, p, i) =>
-              jscore.Call(
-                jscore.Select(
-                  jscore.New(jscore.Name("RegExp"), List(
-                    p,
-                    jscore.If(i, jscore.Literal(Js.Str("im")), jscore.Literal(Js.Str("m"))))),
-                  "test"),
-                List(v))
-            })
-        }
-
         case _ => fail(UnsupportedFunction(func))
       }
     }
@@ -904,7 +929,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
     def findArgs(partials: List[PartialJs], comp: Ann):
         OutputM[List[List[WorkflowBuilder]]] =
-      partials.map(_._2.map(_(comp.map(_._2))).sequenceU).sequenceU
+      partials.traverseU(_._2.traverseU(_(comp.map(_._2))))
 
     def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder]]):
         List[JsFn] =
@@ -915,7 +940,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
     // flatMaps over the State but not the \/. That way it can evaluate to left
     // for an individual node without failing the fold. This code takes care of
     // mapping from one to the other.
-    _ match {
+    node => node match {
       case ReadF(path) =>
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         state(Collection.fromPath(mkAbsolute(rootDir, path)).bimap(PlanPathError, WorkflowBuilder.read))
@@ -924,7 +949,10 @@ object MongoDbPlanner extends Planner[Crystallized] {
           κ(NonRepresentableData(data)),
           WorkflowBuilder.pure))
       case InvokeF(func, args) =>
-        val v = invoke(func, args)
+        val v = invoke(func, args) <+>
+          lift(jsExprƒ(node.map(HasJs))).flatMap(pjs =>
+            lift(pjs._2.traverse(_(Cofree(UnsupportedPlan(node, None).left, node.map(_.map(_._2)))))).flatMap(args =>
+              jsExpr(args, x => pjs._1(x.map(JsFn.const))(jscore.Ident(JsFn.defaultName)))))
         State(s => v.run(s).fold(e => s -> -\/(e), t => t._1 -> \/-(t._2)))
       case FreeF(name) =>
         state(-\/(InternalError("variable " + name + " is unbound")))
@@ -939,20 +967,11 @@ object MongoDbPlanner extends Planner[Crystallized] {
             case Type.Int
                | Type.Dec
                | Type.Int ⨿ Type.Dec
-               | Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
-              ((expr: Expression) => $and(
-                $lt($literal(Bson.Null), expr),
-                $lt(expr, $literal(Bson.Text("")))))
-            case Type.Str =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Text("")), expr),
-                $lt(expr, $literal(Bson.Doc(ListMap())))))
+               | Type.Int ⨿ Type.Dec ⨿ Type.Interval => Check.isNumber
+            case Type.Str => Check.isString
             case Type.Obj(map, _) =>
               ((expr: Expression) => {
-                val basic =
-                  $and(
-                    $lte($literal(Bson.Doc(ListMap())), expr),
-                    $lt(expr, $literal(Bson.Arr(Nil))))
+                val basic = Check.isObject(expr)
                 expr match {
                   case $var(dv) =>
                     map.foldLeft(
@@ -964,28 +983,11 @@ object MongoDbPlanner extends Planner[Crystallized] {
                   case _ => basic // FIXME: Check fields
                 }
               })
-            case Type.FlexArr(_, _, _) =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Arr(Nil)), expr),
-                $lt(expr, $literal(Bson.Binary(scala.Array[Byte]())))))
-            case Type.Binary =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Binary(scala.Array[Byte]())), expr),
-                $lt(expr, $literal(Bson.ObjectId(Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))))))
-            case Type.Id =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.ObjectId(Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))), expr),
-                $lt(expr, $literal(Bson.Bool(false)))))
-            case Type.Bool =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Bool(false)), expr),
-                $lte(expr, $literal(Bson.Bool(true)))))
-            case Type.Date =>
-              ((expr: Expression) => $and(
-                $lte($literal(Bson.Date(Instant.ofEpochMilli(0))), expr),
-                // TODO: in Mongo 3.0, we can have a tighter type check.
-                // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
-                $lt(expr, $literal(Bson.Regex("", "")))))
+            case Type.FlexArr(_, _, _) => Check.isArray
+            case Type.Binary => Check.isBinary
+            case Type.Id => Check.isId
+            case Type.Bool => Check.isBoolean
+            case Type.Date => Check.isDate
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
               ((expr: Expression) => $and(
@@ -1002,6 +1004,13 @@ object MongoDbPlanner extends Planner[Crystallized] {
                   // TODO: in Mongo 3.0, we can have a tighter type check.
                   // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
                   $lt(expr, $literal(Bson.Regex("", "")))))
+            case Type.Syntaxed =>
+              ((expr: Expression) =>
+                $or(
+                  $lt(expr, $literal(Bson.Doc(ListMap()))),
+                  $and(
+                    $lte($literal(Bson.ObjectId(minOid)), expr),
+                    $lt(expr, $literal(Bson.Regex("", ""))))))
           }
 
         val v =
@@ -1022,8 +1031,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
   val annotateƒ =
     GAlgebraZip[(Fix[LogicalPlan], ?), LogicalPlan].zip(
-      selectorƒ[OutputM[WorkflowBuilder]],
-      jsExprƒ[OutputM[WorkflowBuilder]].generalize[(Fix[LogicalPlan], ?)])
+      selectorƒ,
+      ToAlgebraOps(jsExprƒ).generalize[(Fix[LogicalPlan], ?)])
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.

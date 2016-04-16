@@ -171,11 +171,11 @@ object Bson {
   }
   final case class Int32(value: Int) extends Bson {
     def repr = new BsonInt32(value)
-    def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.num(value.toLong)))
+    def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.Str(value.shows)))
   }
   final case class Int64(value: Long) extends Bson {
     def repr = new BsonInt64(value)
-    def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.num(value)))
+    def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.Str(value.shows)))
   }
   final case class Timestamp private (epochSecond: Int, ordinal: Int) extends Bson {
     def repr = new BsonTimestamp(epochSecond, ordinal)

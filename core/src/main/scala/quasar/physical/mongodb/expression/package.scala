@@ -266,6 +266,49 @@ package object expression {
     }
   }
 
+  val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
+  val minInstant = Instant.ofEpochMilli(0)
+  val minOid =
+    ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+  object Check {
+    def isNull(expr: Expression) = $eq($literal(Bson.Null), expr)
+    def isNumber(expr: Expression) =
+      $and(
+        $lt($literal(Bson.Null), expr),
+        $lt(expr, $literal(Bson.Text(""))))
+    def isString(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Text("")), expr),
+        $lt(expr, $literal(Bson.Doc(ListMap()))))
+    def isObject(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Doc(ListMap())), expr),
+        $lt(expr, $literal(Bson.Arr(Nil))))
+    def isArray(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Arr(Nil)), expr),
+        $lt(expr, $literal(Bson.Binary(minBinary))))
+    def isBinary(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Binary(minBinary)), expr),
+        $lt(expr, $literal(Bson.ObjectId(minOid))))
+    def isId(expr: Expression) =
+      $and(
+        $lte($literal(Bson.ObjectId(minOid)), expr),
+        $lt(expr, $literal(Bson.Bool(false))))
+    def isBoolean(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Bool(false)), expr),
+        $lte(expr, $literal(Bson.Bool(true))))
+    def isDate(expr: Expression) =
+      $and(
+        $lte($literal(Bson.Date(minInstant)), expr),
+        // TODO: in Mongo 3.0, we can have a tighter type check.
+        // $lt(expr, $literal(Bson.Timestamp(minInstant, 0)))))
+        $lt(expr, $literal(Bson.Regex("", ""))))
+  }
+
   // The following few cases are places where the ExprOp created from
   // the LogicalPlan needs special handling to behave the same when
   // converted to JS.
@@ -301,9 +344,9 @@ package object expression {
           app(f1, isString)
         case (
           $lte($literal(Bson.Doc(m1)), f1),
-          $lt(f2, $literal(b1)),
+          $lt(f2, $literal(Bson.Binary(b1))),
           Nil)
-            if f1 == f2 && b1 == Bson.Binary(scala.Array[Byte]()) =>
+            if f1 == f2 && b1 ≟ minBinary =>
           app(f1, isObjectOrArray)
         case (
           $lte($literal(Bson.Doc(m1)), f1),
@@ -313,21 +356,33 @@ package object expression {
           app(f1, isObject)
         case (
           $lte($literal(Bson.Arr(Nil)), f1),
-          $lt(f2, $literal(b1)),
+          $lt(f2, $literal(Bson.Binary(b1))),
           Nil)
-            if f1 == f2 && b1 == Bson.Binary(scala.Array[Byte]()) =>
+            if f1 == f2 && b1 ≟ minBinary =>
           app(f1, isArray)
         case (
-          $lte($literal(b1), f1),
+          $lte($literal(Bson.Binary(b1)), f1),
           $lt(f2, $literal(Bson.ObjectId(oid))),
           Nil)
-            if f1 == f2 && b1 == Bson.Binary(scala.Array[Byte]()) && oid == scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) =>
+            if f1 == f2 && b1 ≟ minBinary && oid ≟ minOid =>
           app(f1, isBinary)
+        case (
+          $lte($literal(Bson.Binary(b1)), f1),
+          $lt(f2, $literal(Bson.Regex("", ""))),
+          Nil)
+            if f1 == f2 && b1 ≟ minBinary =>
+          app(f1, x =>
+            jscore.binop(jscore.Or,
+              isBinary(x),
+              isObjectId(x),
+              isBoolean(x),
+              isDate(x),
+              isTimestamp(x)))
         case (
           $lte($literal(Bson.ObjectId(oid)), f1),
           $lt(f2, $literal(Bson.Bool(false))),
           Nil)
-            if f1 == f2 && oid == scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) =>
+            if f1 == f2 && oid ≟ minOid =>
           app(f1, isObjectId)
         case (
           $lte($literal(Bson.Bool(false)), f1),
@@ -339,22 +394,19 @@ package object expression {
           $lte($literal(Bson.Date(i1)), f1),
           $lt(f2, $literal(Bson.Timestamp(i2, 0))),
           Nil)
-            if f1 == f2 && i1 == Instant.ofEpochMilli(0) && i2  == Instant.ofEpochMilli(0)
-            =>
+            if f1 == f2 && i1 == minInstant && i2 == minInstant =>
           app(f1, isDate)
         case (
           $lte($literal(Bson.Timestamp(i, 0)), f1),
           $lt(f2, $literal(Bson.Regex("", ""))),
           Nil)
-            if f1 == f2 && i == Instant.ofEpochMilli(0)
-            =>
+            if f1 == f2 && i == minInstant =>
           app(f1, isTimestamp)
         case (
           $lte($literal(Bson.Date(i)), f1),
           $lt(f2, $literal(Bson.Regex("", ""))),
           Nil)
-            if f1 == f2 && i == Instant.ofEpochMilli(0)
-            =>
+            if f1 == f2 && i == minInstant =>
           app(f1, x =>
             jscore.BinOp(jscore.Or,
               isDate(x),
@@ -386,7 +438,33 @@ package object expression {
               jscore.BinOp(jscore.And,
                 l(jscore.Ident(JsFn.defaultName)),
                 r(jscore.Ident(JsFn.defaultName))))))
-    }
+      }
+    case $or(f, s, o @ _*) =>
+      def app(x: Expression, tc: JsCore => JsCore): PlannerError \/ JsFn =
+        toJs(x).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
+
+      (f, s, o) match {
+        case (
+          $lt(f0, $literal(Bson.Doc(m1))),
+          $and($lte($literal(Bson.ObjectId(oid)), f1), $lt(f2, $literal(Bson.Regex("", "")))),
+          Nil)
+            if f0 == f1 && f1 == f2 && m1 == ListMap() && oid ≟ minOid =>
+          app(f1, x =>
+            jscore.binop(jscore.Or,
+              isNull(x),
+              isAnyNumber(x),
+              isString(x),
+              isObjectId(x),
+              isBoolean(x),
+              isDate(x),
+              isTimestamp(x)))
+        case _ =>
+          NonEmptyList(f, s +: o: _*).traverse[PlannerError \/ ?, JsFn](toJs).map(v =>
+            v.foldLeft1((l, r) => JsFn(JsFn.defaultName,
+              jscore.BinOp(jscore.Or,
+                l(jscore.Ident(JsFn.defaultName)),
+                r(jscore.Ident(JsFn.defaultName))))))
+      }
   }
 
   /** "Idiomatic" translation to JS, accounting for patterns needing special

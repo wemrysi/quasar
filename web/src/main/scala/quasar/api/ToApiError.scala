@@ -328,11 +328,6 @@ sealed abstract class ToApiErrorInstances {
           "functionName" := fn.name,
           "expectedArgs" := exp,
           "actualArgs"   := act)
-      case ExpectedLiteral(expr) =>
-        fromMsg(
-          BadRequest withReason "Literal value expected.",
-          err.message,
-          "sql" := expr.render)
       case AmbiguousReference(expr, _) =>
         fromMsg(
           BadRequest withReason "Ambiguous table reference.",
