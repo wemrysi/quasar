@@ -18,11 +18,12 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.{Variables, VarName, VarValue}
-import quasar.fp.prism._
+import quasar.fp._
 import quasar.fs.FileSystemType
-import quasar.sql, sql.{Expr}
+import quasar.sql, sql.Sql
 
 import argonaut._, Argonaut._
+import matryoshka._
 import monocle.Prism
 import scalaz._, Scalaz._
 
@@ -30,26 +31,22 @@ import scalaz._, Scalaz._
 sealed trait MountConfig
 
 object MountConfig {
-  final case class ViewConfig private[mount] (query: Expr, vars: Variables)
+  final case class ViewConfig private[mount] (query: Fix[Sql], vars: Variables)
     extends MountConfig
 
   final case class FileSystemConfig private[mount] (typ: FileSystemType, uri: ConnectionUri)
     extends MountConfig
 
-  val viewConfig: Prism[MountConfig, (Expr, Variables)] =
-    Prism[MountConfig, (Expr, Variables)] {
-      case ViewConfig(query, vars) => Some((query, vars))
-      case _                       => None
-    } ((ViewConfig(_, _)).tupled)
+  val viewConfig = pPrism[MountConfig, (Fix[Sql], Variables)] {
+    case ViewConfig(query, vars) => (query, vars)
+  } ((ViewConfig(_, _)).tupled)
 
-  val viewConfigUri: Prism[String, (Expr, Variables)] =
+  val viewConfigUri: Prism[String, (Fix[Sql], Variables)] =
     Prism((viewCfgFromUri _) andThen (_.toOption))((viewCfgAsUri _).tupled)
 
-  val fileSystemConfig: Prism[MountConfig, (FileSystemType, ConnectionUri)] =
-    Prism[MountConfig, (FileSystemType, ConnectionUri)] {
-      case FileSystemConfig(typ, uri) => Some((typ, uri))
-      case _                          => None
-    } ((FileSystemConfig(_, _)).tupled)
+  val fileSystemConfig = pPrism[MountConfig, (FileSystemType, ConnectionUri)] {
+    case FileSystemConfig(typ, uri) => (typ, uri)
+  } ((FileSystemConfig(_, _)).tupled)
 
   implicit val mountConfigShow: Show[MountConfig] =
     Show.shows {
@@ -59,9 +56,9 @@ object MountConfig {
         s"[${typ.value}] ${uri.value}"
     }
 
-/** TODO: Equal[sql.Expr]
+/** TODO: Equal[Sql[A]]
   implicit val mountConfigEqual: Equal[MountConfig] =
-    Equal.equalBy[MountConfig, Expr \/ (FileSystemType, Json)] {
+    Equal.equalBy[MountConfig, Fix[Sql] \/ (FileSystemType, Json)] {
       case ViewConfig(query)           => query.left
       case FileSystemConfig(typ, json) => (typ, json).right
     }
@@ -99,15 +96,15 @@ object MountConfig {
 
   private val VarPrefix = "var."
 
-  private def viewCfgFromUri(uri: String): String \/ (Expr, Variables) = {
-    import org.http4s._, util._, CaseInsensitiveString._
+  private def viewCfgFromUri(uri: String): String \/ (Fix[Sql], Variables) = {
+    import org.http4s.{parser => _, _}, util._, CaseInsensitiveString._
 
     for {
       parsed   <- Uri.fromString(uri).leftMap(_.sanitized)
       scheme   <- parsed.scheme \/> s"missing URI scheme: $parsed"
       _        <- (scheme == "sql2".ci) either (()) or s"unrecognized scheme: $scheme"
       queryStr <- parsed.params.get("q") \/> s"missing query: $uri"
-      query    <- sql.parse(sql.Query(queryStr)).leftMap(_.message)
+      query    <- sql.fixParser.parse(sql.Query(queryStr)).leftMap(_.message)
       vars     =  Variables(parsed.multiParams collect {
                     case (n, vs) if n.startsWith(VarPrefix) => (
                       VarName(n.substring(VarPrefix.length)),
@@ -117,7 +114,7 @@ object MountConfig {
     } yield (query, vars)
   }
 
-  private def viewCfgAsUri(query: Expr, vars: Variables): String = {
+  private def viewCfgAsUri(query: Fix[Sql], vars: Variables): String = {
     import org.http4s._, util._, CaseInsensitiveString._
 
     val qryMap = vars.value.foldLeft(Map("q" -> List(sql.pprint(query)))) {

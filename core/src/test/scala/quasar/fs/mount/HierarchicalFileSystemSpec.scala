@@ -121,7 +121,7 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
       val joinQry =
         "select f.x, q.y from `/bar/mntA/foo` as f inner join `/foo/mntC/quux` as q on f.id = q.id"
 
-      val lp = parse(Query(joinQry)).toOption
+      val lp = fixParser.parse(Query(joinQry)).toOption
         .flatMap(expr => queryPlan(expr, Variables(Map())).run.value.toOption)
         .get
 

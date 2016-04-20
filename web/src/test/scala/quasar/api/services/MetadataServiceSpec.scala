@@ -31,6 +31,7 @@ import quasar.fs.mount._
 import quasar.sql._
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import monocle.Lens
 import org.http4s._
 import org.http4s.argonaut._
@@ -116,7 +117,7 @@ class MetadataServiceSpec extends Specification with ScalaCheck with FileSystemF
         dName: DirName,
         mName: DirName,
         vName: FileName,
-        vcfg: (Expr, Variables),
+        vcfg: (Fix[Sql], Variables),
         fsCfg: (FileSystemType, ConnectionUri)
       ) => (fName != vName && dName != mName) ==> {
         val parent: ADir = rootDir </> dir("foo")

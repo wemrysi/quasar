@@ -35,7 +35,7 @@ trait CompilerHelpers extends Specification with TermLogicalPlanMatchers {
 
   val compile: String => String \/ Fix[LogicalPlan] = query => {
     for {
-      select <- sql.parse(Query(query)).leftMap(_.toString)
+      select <- sql.fixParser.parse(Query(query)).leftMap(_.toString)
       attr   <- AllPhases(select).leftMap(_.toString)
       cld    <- Compiler.compile(attr).leftMap(_.toString)
     } yield cld

@@ -22,6 +22,7 @@ import quasar.fp.prism._
 import quasar.fs._, FileSystemTypeArbitrary._
 import quasar.sql._, ExprArbitrary._
 
+import matryoshka.Fix
 import org.scalacheck.{Arbitrary, Gen}
 
 trait MountConfigArbitrary {
@@ -38,7 +39,7 @@ trait MountConfigArbitrary {
 
   private def genViewConfig: Gen[MountConfig] =
     for {
-      expr <- Arbitrary.arbitrary[Expr]
+      expr <- Arbitrary.arbitrary[Fix[Sql]]
       vars <- Arbitrary.arbitrary[Variables]
     } yield viewConfig(expr, vars)
 }

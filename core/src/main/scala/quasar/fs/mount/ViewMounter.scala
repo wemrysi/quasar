@@ -22,7 +22,7 @@ import quasar.effect.KeyValueStore
 import quasar.fp.κ
 import quasar.fp.prism._
 import quasar.fs._
-import quasar.sql.Expr
+import quasar.sql.Sql
 
 import matryoshka._, TraverseT.ops._
 import pathy.Path._
@@ -43,12 +43,12 @@ object ViewMounter {
   def lookup[S[_]: Functor]
     (loc: AFile)
     (implicit S: MountConfigsF :<: S)
-    : OptionT[Free[S, ?], (Expr, Variables)] =
+    : OptionT[Free[S, ?], (Fix[Sql], Variables)] =
     mntCfgs[S].get(loc).flatMap(mc => OptionT.optionT[Free[S, ?]](Free.point(viewConfig.getOption(mc))))
 
   /** Attempts to mount a view at the given location. */
   def mount[S[_]: Functor]
-    (loc: AFile, query: Expr, vars: Variables)
+    (loc: AFile, query: Fix[Sql], vars: Variables)
     (implicit S: MountConfigsF :<: S)
     : Free[S, MountingError \/ Unit] = {
     val vc = viewConfig(query, vars)

@@ -21,8 +21,9 @@ import quasar.Variables
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fs._
-import quasar.sql._
+import quasar.sql.Sql
 
+import matryoshka.Fix
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import pathy._, Path._
@@ -34,7 +35,7 @@ object Mounting {
   final case class Lookup(path: APath)
     extends Mounting[Option[MountConfig]]
 
-  final case class MountView(loc: AFile, query: Expr, vars: Variables)
+  final case class MountView(loc: AFile, query: Fix[Sql], vars: Variables)
     extends Mounting[MountingError \/ Unit]
 
   final case class MountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri)
@@ -71,7 +72,7 @@ object Mounting {
       OptionT(lift(Lookup(path)))
 
     /** Create a view mount at the given location. */
-    def mountView(loc: AFile, query: Expr, vars: Variables): M[Unit] =
+    def mountView(loc: AFile, query: Fix[Sql], vars: Variables): M[Unit] =
       EitherT(lift(MountView(loc, query, vars)))
 
     /** Create a filesystem mount at the given location. */

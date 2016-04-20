@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.fp
 
-import quasar.sql.Expr
-
-final case class QueryRequest(
-  query:      Expr,
-  variables:  Variables)
+/** Functor composition */
+trait Composition[F[_], G[_]] {
+  type λ[A] = F[G[A]]
+}

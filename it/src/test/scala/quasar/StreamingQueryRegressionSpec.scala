@@ -17,13 +17,15 @@
 package quasar
 
 import quasar.regression._
-import quasar.sql._
+import quasar.sql.Sql
+
+import matryoshka.Fix
 
 class StreamingQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS) {
 
   val suiteName = "Streaming Queries"
 
-  def queryResults(expr: Expr, vars: Variables) =
+  def queryResults(expr: Fix[Sql], vars: Variables) =
     query.evaluateQuery(expr, vars)
 }

@@ -21,9 +21,9 @@ import quasar.Variables
 import quasar.fp.prism._
 import quasar.fs.{APath, ADir, AFile, PathError, FileSystemType}
 import quasar.specs2.DisjunctionMatchers
-import quasar.sql
+import quasar.sql, sql.Sql
 
-import matryoshka.Fix
+import matryoshka._
 import monocle.function.Field1
 import monocle.std.{disjunction => D}
 import monocle.std.tuple2._
@@ -52,8 +52,8 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
   }
 
   val noVars   = Variables.fromMap(Map.empty)
-  val exprA    = Fix(sql.StringLiteralF[sql.Expr]("A"))
-  val exprB    = Fix(sql.StringLiteralF[sql.Expr]("B"))
+  val exprA    = sql.stringLiteral[Fix[Sql]]("A").embed
+  val exprB    = sql.stringLiteral[Fix[Sql]]("B").embed
   val viewCfgA = viewConfig(exprA, noVars)
   val viewCfgB = viewConfig(exprB, noVars)
 
@@ -82,7 +82,7 @@ abstract class MountingSpec[S[_]](implicit S0: Functor[S], S1: MountingF :<: S)
   def maybeExists[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism pathExists getOption dj
 
-  def mountViewNoVars(loc: AFile, query: sql.Expr): M[Unit] =
+  def mountViewNoVars(loc: AFile, query: Fix[Sql]): M[Unit] =
     mountView(loc, query, noVars)
 
   s"$interpName mounting interpreter" should {

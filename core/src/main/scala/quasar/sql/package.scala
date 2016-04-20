@@ -20,40 +20,55 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.fs._
 
-import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
-import pathy.Path.posixCodec
-
 package object sql {
-  type Expr = Fix[ExprF]
+  def select[A] = pPrism[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
+    case Select(d, p, r, f, g, o) => (d, p, r, f, g, o)
+  } ((Select[A] _).tupled)
+
+  def vari[A] = pPrism[Sql[A], String] { case Vari(sym) => sym } (Vari(_))
+  def setLiteral[A] = pPrism[Sql[A], List[A]] { case SetLiteral(exprs) => exprs } (SetLiteral(_))
+  def arrayLiteral[A] = pPrism[Sql[A], List[A]] { case ArrayLiteral(exprs) => exprs } (ArrayLiteral(_))
+  def mapLiteral[A] = pPrism[Sql[A], List[(A, A)]] { case MapLiteral(exprs) => exprs } (MapLiteral(_))
+  def splice[A] = pPrism[Sql[A], Option[A]] { case Splice(exprs) => exprs } (Splice(_))
+  def binop[A] = pPrism[Sql[A], (A, A, BinaryOperator)] { case Binop(l, r, op) => (l, r, op) } ((Binop[A] _).tupled)
+  def unop[A] = pPrism[Sql[A], (A, UnaryOperator)] { case Unop(a, op) => (a, op) } ((Unop[A] _).tupled)
+  def ident[A] = pPrism[Sql[A], String] { case Ident(name) => name } (Ident(_))
+  def invokeFunction[A] = pPrism[Sql[A], (String, List[A])] { case InvokeFunction(name, args) => (name, args) } ((InvokeFunction[A] _).tupled)
+  def matc[A] = pPrism[Sql[A], (A, List[Case[A]], Option[A])] { case Match(expr, cases, default) => (expr, cases, default) } ((Match[A] _).tupled)
+  def switch[A] = pPrism[Sql[A], (List[Case[A]], Option[A])] { case Switch(cases, default) => (cases, default) } ((Switch[A] _).tupled)
+  def let[A] = pPrism[Sql[A], (String, A, A)] { case Let(n, f, b) => (n, f, b) } ((Let[A](_, _, _)).tupled)
+  def intLiteral[A] = pPrism[Sql[A], Long] { case IntLiteral(v) => v } (IntLiteral(_))
+  def floatLiteral[A] = pPrism[Sql[A], Double] { case FloatLiteral(v) => v } (FloatLiteral(_))
+  def stringLiteral[A] = pPrism[Sql[A], String] { case StringLiteral(v) => v } (StringLiteral(_))
+  def nullLiteral[A] = pPrism[Sql[A], Unit] { case NullLiteral() => () } (_ => NullLiteral())
+  def boolLiteral[A] = pPrism[Sql[A], Boolean] { case BoolLiteral(v) => v } (BoolLiteral(_))
 
   // NB: we need to support relative paths, including `../foo`
   type FUPath = pathy.Path[_, pathy.Path.File, pathy.Path.Unsandboxed]
 
-  private val parser = new SQLParser()
+  private def parser[T[_[_]]: Recursive: Corecursive] = new SQLParser[T]()
 
-  val parse: Query => (ParsingError \/ Expr) =
-    parser.parse(_).map(_.transAna(repeatedly(normalizeƒ[Fix])).makeTables(Nil))
+  // NB: Statically allocated to avoid multiple allocations of the parser.
+  val muParser = parser[Mu]
+  // TODO: Get rid of this one once we’ve parameterized everything on `T`.
+  val fixParser = parser[Fix]
 
-  def parseInContext(sql: Query, basePath: ADir): ParsingError \/ Expr =
-    parse(sql).map(_.mkPathsAbsolute(basePath))
+  def CrossRelation[T[_[_]]: Corecursive](left: SqlRelation[T[Sql]], right: SqlRelation[T[Sql]]) =
+    JoinRelation(left, right, InnerJoin, boolLiteral[T[Sql]](true).embed)
 
-  def CrossRelation(left: SqlRelation[Expr], right: SqlRelation[Expr]) =
-    JoinRelation(left, right, InnerJoin, BoolLiteral(true))
-
-  def projectionNames[T[_[_]]:Recursive](projections: List[Proj[T[ExprF]]], relName: Option[String]):
-      SemanticError \/ List[(String, T[ExprF])] = {
-    def extractName(expr: T[ExprF]): Option[String] = expr.project match {
-      case IdentF(name) if Some(name) != relName => Some(name)
-      // TODO[matryoshka]: Change to Embed(StringLiteralF(name)
-      case BinopF(_, stringLiteral, FieldDeref)  => stringLiteral.project match {
-        case string: ExprF.StringLiteralF[_] => Some(string.v)
-        case _                               => None
-      }
-      case UnopF(expr, FlattenMapValues)         => extractName(expr)
-      case UnopF(expr, FlattenArrayValues)       => extractName(expr)
-      case _                                     => None
+  def projectionNames[T[_[_]]: Recursive](
+    projections: List[Proj[T[Sql]]], relName: Option[String]):
+      SemanticError \/ List[(String, T[Sql])] = {
+    def extractName(expr: T[Sql]): Option[String] = expr.project match {
+      case Ident(name) if Some(name) != relName          => name.some
+      case Binop(_, Embed(StringLiteral(v)), FieldDeref) => v.some
+      case Unop(expr, FlattenMapValues)                  => extractName(expr)
+      case Unop(expr, FlattenArrayValues)                => extractName(expr)
+      case _                                             => None
     }
 
     val aliases = projections.flatMap{ case Proj(expr, alias) => alias.toList}
@@ -72,21 +87,24 @@ package object sql {
       }._2.right)
   }
 
-  def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): ExprF[Expr] => F[Expr] = {
-    case select: ExprF.SelectF[Expr] =>
-      select.relations.map(_.mapPathsM(f)).sequence.map(rels => Fix(select.copy(relations = rels)))
-    case x => Fix(x).point[F]
-  }
+  def mapPathsMƒ[F[_]: Monad](f: FUPath => F[FUPath]): Sql ~> (F ∘ Sql)#λ =
+    new (Sql ~> (F ∘ Sql)#λ) {
+      def apply[A](e: Sql[A]) = e match {
+        case Select(d, p, relations, filt, g, o) =>
+          relations.traverse(_.mapPathsM(f)).map(Select(d, p, _, filt, g, o))
+        case x => x.point[F]
+      }
+    }
 
-  implicit class ExprOps(q: Expr) {
-    def mkPathsAbsolute(basePath: ADir): Expr =
-      q.cata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
+  implicit class ExprOps[T[_[_]]: Recursive: Corecursive](q: T[Sql]) {
+    def mkPathsAbsolute(basePath: ADir): T[Sql] =
+      q.transCata(mapPathsMƒ[Id](refineTypeAbs(_).fold(ι, pathy.Path.unsandbox(basePath) </> _)))
 
-    def makeTables(bindings: List[String]): Expr = q.project match {
-      case sel @ SelectF(_, _, _, _, _, _) => {
+    def makeTables(bindings: List[String]): T[Sql] = q.project match {
+      case sel @ Select(_, _, _, _, _, _) => {
         // perform all the appropriate recursions
         // TODO remove asInstanceOf by providing a `SelectF` at compile time
-        val sel2 = sel.map(_.makeTables(bindings)).asInstanceOf[ExprF.SelectF[Expr]]
+        val sel2 = Functor[Sql].map(sel)(_.makeTables(bindings)).asInstanceOf[Select[T[Sql]]]
 
         def mkRel[A](rel: SqlRelation[A]): SqlRelation[A] = rel match {
           case ir @ IdentRelationAST(name, alias) if !bindings.contains(name) => {
@@ -104,17 +122,17 @@ package object sql {
         sel2.copy(relations = sel2.relations.map(mkRel(_))).embed
       }
 
-      case LetF(name, form, body) => {
+      case Let(name, form, body) => {
         val form2 = form.makeTables(bindings)
         val body2 = body.makeTables(name :: bindings)
-        Let(name, form2, body2)
+        let(name, form2, body2).embed
       }
 
       case other => other.map(_.makeTables(bindings)).embed
     }
   }
 
-  def pprint(sql: Expr) = sql.para(pprintƒ)
+  def pprint[T[_[_]]: Recursive](sql: T[Sql]) = sql.para(pprintƒ)
 
   private val SimpleNamePattern = "[_a-zA-Z][_a-zA-Z0-9]*".r
 
@@ -125,31 +143,33 @@ package object sql {
     case _                   => delimiter + s.replace("\\", "\\\\").replace(delimiter, "\\`") + delimiter
   }
 
-  private def pprintRelationƒ(r: SqlRelation[(Expr, String)]): String = (r match {
-    case IdentRelationAST(name, alias) =>
-      _qq("`", name) :: alias.map("as " + _).toList
-    case TableRelationAST(path, alias) =>
-      _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
-    case ExprRelationAST(expr, aliasName) =>
-      List(expr._2, "as", aliasName)
-    case JoinRelation(left, right, tpe, clause) =>
-      (tpe, clause._1) match {
-        case (InnerJoin, BoolLiteral(true)) =>
-          List("(", pprintRelationƒ(left), "cross join", pprintRelationƒ(right), ")")
-        case (_, _) =>
-          List("(", pprintRelationƒ(left), tpe.sql, pprintRelationƒ(right), "on", clause._2, ")")
-      }
-  }).mkString(" ")
+  private def pprintRelationƒ[T[_[_]]: Recursive](r: SqlRelation[(T[Sql], String)]):
+      String =
+    (r match {
+      case IdentRelationAST(name, alias) =>
+        _qq("`", name) :: alias.map("as " + _).toList
+      case TableRelationAST(path, alias) =>
+        _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
+      case ExprRelationAST(expr, aliasName) =>
+        List(expr._2, "as", aliasName)
+      case JoinRelation(left, right, tpe, clause) =>
+        (tpe, clause._1) match {
+          case (InnerJoin, Embed(BoolLiteral(true))) =>
+            List("(", pprintRelationƒ(left), "cross join", pprintRelationƒ(right), ")")
+          case (_, _) =>
+            List("(", pprintRelationƒ(left), tpe.sql, pprintRelationƒ(right), "on", clause._2, ")")
+        }
+    }).mkString(" ")
 
-  def pprintRelation(r: SqlRelation[Expr]) =
-    pprintRelationƒ(traverseRelation[Id, Expr, (Expr, String)](r, x => (x, pprint(x))))
+  def pprintRelation[T[_[_]]: Recursive](r: SqlRelation[T[Sql]]) =
+    pprintRelationƒ(traverseRelation[Id, T[Sql], (T[Sql], String)](r, x => (x, pprint(x))))
 
-  val pprintƒ: ExprF[(Expr, String)] => String = {
-    def caseSql(c: Case[(Expr, String)]): String =
+  def pprintƒ[T[_[_]]: Recursive]: Sql[(T[Sql], String)] => String = {
+    def caseSql(c: Case[(T[Sql], String)]): String =
       List("when", c.cond._2, "then", c.expr._2) mkString " "
 
     {
-      case SelectF(
+      case Select(
         isDistinct,
         projections,
         relations,
@@ -169,22 +189,22 @@ package object sql {
               g.having.map("having " + _._2).toList).mkString(" ")),
           orderBy.map(o => List("order by", o.keys.map(x => x._2._2 + " " + x._1.toString) mkString(", ")).mkString(" "))).foldMap(_.toList).mkString(" ") +
         ")"
-      case VariF(symbol) => ":" + symbol
-      case SetLiteralF(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
-      case ArrayLiteralF(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
-      case MapLiteralF(exprs) => exprs.map {
+      case Vari(symbol) => ":" + symbol
+      case SetLiteral(exprs) => exprs.map(_._2).mkString("(", ", ", ")")
+      case ArrayLiteral(exprs) => exprs.map(_._2).mkString("[", ", ", "]")
+      case MapLiteral(exprs) => exprs.map {
         case (k, v) => k._2 + ": " + v._2
       }.mkString("{", ", ", "}")
-      case SpliceF(expr) => expr.fold("*")("(" + _._2 + ").*")
-      case BinopF(lhs, rhs, op) => op match {
-        case FieldDeref => rhs._1 match {
+      case Splice(expr) => expr.fold("*")("(" + _._2 + ").*")
+      case Binop(lhs, rhs, op) => op match {
+        case FieldDeref => rhs._1.project match {
           case StringLiteral(str) => "(" + lhs._2 + ")." + _qq("\"", str)
-          case _ => "(" + lhs._2 + "){" + rhs._2 + "}"
+          case _                   => "(" + lhs._2 + "){" + rhs._2 + "}"
         }
         case IndexDeref => "(" + lhs._2 + ")[" + rhs._2 + "]"
         case _ => List("(" + lhs._2 + ")", op.sql, "(" + rhs._2 + ")").mkString(" ")
       }
-      case UnopF(expr, op) => op match {
+      case Unop(expr, op) => op match {
         case FlattenMapKeys      => "(" + expr._2 + "){*:}"
         case FlattenMapValues    => "(" + expr._2 + "){:*}"
         case ShiftMapKeys        => "(" + expr._2 + "){_:}"
@@ -198,104 +218,62 @@ package object sql {
           // NB: dis-ambiguates the query in case this is the leading projection
           if (op == Distinct) "(" + s + ")" else s
       }
-      case IdentF(name) => _qq("`", name)
-      case InvokeFunctionF(name, args) =>
+      case Ident(name) => _qq("`", name)
+      case InvokeFunction(name, args) =>
         import quasar.std.StdLib.string
         (name, args) match {
-          case (string.Like.name, (_, value) :: (_, pattern) :: (StringLiteral("\\"), _) :: Nil) =>
+          case (string.Like.name, (_, value) :: (_, pattern) :: (Embed(StringLiteral("\\")), _) :: Nil) =>
             "(" + value + ") like (" + pattern + ")"
           case (string.Like.name, (_, value) :: (_, pattern) :: (_, esc) :: Nil) =>
             "(" + value + ") like (" + pattern + ") escape (" + esc + ")"
           case _ => name + "(" + args.map(_._2).mkString(", ") + ")"
         }
-      case MatchF(expr, cases, default) =>
+      case Match(expr, cases, default) =>
         ("case" ::
           expr._2 ::
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
-      case SwitchF(cases, default) =>
+      case Switch(cases, default) =>
         ("case" ::
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
-      case IntLiteralF(v) => v.toString
-      case FloatLiteralF(v) => v.toString
-      case StringLiteralF(v) => _q(v)
-      case NullLiteralF() => "null"
-      case BoolLiteralF(v) => if (v) "true" else "false"
+      case Let(name, form, body) =>
+        name ++ " :: " ++ form._2 ++ "; " ++ body._2
+      case IntLiteral(v) => v.toString
+      case FloatLiteral(v) => v.toString
+      case StringLiteral(v) => _q(v)
+      case NullLiteral() => "null"
+      case BoolLiteral(v) => if (v) "true" else "false"
     }
   }
 
   def normalizeƒ[T[_[_]]: Corecursive]:
-      ExprF[T[ExprF]] => Option[ExprF[T[ExprF]]] = {
-    case BinopF(l, r, Union) =>
-      UnopF(BinopF(l, r, UnionAll).embed, Distinct).some
-    case BinopF(l, r, Intersect) =>
-      UnopF(BinopF(l, r, IntersectAll).embed, Distinct).some
+      Sql[T[Sql]] => Option[Sql[T[Sql]]] = {
+    case Binop(l, r, Union) =>
+      Unop(Binop(l, r, UnionAll).embed, Distinct).some
+    case Binop(l, r, Intersect) =>
+      Unop(Binop(l, r, IntersectAll).embed, Distinct).some
     case _ => None
   }
 
-  private def traverseRelation[G[_], A, B](r: SqlRelation[A], f: A => G[B])(
-      implicit G: Applicative[G]): G[SqlRelation[B]] = r match {
-    case IdentRelationAST(name, alias) =>
-      G.point(IdentRelationAST(name, alias))
-    case TableRelationAST(name, alias) =>
-      G.point(TableRelationAST(name, alias))
-    case ExprRelationAST(expr, aliasName) =>
-      G.apply(f(expr))(ExprRelationAST(_, aliasName))
-    case JoinRelation(left, right, tpe, clause) =>
-      G.apply3(traverseRelation(left, f), traverseRelation(right, f), f(clause))(
-        JoinRelation(_, _, tpe, _))
-  }
-
-  implicit val ExprFTraverse: Traverse[ExprF] = new Traverse[ExprF] {
-    def traverseImpl[G[_], A, B](
-      fa: ExprF[A])(
-      f: A => G[B])(
-      implicit G: Applicative[G]):
-        G[ExprF[B]] = {
-      def traverseCase(c: Case[A]): G[Case[B]] =
-        (f(c.cond) ⊛ f(c.expr))(Case(_, _))
-
-      fa match {
-        case SelectF(dist, proj, rel, filter, group, order) =>
-          (proj.traverse(p => f(p.expr).map(Proj(_, p.alias))) ⊛
-            rel.traverse(traverseRelation(_, f)) ⊛
-            filter.traverse(f) ⊛
-            group.traverse(g =>
-              (g.keys.traverse(f) ⊛ g.having.traverse(f))(GroupBy(_, _))) ⊛
-            order.traverse(_.keys.traverse(_.traverse(f)).map(OrderBy(_))))(
-            SelectF(dist, _, _, _, _, _))
-        case VariF(symbol) => VariF(symbol).point[G]
-        case SetLiteralF(exprs) => exprs.traverse(f).map(SetLiteralF(_))
-        case ArrayLiteralF(exprs) => exprs.traverse(f).map(ArrayLiteralF(_))
-        case MapLiteralF(exprs) =>
-          exprs.traverse(_.bitraverse(f, f)).map(MapLiteralF(_))
-        case SpliceF(expr) => expr.traverse(f).map(SpliceF(_))
-        case BinopF(lhs, rhs, op) => (f(lhs) ⊛ f(rhs))(BinopF(_, _, op))
-        case UnopF(expr, op) => f(expr).map(UnopF(_, op))
-        case IdentF(name) => G.point(IdentF(name))
-        case InvokeFunctionF(name, args) =>
-          args.traverse(f).map(InvokeFunctionF(name, _))
-        case MatchF(expr, cases, default) =>
-          (f(expr) ⊛ cases.traverse(traverseCase) ⊛ default.traverse(f))(
-            MatchF(_, _, _))
-        case SwitchF(cases, default) =>
-          (cases.traverse(traverseCase) ⊛ default.traverse(f))(
-            SwitchF(_, _))
-        case LetF(name, form, body) =>
-          (f(form) ⊛ f(body))(LetF(name, _, _))
-        case IntLiteralF(v) => IntLiteralF(v).point[G]
-        case FloatLiteralF(v) => FloatLiteralF(v).point[G]
-        case StringLiteralF(v) => StringLiteralF(v).point[G]
-        case NullLiteralF() => NullLiteralF().point[G]
-        case BoolLiteralF(v) => BoolLiteralF(v).point[G]
-      }
+  def traverseRelation[G[_], A, B](r: SqlRelation[A], f: A => G[B])(
+    implicit G: Applicative[G]):
+      G[SqlRelation[B]] =
+    r match {
+      case IdentRelationAST(name, alias) =>
+        G.point(IdentRelationAST(name, alias))
+      case TableRelationAST(name, alias) =>
+        G.point(TableRelationAST(name, alias))
+      case ExprRelationAST(expr, aliasName) =>
+        G.apply(f(expr))(ExprRelationAST(_, aliasName))
+      case JoinRelation(left, right, tpe, clause) =>
+        G.apply3(traverseRelation(left, f), traverseRelation(right, f), f(clause))(
+          JoinRelation(_, _, tpe, _))
     }
-  }
 
   private val astType = "AST" :: Nil
 
-  implicit def SqlRelationRenderTree: RenderTree ~> λ[α => RenderTree[SqlRelation[α]]] =
+  implicit def ExprRelationRenderTree: RenderTree ~> λ[α => RenderTree[SqlRelation[α]]] =
     new (RenderTree ~> λ[α => RenderTree[SqlRelation[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[SqlRelation[α]] {
         def render(r: SqlRelation[α]): RenderedTree = r match {
@@ -314,21 +292,21 @@ package object sql {
       }
     }
 
-  implicit val ExprFRenderTree: RenderTree ~> λ[α => RenderTree[ExprF[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[ExprF[α]]]) {
-      def apply[α](ra: RenderTree[α]): RenderTree[ExprF[α]] = new RenderTree[ExprF[α]] {
+  implicit val SqlRenderTree: RenderTree ~> λ[α => RenderTree[Sql[α]]] =
+    new (RenderTree ~> λ[α => RenderTree[Sql[α]]]) {
+      def apply[α](ra: RenderTree[α]): RenderTree[Sql[α]] = new RenderTree[Sql[α]] {
         def renderCase(c: Case[α]): RenderedTree =
           NonTerminal("Case" :: astType, None, ra.render(c.cond) :: ra.render(c.expr) :: Nil)
 
-        def render(n: ExprF[α]) = n match {
-          case SelectF(isDistinct, projections, relations, filter, groupBy, orderBy) =>
+        def render(n: Sql[α]) = n match {
+          case Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
             val nt = "Select" :: astType
             NonTerminal(nt,
               isDistinct match { case `SelectDistinct` => Some("distinct"); case _ => None },
               projections.map { p =>
                 NonTerminal("Proj" :: astType, p.alias, ra.render(p.expr) :: Nil)
               } ⊹
-                (relations.map(SqlRelationRenderTree(ra).render) ::
+                (relations.map(ExprRelationRenderTree(ra).render) ::
                   filter.map(ra.render) ::
                   groupBy.map {
                     case GroupBy(keys, Some(having)) => NonTerminal("GroupBy" :: astType, None, keys.map(ra.render) :+ ra.render(having))
@@ -342,36 +320,36 @@ package object sql {
                   } ::
                   Nil).foldMap(_.toList))
 
-          case SetLiteralF(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
-          case ArrayLiteralF(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
-          case MapLiteralF(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
+          case SetLiteral(exprs) => NonTerminal("Set" :: astType, None, exprs.map(ra.render))
+          case ArrayLiteral(exprs) => NonTerminal("Array" :: astType, None, exprs.map(ra.render))
+          case MapLiteral(exprs) => NonTerminal("Map" :: astType, None, exprs.map(Tuple2RenderTree(ra, ra).render))
 
-          case InvokeFunctionF(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
+          case InvokeFunction(name, args) => NonTerminal("InvokeFunction" :: astType, Some(name), args.map(ra.render))
 
-          case MatchF(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
-          case MatchF(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
+          case Match(expr, cases, Some(default)) => NonTerminal("Match" :: astType, None, ra.render(expr) :: (cases.map(renderCase) :+ ra.render(default)))
+          case Match(expr, cases, None)          => NonTerminal("Match" :: astType, None, ra.render(expr) :: cases.map(renderCase))
 
-          case SwitchF(cases, Some(default)) => NonTerminal("Switch" :: astType, None, cases.map(renderCase) :+ ra.render(default))
-          case SwitchF(cases, None)          => NonTerminal("Switch" :: astType, None, cases.map(renderCase))
+          case Switch(cases, Some(default)) => NonTerminal("Switch" :: astType, None, cases.map(renderCase) :+ ra.render(default))
+          case Switch(cases, None)          => NonTerminal("Switch" :: astType, None, cases.map(renderCase))
 
-          case BinopF(lhs, rhs, op) => NonTerminal("Binop" :: astType, Some(op.toString), ra.render(lhs) :: ra.render(rhs) :: Nil)
+          case Binop(lhs, rhs, op) => NonTerminal("Binop" :: astType, Some(op.toString), ra.render(lhs) :: ra.render(rhs) :: Nil)
 
-          case UnopF(expr, op) => NonTerminal("Unop" :: astType, Some(op.sql), ra.render(expr) :: Nil)
+          case Unop(expr, op) => NonTerminal("Unop" :: astType, Some(op.sql), ra.render(expr) :: Nil)
 
-          case SpliceF(expr) => NonTerminal("Splice" :: astType, None, expr.toList.map(ra.render))
+          case Splice(expr) => NonTerminal("Splice" :: astType, None, expr.toList.map(ra.render))
 
-          case IdentF(name) => Terminal("Ident" :: astType, Some(name))
+          case Ident(name) => Terminal("Ident" :: astType, Some(name))
 
-          case VariF(name) => Terminal("Variable" :: astType, Some(":" + name))
+          case Vari(name) => Terminal("Variable" :: astType, Some(":" + name))
 
-          case LetF(name, form, body) =>
+          case Let(name, form, body) =>
             NonTerminal("Let" :: astType, Some(name), ra.render(form) :: ra.render(body) :: Nil)
 
-          case IntLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case FloatLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case StringLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
-          case NullLiteralF() => Terminal("LiteralExpr" :: astType, None)
-          case BoolLiteralF(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case IntLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case FloatLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case StringLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
+          case NullLiteral() => Terminal("LiteralExpr" :: astType, None)
+          case BoolLiteral(v) => Terminal("LiteralExpr" :: astType, Some(v.shows))
         }
       }
     }

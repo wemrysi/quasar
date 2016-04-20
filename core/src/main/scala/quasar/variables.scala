@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.SemanticError._
-import quasar.sql.{Expr, ExprF, Query, VariF}
+import quasar.sql.{Sql, Query, Vari}
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
@@ -30,21 +30,23 @@ final case class VarName(value: String) {
 final case class VarValue(value: String)
 
 object Variables {
-  val empty: Variables =
-    Variables(Map())
+  val empty: Variables = Variables(Map())
 
   def fromMap(value: Map[String, String]): Variables =
     Variables(value.map(t => VarName(t._1) -> VarValue(t._2)))
 
-  def substVarsƒ[A](vars: Variables): ExprF[Expr] => SemanticError \/ Expr = {
-    case VariF(name) =>
-      vars.value.get(VarName(name)).fold[SemanticError \/ Expr](
+  def substVarsƒ(vars: Variables):
+      AlgebraM[SemanticError \/ ?, Sql, Fix[Sql]] = {
+    case Vari(name) =>
+      vars.value.get(VarName(name)).fold[SemanticError \/ Fix[Sql]](
         UnboundVariable(VarName(name)).left)(
-        varValue => sql.parse(Query(varValue.value))
+        varValue => sql.fixParser.parse(Query(varValue.value))
           .leftMap(VariableParseError(VarName(name), varValue, _)))
-    case x => Fix(x).right
+    case x => x.embed.right
   }
 
-  def substVars(expr: Expr, variables: Variables): SemanticError \/ Expr =
-    expr.cataM[SemanticError \/ ?, Expr](substVarsƒ(variables))
+  // FIXME: Get rid of this
+  def substVars(expr: Fix[Sql], variables: Variables):
+      SemanticError \/ Fix[Sql] =
+    expr.cataM[SemanticError \/ ?, Fix[Sql]](substVarsƒ(variables))
 }

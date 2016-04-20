@@ -17,10 +17,12 @@
 package quasar.sql
 
 import quasar.Predef._
+import quasar.fp._
 
 import scala.Any
 
 import matryoshka._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import pathy.Path._
 
@@ -28,49 +30,97 @@ trait IsDistinct
 final case object SelectDistinct extends IsDistinct
 final case object SelectAll extends IsDistinct
 
-final case class Proj[A](expr: A, alias: Option[String])
+@Lenses final case class Proj[A](expr: A, alias: Option[String])
 
-sealed trait ExprF[A]
-object ExprF {
-  final case class SelectF[A](
-    isDistinct:  IsDistinct,
-    projections: List[Proj[A]],
-    relations:   Option[SqlRelation[A]],
-    filter:      Option[A],
-    groupBy:     Option[GroupBy[A]],
-    orderBy:     Option[OrderBy[A]])
-      extends ExprF[A]
-  final case class VariF[A](symbol: String) extends ExprF[A]
-  final case class SetLiteralF[A](exprs: List[A]) extends ExprF[A]
-  final case class ArrayLiteralF[A](exprs: List[A]) extends ExprF[A]
-  /** Can’t be a Map, because we need to arbitrarily transform the key */
-  final case class MapLiteralF[A](exprs: List[(A, A)]) extends ExprF[A]
-  final case class SpliceF[A](expr: Option[A]) extends ExprF[A]
-  final case class BinopF[A](lhs: A, rhs: A, op: BinaryOperator)
-      extends ExprF[A]
-  final case class UnopF[A](expr: A, op: UnaryOperator) extends ExprF[A]
-  final case class IdentF[A](name: String) extends ExprF[A]
-  final case class InvokeFunctionF[A](name: String, args: List[A])
-      extends ExprF[A]
-  final case class MatchF[A](expr: A, cases: List[Case[A]], default: Option[A])
-      extends ExprF[A]
-  final case class SwitchF[A](cases: List[Case[A]], default: Option[A])
-      extends ExprF[A]
-  final case class LetF[A](name: String, form: A, body: A) extends ExprF[A]
-  final case class IntLiteralF[A](v: Long) extends ExprF[A]
-  final case class FloatLiteralF[A](v: Double) extends ExprF[A]
-  final case class StringLiteralF[A](v: String) extends ExprF[A]
-  final case class NullLiteralF[A]() extends ExprF[A]
-  final case class BoolLiteralF[A](value: Boolean) extends ExprF[A]
+sealed trait Sql[A]
+object Sql {
+  implicit val traverse: Traverse[Sql] = new Traverse[Sql] {
+    def traverseImpl[G[_], A, B](
+      fa: Sql[A])(
+      f: A => G[B])(
+      implicit G: Applicative[G]):
+        G[Sql[B]] = {
+      def traverseCase(c: Case[A]): G[Case[B]] =
+        (f(c.cond) ⊛ f(c.expr))(Case(_, _))
 
-  implicit def ToExprAlgebraOps[A](a: Algebra[ExprF, A]): AlgebraOps[ExprF, A] =
-    ToAlgebraOps[ExprF, A](a)
+      fa match {
+        case Select(dist, proj, rel, filter, group, order) =>
+          (proj.traverse(p => f(p.expr).map(Proj(_, p.alias))) ⊛
+            rel.traverse(traverseRelation(_, f)) ⊛
+            filter.traverse(f) ⊛
+            group.traverse(g =>
+              (g.keys.traverse(f) ⊛ g.having.traverse(f))(GroupBy(_, _))) ⊛
+            order.traverse(_.keys.traverse(_.traverse(f)).map(OrderBy(_))))(
+            Select(dist, _, _, _, _, _))
+        case Vari(symbol) => vari(symbol).point[G]
+        case SetLiteral(exprs) => exprs.traverse(f).map(setLiteral(_))
+        case ArrayLiteral(exprs) => exprs.traverse(f).map(arrayLiteral(_))
+        case MapLiteral(exprs) =>
+          exprs.traverse(_.bitraverse(f, f)).map(mapLiteral(_))
+        case Splice(expr) => expr.traverse(f).map(splice(_))
+        case Binop(lhs, rhs, op) => (f(lhs) ⊛ f(rhs))(binop(_, _, op))
+        case Unop(expr, op) => f(expr).map(unop(_, op))
+        case Ident(name) => G.point(ident(name))
+        case InvokeFunction(name, args) =>
+          args.traverse(f).map(invokeFunction(name, _))
+        case Match(expr, cases, default) =>
+          (f(expr) ⊛ cases.traverse(traverseCase) ⊛ default.traverse(f))(
+            matc(_, _, _))
+        case Switch(cases, default) =>
+          (cases.traverse(traverseCase) ⊛ default.traverse(f))(
+            switch(_, _))
+        case Let(name, form, body) => (f(form) ⊛ f(body))(Let(name, _, _))
+        case IntLiteral(v) => intLiteral(v).point[G]
+        case FloatLiteral(v) => floatLiteral(v).point[G]
+        case StringLiteral(v) => stringLiteral(v).point[G]
+        case NullLiteral() => nullLiteral().point[G]
+        case BoolLiteral(v) => boolLiteral(v).point[G]
+      }
+    }
+  }
+
+  implicit def ToExprAlgebraOps[A](a: Algebra[Sql, A]): AlgebraOps[Sql, A] =
+    ToAlgebraOps[Sql, A](a)
 }
 
-// TODO: Change to extend `(A, A) => ExprF[A]`
-sealed abstract class BinaryOperator(val sql: String)
-    extends ((Expr, Expr) => Expr) {
-  def apply(lhs: Expr, rhs: Expr): Expr = Binop(lhs, rhs, this)
+@Lenses final case class Select[A] private[sql] (
+  isDistinct:  IsDistinct,
+  projections: List[Proj[A]],
+  relations:   Option[SqlRelation[A]],
+  filter:      Option[A],
+  groupBy:     Option[GroupBy[A]],
+  orderBy:     Option[OrderBy[A]])
+    extends Sql[A]
+@Lenses final case class Vari[A] private[sql] (symbol: String) extends Sql[A]
+@Lenses final case class SetLiteral[A] private[sql] (exprs: List[A]) extends Sql[A]
+@Lenses final case class ArrayLiteral[A] private[sql] (exprs: List[A]) extends Sql[A]
+/** Can’t be a Map, because we need to arbitrarily transform the key */
+@Lenses final case class MapLiteral[A] private[sql] (exprs: List[(A, A)]) extends Sql[A]
+/** Represents the wildcard in a select projection
+  * For instance:
+  *  "select foo.* from example" => ...(Splice(Some(Ident("foo"))))...
+  *  "select * from example"     => ...(Splice(None))...
+  */
+@Lenses final case class Splice[A] private[sql] (expr: Option[A]) extends Sql[A]
+@Lenses final case class Binop[A] private[sql] (lhs: A, rhs: A, op: BinaryOperator)
+    extends Sql[A]
+@Lenses final case class Unop[A] private[sql] (expr: A, op: UnaryOperator) extends Sql[A]
+@Lenses final case class Ident[A] private[sql] (name: String) extends Sql[A]
+@Lenses final case class InvokeFunction[A] private[sql] (name: String, args: List[A])
+    extends Sql[A]
+@Lenses final case class Match[A] private[sql] (expr: A, cases: List[Case[A]], default: Option[A])
+    extends Sql[A]
+@Lenses final case class Switch[A] private[sql] (cases: List[Case[A]], default: Option[A])
+    extends Sql[A]
+@Lenses final case class Let[A](name: String, form: A, body: A) extends Sql[A]
+@Lenses final case class IntLiteral[A] private[sql] (v: Long) extends Sql[A]
+@Lenses final case class FloatLiteral[A] private[sql] (v: Double) extends Sql[A]
+@Lenses final case class StringLiteral[A] private[sql] (v: String) extends Sql[A]
+@Lenses final case class NullLiteral[A] private[sql] () extends Sql[A]
+@Lenses final case class BoolLiteral[A] private[sql] (value: Boolean) extends Sql[A]
+
+sealed abstract class BinaryOperator(val sql: String) {
+  def apply[A](lhs: A, rhs: A): Sql[A] = binop(lhs, rhs, this)
 
   val name = "(" + sql + ")"
 
@@ -110,9 +160,8 @@ final case object Intersect    extends BinaryOperator("intersect")
 final case object IntersectAll extends BinaryOperator("intersect all")
 final case object Except       extends BinaryOperator("except")
 
-// TODO: Change to extend `A => ExprF[A]`
-sealed abstract class UnaryOperator(val sql: String) extends (Expr => Expr) {
-  def apply(expr: Expr): Expr = Unop(expr, this)
+sealed abstract class UnaryOperator(val sql: String) {
+  def apply[A](expr: A): Sql[A] = unop(expr, this)
 
   val name = sql
 
@@ -142,7 +191,7 @@ final case object ShiftArrayIndices   extends UnaryOperator("[_:]")
 final case object ShiftArrayValues    extends UnaryOperator("shift_array")
 final case object UnshiftArray        extends UnaryOperator("[...]")
 
-final case class Case[A](cond: A, expr: A)
+@Lenses final case class Case[A](cond: A, expr: A)
 
 sealed trait SqlRelation[A] {
   def namedRelations: Map[String, List[NamedRelation[A]]] = {
@@ -174,19 +223,19 @@ sealed trait NamedRelation[A] extends SqlRelation[A] {
  * Ideally we can unify these two contexts, providing a single way to reference a
  * let binding.
  */
-final case class IdentRelationAST[A](name: String, alias: Option[String])
+@Lenses final case class IdentRelationAST[A](name: String, alias: Option[String])
     extends NamedRelation[A] {
   def aliasName = alias.getOrElse(name)
 }
 
-final case class TableRelationAST[A](tablePath: FUPath, alias: Option[String])
+@Lenses final case class TableRelationAST[A](tablePath: FUPath, alias: Option[String])
     extends NamedRelation[A] {
   def aliasName = alias.getOrElse(fileName(tablePath).value)
 }
-final case class ExprRelationAST[A](expr: A, aliasName: String)
+@Lenses final case class ExprRelationAST[A](expr: A, aliasName: String)
     extends NamedRelation[A]
 
-final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
+@Lenses final case class JoinRelation[A](left: SqlRelation[A], right: SqlRelation[A], tpe: JoinType, clause: A)
     extends SqlRelation[A]
 
 sealed abstract class JoinType(val sql: String)
@@ -199,163 +248,6 @@ sealed trait OrderType
 final case object ASC extends OrderType
 final case object DESC extends OrderType
 
-final case class GroupBy[A](keys: List[A], having: Option[A])
+@Lenses final case class GroupBy[A](keys: List[A], having: Option[A])
 
-final case class OrderBy[A](keys: List[(OrderType, A)])
-
-object SelectF {
-  def apply[A](
-    isDistinct:  IsDistinct,
-    projections: List[Proj[A]],
-    relations:   Option[SqlRelation[A]],
-    filter:      Option[A],
-    groupBy:     Option[GroupBy[A]],
-    orderBy:     Option[OrderBy[A]]):
-      ExprF[A] =
-    ExprF.SelectF(isDistinct, projections, relations, filter, groupBy, orderBy)
-  def unapply[A](obj: ExprF[A]):
-      Option[(
-        IsDistinct,
-        List[Proj[A]],
-        Option[SqlRelation[A]],
-        Option[A],
-        Option[GroupBy[A]],
-        Option[OrderBy[A]])] =
-    obj match {
-      case ExprF.SelectF(
-        isDistinct,
-        projections,
-        relations,
-        filter,
-        groupBy,
-        orderBy) =>
-        Some((isDistinct, projections, relations, filter, groupBy, orderBy))
-      case _ => None
-    }
-}
-object LetF {
-  def apply[A](name: String, form: A, body: A): ExprF[A] = ExprF.LetF(name, form, body)
-  def unapply[A](obj: ExprF[A]): Option[(String, A, A)] = obj match {
-    case ExprF.LetF(name, form, body) => Some((name, form, body))
-    case _                            => None
-  }
-}
-object VariF {
-  def apply[A](symbol: String): ExprF[A] = ExprF.VariF(symbol)
-  def unapply[A](obj: ExprF[A]): Option[String] = obj match {
-    case ExprF.VariF(symbol) => Some(symbol)
-    case _                   => None
-  }
-}
-object SetLiteralF {
-  def apply[A](exprs: List[A]): ExprF[A] = ExprF.SetLiteralF(exprs)
-  def unapply[A](obj: ExprF[A]): Option[List[A]] = obj match {
-    case ExprF.SetLiteralF(exprs) => Some(exprs)
-    case _                        => None
-  }
-}
-object ArrayLiteralF {
-  def apply[A](exprs: List[A]): ExprF[A] = ExprF.ArrayLiteralF(exprs)
-  def unapply[A](obj: ExprF[A]): Option[List[A]] = obj match {
-    case ExprF.ArrayLiteralF(exprs) => Some(exprs)
-    case _                          => None
-  }
-}
-object MapLiteralF {
-  def apply[A](exprs: List[(A, A)]): ExprF[A] = ExprF.MapLiteralF(exprs)
-  def unapply[A](obj: ExprF[A]): Option[List[(A, A)]] = obj match {
-    case ExprF.MapLiteralF(exprs) => Some(exprs)
-    case _                        => None
-  }
-}
-object SpliceF {
-  def apply[A](expr: Option[A]): ExprF[A] = ExprF.SpliceF(expr)
-  def unapply[A](obj: ExprF[A]): Option[Option[A]] = obj match {
-    case ExprF.SpliceF(expr) => Some(expr)
-    case _                   => None
-  }
-}
-object BinopF {
-  def apply[A](lhs: A, rhs: A, op: BinaryOperator): ExprF[A] =
-    ExprF.BinopF(lhs, rhs, op)
-  def unapply[A](obj: ExprF[A]): Option[(A, A, BinaryOperator)] =
-    obj match {
-      case ExprF.BinopF(lhs, rhs, op) => Some((lhs, rhs, op))
-      case _                          => None
-  }
-}
-object UnopF {
-  def apply[A](expr: A, op: UnaryOperator): ExprF[A] = ExprF.UnopF(expr, op)
-  def unapply[A](obj: ExprF[A]): Option[(A, UnaryOperator)] = obj match {
-    case ExprF.UnopF(expr, op) => Some((expr, op))
-    case _                     => None
-  }
-}
-object IdentF {
-  def apply[A](name: String): ExprF[A] = ExprF.IdentF(name)
-  def unapply[A](obj: ExprF[A]): Option[String] = obj match {
-    case ExprF.IdentF(name) => Some(name)
-    case _                  => None
-  }
-}
-object InvokeFunctionF {
-  def apply[A](name: String, args: List[A]): ExprF[A] =
-    ExprF.InvokeFunctionF(name, args)
-  def unapply[A](obj: ExprF[A]): Option[(String, List[A])] = obj match {
-    case ExprF.InvokeFunctionF(name, args) => Some((name, args))
-    case _                                 => None
-  }
-}
-object MatchF {
-  def apply[A](expr: A, cases: List[Case[A]], default: Option[A]): ExprF[A] =
-    ExprF.MatchF(expr, cases, default)
-  def unapply[A](obj: ExprF[A]): Option[(A, List[Case[A]], Option[A])] =
-    obj match {
-      case ExprF.MatchF(expr, cases, default) => Some((expr, cases, default))
-      case _                                  => None
-    }
-}
-object SwitchF {
-  def apply[A](cases: List[Case[A]], default: Option[A]): ExprF[A] =
-    ExprF.SwitchF(cases, default)
-  def unapply[A](obj: ExprF[A]): Option[(List[Case[A]], Option[A])] =
-    obj match {
-      case ExprF.SwitchF(cases, default) => Some((cases, default))
-      case _                             => None
-  }
-}
-object IntLiteralF {
-  def apply[A](v: Long): ExprF[A] = ExprF.IntLiteralF(v)
-  def unapply[A](obj: ExprF[A]): Option[Long] = obj match {
-    case ExprF.IntLiteralF(v) => Some(v)
-    case _                    => None
-  }
-}
-object FloatLiteralF {
-  def apply[A](v: Double): ExprF[A] = ExprF.FloatLiteralF(v)
-  def unapply[A](obj: ExprF[A]): Option[Double] = obj match {
-    case ExprF.FloatLiteralF(v) => Some(v)
-    case _                      => None
-  }
-}
-object StringLiteralF {
-  def apply[A](v: String): ExprF[A] = ExprF.StringLiteralF(v)
-  def unapply[A](obj: ExprF[A]): Option[String] = obj match {
-    case ExprF.StringLiteralF(v) => Some(v)
-    case _                       => None
-  }
-}
-object NullLiteralF {
-  def apply[A](): ExprF[A] = ExprF.NullLiteralF()
-  def unapply[A](obj: ExprF[A]): Boolean = obj match {
-    case ExprF.NullLiteralF() => true
-    case _                    => false
-  }
-}
-object BoolLiteralF {
-  def apply[A](value: Boolean): ExprF[A] = ExprF.BoolLiteralF(value)
-  def unapply[A](obj: ExprF[A]): Option[Boolean] = obj match {
-    case ExprF.BoolLiteralF(value) => Some(value)
-    case _                         => None
-  }
-}
+@Lenses final case class OrderBy[A](keys: List[(OrderType, A)])

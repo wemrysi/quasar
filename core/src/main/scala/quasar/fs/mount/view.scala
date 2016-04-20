@@ -23,7 +23,7 @@ import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
 import quasar.std.StdLib._, set._
-import quasar.sql.Expr
+import quasar.sql.Sql
 
 import matryoshka._
 import pathy.Path._
@@ -57,7 +57,8 @@ object view {
             } yield h
           }.run
 
-          def vOpen(e: Expr, v: Variables): Free[S, FileSystemError \/ ReadHandle] = {
+          def vOpen(e: Fix[Sql], v: Variables):
+              Free[S, FileSystemError \/ ReadHandle] = {
             queryPlan(e, v).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
               e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
                 // TODO: more sensible error?

@@ -226,9 +226,8 @@ trait ToCatchableOps {
   trait CatchableOps[F[_], A] extends scalaz.syntax.Ops[F[A]] {
     import SKI._
 
-    /**
-      A new task which runs a cleanup task only in the case of failure, and
-      ignores any result from the cleanup task.
+    /** A new task which runs a cleanup task only in the case of failure, and
+      * ignores any result from the cleanup task.
       */
     final def onFailure(cleanup: F[_])(implicit FM: Monad[F], FC: Catchable[F]):
         F[A] =
@@ -236,9 +235,8 @@ trait ToCatchableOps {
         err => cleanup.attempt.flatMap(κ(FC.fail(err))),
         _.point[F]))
 
-    /**
-      A new task that ignores the result of this task, and runs another task no
-      matter what.
+    /** A new task that ignores the result of this task, and runs another task
+      * no matter what.
       */
     final def ignoreAndThen[B](t: F[B])(implicit FB: Bind[F], FC: Catchable[F]):
         F[B] =
@@ -341,7 +339,20 @@ trait SKI {
 }
 object SKI extends SKI
 
-package object fp extends TreeInstances with ListMapInstances with EitherTInstances with OptionTInstances with StateTInstances with WriterTInstances with ToCatchableOps with PartialFunctionOps with JsonOps with ProcessOps with QFoldableOps with PrismInstances with SKI {
+package object fp
+    extends TreeInstances
+    with ListMapInstances
+    with EitherTInstances
+    with OptionTInstances
+    with StateTInstances
+    with WriterTInstances
+    with ToCatchableOps
+    with PartialFunctionOps
+    with JsonOps
+    with ProcessOps
+    with QFoldableOps
+    with PrismInstances
+    with SKI {
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }
@@ -482,4 +493,6 @@ package object fp extends TreeInstances with ListMapInstances with EitherTInstan
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
+
+  type ∘[F[_], G[_]] = Composition[F, G]
 }
