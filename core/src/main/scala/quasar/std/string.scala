@@ -34,7 +34,7 @@ trait StringLib extends Library {
     }
 
   // TODO: variable arity
-  val Concat = Mapping("concat", "Concatenates two (or more) string values",
+  val Concat = Func(Mapping, "concat", "Concatenates two (or more) string values",
     Type.Str, Type.Str :: Type.Str :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -78,7 +78,7 @@ trait StringLib extends Library {
     "^" + escape(pattern.toList).mkString + "$"
   }
 
-  val Like = Mapping(
+  val Like = Func(Mapping, 
     "(like)",
     "Determines if a string value matches a pattern.",
     Type.Bool, Type.Str :: Type.Str :: Type.Str :: Nil,
@@ -101,7 +101,7 @@ trait StringLib extends Library {
   def matchAnywhere(str: String, pattern: String, insen: Boolean) =
     java.util.regex.Pattern.compile(if (insen) "(?i)" ⊹ pattern else pattern).matcher(str).find()
 
-  val Search = Mapping(
+  val Search = Func(Mapping, 
     "search",
     "Determines if a string value matches a regular expresssion. If the third argument is true, then it is a case-insensitive match.",
     Type.Bool, Type.Str :: Type.Str :: Type.Bool :: Nil,
@@ -116,7 +116,7 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  val Length = Mapping(
+  val Length = Func(Mapping, 
     "length",
     "Counts the number of characters in a string.",
     Type.Int, Type.Str :: Nil,
@@ -127,7 +127,7 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  val Lower = Mapping(
+  val Lower = Func(Mapping, 
     "lower",
     "Converts the string to lower case.",
     Type.Str, Type.Str :: Nil,
@@ -139,7 +139,7 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  val Upper = Mapping(
+  val Upper = Func(Mapping, 
     "upper",
     "Converts the string to upper case.",
     Type.Str, Type.Str :: Nil,
@@ -151,7 +151,7 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  val Substring: Mapping = Mapping(
+  val Substring: Func = Func(Mapping, 
     "substring",
     "Extracts a portion of the string",
     Type.Str, Type.Str :: Type.Int :: Type.Int :: Nil,
@@ -200,7 +200,7 @@ trait StringLib extends Library {
     },
     basicUntyper)
 
-  val Boolean = Mapping(
+  val Boolean = Func(Mapping, 
     "boolean",
     "Converts the strings “true” and “false” into boolean values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Bool, Type.Str :: Nil,
@@ -222,7 +222,7 @@ trait StringLib extends Library {
   val timeRegex = "\\d{2}(?::?\\d{2}(?::?\\d{2}(?:\\.\\d{3})?)?)?Z?"
   val timestampRegex = dateRegex + "T" + timeRegex
 
-  val Integer = Mapping(
+  val Integer = Func(Mapping, 
     "integer",
     "Converts strings containing integers into integer values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Int, Type.Str :: Nil,
@@ -236,7 +236,7 @@ trait StringLib extends Library {
     },
     untyper(x => ToString(List(x)).map(List(_))))
 
-  val Decimal = Mapping(
+  val Decimal = Func(Mapping, 
     "decimal",
     "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Dec, Type.Str :: Nil,
@@ -250,7 +250,7 @@ trait StringLib extends Library {
     },
     untyper(x => ToString(List(x)).map(List(_))))
 
-  val Null = Mapping(
+  val Null = Func(Mapping, 
     "null",
     "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Null, Type.Str :: Nil,
@@ -263,7 +263,7 @@ trait StringLib extends Library {
     },
     untyper(x => ToString(List(x)).map(List(_))))
 
-  val ToString: Func = Mapping(
+  val ToString: Func = Func(Mapping, 
     "to_string",
     "Converts any primitive type to a string.",
     Type.Str, Type.Syntaxed :: Nil,

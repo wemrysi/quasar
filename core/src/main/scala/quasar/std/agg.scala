@@ -32,7 +32,7 @@ trait AggLib extends Library {
   private val reflexiveUntyper: Func.Untyper =
     untyper(t => success(List(t)))
 
-  val Count = Reduction("COUNT", "Counts the values in a set",
+  val Count = Func(Reduction, "COUNT", "Counts the values in a set",
     Type.Int, Type.Top :: Nil,
     noSimplification,
     partialTyper {
@@ -41,7 +41,7 @@ trait AggLib extends Library {
     },
     basicUntyper)
 
-  val Sum = Reduction("SUM", "Sums the values in a set",
+  val Sum = Func(Reduction, "SUM", "Sums the values in a set",
     Type.Numeric ⨿ Type.Interval, Type.Numeric ⨿ Type.Interval :: Nil,
     noSimplification,
     partialTyperV {
@@ -68,7 +68,7 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
-  val Min = Reduction("MIN", "Finds the minimum in a set of values",
+  val Min = Func(Reduction, "MIN", "Finds the minimum in a set of values",
     Type.Comparable, Type.Comparable :: Nil,
     noSimplification,
     partialTyperV {
@@ -81,7 +81,7 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
-  val Max = Reduction("MAX", "Finds the maximum in a set of values",
+  val Max = Func(Reduction, "MAX", "Finds the maximum in a set of values",
     Type.Comparable, Type.Comparable :: Nil,
     noSimplification,
     partialTyperV {
@@ -94,7 +94,7 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
-  val Avg = Reduction("AVG", "Finds the average in a set of numeric values",
+  val Avg = Func(Reduction, "AVG", "Finds the average in a set of numeric values",
     Type.Numeric ⨿ Type.Interval, Type.Numeric ⨿ Type.Interval :: Nil,
     noSimplification,
     partialTyperV {
@@ -111,7 +111,7 @@ trait AggLib extends Library {
     },
     reflexiveUntyper)
 
-  val Arbitrary = Reduction("ARBITRARY", "Returns an arbitrary value from a set",
+  val Arbitrary = Func(Reduction, "ARBITRARY", "Returns an arbitrary value from a set",
     Type.Top, Type.Top :: Nil,
     noSimplification,
     partialTyperV {

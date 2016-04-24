@@ -80,7 +80,7 @@ trait MathLib extends Library {
   /** Adds two numeric values, promoting to decimal if either operand is
     * decimal.
     */
-  val Add = Mapping("(+)", "Adds two numeric or temporal values",
+  val Add = Func(Mapping, "(+)", "Adds two numeric or temporal values",
     MathAbs, MathAbs :: MathRel :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -109,7 +109,7 @@ trait MathLib extends Library {
   /**
    * Multiplies two numeric values, promoting to decimal if either operand is decimal.
    */
-  val Multiply = Mapping("(*)", "Multiplies two numeric values or one interval and one numeric value",
+  val Multiply = Func(Mapping, "(*)", "Multiplies two numeric values or one interval and one numeric value",
     MathRel, MathRel :: Type.Numeric :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -132,7 +132,7 @@ trait MathLib extends Library {
     }) ||| numericWidening,
     biReflexiveUnapply)
 
-  val Power = Mapping("(^)", "Raises the first argument to the power of the second",
+  val Power = Func(Mapping, "(^)", "Raises the first argument to the power of the second",
     Type.Numeric, Type.Numeric :: Type.Numeric :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -157,7 +157,7 @@ trait MathLib extends Library {
   /** Subtracts one value from another, promoting to decimal if either operand
     * is decimal.
     */
-  val Subtract = Mapping("(-)", "Subtracts two numeric or temporal values",
+  val Subtract = Func(Mapping, "(-)", "Subtracts two numeric or temporal values",
     MathAbs, MathAbs :: MathAbs :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -188,7 +188,7 @@ trait MathLib extends Library {
   /**
    * Divides one value by another, promoting to decimal if either operand is decimal.
    */
-  val Divide = Mapping("(/)", "Divides one numeric or interval value by another (non-zero) numeric value",
+  val Divide = Func(Mapping, "(/)", "Divides one numeric or interval value by another (non-zero) numeric value",
     MathRel, MathAbs :: MathRel :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -219,7 +219,7 @@ trait MathLib extends Library {
   /**
    * Aka "unary minus".
    */
-  val Negate = Mapping("-", "Reverses the sign of a numeric or interval value",
+  val Negate = Func(Mapping, "-", "Reverses the sign of a numeric or interval value",
     MathRel, MathRel :: Nil,
     noSimplification,
     partialTyperV {
@@ -233,7 +233,7 @@ trait MathLib extends Library {
       case t             => success(t          :: Nil)
     })
 
-  val Modulo = Mapping(
+  val Modulo = Func(Mapping, 
     "(%)",
     "Finds the remainder of one number divided by another",
     MathRel, MathRel :: Type.Numeric :: Nil,

@@ -17,7 +17,7 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Type, Mapping, SemanticError}, SemanticError._
+import quasar.{Data, Func, Mapping, Type, SemanticError}, SemanticError._
 import quasar.fp._
 
 import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime, Period, ZoneOffset}
@@ -57,7 +57,7 @@ trait DateLib extends Library {
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
-  val Extract = Mapping(
+  val Extract = Func(Mapping, 
     "date_part",
     "Pulls out a part of the date. The first argument is one of the strings defined for Postgres’ `date_type function. This is a partial function – using an unsupported string has undefined results.",
     Type.Numeric, Type.Str :: Type.Temporal :: Nil,
@@ -65,7 +65,7 @@ trait DateLib extends Library {
     constTyper(Type.Numeric),
     basicUntyper)
 
-  val Date = Mapping(
+  val Date = Func(Mapping, 
     "date",
     "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Date, Type.Str :: Nil,
@@ -76,7 +76,7 @@ trait DateLib extends Library {
     },
     basicUntyper)
 
-  val Time = Mapping(
+  val Time = Func(Mapping, 
     "time",
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Time, Type.Str :: Nil,
@@ -87,7 +87,7 @@ trait DateLib extends Library {
     },
     basicUntyper)
 
-  val Timestamp = Mapping(
+  val Timestamp = Func(Mapping, 
     "timestamp",
     "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Timestamp, Type.Str :: Nil,
@@ -98,7 +98,7 @@ trait DateLib extends Library {
     },
     basicUntyper)
 
-  val Interval = Mapping(
+  val Interval = Func(Mapping, 
     "interval",
     "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval, Type.Str :: Nil,
@@ -109,7 +109,7 @@ trait DateLib extends Library {
     },
     basicUntyper)
 
-  val TimeOfDay = Mapping(
+  val TimeOfDay = Func(Mapping, 
     "time_of_day",
     "Extracts the time of day from a (UTC) timestamp value.",
     Type.Time, Type.Timestamp :: Nil,
@@ -120,7 +120,7 @@ trait DateLib extends Library {
     },
     basicUntyper)
 
-  val ToTimestamp = Mapping(
+  val ToTimestamp = Func(Mapping, 
     "to_timestamp",
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
     Type.Timestamp, Type.Int :: Nil,

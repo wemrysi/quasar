@@ -21,22 +21,41 @@ import quasar.Predef._
 import matryoshka._
 import scalaz._
 
-sealed trait Func {
-  def name: String
+sealed trait DimensionalEffect
+/** Describes a function that reduces a set of values to a single value. */
+final case object Reduction extends DimensionalEffect
+/** Describes a function that expands a compound value into a set of values for
+  * an operation.
+  */
+final case object Expansion extends DimensionalEffect
+/** Describes a function that expands a compound value into a set of values. */
+final case object ExpansionFlat extends DimensionalEffect
+/** Describes a function that each individual value. */
+final case object Mapping extends DimensionalEffect
+/** Describes a function that compresses the identity information. */
+final case object Squashing extends DimensionalEffect
+/** Describes a function that operates on the set containing values, not
+  * modifying individual values. (EG, filter, sort, take)
+  */
+final case object Sifting extends DimensionalEffect
+/** Describes a function that operates on the set containing values, potentially
+  * modifying individual values. (EG, joins).
+  */
+final case object Transformation extends DimensionalEffect
 
-  def help: String
+object DimensionalEffect {
+  implicit val equal: Equal[DimensionalEffect] = Equal.equalA[DimensionalEffect]
+}
 
-  def codomain: Type
-
-  def domain: List[Type]
-
-  /** This handles rewrites that constant-folding (handled by the typers) can’t.
-    * I.e., any rewrite where either the result or one of the relevant arguments
-    * is a non-Constant expression. It _could_ cover all the rewrites, but
-    * there’s no need to duplicate the cases that must also be handled by the
-    * typer.
-    */
-  def simplify: Func.Simplifier
+final case class Func(
+  effect: DimensionalEffect,
+  name: String,
+  help: String,
+  codomain: Type,
+  domain: List[Type],
+  simplify: Func.Simplifier,
+  apply: Func.Typer,
+  untype0: Func.Untyper) {
 
   def apply[A](args: A*): LogicalPlan[A] =
     LogicalPlan.InvokeF(this, args.toList)
@@ -48,10 +67,6 @@ sealed trait Func {
       case _                                      => None
     }
   }
-
-  def apply: Func.Typer
-
-  val untype0: Func.Untyper
 
   def untype(tpe: Type) = untype0(this, tpe)
 
@@ -69,6 +84,12 @@ trait FuncInstances {
 }
 
 object Func extends FuncInstances {
+  /** This handles rewrites that constant-folding (handled by the typers) can’t.
+    * I.e., any rewrite where either the result or one of the relevant arguments
+    * is a non-Constant expression. It _could_ cover all the rewrites, but
+    * there’s no need to duplicate the cases that must also be handled by the
+    * typer.
+    */
   trait Simplifier {
     def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]):
         Option[LogicalPlan[T[LogicalPlan]]]
@@ -76,30 +97,3 @@ object Func extends FuncInstances {
   type Typer      = List[Type] => ValidationNel[SemanticError, Type]
   type Untyper    = (Func, Type) => ValidationNel[SemanticError, List[Type]]
 }
-
-/** A function that reduces a set of values to a single value. */
-final case class Reduction(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that expands a compound value into a set of values for an
-  * operation.
-  */
-final case class Expansion(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that expands a compound value into a set of values. */
-final case class ExpansionFlat(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that each individual value. */
-final case class Mapping(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that compresses the identity information. */
-final case class Squashing(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that operates on the set containing values, not modifying
-  * individual values. (EG, filter, sort, take)
-  */
-final case class Sifting(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func
-
-/** A function that operates on the set containing values, potentially modifying
-  * individual values. (EG, joins).
-  */
-final case class Transformation(name: String, help: String, codomain: Type, domain: List[Type], simplify: Func.Simplifier, apply: Func.Typer, untype0: Func.Untyper) extends Func

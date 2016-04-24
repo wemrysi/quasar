@@ -17,12 +17,12 @@
 package quasar.std
 
 import quasar.Predef._
-import quasar.{Data, Type, Mapping, SemanticError}, SemanticError._
+import quasar.{Data, Func, Type, Mapping, SemanticError}, SemanticError._
 
 import scalaz._, NonEmptyList.nels, Validation.{success, failure}
 
 trait ArrayLib extends Library {
-  val ArrayLength = Mapping(
+  val ArrayLength = Func(Mapping,
     "array_length",
     "Gets the length of a given dimension of an array.",
     Type.Int, Type.AnyArray :: Type.Int :: Nil,
