@@ -172,7 +172,6 @@ package object sql {
         case FlattenArrayValues  => "(" + expr._2 + ")[:*]"
         case ShiftArrayIndices   => "(" + expr._2 + ")[_:]"
         case ShiftArrayValues    => "(" + expr._2 + ")[:_]"
-        case IsNull              => "(" + expr._2 + ") is null"
         case _ =>
           val s = List(op.sql, "(", expr._2, ")") mkString " "
           // NB: dis-ambiguates the query in case this is the leading projection

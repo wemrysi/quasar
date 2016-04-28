@@ -185,7 +185,8 @@ private[sql] class SQLParser extends StandardTokenParsers {
     op("<")  ^^^ Lt  |
     op("<=") ^^^ Le  |
     op(">")  ^^^ Gt  |
-    op(">=") ^^^ Ge
+    op(">=") ^^^ Ge  |
+    keyword("is") ~> opt(keyword("not")) ^^ (_.fold[BinaryOperator](Eq)(κ(Neq)))
 
   def relational_suffix: Parser[Expr => Expr] =
     relationalOp ~ default_expr ^^ {
@@ -211,32 +212,24 @@ private[sql] class SQLParser extends StandardTokenParsers {
       case _ ~ a ~ esc => LIKE(_, a, esc)
     }
 
-  def is_suffix: Parser[Expr => Expr] =
-    (keyword("is") ~ opt(keyword("not")) ~ (
-      keyword("null")    ^^^ (IsNull(_))
-      | keyword("true")  ^^^ ((x: Expr) => Eq(x, BoolLiteral(true)))
-      | keyword("false") ^^^ ((x: Expr) => Eq(x, BoolLiteral(false)))
-    )) ^^ { case _ ~ n ~ f => (x: Expr) => val u = f(x); n.fold(u)(κ(Not(u))) }
-
-  def negatable_suffix: Parser[Expr => Expr] = {
-    opt(keyword("not")) ~ (between_suffix | in_suffix | like_suffix) ^^ {
-      case inv ~ suffix =>
-        inv.fold(suffix)(κ(lhs => Not(suffix(lhs))))
-    }
-  }
+  def negatable_suffix: Parser[Expr => Expr] =
+    opt(keyword("is")) ~> opt(keyword("not")) ~
+      (between_suffix | in_suffix | like_suffix) ^^ {
+        case inv ~ suffix => inv.fold(suffix)(κ(lhs => Not(suffix(lhs))))
+      }
 
   def array_literal: Parser[Expr] =
     (op("[") ~> repsep(expr, op(",")) <~ op("]")) ^^ (ArrayLiteral(_))
 
-  def pair: Parser[(Expr, Expr)] = expr ~ op(":") ~ expr ^^ {
-    case l ~ _ ~ r => (l,r)
+  def pair: Parser[(Expr, Expr)] = expr ~ (op(":") ~> expr) ^^ {
+    case l ~ r => (l,r)
   }
 
   def map_literal: Parser[Expr] =
     (op("{") ~> repsep(pair, op(",")) <~ op("}")) ^^ (MapLiteral(_))
 
   def cmp_expr: Parser[Expr] =
-    default_expr ~ rep(relational_suffix | negatable_suffix | is_suffix) ^^ {
+    default_expr ~ rep(negatable_suffix | relational_suffix) ^^ {
       case lhs ~ suffixes => suffixes.foldLeft(lhs)((lhs, op) => op(lhs))
     }
 
@@ -311,6 +304,14 @@ private[sql] class SQLParser extends StandardTokenParsers {
   def wildcard: Parser[Expr] = op("*") ^^^ Splice(None)
 
   def set_list: Parser[List[Expr]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
+
+  def function_expr: Parser[Expr] =
+    ident ~ set_list ^^ {
+      // TODO: `is_null` is deprecated, but leaving this here until we figure
+      //       out how to message deprecation to users.
+      case a ~ List(x) if a.toLowerCase ≟ "is_null" => Eq(x, NullLiteral())
+      case a ~ xs                                   => InvokeFunction(a, xs)
+    }
 
   def primary_expr: Parser[Expr] =
     case_expr |

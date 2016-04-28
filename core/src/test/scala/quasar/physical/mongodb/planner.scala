@@ -966,7 +966,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "zips")),
           $match(
             Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("city") -> Selector.NotExpr(Selector.Eq(Bson.Null)))))))
+              BsonField.Name("city") -> Selector.Expr(Selector.Neq(Bson.Null)))))))
     }
 
     "plan filter with both index and field projections" in {

@@ -120,8 +120,7 @@ trait ExprArbitrary {
           FlattenMapKeys,   FlattenArrayIndices,
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
-          ShiftMapValues,   ShiftArrayValues,
-          IsNull))(
+          ShiftMapValues,   ShiftArrayValues))(
         Unop(_, _)),
       2 -> (for {
         fn  <- Gen.oneOf(agg.Sum, agg.Count, agg.Avg, string.Length, structural.MakeArray)

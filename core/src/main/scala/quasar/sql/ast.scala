@@ -126,7 +126,6 @@ sealed abstract class UnaryOperator(val sql: String) extends (Expr => Expr) {
 }
 
 final case object Not                 extends UnaryOperator("not")
-final case object IsNull              extends UnaryOperator("is_null")
 final case object Exists              extends UnaryOperator("exists")
 final case object Positive            extends UnaryOperator("+")
 final case object Negative            extends UnaryOperator("-")
