@@ -395,13 +395,15 @@ object LogicalPlan {
           consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))).sequenceU)
           plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenMap, consts))
         } yield plan
-        case InvokeF(f @ Mapping(_, _, _, _, _, _, _), args) =>
-          val (types, constraints, terms) = args.foldMap(a =>
-            (List(a.inferred), a.constraints, List(a.plan)))
-          lift(f.apply(types).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, terms))).map(cp =>
-            cp.copy(constraints = cp.constraints ++ constraints))
-        case InvokeF(f, args) =>
-          lift(f.apply(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
+        case InvokeF(f, args) => f.effect match {
+          case Mapping =>
+            val (types, constraints, terms) = args.foldMap(a =>
+              (List(a.inferred), a.constraints, List(a.plan)))
+            lift(f.apply(types).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, terms))).map(cp =>
+              cp.copy(constraints = cp.constraints ++ constraints))
+          case _ =>
+            lift(f.apply(args.map(_.inferred)).disjunction).flatMap(unifyOrCheck(inf, _, Invoke(f, args.map(appConst(_, Constant(Data.NA))))))
+        }
         case TypecheckF(expr, typ, cont, fallback) =>
           unifyOrCheck(inf, Type.glb(cont.inferred, typ), Typecheck(expr.plan, typ, cont.plan, fallback.plan))
         case LetF(name, value, in) =>

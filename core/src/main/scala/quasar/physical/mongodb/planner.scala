@@ -417,7 +417,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
         }
     }
 
-    def relMapping(f: Func): Option[Bson => Selector.Condition] = f match {
+    def relFunc(f: Func): Option[Bson => Selector.Condition] = f match {
       case Eq  => Some(Selector.Eq)
       case Neq => Some(Selector.Neq)
       case Lt  => Some(Selector.Lt)
@@ -478,8 +478,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
         }
       }
 
-      def reversibleRelop(f: Mapping): Output =
-        (relMapping(f) |@| flip(f).flatMap(relMapping))(relop).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+      def reversibleRelop(f: Func): Output =
+        (relFunc(f) |@| flip(f).flatMap(relFunc))(relop).getOrElse(-\/(InternalError("couldn’t decipher operation")))
 
       (func, args) match {
         case (Gt, _ :: IsDate(d2) :: Nil)  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
@@ -1049,7 +1049,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
           terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(Or, _))
         case InvokeF(Not, terms) =>
           terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(Not, _))
-        case x @ InvokeF(func: Mapping, List(left, right)) =>
+        case x @ InvokeF(func, List(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
             \/-(Invoke(func, List(left, right)))
           else if (containsTableRefs(left, rt, right, lt))

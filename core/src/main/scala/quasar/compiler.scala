@@ -529,7 +529,7 @@ object Compiler {
         t match {
           case InvokeF(set.GroupBy, List(src, structural.MakeArrayN(keys))) =>
             Some(keys.map(_.transCataT(t => if (t ≟ src) newSrc else t)))
-          case InvokeF(Sifting(_, _, _, _, _, _, _), src :: _) =>
+          case InvokeF(func, src :: _) if func.effect ≟ Sifting =>
             groupedKeys(src.unFix, newSrc)
           case _ => None
         }
@@ -549,7 +549,7 @@ object Compiler {
       def strip(v: Cofree[LogicalPlan, Boolean]) = Cofree(false, v.tail)
 
       t => t.tail match {
-        case InvokeF(func @ Reduction(_, _, _, _, _, _, _), arg :: Nil) =>
+        case InvokeF(func, arg :: Nil) if func.effect ≟ Reduction =>
           InvokeF(func, List(strip(arg)))
 
         case _ =>

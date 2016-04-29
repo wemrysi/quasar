@@ -32,7 +32,7 @@ trait SetLib extends Library {
       case rez                         => rez
     }
 
-  val Take = Sifting("(LIMIT)", "Takes the first N elements from a set",
+  val Take = Func(Sifting, "(LIMIT)", "Takes the first N elements from a set",
     Type.Top, Type.Top :: Type.Int :: Nil,
     noSimplification,
     setTyper(partialTyper {
@@ -45,7 +45,7 @@ trait SetLib extends Library {
     }),
     untyper(t => success(t :: Type.Int :: Nil)))
 
-  val Drop = Sifting("(OFFSET)", "Drops the first N elements from a set",
+  val Drop = Func(Sifting, "(OFFSET)", "Drops the first N elements from a set",
     Type.Top, Type.Top :: Type.Int :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
@@ -63,13 +63,13 @@ trait SetLib extends Library {
     }),
     untyper(t => success(t :: Type.Int :: Nil)))
 
-  val OrderBy = Sifting("ORDER BY", "Orders a set by the natural ordering of a projection on the set",
+  val OrderBy = Func(Sifting, "ORDER BY", "Orders a set by the natural ordering of a projection on the set",
     Type.Top, Type.Top :: Type.Top :: Type.Top :: Nil,
     noSimplification,
     setTyper(partialTyper { case set :: _ :: _ :: Nil => set }),
     untyper(t => success(t :: Type.Top :: Type.Top :: Nil)))
 
-  val Filter = Sifting("WHERE", "Filters a set to include only elements where a projection is true",
+  val Filter = Func(Sifting, "WHERE", "Filters a set to include only elements where a projection is true",
     Type.Top, Type.Top :: Type.Bool :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -85,7 +85,7 @@ trait SetLib extends Library {
     }),
     untyper(t => success(t :: Type.Bool :: Nil)))
 
-  val InnerJoin = Transformation(
+  val InnerJoin = Func(Transformation, 
     "INNER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition.",
     Type.Top, Type.Top :: Type.Top :: Type.Bool :: Nil,
@@ -100,7 +100,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         l :: r :: Type.Bool :: Nil)))
 
-  val LeftOuterJoin = Transformation(
+  val LeftOuterJoin = Func(Transformation, 
     "LEFT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the left set.",
     Type.Top, Type.Top :: Type.Top :: Type.Bool :: Nil,
@@ -116,7 +116,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         l :: r :: Type.Bool :: Nil)))
 
-  val RightOuterJoin = Transformation(
+  val RightOuterJoin = Func(Transformation, 
     "RIGHT OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from the right set.",
     Type.Top, Type.Top :: Type.Top :: Type.Bool :: Nil,
@@ -131,7 +131,7 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         l :: r :: Type.Bool :: Nil)))
 
-  val FullOuterJoin = Transformation(
+  val FullOuterJoin = Func(Transformation, 
     "FULL OUTER JOIN",
     "Returns a new set containing the pairs values from the two sets that satisfy the condition, plus all other values from either set.",
     Type.Top, Type.Top :: Type.Top :: Type.Bool :: Nil,
@@ -146,25 +146,25 @@ trait SetLib extends Library {
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         l :: r :: Type.Bool :: Nil)))
 
-  val GroupBy = Transformation("GROUP BY", "Groups a projection of a set by another projection",
+  val GroupBy = Func(Transformation, "GROUP BY", "Groups a projection of a set by another projection",
     Type.Top, Type.Top :: Type.Top :: Nil,
     noSimplification,
     setTyper(partialTyper { case s1 :: _ :: Nil => s1 }),
     untyper(t => success(t :: Type.Top :: Nil)))
 
-  val Distinct = Sifting("DISTINCT", "Discards all but the first instance of each unique value",
+  val Distinct = Func(Sifting, "DISTINCT", "Discards all but the first instance of each unique value",
     Type.Top, Type.Top :: Nil,
     noSimplification,
     setTyper(partialTyper { case a :: Nil => a}),
     untyper(t => success(t :: Nil)))
 
-  val DistinctBy = Sifting("DISTINCT BY", "Discards all but the first instance of the first argument, based on uniqueness of the second argument",
+  val DistinctBy = Func(Sifting, "DISTINCT BY", "Discards all but the first instance of the first argument, based on uniqueness of the second argument",
     Type.Top, Type.Top :: Type.Top :: Nil,
     noSimplification,
     setTyper(partialTyper { case a :: _ :: Nil => a }),
     untyper(t => success(t :: Type.Top :: Nil)))
 
-  val Union = Transformation("(UNION ALL)",
+  val Union = Func(Transformation, "(UNION ALL)",
     "Creates a new set with all the elements of each input set, keeping duplicates.",
     Type.Top, Type.Top :: Type.Top :: Nil,
     noSimplification,
@@ -175,7 +175,7 @@ trait SetLib extends Library {
     }),
     untyper(t => success(t :: t :: Nil)))
 
-  val Intersect = Transformation("(INTERSECT ALL)",
+  val Intersect = Func(Transformation, "(INTERSECT ALL)",
     "Creates a new set with only the elements that exist in both input sets, keeping duplicates.",
     Type.Top, Type.Top :: Type.Top :: Nil,
     noSimplification,
@@ -184,7 +184,7 @@ trait SetLib extends Library {
     }),
     untyper(t => success(t :: t :: Nil)))
 
-  val Except = Transformation("(EXCEPT)",
+  val Except = Func(Transformation, "(EXCEPT)",
     "Removes the elements of the second set from the first set.",
     Type.Top, Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
@@ -201,7 +201,7 @@ trait SetLib extends Library {
   //       a separate functor and inlined prior to getting this far. It will
   //       also allow us to make simplification non-Corecursive and ∴ operate
   //       on Cofree.
-  val In = Mapping(
+  val In = Func(Mapping, 
     "(in)",
     "Determines whether a value is in a given set.",
     Type.Bool, Type.Top :: Type.Top :: Nil,
@@ -227,7 +227,7 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
-  val Within = Mapping(
+  val Within = Func(Mapping, 
     "within",
     "Determines whether a value is in a given array.",
     Type.Bool, Type.Top :: Type.AnyArray :: Nil,
@@ -241,7 +241,7 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
-  val Constantly = Mapping("CONSTANTLY", "Always return the same value",
+  val Constantly = Func(Mapping, "CONSTANTLY", "Always return the same value",
     Type.Bottom, Type.Top :: Type.Top :: Nil,
     noSimplification,
     partialTyper {

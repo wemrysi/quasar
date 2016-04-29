@@ -24,7 +24,7 @@ import scalaz._, Scalaz._, Validation.success
 
 // TODO: Cleanup!
 trait RelationsLib extends Library {
-  val Eq = Mapping("(=)", "Determines if two values are equal",
+  val Eq = Func(Mapping, "(=)", "Determines if two values are equal",
     Type.Bool, Type.Top :: Type.Top :: Nil,
     noSimplification,
     partialTyper {
@@ -34,7 +34,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Neq = Mapping("(<>)", "Determines if two values are not equal",
+  val Neq = Func(Mapping, "(<>)", "Determines if two values are not equal",
     Type.Bool, Type.Top :: Type.Top :: Nil,
     noSimplification,
     partialTyper {
@@ -44,7 +44,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Lt = Mapping("(<)", "Determines if one value is less than another value of the same type",
+  val Lt = Func(Mapping, "(<)", "Determines if one value is less than another value of the same type",
     Type.Bool, Type.Comparable :: Type.Comparable :: Nil,
     noSimplification,
     partialTyper {
@@ -57,7 +57,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Lte = Mapping("(<=)", "Determines if one value is less than or equal to another value of the same type",
+  val Lte = Func(Mapping, "(<=)", "Determines if one value is less than or equal to another value of the same type",
     Type.Bool, Type.Comparable :: Type.Comparable :: Nil,
     noSimplification,
     partialTyper {
@@ -70,7 +70,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Gt = Mapping("(>)", "Determines if one value is greater than another value of the same type",
+  val Gt = Func(Mapping, "(>)", "Determines if one value is greater than another value of the same type",
     Type.Bool, Type.Comparable :: Type.Comparable :: Nil,
     noSimplification,
     partialTyper {
@@ -83,7 +83,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Gte = Mapping("(>=)", "Determines if one value is greater than or equal to another value of the same type",
+  val Gte = Func(Mapping, "(>=)", "Determines if one value is greater than or equal to another value of the same type",
     Type.Bool, Type.Comparable :: Type.Comparable :: Nil,
     noSimplification,
     partialTyper {
@@ -96,7 +96,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Between = Mapping("(BETWEEN)", "Determines if a value is between two other values of the same type, inclusive",
+  val Between = Func(Mapping, "(BETWEEN)", "Determines if a value is between two other values of the same type, inclusive",
     Type.Bool, Type.Comparable :: Type.Comparable :: Type.Comparable :: Nil,
     noSimplification,
     partialTyper {
@@ -106,7 +106,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val And = Mapping("(AND)", "Performs a logical AND of two boolean values",
+  val And = Func(Mapping, "(AND)", "Performs a logical AND of two boolean values",
     Type.Bool, Type.Bool :: Type.Bool :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -126,7 +126,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Or = Mapping("(OR)", "Performs a logical OR of two boolean values",
+  val Or = Func(Mapping, "(OR)", "Performs a logical OR of two boolean values",
     Type.Bool, Type.Bool :: Type.Bool :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -146,7 +146,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Not = Mapping("NOT", "Performs a logical negation of a boolean value",
+  val Not = Func(Mapping, "NOT", "Performs a logical negation of a boolean value",
     Type.Bool, Type.Bool :: Nil,
     noSimplification,
     partialTyper {
@@ -155,7 +155,7 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
-  val Cond = Mapping("(IF_THEN_ELSE)", "Chooses between one of two cases based on the value of a boolean expression",
+  val Cond = Func(Mapping, "(IF_THEN_ELSE)", "Chooses between one of two cases based on the value of a boolean expression",
     Type.Bottom, Type.Bool :: Type.Top :: Type.Top :: Nil,
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
@@ -172,7 +172,7 @@ trait RelationsLib extends Library {
     },
     untyper(t => success(Type.Bool :: t :: t :: Nil)))
 
-  val Coalesce = Mapping(
+  val Coalesce = Func(Mapping, 
     "coalesce",
     "Returns the first of its arguments that isn't null.",
     Type.Bottom, Type.Top :: Type.Top :: Nil,
@@ -199,7 +199,7 @@ trait RelationsLib extends Library {
 
   def functions = Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: Between :: And :: Or :: Not :: Cond :: Coalesce :: Nil
 
-  def flip(f: Mapping): Option[Mapping] = f match {
+  def flip(f: Func): Option[Func] = f match {
     case Eq  => Some(Eq)
     case Neq => Some(Neq)
     case Lt  => Some(Gt)
@@ -211,7 +211,7 @@ trait RelationsLib extends Library {
     case _   => None
   }
 
-  def negate(f: Mapping): Option[Mapping] = f match {
+  def negate(f: Func): Option[Func] = f match {
     case Eq  => Some(Neq)
     case Neq => Some(Eq)
     case Lt  => Some(Gte)

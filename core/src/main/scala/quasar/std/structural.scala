@@ -26,7 +26,7 @@ import scalaz._, Scalaz._, Validation.{success, failure}
 trait StructuralLib extends Library {
   import Type._
 
-  val MakeObject = Mapping(
+  val MakeObject = Func(Mapping, 
     "MAKE_OBJECT",
     "Makes a singleton object containing a single field",
     AnyObject, Str :: Top :: Nil,
@@ -51,7 +51,7 @@ trait StructuralLib extends Library {
       }
     })
 
-  val MakeArray = Mapping(
+  val MakeArray = Func(Mapping, 
     "MAKE_ARRAY",
     "Makes a singleton array containing a single element",
     AnyArray, Top :: Nil,
@@ -68,7 +68,7 @@ trait StructuralLib extends Library {
       case FlexArr(_, _, elemType)     => List(elemType)
     })
 
-  val ObjectConcat: Mapping = Mapping(
+  val ObjectConcat: Func = Func(Mapping, 
     "OBJECT_CONCAT",
     "A right-biased merge of two objects into one object",
     AnyObject, AnyObject :: AnyObject :: Nil,
@@ -94,7 +94,7 @@ trait StructuralLib extends Library {
         List(t, t)
     })
 
-  val ArrayConcat: Mapping = Mapping(
+  val ArrayConcat: Func = Func(Mapping, 
     "ARRAY_CONCAT",
     "A merge of two arrays into one array",
     AnyArray, AnyArray :: AnyArray :: Nil,
@@ -133,7 +133,7 @@ trait StructuralLib extends Library {
     })
 
   // NB: Used only during type-checking, and then compiled into either (string) Concat or ArrayConcat.
-  val ConcatOp = Mapping(
+  val ConcatOp = Func(Mapping, 
     "(||)",
     "A merge of two arrays/strings.",
     AnyArray ⨿ Str, AnyArray ⨿ Str :: AnyArray ⨿ Str :: Nil,
@@ -159,7 +159,7 @@ trait StructuralLib extends Library {
       case x if x.contains(Type.Str)        => StringLib.Concat.untype(x)
     })
 
-  val ObjectProject = Mapping(
+  val ObjectProject = Func(Mapping, 
     "({})",
     "Extracts a specified field of an object",
     Top, AnyObject :: Str :: Nil,
@@ -173,7 +173,7 @@ trait StructuralLib extends Library {
     partialTyperV { case List(v1, v2) => v1.objectField(v2) },
     basicUntyper)
 
-  val ArrayProject = Mapping(
+  val ArrayProject = Func(Mapping, 
     "([])",
     "Extracts a specified index of an array",
     Top, AnyArray :: Int :: Nil,
@@ -181,7 +181,7 @@ trait StructuralLib extends Library {
     partialTyperV { case List(v1, v2) => v1.arrayElem(v2) },
     basicUntyper)
 
-  val DeleteField: Mapping = Mapping(
+  val DeleteField: Func = Func(Mapping, 
     "DELETE_FIELD",
     "Deletes a specified field from an object",
     AnyObject, AnyObject :: Str :: Nil,
@@ -197,7 +197,7 @@ trait StructuralLib extends Library {
       case Obj(map, _)              => success(List(Obj(map, Some(Top)), Str))
     })
 
-  val FlattenMap = Expansion(
+  val FlattenMap = Func(Expansion, 
     "FLATTEN_MAP",
     "Zooms in on the values of a map, extending the current dimension with the keys",
     Top, AnyObject :: Nil,
@@ -212,7 +212,7 @@ trait StructuralLib extends Library {
     },
     untyper(tpe => success(List(Obj(Map(), Some(tpe))))))
 
-  val FlattenArray = Expansion(
+  val FlattenArray = Func(Expansion, 
     "FLATTEN_ARRAY",
     "Zooms in on the elements of an array, extending the current dimension with the indices",
     Top, AnyArray :: Nil,
@@ -226,7 +226,7 @@ trait StructuralLib extends Library {
     },
     untyper(tpe => success(List(FlexArr(0, None, tpe)))))
 
-  val FlattenMapKeys = Expansion(
+  val FlattenMapKeys = Func(Expansion, 
     "{*:}",
     "Zooms in on the keys of a map, also extending the current dimension with the keys",
     Top, AnyObject :: Nil,
@@ -238,7 +238,7 @@ trait StructuralLib extends Library {
     },
     untyper(tpe => success(List(Obj(Map(), Some(Top))))))
 
-  val FlattenArrayIndices = Expansion(
+  val FlattenArrayIndices = Func(Expansion, 
     "[*:]",
     "Zooms in on the indices of an array, also extending the current dimension with the indices",
     Int, AnyArray :: Nil,
@@ -246,7 +246,7 @@ trait StructuralLib extends Library {
     partialTyper { case List(x) if x.arrayLike => Int },
     partialUntyper { case Int => List(FlexArr(0, None, Top)) })
 
-  val ShiftMap = Expansion(
+  val ShiftMap = Func(Expansion, 
     "SHIFT_MAP",
     "Zooms in on the values of a map, adding the keys as a new dimension",
     Top, AnyObject :: Nil,
@@ -264,7 +264,7 @@ trait StructuralLib extends Library {
     },
     untyper(tpe => success(List(Obj(Map(), Some(tpe))))))
 
-  val ShiftArray = Expansion(
+  val ShiftArray = Func(Expansion, 
     "SHIFT_ARRAY",
     "Zooms in on the elements of an array, adding the indices as a new dimension",
     Top, AnyArray :: Nil,
@@ -283,7 +283,7 @@ trait StructuralLib extends Library {
     },
     untyper(tpe => success(List(FlexArr(0, None, tpe)))))
 
-  val ShiftMapKeys = Expansion(
+  val ShiftMapKeys = Func(Expansion, 
     "{_:}",
     "Zooms in on the keys of a map, also adding the keys as a new dimension",
     Top, AnyObject :: Nil,
@@ -291,7 +291,7 @@ trait StructuralLib extends Library {
     partialTyper { case List(x) if x.objectLike => Str },
     untyper(tpe => success(List(Obj(Map(), Some(Top))))))
 
-  val ShiftArrayIndices = Expansion(
+  val ShiftArrayIndices = Func(Expansion, 
     "[_:]",
     "Zooms in on the indices of an array, also adding the keys as a new dimension",
     Int, AnyArray :: Nil,
@@ -299,7 +299,7 @@ trait StructuralLib extends Library {
     partialTyper { case List(x) if x.arrayLike => Int },
     partialUntyper { case Int => List(FlexArr(0, None, Top)) })
 
-  val UnshiftMap: Func = Reduction(
+  val UnshiftMap: Func = Func(Reduction, 
     "{...}",
     "Unshifts a dimension from the set identity, creating a map with the dimensional values as the keys.",
     AnyObject, Top :: Nil,
@@ -316,7 +316,7 @@ trait StructuralLib extends Library {
         x => success(List(x)))
     })
 
-  val UnshiftArray: Func = Reduction(
+  val UnshiftArray: Func = Func(Reduction, 
     "[...]",
     "Unshifts an integral dimension from the set identity, creating an array with the dimensional values as the indices.",
     AnyArray, Top :: Nil,

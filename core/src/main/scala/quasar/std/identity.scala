@@ -25,13 +25,13 @@ trait IdentityLib extends Library {
   import Type._
   import Validation.success
 
-  val Squash = Squashing("SQUASH", "Squashes all dimensional information",
+  val Squash = Func(Squashing, "SQUASH", "Squashes all dimensional information",
     Top, Top :: Nil,
     noSimplification,
     partialTyper { case x :: Nil => x },
     untyper(t => success(t :: Nil)))
 
-  val ToId = Mapping(
+  val ToId = Func(Mapping, 
     "oid",
     "Converts a string to a (backend-specific) object identifier.",
     Type.Id, Type.Str :: Nil,
