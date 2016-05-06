@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.{DataEncodingError, Data, DataCodec}
 import quasar.csv._
 import quasar.fp._
-import quasar.repl.Prettify
+import quasar.main.Prettify
 
 import argonaut.EncodeJson
 import org.http4s._
