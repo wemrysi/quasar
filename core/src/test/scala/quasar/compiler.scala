@@ -65,6 +65,43 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
           "b" -> Constant(Data.Str("abc"))))
     }
 
+    "compile complex constant" in {
+      testTypedLogicalPlanCompile("[1, 2, 3, 4, 5][*] limit 3 offset 1",
+        Constant(Data.Set(List(Data.Int(2), Data.Int(3)))))
+    }
+
+    "select complex constant" in {
+      testTypedLogicalPlanCompile(
+        "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1",
+        Constant(Data.Set(List(
+          Data.Obj(ListMap("0" -> Data.Int(2))),
+          Data.Obj(ListMap("0" -> Data.Int(3)))))))
+    }
+
+    "select complex constant 2" in {
+      testTypedLogicalPlanCompile(
+        "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*:} limit 3 offset 1",
+        Constant(Data.Set(List(
+          Data.Obj(ListMap("0" -> Data.Str("b"))),
+          Data.Obj(ListMap("0" -> Data.Str("c")))))))
+    }
+
+    "compile expression with timestamp, date, time, and interval" in {
+      import org.threeten.bp.{Instant, LocalDate, LocalTime}
+
+      testTypedLogicalPlanCompile(
+        """select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
+        Constant(Data.Obj(ListMap(
+          "0" -> Data.Timestamp(Instant.parse("2014-11-17T22:43:40Z")),
+          "1" -> Data.Date(LocalDate.parse("2015-01-19")),
+          "2" -> Data.Time(LocalTime.parse("14:21:00.000"))))))
+    }
+
+    "compile simple constant from collection" in {
+      testTypedLogicalPlanCompile("select 1 from zips",
+        Constant(Data.Obj(ListMap("0" -> Data.Int(1)))))
+    }
+
     "compile select substring" in {
       testLogicalPlanCompile(
         "select substring(bar, 2, 3) from foo",
@@ -404,6 +441,16 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
                   Concat[FLP](
                     Constant(Data.Str(" ")),
                     ObjectProject(Free('__tmp0), Constant(Data.Str("bar")))))))))
+    }
+
+    "filter on constant false" in {
+      testTypedLogicalPlanCompile("select * from zips where false",
+        Constant(Data.Set(Nil)))
+    }
+
+    "filter with field in empty set" in {
+      testTypedLogicalPlanCompile("select * from zips where state in ()",
+        Constant(Data.Set(Nil)))
     }
 
     "compile between" in {

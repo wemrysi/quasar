@@ -63,13 +63,6 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
         Path(FieldSeg("arr"), IndexSeg(1)) -> Data.Str("b"))
     }
 
-    "find set indices" in {
-      val data = Data.Obj(ListMap("set" -> Data.Set(List(Data.Str("a"), Data.Str("b")))))
-      flatten(data) must_== ListMap(
-        Path(FieldSeg("set"), IndexSeg(0)) -> Data.Str("a"),
-        Path(FieldSeg("set"), IndexSeg(1)) -> Data.Str("b"))
-    }
-
     "find nested array indices" in {
       val data = Data.Obj(ListMap(
         "arr" -> Data.Arr(List(
@@ -244,7 +237,6 @@ class PrettifySpecs extends Specification with ScalaCheck with DisjunctionMatche
     def isFlat(data: Data) = data match {
       case Data.Obj(_) => false
       case Data.Arr(_) => false
-      case Data.Set(_) => false
       case _ => true
     }
 

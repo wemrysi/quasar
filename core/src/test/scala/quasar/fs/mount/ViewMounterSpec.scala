@@ -26,6 +26,7 @@ import quasar.std.IdentityLib.Squash
 import quasar.std.StdLib._, set.{InnerJoin, Take, Drop}
 import quasar.sql, sql.Sql
 
+import eu.timepit.refined.auto._
 import matryoshka._
 import monocle.{Lens => MLens}
 import org.specs2.ScalaCheck
@@ -141,25 +142,26 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val p = rootDir </> dir("view") </> file("simpleZips")
 
       val outer =
-        Fix(Take(
-          Fix(Drop(
+        Take(
+          Drop(
             Read(p),
-            Constant(Data.Int(5)))),
-          Constant(Data.Int(10))))
+            Constant(Data.Int(5))).embed,
+          Constant(Data.Int(10))).embed
 
-      val innerLP = (quasar.queryPlan _).tupled(inner).run.run._2.toOption.get
+      val innerLP =
+        quasar.queryPlan(inner._1, inner._2, 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
 
       val vs = Map[APath, MountConfig](
         p -> MountConfig.viewConfig(inner))
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](outer).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Take(
-            Fix(Drop(
+          Take(
+            Drop(
               innerLP,
-              Constant(Data.Int(5)))),
-            Constant(Data.Int(10)))))
-        }
+              Constant(Data.Int(5))).embed,
+            Constant(Data.Int(10))).embed)
+      }
     }
 
     "multi-level" >> {
@@ -171,7 +173,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(rootDir </> dir("view") </> file("view2"))).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-          Fix(Squash(Fix(Squash(Read(rootDir </> file("zips")))))))
+          Squash(Squash(Read(rootDir </> file("zips"))).embed).embed)
         }
     }
 
@@ -188,15 +190,15 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
       val vs = Map[APath, MountConfig](
         vp -> MountConfig.viewConfig(viewConfig("select * from `/zips`")))
 
-      val q = Fix(InnerJoin(
+      val q = InnerJoin(
         Read(vp),
         Read(vp),
-        Constant(Data.Bool(true))))
+        Constant(Data.Bool(true))).embed
 
-      val exp = Fix(InnerJoin(
-        Fix(Squash(Read(zp))),
-        Fix(Squash(Read(zp))),
-        Constant(Data.Bool(true))))
+      val exp = InnerJoin(
+        Squash(Read(zp)).embed,
+        Squash(Read(zp)).embed,
+        Constant(Data.Bool(true))).embed
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](q).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(exp) }
@@ -210,7 +212,8 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       val q = viewConfig(s"select * from `${posixCodec.printPath(p)}` limit 10")
 
-      val qlp = (quasar.queryPlan _).tupled(q).run.run._2.toOption.get
+      val qlp =
+        quasar.queryPlan(q._1, q._2, 0L, None).run.run._2.toOption.get.valueOr(_ => scala.sys.error("impossible constant plan"))
 
       val vs = Map[APath, MountConfig](p -> MountConfig.viewConfig(q))
 
@@ -239,11 +242,11 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
       eval(vs)(ViewMounter.rewrite[MountConfigsF](Read(v2p)).run)
         ._2 must beRightDisjunction.like { case r => r must beTree(
-           Fix(Take(
-             Fix(Squash(Fix(Drop(
-               Fix(Squash(Read(v2p))),
-               Constant(Data.Int(5)))))),
-             Constant(Data.Int(10))))
+          Take(
+            Squash(Drop(
+              Squash(Read(v2p)).embed,
+              Constant(Data.Int(5))).embed).embed,
+            Constant(Data.Int(10))).embed
         )}
 
     }

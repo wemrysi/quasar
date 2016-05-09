@@ -733,8 +733,11 @@ class TypesSpec extends Specification with ScalaCheck with ValidationMatchers wi
     }
 
     "encode constant types as their data encoding" ! prop { data: Data =>
-      val exp = DataCodec.Precise.encode(data) map (jd => Json((("Const", jd))))
-      Right(typJson(Const(data))) must_== exp.toEither
+      val exp = DataCodec.Precise.encode(data)
+      exp.isRight ==> {
+        Right(typJson(Const(data))) must_==
+          exp.map(jd => Json((("Const", jd)))).toEither
+      }
     }
 
     "encode arrays as an array of types" ! prop { types: List[Type] =>

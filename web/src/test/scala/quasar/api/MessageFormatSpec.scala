@@ -115,10 +115,11 @@ class MessageFormatSpec extends org.specs2.mutable.Specification {
       val simpleData = List(
         Data.Obj(ListMap("a" -> Data.Int(1))),
         Data.Obj(ListMap("b" -> Data.Int(2))),
-        Data.Obj(ListMap("c" -> Data.Set(List(Data.Int(3))))))
+        Data.Obj(ListMap("c" -> Data.Arr(List(Data.Int(3))))))
       val simpleExpected = List("a,b,c[0]", "1,,", ",2,", ",,3").mkString("", "\r\n", "\r\n")
       def test(data: List[Data], expectedEncoding: String, format: Csv) =
         format.encode(Process.emitAll(data): Process[Task,Data]).runLog.unsafePerformSync.mkString("") must_== expectedEncoding
+
       "simple" >> test(
         data = simpleData,
         expectedEncoding = simpleExpected,

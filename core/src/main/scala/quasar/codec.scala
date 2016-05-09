@@ -63,7 +63,6 @@ object DataCodec {
     C.encode(data).map(_.pretty(minspace))
 
   val Precise = new DataCodec {
-    val SetKey = "$set"
     val TimestampKey = "$timestamp"
     val DateKey = "$date"
     val TimeKey = "$time"
@@ -84,7 +83,7 @@ object DataCodec {
         } yield value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj)))
 
         case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
-        case Set(value) => value.traverse(encode).map(vs => Json.obj(SetKey -> Json.array(vs: _*)))
+        case Set(_)     => -\/(UnrepresentableDataError(data))
 
         case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)))
         case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)))
@@ -124,7 +123,6 @@ object DataCodec {
             case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseTime(_).leftMap(err => ParseError(err.message)))
             case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
             case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`SetKey`, value) :: Nil       => unpack(value.array,  "a list of values for $set")(_.traverse(decode).map(Data.Set(_)))
             case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
@@ -150,7 +148,7 @@ object DataCodec {
 
         case Obj(value) => value.toList.traverse { case (k, v) => encode(v).map(k -> _) }.map(Json.obj(_: _*))
         case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
-        case Set(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
+        case Set(_)     => -\/(UnrepresentableDataError(data))
 
         case Timestamp(value) => \/-(jString(value.toString))
         case Date(value)      => \/-(jString(value.toString))

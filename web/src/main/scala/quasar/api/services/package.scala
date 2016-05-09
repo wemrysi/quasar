@@ -22,6 +22,7 @@ import quasar.fs._
 import quasar.fp.numeric._
 
 import argonaut._, Argonaut._
+import eu.timepit.refined.auto._
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.headers.`Content-Type`
@@ -52,8 +53,8 @@ package object services {
 
   def offsetOrInvalid(
     offsetParam: Option[ValidationNel[ParseFailure, Natural]]
-  ): ApiError \/ Option[Natural] =
-    valueOrInvalid("offset", offsetParam)
+  ): ApiError \/ Natural =
+    valueOrInvalid("offset", offsetParam).map(_.getOrElse(0L))
 
   def valueOrInvalid[F[_]: Traverse, A](
     paramName: String,

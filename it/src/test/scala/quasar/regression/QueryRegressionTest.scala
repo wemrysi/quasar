@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._
 import quasar.fp._
 import quasar.fs._
+import quasar.main.FilesystemQueries
 import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
 import quasar.physical.mongodb.fs.MongoDBFsType
 import quasar.sql, sql.{Query, Sql}
@@ -72,6 +73,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   val query  = QueryFile.Ops[S]
   val write  = WriteFile.Ops[S]
   val manage = ManageFile.Ops[S]
+  val fsQ    = new FilesystemQueries[S]
 
   /** A name to identify the suite in test output. */
   def suiteName: String

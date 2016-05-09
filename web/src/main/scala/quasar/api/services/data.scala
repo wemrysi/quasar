@@ -51,7 +51,7 @@ object data {
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
       respond_((offsetOrInvalid(offsetParam) |@| limitOrInvalid(limitParam)) { (offset, limit) =>
         val requestedFormat = MessageFormat.fromAccept(req.headers.get(Accept))
-        download[S](requestedFormat, path, offset.getOrElse(0L), limit)
+        download[S](requestedFormat, path, offset, limit)
       })
 
     case req @ POST -> AsFilePath(path) =>

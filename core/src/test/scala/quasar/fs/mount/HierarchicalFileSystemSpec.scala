@@ -19,11 +19,12 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.{Data, Func, LogicalPlan}
 import quasar.effect._
-import quasar.fp.{hoistFree, free, zoomNT}
+import quasar.fp._
 import quasar.fs._
 import quasar.std.IdentityLib.Squash
 import quasar.std.SetLib.Take
 
+import eu.timepit.refined.auto._
 import matryoshka.Fix
 import monocle.Lens
 import org.specs2.mutable
@@ -123,10 +124,10 @@ class HierarchicalFileSystemSpec extends mutable.Specification with FileSystemFi
         "select f.x, q.y from `/bar/mntA/foo` as f inner join `/foo/mntC/quux` as q on f.id = q.id"
 
       val lp = fixParser.parse(Query(joinQry)).toOption
-        .flatMap(expr => queryPlan(expr, Variables(Map())).run.value.toOption)
+        .flatMap(queryPlan(_, Variables(Map()), 0L, None).run.value.toOption)
         .get
 
-      runMntd(f(lp, mntA </> file("out0")).run.value)
+      runMntd(f(lp.valueOr(_ => scala.sys.error("impossible constant plan")), mntA </> file("out0")).run.value)
         .eval(emptyMS) must failDueToInvalidPath(mntC)
     }
 

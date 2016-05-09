@@ -79,14 +79,14 @@ class BsonSpecs extends Specification with ScalaCheck {
 
     "correspond to Data.toJs where toData is defined" ! prop { (bson: Bson) =>
       val data = BsonCodec.toData(bson)
-      (data != Data.NA) ==> {
+      (data != Data.NA && !data.isInstanceOf[Data.Set]) ==> {
         data match {
           case Data.Int(x) =>
             // NB: encoding int as Data loses size info
             (bson.toJs must_== jscore.Call(jscore.ident("NumberInt"), List(jscore.Literal(Js.Str(x.shows)))).toJs) or
               (bson.toJs must_== jscore.Call(jscore.ident("NumberLong"), List(jscore.Literal(Js.Str(x.shows)))).toJs)
           case _ =>
-            bson.toJs must_== data.toJs.toJs
+            bson.toJs.some must_== data.toJs.map(_.toJs)
         }
       }
     }.setGen(simpleGen)

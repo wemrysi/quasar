@@ -22,7 +22,6 @@ import quasar.effect._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._, FileSystemError._, PathError._
-import quasar.std.StdLib._, set._
 import quasar.sql.Sql
 
 import matryoshka._
@@ -53,22 +52,26 @@ object view {
             for {
               rh <- readUnsafe.open(path, off, lim)
               h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
-              _  <- viewState.put(h, -\/(rh)).liftM[FileSystemErrT]
+              _  <- viewState.put(h, ResultSet.Read(rh)).liftM[FileSystemErrT]
             } yield h
           }.run
 
           def vOpen(e: Fix[Sql], v: Variables):
               Free[S, FileSystemError \/ ReadHandle] = {
-            queryPlan(e, v).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
+            queryPlan(e, v, off, lim).run.value.fold[EitherT[queryUnsafe.F, FileSystemError, ReadHandle]](
               e => EitherT[Free[S, ?], FileSystemError, ReadHandle](
                 // TODO: more sensible error?
                 Free.point(pathErr(invalidPath(path, e.shows)).left[ReadHandle])),
-              lp =>
-                for {
-                  qh <- EitherT(queryUnsafe.eval(limit(lp, off, lim)).run.value)
+              _.fold(
+                data => (for {
+                  h <- seq.next.map(ReadHandle(path, _))
+                  _ <- viewState.put(h, ResultSet.Data(data.toVector))
+                } yield h).liftM[FileSystemErrT],
+                lp => for {
+                  qh <- EitherT(queryUnsafe.eval(lp).run.value)
                   h  <- seq.next.map(ReadHandle(path, _)).liftM[FileSystemErrT]
-                  _  <- viewState.put(h, \/-(qh)).liftM[FileSystemErrT]
-                } yield h)
+                  _  <- viewState.put(h, ResultSet.Results(qh)).liftM[FileSystemErrT]
+                } yield h))
           }.run
 
           ViewMounter.lookup[S](path).run.flatMap(_.cata((vOpen _).tupled, fOpen))
@@ -76,25 +79,29 @@ object view {
         case Read(handle) =>
           (for {
             v <- viewState.get(handle).toRight(unknownReadHandle(handle))
-            d <- v.fold(readUnsafe.read, queryUnsafe.more)
+            d <- v match {
+              case ResultSet.Data(values)    =>
+                (values.point[Free[S, ?]] <*
+                  viewState.put(handle, ResultSet.Data(Vector.empty)))
+                  .liftM[FileSystemErrT]
+              case ResultSet.Read(handle)    => readUnsafe.read(handle)
+              case ResultSet.Results(handle) => queryUnsafe.more(handle)
+            }
           } yield d).run
 
         case Close(handle) =>
           (for {
             v <- viewState.get(handle)
             _ <- viewState.delete(handle).liftM[OptionT]
-            _ <- v.fold(readUnsafe.close, queryUnsafe.close).liftM[OptionT]
+            _ <- (v match {
+              case ResultSet.Data(_)         => ().point[Free[S, ?]]
+              case ResultSet.Read(handle)    => readUnsafe.close(handle)
+              case ResultSet.Results(handle) => queryUnsafe.close(handle)
+            }).liftM[OptionT]
           } yield ()).getOrElse(())
       }
     }
   }
-
-  def limit(lp: Fix[LogicalPlan], off: Natural, lim: Option[Positive]): Fix[LogicalPlan] = {
-    val skipped = if (off.get != 0L) Fix(Drop(lp, LogicalPlan.Constant(Data.Int(off.get)))) else lp
-    val limited = lim.fold(skipped)(l => Fix(Take(skipped, LogicalPlan.Constant(Data.Int(l.get)))))
-    limited
-  }
-
 
   /** Intercept and fail any write to a view path; all others are passed untouched. */
   def writeFile[S[_]: Functor]

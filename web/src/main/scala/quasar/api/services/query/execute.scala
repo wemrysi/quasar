@@ -22,7 +22,9 @@ import quasar.api._
 import quasar.api.ToApiError.ops._
 import quasar.api.services._
 import quasar.fp._
+import quasar.fp.numeric._
 import quasar.fs._
+import quasar.main.FilesystemQueries
 import quasar.sql.{Sql, Query}
 
 import argonaut._, Argonaut._
@@ -33,13 +35,18 @@ import org.http4s.dsl._
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 object execute {
 
-  def service[S[_]: Functor](implicit S0: QueryFileF :<: S,
+  // QScriptCore :<: F ===> ThetaJoin :+: F => EquiJoin :+: F
+
+  def service[S[_]: Functor](implicit W: WriteFileF :<: S,
+                                      Q: QueryFile.Ops[S],
+                                      M: ManageFileF :<: S,
                                       S1: Task :<: S,
                                       S2: FileSystemFailureF :<: S): QHttpService[S] = {
-    val Q = QueryFile.Ops[S]
+    val fsQ = new FilesystemQueries[S]
 
     val removePhaseResults = new (FileSystemErrT[PhaseResultT[Free[S,?], ?], ?] ~> FileSystemErrT[Free[S,?], ?]) {
       def apply[A](t: FileSystemErrT[PhaseResultT[Free[S,?], ?], A]): FileSystemErrT[Free[S,?], A] =
@@ -57,10 +64,11 @@ object execute {
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, off, lim) =>
-          queryPlan(addOffsetLimit[Fix](xpr, off, lim), requestVars(req))
+          // FIXME: use fsQ.evaluateQuery here
+          queryPlan(xpr, requestVars(req), off, lim)
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
-              Q.evaluate(lp).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
+              lp.fold(Process(_: _*), Q.evaluate(_)).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
         })
 
       case req @ POST -> AsDirPath(path) =>
@@ -79,7 +87,7 @@ object execute {
 
               parseRes tuple absDestination
             } traverse { case (expr, out) =>
-              Q.executeQuery(expr, requestVars(req), out).run.run.run map {
+              fsQ.executeQuery(expr, requestVars(req), out).run.run.run map {
                 case (phases, result) =>
                   result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
                     .bimap(_ :+ ("phases" := phases), f => Json(

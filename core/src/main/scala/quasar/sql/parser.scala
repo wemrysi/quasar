@@ -119,7 +119,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
   ignore(lexical.delimiters += (
     "*", "+", "-", "%", "^", "~~", "!~~", "~", "~*", "!~", "!~*", "||", "<", "=",
-    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ":", ";", "...",
+    "<>", "!=", "<=", ">=", ">", "/", "(", ")", ",", ".", ":", "??", ";", "..", "...",
     "{", "}", "{*}", "{:*}", "{*:}", "{_}", "{:_}", "{_:}",
     "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]", ":="))
 
@@ -158,8 +158,8 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
   def insert: Parser[T[Sql]] =
     keyword("insert") ~> keyword("into") ~> relations ~ (
-      keyword("values") ~> rep1sep(or_expr, op(",")) ^^ (setLiteral(_).embed) |
-        set_list ~ keyword("values") ~ rep1sep(set_list, op(",")) ^^ {
+      keyword("values") ~> rep1sep(defined_expr, op(",")) ^^ (setLiteral(_).embed) |
+        paren_list ~ keyword("values") ~ rep1sep(paren_list, op(",")) ^^ {
           case keys ~ _ ~ valueses =>
             setLiteral(valueses ∘ (vs => mapLiteral(keys zip vs).embed)).embed
         }) ^^ {
@@ -179,12 +179,18 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     repsep(projection, op(",")).map(_.toList)
 
   def projection: Parser[Proj[T[Sql]]] =
-    or_expr ~ opt(keyword("as") ~> ident) ^^ {
+    defined_expr ~ opt(keyword("as") ~> ident) ^^ {
       case expr ~ ident => Proj(expr, ident)
     }
 
   def variable: Parser[T[Sql]] =
     elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => vari[T[Sql]](token.chars).embed)
+
+  def defined_expr: Parser[T[Sql]] =
+    range_expr * (op("??") ^^^ (IfUndefined(_: T[Sql], _: T[Sql]).embed))
+
+  def range_expr: Parser[T[Sql]] =
+    or_expr * (op("..") ^^^ (Range(_: T[Sql], _: T[Sql]).embed))
 
   def or_expr: Parser[T[Sql]] =
     and_expr * (keyword("or") ^^^ (Or(_: T[Sql], _: T[Sql]).embed))
@@ -317,14 +323,17 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
   def unary_operator: Parser[UnaryOperator] =
     op("+")             ^^^ Positive |
     op("-")             ^^^ Negative |
-    keyword("distinct") ^^^ Distinct
+    keyword("distinct") ^^^ Distinct |
+    keyword("not")      ^^^ Not |
+    keyword("exists")   ^^^ Exists
+
 
   def wildcard: Parser[T[Sql]] = op("*") ^^^ splice[T[Sql]](None).embed
 
-  def set_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
+  def paren_list: Parser[List[T[Sql]]] = op("(") ~> repsep(expr, op(",")) <~ op(")")
 
   def function_expr: Parser[T[Sql]] =
-    ident ~ set_list ^^ {
+    ident ~ paren_list ^^ {
       // TODO: `is_null` is deprecated, but leaving this here until we figure
       //       out how to message deprecation to users.
       case a ~ List(x) if a.toLowerCase ≟ "is_null" =>
@@ -335,7 +344,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
   def primary_expr: Parser[T[Sql]] =
     case_expr |
     unshift_expr |
-    set_list ^^ {
+    paren_list ^^ {
       case Nil      => setLiteral[T[Sql]](Nil).embed
       case x :: Nil => x
       case xs       => setLiteral(xs).embed
@@ -343,11 +352,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     unary_operator ~ primary_expr ^^ {
       case op ~ expr => op(expr).embed
     } |
-    keyword("not")    ~> cmp_expr ^^ (Not(_).embed) |
-    keyword("exists") ~> cmp_expr ^^ (Exists(_).embed) |
-    ident ~ (op("(") ~> repsep(expr, op(",")) <~ op(")")) ^^ {
-      case a ~ xs => invokeFunction(a, xs).embed
-    } |
+    function_expr |
     variable |
     literal |
     wildcard |
@@ -416,15 +421,15 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       }) |
       relation <~ op(")"))
 
-  def filter: Parser[T[Sql]] = keyword("where") ~> or_expr
+  def filter: Parser[T[Sql]] = keyword("where") ~> defined_expr
 
   def group_by: Parser[GroupBy[T[Sql]]] =
-    keyword("group") ~> keyword("by") ~> rep1sep(or_expr, op(",")) ~ opt(keyword("having") ~> or_expr) ^^ {
+    keyword("group") ~> keyword("by") ~> rep1sep(defined_expr, op(",")) ~ opt(keyword("having") ~> defined_expr) ^^ {
       case k ~ h => GroupBy(k, h)
     }
 
   def order_by: Parser[OrderBy[T[Sql]]] =
-    keyword("order") ~> keyword("by") ~> rep1sep(or_expr ~ opt(keyword("asc") | keyword("desc")) ^^ {
+    keyword("order") ~> keyword("by") ~> rep1sep(defined_expr ~ opt(keyword("asc") | keyword("desc")) ^^ {
       case i ~ (Some("asc") | None) => (ASC, i)
       case i ~ Some("desc") => (DESC, i)
     }, op(",")) ^^ (OrderBy(_))
@@ -432,7 +437,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
   def expr: Parser[T[Sql]] = let_expr
 
   def query_expr: Parser[T[Sql]] =
-    (query | or_expr) * (
+    (query | defined_expr) * (
       keyword("limit")                        ^^^ (Limit(_: T[Sql], _: T[Sql]).embed)        |
         keyword("offset")                     ^^^ (Offset(_: T[Sql], _: T[Sql]).embed)       |
         keyword("union") ~ keyword("all")     ^^^ (UnionAll(_: T[Sql], _: T[Sql]).embed)     |

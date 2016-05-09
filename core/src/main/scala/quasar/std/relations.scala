@@ -145,6 +145,19 @@ trait RelationsLib extends Library {
     },
     basicUntyper)
 
+  val IfUndefined = BinaryFunc(
+    Mapping,
+    "(??)",
+    "This is the only way to recognize an undefined value. If the first argument is undefined, return the second argument, otherwise, return the first.",
+    Type.Top,
+    Func.Input2(Type.Top, Type.Top),
+    noSimplification,
+    partialTyper {
+      case Sized(Type.Bottom, fallback) => fallback
+      case Sized(value,       fallback) => value ⨿ fallback
+    },
+    partialUntyper[nat._2] { case t => Func.Input2(t, t) })
+
   val And = BinaryFunc(
     Mapping,
     "(AND)",
@@ -257,7 +270,7 @@ trait RelationsLib extends Library {
   def unaryFunctions: List[GenericFunc[nat._1]] = Not :: Nil
 
   def binaryFunctions: List[GenericFunc[nat._2]] =
-    Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: And :: Or :: Coalesce :: Nil
+    Eq :: Neq :: Lt :: Lte :: Gt :: Gte :: IfUndefined :: And :: Or :: Coalesce :: Nil
 
   def ternaryFunctions: List[GenericFunc[nat._3]] = Between :: Cond :: Nil
 

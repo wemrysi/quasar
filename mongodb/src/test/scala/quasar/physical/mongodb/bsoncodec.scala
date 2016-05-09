@@ -85,18 +85,18 @@ class BsonCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
       // Which is to say, every Bson value that results from conversion
       // can be converted to Data and back to Bson, recovering the same
       // Bson value.
-      fromData(data).fold(
-        err => scala.sys.error(err.toString),
-        bson => fromData(toData(bson)) must beRightDisjunction(bson))
+      val v = fromData(data)
+      v.isRight ==> {
+        v.flatMap(bson => fromData(toData(bson))) must_== v
+      }
     }
   }
 
   "round trip to repr (all Data types)" ! prop { (data: Data) =>
-    BsonCodec.fromData(data).fold(
-      err => scala.sys.error(err.message),
-      bson => {
-        val wrapped = Bson.Doc(ListMap("value" -> bson))
-        Bson.fromRepr(wrapped.repr) must_== wrapped
-      })
+      val v = fromData(data)
+      v.isRight ==> {
+        val wrapped = v.map(bson => Bson.Doc(ListMap("value" -> bson)))
+        wrapped.map(w => Bson.fromRepr(w.repr)) must_== wrapped
+      }
   }
 }

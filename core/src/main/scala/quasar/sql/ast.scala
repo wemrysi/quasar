@@ -134,6 +134,8 @@ sealed abstract class BinaryOperator(val sql: String) {
   override def toString = sql
 }
 
+final case object IfUndefined  extends BinaryOperator("??")
+final case object Range        extends BinaryOperator("..")
 final case object Or           extends BinaryOperator("or")
 final case object And          extends BinaryOperator("and")
 final case object Eq           extends BinaryOperator("=")

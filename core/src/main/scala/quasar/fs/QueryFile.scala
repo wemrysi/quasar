@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
-import quasar.sql.Sql
 
 import matryoshka._
 import pathy.Path._
@@ -70,9 +69,10 @@ object QueryFile {
   final case class Close(h: ResultHandle)
     extends QueryFile[Unit]
 
-  /** Represents an "explain plan" operation. This operation should not actually have any side effect
-    * on the filesystem, it should simply return useful information to the user about how a given query
-    * would be evaluated on this filesystem implementation.
+  /** Represents an "explain plan" operation. This operation should not actually
+    * have any side effect on the filesystem, it should simply return useful
+    * information to the user about how a given query would be evaluated on
+    * this filesystem implementation.
     * The `LogicalPlan` is expected to only contain absolute paths even though
     * that is unfortunatly not expressed in the types currently.
     */
@@ -150,35 +150,6 @@ object QueryFile {
     def explain(plan: Fix[LogicalPlan]): ExecM[ExecutionPlan] =
       EitherT(WriterT(lift(Explain(plan))): G[FileSystemError \/ ExecutionPlan])
 
-    /** Returns the path to the result of executing the given SQL^2 query
-      * using the given output file if possible.
-      */
-    def executeQuery(query: Fix[Sql], vars: Variables, out: AFile)
-                    : CompExecM[AFile] = {
-
-      compileAnd(query, vars)(execute(_, out))
-    }
-
-    /** Returns the source of values from the result of executing the given
-      * SQL^2 query.
-      */
-    def evaluateQuery(query: Fix[Sql], vars: Variables)
-                     : Process[CompExecM, Data] = {
-
-      compToCompExec(queryPlan(query, vars))
-        .liftM[Process]
-        .flatMap(lp => evaluate(lp).translate[CompExecM](execToCompExec))
-    }
-
-    /** Returns a description of how the the given SQL^2 query will be
-      * executed.
-      */
-    def explainQuery(query: Fix[Sql], vars: Variables)
-                    : CompExecM[ExecutionPlan] = {
-
-      compileAnd(query, vars)(explain)
-    }
-
     /** Returns the names of the immediate children of the given directory,
       * fails if the directory does not exist.
       */
@@ -213,15 +184,6 @@ object QueryFile {
       */
     def fileExistsM(file: AFile): M[Boolean] =
       fileExists(file).liftM[FileSystemErrT]
-
-    ////
-
-    private def compileAnd[A](query: Fix[Sql], vars: Variables)
-                             (f: Fix[LogicalPlan] => ExecM[A])
-                             : CompExecM[A] = {
-      compToCompExec(queryPlan(query, vars))
-        .flatMap(lp => execToCompExec(f(lp)))
-    }
   }
 
   object Ops {

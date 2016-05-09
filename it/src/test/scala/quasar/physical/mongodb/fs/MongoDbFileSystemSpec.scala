@@ -22,6 +22,7 @@ import quasar._
 import quasar.fs._
 import quasar.fs.mount.MountConfig
 import quasar.fp._
+import quasar.main.FilesystemQueries
 import quasar.physical.mongodb.Collection
 import quasar.regression._
 import quasar.specs2._
@@ -56,6 +57,7 @@ class MongoDbFileSystemSpec
   val query  = QueryFile.Ops[FileSystemIO]
   val write  = WriteFile.Ops[FileSystemIO]
   val manage = ManageFile.Ops[FileSystemIO]
+  val fsQ = new FilesystemQueries[FileSystemIO]
 
   type X[A] = Process[manage.M, A]
 
@@ -241,7 +243,7 @@ class MongoDbFileSystemSpec
             def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
-                runExec(query.executeQuery(expr, Variables.fromMap(Map()), out))
+                runExec(fsQ.executeQuery(expr, Variables.fromMap(Map()), out))
                   .run.value.unsafePerformSync
               ) must beSome(file))
 

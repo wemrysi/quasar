@@ -17,9 +17,13 @@
 import quasar.Predef.{List, Long, String, Vector}
 import quasar.effect.Failure
 import quasar.fp._
+import quasar.fp.numeric._
 import quasar.sql._
+import quasar.std.StdLib.set._
 
-import matryoshka._
+import scala.Option
+
+import matryoshka._, Recursive.ops._
 import scalaz._
 import scalaz.Leibniz._
 import scalaz.std.vector._
@@ -47,26 +51,54 @@ package object quasar {
   type SeqNameGeneratorT[F[_], A] = StateT[F, Long, A]
   type SaltedSeqNameGeneratorT[F[_], A] = ReaderT[SeqNameGeneratorT[F, ?], String, A]
 
-  /** Returns the `LogicalPlan` for the given SQL^2 query. */
-  def queryPlan(query: Fix[Sql], vars: Variables)(implicit RT: RenderTree[Fix[Sql]]):
-      CompileM[Fix[LogicalPlan]] = {
-    import SemanticAnalysis.AllPhases
-
-    def phase[A: RenderTree](label: String, r: SemanticErrors \/ A): CompileM[A] =
+  private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
+      CompileM[A] =
       EitherT(r.point[PhaseResultW]) flatMap { a =>
         val pr = PhaseResult.Tree(label, RenderTree[A].render(a))
         (a.set(Vector(pr)): PhaseResultW[A]).liftM[SemanticErrsT]
       }
 
+  // TODO: Move this into the SQL package, provide a type class for it in core.
+  def precompile(query: Fix[Sql], vars: Variables)(
+    implicit RT: RenderTree[Fix[Sql]]):
+      CompileM[Fix[LogicalPlan]] = {
+    import SemanticAnalysis.AllPhases
+
     for {
-      ast         <- phase("SQL AST", query.right)
-      substAst    <- phase("Variables Substituted",
-                        Variables.substVars(ast, vars) leftMap (_.wrapNel))
-      annTree     <- phase("Annotated Tree", AllPhases(substAst))
-      logical     <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
-      optimized   <- phase("Optimized", \/-(Optimizer.optimize(logical)))
-      typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
-    } yield typechecked
+      ast      <- phase("SQL AST", query.right)
+      substAst <- phase("Variables Substituted",
+                    Variables.substVars(ast, vars) leftMap (_.wrapNel))
+      annTree  <- phase("Annotated Tree", AllPhases(substAst))
+      logical  <- phase("Logical Plan", Compiler.compile(annTree) leftMap (_.wrapNel))
+    } yield logical
+  }
+
+  /** Returns the `LogicalPlan` for the given SQL^2 query, or a list of
+    * results, if the query was foldable to a constant. This also takes a
+    * function to apply any extra-query operations to the LP prior to
+    * optimization.
+    */
+  def queryPlan(
+    query: Fix[Sql], vars: Variables, off: Natural, lim: Option[Positive])(
+    implicit RT: RenderTree[Fix[Sql]]):
+      CompileM[List[Data] \/ Fix[LogicalPlan]] = for {
+    logical     <- precompile(query, vars)
+    optimized   <- phase("Optimized", Optimizer.optimize(addOffsetLimit(logical, off, lim)).right)
+    typechecked <- phase("Typechecked", LogicalPlan.ensureCorrectTypes(optimized).disjunction)
+  } yield typechecked.project match {
+    case LogicalPlan.ConstantF(Data.Set(records)) => records.left
+    case LogicalPlan.ConstantF(value)             => List(value).left
+    case _                                        => typechecked.right
+  }
+
+  def addOffsetLimit[T[_[_]]: Corecursive](
+    lp: T[LogicalPlan], off: Natural, lim: Option[Positive]):
+      T[LogicalPlan] = {
+    val skipped =
+      Drop(lp, LogicalPlan.ConstantF[T[LogicalPlan]](Data.Int(off.get)).embed).embed
+    lim.fold(
+      skipped)(
+      l => Take(skipped, LogicalPlan.ConstantF[T[LogicalPlan]](Data.Int(l.get)).embed).embed)
   }
 
   // TODO generalize this and contribute to shapeless-contrib

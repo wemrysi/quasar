@@ -30,7 +30,6 @@ trait DataArbitrary {
       Gen.oneOf(
         Gen.listOf(for { c <- Gen.alphaChar; d <- simpleData } yield c.toString -> d).map(t => Data.Obj(ListMap(t: _*))),
         Gen.listOf(simpleData).map(Data.Arr(_)),
-        Gen.listOf(simpleData).map(Data.Set(_)),
         // Tricky cases:
         Gen.const(Data.Obj(ListMap("$date" -> Data.Str("Jan 1")))),
         SafeInt.map(x =>

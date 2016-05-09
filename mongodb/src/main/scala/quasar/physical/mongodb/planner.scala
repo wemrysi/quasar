@@ -34,7 +34,7 @@ import pathy.Path.rootDir
 import scalaz._, Scalaz._
 import shapeless.{Data => _, :: => _, _}
 
-object MongoDbPlanner extends Planner[Crystallized] {
+object MongoDbPlanner {
   import LogicalPlan._
   import Planner._
   import WorkflowBuilder._
@@ -157,7 +157,12 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case Gte => makeSimpleBinop(jscore.Gte)
         case And => makeSimpleBinop(jscore.And)
         case Or  => makeSimpleBinop(jscore.Or)
+        case Squash      => Arity1(v => v)
+        case IfUndefined => Arity2((value, fallback) =>
+          // TODO: Only evaluate `value` once.
+          If(BinOp(jscore.Eq, value, ident("undefined")), fallback, value))
         case Not => makeSimpleUnop(jscore.Not)
+        case Concat => makeSimpleBinop(jscore.Add)
         case In | Within =>
           Arity2((value, array) =>
             BinOp(jscore.Neq,
@@ -316,7 +321,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
     }
 
     {
-      case ConstantF(x)     => \/-(({ case Nil => JsFn.const(x.toJs) }, Nil))
+      case c @ ConstantF(x)     => x.toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> UnsupportedPlan(c, None)
       case InvokeF(f, a)    => invoke(f, a)
       case FreeF(_)         => \/-(({ case List(x) => x }, List(Here)))
       case LogicalPlan.LetF(_, _, body) => body
@@ -1069,7 +1074,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
     }
   }
 
-  def plan(logical: Fix[LogicalPlan]): EitherWriter[PlannerError, Crystallized] = {
+  def plan(logical: Fix[LogicalPlan]):
+      EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
     import StateT.stateTMonadState
@@ -1078,14 +1084,14 @@ object MongoDbPlanner extends Planner[Crystallized] {
     //     can be done in a single for comprehension.
     type PlanT[X[_], A] = EitherT[X, PlannerError, A]
     type GenT[X[_], A]  = StateT[X, NameGen, A]
-    type W[A]           = (PhaseResults, A)
+    type W[A]           = Writer[PhaseResults, A]
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
         val result = PhaseResult.Tree(label, RenderTree[A].render(a))
-        ((Vector(result), a): W[A]).liftM[PlanT].liftM[GenT]
+        (Writer(Vector(result), a): W[A]).liftM[PlanT].liftM[GenT]
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
