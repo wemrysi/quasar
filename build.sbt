@@ -127,24 +127,63 @@ lazy val oneJarSettings =
         commitReleaseVersion,
         pushChanges))
 
+//        core
+//        /   \
+// mongodb    «other backends»
+//        \   /
+//        main
+//        /  \
+//    repl    web
+//        \  /
+//         it
+//          |
+//        root
+
+// common components
+
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
-  .aggregate(core, web, it)
+  .aggregate(repl, web, it)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
   .settings(oneJarSettings: _*)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
-lazy val web = project
+lazy val main = project
+  .dependsOn(mongodb % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+// filesystems (backends)
+
+lazy val mongodb = project
   .dependsOn(core % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+// frontends
+
+// TODO: Get SQL here
+
+// interfaces
+
+lazy val repl = project
+  .dependsOn(main % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
+
+lazy val web = project
+  .dependsOn(main % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  .enablePlugins(AutomateHeaderPlugin)
+
+// integration tests
 
 lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
-    core % "test->test;compile->compile",
+    main % "test->test;compile->compile",
     web  % "test->test;compile->compile")
   .settings(commonSettings: _*)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.

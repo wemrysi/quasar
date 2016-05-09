@@ -24,6 +24,7 @@ import quasar.effect._
 import quasar.fp._, free.freeCatchable
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.main.Prettify
 import quasar.sql
 
 import pathy.Path, Path._
