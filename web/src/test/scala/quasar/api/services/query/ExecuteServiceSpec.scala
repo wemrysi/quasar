@@ -17,29 +17,30 @@
 package quasar.api.services.query
 
 import quasar.Predef._
-import quasar._, fp._
-import quasar.fp.numeric._
+import quasar._
 import quasar.api._
 import quasar.api.services.Fixture._
 import quasar.api.matchers._
-import quasar.api.PathUtils
-import quasar.api.ApiError
+import quasar.api.{ApiError, PathUtils}
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.ToApiError.ops._
-import quasar.fs._
-import quasar.fs.PathArbitrary._
-import quasar.fs.InMemory._
+import quasar.api.matchers._
+import quasar.api.services.Fixture._
+import quasar.fp._
+import quasar.fp.numeric._
+import quasar.fs._, InMemory._, PathArbitrary._
+import quasar.sql.Sql
 
 import argonaut.{Json => AJson, _}, Argonaut._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.Fix
-import org.scalacheck.Arbitrary
 import org.http4s._
+import org.scalacheck.Arbitrary
+import org.specs2.ScalaCheck
 import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
 import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
@@ -125,7 +126,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
   }
 
   def toLP(q: String, vars: Variables): Fix[LogicalPlan] =
-      sql.parse(sql.Query(q)).fold(
+      sql.fixParser.parse(sql.Query(q)).fold(
         error => scala.sys.error(s"could not compile query: $q due to error: $error"),
         ast => quasar.queryPlan(ast,vars).run.value.toOption.get)
 
@@ -259,7 +260,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         val err: SemanticError =
           SemanticError.WrongArgumentCount(quasar.std.AggLib.Sum, 1, 4)
 
-        val expr: sql.Expr = sql.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =
@@ -280,7 +281,7 @@ class ExecuteServiceSpec extends Specification with FileSystemFixture with Scala
         val msg = "EXEC FAILED"
         val err = executionFailed_(lp, msg)
 
-        val expr: sql.Expr = sql.parse(sql.Query(q)).valueOr(
+        val expr: Fix[Sql] = sql.fixParser.parse(sql.Query(q)).valueOr(
           err => scala.sys.error("Parse failed: " + err.toString))
 
         val phases: PhaseResults =

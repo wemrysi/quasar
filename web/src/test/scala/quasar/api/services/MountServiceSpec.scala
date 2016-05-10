@@ -17,14 +17,13 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.{Variables}
-import quasar.api._
+import quasar.Variables
+import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
-import quasar.effect.{KeyValueStore}
+import quasar.effect.KeyValueStore
 import quasar.fp._, PathyCodecJson._
-import quasar.fs._
-import quasar.fs.PathArbitrary._
+import quasar.fs._, PathArbitrary._
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._
@@ -34,10 +33,10 @@ import org.specs2.specification.core.Fragments
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.specs2.scalaz.ScalazMatchers._
-import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import pathy.Path, Path._
 import pathy.scalacheck.PathyArbitrary._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
   import quasar.fs.mount.ViewMounterSpec._

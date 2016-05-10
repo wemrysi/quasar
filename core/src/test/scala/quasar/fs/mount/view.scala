@@ -54,7 +54,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   object VS {
     def empty = VS(0, Map.empty, Map.empty, InMemState.empty)
 
-    def emptyWithViews(views: Map[AFile, Expr]) =
+    def emptyWithViews(views: Map[AFile, Fix[Sql]]) =
       _mountConfigs.set(
         views.map { case (p, expr) => p -> MountConfig.viewConfig(expr, Variables.empty) }
       )(empty)
@@ -74,12 +74,12 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
   case class ViewInterpResultTrace[A](renderedTrees: Vector[RenderedTree], vs: VS, result: A)
 
-  def viewInterpTrace[A](views: Map[AFile, Expr], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+  def viewInterpTrace[A](views: Map[AFile, Fix[Sql]], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] =
     viewInterpTrace(views, List.empty[AFile], paths, t)
 
   def viewInterpTrace[A](
-    views: Map[AFile, Expr], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
+    views: Map[AFile, Fix[Sql]], files: List[AFile], paths: Map[ADir, Set[PathSegment]], t: Free[FileSystem, A])
     : ViewInterpResultTrace[A] = {
     val tFS: Free[ViewFileSystem, A] = t flatMapSuspension view.fileSystem[ViewFileSystem]
 
@@ -100,7 +100,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
   case class ViewInterpResult[A](vs: VS, result: A)
 
   def viewInterp[A]
-    (views: Map[AFile, Expr], files: List[AFile], f: Free[FileSystem, A])
+    (views: Map[AFile, Fix[Sql]], files: List[AFile], f: Free[FileSystem, A])
     : ViewInterpResult[A] = {
 
     val fv: Free[ViewFileSystem, A] = f flatMapSuspension view.fileSystem[ViewFileSystem]
@@ -124,7 +124,8 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     (ViewInterpResult[A] _).tupled(r)
   }
 
-  def parseExpr(query: String) = parseInContext(Query(query), rootDir[Sandboxed]).toOption.get
+  def parseExpr(query: String) =
+    fixParser.parseInContext(Query(query), rootDir[Sandboxed]).toOption.get
 
   implicit val RenderedTreeRenderTree = new RenderTree[RenderedTree] {
     def render(t: RenderedTree) = t
@@ -238,7 +239,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     val dstPath = rootDir </> dir("foo") </> file("bar")
     val expr = parseExpr("select * from zips")
 
-    def moveShouldSucceed(views: Map[AFile, Expr], files: List[AFile], moveSemantic: MoveSemantics) = {
+    def moveShouldSucceed(views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
       viewInterp(views, files, f) must_== ViewInterpResult(
@@ -247,7 +248,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     }
 
     def moveShouldFail
-      (views: Map[AFile, Expr], files: List[AFile], moveSemantic: MoveSemantics, pathError: PathError) = {
+      (views: Map[AFile, Fix[Sql]], files: List[AFile], moveSemantic: MoveSemantics, pathError: PathError) = {
       val f = manage.move(fileToFile(srcPath, dstPath), moveSemantic).run
 
       viewInterp(views, files, f) must_== ViewInterpResult(
@@ -426,7 +427,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     }
 
     "preserve empty dir result" ! prop { (aDir: ADir) =>
-      val views = Map[AFile, Expr]()
+      val views = Map[AFile, Fix[Sql]]()
 
       val f = query.ls(aDir).run
 
@@ -438,7 +439,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
 
     "preserve error for non-existent dir" ! prop { (aDir: ADir) =>
       (aDir =/= rootDir) ==> {
-        val views = Map[AFile, Expr]()
+        val views = Map[AFile, Fix[Sql]]()
 
         val f = query.ls(aDir).run
 
@@ -450,7 +451,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     }
 
     "preserve empty dir result at root" in {
-      val views = Map[AFile, Expr]()
+      val views = Map[AFile, Fix[Sql]]()
 
       val f = query.ls(rootDir).run
 
@@ -477,7 +478,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       hasFile and noFile
     }
 
-    "return true if there is a view at that path" ! prop { (file: AFile, expr: Expr) =>
+    "return true if there is a view at that path" ! prop { (file: AFile, expr: Fix[Sql]) =>
       val views = Map(file -> expr)
 
       val program = query.fileExists(file)

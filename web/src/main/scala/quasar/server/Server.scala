@@ -25,6 +25,7 @@ import quasar.fp.TaskRef
 import quasar.main._
 
 import argonaut.DecodeJson
+import matryoshka._
 import org.http4s.HttpService
 import org.http4s.server._
 import org.http4s.server.syntax._
@@ -94,7 +95,7 @@ object Server {
     ): _*)
   }
 
-  def service(
+  def service[T[_[_]]: Recursive: Corecursive](
     initialPort: Int,
     staticContent: List[StaticContent],
     redirect: Option[String],
@@ -104,12 +105,12 @@ object Server {
 
     (reload: Int => Task[Unit]) =>
       finalizeServices(eval)(
-        coreServices[CoreEff],
+        coreServices[T, CoreEff],
         additionalServices
       ) orElse nonApiService(initialPort, reload, staticContent, redirect)
   }
 
-  def durableService(
+  def durableService[T[_[_]]: Recursive: Corecursive](
     qConfig: QuasarConfig,
     webConfig: WebConfig)(
     implicit
@@ -122,7 +123,7 @@ object Server {
       ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
       _            <- (mountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
       durableApi   =  toResponseOr(MntCfgsIO.durableFile[WebConfig](mntCfgsT)) compose coreApi
-    } yield service(
+    } yield service[T](
       webConfig.server.port,
       qConfig.staticContent,
       qConfig.redirect,
@@ -136,7 +137,7 @@ object Server {
       wCfg    <- loadConfigFile(WebConfig, qCfg.configPath).liftM[MainErrT]
                  // TODO: Find better way to do this
       updWCfg =  wCfg.copy(server = wCfg.server.copy(qCfg.port.getOrElse(wCfg.server.port)))
-      srvc    <- durableService(qCfg, updWCfg)
+      srvc    <- durableService[Fix](qCfg, updWCfg)
       _       <- Http4sUtils.startAndWait(updWCfg.server.port, srvc, qCfg.openClient).liftM[MainErrT]
     } yield ()
 

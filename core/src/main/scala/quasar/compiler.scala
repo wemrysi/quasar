@@ -180,7 +180,7 @@ trait Compiler[F[_]] {
   val library = std.StdLib
 
   type CoAnn[F[_]] = Cofree[F, Annotations]
-  type CoExpr = CoAnn[ExprF]
+  type CoExpr = CoAnn[Sql]
 
   // CORE COMPILER
   private def compile0(node: CoExpr)(implicit M: Monad[F]):
@@ -321,7 +321,7 @@ trait Compiler[F[_]] {
       }
 
     node.tail match {
-      case s @ SelectF(isDistinct, projections, relations, filter, groupBy, orderBy) =>
+      case s @ Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
         /* 1. Joins, crosses, subselects (FROM)
          * 2. Filter (WHERE)
          * 3. Group by (GROUP BY)
@@ -337,7 +337,10 @@ trait Compiler[F[_]] {
         // objects created from other columns:
         val namesOrError: SemanticError \/ List[Option[String]] =
           projectionNames[CoAnn](projections, relationName(node).toOption).map(_.map {
-            case (name, expr) => if (expr.project.isInstanceOf[ExprF.SpliceF[_]]) None else Some(name)
+            case (name, Embed(expr)) => expr match {
+              case Splice(_) => None
+              case _         => name.some
+            }
           })
 
         namesOrError.fold(
@@ -413,34 +416,34 @@ trait Compiler[F[_]] {
               })
         })
 
-      case LetF(name, form, body) => {
+      case Let(name, form, body) => {
         val rel = ExprRelationAST(form, name)
         step(rel)(compile0(form).some)(compile0(body))
       }
 
-      case SetLiteralF(values0) =>
+      case SetLiteral(values0) =>
         values0.traverse(compile0).map(vs =>
           ShiftArray(MakeArrayN(vs: _*).embed).embed)
 
-      case ArrayLiteralF(exprs) =>
+      case ArrayLiteral(exprs) =>
         exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
 
-      case MapLiteralF(exprs) =>
+      case MapLiteral(exprs) =>
         exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>
           Fix(MakeObjectN(elems: _*)))
 
-      case SpliceF(expr) =>
+      case Splice(expr) =>
         expr.fold(
           CompilerState.fullTable.flatMap(_.map(emit _).getOrElse(fail(GenericError("Not within a table context so could not find table expression for wildcard")))))(
           compile0)
 
-      case BinopF(left, right, op) =>
+      case Binop(left, right, op) =>
         findFunction(op.name).flatMap(compileFunction(_, left :: right :: Nil))
 
-      case UnopF(expr, op) =>
+      case Unop(expr, op) =>
         findFunction(op.name).flatMap(compileFunction(_, expr :: Nil))
 
-      case IdentF(name) =>
+      case Ident(name) =>
         CompilerState.fields.flatMap(fields =>
           if (fields.any(_ == name))
             CompilerState.rootTableReq.map(obj =>
@@ -453,10 +456,10 @@ trait Compiler[F[_]] {
               if ((rName: String) ≟ name) table
               else Fix(ObjectProject(table, LogicalPlan.Constant(Data.Str(name)))))
 
-      case InvokeFunctionF(name, args) =>
+      case InvokeFunction(name, args) =>
         findFunction(name).flatMap(compileFunction(_, args))
 
-      case MatchF(expr, cases, default0) =>
+      case Match(expr, cases, default0) =>
         for {
           expr    <- compile0(expr)
           default <- default0.fold(emit(LogicalPlan.Constant(Data.Null)))(compile0)
@@ -467,23 +470,23 @@ trait Compiler[F[_]] {
           }
         } yield cases
 
-      case SwitchF(cases, default0) =>
+      case Switch(cases, default0) =>
         default0.fold(emit(LogicalPlan.Constant(Data.Null)))(compile0).flatMap(
           compileCases(cases, _) {
             case Case(cond, expr2) =>
               (compile0(cond) ⊛ compile0(expr2))((_, _))
           })
 
-      case IntLiteralF(value) => emit(LogicalPlan.Constant(Data.Int(value)))
-      case FloatLiteralF(value) => emit(LogicalPlan.Constant(Data.Dec(value)))
-      case StringLiteralF(value) => emit(LogicalPlan.Constant(Data.Str(value)))
-      case BoolLiteralF(value) => emit(LogicalPlan.Constant(Data.Bool(value)))
-      case NullLiteralF() => emit(LogicalPlan.Constant(Data.Null))
-      case VariF(name) => emit(LogicalPlan.Free(Symbol(name)))
+      case IntLiteral(value) => emit(LogicalPlan.Constant(Data.Int(value)))
+      case FloatLiteral(value) => emit(LogicalPlan.Constant(Data.Dec(value)))
+      case StringLiteral(value) => emit(LogicalPlan.Constant(Data.Str(value)))
+      case BoolLiteral(value) => emit(LogicalPlan.Constant(Data.Bool(value)))
+      case NullLiteral() => emit(LogicalPlan.Constant(Data.Null))
+      case Vari(name) => emit(LogicalPlan.Free(Symbol(name)))
     }
   }
 
-  def compile(tree: Cofree[ExprF, Annotations])(implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
+  def compile(tree: Cofree[Sql, Annotations])(implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
     compile0(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.map(_.map(Compiler.reduceGroupKeys))
   }
 }
@@ -512,7 +515,7 @@ object Compiler {
 
   def trampoline = apply[scalaz.Free.Trampoline]
 
-  def compile(tree: Cofree[ExprF, Annotations]):
+  def compile(tree: Cofree[Sql, Annotations]):
       SemanticError \/ Fix[LogicalPlan] =
     trampoline.compile(tree).run
 

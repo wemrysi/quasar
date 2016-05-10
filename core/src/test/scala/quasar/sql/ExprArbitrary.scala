@@ -20,27 +20,29 @@ import quasar.Predef._
 import quasar.fs._
 import quasar.fs.PathArbitrary._
 import quasar.std.StdLib._
+import quasar.sql.fixpoint._
 
+import matryoshka.Fix
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Duration, Instant}
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
 
 trait ExprArbitrary {
-  implicit val exprArbitrary: Arbitrary[Expr] = Arbitrary(selectGen(4))
+  implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))
 
-  private def selectGen(depth: Int): Gen[Expr] = for {
+  private def selectGen(depth: Int): Gen[Fix[Sql]] = for {
     isDistinct <- Gen.oneOf(SelectDistinct, SelectAll)
     projs      <- smallNonEmptyListOf(projGen)
     relations  <- Gen.option(relationGen(depth-1))
     filter     <- Gen.option(exprGen(depth-1))
     groupBy    <- Gen.option(groupByGen(depth-1))
     orderBy    <- Gen.option(orderByGen(depth-1))
-  } yield Select(isDistinct, projs, relations, filter, groupBy, orderBy)
+  } yield SelectR(isDistinct, projs, relations, filter, groupBy, orderBy)
 
-  private def projGen: Gen[Proj[Expr]] =
+  private def projGen: Gen[Proj[Fix[Sql]]] =
     Gen.oneOf(
-      Gen.const(Proj(Splice(None), None)),
+      Gen.const(Proj(SpliceR(None), None)),
       exprGen(1) >>= (x =>
         Gen.oneOf(
           Gen.const(Proj(x, None)),
@@ -50,11 +52,11 @@ trait ExprArbitrary {
             Gen.const("I quote: \"foo\"")) ∘
             (n => Proj(x, Some(n))))))
 
-  private def relationGen(depth: Int): Gen[SqlRelation[Expr]] = {
+  private def relationGen(depth: Int): Gen[SqlRelation[Fix[Sql]]] = {
     val simple = for {
-        n <- Arbitrary.arbitrary[FPath]
-        a <- Gen.option(Gen.alphaChar.map(_.toString))
-      } yield TableRelationAST[Expr](pathy.Path.unsandbox(n), a)
+      n <- Arbitrary.arbitrary[FPath]
+      a <- Gen.option(Gen.alphaChar.map(_.toString))
+    } yield TableRelationAST[Fix[Sql]](pathy.Path.unsandbox(n), a)
     if (depth <= 0) simple
     else Gen.frequency(
       5 -> simple,
@@ -67,53 +69,53 @@ trait ExprArbitrary {
         JoinRelation(_, _, _, _)))
   }
 
-  private def groupByGen(depth: Int): Gen[GroupBy[Expr]] =
+  private def groupByGen(depth: Int): Gen[GroupBy[Fix[Sql]]] =
     (smallNonEmptyListOf(exprGen(depth)) ⊛ Gen.option(exprGen(depth)))(
       GroupBy(_, _))
 
-  private def orderByGen(depth: Int): Gen[OrderBy[Expr]] =
+  private def orderByGen(depth: Int): Gen[OrderBy[Fix[Sql]]] =
     smallNonEmptyListOf((Gen.oneOf(ASC, DESC) ⊛ exprGen(depth))((_, _))) ∘
-      (OrderBy(_))
+  (OrderBy(_))
 
-  private def exprGen(depth: Int): Gen[Expr] = Gen.lzy {
+  private def exprGen(depth: Int): Gen[Fix[Sql]] = Gen.lzy {
     if (depth <= 0) simpleExprGen
     else complexExprGen(depth-1)
   }
 
-  private def simpleExprGen: Gen[Expr] =
+  private def simpleExprGen: Gen[Fix[Sql]] =
     Gen.frequency(
       2 -> (for {
         n <- Gen.alphaChar.map(_.toString)
-      } yield Vari(n)),
+      } yield VariR(n)),
       1 -> (for {
-        n  <- Gen.chooseNum(2, 5)  // Note: at least two, to be valid set syntax
+        n  <- Gen.chooseNum(2, 5) // Note: at least two, to be valid set syntax
         cs <- Gen.listOfN(n, constExprGen)
-      } yield SetLiteral(cs)),
+      } yield SetLiteralR(cs)),
       10 -> Gen.oneOf(
         Gen.alphaChar.map(_.toString),
         Gen.const("name, address"),
         Gen.const("q: \"a\"")) ∘
-        (Ident(_)),
-      1 -> InvokeFunction(date.Timestamp.name, List(StringLiteral(Instant.now.toString))),
-      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunction(date.Interval.name, List(StringLiteral(Duration.ofMillis(millis).toString)))),
-      1 -> InvokeFunction(date.Date.name, List(StringLiteral("2014-11-17"))),
-      1 -> InvokeFunction(date.Time.name, List(StringLiteral("12:00:00"))),
-      1 -> InvokeFunction(identity.ToId.name, List(StringLiteral("123456")))
+        (IdentR(_)),
+      1 -> InvokeFunctionR(date.Timestamp.name, List(StringLiteralR(Instant.now.toString))),
+      1 -> Gen.choose(0L, 10000000000L).map(millis => InvokeFunctionR(date.Interval.name, List(StringLiteralR(Duration.ofMillis(millis).toString)))),
+      1 -> InvokeFunctionR(date.Date.name, List(StringLiteralR("2014-11-17"))),
+      1 -> InvokeFunctionR(date.Time.name, List(StringLiteralR("12:00:00"))),
+      1 -> InvokeFunctionR(identity.ToId.name, List(StringLiteralR("123456")))
     )
 
-  private def complexExprGen(depth: Int): Gen[Expr] =
+  private def complexExprGen(depth: Int): Gen[Fix[Sql]] =
     Gen.frequency(
       5 -> simpleExprGen,
       1 -> Gen.lzy(selectGen(depth-1)),
-      1 -> exprGen(depth) ∘ (expr => Splice(Some(expr))),
+      1 -> exprGen(depth) ∘ (expr => SpliceR(Some(expr))),
       3 -> (exprGen(depth) ⊛ exprGen(depth) ⊛
         Gen.oneOf(
           Or, And, Eq, Neq, Ge, Gt, Le, Lt,
           Plus, Minus, Mult, Div, Mod, Pow,
           In))(
-        Binop(_, _, _)),
-      1 -> (exprGen(depth) ⊛ exprGen(depth))(Binop(_, _, FieldDeref)),
-      1 -> (exprGen(depth) ⊛ exprGen(depth))(Binop(_, _, IndexDeref)),
+        BinopR(_, _, _)),
+      1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, FieldDeref)),
+      1 -> (exprGen(depth) ⊛ exprGen(depth))(BinopR(_, _, IndexDeref)),
       2 -> (exprGen(depth) ⊛
         Gen.oneOf(
           Not, Exists, Positive, Negative, Distinct,
@@ -121,45 +123,45 @@ trait ExprArbitrary {
           FlattenMapValues, FlattenArrayValues,
           ShiftMapKeys,     ShiftArrayIndices,
           ShiftMapValues,   ShiftArrayValues))(
-        Unop(_, _)),
+        UnopR(_, _)),
       2 -> (for {
         fn  <- Gen.oneOf(agg.Sum, agg.Count, agg.Avg, string.Length, structural.MakeArray)
         arg <- exprGen(depth)
-      } yield InvokeFunction(fn.name, List(arg))),
+      } yield InvokeFunctionR(fn.name, List(arg))),
       1 -> (for {
         arg <- exprGen(depth)
-      } yield InvokeFunction(string.Like.name, List(arg, StringLiteral("B%"), StringLiteral("")))),
+      } yield InvokeFunctionR(string.Like.name, List(arg, StringLiteralR("B%"), StringLiteralR("")))),
       1 -> (for {
         expr  <- exprGen(depth)
         cases <- casesGen(depth)
         dflt  <- Gen.option(exprGen(depth))
-      } yield Match(expr, cases, dflt)),
+      } yield MatchR(expr, cases, dflt)),
       1 -> (for {
         cases <- casesGen(depth)
         dflt  <- Gen.option(exprGen(depth))
-      } yield Switch(cases, dflt))
+      } yield SwitchR(cases, dflt))
     )
 
-  private def casesGen(depth: Int): Gen[List[Case[Expr]]] =
+  private def casesGen(depth: Int): Gen[List[Case[Fix[Sql]]]] =
     smallNonEmptyListOf(for {
-        cond <- exprGen(depth)
-        expr <- exprGen(depth)
-      } yield Case(cond, expr))
+      cond <- exprGen(depth)
+      expr <- exprGen(depth)
+    } yield Case(cond, expr))
 
-  def constExprGen: Gen[Expr] =
+  def constExprGen: Gen[Fix[Sql]] =
     Gen.oneOf(
-      // NB: negative numbers are parsed as Unop(-, _)
-      Gen.chooseNum(0, Long.MaxValue).flatMap(IntLiteral(_)),
-      Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteral(_)),
-      Gen.alphaStr.flatMap(StringLiteral(_)),
+      // NB: negative numbers are parsed as UnopR(-, _)
+      Gen.chooseNum(0, Long.MaxValue).flatMap(IntLiteralR(_)),
+      Gen.chooseNum(0.0, 10.0).flatMap(FloatLiteralR(_)),
+      Gen.alphaStr.flatMap(StringLiteralR(_)),
       // Note: only `"` gets special encoding; the rest should be accepted as is.
       for {
         s  <- Gen.choose(1, 5)
         cs <- Gen.listOfN(s, Gen.oneOf("\"", "\\", " ", "\n", "\t", "a", "b", "c"))
-      } yield StringLiteral(cs.mkString),
-      Gen.const(NullLiteral()),
-      Gen.const(BoolLiteral(true)),
-      Gen.const(BoolLiteral(false)))
+      } yield StringLiteralR(cs.mkString),
+      Gen.const(NullLiteralR),
+      Gen.const(BoolLiteralR(true)),
+      Gen.const(BoolLiteralR(false)))
 
   /** Generates non-empty lists which grow based on the `size` parameter, but
     * slowly (log), so that trees built out of the lists don't get

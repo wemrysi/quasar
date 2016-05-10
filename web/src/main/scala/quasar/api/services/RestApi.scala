@@ -25,6 +25,7 @@ import quasar.fs.mount._
 import scala.concurrent.duration._
 import scala.collection.immutable.ListMap
 
+import matryoshka._
 import org.http4s.HttpService
 import org.http4s.dsl._
 import org.http4s.server.HttpMiddleware
@@ -34,7 +35,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object RestApi {
-  def coreServices[S[_]: Functor]
+  def coreServices[T[_[_]]: Recursive: Corecursive, S[_]: Functor]
       (implicit
         S0: Task :<: S,
         S1: ReadFileF :<: S,

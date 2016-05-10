@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.sql.Sql
 
 import matryoshka._
 import pathy.Path._
@@ -149,7 +150,7 @@ object QueryFile {
     /** Returns the path to the result of executing the given SQL^2 query
       * using the given output file if possible.
       */
-    def executeQuery(query: sql.Expr, vars: Variables, out: AFile)
+    def executeQuery(query: Fix[Sql], vars: Variables, out: AFile)
                     : CompExecM[AFile] = {
 
       compileAnd(query, vars)(execute(_, out))
@@ -158,7 +159,7 @@ object QueryFile {
     /** Returns the source of values from the result of executing the given
       * SQL^2 query.
       */
-    def evaluateQuery(query: sql.Expr, vars: Variables)
+    def evaluateQuery(query: Fix[Sql], vars: Variables)
                      : Process[CompExecM, Data] = {
 
       compToCompExec(queryPlan(query, vars))
@@ -169,7 +170,7 @@ object QueryFile {
     /** Returns a description of how the the given SQL^2 query will be
       * executed.
       */
-    def explainQuery(query: sql.Expr, vars: Variables)
+    def explainQuery(query: Fix[Sql], vars: Variables)
                     : CompExecM[ExecutionPlan] = {
 
       compileAnd(query, vars)(explain)
@@ -212,7 +213,7 @@ object QueryFile {
 
     ////
 
-    private def compileAnd[A](query: sql.Expr, vars: Variables)
+    private def compileAnd[A](query: Fix[Sql], vars: Variables)
                              (f: Fix[LogicalPlan] => ExecM[A])
                              : CompExecM[A] = {
       compToCompExec(queryPlan(query, vars))

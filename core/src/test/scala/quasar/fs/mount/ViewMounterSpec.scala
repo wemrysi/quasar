@@ -17,25 +17,28 @@
 package quasar.fs.mount
 
 import quasar.Predef._
-import quasar._, fp._, fs._, LogicalPlan._
+import quasar._
+import quasar.LogicalPlan._
+import quasar.fp._
+import quasar.fs._
 import quasar.effect.KeyValueStore
 import quasar.std.IdentityLib.Squash
 import quasar.std.StdLib._, set.{InnerJoin, Take, Drop}
-import quasar.sql, sql._
+import quasar.sql, sql.Sql
 
-import matryoshka.Fix
+import matryoshka._
 import monocle.{Lens => MLens}
-import org.specs2.mutable
 import org.specs2.ScalaCheck
+import org.specs2.mutable
 import org.specs2.scalaz.DisjunctionMatchers._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
 object ViewMounterSpec {
-  def viewConfig(q: String, vars: (String, String)*): (Expr, Variables) =
+  def viewConfig(q: String, vars: (String, String)*): (Fix[Sql], Variables) =
     (
-      parse(Query(q)).toOption.get,
+      sql.fixParser.parse(sql.Query(q)).toOption.get,
       Variables(Map(vars.map { case (n, v) =>
         quasar.VarName(n) -> quasar.VarValue(v) }: _*))
     )
@@ -59,7 +62,7 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
 
   "mounting views" >> {
     "fails with InvalidConfig when compilation fails" >> {
-      val fnDNE = Fix(sql.InvokeFunctionF("DNE", List[sql.Expr]()))
+      val fnDNE = sql.invokeFunction("DNE", List[Fix[Sql]]()).embed
       val f     = rootDir </> dir("mnt") </> file("dne")
 
       eval(Map.empty)(ViewMounter.mount[MountConfigsF](f, fnDNE, Variables.empty))
@@ -69,11 +72,11 @@ class ViewMounterSpec extends mutable.Specification with ScalaCheck with TreeMat
     }
 
     "updates mounted views with compiled plan when compilation succeeds" >> {
-      val selStar = Fix(sql.SelectF(
+      val selStar = sql.select(
         sql.SelectAll,
         Nil,
-        Some(sql.TableRelationAST[sql.Expr](rootDir </> dir("foo") </> file("bar"), None)),
-        None, None, None))
+        Some(sql.TableRelationAST[Fix[Sql]](rootDir </> dir("foo") </> file("bar"), None)),
+        None, None, None).embed
 
       val f = rootDir </> dir("mnt") </> file("selectStar")
 

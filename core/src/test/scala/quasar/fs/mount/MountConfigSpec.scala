@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.{Variables, VarName, VarValue}
 import quasar.fp.prism._
 import quasar.sql
+import quasar.sql.fixpoint._
 
 import argonaut._, Argonaut._
 import org.specs2.mutable
@@ -32,9 +33,9 @@ class MountConfigSpec extends mutable.Specification with DisjunctionMatchers {
   import MountConfig._
 
   "View config codec" should {
-    val read = sql.Select(
+    val read = SelectR(
       sql.SelectAll,
-      List(sql.Proj(sql.Splice(None), None)),
+      List(sql.Proj(SpliceR(None), None)),
       Some(sql.TableRelationAST(file("zips"), None)),
       None, None, None)
 

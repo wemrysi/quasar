@@ -45,7 +45,8 @@ package object quasar {
   type SaltedSeqNameGeneratorT[F[_], A] = ReaderT[SeqNameGeneratorT[F, ?], String, A]
 
   /** Returns the `LogicalPlan` for the given SQL^2 query. */
-  def queryPlan(query: Expr, vars: Variables): CompileM[Fix[LogicalPlan]] = {
+  def queryPlan(query: Fix[Sql], vars: Variables)(implicit RT: RenderTree[Fix[Sql]]):
+      CompileM[Fix[LogicalPlan]] = {
     import SemanticAnalysis.AllPhases
 
     def phase[A: RenderTree](label: String, r: SemanticErrors \/ A): CompileM[A] =

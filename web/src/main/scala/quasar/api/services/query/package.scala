@@ -18,12 +18,14 @@ package quasar.api.services
 
 import quasar.Predef._
 import quasar._, api._
+import quasar.fp._
 import quasar.fp.numeric._
-import quasar.sql.{Expr, Query}
+import quasar.sql.{Sql, Query}
 
 import scala.collection.Seq
 
 import argonaut._, Argonaut._
+import matryoshka._
 import org.http4s._, dsl._
 import scalaz._, Scalaz._
 
@@ -61,12 +63,12 @@ package object query {
   def parsedQueryRequest(
     req: Request,
     offset: Option[ValidationNel[ParseFailure, Natural]],
-    limit: Option[ValidationNel[ParseFailure, Positive]]
-  ): ApiError \/ (Expr, Option[Natural], Option[Positive]) =
+    limit: Option[ValidationNel[ParseFailure, Positive]]):
+      ApiError \/ (Fix[Sql], Option[Natural], Option[Positive]) =
     for {
       dir <- decodedDir(req.uri.path)
       qry <- queryParam(req.multiParams)
-      xpr <- sql.parseInContext(qry, dir) leftMap (_.toApiError)
+      xpr <- sql.fixParser.parseInContext(qry, dir) leftMap (_.toApiError)
       off <- offsetOrInvalid(offset)
       lim <- limitOrInvalid(limit)
     } yield (xpr, off, lim)
@@ -77,9 +79,12 @@ package object query {
   def requestVars(req: Request) = Variables(req.params.collect {
     case (k, v) if k.startsWith(VarPrefix) => (VarName(k.substring(VarPrefix.length)), VarValue(v)) })
 
-  def addOffsetLimit(query: sql.Expr, offset: Option[Natural], limit: Option[Positive]): sql.Expr = {
-    val skipped = offset.fold(query)(o => sql.Binop(query, sql.IntLiteral(o.get), sql.Offset))
-    limit.fold(skipped)(l => sql.Binop(skipped, sql.IntLiteral(l.get), sql.Limit))
+  def addOffsetLimit[T[_[_]]: Corecursive](query: T[Sql], offset: Option[Natural], limit: Option[Positive]):
+      T[Sql] = {
+    val skipped = offset.fold(
+      query)(
+      o => sql.binop(query, sql.intLiteral[T[Sql]](o.get).embed, sql.Offset).embed)
+    limit.fold(skipped)(l => sql.binop(skipped, sql.intLiteral[T[Sql]](l.get).embed, sql.Limit).embed)
   }
 
   private val VarPrefix = "var."

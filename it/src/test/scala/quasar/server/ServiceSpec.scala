@@ -27,6 +27,7 @@ import quasar.TestConfig
 
 import java.io.File
 
+import matryoshka.Mu
 import org.http4s.Uri.Authority
 import org.http4s._, Status._
 import org.specs2.mutable
@@ -46,7 +47,7 @@ class ServiceSpec extends mutable.Specification {
     : String \/ A = {
     val uri = Uri(authority = Some(Authority(port = Some(port))))
 
-    val service = Server.durableService(
+    val service = Server.durableService[Mu](
       QuasarConfig(
         staticContent = Nil,
         redirect = None,

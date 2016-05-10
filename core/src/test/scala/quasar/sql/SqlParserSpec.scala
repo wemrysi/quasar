@@ -20,7 +20,9 @@ import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp._
 import quasar.specs2._
+import quasar.sql.fixpoint._
 
+import matryoshka._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
@@ -31,8 +33,8 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
   implicit def stringToQuery(s: String): Query = Query(s)
 
-  def parse(query: Query): ParsingError \/ Expr =
-    (new SQLParser).parse(query).map(_.makeTables(Nil))
+  def parse(query: Query): ParsingError \/ Fix[Sql] =
+    fixParser.parse(query).map(_.makeTables(Nil))
 
   "SQLParser" should {
     "parse query1" in {
@@ -143,9 +145,9 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse basic select" in {
       parse("select foo from bar") must
         beRightDisjunction(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Ident("foo"), None)),
+            List(Proj(IdentR("foo"), None)),
             Some(TableRelationAST(file("bar"), None)),
             None, None, None))
     }
@@ -153,21 +155,21 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse keywords as identifiers" in {
       parse("select as as as from from as from where where group by group order by order") should
         beRightDisjOrDiff(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Ident("as"), "as".some)),
+            List(Proj(IdentR("as"), "as".some)),
             TableRelationAST(file("from"), "from".some).some,
-            Ident("where").some,
-            GroupBy(List(Ident("group")), None).some,
-            OrderBy(List((ASC, Ident("order")))).some))
+            IdentR("where").some,
+            GroupBy(List(IdentR("group")), None).some,
+            OrderBy(List((ASC, IdentR("order")))).some))
     }
 
     "parse ambiguous keyword as identifier" in {
       parse("""select `false` from zips""") should
         beRightDisjOrDiff(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Ident("false"), None)),
+            List(Proj(IdentR("false"), None)),
             TableRelationAST(file("zips"), None).some,
             None, None, None))
     }
@@ -175,20 +177,20 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse ambiguous expression as expression" in {
       parse("""select case from when where then and end""") should
         beRightDisjOrDiff(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Match(Ident("from"), List(Case(Ident("where"), Ident("and"))), None), None)),
+            List(Proj(MatchR(IdentR("from"), List(Case(IdentR("where"), IdentR("and"))), None), None)),
             None, None, None, None))
     }
 
     "parse partially-disambiguated expression" in {
       parse("""select `case` from when where then and end""") should
         beRightDisjOrDiff(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Ident("case"), None)),
+            List(Proj(IdentR("case"), None)),
             TableRelationAST(file("when"), None).some,
-            Binop(Ident("then"), Ident("end"), And).some,
+            BinopR(IdentR("then"), IdentR("end"), And).some,
             None, None))
     }
     "parse quoted literal" in {
@@ -206,11 +208,11 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse literal that’s too big for an Int" in {
       parse("select * from users where add_date > 1425460451000") should
         beRightDisjOrDiff(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Splice(None), None)),
+            List(Proj(SpliceR(None), None)),
             Some(TableRelationAST(file("users"),None)),
-            Some(Binop(Ident("add_date"),IntLiteral(1425460451000L), Gt)),
+            Some(BinopR(IdentR("add_date"),IntLiteralR(1425460451000L), Gt)),
             None,None))
     }
 
@@ -233,27 +235,27 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse “full-value” insert expression" in {
       parse("insert into zips values 1, 2, 3") should
       beRightDisjOrDiff(
-        Union(
-          SetLiteral(List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
-          Select(
+        Distinct(UnionAll(
+          SetLiteralR(List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+          SelectR(
             SelectAll,
-            List(Proj(Splice(None), None)),
+            List(Proj(SpliceR(None), None)),
             Some(TableRelationAST(file("zips"),None)),
-            None, None, None)))
+            None, None, None)).embed).embed)
     }
 
     "parse “keyed” insert expression" in {
       parse("insert into zips ('a', 'b') values (1, 2), (3, 4)") should
       beRightDisjOrDiff(
-        Union(
-          SetLiteral(List(
-            MapLiteral(List(StringLiteral("a") -> IntLiteral(1), StringLiteral("b") -> IntLiteral(2))),
-            MapLiteral(List(StringLiteral("a") -> IntLiteral(3), StringLiteral("b") -> IntLiteral(4))))),
-          Select(
+        Distinct(UnionAll(
+          SetLiteralR(List(
+            MapLiteralR(List(StringLiteralR("a") -> IntLiteralR(1), StringLiteralR("b") -> IntLiteralR(2))),
+            MapLiteralR(List(StringLiteralR("a") -> IntLiteralR(3), StringLiteralR("b") -> IntLiteralR(4))))),
+          SelectR(
             SelectAll,
-            List(Proj(Splice(None), None)),
+            List(Proj(SpliceR(None), None)),
             Some(TableRelationAST(file("zips"),None)),
-            None, None, None)))
+            None, None, None)).embed).embed)
     }
 
     "parse numeric literals" in {
@@ -307,9 +309,9 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse nested joins with parens" in {
       val q = "select * from a cross join (b cross join c)"
       parse(q) must beRightDisjunction(
-        Select(
+        SelectR(
           SelectAll,
-          List(Proj(Splice(None), None)),
+          List(Proj(SpliceR(None), None)),
           Some(
             CrossRelation(
               TableRelationAST(file("a"), None),
@@ -321,20 +323,20 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse array constructor and concat op" in {
       parse("select loc || [ pop ] from zips") must beRightDisjunction(
-        Select(SelectAll,
+        SelectR(SelectAll,
           List(
             Proj(
-              Binop(Ident("loc"),
-                ArrayLiteral(List(
-                  Ident("pop"))),
+              BinopR(IdentR("loc"),
+                ArrayLiteralR(List(
+                  IdentR("pop"))),
                 Concat),
               None)),
           Some(TableRelationAST(file("zips"), None)),
           None, None, None))
     }
 
-    val expectedSelect = Select(SelectAll,
-      List(Proj(Ident("loc"), None)),
+    val expectedSelect = SelectR(SelectAll,
+      List(Proj(IdentR("loc"), None)),
       Some(TableRelationAST(file("places"), None)),
       None,
       None,
@@ -345,7 +347,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse offset" in {
       val q = s"$selectString offset 6"
       parse(q) must beRightDisjunction(
-        Offset(expectedSelect, IntLiteral(6))
+        Offset(expectedSelect, IntLiteralR(6)).embed
       )
     }
 
@@ -353,13 +355,13 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       "normal" in {
         val q = s"$selectString limit 6"
         parse(q) must beRightDisjunction(
-          Limit(expectedSelect, IntLiteral(6))
+          Limit(expectedSelect, IntLiteralR(6)).embed
         )
       }
       "multiple limits" in {
         val q = s"$selectString limit 6 limit 3"
         parse(q) must beRightDisjunction(
-          Limit(Limit(expectedSelect, IntLiteral(6)), IntLiteral(3))
+          Limit(Limit(expectedSelect, IntLiteralR(6)).embed, IntLiteralR(3)).embed
         )
       }
       "should not allow single limit" in {
@@ -372,13 +374,13 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       "limit before" in {
         val q = s"$selectString limit 6 offset 3"
         parse(q) must beRightDisjunction(
-          Offset(Limit(expectedSelect, IntLiteral(6)), IntLiteral(3))
+          Offset(Limit(expectedSelect, IntLiteralR(6)).embed, IntLiteralR(3)).embed
         )
       }
       "limit after" in {
         val q = s"$selectString offset 6 limit 3"
         parse(q) must beRightDisjunction(
-          Limit(Offset(expectedSelect, IntLiteral(6)), IntLiteral(3))
+          Limit(Offset(expectedSelect, IntLiteralR(6)).embed, IntLiteralR(3)).embed
         )
       }
     }
@@ -394,32 +396,32 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse basic let" in {
       parse("""foo := 5; foo""") must
         beRightDisjunction(
-          Let("foo", IntLiteral(5), Ident("foo")))
+          LetR("foo", IntLiteralR(5), IdentR("foo")))
     }
 
     "parse nested lets" in {
       parse("""foo := 5; bar := "hello"; bar + foo""") must
         beRightDisjunction(
-          Let(
+          LetR(
             "foo",
-            IntLiteral(5),
-            Let(
+            IntLiteralR(5),
+            LetR(
               "bar",
-              StringLiteral("hello"),
-              Binop(Ident("bar"), Ident("foo"), Plus))))
+              StringLiteralR("hello"),
+              BinopR(IdentR("bar"), IdentR("foo"), Plus))))
     }
 
     "parse let inside select" in {
       parse("""select foo from (bar := 12; baz) as quag""") must
         beRightDisjunction(
-          Select(
+          SelectR(
             SelectAll,
-            List(Proj(Ident("foo"), None)),
+            List(Proj(IdentR("foo"), None)),
             Some(ExprRelationAST(
-              Let(
+              LetR(
                 "bar",
-                IntLiteral(12),
-                Ident("baz")),
+                IntLiteralR(12),
+                IdentR("baz")),
               "quag")),
             None,
             None,
@@ -429,13 +431,13 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse select inside body of let" in {
       parse("""foo := (1,2,3); select * from foo""") must
         beRightDisjunction(
-          Let(
+          LetR(
             "foo",
-            SetLiteral(
-              List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
-            Select(
+            SetLiteralR(
+              List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+            SelectR(
               SelectAll,
-              List(Proj(Splice(None), None)),
+              List(Proj(SpliceR(None), None)),
               Some(IdentRelationAST("foo", None)),
               None,
               None,
@@ -445,14 +447,14 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     "parse select inside body of let" in {
       parse("""foo := (1,2,3); select foo from bar""") must
         beRightDisjunction(
-          Let(
+          LetR(
             "foo",
-            SetLiteral(
-              List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
-            Select(
+            SetLiteralR(
+              List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+            SelectR(
               SelectAll,
               // TODO this should be IdentRelationAST not Ident
-              List(Proj(Ident("foo"), None)),
+              List(Proj(IdentR("foo"), None)),
               Some(TableRelationAST(file("bar"), None)),
               None,
               None,
@@ -461,13 +463,13 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse select inside body of let inside select" in {
       val innerLet =
-        Let(
+        LetR(
           "foo",
-          SetLiteral(
-            List(IntLiteral(1), IntLiteral(2), IntLiteral(3))),
-          Select(
+          SetLiteralR(
+            List(IntLiteralR(1), IntLiteralR(2), IntLiteralR(3))),
+          SelectR(
             SelectAll,
-            List(Proj(Splice(None), None)),
+            List(Proj(SpliceR(None), None)),
             Some(IdentRelationAST("foo", None)),
             None,
             None,
@@ -475,7 +477,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
       parse("""select (foo := (1,2,3); select * from foo) from baz""") must
         beRightDisjunction(
-          Select(
+          SelectR(
             SelectAll,
             List(Proj(innerLet, None)),
             Some(TableRelationAST(file("baz"), None)),
@@ -486,21 +488,21 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "should parse a single-quoted character" in {
       val q = "'c'"
-      parse(q) must beRightDisjunction(StringLiteral("c"))
+      parse(q) must beRightDisjunction(StringLiteralR("c"))
     }
 
     "should parse escaped characters" in {
       val q = raw"select '\'', '\\', '\u1234'"
       parse(q) must beRightDisjunction(
-        Select(SelectAll, List(
-          Proj(StringLiteral("'"), None),
-          Proj(StringLiteral(raw"\"), None),
-          Proj(StringLiteral("ሴ"), None)),
+        SelectR(SelectAll, List(
+          Proj(StringLiteralR("'"), None),
+          Proj(StringLiteralR(raw"\"), None),
+          Proj(StringLiteralR("ሴ"), None)),
           None, None, None, None))
     }
     "should parse escaped characters in a string" in {
       val q = raw""""'\\\u1234""""
-      parse(q) must beRightDisjunction(StringLiteral(raw"'\ሴ"))
+      parse(q) must beRightDisjunction(StringLiteralR(raw"'\ሴ"))
     }
 
     "should not parse multiple expressions seperated incorrectly" in {
@@ -510,22 +512,22 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
 
     "parse array literal at top level" in {
       parse("""["X", "Y"]""") must beRightDisjunction(
-        ArrayLiteral(List(StringLiteral("X"), StringLiteral("Y"))))
+        ArrayLiteralR(List(StringLiteralR("X"), StringLiteralR("Y"))))
     }
 
     "parse empty set literal" in {
       parse("()") must beRightDisjunction(
-        SetLiteral(Nil))
+        SetLiteralR(Nil))
     }
 
     "parse parenthesized simple expression (which is syntactically identical to a 1-element set literal)" in {
       parse("(a)") must beRightDisjunction(
-        Ident("a"))
+        IdentR("a"))
     }
 
     "parse 2-element set literal" in {
       parse("(a, b)") must beRightDisjunction(
-        SetLiteral(List(Ident("a"), Ident("b"))))
+        SetLiteralR(List(IdentR("a"), IdentR("b"))))
     }
 
     "parse deeply nested parens" in {
@@ -533,7 +535,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       // left-recursive expression with many unneeded parenes, which
       // happens to be exactly what pprint produces.
       val q = """(select distinct topArr, topObj from `/demo/demo/nested` where (((((((((((((((search((((topArr)[:*])[:*])[:*], "^.*$", true)) or (search((((topArr)[:*])[:*]).a, "^.*$", true))) or (search((((topArr)[:*])[:*]).b, "^.*$", true))) or (search((((topArr)[:*])[:*]).c, "^.*$", true))) or (search((((topArr)[:*]).botObj).a, "^.*$", true))) or (search((((topArr)[:*]).botObj).b, "^.*$", true))) or (search((((topArr)[:*]).botObj).c, "^.*$", true))) or (search((((topArr)[:*]).botArr)[:*], "^.*$", true))) or (search((((topObj).midArr)[:*])[:*], "^.*$", true))) or (search((((topObj).midArr)[:*]).a, "^.*$", true))) or (search((((topObj).midArr)[:*]).b, "^.*$", true))) or (search((((topObj).midArr)[:*]).c, "^.*$", true))) or (search((((topObj).midObj).botArr)[:*], "^.*$", true))) or (search((((topObj).midObj).botObj).a, "^.*$", true))) or (search((((topObj).midObj).botObj).b, "^.*$", true))) or (search((((topObj).midObj).botObj).c, "^.*$", true)))"""
-      parse(q).map(pprint) must beRightDisjunction(q)
+      parse(q).map(pprint[Fix]) must beRightDisjunction(q)
     }
 
     "should not parse query with a single backslash in an identifier" >> {
@@ -545,7 +547,7 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
       }.pendingUntilFixed("SD-1536")
     }
 
-    "round-trip to SQL and back" ! prop { (node: Expr) =>
+    "round-trip to SQL and back" ! prop { (node: Fix[Sql]) =>
       val parsed = parse(pprint(node))
 
       parsed.fold(

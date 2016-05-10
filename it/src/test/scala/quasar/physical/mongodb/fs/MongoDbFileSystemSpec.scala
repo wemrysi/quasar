@@ -25,9 +25,10 @@ import quasar.fp._
 import quasar.physical.mongodb.Collection
 import quasar.regression._
 import quasar.specs2._
-import quasar.sql
+import quasar.sql, sql.Sql
 
 import com.mongodb.MongoException
+import matryoshka.Fix
 import monocle.Prism
 import monocle.std.{disjunction => D}
 import monocle.function.Field1
@@ -234,14 +235,14 @@ class MongoDbFileSystemSpec
 
             val out = renameFile(file, κ(FileName("out")))
 
-            def check0(expr: sql.Expr) =
+            def check0(expr: Fix[Sql]) =
               (run(query.fileExists(file)).unsafePerformSync ==== false) and
               (errP.getOption(
                 runExec(query.executeQuery(expr, Variables.fromMap(Map()), out))
                   .run.value.unsafePerformSync
               ) must beSome(file))
 
-            sql.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
+            sql.fixParser.parse(sql.Query(f(posixCodec.printPath(file)))) fold (
               err => ko(s"Parsing failed: ${err.shows}"),
               check0)
           }

@@ -16,19 +16,20 @@
 
 package quasar.regression
 
-import quasar._
 import quasar.Predef._
+import quasar._
 import quasar.fp._
 import quasar.fs._
 import quasar.fs.mount.{MountConfig, Mounts, hierarchical}
 import quasar.physical.mongodb.fs.MongoDBFsType
-import quasar.sql, sql.{Expr, Query}
+import quasar.sql, sql.{Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
 import scala.io.Source
 import scala.util.matching.Regex
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import org.specs2.execute._
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
@@ -76,7 +77,7 @@ abstract class QueryRegressionTest[S[_]: Functor](
   def suiteName: String
 
   /** Return the results of evaluating the given query as a stream. */
-  def queryResults(expr: Expr, vars: Variables): Process[CompExecM, Data]
+  def queryResults(expr: Fix[Sql], vars: Variables): Process[CompExecM, Data]
 
   ////
 
@@ -169,8 +170,8 @@ abstract class QueryRegressionTest[S[_]: Functor](
     val f: Task ~> CompExecM =
       toCompExec compose injectTask
 
-    val parseTask: Task[Expr] =
-      sql.parseInContext(Query(qry), loc)
+    val parseTask: Task[Fix[Sql]] =
+      sql.fixParser.parseInContext(Query(qry), loc)
         .fold(e => Task.fail(new RuntimeException(e.message)), _.point[Task])
 
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars)))

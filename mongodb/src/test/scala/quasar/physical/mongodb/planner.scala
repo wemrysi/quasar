@@ -17,26 +17,25 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.RenderTree, RenderTree.ops._
+import quasar._, RenderTree.ops._
 import quasar.fp._
-import quasar._
 import quasar.javascript._
-import quasar.sql.{ParsingError, Query}
-import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
+import quasar.sql.{fixpoint => sql, _}
+import quasar.std._
 
 import scala.Either
 
 import matryoshka._, Recursive.ops._
 import org.scalacheck._
+import org.specs2.ScalaCheck
 import org.specs2.execute.Result
+import org.specs2.matcher.{Matcher, Expectable}
 import org.specs2.mutable._
 import org.specs2.scalaz._
-import org.specs2.matcher.{Matcher, Expectable}
-import org.specs2.ScalaCheck
 import org.threeten.bp.Instant
-import scalaz._, Scalaz._
 import pathy.Path._
+import scalaz._, Scalaz._
 
 class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers with DisjunctionMatchers with PendingWithAccurateCoverage {
   import StdLib.{set => s, _}
@@ -65,14 +64,14 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
   }
 
-  def queryPlanner(qr: QueryRequest) =
-    MongoDbPlanner.compileToLP.apply(qr)
+  def queryPlanner(query: Fix[Sql], variables: Variables) =
+    MongoDbPlanner.compileToLP(query, variables)
       .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
 
   def plan(query: String): Either[CompilationError, Crystallized] = {
-    val (log, wf) = sql.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
+    val (log, wf) = fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      expr => queryPlanner(QueryRequest(expr, Variables(Map()))).run)
+      queryPlanner(_, Variables(Map())).run)
 
     wf.toEither
   }
@@ -90,8 +89,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
-      expr <- sql.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db"))
-    } yield queryPlanner(QueryRequest(expr, Variables(Map()))).run._1
+      expr <- fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db"))
+    } yield queryPlanner(expr, Variables(Map())).run._1
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -3520,44 +3519,42 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     * @throws AssertionError If the `Query` is not a selection
     */
   def columnNames(q: Query): List[String] =
-    sql.parse(q).toOption.get.project match {
-      case select: sql.ExprF.SelectF[sql.Expr] =>
-        sql.projectionNames(select.projections, None).toOption.get.map(_._1)
+    fixParser.parse(q).toOption.get.project match {
+      case Select(_, projections, _, _, _, _) =>
+        projectionNames(projections, None).toOption.get.map(_._1)
       case _ => throw new java.lang.AssertionError("Query was expected to be a selection")
     }
 
   def fieldNames(wf: Workflow): Option[List[String]] =
     Workflow.simpleShape(wf).map(_.map(_.asText))
 
-  import sql.{Binop => _, Ident => _, _}
-
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)
 
-  val noGroupBy = Gen.const[Option[GroupBy[Expr]]](None)
+  val noGroupBy = Gen.const[Option[GroupBy[Fix[Sql]]]](None)
   val groupBySeveral = Gen.nonEmptyListOf(Gen.oneOf(
-    sql.Ident("state"),
-    sql.Ident("territory"))).map(keys => GroupBy(keys.distinct, None))
+    sql.IdentR("state"),
+    sql.IdentR("territory"))).map(keys => GroupBy(keys.distinct, None))
 
-  val noFilter = Gen.const[Option[Expr]](None)
+  val noFilter = Gen.const[Option[Fix[Sql]]](None)
   val filter = Gen.oneOf(
     for {
       x <- genInnerInt
-    } yield sql.Binop(x, IntLiteral(100), sql.Lt),
+    } yield sql.BinopR(x, sql.IntLiteralR(100), quasar.sql.Lt),
     for {
       x <- genInnerStr
-    } yield InvokeFunction(StdLib.string.Like.name, List(x, StringLiteral("BOULDER%"), StringLiteral(""))),
-    Gen.const(sql.Binop(sql.Ident("p"), sql.Ident("q"), sql.Eq)))  // Comparing two fields requires a $project before the $match
+    } yield sql.InvokeFunctionR(StdLib.string.Like.name, List(x, sql.StringLiteralR("BOULDER%"), sql.StringLiteralR(""))),
+    Gen.const(sql.BinopR(sql.IdentR("p"), sql.IdentR("q"), quasar.sql.Eq)))  // Comparing two fields requires a $project before the $match
 
-  val noOrderBy: Gen[Option[OrderBy[Expr]]] = Gen.const(None)
-  val orderBySeveral: Gen[Option[OrderBy[Expr]]] = Gen.nonEmptyListOf(for {
+  val noOrderBy: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.const(None)
+  val orderBySeveral: Gen[Option[OrderBy[Fix[Sql]]]] = Gen.nonEmptyListOf(for {
     x <- Gen.oneOf(genInnerInt, genInnerStr)
     t <- Gen.oneOf(ASC, DESC)
   } yield (t, x)).map(ps => Some(OrderBy(ps)))
 
   val maybeReducingExpr = Gen.oneOf(genOuterInt, genOuterStr)
 
-  def select(distinctGen: Gen[IsDistinct], exprGen: Gen[Expr], filterGen: Gen[Option[Expr]], groupByGen: Gen[Option[GroupBy[Expr]]], orderByGen: Gen[Option[OrderBy[Expr]]]): Gen[Query] =
+  def select(distinctGen: Gen[IsDistinct], exprGen: Gen[Fix[Sql]], filterGen: Gen[Option[Fix[Sql]]], groupByGen: Gen[Option[GroupBy[Fix[Sql]]]], orderByGen: Gen[Option[OrderBy[Fix[Sql]]]]): Gen[Query] =
     for {
       distinct <- distinctGen
       projs    <- Gen.nonEmptyListOf(exprGen).map(_.zipWithIndex.map {
@@ -3566,60 +3563,60 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
       filter   <- filterGen
       groupBy  <- groupByGen
       orderBy  <- orderByGen
-    } yield Query(pprint(sql.Select(distinct, projs, Some(TableRelationAST(file("zips"), None)), filter, groupBy, orderBy)))
+    } yield Query(pprint(sql.SelectR(distinct, projs, Some(TableRelationAST(file("zips"), None)), filter, groupBy, orderBy)))
 
   def genInnerInt = Gen.oneOf(
-    sql.Ident("pop"),
-    // IntLiteral(0),  // TODO: exposes bugs (see SD-478)
-    sql.Binop(sql.Ident("pop"), IntLiteral(1), Minus), // an ExprOp
-    InvokeFunction("length", List(sql.Ident("city"))))     // requires JS
+    sql.IdentR("pop"),
+    // IntLiteralR(0),  // TODO: exposes bugs (see SD-478)
+    sql.BinopR(sql.IdentR("pop"), sql.IntLiteralR(1), Minus), // an ExprOp
+    sql.InvokeFunctionR("length", List(sql.IdentR("city")))) // requires JS
   def genReduceInt = genInnerInt.flatMap(x => Gen.oneOf(
     x,
-    InvokeFunction("min", List(x)),
-    InvokeFunction("max", List(x)),
-    InvokeFunction("sum", List(x)),
-    InvokeFunction("count", List(Splice(None)))))
+    sql.InvokeFunctionR("min", List(x)),
+    sql.InvokeFunctionR("max", List(x)),
+    sql.InvokeFunctionR("sum", List(x)),
+    sql.InvokeFunctionR("count", List(sql.SpliceR(None)))))
   def genOuterInt = Gen.oneOf(
-    Gen.const(IntLiteral(0)),
+    Gen.const(sql.IntLiteralR(0)),
     genReduceInt,
-    genReduceInt.flatMap(sql.Binop(_, IntLiteral(1000), sql.Div)),
-    genInnerInt.flatMap(x => sql.Binop(sql.Ident("loc"), ArrayLiteral(List(x)), sql.Concat)))
+    genReduceInt.flatMap(sql.BinopR(_, sql.IntLiteralR(1000), quasar.sql.Div)),
+    genInnerInt.flatMap(x => sql.BinopR(sql.IdentR("loc"), sql.ArrayLiteralR(List(x)), quasar.sql.Concat)))
 
   def genInnerStr = Gen.oneOf(
-    sql.Ident("city"),
-    // StringLiteral("foo"),  // TODO: exposes bugs (see SD-478)
-    InvokeFunction("lower", List(sql.Ident("city"))))
+    sql.IdentR("city"),
+    // StringLiteralR("foo"),  // TODO: exposes bugs (see SD-478)
+    sql.InvokeFunctionR("lower", List(sql.IdentR("city"))))
   def genReduceStr = genInnerStr.flatMap(x => Gen.oneOf(
     x,
-    InvokeFunction("min", List(x)),
-    InvokeFunction("max", List(x))))
+    sql.InvokeFunctionR("min", List(x)),
+    sql.InvokeFunctionR("max", List(x))))
   def genOuterStr = Gen.oneOf(
-    Gen.const(StringLiteral("foo")),
-    Gen.const(sql.Ident("state")),  // possibly the grouping key, so never reduced
+    Gen.const(sql.StringLiteralR("foo")),
+    Gen.const(sql.IdentR("state")),  // possibly the grouping key, so never reduced
     genReduceStr,
-    genReduceStr.flatMap(x => InvokeFunction("lower", List(x))),   // an ExprOp
-    genReduceStr.flatMap(x => InvokeFunction("length", List(x))))  // requires JS
+    genReduceStr.flatMap(x => sql.InvokeFunctionR("lower", List(x))),   // an ExprOp
+    genReduceStr.flatMap(x => sql.InvokeFunctionR("length", List(x))))  // requires JS
 
-  implicit def shrinkQuery(implicit SS: Shrink[Expr]): Shrink[Query] = Shrink { q =>
-    sql.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
+  implicit def shrinkQuery(implicit SS: Shrink[Fix[Sql]]): Shrink[Query] = Shrink { q =>
+    fixParser.parse(q).fold(κ(Stream.empty), SS.shrink(_).map(sel => Query(pprint(sel))))
   }
 
   /**
    Shrink a query by reducing the number of projections or grouping expressions. Do not
    change the "shape" of the query, by removing the group by entirely, etc.
    */
-  implicit def shrinkExpr: Shrink[Expr] = {
+  implicit def shrinkExpr: Shrink[Fix[Sql]] = {
     /** Shrink a list, removing a single item at a time, but never producing an empty list. */
     def shortened[A](as: List[A]): Stream[List[A]] =
       if (as.length <= 1) Stream.empty
       else as.toStream.map(a => as.filterNot(_ == a))
 
     Shrink {
-      case Select(d, projs, rel, filter, groupBy, orderBy) =>
-        val sDistinct = if (d == SelectDistinct) Stream(sql.Select(SelectAll, projs, rel, filter, groupBy, orderBy)) else Stream.empty
-        val sProjs = shortened(projs).map(ps => sql.Select(d, ps, rel, filter, groupBy, orderBy))
+      case Embed(Select(d, projs, rel, filter, groupBy, orderBy)) =>
+        val sDistinct = if (d == SelectDistinct) Stream(sql.SelectR(SelectAll, projs, rel, filter, groupBy, orderBy)) else Stream.empty
+        val sProjs = shortened(projs).map(ps => sql.SelectR(d, ps, rel, filter, groupBy, orderBy))
         val sGroupBy = groupBy.map { case GroupBy(keys, having) =>
-          shortened(keys).map(ks => sql.Select(d, projs, rel, filter, Some(GroupBy(ks, having)), orderBy))
+          shortened(keys).map(ks => sql.SelectR(d, projs, rel, filter, Some(GroupBy(ks, having)), orderBy))
         }.getOrElse(Stream.empty)
         sDistinct ++ sProjs ++ sGroupBy
       case expr => Stream(expr)
@@ -3732,8 +3729,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
             obj(
               "__tmp1" ->
-                Call(ident("remove"),
-                  List(ident("x"), jscore.Literal(Js.Str("_id")))))))),
+                Call(jscore.ident("remove"),
+                  List(jscore.ident("x"), jscore.Literal(Js.Str("_id")))))))),
             ListMap()),
           $group(
             grouped(),

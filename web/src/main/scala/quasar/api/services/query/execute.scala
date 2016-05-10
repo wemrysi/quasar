@@ -23,9 +23,10 @@ import quasar.api.ToApiError.ops._
 import quasar.api.services._
 import quasar.fp._
 import quasar.fs._
-import quasar.sql.{Expr, Query}
+import quasar.sql.{Sql, Query}
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import org.http4s.headers.Accept
 import org.http4s._
 import org.http4s.dsl._
@@ -56,7 +57,7 @@ object execute {
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond_(parsedQueryRequest(req, offset, limit) map { case (xpr, off, lim) =>
-          queryPlan(addOffsetLimit(xpr, off, lim), requestVars(req))
+          queryPlan(addOffsetLimit[Fix](xpr, off, lim), requestVars(req))
             .run.value map (lp => formattedDataResponse(
               MessageFormat.fromAccept(req.headers.get(Accept)),
               Q.evaluate(lp).translate[FileSystemErrT[Free[S, ?], ?]](removePhaseResults)))
@@ -68,8 +69,8 @@ object execute {
             respond_(bodyMustContainQuery)
           } else {
             respond(requiredHeader(Destination, req) flatMap { destination =>
-              val parseRes: ApiError \/ Expr =
-                sql.parseInContext(Query(query), path)
+              val parseRes: ApiError \/ Fix[Sql] =
+                sql.fixParser.parseInContext(Query(query), path)
                   .leftMap(_.toApiError)
 
               val absDestination: ApiError \/ AFile =

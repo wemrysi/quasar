@@ -24,13 +24,15 @@ import quasar.api.ToQResponse.ops._
 import quasar.fp.numeric._
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
+import matryoshka._
 import org.http4s.dsl._
 import scalaz._, Scalaz._
 
 object compile {
 
-  def service[S[_]: Functor](implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]): QHttpService[S] = {
+  def service[S[_]: Functor](
+    implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]):
+      QHttpService[S] = {
     def phaseResultsResponse(prs: PhaseResults): Option[QResponse[S]] =
       prs.lastOption map {
         case PhaseResult.Tree(name, value)   => Json(name := value).toResponse
@@ -43,12 +45,12 @@ object compile {
         "logicalPlan" := lp.render)
 
     def explainQuery(
-      expr: sql.Expr,
+      expr: Fix[sql.Sql],
       offset: Option[Natural],
       limit: Option[Positive],
       vars: Variables
     ): Free[S, QResponse[S]] =
-      respond(queryPlan(addOffsetLimit(expr, offset, limit), vars)
+      respond(queryPlan(addOffsetLimit[Fix](expr, offset, limit), vars)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](lp =>
           Q.explain(lp).run.run.map {
             case (phases, \/-(_)) =>

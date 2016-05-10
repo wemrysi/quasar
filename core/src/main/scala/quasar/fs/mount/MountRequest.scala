@@ -18,10 +18,11 @@ package quasar.fs.mount
 
 import quasar.Predef.{Some, None}
 import quasar.Variables
-import quasar.sql.Expr
 import quasar.fs.{AFile, ADir, APath, FileSystemType}
 import quasar.fp.prism._
+import quasar.sql.Sql
 
+import matryoshka.Fix
 import monocle.Prism
 
 sealed trait MountRequest {
@@ -43,7 +44,7 @@ sealed trait MountRequest {
 object MountRequest {
   final case class MountView private[mount] (
     file: AFile,
-    query: Expr,
+    query: Fix[Sql],
     vars: Variables
   ) extends MountRequest
 
@@ -53,7 +54,7 @@ object MountRequest {
     uri: ConnectionUri
   ) extends MountRequest
 
-  val mountView = Prism[MountRequest, (AFile, Expr, Variables)] {
+  val mountView = Prism[MountRequest, (AFile, Fix[Sql], Variables)] {
     case MountView(f, q, vs) => Some((f, q, vs))
     case _                   => None
   } ((MountView(_, _, _)).tupled)

@@ -21,6 +21,7 @@ import quasar._, api._, fp._, fs._
 import quasar.fp.numeric._
 import quasar.fs.InMemory._
 import quasar.sql._
+import quasar.sql.fixpoint._
 
 import org.http4s._
 import org.specs2.matcher._, MustMatchers._
@@ -67,19 +68,19 @@ object queryFixture {
     execute.service[Eff].toHttpService(effRespOr(runFs(state).unsafePerformSync))
 
   def selectAll(from: FPath) = {
-    val ast = Select(
+    val ast = SelectR(
       SelectAll,
-      List(Proj(Splice(None), None)),
+      List(Proj(SpliceR(None), None)),
       Some(TableRelationAST(unsandbox(from), None)),
       None, None, None)
     pprint(ast)
   }
   def selectAllWithVar(from: FPath, varName: String) = {
-    val ast = Select(
+    val ast = SelectR(
       SelectAll,
-      List(Proj(Splice(None), None)),
+      List(Proj(SpliceR(None), None)),
       Some(TableRelationAST(unsandbox(from), None)),
-      Some(Binop(Ident("pop"),Vari(varName), Gt)),
+      Some(BinopR(IdentR("pop"), VariR(varName), Gt)),
       None, None)
     pprint(ast)
   }

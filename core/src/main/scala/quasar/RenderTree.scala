@@ -23,7 +23,7 @@ import java.lang.{Object, Runnable}
 import scala.Any
 
 import argonaut._, Argonaut._
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
@@ -367,4 +367,11 @@ sealed abstract class RenderTreeInstances {
   implicit val renderTreeUnit = new RenderTree[Unit] {
     def render(v: Unit) = Terminal(List("()", "Unit"), None)
   }
+
+  implicit def recursiveRenderTree[T[_[_]]: Recursive, F[_]: Functor](
+    implicit F: RenderTree ~> (RenderTree ∘ F)#λ):
+      RenderTree[T[F]] =
+    new RenderTree[T[F]] {
+      def render(v: T[F]) = F(recursiveRenderTree[T, F]).render(v.project)
+    }
 }

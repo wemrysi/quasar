@@ -18,8 +18,9 @@ package quasar
 
 import quasar.Predef._
 import quasar.specs2._
+import quasar.sql.fixpoint._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import pathy.Path._
 
@@ -31,108 +32,109 @@ class SemanticsSpec extends Specification with PendingWithAccurateCoverage with 
 
     val compiler = Compiler.trampoline
 
-    def transform(q: Expr): Expr = q.cata(projectSortKeysƒ)
+    def transform[T[_[_]]: Recursive: Corecursive](q: T[Sql]): T[Sql] =
+      q.transCata(orOriginal(projectSortKeysƒ))
 
     "add single field for order by" in {
-      val q = Select(SelectAll,
-                     Proj(Ident("name"), None) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(IdentR("name"), None) :: Nil,
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, Ident("height")) :: Nil)))
+                     Some(OrderBy((ASC, IdentR("height")) :: Nil)))
       transform(q) must beTree(
-               Select(SelectAll,
-                      Proj(Ident("name"), None) :: Proj(Ident("height"), Some("__sd__0")) :: Nil,
+               SelectR(SelectAll,
+                      Proj(IdentR("name"), None) :: Proj(IdentR("height"), Some("__sd__0")) :: Nil,
                       Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
-                      Some(OrderBy((ASC, Ident("__sd__0")) :: Nil)))
+                      Some(OrderBy((ASC, IdentR("__sd__0")) :: Nil)))
                )
     }
 
     "not add a field that appears in the projections" in {
-      val q = Select(SelectAll,
-                     Proj(Ident("name"), None) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(IdentR("name"), None) :: Nil,
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, Ident("name")) :: Nil)))
+                     Some(OrderBy((ASC, IdentR("name")) :: Nil)))
       transform(q) must beTree(q)
     }
 
     "not add a field that appears as an alias in the projections" in {
-      val q = Select(SelectAll,
-                     Proj(Ident("foo"), Some("name")) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(IdentR("foo"), Some("name")) :: Nil,
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, Ident("name")) :: Nil)))
+                     Some(OrderBy((ASC, IdentR("name")) :: Nil)))
       transform(q) must beTree(q)
     }
 
     "not add a field with wildcard present" in {
-      val q = Select(SelectAll,
-                     Proj(Splice(None), None) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(SpliceR(None), None) :: Nil,
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, Ident("height")) :: Nil)))
+                     Some(OrderBy((ASC, IdentR("height")) :: Nil)))
       transform(q) must beTree(q)
     }
 
     "add single field for order by" in {
-      val q = Select(SelectAll,
-                     Proj(Ident("name"), None) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(IdentR("name"), None) :: Nil,
                      Some(TableRelationAST(file("person"), None)),
                      None,
                      None,
-                     Some(OrderBy((ASC, Ident("height")) ::
-                                  (ASC, Ident("name")) ::
+                     Some(OrderBy((ASC, IdentR("height")) ::
+                                  (ASC, IdentR("name")) ::
                                   Nil)))
       transform(q) must beTree(
-               Select(SelectAll,
-                      Proj(Ident("name"), None) ::
-                        Proj(Ident("height"), Some("__sd__0")) ::
+               SelectR(SelectAll,
+                      Proj(IdentR("name"), None) ::
+                        Proj(IdentR("height"), Some("__sd__0")) ::
                         Nil,
                       Some(TableRelationAST(file("person"), None)),
                       None,
                       None,
-                      Some(OrderBy((ASC, Ident("__sd__0")) ::
-                                   (ASC, Ident("name")) ::
+                      Some(OrderBy((ASC, IdentR("__sd__0")) ::
+                                   (ASC, IdentR("name")) ::
                                    Nil))))
     }
 
     "transform sub-select" in {
-      val q = Select(SelectAll,
-                     Proj(Splice(None), None) :: Nil,
+      val q = SelectR(SelectAll,
+                     Proj(SpliceR(None), None) :: Nil,
                      Some(TableRelationAST(file("foo"), None)),
                      Some(
-                       Binop(
-                         Ident("a"),
-                         Select(SelectAll,
-                                Proj(Ident("a"), None) :: Nil,
+                       BinopR(
+                         IdentR("a"),
+                         SelectR(SelectAll,
+                                Proj(IdentR("a"), None) :: Nil,
                                 Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
-                                Some(OrderBy((ASC, Ident("b")) :: Nil))),
+                                Some(OrderBy((ASC, IdentR("b")) :: Nil))),
                          In)),
                      None,
                      None)
       transform(q) must beTree(
-              Select(SelectAll,
-                     Proj(Splice(None), None) :: Nil,
+              SelectR(SelectAll,
+                     Proj(SpliceR(None), None) :: Nil,
                      Some(TableRelationAST(file("foo"), None)),
                      Some(
-                       Binop(
-                         Ident("a"),
-                         Select(SelectAll,
-                                Proj(Ident("a"), None) ::
-                                  Proj(Ident("b"), Some("__sd__0")) ::
+                       BinopR(
+                         IdentR("a"),
+                         SelectR(SelectAll,
+                                Proj(IdentR("a"), None) ::
+                                  Proj(IdentR("b"), Some("__sd__0")) ::
                                   Nil,
                                 Some(TableRelationAST(file("bar"), None)),
                                 None,
                                 None,
-                                Some(OrderBy((ASC, Ident("__sd__0")) :: Nil))),
+                                Some(OrderBy((ASC, IdentR("__sd__0")) :: Nil))),
                          In)),
                      None,
                      None))
