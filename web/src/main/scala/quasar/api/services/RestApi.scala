@@ -81,7 +81,7 @@ object RestApi {
   }
 
   def defaultMiddleware: HttpMiddleware =
-    cors <<< gzip <<< HeaderParam <<< passOptions
+    (cors(_)) <<< gzip <<< HeaderParam <<< passOptions
 
   val cors: HttpMiddleware =
     CORS(_, CORSConfig(

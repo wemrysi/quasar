@@ -63,7 +63,7 @@ object compile {
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
-        respond(parsedQueryRequest(req, offset, limit) traverseU {
+        respond(parsedQueryRequest(req, offset, limit) traverse {
           case (expr, offset, limit) =>
             explainQuery(expr, offset, limit, requestVars(req))
         })

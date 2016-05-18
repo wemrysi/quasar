@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.fp.free._
 
 import pathy.Path, Path._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, :+: => _, _}, Scalaz._
 
 package object fs {
   type ReadFileF[A]    = Coyoneda[ReadFile, A]
@@ -30,10 +30,8 @@ package object fs {
   type ManageFileF[A]  = Coyoneda[ManageFile, A]
   type QueryFileF[A]   = Coyoneda[QueryFile, A]
 
-  type FileSystem0[A] = Coproduct[WriteFileF, ManageFileF, A]
-  type FileSystem1[A] = Coproduct[ReadFileF, FileSystem0, A]
-  /** FileSystem[A] = QueryFileF or ReadFileF or WriteFileF or ManageFileF */
-  type FileSystem[A]  = Coproduct[QueryFileF, FileSystem1, A]
+  type FileSystem[A] =
+    (QueryFileF :+: (ReadFileF :+: (WriteFileF :+: ManageFileF)#λ)#λ)#λ[A]
 
   type AbsPath[T] = pathy.Path[Abs,T,Sandboxed]
   type RelPath[T] = pathy.Path[Rel,T,Sandboxed]

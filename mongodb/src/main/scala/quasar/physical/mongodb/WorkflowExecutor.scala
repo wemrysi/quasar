@@ -35,6 +35,9 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
   import MapReduce._
   import WorkflowExecutor.WorkflowCursor
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   /** Execute the given aggregation pipeline with the given collection as
     * input.
     */
@@ -206,7 +209,7 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 
       case PureTask(Bson.Arr(vs)) =>
         for {
-          docs <- vs.toList.traverseU {
+          docs <- vs.toList.traverse {
                     case doc @ Bson.Doc(_) => doc.right
                     case other             => other.left
                   } fold (unableToStore[List[Bson.Doc]], _.point[N])

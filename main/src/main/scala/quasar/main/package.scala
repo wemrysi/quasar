@@ -21,6 +21,7 @@ import quasar.Predef._
 import quasar.config.{writeConfig, ConfigOps, FsFile}
 import quasar.effect._
 import quasar.fp._
+import quasar.fp.free.{:+:}
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
@@ -46,10 +47,8 @@ package object main {
   val MainTask           = MonadError[EitherT[Task,String,?], String]
 
   /** Effects that physical filesystems require.
-    *
-    * MongoErrF \/ Task
     */
-  type PhysFsEff[A]  = Coproduct[MongoErrF, Task, A]
+  type PhysFsEff[A] = (MongoErrF :+: Task)#λ[A]
   type PhysFsEffM[A] = Free[PhysFsEff, A]
 
   object PhysFsEff {
@@ -69,13 +68,9 @@ package object main {
     quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff]
 
   /** The intermediate effect FileSystem operations are interpreted into.
-    *
-    * MountConfigsF \/ PhysFsEffM \/ MonotonicSeqF \/ ViewStateF \/ MountedResultHF
     */
-  type FsEff0[A] = Coproduct[ViewStateF, MountedResultHF, A]
-  type FsEff1[A] = Coproduct[MonotonicSeqF, FsEff0, A]
-  type FsEff2[A] = Coproduct[PhysFsEffM, FsEff1, A]
-  type FsEff[A]  = Coproduct[MountConfigsF, FsEff2, A]
+  type FsEff[A] =
+    (MountConfigsF :+: (PhysFsEffM :+: (MonotonicSeqF :+: (ViewStateF :+: MountedResultHF)#λ)#λ)#λ)#λ[A]
   type FsEffM[A] = Free[FsEff, A]
 
   object FsEff {
@@ -118,10 +113,8 @@ package object main {
     *
     * We interpret into this effect to defer error handling based on the
     * final context of interpretation (i.e. web service vs cmd line).
-    *
-    * MongoErrF \/ Task
     */
-  type FsErrsIO[A]  = Coproduct[MongoErrF, Task, A]
+  type FsErrsIO[A] = (MongoErrF :+: Task)#λ[A]
   type FsErrsIOM[A] = Free[FsErrsIO, A]
 
 
@@ -142,12 +135,9 @@ package object main {
 
   /** Effect required by the composite (view + hierarchical + physical)
     * filesystem.
-    *
-    * EvalFSRefF \/ PhysFsEffM \/ MountedFsF \/ MountConfigsF
     */
-  type CompFsEff0[A] = Coproduct[MountedFsF, MountConfigsF, A]
-  type CompFsEff1[A] = Coproduct[PhysFsEffM, CompFsEff0, A]
-  type CompFsEff[A] = Coproduct[EvalFSRefF, CompFsEff1, A]
+  type CompFsEff[A] =
+    (EvalFSRefF :+: (PhysFsEffM :+: (MountedFsF :+: MountConfigsF)#λ)#λ)#λ[A]
   type CompFsEffM[A] = Free[CompFsEff, A]
 
   object CompFsEff {
@@ -169,16 +159,12 @@ package object main {
 
   /** Effect required by the "complete" filesystem supporting modifying mounts,
     * views, hierarchical mounts and physical implementations.
-    *
-    * MountConfigsF \/ CompFsEffM
     */
-  type CompleteFsEff[A]  = Coproduct[MountConfigsF, CompFsEffM, A]
+  type CompleteFsEff[A] = (MountConfigsF :+: CompFsEffM)#λ[A]
   type CompleteFsEffM[A] = Free[CompleteFsEff, A]
 
-  // TODO: For some reason, scalac complains of a diverging implicits when
-  //       attempting to resolve this.
   implicit val completeFsEffFunctor: Functor[CompleteFsEff] =
-    Coproduct.coproductFunctor[MountConfigsF, CompFsEffM](implicitly, implicitly)
+    Coproduct.coproductFunctor[MountConfigsF, CompFsEffM]
 
   val mounter: Mounting ~> CompleteFsEffM =
     quasar.fs.mount.Mounter[CompFsEffM, CompleteFsEff](
@@ -187,10 +173,8 @@ package object main {
 
   /** Effect representing fully interpreting everything but `MountConfigs` to
     * allow for multiple implementations.
-    *
-    * MountConfigsF \/ Task
     */
-  type MntCfgsIO[A]  = Coproduct[MountConfigsF, Task, A]
+  type MntCfgsIO[A] = (MountConfigsF :+: Task)#λ[A]
   type MntCfgsIOM[A] = Free[MntCfgsIO, A]
 
   object MntCfgsIO {
@@ -226,11 +210,8 @@ package object main {
 
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.
-    *
-    * FileSystemFailureF \/ MongoErrF \/ MntCfgsIO
     */
-  type CfgsErrsIO0[A] = Coproduct[MongoErrF, MntCfgsIO, A]
-  type CfgsErrsIO[A]  = Coproduct[FileSystemFailureF, CfgsErrsIO0, A]
+  type CfgsErrsIO[A] = (FileSystemFailureF :+: (MongoErrF :+: MntCfgsIO)#λ)#λ[A]
   type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
 
   object CfgsErrsIO {
@@ -251,13 +232,9 @@ package object main {
   }
 
   /** Effect required by the core Quasar services
-    *
-    * Task \/ FileSystemFailureF \/ MountingF \/ FileSystem
     */
-  type CoreEff0[A] = Coproduct[MountingF, FileSystem, A]
-  type CoreEff1[A] = Coproduct[FileSystemFailureF, CoreEff0, A]
-  type CoreEff2[A] = Coproduct[MountConfigsF, CoreEff1, A]
-  type CoreEff[A]  = Coproduct[Task, CoreEff2, A]
+  type CoreEff[A] =
+    (Task :+: (MountConfigsF :+: (FileSystemFailureF :+: (MountingF :+: FileSystem)#λ)#λ)#λ)#λ[A]
   type CoreEffM[A] = Free[CoreEff, A]
 
   object CoreEff {

@@ -59,7 +59,7 @@ sealed trait Type { self =>
     case Obj(value, uk) =>
       Some((uk.toList ++ value.toList.map(_._2)).concatenate(TypeOrMonoid))
     case x @ Coproduct(_, _) =>
-      x.flatten.toList.map(_.objectType).sequence.map(_.concatenate(TypeOrMonoid))
+      x.flatten.toList.traverse(_.objectType).map(_.concatenate(TypeOrMonoid))
     case _ => None
   }
 
@@ -75,7 +75,7 @@ sealed trait Type { self =>
     case Arr(value) => Some(value.concatenate(TypeOrMonoid))
     case FlexArr(_, _, value) => Some(value)
     case x @ Coproduct(_, _) =>
-      x.flatten.toList.map(_.arrayType).sequenceU.map(_.concatenate(TypeLubMonoid))
+      x.flatten.toList.traverse(_.arrayType).map(_.concatenate(TypeLubMonoid))
     case _ => None
   }
 
@@ -386,13 +386,13 @@ object Type extends TypeInstances {
         } yield newType2
 
       case FlexArr(min, max, value) => wrap(value, FlexArr(min, max, _))
-      case Arr(value)               => value.map(f).sequence.map(Arr)
+      case Arr(value)               => value.traverse(f).map(Arr)
       case Obj(map, uk)             =>
-        ((map ∘ f).sequence |@| uk.map(f).sequence)(Obj)
+        ((map ∘ f).sequence |@| uk.traverse(f))(Obj)
 
       case x @ Coproduct(_, _) =>
         for {
-          xs <- Traverse[List].sequence(x.flatten.toList.map(loop _))
+          xs <- x.flatten.toList.traverse(loop)
           v2 <- f(Coproduct(xs))
         } yield v2
 

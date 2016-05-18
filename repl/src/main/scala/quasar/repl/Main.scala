@@ -22,6 +22,7 @@ import quasar.config.{CoreConfig, FsPath, FsFile}
 import quasar.console._
 import quasar.effect._
 import quasar.fp._
+import quasar.fp.free.{:+:}
 import quasar.fs.mount._
 import quasar.main._
 
@@ -43,8 +44,7 @@ object Main {
       }
     }
 
-  type DriverEff0[A] = Coproduct[ConsoleIOF, Task, A]
-  type DriverEff[A] = Coproduct[ReplFailF, DriverEff0, A]
+  type DriverEff[A] = (ReplFailF :+: (ConsoleIOF :+: Task)#λ)#λ[A]
   type DriverEffM[A] = Free[DriverEff, A]
 
   private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = Task.delay {
@@ -85,11 +85,8 @@ object Main {
     ()
   }
 
-  type ReplEff0[A] = Coproduct[Task, MountingFileSystem, A]
-  type ReplEff1[A] = Coproduct[TimingF, ReplEff0, A]
-  type ReplEff2[A] = Coproduct[ReplFailF, ReplEff1, A]
-  type ReplEff3[A] = Coproduct[ConsoleIOF, ReplEff2, A]
-  type ReplEff[A] = Coproduct[Repl.RunStateF, ReplEff3, A]
+  type ReplEff[A] =
+    (Repl.RunStateF :+: (ConsoleIOF :+: (ReplFailF :+: (TimingF :+: (Task :+: MountingFileSystem)#λ)#λ)#λ)#λ)#λ[A]
 
   def repl(fs: MountingFileSystem ~> DriverEffM): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
@@ -105,7 +102,7 @@ object Main {
     }
   }
 
-  private val DF = Failure.Ops[String, DriverEff](implicitly, Inject[ReplFailF, DriverEff])
+  private val DF = Failure.Ops[String, DriverEff]
 
   private val mt: MainTask ~> DriverEffM =
     new (MainTask ~> DriverEffM) {

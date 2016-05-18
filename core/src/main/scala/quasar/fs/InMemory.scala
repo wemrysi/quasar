@@ -318,7 +318,7 @@ object InMemory {
       m     <- contentsL.st
       sufxs =  m.keys.toStream.map(_ relativeTo src).unite
       files =  sufxs map (src </> _) zip (sufxs map (dst </> _))
-      r0    <- files.traverseU { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
+      r0    <- files.traverse { case (sf, df) => EitherT(moveFile(sf, df, s)) }.run
       r1    =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(src)))
     } yield r1
 
@@ -344,7 +344,7 @@ object InMemory {
     for {
       m  <- contentsL.st
       ss =  m.keys.toStream.map(_ relativeTo d).unite
-      r0 <- ss.traverseU(f => EitherT(deleteFile(d </> f))).run
+      r0 <- ss.traverse(f => EitherT(deleteFile(d </> f))).run
       r1 =  r0 flatMap (_.nonEmpty either (()) or pathErr(pathNotFound(d)))
     } yield r1
 

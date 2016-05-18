@@ -18,7 +18,8 @@ package quasar.fs
 
 import quasar.Predef.Map
 import quasar.effect._
-import quasar.fp.{free, TaskRef}
+import quasar.fp.{TaskRef}
+import quasar.fp.free, free.{:+:}
 
 import monocle.Lens
 import scalaz.{Lens => _, _}
@@ -31,7 +32,7 @@ package object mount {
   type MountConfigs[A]  = KeyValueStore[APath, MountConfig, A]
   type MountConfigsF[A] = Coyoneda[MountConfigs, A]
 
-  type MountingFileSystem[A] = Coproduct[MountingF, FileSystem, A]
+  type MountingFileSystem[A] = (MountingF :+: FileSystem)#λ[A]
 
   def interpretMountingFileSystem[M[_]: Functor](
     m: Mounting ~> M,
@@ -65,10 +66,8 @@ package object mount {
       KeyValueStore.toState[State[S,?]](l)
   }
 
-  type ViewFileSystem0[A] = Coproduct[MonotonicSeqF, FileSystem, A]
-  type ViewFileSystem1[A] = Coproduct[ViewStateF, ViewFileSystem0, A]
-  /** Adds MountConfigsF, ViewStateF, and MonotonicSeqF to FileSystem. */
-  type ViewFileSystem[A]  = Coproduct[MountConfigsF, ViewFileSystem1, A]
+  type ViewFileSystem[A] =
+    (MountConfigsF :+: (ViewStateF :+: (MonotonicSeqF :+: FileSystem)#λ)#λ)#λ[A]
 
   def interpretViewFileSystem[M[_]: Functor](
     mc: MountConfigs ~> M,

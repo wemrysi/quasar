@@ -218,7 +218,7 @@ package object optimize {
 
     /** Map from old grouped names to new names and mapping of expressions. */
     def renameProjectGroup(r: Reshape, g: Grouped): Option[ListMap[BsonField.Name, List[BsonField.Name]]] = {
-      val s = r.value.toList.map {
+      val s = r.value.toList.traverse {
         case (newName, \/-($var(v))) =>
           v.path match {
             case List(oldHead @ BsonField.Name(_)) =>
@@ -231,7 +231,7 @@ package object optimize {
       def multiListMap[A, B](ts: List[(A, B)]): ListMap[A, List[B]] =
         ts.foldLeft(ListMap[A,List[B]]()) { case (map, (a, b)) => map + (a -> (map.get(a).getOrElse(List[B]()) :+ b)) }
 
-      s.sequenceU.map(multiListMap)
+      s.map(multiListMap)
     }
 
     def inlineProjectGroup(r: Reshape, g: Grouped): Option[Grouped] = {

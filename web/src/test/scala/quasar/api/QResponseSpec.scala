@@ -34,7 +34,7 @@ class QResponseSpec extends mutable.Specification {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
   import QResponseSpec._
 
-  type StrIO[A]  = Coproduct[Str, Task, A]
+  type StrIO[A] = Coproduct[Str, Task, A]
   type StrIOM[A] = Free[StrIO, A]
 
   def str(s: String): StrIOM[String] =

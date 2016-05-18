@@ -18,7 +18,8 @@ package quasar.config
 
 import quasar.Predef._
 import quasar.effect._
-import quasar.fp.{free, TaskRef}
+import quasar.fp.{TaskRef}
+import quasar.fp.free
 import quasar.fs.{APath}
 import quasar.fs.mount._
 
@@ -47,10 +48,7 @@ object writeConfig {
       val refToTask: ConfigRef ~> Task = AtomicRef.fromTaskRef(ref)
 
       val write: Cfg => Task[Unit] = configOps.toFile(_, loc)
-      def writing: ConfigRef ~> ConfigRefPlusTaskM =
-        AtomicRef.onSet[Cfg](write)(
-          implicitly, implicitly, implicitly,
-          Inject[ConfigRefF, ConfigRefPlusTask]) // NB: this one is not resolved
+      def writing: ConfigRef ~> ConfigRefPlusTaskM = AtomicRef.onSet[Cfg](write)
 
       val refToTaskF: ConfigRefPlusTask ~> Task =
         free.interpret2[ConfigRefF, Task, Task](

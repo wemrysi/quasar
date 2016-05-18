@@ -17,9 +17,11 @@
 package quasar.api.services.query
 
 import quasar.Predef._
-import quasar._, api._, fp._, fs._
+import quasar.api._
+import quasar.fp._
+import quasar.fp.free.{:+:}
 import quasar.fp.numeric._
-import quasar.fs.InMemory._
+import quasar.fs._, InMemory._
 import quasar.sql._
 import quasar.sql.fixpoint._
 
@@ -32,8 +34,7 @@ import scalaz.concurrent.Task
 object queryFixture {
   import quasar.api.PathUtils.pathUri
 
-  type Eff0[A] = Coproduct[FileSystemFailureF, FileSystem, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff[A] = (Task :+: (FileSystemFailureF :+: FileSystem)#λ)#λ[A]
 
   case class Query(
     q: String,

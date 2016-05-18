@@ -24,11 +24,11 @@ import scalaz.scalacheck.ScalaCheckBinding._
 
 package object scalacheck {
   def nonEmptyListSmallerThan[A: Arbitrary](n: Int): Arbitrary[NonEmptyList[A]] = {
-    val listGen = Gen.containerOfN[List,A](n, implicitly[Arbitrary[A]].arbitrary)
-    Apply[Arbitrary].apply2[A, List[A], NonEmptyList[A]](implicitly[Arbitrary[A]], Arbitrary(listGen))((a, rest) =>
+    val listGen = Gen.containerOfN[List,A](n, Arbitrary.arbitrary[A])
+    Apply[Arbitrary].apply2[A, List[A], NonEmptyList[A]](Arbitrary(Arbitrary.arbitrary[A]), Arbitrary(listGen))((a, rest) =>
       NonEmptyList.nel(a, IList.fromList(rest)))
   }
 
   def listSmallerThan[A: Arbitrary](n: Int): Arbitrary[List[A]] =
-    Arbitrary(Gen.containerOfN[List,A](n,implicitly[Arbitrary[A]].arbitrary))
+    Arbitrary(Gen.containerOfN[List,A](n, Arbitrary.arbitrary[A]))
 }

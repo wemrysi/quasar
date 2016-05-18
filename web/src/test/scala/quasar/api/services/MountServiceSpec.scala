@@ -22,6 +22,7 @@ import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.effect.KeyValueStore
 import quasar.fp._, PathyCodecJson._
+import quasar.fp.free.{:+:}
 import quasar.fs._, PathArbitrary._
 import quasar.fs.mount._
 
@@ -44,15 +45,14 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
   val StubFs = FileSystemType("stub")
 
-  type Eff0[A] = Coproduct[MountingF, MountConfigsF, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff[A] = (Task :+: (MountingF :+: MountConfigsF)#λ)#λ[A]
 
   val M = Mounting.Ops[Eff]
 
   type HttpSvc = Request => M.F[Response]
 
   def runTest[R: org.specs2.execute.AsResult](f: HttpSvc => M.F[R]): R = {
-    type MEff[A] = Coproduct[Task, MountConfigsF, A]
+    type MEff[A] = (Task :+: MountConfigsF)#λ[A]
 
     TaskRef(Map[APath, MountConfig]()).flatMap { ref =>
 

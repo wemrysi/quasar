@@ -19,16 +19,13 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
-import quasar.api._
-import quasar.api.ApiErrorEntityDecoder._
-import quasar.api.MessageFormat.JsonContentType
-import quasar.api.MessageFormatGen._
+import quasar.api._,
+  ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
-import quasar.fs._
-import quasar.fs.PathArbitrary._
-import quasar.fp._
+import quasar.fp._, PathyCodecJson._
+import quasar.fp.free.{:+:}
 import quasar.fp.numeric._
-import quasar.fp.PathyCodecJson._
+import quasar.fs._, PathArbitrary._
 
 import argonaut.Json
 import argonaut.Argonaut._
@@ -60,8 +57,7 @@ class DataServiceSpec extends Specification with ScalaCheck with FileSystemFixtu
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.{pathExists, pathNotFound}
 
-  type Eff0[A] = Coproduct[FileSystemFailureF, FileSystem, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff[A] = (Task :+: (FileSystemFailureF :+: FileSystem)#λ)#λ[A]
   type EffM[A] = Free[Eff, A]
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =

@@ -24,10 +24,9 @@ import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
 package object free {
-  type Coproduct3[F[_], G[_], H[_], A] = Coproduct[F, Coproduct[G, H, ?], A]
-  type Coproduct4[F[_], G[_], H[_], I[_], A] = Coproduct[F, Coproduct3[G, H, I, ?], A]
-  type Coproduct5[F[_], G[_], H[_], I[_], J[_], A] = Coproduct[F, Coproduct4[G, H, I, J, ?], A]
-  type Coproduct6[F[_], G[_], H[_], I[_], J[_], K[_], A] = Coproduct[F, Coproduct5[G, H, I, J, K, ?], A]
+  sealed abstract class :+:[F[_], G[_]] {
+    type λ[A] = Coproduct[F, G, A]
+  }
 
   /** Given `F[_]` and `G[_]` such that `F :<: G`, lifts a natural transformation
     * `F ~> F` to `G ~> G`.
@@ -66,33 +65,36 @@ package object free {
       def apply[A](sa: S[A]) = S.prj(sa).fold(g(sa))(f)
     }
 
-  def interpret2[F[_], G[_], M[_]](f: F ~> M, g: G ~> M): Coproduct[F, G, ?] ~> M =
-    new (Coproduct[F, G, ?] ~> M) {
-      def apply[A](fa: Coproduct[F, G, A]) =
+  def interpret2[F[_], G[_], M[_]](f: F ~> M, g: G ~> M): (F :+: G)#λ ~> M =
+    new ((F :+: G)#λ ~> M) {
+      def apply[A](fa: (F :+: G)#λ[A]) =
         fa.run.fold(f, g)
     }
 
-  def interpret3[F[_], G[_], H[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M): Coproduct3[F, G, H, ?] ~> M =
-    new (Coproduct3[F, G, H, ?] ~> M) {
-      def apply[A](fa: Coproduct3[F, G, H, A]) =
+  def interpret3[F[_], G[_], H[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M): (F :+: (G :+: H)#λ)#λ ~> M =
+    new ((F :+: (G :+: H)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: H)#λ)#λ[A]) =
         fa.run.fold(f, interpret2(g, h)(_))
     }
 
-  def interpret4[F[_], G[_], H[_], I[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M): Coproduct4[F, G, H, I, ?] ~> M =
-    new (Coproduct4[F, G, H, I, ?] ~> M) {
-      def apply[A](fa: Coproduct4[F, G, H, I, A]) =
+  def interpret4[F[_], G[_], H[_], I[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M):
+      (F :+: (G :+: (H :+: I)#λ)#λ)#λ ~> M =
+    new ((F :+: (G :+: (H :+: I)#λ)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: (H :+: I)#λ)#λ)#λ[A]) =
         fa.run.fold(f, interpret3(g, h, i)(_))
     }
 
-  def interpret5[F[_], G[_], H[_], I[_], J[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M): Coproduct5[F, G, H, I, J, ?] ~> M =
-    new (Coproduct5[F, G, H, I, J, ?] ~> M) {
-      def apply[A](fa: Coproduct5[F, G, H, I, J, A]) =
+  def interpret5[F[_], G[_], H[_], I[_], J[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M):
+      (F :+: (G :+: (H :+: (I :+: J)#λ)#λ)#λ)#λ ~> M =
+    new ((F :+: (G :+: (H :+: (I :+: J)#λ)#λ)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: J)#λ)#λ)#λ)#λ[A]) =
         fa.run.fold(f, interpret4(g, h, i, j)(_))
     }
 
-  def interpret6[F[_], G[_], H[_], I[_], J[_], K[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M): Coproduct6[F, G, H, I, J, K, ?] ~> M =
-    new (Coproduct6[F, G, H, I, J, K, ?] ~> M) {
-      def apply[A](fa: Coproduct6[F, G, H, I, J, K, A]) =
+  def interpret6[F[_], G[_], H[_], I[_], J[_], K[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M):
+      (F :+: (G :+: (H :+: (I :+: (J :+: K)#λ)#λ)#λ)#λ)#λ ~> M =
+    new ((F :+: (G :+: (H :+: (I :+: (J :+: K)#λ)#λ)#λ)#λ)#λ ~> M) {
+      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: K)#λ)#λ)#λ)#λ)#λ[A]) =
         fa.run.fold(f, interpret5(g, h, i, j, k)(_))
     }
 

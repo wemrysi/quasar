@@ -42,7 +42,7 @@ sealed trait Selector {
 
   def mapUpFieldsM[M[_]: Monad](f: BsonField => M[BsonField]): M[Selector] =
     this match {
-      case Doc(pairs)       => pairs.toList.map { case (field, expr) => f(field).map(_ -> expr) }.sequenceU.map(ps => Doc(ps.toListMap))
+      case Doc(pairs)       => pairs.toList.traverse { case (field, expr) => f(field).map(_ -> expr) }.map(ps => Doc(ps.toListMap))
       case And(left, right) => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(And(_, _))
       case Or(left, right)  => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(Or(_, _))
       case Nor(left, right) => (left.mapUpFieldsM(f) |@| right.mapUpFieldsM(f))(Nor(_, _))

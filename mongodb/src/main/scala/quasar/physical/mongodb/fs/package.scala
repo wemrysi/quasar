@@ -17,11 +17,11 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError, EnvErrT, EnvErr, EnvErrF}
-import quasar.{NameGenerator => NG}
+import quasar.{EnvironmentError, EnvErrT, EnvErr, EnvErrF, NameGenerator => NG}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp._
+import quasar.fp.free.{:+:}
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs.bsoncursor._
@@ -92,8 +92,7 @@ package object fs {
 
   ////
 
-  private type Eff0[A] = Coproduct[EnvErrF, CfgErrF, A]
-  private type Eff[A]  = Coproduct[Task, Eff0, A]
+  private type Eff[A] = (Task :+: (EnvErrF :+: CfgErrF)#λ)#λ[A]
 
   private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
     (for {

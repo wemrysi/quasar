@@ -145,9 +145,7 @@ object Workflow {
           G.apply(f(src))($SimpleMap(_, exprs, scope))
         case $Reduce(src, fn, scope)  => G.apply(f(src))($Reduce(_, fn, scope))
         case $FoldLeft(head, tail)    =>
-          G.apply2(
-            f(head), Traverse[NonEmptyList].sequence(tail.map(f)))(
-            $FoldLeft(_, _))
+          G.apply2(f(head), tail.traverse(f))($FoldLeft(_, _))
         // NB: Would be nice to replace the rest of this impl with the following
         //     line, but the invariant definition of Traverse doesn’t allow it.
         // case p: PipelineF[_]          => PipelineFTraverse.traverseImpl(p)(f)

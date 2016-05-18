@@ -185,7 +185,7 @@ object hierarchical {
           mountedMfs.toMap.filterKeys(_.relativeTo(d).isDefined)
             .toList
             .traverse { case (mnt, g) => evalManage(g, Delete(mnt)) }
-            .map(_.traverseU_(x => x))) // NB: sequenceU_ doesn't exist =(
+            .map(_.sequence_))
 
       def deleteFile(f: AFile) =
         EitherT.fromDisjunction[M](
@@ -321,6 +321,9 @@ object hierarchical {
   ): FileSystemError \/ (ADir, A) = {
     import LogicalPlan._
 
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
+
     type MntA = (ADir, A)
     type F[A] = State[Option[MntA], A]
     type M[A] = FileSystemErrT[F, A]
@@ -352,7 +355,7 @@ object hierarchical {
         // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
         case ReadF(p) => mountFor(mkAbsolute(rootDir, p))
         case _        => ().point[M]
-      }(implicitly,Monad.monadMTMAB).run.run(initMnt) match {
+      }.run.run(initMnt) match {
         // NB: If mnt is empty, then there were no `ReadF`, so we should
         // be able to get a result without needing an actual filesystem,
         // and we just pass it to an arbitrary mount, if there is at

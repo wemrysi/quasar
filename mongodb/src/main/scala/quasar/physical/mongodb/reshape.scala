@@ -52,7 +52,7 @@ final case class Reshape(value: ListMap[BsonField.Name, Reshape.Shape]) {
   def toJs: PlannerError \/ JsFn =
     value.map { case (key, expr) =>
       key.asText -> expr.fold(_.toJs, expression.toJs)
-    }.sequenceU.map { l => JsFn(JsFn.defaultName,
+    }.sequence.map { l => JsFn(JsFn.defaultName,
       jscore.Obj(l.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(JsFn.defaultName)) }))
     }
 

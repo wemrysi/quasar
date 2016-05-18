@@ -85,7 +85,7 @@ object CsvDetect {
     val subtext = text.take(TestChars)
     (parser.parse(subtext) ++ Stream.continually(\/-(Record(Nil)))).take(TestRecords + 1) match {
       case header #:: rows =>
-        ((header |@| rows.toList.sequenceU) { (header, rows) =>
+        ((header |@| rows.toList.sequence) { (header, rows) =>
           TestResult(header.size, rows.map(_.size))
         }).toOption
 

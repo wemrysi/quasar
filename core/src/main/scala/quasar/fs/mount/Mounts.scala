@@ -38,7 +38,7 @@ final class Mounts[A] private (val toMap: Map[ADir, A]) {
     if (toMap contains d)
       ().right
     else
-      toMap.keys.toStream.traverseU_ { mnt =>
+      toMap.keys.toStream.traverse_ { mnt =>
         mnt.relativeTo(d)
           .as("existing mount below: " + posixCodec.printPath(mnt))
           .toLeftDisjunction(()) *>

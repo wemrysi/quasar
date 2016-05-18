@@ -18,7 +18,8 @@ package quasar.fs.mount
 
 import quasar.Predef.Unit
 import quasar.effect._
-import quasar.fp.{liftFT, injectNT, free}
+import quasar.fp.{liftFT, injectNT}
+import quasar.fp.free, free.{:+:}
 import quasar.fs.FileSystem
 import hierarchical.MountedResultHF
 
@@ -91,9 +92,8 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
 
   ////
 
-  private type ViewEff0[A] = Coproduct[MonotonicSeqF, FileSystem, A]
-  private type ViewEff1[A] = Coproduct[ViewStateF, ViewEff0, A]
-  private type ViewEff[A]  = Coproduct[MountConfigsF, ViewEff1, A]
+  private type ViewEff[A] =
+    (MountConfigsF :+: (ViewStateF :+: (MonotonicSeqF :+: FileSystem)#λ)#λ)#λ[A]
 
   private val fsMounter = FileSystemMounter[F](fsDef)
 

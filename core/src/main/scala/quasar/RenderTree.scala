@@ -194,7 +194,7 @@ object RenderTree extends RenderTreeInstances {
           case RenderedTree(_, _, Nil) => state[Int, Cord](Cord(""))
           case RenderedTree(_, _, children) => {
             for {
-              nodes <- children.map(render(_)).sequenceU
+              nodes <- children.traverse(render(_))
             } yield nodes.map(cn => Cord("  ") ++ n ++ " -> " ++ cn.name ++ ";\n" ++ cn.dot).concatenate
           }
         }
@@ -343,6 +343,11 @@ object RenderTree extends RenderTreeInstances {
   }
 
   val windowCount = new java.util.concurrent.atomic.AtomicInteger()
+
+  implicit def ntRenderTree[F[_], A: RenderTree](
+    implicit F: RenderTree ~> (RenderTree ∘ F)#λ):
+      RenderTree[F[A]] =
+    F(RenderTree[A])
 
   implicit def fixRenderTree[F[_]](implicit RF: RenderTree ~> λ[α => RenderTree[F[α]]]):
       RenderTree[Fix[F]] =

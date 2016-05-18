@@ -45,7 +45,7 @@ class CsvSpec extends Specification {
   }
 
   "bestParse" should {
-    def parse(text: String) = bestParse(CsvParser.AllParsers)(text).map(_.toList.sequenceU).join
+    def parse(text: String) = bestParse(CsvParser.AllParsers)(text).map(_.toList.sequence).join
 
     "parse standard format" in {
       parse(Standard) must_==

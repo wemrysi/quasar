@@ -78,14 +78,13 @@ object execute {
                   sandboxAbs(res.map(unsandbox(path) </> _).merge))
 
               parseRes tuple absDestination
-            } traverseU { case (expr, out) =>
+            } traverse { case (expr, out) =>
               Q.executeQuery(expr, requestVars(req), out).run.run.run map {
                 case (phases, result) =>
                   result.leftMap(_.toApiError).flatMap(_.leftMap(_.toApiError))
                     .bimap(_ :+ ("phases" := phases), f => Json(
                       "out"    := posixCodec.printPath(f),
-                      "phases" := phases
-                    ))
+                      "phases" := phases))
               }
             })
           }

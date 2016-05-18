@@ -181,7 +181,7 @@ object LogicalPlan {
 
   implicit val LogicalPlanBinder: Binder[LogicalPlan] = new Binder[LogicalPlan] {
       type G[A] = Map[Symbol, A]
-      val G = implicitly[Traverse[G]]
+      val G = Traverse[G]
 
       def initial[A] = Map[Symbol, A]()
 
@@ -284,7 +284,7 @@ object LogicalPlan {
 
       case InvokeF(func, args) => for {
         types <- func.untype(typ)
-        args0 <- types.align(args).traverseU(_.onlyBoth match {
+        args0 <- types.align(args).traverse(_.onlyBoth match {
           case Some((t, arg)) => inferTypes(t, arg).disjunction
           case None =>
             (SemanticError.wrongArgumentCount(func, types.length, args.length))
@@ -387,12 +387,12 @@ object LogicalPlan {
         case InvokeF(structural.FlattenArray, args) =>
           for {
             types <- lift(structural.FlattenArray.apply(args.map(_.inferred)).disjunction)
-            consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))).sequenceU)
+            consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.traverse(ensureConstraint(_, Constant(Data.Arr(List(Data.NA))))))
             plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenArray, consts))
           } yield plan
         case InvokeF(structural.FlattenMap, args) => for {
           types <- lift(structural.FlattenMap.apply(args.map(_.inferred)).disjunction)
-          consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.map(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))).sequenceU)
+          consts <- emitName[SemDisj, List[Fix[LogicalPlan]]](args.traverse(ensureConstraint(_, Constant(Data.Obj(ListMap("" -> Data.NA))))))
           plan  <- unifyOrCheck(inf, types, Invoke(structural.FlattenMap, consts))
         } yield plan
         case InvokeF(f, args) => f.effect match {
@@ -416,9 +416,13 @@ object LogicalPlan {
   type SemNames[A] = NameT[SemDisj, A]
 
   def ensureCorrectTypes(term: Fix[LogicalPlan]):
-      ValidationNel[SemanticError, Fix[LogicalPlan]] =
+      ValidationNel[SemanticError, Fix[LogicalPlan]] = {
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import StateT.stateTMonadState
+
     inferTypes(Type.Top, term).flatMap(
-      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ)(implicitly, Monad.monadMTMAB).map(appConst(_, Constant(Data.NA))).evalZero.validation)
+      cofCataM[LogicalPlan, SemNames, Type, ConstrainedPlan](_)(checkTypesƒ).map(appConst(_, Constant(Data.NA))).evalZero.validation)
+  }
 
   // TODO: Generalize this to Binder
   def lpParaZygoHistoM[M[_]: Monad, A, B](
@@ -429,9 +433,9 @@ object LogicalPlan {
     def loop(t: Fix[LogicalPlan], bind: Map[Symbol, Cofree[LogicalPlan, (B, A)]]):
         M[Cofree[LogicalPlan, (B, A)]] = {
       lazy val default: M[Cofree[LogicalPlan, (B, A)]] = for {
-        lp <- (t.unFix.map(x => for {
+        lp <- t.unFix.traverse(x => for {
           co <- loop(x, bind)
-        } yield ((x, co.head._1), co))).sequence
+        } yield ((x, co.head._1), co))
         (xb, co) = lp.unfzip
         b = f(xb)
         a <- g(co)

@@ -219,12 +219,12 @@ object WorkflowBuilder {
   final case class SpliceBuilderF[A](src: A, structure: List[DocContents[Expr]])
       extends WorkflowBuilderF[A] {
     def toJs: PlannerError \/ JsFn =
-      structure.map {
+      structure.traverse {
         case Expr(unknown) => exprToJs(unknown)
-        case Doc(known)    => known.toList.map { case (k, v) =>
+        case Doc(known)    => known.toList.traverse { case (k, v) =>
           exprToJs(v).map(k.asText -> _)
-        }.sequenceU.map(ms => JsFn(jsBase, jscore.Obj(ms.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(jsBase)) }.toListMap)))
-      }.sequenceU.map(srcs =>
+        }.map(ms => JsFn(jsBase, jscore.Obj(ms.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(jsBase)) }.toListMap)))
+      }.map(srcs =>
         JsFn(jsBase, jscore.SpliceObjects(srcs.map(_(jscore.Ident(jsBase))))))
   }
   object SpliceBuilder {
@@ -235,11 +235,11 @@ object WorkflowBuilder {
   final case class ArraySpliceBuilderF[A](src: A, structure: List[ArrayContents[Expr]])
       extends WorkflowBuilderF[A] {
     def toJs: PlannerError \/ JsFn =
-      structure.map {
+      structure.traverse {
         case Expr(unknown) => exprToJs(unknown)
-        case Array(known)  => known.map(exprToJs).sequenceU.map(
+        case Array(known)  => known.traverse(exprToJs).map(
             ms => JsFn(jsBase, jscore.Arr(ms.map(_(jscore.Ident(jsBase))))))
-      }.sequenceU.map(srcs =>
+      }.map(srcs =>
         JsFn(jsBase, jscore.SpliceArrays(srcs.map(_(jscore.Ident(jsBase))))))
   }
   object ArraySpliceBuilder {
@@ -322,9 +322,9 @@ object WorkflowBuilder {
       def rewriteExpr(t: Expression)(applyExpr: PartialFunction[ExprOp[Expr], Option[Expr]]): Option[Expr] =
         t.cataM[Option, Expr] { x =>
           applyExpr.lift(x).getOrElse {
-            x.sequenceU.fold(
+            x.sequence.fold(
               κ(for {
-                op <- x.map(exprToJs).sequenceU.toOption
+                op <- x.traverse(exprToJs).toOption
                 js <- toJsSimpleƒ(op).toOption
               } yield -\/(js)),
               {
@@ -339,7 +339,7 @@ object WorkflowBuilder {
           for {
             xs <- inner.map { case (n, x) =>
                     jscore.Select(jscore.Ident(js.param), n.value) -> exprToJs(x)
-                  }.sequenceU.toOption
+                  }.sequence.toOption
             expr1 <- js.expr.apoM[Fix, Option, jscore.JsCoreF] {
                     case t @ jscore.Access(b, _) if b == jscore.Ident(js.param) =>
                       xs.get(t).map(_(jscore.Ident(js.param)).unFix.map(_.left))
@@ -465,8 +465,8 @@ object WorkflowBuilder {
 
   def commonMap[K, A, B](m: ListMap[K, A \/ B])(f: B => PlannerError \/ A):
       PlannerError \/ (ListMap[K, A] \/ ListMap[K, B]) = {
-    m.sequenceU.fold(
-      κ((m ∘ (_.fold(\/.right, f))).sequenceU.map(\/.left)),
+    m.sequence.fold(
+      κ((m ∘ (_.fold(\/.right, f))).sequence.map(\/.left)),
       l => \/-(\/-(l)))
   }
 
@@ -484,7 +484,7 @@ object WorkflowBuilder {
         // At least one argument has no deref (e.g. $$ROOT)
         def case1(src: WorkflowBuilder, input: WorkflowBuilder, op: PartialFunction[List[BsonField], Workflow => Workflow], fields: List[Base]): M[CollectionBuilderF] = {
           emitSt(freshName).flatMap(name =>
-            fields.map(f => (DocField(name) \\ f.toDocVar).deref).sequence.fold(
+            fields.traverse(f => (DocField(name) \\ f.toDocVar).deref).fold(
               scala.sys.error("prefixed ${name}, but still no field"))(
               op.lift(_).fold(
                 fail[CollectionBuilderF](UnsupportedFunction(set.Filter, "failed to build operation")))(
@@ -532,7 +532,7 @@ object WorkflowBuilder {
             }
           case _ =>
             foldBuilders(src, inputs).flatMap { case (input1, base, fields) =>
-              fields.map(_.toDocVar.deref).sequence.fold(
+              fields.traverse(_.toDocVar.deref).fold(
                 case1(src, input1, op, fields))(
                 case2(src, input1, base, op, _))
             }
@@ -575,7 +575,7 @@ object WorkflowBuilder {
         }
       case ArrayBuilderF(src, shape) =>
         workflow(src).flatMap { case (wf, base) =>
-          lift(shape.map(exprToJs).sequenceU.map(jsExprs =>
+          lift(shape.traverse(exprToJs).map(jsExprs =>
             CollectionBuilderF(
               chain(wf,
                 $simpleMap(NonEmptyList(
@@ -818,7 +818,7 @@ object WorkflowBuilder {
     fold1Builders(wbs).fold[M[WorkflowBuilder]](
       fail(InternalError("impossible – no arguments")))(
       _.flatMap { case (wb, exprs) =>
-        lift(exprs.traverseU(toJs).map(jses => Fix(normalize(ExprBuilderF(wb, -\/(JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase)))))))))))
+        lift(exprs.traverse(toJs).map(jses => Fix(normalize(ExprBuilderF(wb, -\/(JsFn(jsBase, f(jses.map(_(jscore.Ident(jsBase)))))))))))
       })
 
   def makeObject(wb: WorkflowBuilder, name: String): WorkflowBuilder =
