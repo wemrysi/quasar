@@ -1,4 +1,5 @@
 import github.GithubPlugin._
+import quasar.project._
 import quasar.project.build._
 
 import java.lang.Integer
@@ -149,6 +150,12 @@ lazy val root = project.in(file("."))
 
 lazy val core = project
   .settings(oneJarSettings: _*)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true,
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled),
+    buildInfoPackage := "quasar.build")
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val main = project
@@ -172,11 +179,18 @@ lazy val mongodb = project
 lazy val repl = project
   .dependsOn(main % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .settings(
+    fork in run := true,
+    connectInput in run := true,
+    outputStrategy := Some(StdoutOutput))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val web = project
   .dependsOn(main % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
+  .settings(
+    mainClass in Compile := Some("quasar.server.Server"),
+    libraryDependencies ++= Dependencies.web)
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests
