@@ -98,6 +98,9 @@ object QueryFile {
   final case class FileExists(file: AFile)
     extends QueryFile[Boolean]
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
     extends LiftedOps[QueryFile, S] {

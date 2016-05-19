@@ -19,7 +19,8 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._
 import quasar.effect.{KeyValueStore, Failure}
-import quasar.fp.{free, liftMT, TaskRef}
+import quasar.fp.{liftMT, TaskRef}
+import quasar.fp.free, free.{:+:}
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -34,9 +35,8 @@ import scalaz.concurrent.Task
 class RestApiSpecs extends Specification {
   import InMemory._
 
-  type Eff0[A] = Coproduct[FileSystemFailureF, MountingFileSystem, A]
-  type Eff1[A] = Coproduct[MountConfigsF, Eff0, A]
-  type Eff[A]  = Coproduct[Task, Eff1, A]
+  type Eff[A] =
+    (Task :+: (MountConfigsF :+: (FileSystemFailureF :+: MountingFileSystem)#λ)#λ)#λ[A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {

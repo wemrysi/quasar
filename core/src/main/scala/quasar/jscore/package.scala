@@ -198,17 +198,17 @@ package object jscore {
         case LiteralF(lit)           => G.point(LiteralF(lit))
         case IdentF(name)            => G.point(IdentF(name))
         case AccessF(expr, key)      => G.apply2(f(expr), f(key))(AccessF(_, _))
-        case CallF(expr, args)       => G.apply2(f(expr), args.map(f).sequence)(CallF(_, _))
-        case NewF(name, args)        => G.map(args.map(f).sequence)(NewF(name, _))
+        case CallF(expr, args)       => G.apply2(f(expr), args.traverse(f))(CallF(_, _))
+        case NewF(name, args)        => G.map(args.traverse(f))(NewF(name, _))
         case IfF(cond, cons, alt)    => G.apply3(f(cond), f(cons), f(alt))(IfF(_, _, _))
         case UnOpF(op, arg)          => G.map(f(arg))(UnOpF(op, _))
         case BinOpF(op, left, right) => G.apply2(f(left), f(right))(BinOpF(op, _, _))
-        case ArrF(values)            => G.map(values.map(f).sequence)(ArrF(_))
+        case ArrF(values)            => G.map(values.traverse(f))(ArrF(_))
         case FunF(params, body)      => G.map(f(body))(FunF(params, _))
         case ObjF(values)            => G.map((values ∘ f).sequence)(ObjF(_))
         case LetF(name, expr, body)  => G.apply2(f(expr), f(body))(LetF(name, _, _))
-        case SpliceObjectsF(srcs)    => G.map(srcs.map(f).sequence)(SpliceObjectsF(_))
-        case SpliceArraysF(srcs)     => G.map(srcs.map(f).sequence)(SpliceArraysF(_))
+        case SpliceObjectsF(srcs)    => G.map(srcs.traverse(f))(SpliceObjectsF(_))
+        case SpliceArraysF(srcs)     => G.map(srcs.traverse(f))(SpliceArraysF(_))
       }
     }
   }

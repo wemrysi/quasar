@@ -17,13 +17,14 @@
 package quasar
 
 import quasar.Predef._
+import quasar.RenderTree.ops._
 import quasar.fp._
 import quasar.fs.prettyPrint
 import quasar.sql._
 
 import scala.AnyRef
 
-import matryoshka.{ToIdOps => toIdOps, _}, Recursive.ops._, FunctorT.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import monocle._
 import pathy.Path, Path._
 import scalaz._, Scalaz._, Validation.{success, failure}
@@ -295,7 +296,7 @@ trait SemanticAnalysis {
           v match {
             case Empty               => Terminal(ProvenanceNodeType, Some("Empty"))
             case Value               => Terminal(ProvenanceNodeType, Some("Value"))
-            case Relation(value)     => ExprRelationRenderTree(implicitly[RenderTree[Unit]]).render(value).copy(nodeType = ProvenanceNodeType)
+            case Relation(value)     => value.render.copy(nodeType = ProvenanceNodeType)
             case Either(left, right) => nest(self.render(left), self.render(right), "|")
             case Both(left, right)   => nest(self.render(left), self.render(right), "&")
         }
@@ -412,7 +413,7 @@ trait SemanticAnalysis {
         NonEmptyList[SemanticError] \/ ?,
         Sql,
         Cofree[Sql, Annotations]] =
-    e => attributeElgotM[(Scope, ?), ValidSem].apply[Sql, Annotations](
+    e => attributeElgotM[(Scope, ?), ValidSem][Sql, Annotations](
       ElgotAlgebraMZip[(Scope, ?), ValidSem, Sql].zip(
         synthElgotMƒ,
         inferProvenanceƒ)).apply(e.leftMap(_._1)).disjunction
@@ -420,8 +421,7 @@ trait SemanticAnalysis {
   // NB: projectSortKeys ⋙ (identifySynthetics &&& (scopeTables ⋙ inferProvenance))
   def AllPhases[T[_[_]]: Recursive: Corecursive](expr: T[Sql]) =
     (Scope(TableScope(Map()), BindingScope(Map())), expr.transCata(orOriginal(projectSortKeysƒ)))
-      .coelgotM[NonEmptyList[SemanticError] \/ ?](
-      addAnnotations, scopeTablesƒ.apply(_).disjunction)
+      .coelgotM(addAnnotations, scopeTablesƒ.apply(_).disjunction)
 }
 
 object SemanticAnalysis extends SemanticAnalysis

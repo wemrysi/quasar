@@ -17,16 +17,14 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.api._
-import quasar.api.matchers._
-import quasar.api.ApiErrorEntityDecoder._
 import quasar.{Variables, VariablesArbitrary}
+import quasar.api._, ApiErrorEntityDecoder._
+import quasar.api.matchers._
 import quasar.effect.KeyValueStore
-import quasar.fp.{liftMT, free}
+import quasar.fp.liftMT
+import quasar.fp.free
 import quasar.fp.prism._
-import quasar.fs._
-import quasar.fs.PathArbitrary._
-import quasar.fs.InMemory._
+import quasar.fs._, InMemory._, PathArbitrary._
 import quasar.fs.mount._
 import quasar.sql._
 

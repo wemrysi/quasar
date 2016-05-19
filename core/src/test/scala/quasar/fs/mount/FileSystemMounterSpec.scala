@@ -16,8 +16,9 @@
 
 package quasar.fs.mount
 
-import quasar.Predef.{implicitly, String}
-import quasar.fp.{free, liftMT}
+import quasar.Predef.String
+import quasar.fp.{liftMT}
+import quasar.fp.free, free.{:+:}
 import quasar.fs.{FileSystem, FileSystemType, PathError, ADir}
 import quasar.effect._
 
@@ -42,13 +43,12 @@ class FileSystemMounterSpec extends mutable.Specification {
   type MountedFs[A]  = AtomicRef[ResMnts, A]
   type MountedFsF[A] = Coyoneda[MountedFs, A]
 
-  type Eff0[A] = Coproduct[AbortF, MountedFsF, A]
-  type Eff[A]  = Coproduct[AbortM, Eff0, A]
+  type Eff[A] = (AbortM :+: (AbortF :+: MountedFsF)#λ)#λ[A]
   type EffM[A] = Free[Eff, A]
 
   type EffR[A] = (ResMnts, String \/ A)
 
-  val abort = Failure.Ops[String, AbortF](implicitly, implicitly[AbortF :<: AbortF])
+  val abort = Failure.Ops[String, AbortF]
 
   def eval(rms: ResMnts): EffM ~> EffR =
     new (EffM ~> EffR) {

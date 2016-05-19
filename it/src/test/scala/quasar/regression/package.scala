@@ -17,21 +17,21 @@
 package quasar
 
 import quasar.Predef.{Long, Map}
-import quasar.fs.{QueryFile, FileSystem, ADir}
-import quasar.fp.{free, TaskRef}
 import quasar.effect._
+import quasar.fp.{TaskRef}
+import quasar.fp.free, free.{:+:}
+import quasar.fs.{QueryFile, FileSystem, ADir}
 
 import scalaz.{Failure => _, _}
-import scalaz.syntax.apply._
 import scalaz.concurrent._
+import scalaz.syntax.apply._
 
 package object regression {
   import quasar.fs.mount.hierarchical.MountedResultHF
 
-  type FileSystemIO[A] = Coproduct[Task, FileSystem, A]
+  type FileSystemIO[A] = (Task :+: FileSystem)#λ[A]
 
-  type HfsIO0[A] = Coproduct[MountedResultHF, Task, A]
-  type HfsIO[A]  = Coproduct[MonotonicSeqF, HfsIO0, A]
+  type HfsIO[A] = (MonotonicSeqF :+: (MountedResultHF :+: Task)#λ)#λ[A]
 
   val interpretHfsIO: Task[HfsIO ~> Task] = {
     import QueryFile.ResultHandle

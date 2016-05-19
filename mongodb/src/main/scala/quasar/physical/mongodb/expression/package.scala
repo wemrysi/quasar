@@ -207,7 +207,7 @@ package object expression {
         case Bson.Text(v)         => js(Js.Str(v))
         case Bson.Null            => js(Js.Null)
         case Bson.Doc(values)     => values.map { case (k, v) => jscore.Name(k) -> const(v) }.sequenceU.map(jscore.Obj(_))
-        case Bson.Arr(values)     => values.toList.map(const(_)).sequenceU.map(jscore.Arr(_))
+        case Bson.Arr(values)     => values.toList.traverse(const(_)).map(jscore.Arr(_))
         case o @ Bson.ObjectId(_) => \/-(toJsObjectId(o))
         case d @ Bson.Date(_)     => \/-(toJsDate(d))
         // TODO: implement the rest of these (see SD-451)
@@ -471,7 +471,7 @@ package object expression {
     * handling. */
   def toJsƒ(t: ExprOp[(Fix[ExprOp], PlannerError \/ JsFn)]): PlannerError \/ JsFn = {
     def expr = Fix(t.map(_._1))
-    def js = t.map(_._2).sequenceU
+    def js = t.traverse(_._2)
     translate.lift(expr).getOrElse(js.flatMap(toJsSimpleƒ))
   }
 

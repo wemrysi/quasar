@@ -623,9 +623,9 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
       _ match {
         case MakeArrayN.Attr(array) =>
-          array.map(d => isSortDir(d.tail)).sequence
+          array.traverse(d => isSortDir(d.tail))
         case Cofree(_, ConstantF(Data.Arr(dirs))) =>
-          dirs.map(d => isSortDir(ConstantF(d))).sequence
+          dirs.traverse(d => isSortDir(ConstantF(d)))
         case n => isSortDir(n.tail).map(List(_))
       }
     }
@@ -738,7 +738,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
                 val on = a2.map(_._2)
                 HasSelector(a2).flatMap { case (sel, inputs) =>
                   if (!inputs.exists(breaksEvalOrder(on, _)))
-                    inputs.map(_(on)).sequence.map(filter(wf, _, sel))
+                    inputs.traverse(_(on)).map(filter(wf, _, sel))
                   else
                     HasWorkflow(a2).map(wf2 => filter(wf, List(wf2), {
                       case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
@@ -746,7 +746,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
                 } <+>
                   HasJs(a2).flatMap(js =>
                     // TODO: have this pass the JS args as the list of inputs … but right now, those inputs get converted to BsonFields, not ExprOps.
-                    js._2.map(_(on)).sequence.map(args => filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
+                    js._2.traverse(_(on)).map(args => filter(wf, Nil, { case Nil => Selector.Where(js._1(args.map(κ(JsFn.identity)))(jscore.ident("this")).toJs) })))
               }))
             case _ => fail(FuncArity(func, args.length))
           }
@@ -763,8 +763,8 @@ object MongoDbPlanner extends Planner[Crystallized] {
                   val (leftKeys, rightKeys) = c.unzip
                   lift((HasWorkflow(left) |@|
                     HasWorkflow(right) |@|
-                    leftKeys.traverseU(HasWorkflow) |@|
-                    rightKeys.traverseU(HasWorkflow))((l, r, lk, rk) =>
+                    leftKeys.traverse(HasWorkflow) |@|
+                    rightKeys.traverse(HasWorkflow))((l, r, lk, rk) =>
                     join(l, r, func, lk, makeKeys(leftKeys, comp), rk, makeKeys(rightKeys, comp)))).join
                 })
             case _ => fail(FuncArity(func, args.length))
@@ -910,7 +910,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
     def splitConditions: Ann => Option[List[(Ann, Ann)]] = _.tail match {
       case InvokeF(relations.And, terms) =>
-        terms.map(splitConditions).sequence.map(_.concatenate)
+        terms.traverse(splitConditions).map(_.concatenate)
       case InvokeF(relations.Eq, List(left, right)) => Some(List((left, right)))
       case ConstantF(Data.Bool(true)) => Some(List())
       case _ => None
@@ -918,7 +918,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
 
     def findArgs(partials: List[PartialJs], comp: Ann):
         OutputM[List[List[WorkflowBuilder]]] =
-      partials.traverseU(_._2.traverseU(_(comp.map(_._2))))
+      partials.traverse(_._2.traverse(_(comp.map(_._2))))
 
     def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder]]):
         List[JsFn] =
@@ -1021,7 +1021,7 @@ object MongoDbPlanner extends Planner[Crystallized] {
   val annotateƒ =
     GAlgebraZip[(Fix[LogicalPlan], ?), LogicalPlan].zip(
       selectorƒ,
-      ToAlgebraOps(jsExprƒ).generalize[(Fix[LogicalPlan], ?)])
+      toAlgebraOps(jsExprƒ).generalize[(Fix[LogicalPlan], ?)])
 
   // FIXME: This removes all type checks from join conditions. Shouldn’t do
   //        this, but currently need it in order to align the joins.
@@ -1044,11 +1044,11 @@ object MongoDbPlanner extends Planner[Crystallized] {
         case TypecheckF(expr, typ, cont, fb) =>
           alignCondition(lt, rt)(cont).map(Typecheck(expr, typ, _, fb))
         case InvokeF(And, terms) =>
-          terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(And, _))
+          terms.traverse(alignCondition(lt, rt)).map(Invoke(And, _))
         case InvokeF(Or, terms) =>
-          terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(Or, _))
+          terms.traverse(alignCondition(lt, rt)).map(Invoke(Or, _))
         case InvokeF(Not, terms) =>
-          terms.map(alignCondition(lt, rt)).sequenceU.map(Invoke(Not, _))
+          terms.traverse(alignCondition(lt, rt)).map(Invoke(Not, _))
         case x @ InvokeF(func, List(left, right)) if func.effect ≟ Mapping =>
           if (containsTableRefs(left, lt, right, rt))
             \/-(Invoke(func, List(left, right)))
@@ -1070,6 +1070,10 @@ object MongoDbPlanner extends Planner[Crystallized] {
   }
 
   def plan(logical: Fix[LogicalPlan]): EitherWriter[PlannerError, Crystallized] = {
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
+    import StateT.stateTMonadState
+
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
     type PlanT[X[_], A] = EitherT[X, PlannerError, A]
@@ -1077,11 +1081,6 @@ object MongoDbPlanner extends Planner[Crystallized] {
     type W[A]           = (PhaseResults, A)
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
-
-    // Needed in order to resolve an ambiguous instances for monadMTMAB
-    // I think either one of them would be fine, so just picking one
-    // so that it compiles
-    import Monad.monadMTMAB
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>

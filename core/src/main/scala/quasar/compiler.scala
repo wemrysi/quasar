@@ -24,7 +24,7 @@ import quasar.sql._
 import quasar.std.StdLib._
 import quasar.SemanticAnalysis._, quasar.SemanticError._
 
-import matryoshka.{ToIdOps => toAllOps, _}, Recursive.ops._, FunctorT.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path._
 import scalaz.{Tree => _, _}, Scalaz._
 
@@ -191,7 +191,7 @@ trait Compiler[F[_]] {
         emit(_))
 
     def compileCases(cases: List[Case[CoExpr]], default: Fix[LogicalPlan])(f: Case[CoExpr] => CompilerM[(Fix[LogicalPlan], Fix[LogicalPlan])]) =
-      cases.traverseU(f).map(_.foldRight(default) {
+      cases.traverse(f).map(_.foldRight(default) {
         case ((cond, expr), default) => Fix(relations.Cond(cond, expr, default))
       })
 
@@ -270,7 +270,7 @@ trait Compiler[F[_]] {
 
     def compileFunction(func: Func, args: List[CoExpr]):
         CompilerM[Fix[LogicalPlan]] =
-      args.traverseU(compile0).map(args => Fix(func.apply(args: _*)))
+      args.traverse(compile0).map(args => Fix(func.apply(args: _*)))
 
     def buildRecord(names: List[Option[String]], values: List[Fix[LogicalPlan]]):
         Fix[LogicalPlan] = {
@@ -356,7 +356,7 @@ trait Compiler[F[_]] {
               }
 
             relations.foldRight(
-              projs.traverseU(compile0).map(buildRecord(names, _)))(
+              projs.traverse(compile0).map(buildRecord(names, _)))(
               (relations, select) => {
                 val stepBuilder = step(relations)
                 stepBuilder(compileRelation(relations).some) {
@@ -367,7 +367,7 @@ trait Compiler[F[_]] {
                   stepBuilder(filtered) {
                     val grouped = groupBy.map(groupBy =>
                       (CompilerState.rootTableReq ⊛
-                        groupBy.keys.traverseU(compile0)) ((src, keys) =>
+                        groupBy.keys.traverse(compile0)) ((src, keys) =>
                         Fix(GroupBy(src, Fix(MakeArrayN(keys: _*))))))
 
                     stepBuilder(grouped) {
@@ -383,7 +383,7 @@ trait Compiler[F[_]] {
                             for {
                               t <- CompilerState.rootTableReq
                               flat = names.foldMap(_.toList)
-                              keys <- CompilerState.addFields(flat)(orderBy.keys.traverseU { case (_, key) => compile0(key) })
+                              keys <- CompilerState.addFields(flat)(orderBy.keys.traverse { case (_, key) => compile0(key) })
                               orders = orderBy.keys.map { case (order, _) => LogicalPlan.Constant(Data.Str(order.toString)) }
                             } yield Fix(OrderBy(t, Fix(MakeArrayN(keys: _*)), Fix(MakeArrayN(orders: _*)))))
 
@@ -426,7 +426,7 @@ trait Compiler[F[_]] {
           ShiftArray(MakeArrayN(vs: _*).embed).embed)
 
       case ArrayLiteral(exprs) =>
-        exprs.traverseU(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
+        exprs.traverse(compile0).map(elems => Fix(MakeArrayN(elems: _*)))
 
       case MapLiteral(exprs) =>
         exprs.traverse(_.bitraverse(compile0, compile0)).map(elems =>

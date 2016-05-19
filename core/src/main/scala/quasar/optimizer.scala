@@ -86,7 +86,7 @@ object Optimizer {
     case InvokeF(DeleteField, List(src, field)) =>
       src._2.map(_.filterNot(_ == field._1))
     case InvokeF(MakeObject, List(field, src)) => Some(List(field._1))
-    case InvokeF(ObjectConcat, srcs) => srcs.map(_._2).sequence.map(_.flatten)
+    case InvokeF(ObjectConcat, srcs) => srcs.traverse(_._2).map(_.flatten)
     // NB: the remaining InvokeF cases simply pass through or combine shapes
     //     from their inputs. It would be great if this information could be
     //     handled generically by the type system.

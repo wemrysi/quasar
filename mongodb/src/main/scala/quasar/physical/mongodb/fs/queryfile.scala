@@ -81,6 +81,9 @@ private final class QueryFileInterpreter[C](
   import Recursive.ops._
   import queryfile._
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import WriterT.writerTMonadListen
+
   type QRT[F[_], A] = QueryRT[F, C, A]
   type MQ[A]        = QRT[MongoDbIO, A]
 

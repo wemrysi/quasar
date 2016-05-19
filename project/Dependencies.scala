@@ -32,7 +32,7 @@ object Dependencies {
     "io.argonaut"       %% "argonaut-scalaz"           % "6.2-M1"                 % "compile, test",
     "org.jboss.aesh"    %  "aesh"                      % "0.66.8"                  % "compile, test",
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion               % "compile, test",
-    "com.slamdata"      %% "matryoshka-core"           % "0.9.0"                  % "compile",
+    "com.slamdata"      %% "matryoshka-core"           % "0.10.2"                 % "compile",
     "com.slamdata"      %% "pathy-core"                % pathyVersion             % "compile",
     "com.github.mpilquist" %% "simulacrum"             % "0.7.0"                  % "compile, test",
     "org.http4s"        %% "http4s-core"               % http4sVersion            % "compile",

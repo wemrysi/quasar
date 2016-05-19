@@ -48,7 +48,7 @@ object Collection {
       tpl  <- dbNameAndRest(path)
       (db, r) = tpl
       ss   <- r.toNel.toRightDisjunction("path names a database, but no collection")
-      segs <- ss.traverseU(CollectionSegmentParser(_))
+      segs <- ss.traverse(CollectionSegmentParser(_))
       coll =  segs.toList mkString "."
       len  =  utf8length(db) + 1 + utf8length(coll)
       _    <- if (len > 120)

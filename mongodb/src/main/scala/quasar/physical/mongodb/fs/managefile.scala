@@ -91,7 +91,7 @@ object managefile {
       colls    <- userCollectionsInDir(src)
       srcFiles =  colls map (_.asFile)
       dstFiles =  srcFiles.map(_ relativeTo (src) map (dst </> _)).unite
-      _        <- srcFiles zip dstFiles traverseU {
+      _        <- srcFiles zip dstFiles traverse {
                     case (s, d) => moveFile(s, d, sem)
                   }
     } yield ()
@@ -175,7 +175,7 @@ object managefile {
 
       case Some(_) =>
         collectionsInDir(dir)
-          .flatMap(_.traverseU_(c => dropCollection(c).liftM[FileSystemErrT]))
+          .flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
 
       case None if depth(dir) == 0 =>
         dropAllDatabases.liftM[FileSystemErrT]

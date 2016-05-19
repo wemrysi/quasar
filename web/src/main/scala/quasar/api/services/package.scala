@@ -70,7 +70,7 @@ package object services {
     param: F[ValidationNel[ParseFailure, A]],
     msg: NonEmptyList[ParseFailure] => String
   ): ApiError \/ F[A] =
-    param.traverseU(_.disjunction.leftMap(nel =>
+    param.traverse(_.disjunction.leftMap(nel =>
       ApiError.fromMsg_(BadRequest withReason "Invalid query parameter.", msg(nel))))
 
   def requiredHeader(key: HeaderKey.Extractable, request: Request): ApiError \/ key.HeaderT =

@@ -94,15 +94,15 @@ package object api {
       def strings(json: Json): String \/ List[String] =
         json.string.map(str => \/-(str :: Nil)).getOrElse(
           json.array.map { vs =>
-            vs.map(v => v.string \/> ("expected string in array; found: " + v.toString)).sequenceU
+            vs.traverse(v => v.string \/> ("expected string in array; found: " + v.toString))
           }.getOrElse(-\/("expected a string or array of strings; found: " + json)))
 
       for {
         json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
         obj <- json.obj \/> ("expected a JSON object; found: " + json.toString)
-        values <- obj.toList.map { case (k, v) =>
+        values <- obj.toList.traverse { case (k, v) =>
           strings(v).map(CaseInsensitiveString(k) -> _)
-        }.sequenceU
+        }
       } yield Map(values: _*)
     }
 

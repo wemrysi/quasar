@@ -80,11 +80,11 @@ object DataCodec {
         // For Object, if we find one of the above keys, which means we serialized something particular
         // to the precise encoding, wrap this object in another object with a single field with the name ObjKey
         case Obj(value) => for {
-          obj <- value.toList.map { case (k, v) => encode(v).map(k -> _) }.sequenceU.map(Json.obj(_: _*))
+          obj <- value.toList.traverse { case (k, v) => encode(v).map(k -> _) }.map(Json.obj(_: _*))
         } yield value.keys.find(_.startsWith("$")).fold(obj)(κ(Json.obj(ObjKey -> obj)))
 
-        case Arr(value) => value.map(encode).sequenceU.map(vs => Json.array(vs: _*))
-        case Set(value) => value.map(encode).sequenceU.map(vs => Json.obj(SetKey -> Json.array(vs: _*)))
+        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
+        case Set(value) => value.traverse(encode).map(vs => Json.obj(SetKey -> Json.array(vs: _*)))
 
         case Timestamp(value) => \/-(Json.obj(TimestampKey -> jString(value.toString)))
         case Date(value)      => \/-(Json.obj(DateKey      -> jString(value.toString)))
@@ -108,7 +108,7 @@ object DataCodec {
           case _           => \/-(Data.Dec(num.toBigDecimal))
         },
         str => \/-(Data.Str(str)),
-        arr => arr.map(decode).sequenceU.map(Data.Arr(_)),
+        arr => arr.traverse(decode).map(Data.Arr(_)),
         obj => {
           import std.DateLib._
 
@@ -116,7 +116,7 @@ object DataCodec {
             (a \/> UnexpectedValueError(expected, json)) flatMap f
 
           def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
-            obj.toList.map { case (k, v) => decode(v).map(k -> _) }.sequenceU.map(pairs => Data.Obj(ListMap(pairs: _*)))
+            obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
 
           obj.toList match {
             case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
@@ -124,7 +124,7 @@ object DataCodec {
             case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseTime(_).leftMap(err => ParseError(err.message)))
             case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
             case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`SetKey`, value) :: Nil       => unpack(value.array,  "a list of values for $set")(_.map(decode).sequenceU.map(Data.Set(_)))
+            case (`SetKey`, value) :: Nil       => unpack(value.array,  "a list of values for $set")(_.traverse(decode).map(Data.Set(_)))
             case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
@@ -148,9 +148,9 @@ object DataCodec {
         case Dec(x)   => \/-(jNumber(JsonBigDecimal(x)))
         case Str(s)   => \/-(jString(s))
 
-        case Obj(value) => value.toList.map { case (k, v) => encode(v).map(k -> _) }.sequenceU.map(Json.obj(_: _*))
-        case Arr(value) => value.map(encode).sequenceU.map(vs => Json.array(vs: _*))
-        case Set(value) => value.map(encode).sequenceU.map(vs => Json.array(vs: _*))
+        case Obj(value) => value.toList.traverse { case (k, v) => encode(v).map(k -> _) }.map(Json.obj(_: _*))
+        case Arr(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
+        case Set(value) => value.traverse(encode).map(vs => Json.array(vs: _*))
 
         case Timestamp(value) => \/-(jString(value.toString))
         case Date(value)      => \/-(jString(value.toString))
@@ -183,7 +183,7 @@ object DataCodec {
               parseInterval(str))
           \/-(converted.flatMap(_.toList).headOption.getOrElse(Data.Str(str)))
         },
-        arr => arr.map(decode).sequenceU.map(Data.Arr(_)),
-        obj => obj.toList.map { case (k, v) => decode(v).map(k -> _) }.sequenceU.map(pairs => Data.Obj(ListMap(pairs: _*))))
+        arr => arr.traverse(decode).map(Data.Arr(_)),
+        obj => obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*))))
   }
 }

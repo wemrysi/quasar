@@ -165,7 +165,7 @@ trait AggLib extends Library {
     homogenized(f.lift, err)
 
   private def homogenized[A](f: Data => Option[A], err: String): List[Data] => SemanticError \/ List[A] =
-    set => set.traverseU(f) \/> SemanticError.DomainError(Data.Set(set), some(err))
+    set => set.traverse(f) \/> SemanticError.DomainError(Data.Set(set), some(err))
 }
 
 object AggLib extends AggLib
