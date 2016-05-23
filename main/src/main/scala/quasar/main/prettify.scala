@@ -150,11 +150,9 @@ object Prettify {
     else if (str == "true") Some(Data.Bool(true))
     else if (str == "false") Some(Data.Bool(false))
     else
-      parseBigInt(str).fold(
-        parseBigDecimal(str).fold(
-          DataCodec.Readable.decode(Json.jString(str)).toOption)(
-          x => Some(Data.Dec(x))))(
-        n => Some(Data.Int(n)))
+      str.parseBigInt.toOption.map(Data.Int(_)) orElse
+        str.parseBigDecimal.toOption.map(Data.Dec(_)) orElse
+          DataCodec.Readable.decode(Json.jString(str)).toOption
   }
 
   /**

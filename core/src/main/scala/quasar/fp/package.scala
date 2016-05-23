@@ -19,6 +19,8 @@ package quasar
 import quasar.Predef._
 import quasar.RenderTree.ops._
 
+import java.lang.NumberFormatException
+
 import monocle.{Lens, Prism}
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.stream._
@@ -339,6 +341,19 @@ trait SKI {
 }
 object SKI extends SKI
 
+trait StringOps {
+  final implicit class StringOps(val s: String) {
+    // NB: see scalaz's `parseInt`, et al.
+    // These will appear in scalaz 7.3.
+
+    def parseBigInt: Validation[NumberFormatException, BigInt] =
+      Validation.fromTryCatchThrowable[BigInt, NumberFormatException](BigInt(s))
+
+    def parseBigDecimal: Validation[NumberFormatException, BigDecimal] =
+      Validation.fromTryCatchThrowable[BigDecimal, NumberFormatException](BigDecimal(s))
+  }
+}
+
 package object fp
     extends TreeInstances
     with ListMapInstances
@@ -352,7 +367,8 @@ package object fp
     with ProcessOps
     with QFoldableOps
     with PrismInstances
-    with SKI {
+    with SKI
+    with StringOps {
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }
@@ -399,18 +415,6 @@ package object fp
     }
     (as.reverse, bs.reverse)
   }
-
-  def parseInt(str: String): Option[Int] =
-    \/.fromTryCatchNonFatal(str.toInt).toOption
-
-  def parseBigInt(str: String): Option[BigInt] =
-    \/.fromTryCatchNonFatal(BigInt(str)).toOption
-
-  def parseDouble(str: String): Option[Double] =
-    \/.fromTryCatchNonFatal(str.toDouble).toOption
-
-  def parseBigDecimal(str: String): Option[BigDecimal] =
-    \/.fromTryCatchNonFatal(BigDecimal(str)).toOption
 
   /** Accept a value (forcing the argument expression to be evaluated for its
     * effects), and then discard it, returning Unit. Makes it explicit that
