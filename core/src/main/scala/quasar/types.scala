@@ -33,7 +33,8 @@ sealed trait Type { self =>
       case (t1, t2) if t1.contains(t2) => t2
       case (t1, t2) if t2.contains(t1) => t1
       case (Obj(m1, u1), Obj(m2, u2)) =>
-        Obj(m1.unionWith(m2)(_ ⨯ _),
+        Obj(
+          m1.unionWith(m2)(_ ⨯ _),
           Apply[Option].lift2((t1: Type, t2: Type) => t1 ⨯ t2)(u1, u2))
       case (FlexArr(min1, max1, t1), FlexArr(min2, max2, t2)) =>
         FlexArr(min1 + min2, (max1 |@| max2)(_ + _), t1 ⨿ t2)
@@ -106,7 +107,7 @@ sealed trait Type { self =>
     case _ => None
   }
 
-  final def objectField(field: Type): ValidationNel[SemanticError, Type] = {
+  final def objectField(field: Type): SemanticResult[Type] = {
     if (Type.lub(field, Str) != Str) failureNel(TypeError(Str, field, None))
     else (field, this) match {
       case (_, x @ Coproduct (_, _)) => {
@@ -119,7 +120,7 @@ sealed trait Type { self =>
       }
 
       case (Str, t) =>
-        t.objectType.fold[ValidationNel[SemanticError, Type]](
+        t.objectType.fold[SemanticResult[Type]](
           failureNel(TypeError(AnyObject, this, None)))(
           success)
 
@@ -129,7 +130,7 @@ sealed trait Type { self =>
 
       case (Const(Data.Str(field)), Obj(map, uk)) =>
         map.get(field).fold(
-          uk.fold[ValidationNel[SemanticError, Type]](
+          uk.fold[SemanticResult[Type]](
             failureNel(MissingField(field)))(
             success))(
           success)
@@ -138,7 +139,7 @@ sealed trait Type { self =>
     }
   }
 
-  final def arrayElem(index: Type): ValidationNel[SemanticError, Type] = {
+  final def arrayElem(index: Type): SemanticResult[Type] = {
     if (Type.lub(index, Int) != Int) failureNel(TypeError(Int, index, None))
     else (index, this) match {
       case (Const(Data.Int(index)), Const(Data.Arr(arr))) =>
@@ -148,15 +149,15 @@ sealed trait Type { self =>
         implicit val lub: Monoid[Type] = Type.TypeLubMonoid
         x.flatten.toList.foldMap(_.arrayElem(index))
 
-      case (Int, t) =>
-        t.arrayType.fold[ValidationNel[SemanticError, Type]](
+      case (Int, _) =>
+        this.arrayType.fold[SemanticResult[Type]](
           failureNel(TypeError(AnyArray, this, None)))(
           success)
 
       case (Const(Data.Int(index)), FlexArr(min, max, value)) =>
         lazy val succ =
           success(value)
-        max.fold[ValidationNel[SemanticError, Type]](
+        max.fold[SemanticResult[Type]](
           succ)(
           max => if (index < max) succ else failureNel(MissingIndex(index.toInt)))
 
@@ -165,7 +166,7 @@ sealed trait Type { self =>
           success(value(index.toInt))
         else failureNel(MissingIndex(index.toInt))
 
-      case _ => failureNel(TypeError(AnyArray, this, None))
+      case (_, _) => failureNel(TypeError(AnyArray, this, None))
     }
   }
 }
@@ -213,7 +214,7 @@ trait TypeInstances {
       case Bottom =>
         jString("Bottom")
       case Const(d) =>
-        Json("Const" -> DataCodec.Precise.encode(d).getOrElse(jNull))
+        Json("Const" -> DataCodec.Precise.encode(d).getOrElse(Json.obj("$na" -> jNull)))
       case Null =>
         jString("Null")
       case Str =>
@@ -257,14 +258,16 @@ trait TypeInstances {
 }
 
 object Type extends TypeInstances {
-  private def fail[A](expected: Type, actual: Type, message: Option[String]): ValidationNel[TypeError, A] =
+  type SemanticResult[A] = ValidationNel[SemanticError, A]
+
+  private def fail[A](expected: Type, actual: Type, message: Option[String]): SemanticResult[A] =
     Validation.failure(NonEmptyList(TypeError(expected, actual, message)))
 
-  private def fail[A](expected: Type, actual: Type): ValidationNel[TypeError, A] = fail(expected, actual, None)
+  private def fail[A](expected: Type, actual: Type): SemanticResult[A] = fail(expected, actual, None)
 
-  private def fail[A](expected: Type, actual: Type, msg: String): ValidationNel[TypeError, A] = fail(expected, actual, Some(msg))
+  private def fail[A](expected: Type, actual: Type, msg: String): SemanticResult[A] = fail(expected, actual, Some(msg))
 
-  private def succeed[A](v: A): ValidationNel[TypeError, A] = Validation.success(v)
+  private def succeed[A](v: A): SemanticResult[A] = Validation.success(v)
 
   def simplify(tpe: Type): Type = mapUp(tpe) {
     case x @ Coproduct(_, _) => {
@@ -274,23 +277,21 @@ object Type extends TypeInstances {
     case x => x
   }
 
-  def glb(left: Type, right: Type): Type = {
-    if (left ≟ right) left
-    else if (left contains right) right
-    else if (right contains left) left
-    else Bottom
-  }
+  def glb(left: Type, right: Type): Type = left ⨯ right
 
   def lub(left: Type, right: Type): Type = (left, right) match {
-    case _ if left ≟ right        => left
-    case _ if left contains right => left
-    case _ if right contains left => right
-    case (Const(l), Const(r))     => lub(l.dataType, r.dataType)
-    case _                        => Top
+    case _ if left contains right   => left
+    case _ if right contains left   => right
+    case (Const(l), Const(r))       => lub(l.dataType, r.dataType)
+    case (Obj(v1, u1), Obj(v2, u2)) =>
+      Obj(
+        v1.unionWith(v2)(lub),
+        u1.fold(u2)(unk => u2.fold(u1)(lub(unk, _).some)))
+    case _                          => Top
   }
 
   def typecheck(superType: Type, subType: Type):
-      ValidationNel[TypeError, Unit] =
+      SemanticResult[Unit] =
     (superType, subType) match {
       case (superType, subType) if (superType ≟ subType) => succeed(())
 
@@ -310,25 +311,25 @@ object Type extends TypeInstances {
         typecheck(superType, elem2.concatenate(TypeOrMonoid))
       case (FlexArr(supMin, supMax, superType), FlexArr(subMin, subMax, subType)) =>
         lazy val tc = typecheck(superType, subType)
-        def checkOpt[A](sup: Option[A], comp: (A, A) => Boolean, sub: Option[A], next: => ValidationNel[TypeError, Unit]) =
+        def checkOpt[A](sup: Option[A], comp: (A, A) => Boolean, sub: Option[A], next: => SemanticResult[Unit]) =
           sup.fold(
             next)(
-            p => sub.fold[ValidationNel[TypeError, Unit]](
+            p => sub.fold[SemanticResult[Unit]](
               fail(superType, subType))(
               b => if (comp(p, b)) next else fail(superType, subType)))
         lazy val max = checkOpt(supMax, Order[Int].greaterThanOrEqual, subMax, tc)
         checkOpt(Some(supMin), Order[Int].lessThanOrEqual, Some(subMin), max)
       case (Obj(supMap, supUk), Obj(subMap, subUk)) =>
         supMap.toList.foldMap { case (k, v) =>
-          subMap.get(k).fold[ValidationNel[TypeError, Unit]](
+          subMap.get(k).fold[SemanticResult[Unit]](
             fail(superType, subType))(
             typecheck(v, _))
         } +++
           supUk.fold(
-            subUk.fold[ValidationNel[TypeError, Unit]](
+            subUk.fold[SemanticResult[Unit]](
               if ((subMap -- supMap.keySet).isEmpty) succeed(()) else fail(superType, subType))(
               κ(fail(superType, subType))))(
-            p => subUk.fold[ValidationNel[TypeError, Unit]](
+            p => subUk.fold[SemanticResult[Unit]](
               // if (subMap -- supMap.keySet) is empty, fail(superType, subType)
               (subMap -- supMap.keySet).foldMap(typecheck(p, _)))(
               typecheck(p, _)))
@@ -470,7 +471,7 @@ object Type extends TypeInstances {
     actuals.foldMap(typecheck(expected, _))
 
   private def typecheckCP(expecteds: Vector[Type], actual: Type) =
-    expecteds.foldLeft[ValidationNel[TypeError, Unit]](
+    expecteds.foldLeft[SemanticResult[Unit]](
       fail(Bottom, actual))(
       (acc, expected) => acc ||| typecheck(expected, actual))
 

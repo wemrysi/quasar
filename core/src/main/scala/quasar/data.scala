@@ -27,23 +27,23 @@ import scalaz._, Scalaz._
 
 sealed trait Data {
   def dataType: Type
-  def toJs: jscore.JsCore
+  def toJs: Option[jscore.JsCore]
 }
 
 object Data {
   final case object Null extends Data {
     def dataType = Type.Null
-    def toJs = jscore.Literal(Js.Null)
+    def toJs = jscore.Literal(Js.Null).some
   }
 
   final case class Str(value: String) extends Data {
     def dataType = Type.Str
-    def toJs = jscore.Literal(Js.Str(value))
+    def toJs = jscore.Literal(Js.Str(value)).some
   }
 
   final case class Bool(value: Boolean) extends Data {
     def dataType = Type.Bool
-    def toJs = jscore.Literal(Js.Bool(value))
+    def toJs = jscore.Literal(Js.Bool(value)).some
   }
   val True = Bool(true)
   val False = Bool(false)
@@ -64,55 +64,56 @@ object Data {
   }
   final case class Dec(value: BigDecimal) extends Number {
     def dataType = Type.Dec
-    def toJs = jscore.Literal(Js.Num(value.doubleValue, true))
+    def toJs = jscore.Literal(Js.Num(value.doubleValue, true)).some
   }
   final case class Int(value: BigInt) extends Number {
     def dataType = Type.Int
-    def toJs = jscore.Literal(Js.Num(value.doubleValue, false))
+    def toJs = jscore.Literal(Js.Num(value.doubleValue, false)).some
   }
 
   final case class Obj(value: ListMap[String, Data]) extends Data {
     def dataType = Type.Obj(value ∘ (Type.Const(_)), None)
-    def toJs =
-      jscore.Obj(value.toList.map { case (k, v) => jscore.Name(k) -> v.toJs }.toListMap)
+
+   def toJs =
+     value.toList.map(_.bimap(jscore.Name(_), _.toJs))
+          .toListMap.sequence.map(jscore.Obj(_))
   }
 
   final case class Arr(value: List[Data]) extends Data {
     def dataType = Type.Arr(value ∘ (Type.Const(_)))
-    def toJs = jscore.Arr(value.map(_.toJs))
+    def toJs = value.traverse(_.toJs).map(jscore.Arr(_))
   }
 
   final case class Set(value: List[Data]) extends Data {
-    def dataType =
-      value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
-    def toJs = jscore.Arr(value.map(_.toJs))
+    def dataType = value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
+    def toJs = None
   }
 
   final case class Timestamp(value: Instant) extends Data {
     def dataType = Type.Timestamp
-    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString))))
+    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
   }
 
   final case class Date(value: LocalDate) extends Data {
     def dataType = Type.Date
-    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString))))
+    def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
   }
 
   final case class Time(value: LocalTime) extends Data {
     def dataType = Type.Time
-    def toJs = jscore.Literal(Js.Str(value.toString))
+    def toJs = jscore.Literal(Js.Str(value.toString)).some
   }
 
   final case class Interval(value: Duration) extends Data {
     def dataType = Type.Interval
-    def toJs = jscore.Literal(Js.Num(value.getSeconds*1000 + value.getNano*1e-6, true))
+    def toJs = jscore.Literal(Js.Num(value.getSeconds*1000 + value.getNano*1e-6, true)).some
   }
 
   final case class Binary(value: ImmutableArray[Byte]) extends Data {
     def dataType = Type.Binary
     def toJs = jscore.Call(jscore.ident("BinData"), List(
       jscore.Literal(Js.Num(0, false)),
-      jscore.Literal(Js.Str(base64))))
+      jscore.Literal(Js.Str(base64)))).some
 
     def base64: String = new sun.misc.BASE64Encoder().encode(value.toArray)
 
@@ -130,7 +131,7 @@ object Data {
 
   final case class Id(value: String) extends Data {
     def dataType = Type.Id
-    def toJs = jscore.Call(jscore.ident("ObjectId"), List(jscore.Literal(Js.Str(value))))
+    def toJs = jscore.Call(jscore.ident("ObjectId"), List(jscore.Literal(Js.Str(value)))).some
   }
 
   /**
@@ -141,7 +142,7 @@ object Data {
    */
   final case object NA extends Data {
     def dataType = Type.Bottom
-    def toJs = jscore.ident(Js.Undefined.ident)
+    def toJs = jscore.ident(Js.Undefined.ident).some
   }
 
   final class Comparable private (val value: Data) extends scala.AnyVal

@@ -20,19 +20,13 @@ import quasar.Predef._
 import quasar.fp._
 import quasar._, LogicalPlan._
 
+import scala.collection.immutable.NumericRange
+
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._, Validation.success
 import shapeless.{Data => _, _}
 
 trait SetLib extends Library {
-  // NB: MRA should make this go away, as we insert dimensiality adjustements
-  //     in the appropriate places.
-  private def setTyper[N <: Nat](f: Func.Typer[N]): Func.Typer[N] =
-    ts => f(ts).map {
-      case x @ Type.Const(Data.Set(_)) => x
-      case rez                         => rez
-    }
-
   val Take = BinaryFunc(
     Sifting,
     "(LIMIT)",
@@ -40,14 +34,14 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
     noSimplification,
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
         Type.Const(Data.Set(Nil))
       case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
           if n.isValidInt =>
         Type.Const(Data.Set(s.take(n.intValue)))
       case Sized(t, _) => t
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
   val Drop = BinaryFunc(
@@ -64,13 +58,29 @@ trait SetLib extends Library {
         case _ => None
       }
     },
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(Type.Const(Data.Set(s)), Type.Const(Data.Int(n)))
           if n.isValidInt =>
         Type.Const(Data.Set(s.drop(n.intValue)))
       case Sized(t, _) => t
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
+
+  val Range = BinaryFunc(
+    Expansion,
+    "(..)",
+    "Creates a set of values in the range from `a` to `b`, inclusive.",
+    Type.Int,
+    Func.Input2(Type.Int, Type.Int),
+    noSimplification,
+    partialTyper[nat._2] {
+      case Sized(Type.Const(Data.Int(a)), Type.Const(Data.Int(b))) =>
+        Type.Const(
+          if (a ≟ b) Data.Int(a)
+          else Data.Set(NumericRange.inclusive[BigInt](a, b, 1).toList ∘ (Data.Int(_))))
+      case Sized(_, _) => Type.Int
+    },
+    basicUntyper)
 
   val OrderBy = TernaryFunc(
     Sifting,
@@ -79,9 +89,9 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Top),
     noSimplification,
-    setTyper[nat._3](partialTyper[nat._3] {
+    partialTyper[nat._3] {
       case Sized(set, _, _) => set
-    }),
+    },
     untyper[nat._3](t => success(Func.Input3(t, Type.Top, Type.Top))))
 
   val Filter = BinaryFunc(
@@ -98,10 +108,10 @@ trait SetLib extends Library {
           case _ => None
         }
     },
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(_ , Type.Const(Data.False)) => Type.Const(Data.Set(Nil))
       case Sized(set, _) => set
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Bool))))
 
   object JoinFunc {
@@ -119,12 +129,12 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
-    setTyper[nat._3](partialTyper[nat._3] {
+    partialTyper[nat._3] {
       case Sized(_, _, Type.Const(Data.Bool(false))) => Type.Const(Data.Set(Nil))
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) => Type.Obj(Map("left" -> s1, "right" -> s2), None)
-    }),
+    },
     untyper[nat._3](t =>
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
@@ -136,13 +146,13 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
-    setTyper[nat._3](partialTyper[nat._3] {
+    partialTyper[nat._3] {
       case Sized(s1, _, Type.Const(Data.Bool(false))) =>
         Type.Obj(Map("left" -> s1, "right" -> Type.Null), None)
       case Sized(Type.Const(Data.Set(Nil)), _, _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
         Type.Obj(Map("left" -> s1, "right" -> (s2 ⨿ Type.Null)), None)
-    }),
+    },
     untyper[nat._3](t =>
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
@@ -154,12 +164,12 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
-    setTyper[nat._3](partialTyper[nat._3] {
+    partialTyper[nat._3] {
       case Sized(_, s2, Type.Const(Data.Bool(false))) =>
         Type.Obj(Map("left" -> Type.Null, "right" -> s2), None)
       case Sized(_, Type.Const(Data.Set(Nil)), _) => Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) => Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> s2), None)
-    }),
+    },
     untyper[nat._3](t =>
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
@@ -171,12 +181,12 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input3(Type.Top, Type.Top, Type.Bool),
     noSimplification,
-    setTyper[nat._3](partialTyper[nat._3] {
+    partialTyper[nat._3] {
       case Sized(Type.Const(Data.Set(Nil)), Type.Const(Data.Set(Nil)), _) =>
         Type.Const(Data.Set(Nil))
       case Sized(s1, s2, _) =>
         Type.Obj(Map("left" -> (s1 ⨿ Type.Null), "right" -> (s2 ⨿ Type.Null)), None)
-    }),
+    },
     untyper[nat._3](t =>
       (t.objectField(Type.Const(Data.Str("left"))) |@| t.objectField(Type.Const(Data.Str("right"))))((l, r) =>
         Func.Input3(l, r, Type.Bool))))
@@ -188,9 +198,9 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(s1, _) => s1
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
   val Distinct = UnaryFunc(
@@ -200,9 +210,9 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input1(Type.Top),
     noSimplification,
-    setTyper[nat._1](partialTyper[nat._1] {
+    partialTyper[nat._1] {
       case Sized(a) => a
-    }),
+    },
     untyper[nat._1](t => success(Func.Input1(t))))
 
   val DistinctBy = BinaryFunc(
@@ -212,9 +222,9 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(a, _) => a
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
   val Union = BinaryFunc(
@@ -224,11 +234,11 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(Type.Const(Data.Set(Nil)), s2) => s2
       case Sized(s1, Type.Const(Data.Set(Nil))) => s1
       case Sized(s1, s2)                        => s1 ⨿ s2
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, t))))
 
   val Intersect = BinaryFunc(
@@ -238,9 +248,9 @@ trait SetLib extends Library {
     Type.Top,
     Func.Input2(Type.Top, Type.Top),
     noSimplification,
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(s1, s2) => if (s1 == s2) s1 else Type.Const(Data.Set(Nil))
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, t))))
 
   val Except = BinaryFunc(
@@ -256,9 +266,9 @@ trait SetLib extends Library {
         case _ => None
       }
     },
-    setTyper[nat._2](partialTyper[nat._2] {
+    partialTyper[nat._2] {
       case Sized(s1, _) => s1
-    }),
+    },
     untyper[nat._2](t => success(Func.Input2(t, Type.Top))))
 
   // TODO: Handle “normal” functions without creating Funcs. They should be in
@@ -326,7 +336,7 @@ trait SetLib extends Library {
     Distinct :: Nil
 
   def binaryFunctions: List[GenericFunc[nat._2]] =
-    Take :: Drop :: Filter :: GroupBy :: DistinctBy ::
+    Take :: Drop :: Range :: Filter :: GroupBy :: DistinctBy ::
     Union :: Intersect :: Except :: In :: Within :: Constantly :: Nil
 
   def ternaryFunctions: List[GenericFunc[nat._3]] =

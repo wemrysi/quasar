@@ -17,68 +17,13 @@
 package quasar
 
 import quasar.Predef._
-import quasar.SemanticAnalysis._
 import quasar.fp._
 import quasar.fs.PathError
-import quasar.sql.Sql
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-trait Planner[PhysicalPlan] {
-  import Planner._
-
-  def plan(logical: Fix[LogicalPlan]): EitherWriter[PlannerError, PhysicalPlan]
-
-  private def withString[E, A](a: A)(render: A => (String, Cord)): EitherWriter[E, A] = {
-    val (name, plan) = render(a)
-    EitherT[WriterResult, E, A]((Vector(PhaseResult.Detail(name, plan.toString)), \/-(a)))
-  }
-
-  def compileToLP(query: Fix[Sql], variables: Variables)(implicit RA: RenderTree[PhysicalPlan]):
-      EitherT[(Vector[quasar.PhaseResult], ?), CompilationError, Fix[LogicalPlan]] =
-    // TODO: Factor these things out as individual WriterT functions that can be composed.
-    for {
-      select     <- withTree("SQL AST")(\/-(query))
-      tree       <- withTree("Variables Substituted")(Variables.substVars(select, variables).leftMap(CSemanticError(_)))
-      tree       <- withTree("Annotated Tree")(AllPhases(tree).leftMap(ManyErrors(_)))
-      logical    <- withTree("Logical Plan")(Compiler.compile(tree).leftMap(CSemanticError(_)))
-      optimized  <- withTree("Optimized")(\/-(Optimizer.optimize(logical)))
-      checked    <- withTree("Typechecked")(LogicalPlan.ensureCorrectTypes(optimized).disjunction.leftMap(ManyErrors(_)))
-    } yield checked
-
-  def backendPlanner(showNative: PhysicalPlan => (String, Cord))(implicit RA: RenderTree[PhysicalPlan]):
-      Fix[LogicalPlan] => EitherT[(Vector[quasar.PhaseResult], ?), CompilationError, PhysicalPlan] = { lp =>
-    // TODO: Factor these things out as individual WriterT functions that can be composed.
-    for {
-      physical   <- plan(lp).leftMap(CPlannerError(_))
-      _          <- withTree("Physical Plan")(\/-(physical))
-      _          <- withString(physical)(showNative)
-    } yield physical
-  }
-}
 object Planner {
-  private type WriterResult[A] = (Vector[PhaseResult], A)
-
-  // NB: can't use private WriterResult in this type
-  type EitherWriter[E, A] = EitherT[(Vector[PhaseResult], ?), E, A]
-
-  def emit[E, A](log: Vector[PhaseResult], v: E \/ A): EitherWriter[E, A] = {
-    EitherT[WriterResult, E, A]((log, v))
-  }
-
-  def withTree[A](name: String)(ea: CompilationError \/ A)(implicit RA: RenderTree[A]): EitherWriter[CompilationError, A] = {
-    emit(Vector.empty, ea).flatMap(a =>
-      emit(Vector(PhaseResult.Tree(name, RA.render(a))), ea))
-  }
-
-  def withString[A](a: A)(render: A => (String, Cord)): EitherWriter[CompilationError, A] = {
-    val (name, plan) = render(a)
-    val result = PhaseResult.Detail(name, plan.toString)
-
-    emit(Vector(result), \/-(a))
-  }
-
   sealed trait PlannerError {
     def message: String
   }

@@ -19,11 +19,11 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar._
 import quasar.effect.KeyValueStore
-import quasar.fp.κ
-import quasar.fp.prism._
+import quasar.fp._
 import quasar.fs._
 import quasar.sql.Sql
 
+import eu.timepit.refined.auto._
 import matryoshka._, TraverseT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -52,7 +52,7 @@ object ViewMounter {
     (implicit S: MountConfigsF :<: S)
     : Free[S, MountingError \/ Unit] = {
     val vc = viewConfig(query, vars)
-    queryPlan(query, vars).run.value.fold(
+    queryPlan(query, vars, 0L, None).run.value.fold(
       e => invalidConfig(vc, e.map(_.shows)).left.point[Free[S, ?]],
       κ(mntCfgs[S].put(loc, vc).map(_.right)))
   }
@@ -83,13 +83,21 @@ object ViewMounter {
       EitherT.right[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
         lp.unFix.map((e, _)).point[Free[S, ?]])
 
+    /** This collapses literal data results into a LogicalPlan for cases where
+      * currently _want_ a Constant plan. This will have to go away when
+      * [[quasar.Data.Set]] does.
+      */
+    def collapseData[T[_[_]]: Corecursive](plan: List[Data] \/ T[LogicalPlan]):
+        T[LogicalPlan] =
+      plan.fold(d => LogicalPlan.ConstantF[T[LogicalPlan]](Data.Set(d)).embed, ι)
+
     (Set[FPath](), lp).anaM[Fix, SemanticErrsT[Free[S, ?], ?], LogicalPlan] {
       case (e, i @ Embed(r @ LogicalPlan.ReadF(p))) if !(e contains p) =>
         refineTypeAbs(p).fold(
           f => EitherT[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](
             lookup[S](f).run.flatMap[SemanticErrors \/ LogicalPlan[(Set[FPath], Fix[LogicalPlan])]] {
-              _ .cata(
-                  { case (expr, vars) => queryPlan(expr, vars).run.run._2.map(absolutize(_, fileParent(f))) },
+              _.cata(
+                { case (expr, vars) => queryPlan(expr, vars, 0L, None).run.run._2.map(p => collapseData(p.map(absolutize(_, fileParent(f))))) },
                   i.right)
                 .map(_.unFix.map((e + f, _)))
                 .point[Free[S, ?]]

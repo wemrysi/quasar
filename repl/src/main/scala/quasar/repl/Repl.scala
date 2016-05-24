@@ -22,11 +22,13 @@ import quasar.{Data, DataCodec, PhaseResult, Variables}
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.fp._, free.freeCatchable
+import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
-import quasar.main.Prettify
+import quasar.main.{FilesystemQueries, Prettify}
 import quasar.sql
 
+import eu.timepit.refined.auto._
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -35,23 +37,23 @@ object Repl {
   import Command.{XDir, XFile}
 
   val HelpMessage =
-    """|Quasar REPL, Copyright (C) 2014-2016 SlamData Inc.
-       |
-       |Available commands:
-       |  exit
-       |  help
-       |  cd [path]
-       |  [query]
-       |  [id] := [query]
-       |  ls [path]
-       |  save [path] [value]
-       |  append [path] [value]
-       |  rm [path]
-       |  set debug = 0 | 1 | 2
-       |  set summaryCount = [rows]
-       |  set format = table | precise | readable | csv
-       |  set [var] = [value]
-       |  env""".stripMargin
+    """Quasar REPL, Copyright © 2014–2016 SlamData Inc.
+      |
+      |Available commands:
+      |  exit
+      |  help
+      |  cd [path]
+      |  [query]
+      |  [id] <- [query]
+      |  ls [path]
+      |  save [path] [value]
+      |  append [path] [value]
+      |  rm [path]
+      |  set debug = 0 | 1 | 2
+      |  set summaryCount = [rows]
+      |  set format = table | precise | readable | csv
+      |  set [var] = [value]
+      |  env""".stripMargin
 
 
  final case class RunState(
@@ -97,6 +99,8 @@ object Repl {
 
     val RS = AtomicRef.Ops[RunState, S]
     val DF = Failure.Ops[String, S]
+
+    val fsQ = new FilesystemQueries[S]
 
     def write(f: (AFile, Vector[Data]) => W.M[Vector[FileSystemError]], dst: XFile, dStr: String): Free[S, Unit] =
       for {
@@ -179,7 +183,7 @@ object Repl {
               state <- RS.get
               out   =  state.cwd </> file(name)
               expr  <- DF.unattempt_(sql.fixParser.parseInContext(q, state.cwd).leftMap(_.message))
-              query =  Q.executeQuery(expr, Variables.fromMap(state.variables), out)
+              query =  fsQ.executeQuery(expr, Variables.fromMap(state.variables), out)
               _     <- runQuery(state, query)(p =>
                         P.println(
                           if (p =/= out) "Source file: " + posixCodec.printPath(p)
@@ -189,7 +193,7 @@ object Repl {
           for {
             state <- RS.get
             expr  <- DF.unattempt_(sql.fixParser.parseInContext(q, state.cwd).leftMap(_.message))
-            query =  Q.evaluateQuery(expr, Variables.fromMap(state.variables)).take(state.summaryCount+1).runLog
+            query =  fsQ.evaluateQuery(expr, Variables.fromMap(state.variables), 0L, Positive(state.summaryCount + 1L)).runLog
             _     <- runQuery(state, query)(
                       ds => summarize[S](state.summaryCount, state.format)(ds))
           } yield ())

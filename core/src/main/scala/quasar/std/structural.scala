@@ -199,6 +199,8 @@ trait StructuralLib extends Library {
     Func.Input2(AnyArray, Int),
     noSimplification,
     partialTyperV[nat._2] {
+      case Sized(v1, Const(Data.Set(elems))) =>
+        elems.traverse(e => v1.arrayElem(Const(e))).map(Coproduct(_))
       case Sized(v1, v2) => v1.arrayElem(v2)
     },
     basicUntyper)

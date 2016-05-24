@@ -135,7 +135,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
     "translate simple read to query" in {
       val p = rootDir[Sandboxed] </> dir("view") </> file("simpleZips")
       val expr = parseExpr("select * from zips")
-      val lp = queryPlan(expr, Variables.empty).run.run._2.toOption.get
+      val lp = queryPlan(expr, Variables.empty, 0L, None).run.run._2.toOption.get
 
       val views = Map(p -> expr)
 
@@ -146,7 +146,7 @@ class ViewFSSpec extends Specification with ScalaCheck with TreeMatchers {
       } yield ()).run
 
       val exp = (for {
-        h   <- query.unsafe.eval(lp)
+        h   <- query.unsafe.eval(lp.valueOr(_ => scala.sys.error("impossible constant plan")))
         _   <- query.transforms.fsErrToExec(
                 query.unsafe.more(h))
         _   <- query.transforms.fsErrToExec(

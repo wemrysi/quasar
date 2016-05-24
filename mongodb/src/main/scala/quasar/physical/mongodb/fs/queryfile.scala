@@ -30,7 +30,7 @@ import com.mongodb.async.client.MongoClient
 import matryoshka.{Fix, Recursive}
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.stream._
+import scalaz.stream.{Writer => _, _}
 import scalaz.concurrent.Task
 
 object queryfile {
@@ -158,7 +158,7 @@ private final class QueryFileInterpreter[C](
 
   ////
 
-  private type PlanR[A]       = EitherT[(PhaseResults, ?), PPlannerError, A]
+  private type PlanR[A]       = EitherT[Writer[PhaseResults, ?], PPlannerError, A]
   private type MongoLogWF[A]  = PhaseResultT[MQ, A]
   private type MongoLogWFR[A] = FileSystemErrT[MongoLogWF, A]
 
@@ -206,7 +206,7 @@ private final class QueryFileInterpreter[C](
   private def convertPlanR(lp: Fix[LogicalPlan]): PlanR ~> MongoLogWFR =
     new (PlanR ~> MongoLogWFR) {
       def apply[A](pa: PlanR[A]) = {
-        val r = pa.leftMap(planningFailed(lp, _)).run
+        val r = pa.leftMap(planningFailed(lp, _)).run.run
         val f: MongoLogWF[FileSystemError \/ A] = WriterT(r.point[MQ])
         EitherT(f)
       }
@@ -218,7 +218,7 @@ private final class QueryFileInterpreter[C](
     handle: (Crystallized, String) => WorkflowExecErrT[MQ, A]
   ): MongoLogWFR[A] = for {
     _      <- checkPathsExist(lp)
-    wf     <- convertPlanR(lp)(MongoDbPlanner plan lp)
+    wf     <- convertPlanR(lp)(MongoDbPlanner.plan(lp))
     prefix <- liftMQ(genPrefix)
     _      <- writeJsLog(lp, log(wf), prefix)
     a      <- EitherT[MongoLogWF, FileSystemError, A](

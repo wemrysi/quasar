@@ -38,7 +38,7 @@ object BsonCodec {
 
       case Data.Arr(value) => value.traverse(fromData).map(Bson.Arr.apply _)
 
-      case Data.Set(value) => value.traverse(fromData).map(Bson.Arr.apply _)
+      case Data.Set(value) => \/ left (NonRepresentableData(data))
 
       case Data.Timestamp(value) => \/ right (Bson.Date(value))
 

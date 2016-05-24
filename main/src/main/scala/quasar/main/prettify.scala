@@ -85,7 +85,6 @@ object Prettify {
         }
       data match {
         case Data.Arr(value) =>  \/-(value.zipWithIndex.flatMap { case (c, i) => prepend(IndexSeg(i), c) })
-        case Data.Set(value) =>  \/-(value.zipWithIndex.flatMap { case (c, i) => prepend(IndexSeg(i), c) })
         case Data.Obj(value) =>  \/-(value.toList.flatMap { case (f, c) => prepend(FieldSeg(f), c) })
         case _               => -\/ (data)
       }

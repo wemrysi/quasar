@@ -20,12 +20,15 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 import quasar.javascript._
+import quasar.sql.{ParsingError, Query}
+import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
 import scala.Either
 
+import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
 import org.scalacheck._
 import org.specs2.ScalaCheck
@@ -50,6 +53,11 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
   import jscore._
   import Planner._
 
+  type EitherWriter[E, A] = EitherT[Writer[Vector[PhaseResult], ?], E, A]
+
+  def emit[E, A](log: Vector[PhaseResult], v: E \/ A): EitherWriter[E, A] =
+    EitherT[Writer[Vector[PhaseResult], ?], E, A](Writer(log, v))
+
   case class equalToWorkflow(expected: Workflow)
       extends Matcher[Crystallized] {
     def apply[S <: Crystallized](s: Expectable[S]) = {
@@ -64,33 +72,34 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     }
   }
 
-  def queryPlanner(query: Fix[Sql], variables: Variables) =
-    MongoDbPlanner.compileToLP(query, variables)
-      .flatMap(MongoDbPlanner.backendPlanner(κ("Mongo" -> Cord.empty)))
+  def queryPlanner(expr: Fix[Sql], vars: Variables) =
+    queryPlan(expr, vars, 0L, None)
+      .leftMap[CompilationError](CompilationError.ManyErrors(_))
+      // TODO: Would be nice to error on Constant plans here, but property
+      // tests currently run into that.
+      .flatMap(_.fold(
+        e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
+        MongoDbPlanner.plan(_).leftMap(CPlannerError(_))))
 
   def plan(query: String): Either[CompilationError, Crystallized] = {
-    val (log, wf) = fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
+    fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db")).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_, Variables(Map())).run)
-
-    wf.toEither
+      queryPlanner(_, Variables(Map())).run).value.toEither
   }
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] = {
-    val (log, wf) = (for {
+    (for {
       _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
       phys       <- MongoDbPlanner.plan(simplified)
-    } yield phys).run
-
-    wf.toEither
+    } yield phys).run.value.toEither
   }
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
       expr <- fixParser.parseInContext(Query(query), rootDir[Sandboxed] </> dir("db"))
-    } yield queryPlanner(expr, Variables(Map())).run._1
+    } yield queryPlanner(expr, Variables(Map())).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -99,42 +108,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
   implicit def toRightShape(exprOp: Expression): Reshape.Shape =  \/-(exprOp)
 
   "plan from query string" should {
-    "plan simple constant example 1" in {
-      plan("select 1") must
-        beWorkflow($pure(Bson.Doc(ListMap("0" -> Bson.Int64(1)))))
-    }
-
-    "compile simple constant example 2" in {
-      plan("select 1 * 1") must
-        beWorkflow($pure(Bson.Doc(ListMap("0" -> Bson.Int64(1)))))
-    }
-
-    "plan complex constant" in {
-      plan("[1, 2, 3, 4, 5][*] limit 3 offset 1") must
-        beWorkflow($pure(Bson.Arr(List(Bson.Int64(2), Bson.Int64(3)))))
-    }
-
-    "plan simple constant from collection" in {
-      plan("select 1 from zips") must
-        beWorkflow($pure(Bson.Doc(ListMap("0" -> Bson.Int64(1)))))
-    }
-
-    "select complex constant" in {
-      plan("select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1") must
-        beWorkflow($pure(Bson.Arr(List(
-          Bson.Doc(ListMap("0" -> Bson.Int64(2))),
-          Bson.Doc(ListMap("0" -> Bson.Int64(3)))))))
-
-    }
-
-    "select complex constant 2" in {
-      plan("select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*:} limit 3 offset 1") must
-      beWorkflow($pure(Bson.Arr(List(
-        Bson.Doc(ListMap("0" -> Bson.Text("b"))),
-        Bson.Doc(ListMap("0" -> Bson.Text("c")))))))
-
-    }
-
     "plan simple select *" in {
       plan("select * from foo") must beWorkflow($read(Collection("db", "foo")))
     }
@@ -730,11 +703,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             Selector.In(Bson.Arr(List(Bson.Text("AZ"), Bson.Text("CO"))))))))
     }
 
-    "plan filter with field in empty set" in {
-      plan("select * from zips where state in ()") must
-        beWorkflow($pure(Bson.Arr(Nil)))
-    }
-
     "plan filter with field containing constant value" in {
       plan("select * from zips where 43.058514 in loc[_]") must
         beWorkflow(chain(
@@ -1093,11 +1061,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
     "filter on constant true" in {
       plan("select * from zips where true") must
         beWorkflow($read(Collection("db", "zips")))
-    }
-
-    "filter on constant false" in {
-      plan("select * from zips where false") must
-        beWorkflow($pure(Bson.Arr(Nil)))
     }
 
     "select partially-applied substing" in {
@@ -2629,17 +2592,6 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $read(Collection("db", "zips")))
     }.pendingUntilFixed
 
-    "plan expression with timestamp, date, time, and interval" in {
-      import org.threeten.bp.{Instant, LocalDateTime, ZoneOffset}
-
-      plan("""select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""") must
-        beWorkflow(
-          $pure(Bson.Doc(ListMap(
-            "0" -> Bson.Date(Instant.parse("2014-11-17T22:43:40Z")),
-            "1" -> Bson.Date(LocalDateTime.parse("2015-01-19T00:00:00").atZone(ZoneOffset.UTC).toInstant),
-            "2" -> Bson.Text("14:21:00.000")))))
-    }
-
     "plan filter with timestamp and interval" in {
       import org.threeten.bp.Instant
 
@@ -3557,7 +3509,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
   def select(distinctGen: Gen[IsDistinct], exprGen: Gen[Fix[Sql]], filterGen: Gen[Option[Fix[Sql]]], groupByGen: Gen[Option[GroupBy[Fix[Sql]]]], orderByGen: Gen[Option[OrderBy[Fix[Sql]]]]): Gen[Query] =
     for {
       distinct <- distinctGen
-      projs    <- Gen.nonEmptyListOf(exprGen).map(_.zipWithIndex.map {
+      projs    <- (genReduceInt ⊛ Gen.nonEmptyListOf(exprGen))(_ :: _).map(_.zipWithIndex.map {
         case (x, n) => Proj(x, Some("p" + n))
       })
       filter   <- filterGen
@@ -3920,7 +3872,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           "Logical Plan", "Optimized", "Typechecked",
           "Logical Plan (reduced typechecks)", "Logical Plan (aligned joins)",
           "Logical Plan (projections preferred)", "Workflow Builder",
-          "Workflow (raw)", "Workflow (crystallized)", "Physical Plan", "Mongo"))
+          "Workflow (raw)", "Workflow (crystallized)"))
     }
 
     "include correct phases with type error" in {

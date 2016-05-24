@@ -21,6 +21,8 @@ import quasar.effect._
 import quasar.fp.{TaskRef}
 import quasar.fp.free, free.{:+:}
 
+import scala.collection.immutable.Vector
+
 import monocle.Lens
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
@@ -42,22 +44,24 @@ package object mount {
 
   //-- Views --
 
-  type ViewHandles = Map[
-    ReadFile.ReadHandle,
-    ReadFile.ReadHandle \/ QueryFile.ResultHandle]
+  sealed trait ResultSet
+  object ResultSet {
+    final case class Data(values: Vector[quasar.Data])       extends ResultSet
+    final case class Read(handle: ReadFile.ReadHandle)       extends ResultSet
+    final case class Results(handle: QueryFile.ResultHandle) extends ResultSet
+  }
 
-  type ViewState[A] = KeyValueStore[
-    ReadFile.ReadHandle,
-    ReadFile.ReadHandle \/ QueryFile.ResultHandle,
-    A]
+  type ViewHandles = Map[ReadFile.ReadHandle, ResultSet]
+
+  type ViewState[A] = KeyValueStore[ReadFile.ReadHandle, ResultSet, A]
 
   type ViewStateF[A] = Coyoneda[ViewState, A]
 
   object ViewState {
     def Ops[S[_]: Functor](
       implicit S: ViewStateF :<: S
-    ): KeyValueStore.Ops[ReadFile.ReadHandle, ReadFile.ReadHandle \/ QueryFile.ResultHandle, S] =
-      KeyValueStore.Ops[ReadFile.ReadHandle, ReadFile.ReadHandle \/ QueryFile.ResultHandle, S]
+    ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S] =
+      KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
 
     def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
       TaskRef(initial) map KeyValueStore.fromTaskRef

@@ -42,6 +42,7 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
     // Long, which Argonaut does not allow us to distinguish from decimals.
     def representable(data: Data) = data match {
       case Data.Int(x)    => x.isValidLong
+      case Data.Set(_)    => false
       case _              => true
     }
 
@@ -72,7 +73,7 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
           beRightDisjunction("""{ "$obj": { "$obj": { "$obj": { "$obj": 1 } } } }""")
       }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
-      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("""{ "$set": [ 0, 1, 2 ] }""") }
+      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beLeftDisjunction }
       "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("""{ "$binary": "TE1OTw==" }""") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("""{ "$oid": "abc" }""") }
       "encode NA"        in { DataCodec.render(Data.NA) must beRightDisjunction("""{ "$na": null }""") }
@@ -149,7 +150,7 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
           beRightDisjunction("""{ "$a": 1, "$date": "2015-01-31T10:30:00Z" }""")
         }
       "encode array"     in { DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
-      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beRightDisjunction("[ 0, 1, 2 ]") }
+      "encode set"       in { DataCodec.render(Data.Set(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beLeftDisjunction }
       "encode binary"    in { DataCodec.render(Data.Binary(Array[Byte](76, 77, 78, 79))) must beRightDisjunction("\"TE1OTw==\"") }
       "encode empty binary" in { DataCodec.render(Data.Binary(Array[Byte]())) must beRightDisjunction("\"\"") }
       "encode objectId"  in { DataCodec.render(Data.Id("abc")) must beRightDisjunction("\"abc\"") }
@@ -194,11 +195,6 @@ class DataCodecSpecs extends Specification with ScalaCheck with DisjunctionMatch
 
       "re-parse very large Int value as Dec" in {
         DataCodec.render(LargeInt).flatMap(DataCodec.parse) must beRightDisjunction(Data.Dec(new java.math.BigDecimal(LargeInt.value.underlying)))
-      }
-
-      "re-parse Set as Arr" in {
-        val set = Data.Set(List[BigInt](1, 2, 3).map(Data.Int.apply))
-        DataCodec.render(set).flatMap(DataCodec.parse) must beRightDisjunction(Data.Arr(set.value))
       }
 
       "re-parse Binary as Str" in {

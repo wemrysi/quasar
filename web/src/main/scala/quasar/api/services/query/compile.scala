@@ -39,6 +39,11 @@ object compile {
         case PhaseResult.Detail(name, value) => QResponse.string(Ok, name + "\n" + value)
       }
 
+    def dataResponse(data: List[Data]): QResponse[S] =
+      QResponse.string(Ok,
+        "Results\n" +
+          data.map(_.toJs.toList).flatten.map(_.toJs.pprint(0)).mkString("\n"))
+
     def noOutputError(lp: Fix[LogicalPlan]): ApiError =
       ApiError.apiError(
         InternalServerError withReason "No explain output for plan.",
@@ -46,20 +51,20 @@ object compile {
 
     def explainQuery(
       expr: Fix[sql.Sql],
-      offset: Option[Natural],
+      offset: Natural,
       limit: Option[Positive],
       vars: Variables
     ): Free[S, QResponse[S]] =
-      respond(queryPlan(addOffsetLimit[Fix](expr, offset, limit), vars)
-        .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](lp =>
-          Q.explain(lp).run.run.map {
+      respond(queryPlan(expr, vars, offset, limit)
+        .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
+          dataResponse(_).toResponse[S].point[Free[S, ?]],
+          lp => Q.explain(lp).run.run.map {
             case (phases, \/-(_)) =>
               phaseResultsResponse(phases)
                 .toRightDisjunction(noOutputError(lp))
                 .toResponse[S]
-            case (_, -\/(fsErr)) =>
-              fsErr.toResponse[S]
-          }))
+            case (_, -\/(fsErr)) => fsErr.toResponse[S]
+          })))
 
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>

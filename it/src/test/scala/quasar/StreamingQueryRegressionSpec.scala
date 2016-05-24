@@ -19,7 +19,10 @@ package quasar
 import quasar.regression._
 import quasar.sql.Sql
 
-import matryoshka.Fix
+import scala.{None}
+
+import eu.timepit.refined.auto._
+import matryoshka.{Fix}
 
 class StreamingQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS) {
@@ -27,5 +30,5 @@ class StreamingQueryRegressionSpec
   val suiteName = "Streaming Queries"
 
   def queryResults(expr: Fix[Sql], vars: Variables) =
-    query.evaluateQuery(expr, vars)
+    fsQ.evaluateQuery(expr, vars, 0L, None)
 }
