@@ -145,7 +145,7 @@ lazy val oneJarSettings =
 
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
-  .aggregate(repl, web, it)
+  .aggregate(core, main, mongodb, repl, web, it)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
