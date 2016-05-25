@@ -20,8 +20,8 @@ import quasar.Predef._
 import quasar.Errors.convertError
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
-import quasar.fp._, PathyCodecJson._
-import quasar.fs._
+import quasar.fp._
+import quasar.fs._, PathyCodecJson._
 
 import java.io.File
 

@@ -211,6 +211,10 @@ sealed abstract class ToApiErrorInstances {
           InternalServerError withReason "Unsupported constant.",
           err.message
         ) :?+ ("data" :?= encodeData(data))
+      case NonRepresentableEJson(_) =>
+        fromMsg_(
+          InternalServerError withReason "Unsupported constant.",
+          err.message)
       case UnsupportedFunction(fn, _) =>
         fromMsg(
           InternalServerError withReason "Unsupported function.",

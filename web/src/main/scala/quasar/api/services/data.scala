@@ -18,8 +18,9 @@ package quasar.api.services
 
 import quasar.Data
 import quasar.api._, ToQResponse.ops._, ToApiError.ops._
-import quasar.fp._, numeric._, PathyCodecJson._
-import quasar.fs._
+import quasar.fp._
+import quasar.fp.numeric._
+import quasar.fs._, PathyCodecJson._
 import quasar.Predef._
 
 import java.nio.charset.StandardCharsets

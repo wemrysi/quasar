@@ -24,6 +24,7 @@ import quasar.jscore, jscore.JsFn
 import scala.Any
 import scala.collection.JavaConverters._
 
+import monocle.Prism
 import org.bson._
 import org.bson.types
 import org.threeten.bp.Instant
@@ -71,11 +72,18 @@ object Bson {
 
     def toJs = Js.Num(value, true)
   }
+
+  val _dec = Prism.partial[Bson, Double] { case Bson.Dec(v) => v } (Bson.Dec(_))
+
   final case class Text(value: String) extends Bson {
     def repr = new BsonString(value)
 
     def toJs = Js.Str(value)
   }
+
+  val _text =
+    Prism.partial[Bson, String] { case Bson.Text(v) => v } (Bson.Text(_))
+
   final case class Binary(value: ImmutableArray[Byte]) extends Bson {
     def repr = new BsonBinary(value.toArray[Byte])
     def toJs = Js.Call(Js.Ident("BinData"), List(Js.Num(0, false), Js.Str(new sun.misc.BASE64Encoder().encode(value.toArray))))
@@ -173,6 +181,10 @@ object Bson {
     def repr = new BsonInt32(value)
     def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.Str(value.shows)))
   }
+
+  val _int32 =
+    Prism.partial[Bson, Int] { case Bson.Int32(v) => v } (Bson.Int32(_))
+
   final case class Int64(value: Long) extends Bson {
     def repr = new BsonInt64(value)
     def toJs = Js.Call(Js.Ident("NumberLong"), List(Js.Str(value.shows)))

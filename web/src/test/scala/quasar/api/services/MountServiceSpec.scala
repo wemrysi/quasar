@@ -21,9 +21,9 @@ import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.effect.KeyValueStore
-import quasar.fp._, PathyCodecJson._
+import quasar.fp._
 import quasar.fp.free._
-import quasar.fs._, PathArbitrary._
+import quasar.fs._, PathArbitrary._, PathyCodecJson._
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._

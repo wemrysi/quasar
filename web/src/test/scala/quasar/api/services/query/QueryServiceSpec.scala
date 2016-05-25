@@ -22,8 +22,7 @@ import quasar.api.PathUtils
 import quasar.api.matchers._
 import quasar.api.ApiError
 import quasar.api.ApiErrorEntityDecoder._
-import quasar.fp.PathyCodecJson._
-import quasar.fs.InMemory._
+import quasar.fs._, InMemory._, PathyCodecJson._
 
 import argonaut._, Argonaut._
 import org.http4s._

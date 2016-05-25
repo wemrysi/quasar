@@ -18,8 +18,8 @@ package quasar.fs.mount
 
 import quasar.Predef.{Map, String, ArrowAssoc}
 import quasar.SKI._
-import quasar.fs.APath
-import quasar.fp.PathyCodecJson._
+import quasar.fs.{APath}
+import quasar.fs.PathyCodecJson._
 
 import scala.AnyVal
 
