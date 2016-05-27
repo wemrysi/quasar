@@ -206,7 +206,7 @@ lazy val main = project
   .settings(name := "quasar-main-internal")
   .dependsOn(mongodb % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
-  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+  .enablePlugins(AutomateHeaderPlugin)
 
 // filesystems (backends)
 
@@ -214,7 +214,7 @@ lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
   .dependsOn(core % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
-  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+  .enablePlugins(AutomateHeaderPlugin)
 
 // frontends
 
