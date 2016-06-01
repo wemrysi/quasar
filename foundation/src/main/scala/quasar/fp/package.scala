@@ -470,4 +470,42 @@ package object fp
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
+
+  type ∘[F[_], G[_]] = Composition[F, G]
+
+  // TODO review definition of equal on coproduct
+  implicit def coproductEqual[F[_], G[_]](
+  implicit fEq: Equal ~> λ[α => Equal[F[α]]],
+           gEq: Equal ~> λ[α => Equal[G[α]]]):
+    Equal ~> λ[α => Equal[Coproduct[F, G, α]]] =
+  new (Equal ~> λ[α => Equal[Coproduct[F, G, α]]]) {
+    def apply[α](eq: Equal[α]) =
+      Equal.equal { (cp1, cp2) =>
+        (cp1.run, cp2.run) match {
+          case (-\/(f1), -\/(f2)) => fEq(eq).equal(f1, f2)
+          case (\/-(g1), \/-(g2)) => gEq(eq).equal(g1, g2)
+          case (_, _) => false
+        }
+      }
+  }
+
+  implicit def freeEqual[F[_]: Functor](
+  implicit F: Equal ~> λ[α => Equal[F[α]]]):
+    Equal ~> λ[α => Equal[Free[F, α]]] =
+  new (Equal ~> λ[α => Equal[Free[F, α]]]) {
+    def apply[α](eq: Equal[α]) =
+      Equal.equal((a, b) => (a.resume, b.resume) match {
+        case (-\/(f1), -\/(f2)) =>
+          F(freeEqual[F](scala.Predef.implicitly, F)(eq)).equal(f1, f2)
+        case (\/-(a1), \/-(a2)) => eq.equal(a1, a2)
+        case (_,       _)       => false
+      })
+  }
+
+  type Delay[F[_], G[_]] = F ~> (F ∘ G)#λ
+
+  implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] = new Delay[Equal, Const[A, ?]] {
+    def apply[B](eq: Equal[B]): Equal[Const[A, B]] =
+      Equal.equal((c1, c2) => c1.getConst === c2.getConst)
+  }
 }
