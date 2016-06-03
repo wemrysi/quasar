@@ -10,7 +10,7 @@ import org.jboss.netty.channel.group.ChannelGroup
 import org.jboss.netty.handler.codec.http.HttpResponseEncoder
 import org.jboss.netty.handler.codec.http.HttpContentCompressor
 import org.jboss.netty.handler.stream.ChunkedWriteHandler
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import HttpServerConfig._
 
@@ -39,7 +39,7 @@ private[engines] class HttpPipelineFactory(protocol: String, host: String, port:
     pipeline.addLast("channelsTracker", new ChannelsTrackerUpstreamHandler(channelGroup))
     pipeline.addLast("handler",         new HttpServiceUpstreamHandler(service, executionContext))
     compression foreach { c => pipeline.addFirst("compression", new HttpContentCompressor(c)) }
-    
+
     pipeline
   }
 }

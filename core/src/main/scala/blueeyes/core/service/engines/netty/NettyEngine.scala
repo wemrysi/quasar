@@ -3,7 +3,7 @@ package engines.netty
 
 import blueeyes.core.data._
 
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logger
 import akka.dispatch.ExecutionContext
 import org.streum.configrity.Configuration
 

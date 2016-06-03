@@ -15,7 +15,7 @@ import blueeyes.util.ClockSystem._
 import scala.collection.JavaConversions._
 import scalaz.Semigroup
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
   private sealed trait StageIn
@@ -101,9 +101,9 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
         val cacheSize = cache.size
         //monitor.sample("cache_size")(cacheSize)
         //monitor.sample("actor_queue_size")( actor.dispatcher.mailboxSize(actor))
-        logger.trace("FlushAll start (%d entries)".format(cacheSize))
+        log.trace("FlushAll start (%d entries)".format(cacheSize))
         cache --= cache.keys
-        logger.trace("FlushAll complete")
+        log.trace("FlushAll complete")
         sender ! cacheSize
     }
 

@@ -9,7 +9,7 @@ import blueeyes.core.service.ServerHealthMonitorService
 import blueeyes.persistence.mongo.RealMongo
 import blueeyes.core.service.engines.HttpClientXLightWeb
 import blueeyes.demo.{BlueEyesDemoFacade, BlueEyesDemoService, BlueEyesDemo}
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 object BenchmarkServerStart extends BenchmarkServer {
   def main(args: Array[String]) = startServer(if (args.size > 0) args(0).toBoolean else false)
@@ -34,12 +34,12 @@ trait BenchmarkServer extends Logging { self =>
       Configgy.configureFromString(configPattern.format(port, port + 1))
 
       server = Some(if (liveDemo) LiveBlueEyesDemo else BlueEyesDemo)
-      server.get.start onFailure { 
+      server.get.start onFailure {
         case v =>
-          logger.error("Server failed to start, trying port " + (port + 2))
+          log.error("Server failed to start, trying port " + (port + 2))
           start(port + 2)
       }
-    } 
+    }
 
     start(port)
   }

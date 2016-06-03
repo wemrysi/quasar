@@ -11,7 +11,7 @@ import blueeyes.util.RichThrowableImplicits._
 import org.specs2.matcher._
 import org.specs2.execute.FailureException
 
-import scala.annotation.tailrec  
+import scala.annotation.tailrec
 import java.util.concurrent.{TimeoutException,  CountDownLatch}
 
 trait AkkaConversions {
@@ -23,7 +23,7 @@ trait AkkaConversions {
   }
 }
 
-trait FutureMatchers extends AkkaConversions { 
+trait FutureMatchers extends AkkaConversions {
   case class FutureTimeouts(retries: Int, duration: Duration)
 
   private sealed trait Outcome[A]
@@ -43,14 +43,14 @@ trait FutureMatchers extends AkkaConversions {
     @tailrec
     private def retry[B <: Future[A]](future: => B, retries: Int, totalRetries: Int): (Boolean, String, String) = {
       val start = System.currentTimeMillis
-      
+
       val outcome: Outcome[A] = try {
         val result = Await.result(future, timeouts.duration)
         val protoResult = matcher(result aka "The value returned from the Future")
 
         if (protoResult.isSuccess || retries <= 0) Done(protoResult)
         else protoResult match{
-          case f @ MatchFailure(ok, ko, _, _) => Retry(ko)
+          case f @ MatchFailure(ok, ko, _, _) => Retry(ko())
           case f @ MatchSkip(m, _)            => Retry(m)
           case _ => Retry(protoResult.message)
         }
@@ -58,12 +58,12 @@ trait FutureMatchers extends AkkaConversions {
         case timeout: TimeoutException => Retry("Retried " + (totalRetries - retries) + " times with interval of " + timeouts.duration + " but did not observe a result.")
         case failure: FailureException => Retry("Assertion failed on retry " + (totalRetries - retries) + ": " + failure.f.message)
         case ex: Throwable             => Retry("Delivery of future was canceled on retry " + (timeouts.retries - retries) + ": " + ex.fullStackTrace)
-      }  
+      }
 
       outcome match {
         case Done(result) => (result.isSuccess, result.message, result.message)
 
-        case Retry(_) if (retries > 0) => 
+        case Retry(_) if (retries > 0) =>
           val end = System.currentTimeMillis
           Thread.sleep(0L.max(timeouts.duration.toMillis - (end - start)))
           print(".")

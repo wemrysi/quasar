@@ -13,8 +13,8 @@ import blueeyes.core.data._
 import blueeyes.core.data.DefaultBijections._
 import blueeyes.util._
 
-import com.weiglewilczek.slf4s.Logger
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logger
+import org.slf4s.Logging
 
 import java.io.IOException
 
@@ -106,21 +106,21 @@ private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[Byte
 
       e.getCause match {
         case ex @ HttpException(code, reason) =>
-          logger.warn("An exception was raised by an I/O thread or a ChannelHandler", ex)
+          log.warn("An exception was raised by an I/O thread or a ChannelHandler", ex)
           writeResponse(request, ctx.getChannel, HttpResponse(status = code, content = Option(reason)))
         case ioe: IOException if Option(ioe.getMessage).exists(_.contains("reset by peer")) =>
           try {
-            logger.warn("Connection reset by peer: " + Option(ctx.getChannel.getRemoteAddress).getOrElse("unknown"))
+            log.warn("Connection reset by peer: " + Option(ctx.getChannel.getRemoteAddress).getOrElse("unknown"))
           } catch {
             case _ => // Noop
           }
         case ex =>
-          logger.warn("An exception was raised by an I/O thread or a ChannelHandler", ex)
+          log.warn("An exception was raised by an I/O thread or a ChannelHandler", ex)
           writeResponse(request, ctx.getChannel, HttpResponse(status = InternalServerError, content = Option(ex.getMessage())))
       }
     } catch {
       case ex =>
-        logger.error("An exception was caught attempting to handle an exception in the Netty exceptionCaught handler.", ex)
+        log.error("An exception was caught attempting to handle an exception in the Netty exceptionCaught handler.", ex)
         super.exceptionCaught(ctx, e)
     }
   }
@@ -167,7 +167,7 @@ private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[Byte
     // Kill all pending responses to this channel:
     pendingResponses.foreach {
       case (pr: Promise[_]) => pr.tryComplete(Left(why))
-      case notPromise => logger.error("Pending response was not a promise, but a %s. This should never happen.".format(Option(notPromise).toString))
+      case notPromise => log.error("Pending response was not a promise, but a %s. This should never happen.".format(Option(notPromise).toString))
     }
     pendingResponses.clear()
   }
@@ -210,7 +210,7 @@ object StreamChunkedInput extends Logging {
           }.point[Future]
       } recover {
         case ex =>
-          logger.error("An error was encountered retrieving the next chunk of data: " + ex.getMessage, ex)
+          log.error("An error was encountered retrieving the next chunk of data: " + ex.getMessage, ex)
           queue.put(None)
           channel.getPipeline.get(classOf[ChunkedWriteHandler]).resumeTransfer()
       }
@@ -218,7 +218,7 @@ object StreamChunkedInput extends Logging {
 
     val queue = new LinkedBlockingQueue[Option[HttpChunk]](maxQueueSize)
     advance(queue, stream).onSuccess {
-      case _ => logger.debug("Response stream fully consumed by Netty.")
+      case _ => log.debug("Response stream fully consumed by Netty.")
     }
 
     new StreamChunkedInput(queue, channel)

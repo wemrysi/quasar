@@ -26,8 +26,8 @@ import java.nio.ByteBuffer
 import org.streum.configrity.Configuration
 import org.streum.configrity.io.BlockFormat
 
-import com.weiglewilczek.slf4s.Logging
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logging
+import org.slf4s.Logger
 
 
 import scalaz._
@@ -74,7 +74,7 @@ class HttpServerConfig(val config: Configuration) {
   def enableCompression: Boolean = config[Boolean]("compressionEnable", true)
 
   /**
-   * A compression level for deflate encoding, which must be a value between 1 and 9. 
+   * A compression level for deflate encoding, which must be a value between 1 and 9.
    * GZip encoding does not require a specific level to be set, but the value must be specified.
    */
   def compressionLevel: Option[CompressionLevel] = config.get[CompressionLevel]("compressionLevel")
@@ -101,7 +101,7 @@ trait HttpServerModule extends Logging {
 
     val config = new HttpServerConfig(rootConfig.detach("server"))
     import config._
-    
+
     private def context[T, S](service: Service[T, S]): ServiceContext = {
       val serviceConfig = rootConfig.detach("services." + service.name + ".v" + service.version.majorVersion)
       ServiceContext(rootConfig, serviceConfig, service.name, service.version, service.desc, host, port, sslPort)
@@ -111,7 +111,7 @@ trait HttpServerModule extends Logging {
       def append[S](lifecycle: ServiceLifecycle[ByteChunk, S], tail: List[Service[ByteChunk, _]]): ServiceLifecycle[ByteChunk, _] = {
         tail match {
           case x :: xs => append(lifecycle ~ x.lifecycle(context(x)), xs)
-          case Nil => lifecycle 
+          case Nil => lifecycle
         }
       }
 
@@ -126,7 +126,7 @@ trait HttpServerModule extends Logging {
     def trapErrors(delegate: AsyncHttpService[ByteChunk, ByteChunk]): AsyncHttpService[ByteChunk, ByteChunk] = new CustomHttpService[ByteChunk, Future[HttpResponse[ByteChunk]]] {
       private def convertErrorToResponse(request: HttpRequest[ByteChunk], th: Throwable): HttpResponse[ByteChunk] = {
         import DefaultBijections._
-        logger.error("Error handling request " + request.shows, th)
+        log.error("Error handling request " + request.shows, th)
         HttpResponse.error[ByteChunk](th)
       }
 
@@ -144,15 +144,15 @@ trait HttpServerModule extends Logging {
         rawValidation match {
           case Success(rawFuture) => success((rawFuture recover { case error => convertErrorToResponse(request, error) }))
 
-          case Failure(DispatchError(failure, message, detail)) => 
+          case Failure(DispatchError(failure, message, detail)) =>
             success(Promise.successful(HttpResponse[ByteChunk](HttpStatus(failure, message))))
 
           case Failure(Inapplicable(services @ _*)) =>
             val message = "No handler could be found for your request: " + request.shows
             success(
               Promise.successful(
-                HttpResponse[ByteChunk](NotFound, 
-                                        headers = HttpHeaders(`Content-Type`(text/plain)), 
+                HttpResponse[ByteChunk](NotFound,
+                                        headers = HttpHeaders(`Content-Type`(text/plain)),
                                         content = Some(DefaultBijections.stringToChunk(message)))
               )
             )
@@ -171,12 +171,12 @@ trait HttpServerMain extends HttpServerModule {
    */
   def main(args: Array[String]) {
     val arguments = CommandLineArguments(args: _*)
-    
+
     if (arguments.size == 0 || !arguments.parameters.get("help").isEmpty) {
       println("Usage: --configFile [config file]")
-      
+
       System.exit(-1)
-    } else {    
+    } else {
       val rootConfiguration = Configuration.load(
         arguments.parameters.get("configFile").getOrElse(sys.error("Expected --configFile option")),
         BlockFormat
@@ -196,7 +196,7 @@ trait HttpServerMain extends HttpServerModule {
     /** Retrieves the logger for the server, which is configured directly from
       * the server's "log" configuration block.
       */
-    val log: Logger = Logger("blueeyes.server")
+    val log: Logger = org.slf4s.LoggerFactory.getLogger("blueeyes.server")
     server(rootConfiguration, executionContext).start map {
       _ onSuccess { case (runningState, stoppable) =>
         log.info("Services started.")
@@ -225,19 +225,19 @@ trait HttpServerMain extends HttpServerModule {
   }
 }
 
-/** 
+/**
  * Reflectively discovers service handlers from the fields of the class into which it is mixed.
  */
 trait ReflectiveServiceList[T] { self =>
   def services: List[Service[T, _]] = {
     val c = self.getClass
-    
+
     val allMethods: List[Method] = c.getDeclaredMethods.toList
-    
+
     val serviceMethods: List[Method] = allMethods.reverse.filter { method =>
       classOf[Service[T, _]].isAssignableFrom(method.getReturnType) && method.getParameterTypes.length == 0
     }
-    
+
     serviceMethods.map { method =>
       method.invoke(self).asInstanceOf[Service[T, Any]]
     }

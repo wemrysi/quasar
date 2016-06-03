@@ -13,7 +13,7 @@ import blueeyes.core.service._
 import blueeyes.Environment
 import blueeyes.util.RichThrowableImplicits._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.util.concurrent.{TimeUnit, CountDownLatch}
 
@@ -39,12 +39,12 @@ abstract class BlueEyesServiceSpecification extends Specification with FutureMat
 
     val config = Configuration.parse(configuration, BlockFormat)
     server(config, executionContext).start map { startFuture =>
-      val started = startFuture map { 
-        case (service, stoppable) => 
+      val started = startFuture map {
+        case (service, stoppable) =>
           _service = service
           _stoppable = stoppable
       } onFailure {
-        case ex => 
+        case ex =>
           System.err.println("Unable to begin test due to error in service start.")
           ex.printStackTrace(System.err)
       }
@@ -111,8 +111,8 @@ abstract class BlueEyesServiceSpecification extends Specification with FutureMat
         val response = service.service(request)
         response.toOption.getOrElse(Future(NotFound))
       } catch {
-        case t: Throwable => 
-          logger.error("Error reported in service.", t)
+        case t: Throwable =>
+          log.error("Error reported in service.", t)
           Future(convertErrorToResponse(t))
       }
     }

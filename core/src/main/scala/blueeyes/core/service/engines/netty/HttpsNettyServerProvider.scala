@@ -11,7 +11,7 @@ import org.jboss.netty.channel.group.ChannelGroup
 import org.jboss.netty.channel.ChannelPipeline
 import org.jboss.netty.handler.ssl.SslHandler
 
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logger
 import org.streum.configrity.Configuration
 
 import HttpServerConfig._
@@ -29,7 +29,7 @@ private[engines] class HttpsNettyServerProvider(conf: HttpServerConfig, service:
 }
 
 private[engines] class HttpsPipelineFactory(protocol: String, host: String, port: Int, chunkSize: Int, compression: Option[CompressionLevel],
-                                            requestHandler: AsyncHttpService[ByteChunk, ByteChunk], channelGroup: ChannelGroup, 
+                                            requestHandler: AsyncHttpService[ByteChunk, ByteChunk], channelGroup: ChannelGroup,
                                             config: Configuration, //TODO: Use of Configuration here is bogus
                                             executionContext: ExecutionContext)
     extends HttpPipelineFactory(protocol: String, host, port, chunkSize, compression, requestHandler, channelGroup, executionContext) {

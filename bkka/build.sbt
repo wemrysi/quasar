@@ -1,5 +1,5 @@
 name := "bkka"
 
 libraryDependencies ++= Seq(
-  "com.weiglewilczek.slf4s"     %  "slf4s_2.9.1"        % "1.0.7"
+  "org.slf4s" %% "slf4s-api" % "1.7.13"
 )

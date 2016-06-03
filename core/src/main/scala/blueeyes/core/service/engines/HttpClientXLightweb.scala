@@ -14,7 +14,7 @@ import akka.dispatch.Promise
 import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import org.xlightweb.client.{HttpClient => XLHttpClient}
 import org.xlightweb.{
@@ -91,12 +91,12 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
 
     val handler = new IHttpResponseHandler() {
       def onResponse(response: IHttpResponse) {
-        val headers = response.getHeaderNameSet.asScala.foldLeft(Map[String, String]()) { 
+        val headers = response.getHeaderNameSet.asScala.foldLeft(Map[String, String]()) {
           (acc, name) => acc + (name -> response.getHeader(name))
         }
 
         val isChunked = headers.exists {
-          case (key, value) => 
+          case (key, value) =>
             key.equalsIgnoreCase("Transfer-Encoding") && value.equalsIgnoreCase("chunked")
         }
 
@@ -109,14 +109,14 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
       }
     }
 
-    logger.trace("Executing request of type " + xlrequest.getClass())
-    logger.trace("xlRequest content type: " + xlrequest.getContentType())
+    log.trace("Executing request of type " + xlrequest.getClass())
+    log.trace("xlRequest content type: " + xlrequest.getContentType())
     for (name <- xlrequest.getHeaderNames.asScala) {
-      logger.trace("Header %s has values %s".format(name, xlrequest.getHeaderList(name.asInstanceOf[String]).asScala.mkString("[", ", ", "]")))
+      log.trace("Header %s has values %s".format(name, xlrequest.getHeaderList(name.asInstanceOf[String]).asScala.mkString("[", ", ", "]")))
     }
 
     xlrequest match {
-      case e: IHttpRequest => 
+      case e: IHttpRequest =>
         clientInstance.send(e, handler)
 
       case e: IHttpRequestHeader =>
@@ -130,7 +130,7 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
   private def sendData(chunk: ByteChunk, bodyDataSink: BodyDataSink) = {
     def writeStream(stream: StreamT[Future, Array[Byte]]): Future[Unit] = {
       stream.uncons flatMap {
-        case Some((data, tail)) => 
+        case Some((data, tail)) =>
           bodyDataSink.write(ByteBuffer.wrap(data))
           writeStream(tail)
         case None =>
@@ -187,7 +187,7 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
     import blueeyes.util.QueryParser
     import java.net.URI
 
-    logger.debug("HttpClientXLightWeb creating XLRequest for HttpRequest: \n%s".format(request.shows))
+    log.debug("HttpClientXLightWeb creating XLRequest for HttpRequest: \n%s".format(request.shows))
 
     // Merge request.parameters and original query params (in uri)
     val origURI = new URI(request.uri.toString)

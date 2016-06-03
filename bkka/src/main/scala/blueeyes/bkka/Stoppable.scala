@@ -16,20 +16,20 @@ import akka.util.Duration
 
 import scala.collection.immutable.Queue
 import scalaz.Semigroup
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 /**
  * A base trait for typeclass instances that describe how to stop a given type of service.
  * TODO: make polymorphic in the type of the Future, perhaps using an ADT such as StopResult { StopSuccess / StopFailure }
- * 
- * In order for implementations of this trait to work properly in a graph where the same service is a dependant of multiple other services, 
+ *
+ * In order for implementations of this trait to work properly in a graph where the same service is a dependant of multiple other services,
  * it should be safe for stop to be called multiple times with the same target.
  */
 trait Stop[-A] {
   def stop(a: A): Future[Any]
 }
 
-/** 
+/**
  * A DAG of things that can be stopped. Dependents are traversed in breadth-first order.
  */
 sealed trait Stoppable { self =>
@@ -50,12 +50,12 @@ sealed trait Stoppable { self =>
 object Stoppable extends Logging {
   def apply[A](a: A, deps: List[Stoppable] = Nil)(implicit stopa: Stop[A], ctx: ExecutionContext): Stoppable = new Stoppable {
     protected def stop = {
-      Future(logger.info("About to stop " + a)) flatMap { _ =>
+      Future(log.info("About to stop " + a)) flatMap { _ =>
         stopa.stop(a).onSuccess {
-          case v => logger.info("Stopped " + a + " with result " + v)
-        } recover { case ex => 
-          logger.error("Stop failed", ex)
-        } 
+          case v => log.info("Stopped " + a + " with result " + v)
+        } recover { case ex =>
+          log.error("Stop failed", ex)
+        }
       }
     }
 
@@ -78,12 +78,12 @@ object Stoppable extends Logging {
 
   /**
    * Stops the specified stoppable, returning a future containing a list of the results
-   * of the stoppable graph in breadth-first order. When this future is completed, 
+   * of the stoppable graph in breadth-first order. When this future is completed,
    * everything will be stopped.
    *
    * TODO: Make it possible to specify whether failure to stop any given service
    * should prevent the stopping of its dependants. At present, any exception encountered
-   * in stopping will stop the stopping process, leaving the system in a potentially 
+   * in stopping will stop the stopping process, leaving the system in a potentially
    * indeterminate state.
    */
   implicit def stoppableStop(timeout: Timeout)(implicit ctx: ExecutionContext): Stop[Stoppable] = new Stop[Stoppable] {
@@ -95,14 +95,14 @@ object Stoppable extends Logging {
           Future.sequence(xs.map(s => Future(Await.result(s.stop, timeout.duration)))).flatMap(r => _stop(remainder ++ xs.map(_.dependents)).map(r ::: _))
         }
       }
-      
+
       _stop(Queue(List(stoppable)))
     }
   }
 
   implicit def stoppableStop(implicit ctx: ExecutionContext): Stop[Stoppable]  = stoppableStop(Timeout.never)
 
-  def stop(stoppable: Stoppable, duration: Duration = Duration.Inf)(implicit ctx: ExecutionContext) = 
+  def stop(stoppable: Stoppable, duration: Duration = Duration.Inf)(implicit ctx: ExecutionContext) =
     stoppableStop(duration).stop(stoppable)
 }
 
@@ -114,11 +114,11 @@ case class ActorRefStop(actorSystem: ActorSystem, timeout: Timeout) extends Stop
     context.setReceiveTimeout(timeout.duration)
 
     def receive = {
-      case Terminated(a) ⇒ 
+      case Terminated(a) ⇒
         result.complete(Right(()))
         self ! PoisonPill
 
-      case ReceiveTimeout ⇒ 
+      case ReceiveTimeout ⇒
         result.complete(Left(new RuntimeException("Failed to stop [%s] within [%s]".format(target.path, context.receiveTimeout))))
         self ! PoisonPill
     }

@@ -18,7 +18,7 @@ import org.jboss.netty.channel.SimpleChannelUpstreamHandler
 import org.jboss.netty.handler.codec.http.{HttpHeaders => NettyHeaders, HttpChunk => NettyChunk, HttpRequest => NettyRequest}
 import org.jboss.netty.util.CharsetUtil
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch

@@ -16,14 +16,14 @@ import org.joda.time.format.DateTimeFormat
  * of log line. Request loggers do not have side effects.
  */
 trait HttpRequestLogger[T, S] extends ((HttpRequest[T], Future[HttpResponse[S]]) => Future[List[(FieldIdentifier, Either[String, Array[Byte]])]]) { self =>
-  /** Combines this logger with the specified logger to produce another logger.
+  /** Combines this logger with the specified logger to produce another log.
    * If necessary, the items are separated by a single space character.
    */
   def :+ (logger: HttpRequestLogger[T, S]): HttpRequestLogger[T, S] = new CompositeHttpRequestLogger(logger)
 
   private[HttpRequestLogger] class CompositeHttpRequestLogger(logger: HttpRequestLogger[T, S]) extends HttpRequestLogger[T, S]{
     def apply(request: HttpRequest[T], response: Future[HttpResponse[S]]): Future[List[(FieldIdentifier, Either[String, Array[Byte]])]] = {
-     (self(request, response) zip logger(request, response)).map { 
+     (self(request, response) zip logger(request, response)).map {
         case (prefix, suffix) => prefix ::: suffix
       }
     }
@@ -34,10 +34,10 @@ trait HttpRequestLogger[T, S] extends ((HttpRequest[T], Future[HttpResponse[S]])
 object HttpRequestLogger extends AkkaDefaults {
   import blueeyes.parsers.W3ExtendedLogGrammar._
   import blueeyes.parsers.W3ExtendedLogAST._
-  
+
   // <date>  = 4<digit> "-" 2<digit> "-" 2<digit> YYYY-MM-DD
   private val DateFormatter = DateTimeFormat.forPattern("yyyy-MM-dd")
-  
+
   // <time>  = 2<digit> ":" 2<digit> [":" 2<digit> ["." *<digit>] HH-MM-SS
   private val TimeFormatter = DateTimeFormat.forPattern("HH:mm:ss.S")
 
@@ -53,7 +53,7 @@ object HttpRequestLogger extends AkkaDefaults {
       case error: Throwable => "localhost"
   }
 
-  
+
   /** Creates a logger from a W3 Extended Log fields directive. e.g.:
    *
    * #Fields: time cs-method cs-uri
@@ -86,7 +86,7 @@ object HttpRequestLogger extends AkkaDefaults {
         response.map[Either[String, Array[Byte]]] { _ =>
           val deltaSeconds = (clock.now().getMillis - start) / 1000.0
           Left(deltaSeconds.toString)
-        } 
+        }
 
       case BytesIdentifier =>
         import HttpHeaders._
@@ -120,31 +120,31 @@ object HttpRequestLogger extends AkkaDefaults {
       }
       case ContentIdentifier(prefix) => prefix match {
         case ClientToServerPrefix => aggregate(request.content.map(req2c(_)))
-        case ServerToClientPrefix => 
-          response.flatMap[Either[String, Array[Byte]]] { 
-            response => aggregate(response.content.map(resp2c(_))) 
-          } recover { 
+        case ServerToClientPrefix =>
+          response.flatMap[Either[String, Array[Byte]]] {
+            response => aggregate(response.content.map(resp2c(_)))
+          } recover {
             case ex => Left(ex.getMessage)
           }
 
         case _   => Promise.successful(Left(""))
       }
       case StatusIdentifier(prefix) => prefix match {
-        case ServerToClientPrefix => 
-          response.map[Either[String, Array[Byte]]] { 
-            response => Left(response.status.code.name) 
-          } recover { 
-            case ex => Left(ex.getMessage) 
+        case ServerToClientPrefix =>
+          response.map[Either[String, Array[Byte]]] {
+            response => Left(response.status.code.name)
+          } recover {
+            case ex => Left(ex.getMessage)
           }
 
         case _   => Promise.successful(Left(""))
       }
       case CommentIdentifier(prefix) => prefix match {
-        case ServerToClientPrefix => 
-          response.map[Either[String, Array[Byte]]] { 
-            response => Left(response.status.reason) 
-          } recover { 
-            case ex => Left(ex.getMessage) 
+        case ServerToClientPrefix =>
+          response.map[Either[String, Array[Byte]]] {
+            response => Left(response.status.reason)
+          } recover {
+            case ex => Left(ex.getMessage)
           }
 
         case _   => Promise.successful(Left(""))
@@ -169,11 +169,11 @@ object HttpRequestLogger extends AkkaDefaults {
         def find(key: String, headers: Map[String, String]) = headers find {keyValue => keyValue._1.toLowerCase == key.toLowerCase} map {keyValue => keyValue._2} getOrElse ("")
         prefix match {
           case ClientToServerPrefix => Promise.successful(Left(find(header, request.headers.raw)))
-          case ServerToClientPrefix => 
-            response.map[Either[String, Array[Byte]]] { 
-              response => Left(find(header, response.headers.raw)) 
-            } recover { 
-              case ex => Left(ex.getMessage) 
+          case ServerToClientPrefix =>
+            response.map[Either[String, Array[Byte]]] {
+              response => Left(find(header, response.headers.raw))
+            } recover {
+              case ex => Left(ex.getMessage)
             }
 
           case _   => Promise.successful(Left(""))

@@ -23,7 +23,7 @@ import scala.sys.process._
 
 import scalaz.effect.IO
 
-trait RealMongoSpecSupport extends Specification with PortFinder {
+trait RealMongoSpecSupport extends SpecificationLike with PortFinder {
   private[this] var mongoImpl: Mongo = _
   private[this] var realMongoImpl: TGMongo = _
 

@@ -7,7 +7,7 @@ import core.service.engines.servlet.ServletEngine
 import akka.dispatch.ExecutionContext
 
 import org.streum.configrity.Configuration
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 /** Convenience trait for building a servlet. This server uses reflection to mix
  * in any services defined as fields.
@@ -25,7 +25,7 @@ import com.weiglewilczek.slf4s.Logging
 
 trait ServletServer extends ServletEngine with ReflectiveServiceList[ByteChunk] { self =>
   type HttpServer = HttpServerLike
-  
-  def server(rootConfig: Configuration, ctx: ExecutionContext) = 
+
+  def server(rootConfig: Configuration, ctx: ExecutionContext) =
     new HttpServerLike(rootConfig, services, ctx)
 }

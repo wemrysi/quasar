@@ -28,12 +28,12 @@ import org.specs2.time.TimeConversions._
 import java.nio.ByteBuffer
 import scalaz.StreamT
 import scalaz.syntax.monad._
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 class HttpClientXLightWebSpec extends Specification with TestAkkaDefaults with HttpRequestMatchers with PortFinder {
   val duration = 2000.milliseconds
   val retries = 30
-  
+
   sequential
 
   private val baseClient = new HttpClientXLightWeb
@@ -58,12 +58,12 @@ class HttpClientXLightWebSpec extends Specification with TestAkkaDefaults with H
       val echoServer = EchoServer.server(config, defaultFutureDispatch)
       val (_, stop) = Await.result(echoServer.start.get, duration)
       stoppable = stop
-    } 
+    }
 
     def stopStep = Step {
       stoppable foreach { Stoppable.stop(_, duration) }
     }
-    
+
     startStep ^ fs ^ stopStep
   }
 
@@ -234,7 +234,7 @@ class HttpClientXLightWebSpec extends Specification with TestAkkaDefaults with H
   }
 }
 
-object EchoServer extends BlueEyesServer with BlueEyesServiceBuilder with HttpRequestHandlerCombinators with TestAkkaDefaults with Logging { 
+object EchoServer extends BlueEyesServer with BlueEyesServiceBuilder with HttpRequestHandlerCombinators with TestAkkaDefaults with Logging {
   import HttpRequestHandlerImplicits._
 
   val executionContext = defaultFutureDispatch

@@ -23,8 +23,8 @@ import akka.dispatch.ExecutionContext
 import akka.util.Timeout
 
 import org.streum.configrity.Configuration
-import com.weiglewilczek.slf4s.Logger
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logger
+import org.slf4s.Logging
 
 import java.util.Calendar
 import printer.HtmlPrinter
@@ -106,7 +106,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
         runningState = (state: S) => {
           val (service, stoppable) = underlying.runningState(state)
           val helpService = {
-            service ~ 
+            service ~
             path(pathPrefix) {
               get {
                 encode {
@@ -138,7 +138,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
    */
   def logging[T, S](f: Logger => ServiceDescriptorFactory[T, S]): ServiceDescriptorFactory[T, S] = {
     (context: ServiceContext) => {
-      val logger = Logger(context.toString)
+      val logger = org.slf4s.LoggerFactory.getLogger(context.toString)
 
       f(logger)(context)
     }
@@ -154,7 +154,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
    * }
    * }}}
    */
-  def requestLogging[T, S](f: => ServiceDescriptorFactory[T, S])(implicit t2c: Bijection[T, ByteChunk], executor: ExecutionContext): ServiceDescriptorFactory[T, S] = 
+  def requestLogging[T, S](f: => ServiceDescriptorFactory[T, S])(implicit t2c: Bijection[T, ByteChunk], executor: ExecutionContext): ServiceDescriptorFactory[T, S] =
     requestLogging(defaultShutdownTimeout)(f)
 
   def requestLogging[T, S](shutdownTimeout: Timeout)(f: => ServiceDescriptorFactory[T, S])(implicit t2c: Bijection[T, ByteChunk], executor: ExecutionContext): ServiceDescriptorFactory[T, S] = {
@@ -206,7 +206,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
 
             val actorSystem = ActorSystem("blueeyes-request-logger")
             val actor = actorSystem.actorOf(Props(new HttpRequestLoggerActor[T](fieldsDirective, includePaths, excludePaths, log, formatter)))
-            
+
             implicit val actorStop = ActorRefStop(actorSystem, shutdownTimeout)
 
             val (service, stoppable) = underlying.runningState(state)
@@ -285,7 +285,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
     }
   }
 
-  private[service] class HttpRequestLoggerService[T](actor: ActorRef, underlying: AsyncHttpService[T, T])(implicit executor: ExecutionContext) 
+  private[service] class HttpRequestLoggerService[T](actor: ActorRef, underlying: AsyncHttpService[T, T])(implicit executor: ExecutionContext)
       extends CustomHttpService[T, Future[HttpResponse[T]]]{
     def service = (request: HttpRequest[T]) => {
       try {
@@ -293,7 +293,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
         for (response <- validation) actor ! ((request, response))
         validation
       } catch {
-        case ex: Throwable => 
+        case ex: Throwable =>
           actor ! ((request, Promise.failed[HttpResponse[T]](ex)))
           throw ex
       }
@@ -336,7 +336,7 @@ trait ServiceDescriptorFactoryCombinators extends HttpRequestHandlerCombinators 
             healthMonitor.trapFuture(errorPath)(response)
 
             response onSuccess {
-              case v => 
+              case v =>
                 healthMonitor.trackTime(timePath)(System.nanoTime - startTime)
                 healthMonitor.count(JPath(List(JPathField("statusCodes"), JPathField(v.status.code.value.toString))))
             }

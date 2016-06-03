@@ -1,16 +1,16 @@
 package blueeyes.core.http
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 sealed trait HttpStatusCode {
   def name = productPrefix.toLowerCase
-      
+
   def productPrefix: String
-  
+
   def value: Int
-  
+
   def defaultMessage: String
-  
+
   def apply() = value
 }
 
@@ -27,7 +27,7 @@ sealed abstract class Warning(val value: Int, val defaultMessage: String) extend
 sealed abstract class ClientError(val value: Int, val defaultMessage: String) extends HttpFailure
 sealed abstract class ServerError(val value: Int, val defaultMessage: String) extends HttpFailure
 
-object HttpStatusCodes {  
+object HttpStatusCodes {
   case object Continue            extends Informational(100, "The server has received the request headers, and the client should proceed to send the request body.")
   case object SwitchingProtocols  extends Informational(101, "The server is switching protocols, because the client requested the switch.")
   case object Processing          extends Informational(102, "The server is processing the request, but no response is available yet.")
@@ -39,7 +39,7 @@ object HttpStatusCodes {
   case object Miscellaneous             extends Warning(119, "Miscellaneous warning.")
   case object Transformation            extends Warning(214, "A transformation changed the content-coding of the response, or the entity-body of the response.")
   case object MiscellaneousPersistent   extends Warning(299, "Miscellaneous persistent warning.")
-  
+
   case object OK              extends Success(200, "")
   case object Created         extends Success(201, "The request has been fulfilled and resulted in a new resource being created.")
   case object Accepted        extends Success(202, "The request has been accepted for processing, but the processing has not been completed.")
@@ -48,7 +48,7 @@ object HttpStatusCodes {
   case object ResetContent    extends Success(205, "The server successfully processed the request, but is not returning any content.")
   case object PartialContent  extends Success(206, "The server is delivering only part of the resource due to a range header sent by the client.")
   case object Multi           extends Success(207, "The message body that follows is an XML message and can contain a number of separate response codes, depending on how many sub-requests were made.")
-  
+
   case object MultipleChoices   extends Redirection(300, "Indicates multiple options for the resource that the client may follow.")
   case object MovedPermanently  extends Redirection(301, "This and all future requests should be directed to the given URI.")
   case object Found             extends Redirection(302, "The resource was found, but at a different URI.")
@@ -56,7 +56,7 @@ object HttpStatusCodes {
   case object NotModified       extends Redirection(304, "Indicates the resource has not been modified since last requested.")
   case object UseProxy          extends Redirection(305, "Many HTTP clients (such as Mozilla[7] and Internet Explorer) do not correctly handle responses with this status code, primarily for security reasons.")
   case object TemporaryRedirect extends Redirection(307, "In this occasion, the request should be repeated with another URI, but future requests can still use the original URI.")
-  
+
   case object BadRequest                          extends ClientError(400, "The request contains bad syntax or cannot be fulfilled.")
   case object Unauthorized                        extends ClientError(401, "Authentication is possible but has failed or not yet been provided.")
   case object PaymentRequired                     extends ClientError(402, "Reserved for future use.")
@@ -82,7 +82,7 @@ object HttpStatusCodes {
   case object UnorderedCollection                 extends ClientError(425, "The collection is unordered.")
   case object UpgradeRequired                     extends ClientError(426, "The client should switch to a different protocol such as TLS/1.0.")
   case object RetryWith                           extends ClientError(449, "The request should be retried after doing the appropriate action.")
-  
+
   case object InternalServerError       extends ServerError(500, "There was an internal server error.")
   case object NotImplemented            extends ServerError(501, "The server either does not recognize the request method, or it lacks the ability to fulfill the request.")
   case object BadGateway                extends ServerError(502, "The server was acting as a gateway or proxy and received an invalid response from the upstream server.")
@@ -102,7 +102,7 @@ trait HttpStatusCodeImplicits extends Logging {
     case HttpStatusCodes.Continue.value                       => HttpStatusCodes.Continue
     case HttpStatusCodes.SwitchingProtocols.value             => HttpStatusCodes.SwitchingProtocols
     case HttpStatusCodes.Processing.value                     => HttpStatusCodes.Processing
-    
+
     case HttpStatusCodes.OK.value                             => HttpStatusCodes.OK
     case HttpStatusCodes.Created.value                        => HttpStatusCodes.Created
     case HttpStatusCodes.Accepted.value                       => HttpStatusCodes.Accepted
@@ -111,7 +111,7 @@ trait HttpStatusCodeImplicits extends Logging {
     case HttpStatusCodes.ResetContent.value                   => HttpStatusCodes.ResetContent
     case HttpStatusCodes.PartialContent.value                 => HttpStatusCodes.PartialContent
     case HttpStatusCodes.Multi.value                          => HttpStatusCodes.Multi
-    
+
     case HttpStatusCodes.MultipleChoices.value                => HttpStatusCodes.MultipleChoices
     case HttpStatusCodes.MovedPermanently.value               => HttpStatusCodes.MovedPermanently
     case HttpStatusCodes.Found.value                          => HttpStatusCodes.Found
@@ -119,7 +119,7 @@ trait HttpStatusCodeImplicits extends Logging {
     case HttpStatusCodes.NotModified.value                    => HttpStatusCodes.NotModified
     case HttpStatusCodes.UseProxy.value                       => HttpStatusCodes.UseProxy
     case HttpStatusCodes.TemporaryRedirect.value              => HttpStatusCodes.TemporaryRedirect
-    
+
     case HttpStatusCodes.BadRequest.value                     => HttpStatusCodes.BadRequest
     case HttpStatusCodes.Unauthorized.value                   => HttpStatusCodes.Unauthorized
     case HttpStatusCodes.PaymentRequired.value                => HttpStatusCodes.PaymentRequired
@@ -145,7 +145,7 @@ trait HttpStatusCodeImplicits extends Logging {
     case HttpStatusCodes.UnorderedCollection.value            => HttpStatusCodes.UnorderedCollection
     case HttpStatusCodes.UpgradeRequired.value                => HttpStatusCodes.UpgradeRequired
     case HttpStatusCodes.RetryWith.value                      => HttpStatusCodes.RetryWith
-    
+
     case HttpStatusCodes.InternalServerError.value            => HttpStatusCodes.InternalServerError
     case HttpStatusCodes.NotImplemented.value                 => HttpStatusCodes.NotImplemented
     case HttpStatusCodes.BadGateway.value                     => HttpStatusCodes.BadGateway
@@ -161,5 +161,5 @@ trait HttpStatusCodeImplicits extends Logging {
     case _                                                    => HttpStatusCodes.InternalServerError
   }
 }
-object HttpStatusCodeImplicits extends HttpStatusCodeImplicits 
+object HttpStatusCodeImplicits extends HttpStatusCodeImplicits
 

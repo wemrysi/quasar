@@ -29,7 +29,7 @@ import org.streum.configrity.io.BlockFormat
 
 import blueeyes.akka_testing.FutureMatchers
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import org.specs2.mutable.Specification
 import org.specs2.specification.{Step, Fragments}
@@ -48,7 +48,7 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
     case _ => throw new Exception("Failed to find 2 unused ports for testing")
   }
 
-  logger.info("Running HttpServerNettySpec with config " + configPattern.format(port, sslPort))
+  log.info("Running HttpServerNettySpec with config " + configPattern.format(port, sslPort))
 
   private var stop: Option[Stoppable] = None
   private var config: Configuration = null

@@ -29,7 +29,7 @@ import akka.util.Timeout
 import java.util.concurrent.TimeUnit
 import scalaz.Scalaz._
 import scalaz._
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 object RealMongo {
   val ServerAndPortPattern = "(.+):(.+)".r
@@ -126,15 +126,15 @@ private[mongo] class RealDatabaseCollection(val collection: DBCollection, databa
 
   def aggregation(pipeline : JArray, output : Option[String] = None): Option[JObject] = {
     // Set up the command object (Java driver doesn't yet provide an interface for this)
-    val cmd = JObject(List(JField("aggregate", JString(collection.getName)), 
+    val cmd = JObject(List(JField("aggregate", JString(collection.getName)),
                            JField("pipeline", pipeline)))
 
-    MongoToJson.unapply(cmd).flatMap { 
+    MongoToJson.unapply(cmd).flatMap {
       obj: DBObject => MongoToJson(database.database.command(obj))
     }.toOption
   }
 
-  def insert(objects: List[JObject]) = { 
+  def insert(objects: List[JObject]) = {
     objects.map(MongoToJson.unapply(_)).sequence[V, DBObject].map{objects: List[DBObject] =>
       collection.insert(objects)
     }

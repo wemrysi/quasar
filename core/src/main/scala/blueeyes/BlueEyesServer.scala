@@ -7,7 +7,7 @@ import core.service.engines.netty.NettyEngine
 import akka.dispatch.ExecutionContext
 
 import org.streum.configrity.Configuration
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 /** Convenience trait for building a server. This server uses reflection to mix
  * in any services defined as fields.

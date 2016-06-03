@@ -54,18 +54,18 @@ object BlueEyesBuild extends Build {
   val scalazVersion = "7.0.0"
 
   val commonSettings = Seq(
-    scalaVersion := "2.9.2",
-    
-    crossScalaVersions := Seq("2.9.2"),
+    scalaVersion := "2.9.3",
+
+    crossScalaVersions := Seq("2.9.3"),
 
     organization := "com.reportgrid",
-    
+
     version := "1.0.0-M9.5",
 
     libraryDependencies ++= Seq(
       "org.scalaz"         %% "scalaz-core"   % scalazVersion,
       "org.scalaz"         %% "scalaz-effect" % scalazVersion,
-      "org.specs2"         %% "specs2"        % "1.12.3"         % "test",
+      "org.specs2"         %% "specs2"        % "1.12.4.1"       % "test",
       "org.scalacheck"     %% "scalacheck"    % "1.10.0"         % "test",
       "ch.qos.logback"     %  "logback-classic"    % "1.0.0" % "test"
     ),
@@ -74,7 +74,7 @@ object BlueEyesBuild extends Build {
   )
 
   lazy val blueeyes = Project(id = "blueeyes", base = file(".")).settings((nexusSettings ++ commonSettings): _*) aggregate(util, json, akka_testing, bkka, core, test, mongo)
-  
+
   lazy val util  = Project(id = "util", base = file("util")).settings((nexusSettings ++ commonSettings): _*)
 
   lazy val json  = Project(id = "json", base = file("json")).settings((nexusSettings ++ commonSettings): _*)

@@ -1,7 +1,7 @@
 package blueeyes.core.service.engines.security
 
 import blueeyes.bkka.AkkaDefaults
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 import akka.dispatch.Future
 import java.lang.ProcessBuilder
 import java.io.{InputStream, ByteArrayOutputStream}
@@ -20,16 +20,16 @@ object JavaKeyTool extends Logging with AkkaDefaults {
 
     val processBuilder = new ProcessBuilder(command: _*)
 
-    logger.info("Creating keypair by command: " + command.mkString(" "))
+    log.info("Creating keypair by command: " + command.mkString(" "))
 
     val process = processBuilder.start()
 
-    val stdout = pump(process.getInputStream).foreach(logger.info(_))
-    val stderr = pump(process.getErrorStream).foreach(logger.error(_))
+    val stdout = pump(process.getInputStream).foreach(log.info(_))
+    val stderr = pump(process.getErrorStream).foreach(log.error(_))
 
     val exitCode = process.waitFor()
 
-    logger.info("JavaKeyTool finished with exit code: " + exitCode)
+    log.info("JavaKeyTool finished with exit code: " + exitCode)
 
     (exitCode, stdout, stderr)
   }

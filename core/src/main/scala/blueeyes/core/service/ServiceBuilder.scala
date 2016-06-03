@@ -7,35 +7,35 @@ import akka.dispatch.ExecutionContext
 import blueeyes.bkka.Stoppable
 import blueeyes.core.http._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 /**
 val emailService = {
   service("email", "1.23") { context =>
     startup {
-  
-    } -> 
+
+    } ->
     request { state =>
-  
+
     } ->
     shutdown { state =>
-  
+
     }
-  
+
   }
 }
 */
 trait ServiceBuilder[T] {
   protected def startup[S](startup: => Future[S]): StartupDescriptor[T, S] = {
     val thunk = () => startup
-    
+
     StartupDescriptor[T, S](thunk)
   }
-  
+
   protected def request[S](request: S => AsyncHttpService[T, T]): RequestDescriptor[T, S] = RequestDescriptor[T, S](request)
-  
+
   protected def request(request: => AsyncHttpService[T, T]): RequestDescriptor[T, Unit] = RequestDescriptor[T, Unit]((u) => request)
-  
+
   def service[S](sname: String, sversion: ServiceVersion, sdesc: Option[String] = None)(slifecycle: ServiceContext => ServiceLifecycle[T, S]): Service[T, S] = {
     new Service[T, S] {
       val name = sname
@@ -48,7 +48,7 @@ trait ServiceBuilder[T] {
         // Service paths are always prefixed by service name and major version string.
         val ServiceLifecycle(startup, runningState) = slifecycle(context)
         ServiceLifecycle(
-          startup, 
+          startup,
           (s: S) => {
             val (service, stoppable) = runningState(s)
             val service0 = path("/%s".format(sname)) { path("/%s".format(sversion.vname)) { service } }
@@ -59,16 +59,16 @@ trait ServiceBuilder[T] {
     }
   }
 
-  def shutdown[S](shutdown: S => Future[Any]): ShutdownDescriptor[S] = 
+  def shutdown[S](shutdown: S => Future[Any]): ShutdownDescriptor[S] =
     ShutdownDescriptor(s => Some(Stoppable.fromFuture(shutdown(s))))
 
-  def shutdown(shutdown: => Future[Any]): ShutdownDescriptor[Any] = 
+  def shutdown(shutdown: => Future[Any]): ShutdownDescriptor[Any] =
     ShutdownDescriptor(_ => Some(Stoppable.fromFuture(shutdown)))
-  
-  def stop[S](stop: S => Stoppable): ShutdownDescriptor[S] = 
+
+  def stop[S](stop: S => Stoppable): ShutdownDescriptor[S] =
     ShutdownDescriptor(s => Some(stop(s)))
 
-  def stop(stop: Stoppable): ShutdownDescriptor[Any] = 
+  def stop(stop: Stoppable): ShutdownDescriptor[Any] =
     ShutdownDescriptor(_ => Some(stop))
 
   protected implicit def statelessRequestDescriptorToServiceLifecycle(rd: RequestDescriptor[T, Unit])(implicit ctx: ExecutionContext): ServiceLifecycle[T, Unit] =

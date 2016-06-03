@@ -28,7 +28,7 @@ import scalaz.syntax.validation._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logger
 
 sealed trait AnyService {
   def metadata: Metadata
@@ -106,7 +106,7 @@ case class OrService[A, B](services: HttpService[A, B]*) extends HttpService[A, 
 
 /**
  * A higher-order natural transformation on responses that allows uniform handling
- * for any 
+ * for any
  */
 trait ResponseModifier[A] {
   def modify(result: A)(f: HttpResponse ~> HttpResponse): A
@@ -448,9 +448,9 @@ object JsonpService extends AkkaDefaults {
   }
 }
 
-class ProxyService[A](httpClient: HttpClient[A], filter: HttpRequest[A] => Boolean) 
+class ProxyService[A](httpClient: HttpClient[A], filter: HttpRequest[A] => Boolean)
 extends CustomHttpService[A, Future[HttpResponse[A]]] {
-  def service = { r: HttpRequest[A] => 
+  def service = { r: HttpRequest[A] =>
     if (filter(r) && httpClient.isDefinedAt(r)) {
       Success(httpClient(r))
     } else {

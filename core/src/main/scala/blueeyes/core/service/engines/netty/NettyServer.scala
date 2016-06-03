@@ -9,8 +9,8 @@ import org.jboss.netty.channel._
 
 import java.util.concurrent.Executors
 
-import com.weiglewilczek.slf4s.Logger
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logger
+import org.slf4s.Logging
 
 import org.streum.configrity.Configuration
 
@@ -29,10 +29,10 @@ class NettyServer(provider: NettyServerProvider) extends Logging {
       channelGroup.add(channel)
       server = Some(bootstrap)
 
-      logger.info("%s netty engine is started using port: %d".format(provider.engineType, provider.enginePort))
+      log.info("%s netty engine is started using port: %d".format(provider.engineType, provider.enginePort))
     } catch {
       case e: Throwable => {
-        logger.error("Error on server startup", e)
+        log.error("Error on server startup", e)
         stop
         throw e
       }
@@ -52,7 +52,7 @@ class NettyServer(provider: NettyServerProvider) extends Logging {
       startStopLock.writeLock.unlock()
     }
 
-    logger.info("%s Netty engine is stopped.".format(provider.engineType))
+    log.info("%s Netty engine is stopped.".format(provider.engineType))
   }
 }
 
@@ -65,7 +65,7 @@ trait NettyServerProvider {
 }
 
 trait AbstractNettyServerProvider extends NettyServerProvider {
-  def config: Configuration 
+  def config: Configuration
 
   def startEngine(channelGroup: ChannelGroup) = {
     val executor  = Executors.newCachedThreadPool()

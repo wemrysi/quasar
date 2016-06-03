@@ -17,15 +17,15 @@ import blueeyes.akka_testing.FutureMatchers
 import org.specs2.mutable.Specification
 import org.specs2.specification.{Outside, Scope}
 
-import  com.weiglewilczek.slf4s._
+import org.slf4s._
 
 object TestServer extends HttpServerModule with TestAkkaDefaults {
   import DefaultBijections._
 
-  class TestServices extends BlueEyesServiceBuilder with HttpRequestCombinators { 
+  class TestServices extends BlueEyesServiceBuilder with HttpRequestCombinators {
     var startupCalled   = false
     var shutdownCalled  = false
-    
+
     val testService = service("test", "1.0.7") {
       context => {
         startup {
@@ -39,7 +39,7 @@ object TestServer extends HttpServerModule with TestAkkaDefaults {
                 get {
                   request: HttpRequest[ByteChunk] => Future(HttpResponse[String](content=Some(value)))
                 } ~
-                path("/error") { 
+                path("/error") {
                   get[ByteChunk, Future[HttpResponse[String]]] { request: HttpRequest[ByteChunk] =>
                     sys.error("He's dead, Jim.")
                   }
@@ -96,13 +96,13 @@ class HttpServerSpec extends Specification with FutureMatchers {
   }
 
   "HttpServer.start" should {
-    "executes start up function" in server { 
+    "executes start up function" in server {
       case (svc, _) => svc.startupCalled must be_==(true)
     }
   }
-  
+
   "HttpServer.apply" should {
-    "delegate to service request handler" in server { 
+    "delegate to service request handler" in server {
       case (s, _) =>
         import HttpHeaders._
         import MimeTypes._
@@ -115,8 +115,8 @@ class HttpServerSpec extends Specification with FutureMatchers {
           }
         }
     }
-    
-    "produce NotFound response when service is not defined for request" in server { 
+
+    "produce NotFound response when service is not defined for request" in server {
       case (s, _) =>
         s.service(HttpRequest[ByteChunk](HttpMethods.GET, "/test/v1/blahblah")).toOption.get must whenDelivered {
           beLike {
@@ -125,7 +125,7 @@ class HttpServerSpec extends Specification with FutureMatchers {
         }
     }
 
-    "gracefully handle error-producing service handler" in server { 
+    "gracefully handle error-producing service handler" in server {
       case (s, _) =>
         s.service(HttpRequest[ByteChunk](HttpMethods.GET, "/test/v1/foo/bar/error")).toOption.get must whenDelivered {
           beLike {
@@ -133,7 +133,7 @@ class HttpServerSpec extends Specification with FutureMatchers {
           }
         }
     }
-    "gracefully handle dead-future-producing service handler" in server { 
+    "gracefully handle dead-future-producing service handler" in server {
       case (s, _) =>
         s.service(HttpRequest[ByteChunk](HttpMethods.GET, "/test/v1/foo/bar/dead")).toOption.get must whenDelivered {
           beLike {
@@ -144,17 +144,17 @@ class HttpServerSpec extends Specification with FutureMatchers {
   }
 
   "HttpServer stop" should {
-    "execute shut down function" in server { 
+    "execute shut down function" in server {
       case (s, Some(stoppable)) =>
         Stoppable.stop(stoppable, 10 seconds)
-        (s.shutdownCalled must beTrue) 
+        (s.shutdownCalled must beTrue)
     }
-  }  
+  }
 }
 
 
-object FailServer extends HttpServerModule 
-      with BlueEyesServiceBuilder 
+object FailServer extends HttpServerModule
+      with BlueEyesServiceBuilder
       with HttpRequestCombinators { enclosing =>
 
   import DefaultBijections._
@@ -178,7 +178,7 @@ object FailServer extends HttpServerModule
     }
   }
 
-  class HttpServer(rootConfig: Configuration, executor: ExecutionContext) extends HttpServerLike(rootConfig, List(testService(executor)), executor) 
+  class HttpServer(rootConfig: Configuration, executor: ExecutionContext) extends HttpServerLike(rootConfig, List(testService(executor)), executor)
 
   def server(config: Configuration, executor: ExecutionContext): HttpServer = new HttpServer(config, executor)
 }
@@ -189,7 +189,7 @@ class FailServerSpec extends Specification with FutureMatchers with TestAkkaDefa
   import akka.util.Duration._
 
   "FailServer.start" should {
-    "not hang if an exception is thrown in the startup function" in { 
+    "not hang if an exception is thrown in the startup function" in {
       val config = Configuration.parse("", BlockFormat)
       Await.result(FailServer.server(config, defaultFutureDispatch).start.get, 10 seconds) must throwA[RuntimeException]
     }

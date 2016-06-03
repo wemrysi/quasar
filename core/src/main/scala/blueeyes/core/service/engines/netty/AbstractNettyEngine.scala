@@ -6,8 +6,8 @@ import blueeyes.core.data._
 import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 
-import com.weiglewilczek.slf4s.Logging
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logging
+import org.slf4s.Logger
 import org.streum.configrity.Configuration
 
 
