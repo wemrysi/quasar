@@ -28,6 +28,10 @@ package object free {
     type λ[A] = Coproduct[F, G, A]
   }
 
+  implicit class EnrichNT[F[_], G[_]](nt1: F ~> G) {
+    def :+:[H[_]](nt2: H ~> G): (H :+: F)#λ ~> G = interpret2(nt2, nt1)
+  }
+
   /** Given `F[_]` and `G[_]` such that `F :<: G`, lifts a natural transformation
     * `F ~> F` to `G ~> G`.
     */
@@ -96,20 +100,6 @@ package object free {
     new ((F :+: (G :+: (H :+: (I :+: (J :+: K)#λ)#λ)#λ)#λ)#λ ~> M) {
       def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: K)#λ)#λ)#λ)#λ)#λ[A]) =
         fa.run.fold(f, interpret5(g, h, i, j, k)(_))
-    }
-
-  def interpret7[F[_], G[_], H[_], I[_], J[_], K[_], L[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M, l: L ~> M):
-      (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ ~> M =
-    new ((F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ ~> M) {
-      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: L)#λ)#λ)#λ)#λ)#λ)#λ[A]) =
-        fa.run.fold(f, interpret6(g, h, i, j, k, l)(_))
-    }
-
-  def interpret8[F[_], G[_], H[_], I[_], J[_], K[_], L[_], N[_], M[_]](f: F ~> M, g: G ~> M, h: H ~> M, i: I ~> M, j: J ~> M, k: K ~> M, l: L ~> M, n: N ~> M):
-      (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ ~> M =
-    new ((F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ ~> M) {
-      def apply[A](fa: (F :+: (G :+: (H :+: (I :+: (J :+: (K :+: (L :+: N)#λ)#λ)#λ)#λ)#λ)#λ)#λ[A]) =
-        fa.run.fold(f, interpret7(g, h, i, j, k, l, n)(_))
     }
 
   /** A `Catchable` instance for `Free[S, ?]` when `Task` can be injected into `S`. */
