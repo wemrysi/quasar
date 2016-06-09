@@ -23,6 +23,7 @@ import java.lang.NumberFormatException
 
 import monocle.{Lens, Prism}
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
+import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
 import simulacrum.typeclass
 
@@ -369,6 +370,9 @@ package object fp
     with PrismInstances
     with SKI
     with StringOps {
+
+  type EnumT[F[_], A] = EnumeratorT[A, F]
+
   sealed trait Polymorphic[F[_], TC[_]] {
     def apply[A: TC]: TC[F[A]]
   }
