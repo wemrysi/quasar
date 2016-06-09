@@ -23,7 +23,7 @@ import scalaz._
 /** Encapsulates boilerplate useful in defining lifted operations on free
   * monads over effect algebras.
   */
-abstract class LiftedOps[G[_], S[_]: Functor](implicit S: Coyoneda[G, ?] :<: S) {
+abstract class LiftedOps[G[_], S[_]](implicit S: Coyoneda[G, ?] :<: S) {
   type F[A] = Free[S, A]
 
   def lift[A](ga: G[A]): F[A] =

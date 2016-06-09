@@ -48,7 +48,7 @@ package object fs {
 
   final case class TmpPrefix(run: String) extends scala.AnyVal
 
-  def mongoDbFileSystem[S[_]: Functor](
+  def mongoDbFileSystem[S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]
   )(implicit
@@ -72,7 +72,7 @@ package object fs {
         mfile compose managefile.interpret))
   }
 
-  def mongoDbFileSystemDef[S[_]: Functor](implicit
+  def mongoDbFileSystemDef[S[_]](implicit
     S0: Task :<: S,
     S1: MongoErrF :<: S
   ): FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF[Free[S, ?]] {
@@ -103,7 +103,7 @@ package object fs {
                   .attempt.void.liftM[OptionT]
     } yield DefaultDb(dbName)).run
 
-  private def asyncClientDef[S[_]: Functor](
+  private def asyncClientDef[S[_]](
     uri: ConnectionUri
   )(implicit
     S0: Task :<: S

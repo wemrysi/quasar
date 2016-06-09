@@ -41,11 +41,14 @@ object execute {
 
   // QScriptCore :<: F ===> ThetaJoin :+: F => EquiJoin :+: F
 
-  def service[S[_]: Functor](implicit W: WriteFileF :<: S,
-                                      Q: QueryFile.Ops[S],
-                                      M: ManageFileF :<: S,
-                                      S1: Task :<: S,
-                                      S2: FileSystemFailureF :<: S): QHttpService[S] = {
+  def service[S[_]](
+    implicit
+    W: WriteFileF :<: S,
+    Q: QueryFile.Ops[S],
+    M: ManageFileF :<: S,
+    S1: Task :<: S,
+    S2: FileSystemFailureF :<: S
+  ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
 
     val removePhaseResults = new (FileSystemErrT[PhaseResultT[Free[S,?], ?], ?] ~> FileSystemErrT[Free[S,?], ?]) {

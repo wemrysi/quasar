@@ -23,28 +23,28 @@ object mounted {
   /** Strips the `mountPoint` off of all input paths in `ReadFile` operations
     * and restores it on output paths.
     */
-   def readFile[S[_]: Functor](mountPoint: ADir)(implicit S: ReadFileF :<: S): S ~> S =
+   def readFile[S[_]](mountPoint: ADir)(implicit S: ReadFileF :<: S): S ~> S =
      transformPaths.readFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `WriteFile` operations
     * and restores it on output paths.
     */
-  def writeFile[S[_]: Functor](mountPoint: ADir)(implicit S: WriteFileF :<: S): S ~> S =
+  def writeFile[S[_]](mountPoint: ADir)(implicit S: WriteFileF :<: S): S ~> S =
     transformPaths.writeFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `ManageFile` operations
     * and restores it on output paths.
     */
-  def manageFile[S[_]: Functor](mountPoint: ADir)(implicit S: ManageFileF :<: S): S ~> S =
+  def manageFile[S[_]](mountPoint: ADir)(implicit S: ManageFileF :<: S): S ~> S =
     transformPaths.manageFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint))
 
   /** Strips the `mountPoint` off of all input paths in `QueryFile` operations
     * and restores it on output paths.
     */
-  def queryFile[S[_]: Functor](mountPoint: ADir)(implicit S: QueryFileF :<: S): S ~> S =
+  def queryFile[S[_]](mountPoint: ADir)(implicit S: QueryFileF :<: S): S ~> S =
     transformPaths.queryFile[S](stripPrefixA(mountPoint), rebaseA(mountPoint), refl)
 
-  def fileSystem[S[_]: Functor](
+  def fileSystem[S[_]](
     mountPoint: ADir
   )(implicit
     S0: ReadFileF :<: S,

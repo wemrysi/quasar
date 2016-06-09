@@ -39,7 +39,8 @@ import scodec.bits.ByteVector
 object data {
   import ManageFile.{MoveSemantics, MoveScenario}
 
-  def service[S[_]: Functor](implicit
+  def service[S[_]](
+    implicit
     R: ReadFile.Ops[S],
     W: WriteFile.Ops[S],
     M: ManageFile.Ops[S],
@@ -76,7 +77,7 @@ object data {
 
   ////
 
-  private def download[S[_]: Functor](
+  private def download[S[_]](
     format: MessageFormat,
     path: APath,
     offset: Natural,
@@ -129,7 +130,7 @@ object data {
           MoveScenario.fileToFile(srcFile, _)))
 
   // TODO: Streaming
-  private def upload[S[_]: Functor](
+  private def upload[S[_]](
     req: Request,
     by: Vector[Data] => FileSystemErrT[Free[S,?], Vector[FileSystemError]]
   )(implicit S0: Task :<: S): Free[S, QResponse[S]] = {
@@ -167,7 +168,7 @@ object data {
       ).flatMap(ι)
   }
 
-  private def zippedContents[S[_]: Functor](
+  private def zippedContents[S[_]](
     dir: AbsDir[Sandboxed],
     format: MessageFormat,
     offset: Natural,

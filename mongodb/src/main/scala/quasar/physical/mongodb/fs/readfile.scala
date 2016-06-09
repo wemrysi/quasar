@@ -57,7 +57,7 @@ object readfile {
   }
 
   /** Run [[MongoRead]], using the given `MongoClient`. */
-  def run[S[_]: Functor](
+  def run[S[_]](
     client: MongoClient
   )(implicit
     S0: Task :<: S,

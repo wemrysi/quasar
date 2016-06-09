@@ -33,7 +33,7 @@ object Mounter {
     * @param mount   Called to handle a mount request.
     * @param unmount Called to handle the removal/undoing of a mount request.
     */
-  def apply[F[_], S[_]: Functor](
+  def apply[F[_], S[_]](
     mount: MountRequest => F[MountingError \/ Unit],
     unmount: MountRequest => F[Unit]
   )(implicit
@@ -97,7 +97,7 @@ object Mounter {
     *
     * Useful in scenarios where only the bookkeeping of mounts is needed.
     */
-  def trivial[S[_]: Functor](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
+  def trivial[S[_]](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
     new (Mounting ~> Free[S, ?]) {
       type F[A] = Coproduct[Id, S, A]
       type M[A] = Free[S, A]

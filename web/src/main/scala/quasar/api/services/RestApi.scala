@@ -34,7 +34,7 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object RestApi {
-  def coreServices[S[_]: Functor]
+  def coreServices[S[_]]
       (implicit
         S0: Task :<: S,
         S1: ReadFileF :<: S,
@@ -65,7 +65,7 @@ object RestApi {
     * TODO: Is using `Prefix` necessary? Can we replace with
     *       `org.http4s.server.Router` instead?
     */
-  def finalizeServices[S[_]: Functor](
+  def finalizeServices[S[_]](
     f: S ~> ResponseOr)(
     qsvcs: Map[String, QHttpService[S]],
     hsvcs: Map[String, HttpService]

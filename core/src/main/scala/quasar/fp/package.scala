@@ -439,13 +439,13 @@ package object fp
     }
 
   /** `Free#foldMap` as a natural transformation */
-  def hoistFree[S[_]: Functor, M[_]: Monad](f: S ~> M): Free[S, ?] ~> M =
+  def hoistFree[S[_], M[_]: Monad](f: S ~> M): Free[S, ?] ~> M =
     new (Free[S, ?] ~> M) {
       def apply[A](fa: Free[S, A]) = fa foldMap f
     }
 
   /** `Free#liftF` as a natural transformation */
-  def liftFT[S[_]: Functor]: S ~> Free[S, ?] =
+  def liftFT[S[_]]: S ~> Free[S, ?] =
     new (S ~> Free[S, ?]) {
       def apply[A](s: S[A]) = Free.liftF(s)
     }
@@ -459,7 +459,7 @@ package object fp
   /** Convenience transformation to inject into a coproduct and lift into
     * `Free`.
     */
-  def injectFT[F[_], S[_]: Functor](implicit S: F :<: S): F ~> Free[S, ?] =
+  def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] =
     liftFT[S] compose injectNT[F, S]
 
   def evalNT[F[_]: Monad, S](initial: S): StateT[F, S, ?] ~> F =

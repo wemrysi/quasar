@@ -47,7 +47,7 @@ import scalaz.stream.Process
   *       inserted for setup/teardown. It'd be nice if the tests for all
   *       filesystems would run concurrently.
   */
-abstract class FileSystemTest[S[_]: Functor](
+abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[FileSystemUT[S]]]
 ) extends Specification {
 

@@ -55,7 +55,7 @@ final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]
   def run(c: MongoClient): Task[A] =
     r.run(c)
 
-  def runF[S[_]: Functor](
+  def runF[S[_]](
     c: MongoClient
   )(implicit
     S0: Task :<: S,

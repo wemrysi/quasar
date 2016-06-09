@@ -47,6 +47,6 @@ final case class FileSystemUT[S[_]](
   def contramap[T[_]](f: T ~> S): FileSystemUT[T] =
     FileSystemUT(name, testInterp compose f, setupInterp compose f, testDir, close)
 
-  def testInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(testInterp)
-  def setupInterpM(implicit S: Functor[S]): F ~> Task = hoistFree(setupInterp)
+  val testInterpM: F ~> Task = hoistFree(testInterp)
+  val setupInterpM: F ~> Task = hoistFree(setupInterp)
 }

@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
 
 object view {
   /** Translate reads on view paths to the equivalent queries. */
-  def readFile[S[_]: Functor]
+  def readFile[S[_]]
       (implicit
         S0: ReadFileF :<: S,
         S1: QueryFileF :<: S,
@@ -104,7 +104,7 @@ object view {
   }
 
   /** Intercept and fail any write to a view path; all others are passed untouched. */
-  def writeFile[S[_]: Functor]
+  def writeFile[S[_]]
       (implicit
         S0: WriteFileF :<: S,
         S1: MountConfigsF :<: S
@@ -131,7 +131,7 @@ object view {
 
 
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
-  def manageFile[S[_]: Functor]
+  def manageFile[S[_]]
       (implicit
         S0: ManageFileF :<: S,
         S1: QueryFileF :<: S,
@@ -212,7 +212,7 @@ object view {
 
   /** Intercept and rewrite queries involving views, and overlay views when
     * enumerating files and directories. */
-  def queryFile[S[_]: Functor]
+  def queryFile[S[_]]
       (implicit
         S0: QueryFileF :<: S,
         S1: MountConfigsF :<: S
@@ -268,7 +268,7 @@ object view {
     * on an underlying filesystem, where references to views have been
     * rewritten as queries against actual files.
     */
-  def fileSystem[S[_]: Functor]
+  def fileSystem[S[_]]
       (implicit
         S0: ReadFileF :<: S,
         S1: WriteFileF :<: S,
@@ -288,5 +288,5 @@ object view {
 
   // NB: wrapping this in a function seems to help the type checker
   // with the narrowed `A` type.
-  private def emit[S[_]: Functor, A](a: A): Free[S, A] = a.point[Free[S, ?]]
+  private def emit[S[_], A](a: A): Free[S, A] = a.point[Free[S, ?]]
 }

@@ -33,7 +33,7 @@ import scalaz.syntax.monad._
   * @tparam F the base effect that `FileSystem` operations are translated into
   * @tparam S the composite effect, supporting the base, view and hierarchical effects
   */
-final class EvaluatorMounter[F[_], S[_]: Functor](
+final class EvaluatorMounter[F[_], S[_]](
   fsDef: FileSystemDef[F]
 )(implicit S0: F :<: S,
            S1: MonotonicSeqF :<: S,
@@ -47,7 +47,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
   type EvalFSRef[A]  = AtomicRef[FileSystem ~> EvalFS, A]
   type EvalFSRefF[A] = Coyoneda[EvalFSRef, A]
 
-  def mount[T[_]: Functor]
+  def mount[T[_]]
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFsF :<: T,
@@ -70,7 +70,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
     (handleMount *> updateComposite[T].liftM[MntErrT]).run
   }
 
-  def unmount[T[_]: Functor]
+  def unmount[T[_]]
       (req: MountRequest)
       (implicit T0: F :<: T,
                 T1: fsMounter.MountedFsF :<: T,
@@ -97,10 +97,10 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
 
   private val fsMounter = FileSystemMounter[F](fsDef)
 
-  private def evalFS[T[_]: Functor](implicit T: EvalFSRefF :<: T) =
+  private def evalFS[T[_]](implicit T: EvalFSRefF :<: T) =
     AtomicRef.Ops[FileSystem ~> EvalFS, T]
 
-  private def mounts[T[_]: Functor](implicit T: fsMounter.MountedFsF :<: T) =
+  private def mounts[T[_]](implicit T: fsMounter.MountedFsF :<: T) =
     AtomicRef.Ops[Mounts[DefinitionResult[F]], T]
 
   /** Builds the composite interpreter from the currently mounted views and
@@ -119,7 +119,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
     *
     *   4. Store the result of (3) in a ref.
     */
-  private def updateComposite[T[_]: Functor]
+  private def updateComposite[T[_]]
               (implicit T0: F :<: T,
                         T1: fsMounter.MountedFsF :<: T,
                         T2: EvalFSRefF :<: T)
@@ -139,7 +139,7 @@ final class EvaluatorMounter[F[_], S[_]: Functor](
 }
 
 object EvaluatorMounter {
-  def apply[F[_], S[_]: Functor](
+  def apply[F[_], S[_]](
     fsDef: FileSystemDef[F]
   )(implicit S0: F :<: S,
              S1: MonotonicSeqF :<: S,

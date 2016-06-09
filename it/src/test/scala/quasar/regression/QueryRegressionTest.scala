@@ -38,7 +38,7 @@ import scalaz.{:+: => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.{merge => pmerge, _}
 
-abstract class QueryRegressionTest[S[_]: Functor](
+abstract class QueryRegressionTest[S[_]](
   fileSystems: Task[IList[FileSystemUT[S]]])(
   implicit S0: QueryFileF :<: S, S1: ManageFileF :<: S,
            S2: WriteFileF :<: S, S3: Task :<: S

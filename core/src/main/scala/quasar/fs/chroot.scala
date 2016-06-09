@@ -21,23 +21,23 @@ import scalaz._, NaturalTransformation.refl
 object chroot {
 
   /** Rebases all paths in `ReadFile` operations onto the given prefix. */
-  def readFile[S[_]: Functor](prefix: ADir)(implicit S: ReadFileF :<: S): S ~> S =
+  def readFile[S[_]](prefix: ADir)(implicit S: ReadFileF :<: S): S ~> S =
     transformPaths.readFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases all paths in `WriteFile` operations onto the given prefix. */
-  def writeFile[S[_]: Functor](prefix: ADir)(implicit S: WriteFileF :<: S): S ~> S =
+  def writeFile[S[_]](prefix: ADir)(implicit S: WriteFileF :<: S): S ~> S =
     transformPaths.writeFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases all paths in `ManageFile` operations onto the given prefix. */
-  def manageFile[S[_]: Functor](prefix: ADir)(implicit S: ManageFileF :<: S): S ~> S =
+  def manageFile[S[_]](prefix: ADir)(implicit S: ManageFileF :<: S): S ~> S =
     transformPaths.manageFile[S](rebaseA(prefix), stripPrefixA(prefix))
 
   /** Rebases paths in `QueryFile` onto the given prefix. */
-  def queryFile[S[_]: Functor](prefix: ADir)(implicit S: QueryFileF :<: S): S ~> S =
+  def queryFile[S[_]](prefix: ADir)(implicit S: QueryFileF :<: S): S ~> S =
     transformPaths.queryFile[S](rebaseA(prefix), stripPrefixA(prefix), refl)
 
   /** Rebases all paths in `FileSystem` operations onto the given prefix. */
-  def fileSystem[S[_]: Functor](
+  def fileSystem[S[_]](
     prefix: ADir
   )(implicit
     S0: ReadFileF :<: S,

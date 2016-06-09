@@ -33,7 +33,7 @@ import scalaz.stream.Process
 package object services {
   import Validation.FlatMap._
 
-  def formattedDataResponse[S[_]: Functor](
+  def formattedDataResponse[S[_]](
     format: MessageFormat,
     data: Process[FileSystemErrT[Free[S, ?], ?], Data]
   )(implicit

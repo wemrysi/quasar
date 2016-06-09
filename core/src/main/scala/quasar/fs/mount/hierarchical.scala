@@ -41,8 +41,7 @@ object hierarchical {
   def readFile[F[_], S[_]](
     rfs: Mounts[ReadFileF ~> F]
   )(implicit
-    S0: Functor[S],
-    S1: F :<: S
+    S: F :<: S
   ): ReadFileF ~> Free[S, ?] = {
     import ReadFile._
 
@@ -86,8 +85,7 @@ object hierarchical {
   def writeFile[F[_], S[_]](
     wfs: Mounts[WriteFileF ~> F]
   )(implicit
-    S0: Functor[S],
-    S1: F :<: S
+    S: F :<: S
   ): WriteFileF ~> Free[S, ?] = {
     import WriteFile._
 
@@ -128,8 +126,7 @@ object hierarchical {
   def manageFile[F[_], S[_]](
     mfs: Mounts[ManageFileF ~> F]
   )(implicit
-    S0: Functor[S],
-    S1: F :<: S
+    S: F :<: S
   ): ManageFileF ~> Free[S, ?] = {
     import ManageFile._
 
@@ -201,12 +198,14 @@ object hierarchical {
   /** Returns a `QueryFileF` interpreter that selects one of the configured
     * child interpreters based on the path of the incoming request.
     */
-  def queryFile[F[_], S[_]](qfs: Mounts[QueryFileF ~> F])
-                           (implicit S0: Functor[S],
-                                     S1: F :<: S,
-                                     S2: MonotonicSeqF :<: S,
-                                     S3: MountedResultHF :<: S)
-                           : QueryFileF ~> Free[S, ?] = {
+  def queryFile[F[_], S[_]](
+    qfs: Mounts[QueryFileF ~> F]
+  )(
+    implicit
+    S1: F :<: S,
+    S2: MonotonicSeqF :<: S,
+    S3: MountedResultHF :<: S
+  ): QueryFileF ~> Free[S, ?] = {
     import QueryFile._
 
     type M[A] = Free[S, A]
@@ -287,7 +286,6 @@ object hierarchical {
   def fileSystem[F[_], S[_]](
     mounts: Mounts[FileSystem ~> F]
   )(implicit
-    S0: Functor[S],
     S1: F :<: S,
     S2: MountedResultHF :<: S,
     S3: MonotonicSeqF :<: S
@@ -380,7 +378,7 @@ object hierarchical {
       type F[A] = Free[S, A]
 
       def apply[A, B](a: A, mnts: Mounts[B])
-                     (implicit S: Functor[S], I: KeyValueStoreF[A, (ADir, A), ?] :<: S)
+                     (implicit I: KeyValueStoreF[A, (ADir, A), ?] :<: S)
                      : OptionT[F, (A, B)] = {
         KeyValueStore.Ops[A, (ADir, A), S].get(a) flatMap { case (d, a1) =>
           OptionT(mnts.lookup(d).strengthL(a1).point[F])

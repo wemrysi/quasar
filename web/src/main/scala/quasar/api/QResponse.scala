@@ -38,16 +38,16 @@ import scodec.bits.ByteVector
 final case class QResponse[S[_]](status: Status, headers: Headers, body: Process[Free[S, ?], ByteVector]) {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
 
-  def flatMapS[T[_]](f: S ~> Free[T, ?])(implicit S: Functor[S]): QResponse[T] =
+  def flatMapS[T[_]](f: S ~> Free[T, ?]): QResponse[T] =
     copy[T](body = body.translate[Free[T, ?]](free.flatMapSNT(f)))
 
-  def mapS[T[_]: Functor](f: S ~> T)(implicit S: Functor[S]): QResponse[T] =
+  def mapS[T[_]](f: S ~> T): QResponse[T] =
     copy[T](body = body.translate[Free[T, ?]](free.mapSNT(f)))
 
   def modifyHeaders(f: Headers => Headers): QResponse[S] =
     QResponse.headers.modify(f)(this)
 
-  def toHttpResponse(i: S ~> ResponseOr)(implicit S: Functor[S]): Task[Response] = {
+  def toHttpResponse(i: S ~> ResponseOr): Task[Response] = {
     val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
       def apply[A](ror: ResponseOr[A]) =
         ror.fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)), _.point[Task]).join
@@ -121,7 +121,7 @@ object QResponse {
     string[S](status, a.asJson.pretty(minspace)).modifyHeaders(_.put(
       `Content-Type`(MediaType.`application/json`, Some(Charset.`UTF-8`))))
 
-  def response[S[_]: Functor, A]
+  def response[S[_], A]
       (status: Status, a: A)
       (implicit E: EntityEncoder[A], S0: Task :<: S)
       : QResponse[S] =
@@ -130,7 +130,7 @@ object QResponse {
       E.headers,
       Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT))
 
-  def streaming[S[_]: Functor, A]
+  def streaming[S[_], A]
       (p: Process[Free[S, ?], A])
       (implicit E: EntityEncoder[A], S0: Task :<: S)
       : QResponse[S] =
@@ -140,7 +140,7 @@ object QResponse {
       p.flatMap[Free[S, ?], ByteVector](a =>
         Process.await(E.toEntity(a))(_.body).translate[Free[S, ?]](injectFT)))
 
-  def streaming[S[_]: Functor, A, E]
+  def streaming[S[_], A, E]
       (p: Process[EitherT[Free[S, ?], E, ?], A])
       (implicit A: EntityEncoder[A], S0: Task :<: S, S1: FailureF[E, ?] :<: S)
       : QResponse[S] = {

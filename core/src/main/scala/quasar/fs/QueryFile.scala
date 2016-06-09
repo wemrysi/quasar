@@ -102,7 +102,7 @@ object QueryFile {
   import EitherT.eitherTMonad
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Ops[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
+  final class Ops[S[_]](implicit S: QueryFileF :<: S)
     extends LiftedOps[QueryFile, S] {
 
     type M[A] = FileSystemErrT[F, A]
@@ -187,7 +187,7 @@ object QueryFile {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S): Ops[S] =
+    implicit def apply[S[_]](implicit S: QueryFileF :<: S): Ops[S] =
       new Ops[S]
   }
 
@@ -195,7 +195,7 @@ object QueryFile {
     * when using these.
     */
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Unsafe[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S)
+  final class Unsafe[S[_]](implicit S: QueryFileF :<: S)
     extends LiftedOps[QueryFile, S] {
 
     val transforms = Transforms[F]
@@ -224,7 +224,7 @@ object QueryFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S0: Functor[S], S1: QueryFileF :<: S): Unsafe[S] =
+    implicit def apply[S[_]](implicit S: QueryFileF :<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

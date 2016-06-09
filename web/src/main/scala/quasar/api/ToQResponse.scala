@@ -57,7 +57,7 @@ sealed abstract class ToQResponseInstances extends ToQResponseInstances0 {
     : ToQResponse[A \/ B, S] =
       response(_.fold(ev1.toResponse, ev2.toResponse))
 
-  implicit def http4sResponseToQResponse[S[_]: Functor](implicit ev: Task :<: S): ToQResponse[Response, S] =
+  implicit def http4sResponseToQResponse[S[_]](implicit ev: Task :<: S): ToQResponse[Response, S] =
     response(r => QResponse(
       status = r.status,
       headers = r.headers,

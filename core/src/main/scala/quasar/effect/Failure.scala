@@ -33,7 +33,7 @@ object Failure {
   final case class Fail[E, A](e: E) extends Failure[E, A]
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Ops[E, S[_]: Functor](implicit S: FailureF[E, ?] :<: S)
+  final class Ops[E, S[_]](implicit S: FailureF[E, ?] :<: S)
     extends LiftedOps[Failure[E, ?], S] {
 
     def attempt[A](fa: F[A]): F[E \/ A] =
@@ -91,7 +91,7 @@ object Failure {
   }
 
   object Ops {
-    def apply[E, S[_]: Functor](implicit S: FailureF[E, ?] :<: S): Ops[E, S] =
+    def apply[E, S[_]](implicit S: FailureF[E, ?] :<: S): Ops[E, S] =
       new Ops[E, S]
   }
 

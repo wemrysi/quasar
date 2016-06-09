@@ -84,7 +84,8 @@ object Repl {
   type RunStateT[A] = AtomicRef[RunState, A]
   type RunStateF[A] = Coyoneda[RunStateT, A]
 
-  def command[S[_]: Functor](cmd: Command)(implicit
+  def command[S[_]: Functor](cmd: Command)(
+    implicit
     Q:  QueryFile.Ops[S],
     M:  ManageFile.Ops[S],
     W:  WriteFile.Ops[S],
@@ -218,7 +219,7 @@ object Repl {
     }
   }
 
-  def mountType[S[_]: Functor](path: APath)(implicit
+  def mountType[S[_]](path: APath)(implicit
     M: Mounting.Ops[S]
   ): Free[S, Option[String]] =
     M.lookup(path).map {
@@ -226,7 +227,7 @@ object Repl {
       case MountConfig.FileSystemConfig(FileSystemType(typ), _) => typ
     }.run
 
-  def printLog[S[_]: Functor](debugLevel: DebugLevel, log: Vector[PhaseResult])(implicit
+  def printLog[S[_]](debugLevel: DebugLevel, log: Vector[PhaseResult])(implicit
     P: ConsoleIO.Ops[S]
   ): Free[S, Unit] =
     debugLevel match {
@@ -235,7 +236,7 @@ object Repl {
       case DebugLevel.Verbose => P.println(log.mkString("\n\n") + "\n")
     }
 
-  def summarize[S[_]: Functor](max: Int, format: OutputFormat)(rows: IndexedSeq[Data])(implicit
+  def summarize[S[_]](max: Int, format: OutputFormat)(rows: IndexedSeq[Data])(implicit
     P: ConsoleIO.Ops[S]
   ): Free[S, Unit] = {
     def formatJson(codec: DataCodec)(data: Data) =

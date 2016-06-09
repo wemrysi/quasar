@@ -39,7 +39,7 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def readFile[S[_]: Functor](
+  def readFile[S[_]](
     inPath: AbsPath ~> AbsPath,
     outPath: AbsPath ~> AbsPath
   )(implicit
@@ -71,7 +71,7 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def writeFile[S[_]: Functor](
+  def writeFile[S[_]](
     inPath: AbsPath ~> AbsPath,
     outPath: AbsPath ~> AbsPath
   )(implicit
@@ -103,7 +103,7 @@ object transformPaths {
     * @param inPath transforms input paths
     * @param outPath transforms output paths (including those in errors)
     */
-  def manageFile[S[_]: Functor](
+  def manageFile[S[_]](
     inPath: AbsPath ~> AbsPath,
     outPath: AbsPath ~> AbsPath
   )(implicit S:
@@ -141,7 +141,7 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     * @param outPathR transforms relative output paths
     */
-  def queryFile[S[_]: Functor](
+  def queryFile[S[_]](
     inPath: AbsPath ~> AbsPath,
     outPath: AbsPath ~> AbsPath,
     outPathR: RelPath ~> RelPath
@@ -193,7 +193,7 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     * @param outPathR transforms relative output paths
     */
-  def fileSystem[S[_]: Functor](
+  def fileSystem[S[_]](
     inPath: AbsPath ~> AbsPath,
     outPath: AbsPath ~> AbsPath,
     outPathR: RelPath ~> RelPath

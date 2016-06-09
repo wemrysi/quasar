@@ -49,7 +49,7 @@ object queryfile {
     new QueryFileInterpreter(execMongo)
   }
 
-  def run[C, S[_]: Functor](
+  def run[C, S[_]](
     client: MongoClient,
     defDb: Option[DefaultDb]
   )(implicit

@@ -96,7 +96,7 @@ package object main {
       * interpreter from a `TaskRef`, allowing for the behavior to change over
       * time as the ref is updated.
       */
-    def evalFSFromRef[S[_]: Functor](
+    def evalFSFromRef[S[_]](
       ref: TaskRef[FileSystem ~> FsEffM],
       f: FsEff ~> Free[S, ?]
     )(implicit S: Task :<: S): FileSystem ~> Free[S, ?] = {
@@ -161,9 +161,6 @@ package object main {
     */
   type CompleteFsEff[A] = (MountConfigsF :+: CompFsEffM)#λ[A]
   type CompleteFsEffM[A] = Free[CompleteFsEff, A]
-
-  implicit val completeFsEffFunctor: Functor[CompleteFsEff] =
-    Coproduct.coproductFunctor[MountConfigsF, CompFsEffM]
 
   val mounter: Mounting ~> CompleteFsEffM =
     quasar.fs.mount.Mounter[CompFsEffM, CompleteFsEff](
@@ -266,7 +263,7 @@ package object main {
   }
 
   /** Mount all the mounts defined in the given configuration. */
-  def mountAll[S[_]: Functor]
+  def mountAll[S[_]]
       (mc: MountingsConfig)
       (implicit mnt: Mounting.Ops[S])
       : Free[S, String \/ Unit] = {

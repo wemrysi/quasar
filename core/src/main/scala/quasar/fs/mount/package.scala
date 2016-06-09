@@ -58,7 +58,7 @@ package object mount {
   type ViewStateF[A] = Coyoneda[ViewState, A]
 
   object ViewState {
-    def Ops[S[_]: Functor](
+    def Ops[S[_]](
       implicit S: ViewStateF :<: S
     ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S] =
       KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
