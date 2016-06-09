@@ -73,7 +73,7 @@ object util {
       */
     def testConnection(aclient: AMongoClient): Task[Unit] =
       MongoDbIO.serverVersion.run(aclient)
-        .unsafePerformTimed(defaultTimeoutMillis.toLong)(Strategy.DefaultTimeoutScheduler)
+        .timed(defaultTimeoutMillis.toLong)(Strategy.DefaultTimeoutScheduler)
         .attempt flatMap {
           case -\/(tout: TimeoutException) =>
             val hosts = aclient.getSettings.getClusterSettings.getHosts.toString
