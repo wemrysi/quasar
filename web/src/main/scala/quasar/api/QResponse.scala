@@ -47,7 +47,10 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
   def modifyHeaders(f: Headers => Headers): QResponse[S] =
     QResponse.headers.modify(f)(this)
 
-  def toHttpResponse(i: S ~> ResponseOr): Task[Response] = {
+  def toHttpResponse(i: S ~> ResponseOr): Task[Response] =
+    toHttpResponseF(free.foldMapNT(i))
+
+  def toHttpResponseF(i: Free[S, ?] ~> ResponseOr): Task[Response] = {
     val failTask: ResponseOr ~> Task = new (ResponseOr ~> Task) {
       def apply[A](ror: ResponseOr[A]) =
         ror.fold(resp => Task.fail(new HttpResponseStreamFailureException(resp)), _.point[Task]).join
@@ -58,7 +61,7 @@ final case class QResponse[S[_]](status: Status, headers: Headers, body: Process
         .withStatus(status)
         .putHeaders(headers.toList: _*)
 
-    body.translate[ResponseOr](free.foldMapNT(i))
+    body.translate[ResponseOr](i)
       .stepUntil(_.foldMap(_.length) >= PROCESS_EFFECT_THRESHOLD_BYTES)
       .map(handleBytes)
       .merge
