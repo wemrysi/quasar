@@ -19,7 +19,6 @@ package quasar.physical.mongodb.fs
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.fp.TaskRef
-import quasar.fp.prism._
 import quasar.fs._
 import quasar.physical.mongodb._
 

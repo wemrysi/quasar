@@ -164,7 +164,7 @@ object Workflow {
     }
 
   def task(fop: Crystallized): WorkflowTask =
-    (finish(_, _)).tupled(fop.op.para(crush))._2.translate(normalize)
+    (finish(_, _)).tupled(fop.op.para(crush))._2.transAna(normalize)
 
   val coalesceƒ: WorkflowF[Workflow] => Option[WorkflowF[Workflow]] = {
     case $Match(src, selector) => src.unFix match {

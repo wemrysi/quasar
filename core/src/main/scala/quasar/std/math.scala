@@ -28,6 +28,10 @@ trait MathLib extends Library {
   private val MathRel = Type.Numeric ⨿ Type.Interval
   private val MathAbs = Type.Numeric ⨿ Type.Interval ⨿ Type.Temporal
 
+  // TODO[monocle]: Unit unapply needs to do Boolean instead of Option[Unit]
+  // val Zero = Prism.partial[Data, Unit] {
+  //   case Data.Number(v) if v == 0 => ()
+  // } (κ(Data.Int(0)))
   object Zero {
     def apply() = Data.Int(0)
     def unapply(obj: Data): Boolean = obj match {

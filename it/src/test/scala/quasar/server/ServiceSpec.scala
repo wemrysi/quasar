@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.config.{ConfigOps, FsPath, WebConfig}
 import quasar.main.MainErrT
 import quasar.api.UriPathCodec
-import quasar.fp._
 import quasar.fs._, mount._
 import quasar.server.Server.QuasarConfig
 import quasar.TestConfig
