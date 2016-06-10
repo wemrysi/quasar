@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, PhaseResult, Variables}
 import quasar.csv.CsvWriter
 import quasar.effect._
-import quasar.fp._, free.freeCatchable
+import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fs._
 import quasar.fs.mount._
@@ -97,6 +97,9 @@ object Repl {
     S2: Task :<: S
   ): Free[S, Unit] = {
     import Command._
+
+    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+    import EitherT.eitherTMonad
 
     val RS = AtomicRef.Ops[RunState, S]
     val DF = Failure.Ops[String, S]
@@ -194,7 +197,10 @@ object Repl {
           for {
             state <- RS.get
             expr  <- DF.unattempt_(sql.fixParser.parseInContext(q, state.cwd).leftMap(_.message))
-            query =  fsQ.evaluateQuery(expr, Variables.fromMap(state.variables), 0L, Positive(state.summaryCount + 1L)).runLog
+            vars  =  Variables.fromMap(state.variables)
+            lim   =  Positive(state.summaryCount + 1L)
+            query =  fsQ.enumerateQuery(expr, vars, 0L, lim) flatMap (enum =>
+                       Q.transforms.execToCompExec(enum.drainTo[Vector]))
             _     <- runQuery(state, query)(
                       ds => summarize[S](state.summaryCount, state.format)(ds))
           } yield ())
