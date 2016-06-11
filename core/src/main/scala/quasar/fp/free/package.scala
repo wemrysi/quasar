@@ -39,10 +39,8 @@ package object free {
       def apply[A](ga: G[A]) = G.prj(ga).fold(ga)(fa => G.inj(f(fa)))
     }
 
-  def restrict[M[_], S[_], T[_]](f: T ~> M)(implicit S: Coyoneda[S, ?] :<: T) =
-    new (S ~> M) {
-      def apply[A](fa: S[A]): M[A] = f(S.inj(Coyoneda.lift(fa)))
-    }
+  def restrict[M[_], S[_], T[_]](f: T ~> M)(implicit S: S :<: T) =
+    f compose injectNT[S, T]
 
   def flatMapSNT[S[_], T[_]](f: S ~> Free[T, ?]): Free[S, ?] ~> Free[T, ?] =
     new (Free[S, ?] ~> Free[T, ?]) {

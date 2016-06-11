@@ -117,7 +117,7 @@ object FileSystemTest {
 
   def allFsUT: Task[IList[FileSystemUT[FileSystem]]] =
     (localFsUT |@| externalFsUT) { (loc, ext) =>
-      (loc ::: ext) map (ut => ut.contramap(chroot.fileSystem(ut.testDir)))
+      (loc ::: ext) map (ut => ut.contramapF(chroot.fileSystem[FileSystem](ut.testDir)))
     }
 
   def externalFsUT = TestConfig.externalFileSystems {

@@ -82,9 +82,8 @@ object Repl {
   }
 
   type RunStateT[A] = AtomicRef[RunState, A]
-  type RunStateF[A] = Coyoneda[RunStateT, A]
 
-  def command[S[_]: Functor](cmd: Command)(
+  def command[S[_]](cmd: Command)(
     implicit
     Q:  QueryFile.Ops[S],
     M:  ManageFile.Ops[S],
@@ -92,8 +91,8 @@ object Repl {
     P:  ConsoleIO.Ops[S],
     T:  Timing.Ops[S],
     N:  Mounting.Ops[S],
-    S0: RunStateF :<: S,
-    S1: ReplFailF :<: S,
+    S0: RunStateT :<: S,
+    S1: ReplFail :<: S,
     S2: Task :<: S
   ): Free[S, Unit] = {
     import Command._

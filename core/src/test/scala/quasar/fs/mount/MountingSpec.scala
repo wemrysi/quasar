@@ -34,7 +34,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-abstract class MountingSpec[S[_]](implicit S: MountingF :<: S)
+abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
   extends mutable.Specification with DisjunctionMatchers {
 
   import MountConfig.{viewConfig, fileSystemConfig}

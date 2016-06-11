@@ -38,7 +38,7 @@ object Mounter {
     unmount: MountRequest => F[Unit]
   )(implicit
     S0: F :<: S,
-    S1: MountConfigsF :<: S
+    S1: MountConfigs :<: S
   ): Mounting ~> Free[S, ?] = {
 
     type FreeS[A]  = Free[S, A]
@@ -97,7 +97,7 @@ object Mounter {
     *
     * Useful in scenarios where only the bookkeeping of mounts is needed.
     */
-  def trivial[S[_]](implicit S: MountConfigsF :<: S): Mounting ~> Free[S, ?] =
+  def trivial[S[_]](implicit S: MountConfigs :<: S): Mounting ~> Free[S, ?] =
     new (Mounting ~> Free[S, ?]) {
       type F[A] = Coproduct[Id, S, A]
       type M[A] = Free[S, A]

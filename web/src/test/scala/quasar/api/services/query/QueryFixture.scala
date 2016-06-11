@@ -34,7 +34,7 @@ import scalaz.concurrent.Task
 object queryFixture {
   import quasar.api.PathUtils.pathUri
 
-  type Eff[A] = (Task :+: (FileSystemFailureF :+: FileSystem)#λ)#λ[A]
+  type Eff[A] = (Task :+: (FileSystemFailure :+: FileSystem)#λ)#λ[A]
 
   case class Query(
     q: String,
@@ -87,9 +87,7 @@ object queryFixture {
   }
 
   def effRespOr(fs: FileSystem ~> Task): Eff ~> ResponseOr =
-    liftMT[Task, ResponseT].compose(NaturalTransformation.refl[Task]) :+:
-    Coyoneda.liftTF[FileSystemFailure, ResponseOr](
-      failureResponseOr[FileSystemError])                             :+:
+    liftMT[Task, ResponseT]             :+:
+    failureResponseOr[FileSystemError]  :+:
     liftMT[Task, ResponseT].compose(fs)
-
 }

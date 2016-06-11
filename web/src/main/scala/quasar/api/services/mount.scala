@@ -46,7 +46,7 @@ object mount {
     implicit
     M: Mounting.Ops[S],
     S0: Task :<: S,
-    S1: MountConfigsF :<: S
+    S1: MountConfigs :<: S
   ): QHttpService[S] =
     QHttpService {
       case GET -> AsPath(path) =>
@@ -102,7 +102,7 @@ object mount {
     typeStr: String
   )(implicit
     M: Mounting.Ops[S],
-    S0: MountConfigsF :<: S
+    S0: MountConfigs :<: S
   ): EitherT[Free[S, ?], ApiError, String] = {
     val mntCfgs = KeyValueStore.Ops[APath, MountConfig, S]
 
@@ -129,7 +129,7 @@ object mount {
   )(implicit
     M: Mounting.Ops[S],
     S0: Task :<: S,
-    S1: MountConfigsF :<: S
+    S1: MountConfigs :<: S
   ): EitherT[Free[S, ?], ApiError, Boolean] = {
     type FreeS[A] = Free[S, A]
 

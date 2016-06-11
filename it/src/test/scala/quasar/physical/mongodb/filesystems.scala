@@ -17,8 +17,8 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvironmentError, EnvErrF, EnvErr}
-import quasar.config.{CfgErr, CfgErrF, ConfigError}
+import quasar.{EnvironmentError, EnvErr}
+import quasar.config.{CfgErr, ConfigError}
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
@@ -36,7 +36,7 @@ object filesystems {
     uri: ConnectionUri,
     prefix: ADir
   ): Task[(FileSystem ~> Task, Task[Unit])] = {
-    val fsDef = quasar.physical.mongodb.fs.mongoDbFileSystemDef[MongoEff].apply(MongoDBFsType, uri).run
+    val fsDef = mongoDbFileSystemDef[MongoEff].apply(MongoDBFsType, uri).run
       .flatMap[FileSystemDef.DefinitionResult[MongoEffM]] {
         case -\/(-\/(strs)) => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(strs.list.toList.mkString)))
         case -\/(\/-(err))  => injectFT[Task, MongoEff].apply(Task.fail(new RuntimeException(err.shows)))
@@ -58,15 +58,15 @@ object filesystems {
   ////
 
   private type MongoEff[A]  =
-    (CfgErrF :+: (EnvErrF :+: (MongoErrF :+: Task)#λ)#λ)#λ[A]
+    (CfgErr :+: (EnvErr :+: (MongoErr :+: Task)#λ)#λ)#λ[A]
   private type MongoEffM[A] = Free[MongoEff, A]
 
   private val envErr = Failure.Ops[EnvironmentError, MongoEff]
 
   private val mongoEffToTask: MongoEff ~> Task =
-    Coyoneda.liftTF[CfgErr, Task](Failure.toRuntimeError[Task,ConfigError])      :+:
-    Coyoneda.liftTF[EnvErr, Task](Failure.toRuntimeError[Task,EnvironmentError]) :+:
-    Coyoneda.liftTF[MongoErr, Task](Failure.toCatchable[Task,MongoException])    :+:
+    Failure.toRuntimeError[Task,ConfigError]      :+:
+    Failure.toRuntimeError[Task,EnvironmentError] :+:
+    Failure.toCatchable[Task,MongoException]      :+:
     NaturalTransformation.refl
 
   private val mongoEffMToTask: MongoEffM ~> Task =

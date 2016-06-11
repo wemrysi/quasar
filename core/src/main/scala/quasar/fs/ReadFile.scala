@@ -109,7 +109,7 @@ object ReadFile {
     * when using these.
     */
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Unsafe[S[_]](implicit S: ReadFileF :<: S)
+  final class Unsafe[S[_]](implicit S: ReadFile :<: S)
     extends LiftedOps[ReadFile, S] {
 
     type M[A] = FileSystemErrT[F, A]
@@ -138,7 +138,7 @@ object ReadFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S: ReadFileF :<: S): Unsafe[S] =
+    implicit def apply[S[_]](implicit S: ReadFile :<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

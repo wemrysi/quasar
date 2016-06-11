@@ -46,7 +46,7 @@ object data {
     M: ManageFile.Ops[S],
     Q: QueryFile.Ops[S],
     S0: Task :<: S,
-    S1: FileSystemFailureF :<: S
+    S1: FileSystemFailure :<: S
   ): QHttpService[S] = QHttpService {
 
     case req @ GET -> AsPath(path) :? Offset(offsetParam) +& Limit(limitParam) =>
@@ -85,7 +85,7 @@ object data {
   )(implicit
     R: ReadFile.Ops[S],
     Q: QueryFile.Ops[S],
-    S0: FileSystemFailureF :<: S,
+    S0: FileSystemFailure :<: S,
     S1: Task :<: S
   ): QResponse[S] =
     refineType(path).fold(

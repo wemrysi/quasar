@@ -43,11 +43,11 @@ object execute {
 
   def service[S[_]](
     implicit
-    W: WriteFileF :<: S,
+    W: WriteFile :<: S,
     Q: QueryFile.Ops[S],
-    M: ManageFileF :<: S,
+    M: ManageFile :<: S,
     S1: Task :<: S,
-    S2: FileSystemFailureF :<: S
+    S2: FileSystemFailure :<: S
   ): QHttpService[S] = {
     val fsQ = new FilesystemQueries[S]
 

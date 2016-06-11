@@ -59,7 +59,7 @@ final class MongoDbIO[A] private (protected val r: ReaderT[Task, MongoClient, A]
     c: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: MongoErrF :<: S
+    S1: MongoErr :<: S
   ): Free[S, A] = {
     val mongoErr = Failure.Ops[MongoException, S]
     mongoErr.unattempt(free.lift(attemptMongo.run.run(c)).into[S])

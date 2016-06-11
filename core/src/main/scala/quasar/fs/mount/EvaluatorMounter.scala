@@ -21,7 +21,7 @@ import quasar.effect._
 import quasar.fp.{liftFT, injectNT}
 import quasar.fp.free, free._
 import quasar.fs.FileSystem
-import hierarchical.MountedResultHF
+import hierarchical.MountedResultH
 
 import scalaz.{:+: => _, _}
 import scalaz.syntax.monad._
@@ -36,23 +36,22 @@ import scalaz.syntax.monad._
 final class EvaluatorMounter[F[_], S[_]](
   fsDef: FileSystemDef[F]
 )(implicit S0: F :<: S,
-           S1: MonotonicSeqF :<: S,
-           S2: ViewStateF :<: S,
-           S3: MountedResultHF :<: S,
-           S5: MountConfigsF :<: S) {
+           S1: MonotonicSeq :<: S,
+           S2: ViewState :<: S,
+           S3: MountedResultH :<: S,
+           S5: MountConfigs :<: S) {
 
   import MountRequest._, FileSystemDef.DefinitionResult
 
   type EvalFS[A]     = Free[S, A]
   type EvalFSRef[A]  = AtomicRef[FileSystem ~> EvalFS, A]
-  type EvalFSRefF[A] = Coyoneda[EvalFSRef, A]
 
   def mount[T[_]]
       (req: MountRequest)
       (implicit T0: F :<: T,
-                T1: fsMounter.MountedFsF :<: T,
-                T2: MountConfigsF :<: T,
-                T3: EvalFSRefF :<: T)
+                T1: fsMounter.MountedFs :<: T,
+                T2: MountConfigs :<: T,
+                T3: EvalFSRef :<: T)
       : Free[T, MountingError \/ Unit] = {
 
     type EvalM[A]    = Free[T, A]
@@ -73,9 +72,9 @@ final class EvaluatorMounter[F[_], S[_]](
   def unmount[T[_]]
       (req: MountRequest)
       (implicit T0: F :<: T,
-                T1: fsMounter.MountedFsF :<: T,
-                T2: EvalFSRefF :<: T,
-                T3: MountConfigsF :<: T)
+                T1: fsMounter.MountedFs :<: T,
+                T2: EvalFSRef :<: T,
+                T3: MountConfigs :<: T)
       : Free[T, Unit] = {
 
     val handleUnmount: Free[T, Unit] =
@@ -93,14 +92,14 @@ final class EvaluatorMounter[F[_], S[_]](
   ////
 
   private type ViewEff[A] =
-    (MountConfigsF :+: (ViewStateF :+: (MonotonicSeqF :+: FileSystem)#λ)#λ)#λ[A]
+    (MountConfigs :+: (ViewState :+: (MonotonicSeq :+: FileSystem)#λ)#λ)#λ[A]
 
   private val fsMounter = FileSystemMounter[F](fsDef)
 
-  private def evalFS[T[_]](implicit T: EvalFSRefF :<: T) =
+  private def evalFS[T[_]](implicit T: EvalFSRef :<: T) =
     AtomicRef.Ops[FileSystem ~> EvalFS, T]
 
-  private def mounts[T[_]](implicit T: fsMounter.MountedFsF :<: T) =
+  private def mounts[T[_]](implicit T: fsMounter.MountedFs :<: T) =
     AtomicRef.Ops[Mounts[DefinitionResult[F]], T]
 
   /** Builds the composite interpreter from the currently mounted views and
@@ -121,16 +120,16 @@ final class EvaluatorMounter[F[_], S[_]](
     */
   private def updateComposite[T[_]]
               (implicit T0: F :<: T,
-                        T1: fsMounter.MountedFsF :<: T,
-                        T2: EvalFSRefF :<: T)
+                        T1: fsMounter.MountedFs :<: T,
+                        T2: EvalFSRef :<: T)
               : Free[T, Unit] =
     for {
       mnts   <- mounts[T].get
       evals  =  mnts.map(_.run)
       mnted  =  hierarchical.fileSystem[F, S](evals)
-      injSeq =  liftFT[S] compose injectNT[MonotonicSeqF, S]
-      injVST =  liftFT[S] compose injectNT[ViewStateF, S]
-      injMC  =  liftFT[S] compose injectNT[MountConfigsF, S]
+      injSeq =  liftFT[S] compose injectNT[MonotonicSeq, S]
+      injVST =  liftFT[S] compose injectNT[ViewState, S]
+      injMC  =  liftFT[S] compose injectNT[MountConfigs, S]
       iView  =  injMC :+: injVST :+: injSeq :+: mnted
       viewd  =  view.fileSystem[ViewEff]
       f      =  free.foldMapNT[ViewEff, EvalFS](iView) compose viewd
@@ -142,10 +141,10 @@ object EvaluatorMounter {
   def apply[F[_], S[_]](
     fsDef: FileSystemDef[F]
   )(implicit S0: F :<: S,
-             S1: MonotonicSeqF :<: S,
-             S2: ViewStateF :<: S,
-             S3: MountedResultHF :<: S,
-             S5: MountConfigsF :<: S
+             S1: MonotonicSeq :<: S,
+             S2: ViewState :<: S,
+             S3: MountedResultH :<: S,
+             S5: MountConfigs :<: S
   ): EvaluatorMounter[F, S] =
     new EvaluatorMounter[F, S](fsDef)
 }

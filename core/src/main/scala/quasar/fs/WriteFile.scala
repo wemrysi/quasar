@@ -250,7 +250,7 @@ object WriteFile {
     * when using these.
     */
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Unsafe[S[_]](implicit S: WriteFileF :<: S)
+  final class Unsafe[S[_]](implicit S: WriteFile :<: S)
     extends LiftedOps[WriteFile, S] {
 
     type M[A] = FileSystemErrT[F, A]
@@ -279,7 +279,7 @@ object WriteFile {
   }
 
   object Unsafe {
-    implicit def apply[S[_]](implicit S: WriteFileF :<: S): Unsafe[S] =
+    implicit def apply[S[_]](implicit S: WriteFile :<: S): Unsafe[S] =
       new Unsafe[S]
   }
 

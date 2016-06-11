@@ -44,7 +44,7 @@ object Main {
       }
     }
 
-  type DriverEff[A] = (ReplFailF :+: (ConsoleIOF :+: Task)#λ)#λ[A]
+  type DriverEff[A] = (ReplFail :+: (ConsoleIO :+: Task)#λ)#λ[A]
   type DriverEffM[A] = Free[DriverEff, A]
 
   private def driver(f: Command => Free[DriverEff, Unit]): Task[Unit] = Task.delay {
@@ -62,8 +62,8 @@ object Main {
     console.setPrompt(new Prompt("💪 $ "))
 
     val i: DriverEff ~> MainTask =
-      Coyoneda.liftTF[ReplFail, MainTask](Failure.toError[MainTask, String])          :+:
-      liftMT[Task, MainErrT].compose[ConsoleIOF](Coyoneda.liftTF(consoleIO(console))) :+:
+      Failure.toError[MainTask, String]                  :+:
+      liftMT[Task, MainErrT].compose(consoleIO(console)) :+:
       liftMT[Task, MainErrT]
 
     console.setConsoleCallback(new AeshConsoleCallback() {
@@ -86,17 +86,16 @@ object Main {
   }
 
   type ReplEff[A] =
-    (Repl.RunStateF :+: (ConsoleIOF :+: (ReplFailF :+: (TimingF :+: (Task :+: MountingFileSystem)#λ)#λ)#λ)#λ)#λ[A]
+    (Repl.RunStateT :+: (ConsoleIO :+: (ReplFail :+: (Timing :+: (Task :+: MountingFileSystem)#λ)#λ)#λ)#λ)#λ[A]
 
   def repl(fs: MountingFileSystem ~> DriverEffM): Task[Command => Free[DriverEff, Unit]] = {
     TaskRef(Repl.RunState(rootDir, DebugLevel.Normal, 10, OutputFormat.Table, Map())).map { ref =>
       val i: ReplEff ~> DriverEffM =
-        injectFT[Task, DriverEff].compose[Repl.RunStateF](
-          Coyoneda.liftTF[Repl.RunStateT, Task](AtomicRef.fromTaskRef(ref)))       :+:
-        injectFT[ConsoleIOF, DriverEff]                                            :+:
-        injectFT[ReplFailF, DriverEff]                                             :+:
-        injectFT[Task, DriverEff].compose[TimingF](Coyoneda.liftTF(Timing.toTask)) :+:
-        injectFT[Task, DriverEff]                                                  :+:
+        injectFT[Task, DriverEff].compose(AtomicRef.fromTaskRef(ref)) :+:
+        injectFT[ConsoleIO, DriverEff]                                :+:
+        injectFT[ReplFail, DriverEff]                                 :+:
+        injectFT[Task, DriverEff].compose(Timing.toTask)              :+:
+        injectFT[Task, DriverEff]                                     :+:
         fs
 
       (cmd => Repl.command[ReplEff](cmd).foldMap(i))

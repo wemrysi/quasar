@@ -54,7 +54,7 @@ object queryfile {
     defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
-    S1: MongoErrF :<: S
+    S1: MongoErr :<: S
   ): Task[MongoQuery[C, ?] ~> Free[S, ?]] = {
     type MQ[A] = MongoQuery[C, A]
     type F[A]  = Free[S, A]

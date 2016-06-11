@@ -37,7 +37,7 @@ package object services {
     format: MessageFormat,
     data: Process[FileSystemErrT[Free[S, ?], ?], Data]
   )(implicit
-    S0: FileSystemFailureF :<: S,
+    S0: FileSystemFailure :<: S,
     S1: Task :<: S
   ): QResponse[S] = {
     val ctype = `Content-Type`(format.mediaType, Some(Charset.`UTF-8`))

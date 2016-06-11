@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{EnvErrF, EnvironmentError}
+import quasar.{EnvErr, EnvironmentError}
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp.free
@@ -46,8 +46,8 @@ object util {
     uri: ConnectionUri
   )(implicit
     S0: Task :<: S,
-    S1: EnvErrF :<: S,
-    S2: CfgErrF :<: S
+    S1: EnvErr :<: S,
+    S2: CfgErr :<: S
   ): Free[S, AMongoClient] = {
     type M[A] = Free[S, A]
     val cfgErr = Failure.Ops[ConfigError, S]

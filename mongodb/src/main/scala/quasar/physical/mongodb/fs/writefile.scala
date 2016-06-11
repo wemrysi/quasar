@@ -67,7 +67,7 @@ object writefile {
     client: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: MongoErrF :<: S
+    S1: MongoErr :<: S
   ): Task[MongoWrite ~> Free[S, ?]] =
     TaskRef[WriteState]((0, Map.empty)) map { ref =>
       new (MongoWrite ~> Free[S, ?]) {

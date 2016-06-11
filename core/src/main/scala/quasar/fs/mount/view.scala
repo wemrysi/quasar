@@ -32,11 +32,11 @@ object view {
   /** Translate reads on view paths to the equivalent queries. */
   def readFile[S[_]]
       (implicit
-        S0: ReadFileF :<: S,
-        S1: QueryFileF :<: S,
-        S2: MonotonicSeqF :<: S,
-        S3: ViewStateF :<: S,
-        S4: MountConfigsF :<: S
+        S0: ReadFile :<: S,
+        S1: QueryFile :<: S,
+        S2: MonotonicSeq :<: S,
+        S3: ViewState :<: S,
+        S4: MountConfigs :<: S
       ): ReadFile ~> Free[S, ?] = {
     import ReadFile._
 
@@ -106,8 +106,8 @@ object view {
   /** Intercept and fail any write to a view path; all others are passed untouched. */
   def writeFile[S[_]]
       (implicit
-        S0: WriteFileF :<: S,
-        S1: MountConfigsF :<: S
+        S0: WriteFile :<: S,
+        S1: MountConfigs :<: S
       ): WriteFile ~> Free[S, ?] = {
     import WriteFile._
 
@@ -133,9 +133,9 @@ object view {
   /** Intercept and handle moves and deletes involving view path(s); all others are passed untouched. */
   def manageFile[S[_]]
       (implicit
-        S0: ManageFileF :<: S,
-        S1: QueryFileF :<: S,
-        S2: MountConfigsF :<: S
+        S0: ManageFile :<: S,
+        S1: QueryFile :<: S,
+        S2: MountConfigs :<: S
       ): ManageFile ~> Free[S, ?] = {
     import ManageFile._
     import MoveSemantics._
@@ -214,8 +214,8 @@ object view {
     * enumerating files and directories. */
   def queryFile[S[_]]
       (implicit
-        S0: QueryFileF :<: S,
-        S1: MountConfigsF :<: S
+        S0: QueryFile :<: S,
+        S1: MountConfigs :<: S
       ): QueryFile ~> Free[S, ?] = {
     import QueryFile._
 
@@ -270,13 +270,13 @@ object view {
     */
   def fileSystem[S[_]]
       (implicit
-        S0: ReadFileF :<: S,
-        S1: WriteFileF :<: S,
-        S2: ManageFileF :<: S,
-        S3: QueryFileF :<: S,
-        S4: MonotonicSeqF :<: S,
-        S5: ViewStateF :<: S,
-        S6: MountConfigsF :<: S
+        S0: ReadFile :<: S,
+        S1: WriteFile :<: S,
+        S2: ManageFile :<: S,
+        S3: QueryFile :<: S,
+        S4: MonotonicSeq :<: S,
+        S5: ViewState :<: S,
+        S6: MountConfigs :<: S
       ): FileSystem ~> Free[S, ?] = {
     interpretFileSystem[Free[S, ?]](
       queryFile,

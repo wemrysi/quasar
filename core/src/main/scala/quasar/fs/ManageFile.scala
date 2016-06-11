@@ -108,7 +108,7 @@ object ManageFile {
     extends ManageFile[FileSystemError \/ AFile]
 
   @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
-  final class Ops[S[_]](implicit S: ManageFileF :<: S)
+  final class Ops[S[_]](implicit S: ManageFile :<: S)
     extends LiftedOps[ManageFile, S] {
 
     type M[A] = FileSystemErrT[F, A]
@@ -145,7 +145,7 @@ object ManageFile {
   }
 
   object Ops {
-    implicit def apply[S[_]](implicit S: ManageFileF :<: S): Ops[S] =
+    implicit def apply[S[_]](implicit S: ManageFile :<: S): Ops[S] =
       new Ops[S]
   }
 

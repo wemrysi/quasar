@@ -17,7 +17,7 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.effect.{Failure, FailureF}
+import quasar.effect.Failure
 import quasar.fp._
 
 import argonaut._, Argonaut._
@@ -142,7 +142,7 @@ object QResponse {
 
   def streaming[S[_], A, E]
       (p: Process[EitherT[Free[S, ?], E, ?], A])
-      (implicit A: EntityEncoder[A], S0: Task :<: S, S1: FailureF[E, ?] :<: S)
+      (implicit A: EntityEncoder[A], S0: Task :<: S, S1: Failure[E, ?] :<: S)
       : QResponse[S] = {
     val failure = Failure.Ops[E, S]
     streaming(p.translate(failure.unattemptT))
