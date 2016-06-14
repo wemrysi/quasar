@@ -25,13 +25,8 @@ import pathy.Path, Path._
 import scalaz.{Failure => _, :+: => _, _}, Scalaz._
 
 package object fs {
-  type ReadFileF[A]    = Coyoneda[ReadFile, A]
-  type WriteFileF[A]   = Coyoneda[WriteFile, A]
-  type ManageFileF[A]  = Coyoneda[ManageFile, A]
-  type QueryFileF[A]   = Coyoneda[QueryFile, A]
-
   type FileSystem[A] =
-    (QueryFileF :+: (ReadFileF :+: (WriteFileF :+: ManageFileF)#λ)#λ)#λ[A]
+    (QueryFile :+: (ReadFile :+: (WriteFile :+: ManageFile)#λ)#λ)#λ[A]
 
   type AbsPath[T] = pathy.Path[Abs,T,Sandboxed]
   type RelPath[T] = pathy.Path[Rel,T,Sandboxed]
@@ -51,16 +46,15 @@ package object fs {
   type PathSegment = DirName \/ FileName
 
   type FileSystemFailure[A] = Failure[FileSystemError, A]
-  type FileSystemFailureF[A] = Coyoneda[FileSystemFailure, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
-  def interpretFileSystem[M[_]: Functor](
+  def interpretFileSystem[M[_]](
     q: QueryFile ~> M,
     r: ReadFile ~> M,
     w: WriteFile ~> M,
     m: ManageFile ~> M
   ): FileSystem ~> M =
-    Coyoneda.liftTF(q) :+: Coyoneda.liftTF(r) :+: Coyoneda.liftTF(w) :+: Coyoneda.liftTF(m)
+    q :+: r :+: w :+: m
 
   /** Rebases absolute paths onto the provided absolute directory, so
     * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.

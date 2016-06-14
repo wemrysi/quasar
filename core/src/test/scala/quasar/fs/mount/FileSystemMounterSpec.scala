@@ -33,22 +33,20 @@ class FileSystemMounterSpec extends mutable.Specification {
   import FileSystemDef._
 
   type Abort[A]  = Failure[String, A]
-  type AbortF[A] = Coyoneda[Abort, A]
-  type AbortM[A] = Free[AbortF, A]
+  type AbortM[A] = Free[Abort, A]
 
   type ResMnts         = Mounts[DefinitionResult[AbortM]]
   type ResMntsS[A]     = State[ResMnts, A]
   type ResMntsSE[A, B] = EitherT[ResMntsS, A, B]
 
   type MountedFs[A]  = AtomicRef[ResMnts, A]
-  type MountedFsF[A] = Coyoneda[MountedFs, A]
 
-  type Eff[A] = (AbortM :+: (AbortF :+: MountedFsF)#λ)#λ[A]
+  type Eff[A] = (AbortM :+: (Abort :+: MountedFs)#λ)#λ[A]
   type EffM[A] = Free[Eff, A]
 
   type EffR[A] = (ResMnts, String \/ A)
 
-  val abort = Failure.Ops[String, AbortF]
+  val abort = Failure.Ops[String, Abort]
 
   def eval(rms: ResMnts): EffM ~> EffR =
     new (EffM ~> EffR) {
@@ -56,11 +54,11 @@ class FileSystemMounterSpec extends mutable.Specification {
       type M[A]        = MT[ResMntsS, A]
       import EitherT.eitherTMonad
 
-      val evalAbort: AbortF ~> M =
-        Coyoneda.liftTF[Abort, M](Failure.toError[M, String])
+      val evalAbort: Abort ~> M =
+        Failure.toError[M, String]
 
-      val evalMnts: MountedFsF ~> ResMntsS =
-        Coyoneda.liftTF[MountedFs, ResMntsS](AtomicRef.toState[ResMntsS, ResMnts])
+      val evalMnts: MountedFs ~> ResMntsS =
+        AtomicRef.toState[ResMntsS, ResMnts]
 
       val evalEff: Eff ~> M =
         free.foldMapNT(evalAbort) :+:

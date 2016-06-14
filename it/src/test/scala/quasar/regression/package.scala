@@ -27,11 +27,11 @@ import scalaz.concurrent._
 import scalaz.syntax.apply._
 
 package object regression {
-  import quasar.fs.mount.hierarchical.MountedResultHF
+  import quasar.fs.mount.hierarchical.MountedResultH
 
   type FileSystemIO[A] = (Task :+: FileSystem)#λ[A]
 
-  type HfsIO[A] = (MonotonicSeqF :+: (MountedResultHF :+: Task)#λ)#λ[A]
+  type HfsIO[A] = (MonotonicSeq :+: (MountedResultH :+: Task)#λ)#λ[A]
 
   val interpretHfsIO: Task[HfsIO ~> Task] = {
     import QueryFile.ResultHandle
@@ -39,13 +39,11 @@ package object regression {
 
     def handlesTask(
       ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
-    ) : MountedResultHF ~> Task =
-      Coyoneda.liftTF[MountedResultH, Task](
-        KeyValueStore.fromTaskRef(ref))
+    ): MountedResultH ~> Task =
+      KeyValueStore.fromTaskRef(ref)
 
-    def monoSeqTask(ref: TaskRef[Long]): MonotonicSeqF ~> Task =
-      Coyoneda.liftTF[MonotonicSeq, Task](
-        MonotonicSeq.fromTaskRef(ref))
+    def monoSeqTask(ref: TaskRef[Long]): MonotonicSeq ~> Task =
+      MonotonicSeq.fromTaskRef(ref)
 
     (TaskRef(Map.empty[ResultHandle, (ADir, ResultHandle)]) |@| TaskRef(0L))(
       (handles, ct) => monoSeqTask(ct) :+: handlesTask(handles) :+: NaturalTransformation.refl)

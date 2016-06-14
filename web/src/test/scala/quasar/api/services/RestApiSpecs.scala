@@ -35,7 +35,7 @@ class RestApiSpecs extends Specification {
   import InMemory._
 
   type Eff[A] =
-    (Task :+: (MountConfigsF :+: (FileSystemFailureF :+: MountingFileSystem)#λ)#λ)#λ[A]
+    (Task :+: (MountConfigs :+: (FileSystemFailure :+: MountingFileSystem)#λ)#λ)#λ[A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {
@@ -43,10 +43,9 @@ class RestApiSpecs extends Specification {
     }
     val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).unsafePerformSync
     val eff =
-      NaturalTransformation.refl[Task]                                                       :+:
-      Coyoneda.liftTF[MountConfigs, Task](
-        KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync)) :+:
-      Coyoneda.liftTF[FileSystemFailure, Task](Failure.toRuntimeError[Task,FileSystemError]) :+:
+      NaturalTransformation.refl[Task]                                                    :+:
+      KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync) :+:
+      Failure.toRuntimeError[Task,FileSystemError]                                        :+:
       fs
     val service = RestApi.finalizeServices[Eff](
       liftMT[Task, ResponseT].compose[Eff](eff))(

@@ -25,16 +25,16 @@ final case class QHttpService[S[_]](f: PartialFunction[Request, Free[S, QRespons
   def apply(req: Request): Free[S, QResponse[S]] =
     f.applyOrElse(req, κ(Free.pure(QResponse.empty[S].withStatus(Status.NotFound))))
 
-  def flatMapS[T[_]](g: S ~> Free[T, ?])(implicit S: Functor[S]): QHttpService[T] =
+  def flatMapS[T[_]](g: S ~> Free[T, ?]): QHttpService[T] =
     QHttpService(f.andThen(_.map(_.flatMapS(g)).flatMapSuspension(g)))
 
-  def mapS[T[_]: Functor](g: S ~> T)(implicit S: Functor[S]): QHttpService[T] =
+  def mapS[T[_]](g: S ~> T): QHttpService[T] =
     QHttpService(f.andThen(_.map(_.mapS(g)).mapSuspension(g)))
 
   def orElse(other: QHttpService[S]): QHttpService[S] =
     QHttpService(f orElse other.f)
 
-  def toHttpService(i: S ~> ResponseOr)(implicit S: Functor[S]): HttpService = {
+  def toHttpService(i: S ~> ResponseOr): HttpService = {
     def mkResponse(prg: Free[S, QResponse[S]]) =
       prg.foldMap(i).flatMap(r => EitherT.right(r.toHttpResponse(i))).merge
 
