@@ -16,9 +16,7 @@
 
 package quasar
 
-import quasar.fp._
-
-import scalaz.{:+: => _, _}
+import scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
   * it, so we simply represent joins and crosses directly. This also means that
@@ -28,31 +26,31 @@ import scalaz.{:+: => _, _}
   * that doesn’t include the cross portion.
   */
 package object qscript {
-  type Pathable[T[_[_]], A] = (Const[DeadEnd, ?] :+: SourcedPathable[T, ?])#λ[A]
+  type Pathable[T[_[_]], A] = Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
   /** These are the operations included in all forms of QScript.
     */
-  type QScriptPrim[T[_[_]], A] = (QScriptCore[T, ?] :+: Pathable[T, ?])#λ[A]
+  type QScriptPrim[T[_[_]], A] = Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]
 
   /** This is the target of the core compiler. Normalization is applied to this
     * structure, and it contains no Read or EquiJoin.
     */
-  type QScriptPure[T[_[_]], A] = (ThetaJoin[T, ?] :+: QScriptPrim[T, ?])#λ[A]
+  type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
 
   /** These nodes exist in all QScript structures that a backend sees.
     */
-  type QScriptCommon[T[_[_]], A] = (Read :+: QScriptPrim[T, ?])#λ[A]
+  type QScriptCommon[T[_[_]], A] = Coproduct[Read, QScriptPrim[T, ?], A]
 
   // The following two types are the only ones that should be seen by a backend.
 
   /** This is the primary form seen by a backend. It contains reads of files.
     */
-  type QScript[T[_[_]], A] = (ThetaJoin[T, ?] :+: QScriptCommon[T, ?])#λ[A]
+  type QScript[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptCommon[T, ?], A]
 
   /** A variant with a simpler join type. A backend can choose to operate on this
     * structure by applying the `equiJoinsOnly` transformation. Backends
     * without true join support will likely find it easier to work with this
     * than to handle full ThetaJoins.
     */
-  type EquiQScript[T[_[_]], A] = (EquiJoin[T, ?] :+: QScriptCommon[T, ?])#λ[A]
+  type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
 }

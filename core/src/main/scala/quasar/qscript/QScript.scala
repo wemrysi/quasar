@@ -102,11 +102,6 @@ object DataLevelOps {
   implicit def JoinBranchEqual[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Equal[JoinBranch[T]] =
     freeEqual[QScriptPure[T, ?]].apply(Equal[Unit])
 
-  sealed trait ReduceFunc
-
-  object ReduceFunc {
-    implicit val equal: Equal[ReduceFunc] = Equal.equalRef
-  }
 
   sealed trait JoinSide
   final case object LeftSide extends JoinSide
@@ -115,7 +110,7 @@ object DataLevelOps {
   object JoinSide {
     implicit val equal: Equal[JoinSide] = Equal.equalRef
   }
-  
+
   type FreeMap[T[_[_]]] = Free[MapFunc[T, ?], Unit]
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
   type JoinBranch[T[_[_]]] = Free[QScriptPure[T, ?], Unit]
@@ -124,16 +119,6 @@ object DataLevelOps {
 }
 
 import DataLevelOps._
-
-// TODO we should statically verify that these have `DimensionalEffect` of `Reduction`
-object ReduceFuncs {
-  final case object Count extends ReduceFunc
-  final case object Sum extends ReduceFunc
-  final case object Min extends ReduceFunc
-  final case object Max extends ReduceFunc
-  final case object Avg extends ReduceFunc
-  final case object Arbitrary extends ReduceFunc
-}
 
 object MapFuncs {
   // array
@@ -239,7 +224,8 @@ object SourcedPathable {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
-          case (LeftShift(a1), LeftShift(a2)) => eq.equal(a1, a2)
+          case (LeftShift(a1, s1, r1), LeftShift(a2, s2, r2)) =>
+            eq.equal(a1, a2) && s1 ≟ s2 && r1 ≟ r2
           case (Union(a1, l1, r1), Union(a2, l2, r2)) =>
             eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
           case (_, _) => false
@@ -254,9 +240,9 @@ object SourcedPathable {
         implicit G: Applicative[G]):
           G[SourcedPathable[T, B]] =
         fa match {
-          case Map(a, func)   => f(a) ∘ (Map[T, B](_, func))
-          case LeftShift(a)   => f(a) ∘ (LeftShift(_))
-          case Union(a, l, r) => f(a) ∘ (Union(_, l, r))
+          case Map(a, func)       => f(a) ∘ (Map[T, B](_, func))
+          case LeftShift(a, s, r) => f(a) ∘ (LeftShift(_, s, r))
+          case Union(a, l, r)     => f(a) ∘ (Union(_, l, r))
         }
     }
 }
@@ -280,8 +266,12 @@ final case object Empty extends DeadEnd
 final case class Map[T[_[_]], A](src: A, f: FreeMap[T]) extends SourcedPathable[T, A]
 // Map(LeftShift(/foo/bar/baz), ObjectConcat(ObjectProject((), "foo"), ObjectProject((), "bar")))
 
-/** Zooms in one level on the data, turning each map or array into a set of
-  * values. Other data types become undefined.
+/** Flattens nested structure, converting each value into a data set, which are
+  * then unioned.
+  *
+  * `struct` is an expression that evaluates to an array or object, which is
+  * then “exploded” into multiple values. `repair` is applied across the new
+  * set, integrating the exploded values into the original set.
   */
 
  //{ ts: 2016.01... }
@@ -300,8 +290,11 @@ final case class Map[T[_[_]], A](src: A, f: FreeMap[T]) extends SourcedPathable[
  //
  // /foo/bar/baz: 
 
-final case class LeftShift[T[_[_]], A](src: A) extends SourcedPathable[T, A]
-//final case class LeftShift[T[_[_]], A](src: A, f: FreeMap[T], jf: JoinFunc[T]) extends SourcedPathable[T, A]
+final case class LeftShift[T[_[_]], A](
+  src: A,
+  struct: FreeMap[T],
+  repair: JoinFunc[T])
+    extends SourcedPathable[T, A]
 
 /** Creates a new dataset, |a|+|b|, containing all of the entries from each of
   * the input sets, without any indication of which set they came from
@@ -321,12 +314,12 @@ sealed trait QScriptCore[T[_[_]], A] {
 }
 
 object QScriptCore {
-  implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Equal ~> (Equal ∘ QScriptCore[T, ?])#λ =
+  implicit def equal[T[_[_]]](implicit EqT: Equal[T[EJson]]): Equal ~> (Equal ∘ QScriptCore[T, ?])#λ =
     new (Equal ~> (Equal ∘ QScriptCore[T, ?])#λ) {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
-          case (Reduce(a1, b1, f1), Reduce(a2, b2, f2)) =>
-            b1 ≟ b2 && f1 ≟ f2 && eq.equal(a1, a2)
+          case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
+            b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
             b1 ≟ b2 && o1 ≟ o2 && eq.equal(a1, a2)
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
@@ -340,24 +333,36 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
-          case Reduce(a, b, func) => f(a) ∘ (Reduce(_, b, func))
-          case Sort(a, b, o)      => f(a) ∘ (Sort(_, b, o))
-          case Filter(a, func)    => f(a) ∘ (Filter(_, func))
-          case _ => ???
+          case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
+          case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
+          case Filter(a, func)            => f(a) ∘ (Filter(_, func))
+          case _                          => ???
         }
     }
 }
 
-// TODO can only have a single source
-final case class PatternGuard[T[_[_]], A](src: A, typ: Type, cont: A, fallback: A)
+// This is _perhaps_ just another MapFunc case.
+final case class PatternGuard[T[_[_]], A](
+  src: A,
+  typ: Type,
+  cont: FreeMap[T],
+  fallback: FreeMap[T])
     extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
+  * `bucket` partitions the values into buckets based on the result of the
+  * expression, `reducers` applies the provided reduction to each expression,
+  * and repair finally turns those reduced expressions into a final value.
+  *
   * @group MRA
   */
-final case class Reduce[T[_[_]], A](src: A, bucket: FreeMap[T], f: ReduceFunc)
+final case class Reduce[T[_[_]], A, N <: Succ[_]](
+  src: A,
+  bucket: FreeMap[T],
+  reducers: Sized[List[ReduceFunc[FreeMap[T]]], N],
+  repair: Free[MapFunc[T, ?], Fin[N]])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
@@ -414,22 +419,20 @@ object Read {
   * to simplify behavior for the backend.
   */
 @Lenses final case class ThetaJoin[T[_[_]], A](
-  on: JoinFunc[T],
-  f: JoinType,
   src: A,
   lBranch: JoinBranch[T],
   rBranch: JoinBranch[T],
-  lName: String,
-  rName: String)
+  on: JoinFunc[T],
+  f: JoinType,
+  combine: JoinFunc[T])
 
 object ThetaJoin {
   implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, ThetaJoin[T, ?]] =
     new Delay[Equal, ThetaJoin[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
-          // TODO different names should not affect equality
-          case (ThetaJoin(o1, f1, a1, l1, r1, n1l, n1r), ThetaJoin(o2, f2, a2, l2, r2, n2l, n2r)) =>
-            eq.equal(a1, a2) && o1 ≟ o2 && f1 ≟ f2 && l1 ≟ l2 && r1 ≟ r2 && n1l ≟ n2l && n1r ≟ n2r 
+          case (ThetaJoin(a1, l1, r1, o1, f1, c1), ThetaJoin(a2, l2, r2, o2, f2, c2)) =>
+            eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2 && o1 ≟ o2 && f1 ≟ f2 && c1 ≟ c2
         }
     }
 
@@ -438,7 +441,7 @@ object ThetaJoin {
       def traverseImpl[G[_]: Applicative, A, B](
         fa: ThetaJoin[T, A])(
         f: A => G[B]) =
-        f(fa.src) ∘ (ThetaJoin(fa.on, fa.f, _, fa.lBranch, fa.rBranch, fa.lName, fa.rName))
+        f(fa.src) ∘ (ThetaJoin(_, fa.lBranch, fa.rBranch, fa.on, fa.f, fa.combine))
     }
 }
 
@@ -475,7 +478,6 @@ object EquiJoin {
 
 object Transform {
   import MapFuncs._
-  import ReduceFuncs._
 
   type Inner[T[_[_]]] = T[QScriptPure[T, ?]]
   type QSAlgebra[T[_[_]]] = LogicalPlan[Inner[T]] => QScriptPure[T, Inner[T]]
@@ -565,7 +567,8 @@ object Transform {
         None
   }
 
-  def combineReduce(r1: ReduceFunc, r2: ReduceFunc): ReduceFunc = ???
+  // This should be combining two lists of inputs.
+  // def combineReduce(r1: ReduceFunc, r2: ReduceFunc): ReduceFunc = ???
 
   implicit def mergeQScriptCore[T[_[_]]: Corecursive]: Mergeable[QScriptCore[T, Unit]] = new Mergeable[QScriptCore[T, Unit]] {
     type IT[F[_]] = T[F]
@@ -577,12 +580,16 @@ object Transform {
         p2: QScriptCore[IT, Unit]): Option[Merge[IT, QScriptCore[IT, Unit]]] =
       (p1, p2) match {
         case (t1, t2) if t1 == t2 => AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](t1, UnitF, UnitF).some
-        case (Reduce(_, bucket1, func1), Reduce(_, bucket2, func2)) => {
+        case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
           val mapL = rebase(bucket1, left)
           val mapR = rebase(bucket2, right)
 
           if (mapL == mapR)
-            AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](Reduce((), mapL, combineReduce(func1, func2)), UnitF, UnitF).some
+            AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](
+              Reduce((), mapL, func1 // ++ func2 // TODO: append Sizeds
+                , rep1),
+              UnitF,
+              UnitF).some
           else
             None
         }
@@ -713,33 +720,52 @@ object Transform {
     F.inj(Map(res.src, Free.roll(func(res.left, res.right))))
   }
 
-  def wrapUnary[T[_[_]]](func: Unary[T, FreeMap[T]])(value: Inner[T]): QScriptPure[T, Inner[T]] =
+  def merge3Map[T[_[_]]: Recursive: Corecursive](
+    values: Func.Input[Inner[T], nat._3])(
+    func: (FreeMap[T], FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]])(
+    implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]):
+      QScriptPure[T, Inner[T]] = {
+
+    val AbsMerge(merged, first, second) = merge(values(0), values(1))
+    val AbsMerge(merged2, fands, third) = merge(merged, values(2))
+
+    val res: Merge[T, Inner[T]] = makeBasicTheta(merged2, first, second)
+    val res2 = makeBasicTheta(res.src, fands, third)
+
+    F.inj(Map(res2.src, Free.roll(func(
+      rebase(res2.left, res.left),
+      rebase(res2.left, res.right),
+      res2.right))))
+  }
+
+  def wrapUnary[T[_[_]]](value: Inner[T])(func: Unary[T, FreeMap[T]]):
+      QScriptPure[T, Inner[T]] =
     F.inj(Map(value, Free.roll(func)))
 
   def invokeMapping1[T[_[_]]](
       func: UnaryFunc,
       values: Func.Input[Inner[T], nat._1]): QScriptPure[T, Inner[T]] = {
-    val unary: Unary[T, FreeMap[T]] = func match {
+    wrapUnary(values(0))(func match {
       case structural.MakeArray => MakeArray(UnitF)
       case _ => ??? // TODO
-    }
-    wrapUnary(unary)(values(0))
+    })
   }
 
   def invokeMapping2[T[_[_]]: Recursive : Corecursive](
       func: BinaryFunc,
-      values: Func.Input[Inner[T], nat._2])(implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]): QScriptPure[T, Inner[T]] =
-    func match {
-      case structural.MakeObject => merge2Map(values)(MakeObject(_, _))
+    values: Func.Input[Inner[T], nat._2])(implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]): QScriptPure[T, Inner[T]] =
+    merge2Map(values)(func match {
+      case structural.MakeObject => MakeObject(_, _)
       case _ => ??? // TODO
-    }
+    })
 
   def invokeMapping3[T[_[_]]: Recursive : Corecursive](
       func: TernaryFunc,
-      values: Func.Input[Inner[T], nat._3]): QScriptPure[T, Inner[T]] =
-    func match {
+      values: Func.Input[Inner[T], nat._3])(implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]): QScriptPure[T, Inner[T]] =
+    merge3Map(values)(func match {
+      case relations.Between => Between(_, _, _)
       case _ => ??? // TODO
-    }
+    })
 
   // TODO we need to handling bucketing from GroupBy
   // the buckets will not always be UnitF, if we have grouped previously
@@ -748,79 +774,100 @@ object Transform {
   // this involves changing how DimensionalEffect is assigned (algebra rather than parameter)
   def invokeReduction1[T[_[_]]](
       func: UnaryFunc,
-      values: Func.Input[Inner[T], nat._1]): QScriptPure[T, Inner[T]] =
-    func match {
-      case agg.Count     => G.inj(Reduce(values(0), UnitF, Count))
-      case agg.Sum       => G.inj(Reduce(values(0), UnitF, Sum))
-      case agg.Min       => G.inj(Reduce(values(0), UnitF, Min))
-      case agg.Max       => G.inj(Reduce(values(0), UnitF, Max))
-      case agg.Avg       => G.inj(Reduce(values(0), UnitF, Avg))
-      case agg.Arbitrary => G.inj(Reduce(values(0), UnitF, Arbitrary))
-    }
+    values: Func.Input[Inner[T], nat._1]):
+      QScriptPure[T, Inner[T]] =
+    G.inj(Reduce[T, Inner[T], nat._1](values(0), UnitF, Sized[List](func match {
+      case agg.Count     => Count[FreeMap[T]](UnitF)
+      case agg.Sum       => Sum[FreeMap[T]](UnitF)
+      case agg.Min       => Min[FreeMap[T]](UnitF)
+      case agg.Max       => Max[FreeMap[T]](UnitF)
+      case agg.Avg       => Avg[FreeMap[T]](UnitF)
+      case agg.Arbitrary => Arbitrary[FreeMap[T]](UnitF)
+    }), Free.point(Fin[nat._0, nat._1])))
 
-  def constructTheta[T[_[_]], A](
-    on: JoinFunc[T],
-    f: JoinType,
-    src: A,
-    lBranch: JoinBranch[T],
-    rBranch: JoinBranch[T]): ThetaJoin[T, A] =
-      ThetaJoin(on, f, src, lBranch, rBranch, "foo", "bar")  // TODO
+  def basicJF[T[_[_]]]: JoinFunc[T] =
+    Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
-  def basicJF[T[_[_]]]: JoinFunc[T] = ???
-
-  def makeBasicTheta[T[_[_]]: Corecursive](src: Inner[T], left: JoinBranch[T], right: JoinBranch[T]): Merge[T, Inner[T]] = {
-    val newSrc: ThetaJoin[T, Inner[T]] = constructTheta(basicJF, Inner, src, left, right)
-    AbsMerge[T, Inner[T], FreeMap](
-      H.inj(newSrc).embed,
-      Free.roll(ObjectProject(UnitF, Free.roll(Nullary(EJson.Str[T[EJson]](newSrc.lName).embed)))),
-      Free.roll(ObjectProject(UnitF, Free.roll(Nullary(EJson.Str[T[EJson]](newSrc.rName).embed)))))
+  def elideNopMaps[T[_[_]]: Recursive](implicit EqT: Equal[T[EJson]]):
+      SourcedPathable[T, T[SourcedPathable[T, ?]]] => SourcedPathable[T, T[SourcedPathable[T, ?]]] = {
+    case Map(src, mf) if mf ≟ UnitF => src.project
+    case x                          => x
   }
 
-  def algebra[T[_[_]]: Recursive: Corecursive](
-      lp: LogicalPlan[Inner[T]])(implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]): QScriptPure[T, Inner[T]] =
-    lp match {
-      case LogicalPlan.ReadF(path) => ??? // nested ObjectProject
+  def elideNopJoins[T[_[_]]: Recursive, F[_]](implicit EqT: Equal[T[EJson]], Th: ThetaJoin[T, ?] :<: F, SP: SourcedPathable[T, ?] :<: F):
+      ThetaJoin[T, T[F]] => F[T[F]] = {
+    case ThetaJoin(src, l, r, on, _, combine)
+        if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ basicJF =>
+      SP.inj(Map(src, combine.void))
+    case x => Th.inj(x)
+  }
 
-      case LogicalPlan.ConstantF(data) => F.inj(Map(
-        E[T].inj(Const[DeadEnd, Inner[T]](Root)).embed,
-        Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](EJson.toEJson[T](data)))))
+  def makeBasicTheta[T[_[_]]: Corecursive](src: Inner[T], left: JoinBranch[T], right: JoinBranch[T]): Merge[T, Inner[T]] = {
+    val newSrc: ThetaJoin[T, Inner[T]] =
+      ThetaJoin(src, left, right, basicJF, Inner,
+        Free.roll(ObjectConcat(
+          Free.roll(MakeObject(Free.roll(StrLit[T, JoinFunc[T]]("tmp1")), Free.point(LeftSide))),
+          Free.roll(MakeObject(Free.roll(StrLit[T, JoinFunc[T]]("tmp2")), Free.point(RightSide))))))
+    AbsMerge[T, Inner[T], FreeMap](
+      H.inj(newSrc).embed,
+      Free.roll(ObjectProject(UnitF, Free.roll(StrLit("tmp1")))),
+      Free.roll(ObjectProject(UnitF, Free.roll(StrLit("tmp2")))))
+  }
 
-      case LogicalPlan.FreeF(name) => F.inj(Map(
-        E[T].inj(Const[DeadEnd, Inner[T]](Empty)).embed,
-        Free.roll(ObjectProjectFree(Free.roll(StrLit(name.toString)), UnitF))))
+  def pathToProj[T[_[_]]: Corecursive](path: pathy.Path[_, _, _]): FreeMap[T] =
+    pathy.Path.peel(path).fold[FreeMap[T]](
+      Free.point(())) {
+      case (p, n) =>
+        Free.roll(ObjectProject(pathToProj[T](p),
+                  Free.roll(StrLit[T, FreeMap[T]](n.fold(_.value, _.value)))))
+    }
 
-      case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
-        G.inj(PatternGuard(expr, typ, cont, fallback))
+  def lpToQScript[T[_[_]]: Recursive: Corecursive](
+    implicit ma: Mergeable.Aux[T, QScriptPure[T, Unit]]):
+      LogicalPlan[Inner[T]] => QScriptPure[T, Inner[T]] = {
+    case LogicalPlan.ReadF(path) =>
+      F.inj(Map(CorecursiveOps[T, QScriptPure[T, ?]](E.inj(Const[DeadEnd, Inner[T]](Root))).embed, pathToProj[T](path)))
 
-      // TODO this illustrates the untypesafe ugliness b/c the pattern match does not guarantee the appropriate sized `Sized`
-      // https://github.com/milessabin/shapeless/pull/187
-      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Mapping =>
-        invokeMapping1(func, Func.Input1(a1))
+    case LogicalPlan.ConstantF(data) => F.inj(Map(
+      E[T].inj(Const[DeadEnd, Inner[T]](Root)).embed,
+      Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](EJson.toEJson[T](data)))))
 
-      case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect == Mapping =>
-        invokeMapping2(func, Func.Input2(a1, a2))
+    case LogicalPlan.FreeF(name) => F.inj(Map(
+      E[T].inj(Const[DeadEnd, Inner[T]](Empty)).embed,
+      Free.roll(ObjectProjectFree(Free.roll(StrLit(name.toString)), UnitF))))
 
-      case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect == Mapping =>
-        invokeMapping3(func, Func.Input3(a1, a2, a3))
+      // case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
+      //   G.inj(PatternGuard(expr, typ, ???, ???))
 
-      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Reduction =>
-        invokeReduction1(func, Func.Input1(a1))
+    // TODO this illustrates the untypesafe ugliness b/c the pattern match does not guarantee the appropriate sized `Sized`
+    // https://github.com/milessabin/shapeless/pull/187
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Mapping =>
+      invokeMapping1(func, Func.Input1(a1))
 
-      case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
-        val AbsMerge(src, jb1, jb2) = merge(a1, a2)
-        G.inj(Take(src, jb1, jb2))
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect == Mapping =>
+      invokeMapping2(func, Func.Input2(a1, a2))
 
-      case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
-        val AbsMerge(src, jb1, jb2) = merge(a1, a2)
-        G.inj(Drop(src, jb1, jb2))
+    case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect == Mapping =>
+      invokeMapping3(func, Func.Input3(a1, a2, a3))
 
-      case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
-        val AbsMerge(src, jb1, jb2) = merge(a1, a2)
+    case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Reduction =>
+      invokeReduction1(func, Func.Input1(a1))
 
-        makeBasicTheta(src, jb1, jb2) match {
-          case AbsMerge(src, fm1, fm2) =>
-            F.inj(Map(G.inj(Filter(src, fm2)).embed, fm1))
-        }
+    case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
+      val AbsMerge(src, jb1, jb2) = merge(a1, a2)
+      G.inj(Take(src, jb1, jb2))
+
+    case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
+      val AbsMerge(src, jb1, jb2) = merge(a1, a2)
+      G.inj(Drop(src, jb1, jb2))
+
+    case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
+      val AbsMerge(src, jb1, jb2) = merge(a1, a2)
+
+      makeBasicTheta(src, jb1, jb2) match {
+        case AbsMerge(src, fm1, fm2) =>
+          F.inj(Map(G.inj(Filter(src, fm2)).embed, fm1))
+      }
 
       //case LogicalPlan.InvokeF(func @ BinaryFunc(_, _, _, _, _, _, _, _), input) if func.effect == Expansion => invokeLeftShift(func, input)
 
@@ -857,6 +904,6 @@ object Transform {
       //// Map(Map(src=form, MakeObject(name, ())), body)
       //case LogicalPlan.LetF(name, form, body) => rewriteLet(body)(qsRewrite(name, form))
 
-      case _ => ??? // TODO
-    }
+    case _ => ??? // TODO
+  }
 }

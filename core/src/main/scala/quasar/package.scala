@@ -28,11 +28,13 @@ import scalaz._
 import scalaz.Leibniz._
 import scalaz.std.vector._
 import scalaz.std.list._
+import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.syntax.either._
 import scalaz.syntax.writer._
 import scalaz.syntax.nel._
+import shapeless._
 
 package object quasar {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -100,10 +102,15 @@ package object quasar {
       l => Take(skipped, LogicalPlan.ConstantF[T[LogicalPlan]](Data.Int(l.get)).embed).embed)
   }
 
+  implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
+    Equal.equal((a, b) => a.unsized ≟ b.unsized)
+
+  implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
+  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
+    Equal.equal((a, b) => true)
+
   // TODO generalize this and contribute to shapeless-contrib
   implicit class FuncUtils[A, N <: shapeless.Nat](val self: Func.Input[A, N]) extends scala.AnyVal {
-    import shapeless._
-
     def reverse: Func.Input[A, N] =
       Sized.wrap[List[A], N](self.unsized.reverse)
 
