@@ -137,10 +137,11 @@ object Main {
       cfgRef       <- TaskRef(config).liftM[MainErrT]
       mntCfgsT     =  writeConfig(CoreConfig.mountings, cfgRef, cfgPath)
       coreApi      <- CoreEff.interpreter[CoreConfig](mntCfgsT).liftM[MainErrT]
-      ephemeralApi =  CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral) compose coreApi
+      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(MntCfgsIO.ephemeral)) compose coreApi
       _            <- (mountAll[CoreEff](config.mountings) foldMap ephemeralApi).flatMapF(_.point[Task])
 
-      durableApi   =  CfgsErrsIO.toMainTask(MntCfgsIO.durable[CoreConfig](mntCfgsT)) compose coreApi
+      durableApi   =  foldMapNT(CfgsErrsIO.toMainTask(MntCfgsIO.durable[CoreConfig](mntCfgsT)))
+                        .compose(coreApi)
 
       r            <- EitherT.right(repl(mt compose (durableApi compose injectNT[MountingFileSystem, CoreEff])))
       _            <- EitherT.right(driver(r))

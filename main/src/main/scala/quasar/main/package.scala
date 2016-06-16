@@ -203,18 +203,16 @@ package object main {
 
   object CfgsErrsIO {
     /** Interprets errors into strings. */
-    def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> MainTask = {
+    def toMainTask(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIO ~> MainTask = {
       val f =
         Failure.toRuntimeError[Task,FileSystemError] :+:
         Failure.toCatchable[Task,MongoException]     :+:
         evalCfgsIO
 
-      val g = new (CfgsErrsIO ~> MainTask) {
+      new (CfgsErrsIO ~> MainTask) {
         def apply[A](a: CfgsErrsIO[A]) =
           EitherT(f(a).attempt).leftMap(_.getMessage)
       }
-
-      foldMapNT(g)
     }
   }
 
