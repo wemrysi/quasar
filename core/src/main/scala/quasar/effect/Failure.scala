@@ -87,7 +87,7 @@ object Failure {
   }
 
   object Ops {
-    def apply[E, S[_]](implicit S: Failure[E, ?] :<: S): Ops[E, S] =
+    implicit def apply[E, S[_]](implicit S: Failure[E, ?] :<: S): Ops[E, S] =
       new Ops[E, S]
   }
 

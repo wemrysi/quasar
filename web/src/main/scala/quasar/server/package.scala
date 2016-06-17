@@ -26,13 +26,10 @@ import scalaz.~>
 import scalaz.concurrent.Task
 
 package object server {
-  /** Interpretes errors into `Response`s, for use in web services. */
-  def toResponseOr(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIOM ~> ResponseOr = {
-    val f =
-      failureResponseOr[FileSystemError]           :+:
-      failureResponseOr[MongoException]            :+:
-      (liftMT[Task, ResponseT] compose evalCfgsIO)
-
-    foldMapNT(f)
+  /** Interprets errors into `Response`s, for use in web services. */
+  def toResponseOr(evalCfgsIO: MntCfgsIO ~> Task): CfgsErrsIO ~> ResponseOr = {
+    failureResponseOr[FileSystemError]           :+:
+    failureResponseOr[MongoException]            :+:
+    (liftMT[Task, ResponseT] compose evalCfgsIO)
   }
 }
