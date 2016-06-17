@@ -18,22 +18,28 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.LogicalPlan
+import quasar.fp._
+import quasar.fs._
+import quasar.std.StdLib._
 
 import matryoshka._, FunctorT.ops._
 import org.specs2.mutable._
 import org.specs2.scalaz._
 import pathy.Path._
-import shapeless.contrib.scalaz.instances._
+//import shapeless.contrib.scalaz.instances.deriveEqual
 import scalaz._
+import Scalaz._
 
 class QScriptSpec extends Specification with ScalazMatchers {
   import DataLevelOps._
   import MapFuncs._
   import Transform._
 
-  implicit val ma: Mergeable.Aux[Fix, QScriptPure[Fix, Unit]] = scala.Predef.implicitly
-
-  def callIt(lp: Fix[LogicalPlan]): Inner[Fix] = lp.transCata(lpToQScript[Fix])
+  def callIt(lp: Fix[LogicalPlan]): Inner[Fix] =
+    lp.transCata(lpToQScript[Fix])
+       .transCata(liftQSAlgebra(elideNopJoins[Fix, QScriptPure[Fix, ?]]))
+       .transCata(liftQSAlgebra(elideNopMaps[Fix, QScriptPure[Fix, ?]]))
+       .transCata(liftQSAlgebra2(coalesceMap[Fix, QScriptPure[Fix, ?]]))
 
   def RootR = CorecursiveOps[Fix, QScriptPure[Fix, ?]](E.inj(Const[DeadEnd, Inner[Fix]](Root))).embed
 
@@ -43,17 +49,40 @@ class QScriptSpec extends Specification with ScalazMatchers {
   def StrR[A](s: String): Free[MapFunc[Fix, ?], A] =
     Free.roll(StrLit[Fix, Free[MapFunc[Fix, ?], A]](s))
 
+  def lpRead(path: String): Fix[LogicalPlan] =
+    LogicalPlan.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+
   "replan" should {
+    "convert a very simple read" in {
+      callIt(lpRead("/foo")) must
+      equal(
+        F.inj(Map(RootR, ObjectProjectR(UnitF, StrR("foo")))).embed)
+    }
+
     "convert a simple read" in {
-      callIt(quasar.LogicalPlan.Read(file("/some/foo/bar"))) must
+      callIt(lpRead("/some/foo/bar")) must
       equal(
         F.inj(
           Map(RootR,
-            ObjectProjectR(ObjectProjectR(ObjectProjectR(UnitF, StrR("some")),
-                                          StrR("foo")),
-                           StrR("bar")))))
+            ObjectProjectR(
+              ObjectProjectR(
+                ObjectProjectR(
+                  UnitF,
+                  StrR("some")),
+                StrR("foo")),
+              StrR("bar")))).embed)
 
       // Map(Root, ObjectProject(ObjectProject(ObjectProject((), "some"), "foo"), "bar"))
+    }
+
+    "convert a basic invoke" in {
+      callIt(math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
+      equal(
+        F.inj(
+          Map(RootR,
+            Free.roll(Add[Fix, FreeMap[Fix]](
+              ObjectProjectR(UnitF, StrR("foo")),
+              ObjectProjectR(UnitF, StrR("bar")))))).embed)
     }
   }
 }
