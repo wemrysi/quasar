@@ -24,8 +24,6 @@ import scalaz._
 sealed trait ReduceFunc[A]
 final case class Count[A](a: A)     extends ReduceFunc[A]
 final case class Sum[A](a: A)       extends ReduceFunc[A]
-final case class First[A](a: A)     extends ReduceFunc[A]
-final case class Last[A](a: A)      extends ReduceFunc[A]
 final case class Min[A](a: A)       extends ReduceFunc[A]
 final case class Max[A](a: A)       extends ReduceFunc[A]
 final case class Avg[A](a: A)       extends ReduceFunc[A]
@@ -36,14 +34,24 @@ object ReduceFunc {
     new Delay[Equal, ReduceFunc] {
       def apply[A](eq: Equal[A]) = Equal.equal {
         case (Count(a),     Count(b))     => eq.equal(a, b)
-        case (First(a),     First(b))     => eq.equal(a, b)
-        case (Last(a),      Last(b))      => eq.equal(a, b)
         case (Sum(a),       Sum(b))       => eq.equal(a, b)
         case (Min(a),       Min(b))       => eq.equal(a, b)
         case (Max(a),       Max(b))       => eq.equal(a, b)
         case (Avg(a),       Avg(b))       => eq.equal(a, b)
         case (Arbitrary(a), Arbitrary(b)) => eq.equal(a, b)
         case (_,            _)            => false
+      }
+    }
+
+  implicit val show: Delay[Show, ReduceFunc] =
+    new Delay[Show, ReduceFunc] {
+      def apply[A](show: Show[A]) = Show.show {
+        case Count(a)     => Cord("Count(") ++ show.show(a) ++ Cord(")")
+        case Sum(a)       => Cord("Sum(") ++ show.show(a) ++ Cord(")")
+        case Min(a)       => Cord("Min(") ++ show.show(a) ++ Cord(")")
+        case Max(a)       => Cord("Max(") ++ show.show(a) ++ Cord(")")
+        case Avg(a)       => Cord("Avg(") ++ show.show(a) ++ Cord(")")
+        case Arbitrary(a) => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
       }
     }
 }

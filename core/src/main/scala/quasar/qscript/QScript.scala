@@ -191,7 +191,7 @@ object MapFuncs {
   def Like[T[_[_]], A](a1: A, a2: A, a3: A) = Ternary[T, A](a1, a2, a3)
   def Search[T[_[_]], A](a1: A, a2: A, a3: A) = Ternary[T, A](a1, a2, a3)
   def Substring[T[_[_]], A](a1: A, a2: A, a3: A) = Ternary[T, A](a1, a2, a3)
-  
+
   // structural
   def MakeArray[T[_[_]], A](a1: A) = Unary[T, A](a1)
   def MakeObject[T[_[_]], A](a1: A, a2: A) = Binary[T, A](a1, a2)
@@ -210,8 +210,10 @@ sealed trait SortDir
 final case object Ascending  extends SortDir
 final case object Descending extends SortDir
 
+// TODO: Just reuse the version of this from LP?
 object SortDir {
   implicit val equal: Equal[SortDir] = Equal.equalRef
+  implicit val show: Show[SortDir] = Show.showFromToString
 }
 
 sealed trait JoinType
@@ -232,9 +234,6 @@ sealed trait SourcedPathable[T[_[_]], A] {
 }
 
 object SourcedPathable {
-  //scala.Predef.implicitly[Equal[MapFunc[Fix, Unit]]]
-  //scala.Predef.implicitly[FreeMap[Fix]]
-
   implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, SourcedPathable[T, ?]] =
     new Delay[Equal, SourcedPathable[T, ?]] {
       def apply[A](eq: Equal[A]) =
@@ -272,11 +271,8 @@ object SourcedPathable {
 }
 
 object DeadEnd {
-  //scala.Predef.implicitly[Equal[MapFunc[Fix, Unit]]]
-  //scala.Predef.implicitly[FreeMap[Fix]]
-
   implicit def equal: Equal[DeadEnd] = Equal.equalRef
-  implicit def show: Show[DeadEnd] = Show.showFromToString[DeadEnd]
+  implicit def show: Show[DeadEnd] = Show.showFromToString
 }
 
 /** The top level of a filesystem. During compilation this represents `/`, but
@@ -339,8 +335,6 @@ sealed trait QScriptCore[T[_[_]], A] {
 }
 
 object QScriptCore {
-  //implicit def NTEq[F[_], A: Equal](implicit del: Delay[Equal, F]) = NTEqual[F, A](implicitly, del)
-
   implicit def equal[T[_[_]]](implicit EqT: Equal[T[EJson]]): Equal ~> (Equal ∘ QScriptCore[T, ?])#λ =
     new (Equal ~> (Equal ∘ QScriptCore[T, ?])#λ) {
       def apply[A](eq: Equal[A]) =
@@ -350,6 +344,8 @@ object QScriptCore {
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
             b1 ≟ b2 && o1 ≟ o2 && eq.equal(a1, a2)
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
+          case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
+          case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
           case (_, _) => false
         }
     }
@@ -363,14 +359,27 @@ object QScriptCore {
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
-          case _                          => ???
+          case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
+          case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
+          case PatternGuard(a, typ, cont, fb) => f(a) ∘ (PatternGuard(_, typ, cont, fb))
         }
     }
 
-  implicit def show[T[_[_]]]: Delay[Show, QScriptCore[T, ?]] =
+  implicit def show[T[_[_]]](implicit EJ: Show[T[EJson]]): Delay[Show, QScriptCore[T, ?]] =
     new Delay[Show, QScriptCore[T, ?]] {
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
-        Show.showFromToString[QScriptCore[T, A]]
+        Show.show {
+          case Reduce(a, b, func, repair) => Cord("Reduce(") ++ s.show(a) ++ b.show ++ // func.show ++ repair.show ++
+            Cord(")")
+          case Sort(a, b, o)              => Cord("Sort(") ++ s.show(a) ++ b.show ++ o.show ++ Cord(")")
+          case Filter(a, func)            => Cord("Filter(") ++ s.show(a) ++ func.show ++ Cord(")")
+          case Take(a, f, c)              => Cord("Take(") ++ s.show(a) ++ // f.show ++ c.show ++
+            Cord(")")
+          case Drop(a, f, c)              => Cord("Drop(") ++ s.show(a) ++ // f.show ++ c.show ++
+            Cord(")")
+          case PatternGuard(a, typ, cont, fb) =>
+            Cord("PatternGuard(") ++ s.show(a) ++ typ.show ++ cont.show ++ fb.show ++ Cord(")")
+        }
     }
 }
 
@@ -415,10 +424,10 @@ final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: SortDir)
 final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-final case class Take[T[_[_]], A](src: A, moreSrc: JoinBranch[T], count: JoinBranch[T])
+final case class Take[T[_[_]], A](src: A, from: JoinBranch[T], count: JoinBranch[T])
     extends QScriptCore[T, A]
 
-final case class Drop[T[_[_]], A](src: A, moreSrc: JoinBranch[T], count: JoinBranch[T])
+final case class Drop[T[_[_]], A](src: A, from: JoinBranch[T], count: JoinBranch[T])
     extends QScriptCore[T, A]
 
 /** A backend-resolved `Root`, which is now a path. */
@@ -822,7 +831,13 @@ object Transform {
     values: Func.Input[Inner[T], nat._2]): QScriptPure[T, Inner[T]] =
     merge2Map(values)(func match {
       case structural.MakeObject => MakeObject(_, _)
-      case math.Add => Add(_, _)
+      case math.Add      => Add(_, _)
+      case math.Multiply => Multiply(_, _)
+      case math.Subtract => Subtract(_, _)
+      case math.Divide   => Divide(_, _)
+      case string.Concat
+         | structural.ArrayConcat
+         | structural.ConcatOp => ArrayConcat(_, _)
       case _ => ??? // TODO
     })
 
