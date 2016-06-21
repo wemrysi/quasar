@@ -16,7 +16,10 @@
 
 package quasar
 
-import scalaz._
+import quasar.Predef._
+import quasar.fp._
+
+import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
   * it, so we simply represent joins and crosses directly. This also means that
@@ -54,9 +57,77 @@ package object qscript {
     */
   type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
 
-  // TODO this should be found from matryoshka - why isn't it being found!?!?
-  implicit def NTEqual[F[_], A](implicit A: Equal[A], F: Equal ~> λ[α => Equal[F[α]]]):
-    Equal[F[A]] =
-  F(A)
+  sealed trait JoinSide
+  final case object LeftSide extends JoinSide
+  final case object RightSide extends JoinSide
 
+  object JoinSide {
+    implicit val equal: Equal[JoinSide] = Equal.equalRef
+    implicit val show: Show[JoinSide] = Show.showFromToString
+  }
+
+  type FreeMap[T[_[_]]] = Free[MapFunc[T, ?], Unit]
+  type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
+  type JoinBranch[T[_[_]]] = Free[QScriptPure[T, ?], Unit]
+
+  def UnitF[T[_[_]]] = Free.point[MapFunc[T, ?], Unit](())
+  final case class AbsMerge[T[_[_]], A, Q[_[_[_]]]](
+    src: A,
+    left: Q[T],
+    right: Q[T])
+
+  type Merge[T[_[_]], A] = AbsMerge[T, A, FreeMap]
+  type MergeJoin[T[_[_]], A] = AbsMerge[T, A, JoinBranch]
+
+  // replace Unit in `in` with `field`
+  def rebase[T[_[_]]](in: FreeMap[T], field: FreeMap[T]): FreeMap[T] = in >> field
+
+  // TODO this should be found from matryoshka - why isn't it being found!?!?
+  implicit def NTEqual[F[_], A](implicit F: Delay[Equal, F], A: Equal[A]):
+      Equal[F[A]] =
+    F(A)
+  implicit def NTShow[F[_], A](implicit F: Delay[Show, F], A: Show[A]):
+      Show[F[A]] =
+    F(A)
+
+  implicit def constMergeable[T[_[_]], A](
+    implicit ma: Mergeable.Aux[T, A]): Mergeable.Aux[T, Const[A, Unit]] = new Mergeable[Const[A, Unit]] {
+    type IT[F[_]] = T[F]
+
+    def mergeSrcs(
+      left: FreeMap[T],
+      right: FreeMap[T],
+      p1: Const[A, Unit],
+      p2: Const[A, Unit]):
+        Option[Merge[T, Const[A, Unit]]] =
+      ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
+        case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
+      }
+  }
+
+  implicit def coproductMergeable[T[_[_]], F[_], G[_]](
+    implicit mf: Mergeable.Aux[T, F[Unit]],
+             mg: Mergeable.Aux[T, G[Unit]]):
+      Mergeable.Aux[T, Coproduct[F, G, Unit]] =
+    new Mergeable[Coproduct[F, G, Unit]] {
+      type IT[F[_]] = T[F]
+
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        cp1: Coproduct[F, G, Unit],
+        cp2: Coproduct[F, G, Unit]): Option[Merge[IT, Coproduct[F, G, Unit]]] = {
+        (cp1.run, cp2.run) match {
+          case (-\/(left1), -\/(left2)) =>
+            mf.mergeSrcs(left, right, left1, left2).map {
+              case AbsMerge(src, left, right) => AbsMerge(Coproduct(-\/(src)), left, right)
+            }
+          case (\/-(right1), \/-(right2)) =>
+            mg.mergeSrcs(left, right, right1, right2).map {
+              case AbsMerge(src, left, right) => AbsMerge(Coproduct(\/-(src)), left, right)
+            }
+          case (_, _) => None
+        }
+      }
+    }
 }

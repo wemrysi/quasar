@@ -516,13 +516,13 @@ package object fp
       })
   }
 
-  implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]): Delay[Show, Free[F, ?]] =
+  implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]):
+      Delay[Show, Free[F, ?]] =
     new Delay[Show, Free[F, ?]] {
       def apply[α](sh: Show[α]): Show[Free[F, α]] =
-        Show.show(_.resume match {
-          case -\/(branch) => Cord("Roll(") ++ F(freeShow[F].apply(sh)).show(branch) ++ Cord(")") //F[Free[F, A]]
-          case \/-(leaf) => Cord("Point(") ++ sh.show(leaf) ++ Cord(")")
-        })
+        Show.show(_.resume.fold(
+          Cord("Roll(") ++ F(freeShow[F].apply(sh)).show(_) ++ Cord(")"),
+          Cord("Point(") ++ sh.show(_) ++ Cord(")")))
     }
 
   implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] = new Delay[Equal, Const[A, ?]] {
@@ -530,26 +530,24 @@ package object fp
       Equal.equal((c1, c2) => c1.getConst === c2.getConst)
   }
 
-  implicit def constShow[A: Show]: Delay[Show, Const[A, ?]] = new Delay[Show, Const[A, ?]] {
-    def apply[B](showB: Show[B]): Show[Const[A, B]] =
-      Show.show(const => Show[A].show(const.getConst))
-  }
+  implicit def constShow[A: Show]: Delay[Show, Const[A, ?]] =
+    new Delay[Show, Const[A, ?]] {
+      def apply[B](showB: Show[B]): Show[Const[A, B]] =
+        Show.show(const => Show[A].show(const.getConst))
+    }
 
   implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
     Equal.equal((a, b) => a.unsized ≟ b.unsized)
 
   implicit def sizedShow[A: Show, N <: Nat]: Show[Sized[A, N]] =
-    Show.show(s => Cord(s.toString))
+    Show.showFromToString
 
-  implicit def natEqual[N <: Nat]: Equal[N] =
-    Equal.equal((a, b) => true)
+  implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
 
-  implicit def natShow[N <: Nat]: Show[N] =
-    Show.show(n => Cord(n.toString))
+  implicit def natShow[N <: Nat]: Show[N] = Show.showFromToString
 
   implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
     Equal.equal((a, b) => true)
 
-  implicit def finShow[N <: Succ[_]]: Show[Fin[N]] =
-    Show.show(f => Cord(f.toString))
+  implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
 }
