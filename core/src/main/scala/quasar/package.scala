@@ -28,7 +28,6 @@ import scalaz._
 import scalaz.Leibniz._
 import scalaz.std.vector._
 import scalaz.std.list._
-import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.syntax.either._
@@ -101,13 +100,6 @@ package object quasar {
       skipped)(
       l => Take(skipped, LogicalPlan.ConstantF[T[LogicalPlan]](Data.Int(l.get)).embed).embed)
   }
-
-  implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
-    Equal.equal((a, b) => a.unsized ≟ b.unsized)
-
-  implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
-  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
-    Equal.equal((a, b) => true)
 
   // TODO generalize this and contribute to shapeless-contrib
   implicit class FuncUtils[A, N <: shapeless.Nat](val self: Func.Input[A, N]) extends scala.AnyVal {

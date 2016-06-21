@@ -71,49 +71,6 @@ object EJson {
 }
 
 object DataLevelOps {
-  sealed trait MapFunc[T[_[_]], A]
-  final case class Nullary[T[_[_]], A](value: T[EJson]) extends MapFunc[T, A]
-  final case class Unary[T[_[_]], A](a1: A) extends MapFunc[T, A]
-  final case class Binary[T[_[_]], A](a1: A, a2: A) extends MapFunc[T, A]
-  final case class Ternary[T[_[_]], A](a1: A, a2: A, a3: A) extends MapFunc[T, A]
-
-  object MapFunc {
-    implicit def equal[T[_[_]], A](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, MapFunc[T, ?]] = new Delay[Equal, MapFunc[T, ?]] {
-      // TODO this is wrong - we need to define equality on a function by function basis
-      def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
-        case (Nullary(v1), Nullary(v2)) => v1.equals(v2)
-        case (Unary(a1), Unary(a2)) => in.equal(a1, a2)
-        case (Binary(a11, a12), Binary(a21, a22)) => in.equal(a11, a21) && in.equal(a12, a22)
-        case (Ternary(a11, a12, a13), Ternary(a21, a22, a23)) => in.equal(a11, a21) && in.equal(a12, a22) && in.equal(a13, a23)
-        case (_, _) => false
-      }
-    }
-
-    implicit def functor[T[_[_]]]: Functor[MapFunc[T, ?]] = new Functor[MapFunc[T, ?]] {
-      def map[A, B](fa: MapFunc[T, A])(f: A => B): MapFunc[T, B] =
-        fa match {
-          case Nullary(v) => Nullary[T, B](v)
-          case Unary(a1) => Unary(f(a1))
-          case Binary(a1, a2) => Binary(f(a1), f(a2))
-          case Ternary(a1, a2, a3) => Ternary(f(a1), f(a2), f(a3))
-        }
-    }
-
-    implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, MapFunc[T, ?]] =
-      new Delay[Show, MapFunc[T, ?]] {
-        def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = Show.show {
-          case Nullary(v) => Cord("Nullary(") ++ shEj.show(v) ++ Cord(")")
-          case Unary(a1) => Cord("Unary(") ++ sh.show(a1) ++ Cord(")")
-          case Binary(a1, a2) => Cord("Binary(") ++ sh.show(a1) ++ sh.show(a2) ++ Cord(")")
-          case Ternary(a1, a2, a3) => Cord("Ternary(") ++ sh.show(a1) ++ sh.show(a2) ++ sh.show(a3) ++ Cord(")")
-        }
-      }
-  }
-
-  // TODO this should be found from matryoshka - why isn't it being found!?!?
-  implicit def NTEqual[F[_], A](implicit A: Equal[A], F: Equal ~> λ[α => Equal[F[α]]]):
-    Equal[F[A]] =
-  F(A)
 
   // TODO we would like to use `f1 ≟ f2` - but the implicit for Free is not found
   implicit def JoinBranchEqual[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Equal[JoinBranch[T]] =
@@ -264,8 +221,17 @@ object SourcedPathable {
   implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, SourcedPathable[T, ?]] =
     new Delay[Show, SourcedPathable[T, ?]] {
       def apply[A](s: Show[A]): Show[SourcedPathable[T, A]] = Show.show(_ match {
-        case Map(src, mf) => Cord("Map(") ++ s.show(src) ++ Cord(",") ++ Show[FreeMap[T]].show(mf) ++ Cord(")")
-        case _ => Cord("some other sourced pathable sorry")
+        case Map(src, mf) => Cord("Map(") ++
+          s.show(src) ++ Cord(",") ++
+          mf.show ++ Cord(")")
+        case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
+          s.show(src) ++ Cord(",") ++
+          struct.show ++ Cord(",") ++
+          repair.show ++ Cord(")")
+        case Union(src, l, r) => Cord("Union(") ++
+          s.show(src) ++ Cord(",") ++
+          l.show ++ Cord(",") ++
+          r.show ++ Cord(")")
       })
     }
 }
@@ -335,8 +301,8 @@ sealed trait QScriptCore[T[_[_]], A] {
 }
 
 object QScriptCore {
-  implicit def equal[T[_[_]]](implicit EqT: Equal[T[EJson]]): Equal ~> (Equal ∘ QScriptCore[T, ?])#λ =
-    new (Equal ~> (Equal ∘ QScriptCore[T, ?])#λ) {
+  implicit def equal[T[_[_]]](implicit EqT: Equal[T[EJson]]): Delay[Equal, QScriptCore[T, ?]] =
+    new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
@@ -369,16 +335,31 @@ object QScriptCore {
     new Delay[Show, QScriptCore[T, ?]] {
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
-          case Reduce(a, b, func, repair) => Cord("Reduce(") ++ s.show(a) ++ b.show ++ // func.show ++ repair.show ++
-            Cord(")")
-          case Sort(a, b, o)              => Cord("Sort(") ++ s.show(a) ++ b.show ++ o.show ++ Cord(")")
-          case Filter(a, func)            => Cord("Filter(") ++ s.show(a) ++ func.show ++ Cord(")")
-          case Take(a, f, c)              => Cord("Take(") ++ s.show(a) ++ // f.show ++ c.show ++
-            Cord(")")
-          case Drop(a, f, c)              => Cord("Drop(") ++ s.show(a) ++ // f.show ++ c.show ++
-            Cord(")")
-          case PatternGuard(a, typ, cont, fb) =>
-            Cord("PatternGuard(") ++ s.show(a) ++ typ.show ++ cont.show ++ fb.show ++ Cord(")")
+          case Reduce(a, b, red, rep) => Cord("Reduce(") ++
+            s.show(a) ++ Cord(",") ++
+            b.show ++ Cord(",") ++
+            red.show ++ Cord(",") ++
+            rep.show ++ Cord(")")
+          case Sort(a, b, o) => Cord("Sort(") ++
+            s.show(a) ++ Cord(",") ++
+            b.show ++ Cord(",") ++
+            o.show ++ Cord(")")
+          case Filter(a, func) => Cord("Filter(") ++
+            s.show(a) ++ Cord(",") ++
+            func.show ++ Cord(")")
+          case Take(a, f, c) => Cord("Take(") ++
+            s.show(a) ++ Cord(",") ++
+            f.show ++ Cord(",") ++
+            c.show ++ Cord(")")
+          case Drop(a, f, c) => Cord("Drop(") ++
+            s.show(a) ++ Cord(",") ++
+            f.show ++ Cord(",") ++
+            c.show ++ Cord(")")
+          case PatternGuard(a, typ, cont, fb) => Cord("PatternGuard(") ++
+            s.show(a) ++ Cord(",") ++
+            typ.show ++ Cord(",") ++
+            cont.show ++ Cord(",") ++
+            fb.show ++ Cord(")")
         }
     }
 }
@@ -400,11 +381,11 @@ final case class PatternGuard[T[_[_]], A](
   *
   * @group MRA
   */
-final case class Reduce[T[_[_]], A, N <: Succ[_]](
+final case class Reduce[T[_[_]], A, N <: Nat](
   src: A,
   bucket: FreeMap[T],
-  reducers: Sized[List[ReduceFunc[FreeMap[T]]], N],
-  repair: Free[MapFunc[T, ?], Fin[N]])
+  reducers: Sized[List[ReduceFunc[FreeMap[T]]], Succ[N]],
+  repair: Free[MapFunc[T, ?], Fin[Succ[N]]])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
@@ -487,17 +468,17 @@ object ThetaJoin {
     }
 
 
-  implicit def show[T[_[_]]: Recursive](implicit s: Show[T[EJson]]): Delay[Show, ThetaJoin[T, ?]] =
+  implicit def show[T[_[_]]](implicit s: Show[T[EJson]]): Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
           Cord("ThetaJoin(") ++
           showA.show(src) ++ Cord(",") ++
-          Show[JoinBranch[T]].show(lBr) ++ Cord(",") ++
-          Show[JoinBranch[T]].show(rBr) ++ Cord(",") ++
-          Show[JoinFunc[T]].show(on) ++ Cord(",") ++
-          Show[JoinType].show(f) ++ Cord(",") ++
-          Show[JoinFunc[T]].show(combine) ++ Cord(")")
+          lBr.show ++ Cord(",") ++
+          rBr.show ++ Cord(",") ++
+          on.show ++ Cord(",") ++
+          f.show ++ Cord(",") ++
+          combine.show ++ Cord(")")
       }
     }
 }
@@ -813,32 +794,83 @@ object Transform {
       Free.roll(ObjectProject(UnitF, Free.roll(StrLit("tmp2")))))
   }
 
-  def wrapUnary[T[_[_]]](value: Inner[T])(func: Unary[T, FreeMap[T]]):
-      QScriptPure[T, Inner[T]] =
-    F.inj(Map(value, Free.roll(func)))
+  def invokeLeftShift[T[_[_]]](
+      func: UnaryFunc,
+      values: Func.Input[Inner[T], nat._1]): SourcedPathable[T, Inner[T]] =
+
+        /// ThetaJoin(cs, Map((), mf), LeftShift((), struct, repair), comb)
+        //  LeftShift(cs, struct, comb.flatMap(LeftSide => mf.map(_ => LeftSide), RS => repair))
+    func match {
+      case structural.FlattenMap => LeftShift(values(0), UnitF, Free.point(RightSide))
+      case structural.FlattenArray => LeftShift(values(0), UnitF, Free.point(RightSide))
+      case structural.ShiftMap => LeftShift(values(0), UnitF, Free.point(RightSide)) // TODO affects bucketing metadata
+      case structural.ShiftArray => LeftShift(values(0), UnitF, Free.point(RightSide)) // TODO affects bucketing metadata
+      case _ => ???
+
+      // ['a', 'b', 'c'] => [0, 1, 2] // custom map func - does not affect bucketing
+      // LeftShift(Map(flattenArrayIndices))
+    }
 
   def invokeMapping1[T[_[_]]](
       func: UnaryFunc,
-      values: Func.Input[Inner[T], nat._1]): QScriptPure[T, Inner[T]] = {
-    wrapUnary(values(0))(func match {
-      case structural.MakeArray => MakeArray(UnitF)
-      case _ => ??? // TODO
-    })
-  }
+      values: Func.Input[Inner[T], nat._1]): SourcedPathable[T, Inner[T]] =
+    Map(
+      values(0),
+      Free.roll {
+        val applied: FreeMap[T] => Unary[T, FreeMap[T]] = func match {
+          case date.Date => Date _
+          case date.Time => Time _
+          case date.Timestamp => Timestamp _
+          case date.Interval => Interval _
+          case date.TimeOfDay => TimeOfDay _
+          case date.ToTimestamp => ToTimestamp _
+          case math.Negate => Negate _
+          case relations.Not => Not _
+          case string.Length => Length _
+          case string.Lower => Lower _
+          case string.Upper => Upper _
+          case string.Boolean => Boolean _
+          case string.Integer => Integer _
+          case string.Decimal => Decimal _
+          case string.Null => Null _
+          case string.ToString => ToString _
+          case structural.MakeArray => MakeArray _
+        }
+        applied(UnitF)
+      })
 
   def invokeMapping2[T[_[_]]: Recursive : Corecursive](
       func: BinaryFunc,
-    values: Func.Input[Inner[T], nat._2]): QScriptPure[T, Inner[T]] =
+      values: Func.Input[Inner[T], nat._2]): QScriptPure[T, Inner[T]] =
     merge2Map(values)(func match {
-      case structural.MakeObject => MakeObject(_, _)
+      case date.Extract => Extract(_, _)
       case math.Add      => Add(_, _)
       case math.Multiply => Multiply(_, _)
       case math.Subtract => Subtract(_, _)
       case math.Divide   => Divide(_, _)
+      case math.Modulo   => Modulo(_, _)
+      case math.Power    => Power(_, _)
+      case relations.Eq => Eq(_, _)
+      case relations.Neq => Neq(_, _)
+      case relations.Lt => Lt(_, _)
+      case relations.Lte => Lte(_, _)
+      case relations.Gt => Gt(_, _)
+      case relations.Gte => Gte(_, _)
+      case relations.IfUndefined => IfUndefined(_, _)
+      case relations.And => And(_, _)
+      case relations.Or => Or(_, _)
+      case relations.Coalesce => Coalesce(_, _)
+      case set.In => In(_, _)
+      case set.Within => Within(_, _)
+      case set.Constantly => Constantly(_, _)
+      case structural.MakeObject => MakeObject(_, _)
+      case structural.ObjectConcat => ObjectConcat(_, _)
+      case structural.ArrayProject => ArrayProject(_, _)
+      case structural.ObjectProject => ObjectProject(_, _)
+      case structural.DeleteField => DeleteField(_, _)
       case string.Concat
          | structural.ArrayConcat
          | structural.ConcatOp => ArrayConcat(_, _)
-      case _ => ??? // TODO
     })
 
   def invokeMapping3[T[_[_]]: Recursive : Corecursive](
@@ -846,11 +878,22 @@ object Transform {
       values: Func.Input[Inner[T], nat._3]): QScriptPure[T, Inner[T]] =
     merge3Map(values)(func match {
       case relations.Between => Between(_, _, _)
-      case _ => ??? // TODO
+      case relations.Cond => Cond(_, _, _)
+      case string.Like => Like(_, _, _)
+      case string.Search => Search(_, _, _)
+      case string.Substring => Substring(_, _, _)
     })
 
   // TODO we need to handling bucketing from GroupBy
   // the buckets will not always be UnitF, if we have grouped previously
+  // GroupBy probably just modifies state
+  //
+  // TODO handle inner LeftShift
+  // an Expansion creates node and modifies state
+  //
+  // when we get here, look at the bucketing state - consume the state!
+  // List[BucketingState] - List[FreeMap]
+  // Nil ~ UnitF
   //
   // TODO also we should be able to statically guarantee that we are matching on all reductions here
   // this involves changing how DimensionalEffect is assigned (algebra rather than parameter)
@@ -858,7 +901,7 @@ object Transform {
       func: UnaryFunc,
     values: Func.Input[Inner[T], nat._1]):
       QScriptPure[T, Inner[T]] =
-    G.inj(Reduce[T, Inner[T], nat._1](values(0), UnitF, Sized[List](func match {
+    G.inj(Reduce[T, Inner[T], nat._0](values(0), UnitF, Sized[List](func match {
       case agg.Count     => Count[FreeMap[T]](UnitF)
       case agg.Sum       => Sum[FreeMap[T]](UnitF)
       case agg.Min       => Min[FreeMap[T]](UnitF)
@@ -872,7 +915,7 @@ object Transform {
 
   def elideNopMaps[T[_[_]]: Recursive, F[_]: Functor](implicit EqT: Equal[T[EJson]], SP: SourcedPathable[T, ?] :<: F):
       SourcedPathable[T, T[F]] => F[T[F]] = {
-    case Map(src, mf) if Equal(quasar.qscript.DataLevelOps.NTEqual[Free[MapFunc[T, ?], ?], Unit](implicitly, freeEqual[MapFunc[T, ?]])).equal(mf, UnitF) => src.project
+    case Map(src, mf) if Equal(NTEqual[Free[MapFunc[T, ?], ?], Unit](implicitly, freeEqual[MapFunc[T, ?]])).equal(mf, UnitF) => src.project
     case x                          => SP.inj(x)
   }
 
@@ -930,7 +973,7 @@ object Transform {
     // TODO this illustrates the untypesafe ugliness b/c the pattern match does not guarantee the appropriate sized `Sized`
     // https://github.com/milessabin/shapeless/pull/187
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Mapping =>
-      invokeMapping1(func, Func.Input1(a1))
+      F.inj(invokeMapping1(func, Func.Input1(a1)))
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect == Mapping =>
       invokeMapping2(func, Func.Input2(a1, a2))
@@ -957,7 +1000,8 @@ object Transform {
           F.inj(Map(G.inj(Filter(src, fm2)).embed, fm1))
       }
 
-      //case LogicalPlan.InvokeF(func @ BinaryFunc(_, _, _, _, _, _, _, _), input) if func.effect == Expansion => invokeLeftShift(func, input)
+      case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Expansion =>
+        F.inj(invokeLeftShift(func, Func.Input1(a1)))
 
       //// handling bucketing for sorting
       //// e.g. squashing before a reduce puts everything in the same bucket

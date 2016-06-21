@@ -53,4 +53,10 @@ package object qscript {
     * than to handle full ThetaJoins.
     */
   type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
+
+  // TODO this should be found from matryoshka - why isn't it being found!?!?
+  implicit def NTEqual[F[_], A](implicit A: Equal[A], F: Equal ~> λ[α => Equal[F[α]]]):
+    Equal[F[A]] =
+  F(A)
+
 }
