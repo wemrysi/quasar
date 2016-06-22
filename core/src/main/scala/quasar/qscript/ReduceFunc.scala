@@ -16,20 +16,17 @@
 
 package quasar.qscript
 
+import quasar._
 import quasar.fp._
+import quasar.std.StdLib._
 
 import scalaz._
 
-// TODO we should statically verify that these have `DimensionalEffect` of `Reduction`
 sealed trait ReduceFunc[A]
-final case class Count[A](a: A)     extends ReduceFunc[A]
-final case class Sum[A](a: A)       extends ReduceFunc[A]
-final case class Min[A](a: A)       extends ReduceFunc[A]
-final case class Max[A](a: A)       extends ReduceFunc[A]
-final case class Avg[A](a: A)       extends ReduceFunc[A]
-final case class Arbitrary[A](a: A) extends ReduceFunc[A]
 
 object ReduceFunc {
+  import ReduceFuncs._
+
   implicit val equal: Delay[Equal, ReduceFunc] =
     new Delay[Equal, ReduceFunc] {
       def apply[A](eq: Equal[A]) = Equal.equal {
@@ -54,4 +51,23 @@ object ReduceFunc {
         case Arbitrary(a) => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
       }
     }
+
+  def translateReduction[A]: UnaryFunc => A => ReduceFunc[A] = {
+    case agg.Count     => Count(_)
+    case agg.Sum       => Sum(_)
+    case agg.Min       => Min(_)
+    case agg.Max       => Max(_)
+    case agg.Avg       => Avg(_)
+    case agg.Arbitrary => Arbitrary(_)
+  }
+}
+
+// TODO we should statically verify that these have a `DimensionalEffect` of `Reduction`
+object ReduceFuncs {
+  final case class Count[A](a: A)     extends ReduceFunc[A]
+  final case class Sum[A](a: A)       extends ReduceFunc[A]
+  final case class Min[A](a: A)       extends ReduceFunc[A]
+  final case class Max[A](a: A)       extends ReduceFunc[A]
+  final case class Avg[A](a: A)       extends ReduceFunc[A]
+  final case class Arbitrary[A](a: A) extends ReduceFunc[A]
 }

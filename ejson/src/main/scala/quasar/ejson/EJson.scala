@@ -19,7 +19,6 @@ package quasar.ejson
 import quasar.Predef._
 import quasar.fp._
 
-import matryoshka.∘
 import scalaz._, Scalaz._
 
 sealed trait Common[A]
@@ -45,8 +44,8 @@ object Common {
       }
   }
 
-  implicit val equal: Equal ~> (Equal ∘ Common)#λ =
-    new (Equal ~> (Equal ∘ Common)#λ) {
+  implicit val equal: Delay[Equal, Common] =
+    new Delay[Equal, Common] {
       def apply[α](eq: Equal[α]) = Equal.equal((a, b) => (a, b) match {
         case (Arr(l),       Arr(r))  => listEqual(eq).equal(l, r)
         case (Arr(_),       _)       => false
@@ -60,6 +59,17 @@ object Common {
         case (Dec(_),       _)       => false
       })
     }
+
+  implicit val show: Delay[Show, Common] =
+    new Delay[Show, Common] {
+      def apply[α](eq: Show[α]) = Show.show(a => a match {
+        case Arr(v)  => Cord(s"Arr($v)")
+        case Null()  => Cord("Null()")
+        case Bool(v) => Cord(s"Bool($v)")
+        case Str(v)  => Cord(s"Str($v)")
+        case Dec(v)  => Cord(s"Dec($v)")
+      })
+    }
 }
 
 final case class Obj[A](value: ListMap[String, A])
@@ -71,8 +81,8 @@ object Obj {
       fa.value.traverse(f).map(Obj(_))
   }
 
-  implicit val equal: Equal ~> (Equal ∘ Obj)#λ =
-    new (Equal ~> (Equal ∘ Obj)#λ) {
+  implicit val equal: Delay[Equal, Obj] =
+    new Delay[Equal, Obj] {
       def apply[α](eq: Equal[α]) = Equal.equal((a, b) =>
         mapEqual(stringInstance, eq).equal(a.value, b.value))
     }
@@ -106,8 +116,8 @@ object Extension {
       }
   }
 
-  implicit val equal: Equal ~> (Equal ∘ Extension)#λ =
-    new (Equal ~> (Equal ∘ Extension)#λ) {
+  implicit val equal: Delay[Equal, Extension] =
+    new Delay[Equal, Extension] {
       def apply[α](eq: Equal[α]) = Equal.equal((a, b) => (a, b) match {
         case (Meta(l, _), Meta(r, _)) => eq.equal(l, r)
         case (Meta(_, _), _)          => false
@@ -120,6 +130,17 @@ object Extension {
         case (Char(_),    _)          => false
         case (Int(l),     Int(r))     => l ≟ r
         case (Int(_),     _)          => false
+      })
+    }
+
+  implicit val show: Delay[Show, Extension] =
+    new Delay[Show, Extension] {
+      def apply[α](eq: Show[α]) = Show.show(a => a match {
+        case Meta(v, m) => Cord(s"Meta($v, $m)")
+        case Map(v)     => Cord(s"Map($v)")
+        case Byte(v)    => Cord(s"Byte($v)")
+        case Char(v)    => Cord(s"Char($v)")
+        case Int(v)     => Cord(s"Int($v)")
       })
     }
 

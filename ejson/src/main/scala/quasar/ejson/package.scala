@@ -18,6 +18,8 @@ package quasar
 
 import java.lang.String
 
+import scala.Predef.implicitly
+
 import matryoshka._, FunctorT.ops._
 import monocle.Prism
 import scalaz._
@@ -27,9 +29,16 @@ package object ejson {
 
   /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
     */
+
   type Json[A] = Coproduct[Obj, Common, A]
 
+  val ObjJson = implicitly[Obj :<: Json]
+  val CommonJson = implicitly[Common :<: Json]
+
   type EJson[A] = Coproduct[Extension, Common, A]
+
+  val ObjEJson = implicitly[Extension :<: EJson]
+  val CommonEJson = implicitly[Common :<: EJson]
 
   object EJson {
     def fromJson[A](f: String => A): Json[A] => EJson[A] =

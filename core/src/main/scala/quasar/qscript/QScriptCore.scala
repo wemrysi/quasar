@@ -17,9 +17,11 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.ejson.{Int => _, _}
 import quasar.fp._
 import quasar.Type
 
+import matryoshka._
 import scalaz._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
 
@@ -60,7 +62,7 @@ final case class Reduce[T[_[_]], A, N <: Nat](
   */
 // Should this operate on a sequence of mf/order pairs? Might be easier for
 // implementers to handle stable sorting that way.
-final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: SortDir)
+final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
 /** Eliminates some values from a dataset, based on the result of FilterFunc.
@@ -68,10 +70,10 @@ final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: SortDir)
 final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-final case class Take[T[_[_]], A](src: A, from: JoinBranch[T], count: JoinBranch[T])
+final case class Take[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
-final case class Drop[T[_[_]], A](src: A, from: JoinBranch[T], count: JoinBranch[T])
+final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
 object QScriptCore {
@@ -165,5 +167,21 @@ object QScriptCore {
           }
           case (_, _) => None
         }
+    }
+
+  implicit def bucketable[T[_[_]]: Corecursive]:
+      Bucketable.Aux[T, QScriptCore[T, ?]] =
+    new Bucketable[QScriptCore[T, ?]] {
+      type IT[G[_]] = T[G]
+
+      def digForBucket: QScriptCore[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = {
+        case Reduce(src, _, _, _) => StateT { s =>
+          ((s + 1, src)).right[QScriptBucket[T, Inner]]
+        }
+        case Sort(src, _, _) => StateT { s =>
+          ((s + 1, src)).right[QScriptBucket[T, Inner]]
+        }
+        case qs => IndexedStateT.stateT(qs.src)
+      }
     }
 }

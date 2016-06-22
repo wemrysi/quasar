@@ -17,7 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.ejson.{Int => _, _}
 import quasar.fp._
+import quasar.qscript.MapFuncs._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -52,8 +54,8 @@ final case class LeftShift[T[_[_]], A](
   */
 final case class Union[T[_[_]], A](
   src: A,
-  lBranch: JoinBranch[T],
-  rBranch: JoinBranch[T])
+  lBranch: FreeQS[T],
+  rBranch: FreeQS[T])
     extends SourcedPathable[T, A]
 
 object SourcedPathable {
@@ -93,7 +95,7 @@ object SourcedPathable {
         case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
           s.show(src) ++ Cord(",") ++
           struct.show ++ Cord(",") ++
-          repair.show ++ Cord(")")
+          repair.show ++ Cord(",")
         case Union(src, l, r) => Cord("Union(") ++
           s.show(src) ++ Cord(",") ++
           l.show ++ Cord(",") ++
@@ -106,9 +108,6 @@ object SourcedPathable {
     new Mergeable[SourcedPathable[T, Unit]] {
       type IT[F[_]] = T[F]
 
-      val mf = new MapFuncs[IT, FreeMap[IT]]
-      import mf._
-
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
@@ -117,17 +116,26 @@ object SourcedPathable {
         (p1, p2) match {
           case (Map(_, m1), Map(_, m2)) => {
             val lf =
-              Free.roll(ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit("tmp1"))))
+              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit[IT, FreeMap[IT]]("tmp1"))))
             val rf =
-              Free.roll(ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit("tmp2"))))
+              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit[IT, FreeMap[IT]]("tmp2"))))
 
             AbsMerge[IT, SourcedPathable[IT, Unit], FreeMap](Map((), Free.roll[MapFunc[IT, ?], Unit](
-              ConcatObjects(List(
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit("tmp1")), rebase(m1, left))),
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit("tmp2")), rebase(m2, right))))))),
+              ConcatObjects(
+                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit[IT, FreeMap[IT]]("tmp1")), rebase(m1, left))),
+                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit[IT, FreeMap[IT]]("tmp2")), rebase(m2, right)))))),
               lf, rf).some
           }
           case _ => None
         }
+    }
+
+  implicit def bucketable[T[_[_]]: Corecursive]:
+      Bucketable.Aux[T, SourcedPathable[T, ?]] =
+    new Bucketable[SourcedPathable[T, ?]] {
+      type IT[G[_]] = T[G]
+
+      def digForBucket: SourcedPathable[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
+        sp => IndexedStateT.stateT(sp.src)
     }
 }

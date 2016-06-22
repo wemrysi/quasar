@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fp._
 
 import scalaz._, Scalaz._
 
@@ -40,6 +39,8 @@ package object qscript {
     */
   type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
 
+  type QScriptInternal[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], QScriptPure[T, ?], A]
+
   /** These nodes exist in all QScript structures that a backend sees.
     */
   type QScriptCommon[T[_[_]], A] = Coproduct[Read, QScriptPrim[T, ?], A]
@@ -49,6 +50,7 @@ package object qscript {
   /** This is the primary form seen by a backend. It contains reads of files.
     */
   type QScript[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptCommon[T, ?], A]
+
 
   /** A variant with a simpler join type. A backend can choose to operate on this
     * structure by applying the `equiJoinsOnly` transformation. Backends
@@ -66,9 +68,12 @@ package object qscript {
     implicit val show: Show[JoinSide] = Show.showFromToString
   }
 
-  type FreeMap[T[_[_]]] = Free[MapFunc[T, ?], Unit]
+  type FreeUnit[T[_[_]], F[_]] = Free[F, Unit]
+
+  type FreeMap[T[_[_]]] = FreeUnit[T, MapFunc[T, ?]]
+  type FreeQS[T[_[_]]] = FreeUnit[T, QScriptInternal[T, ?]]
+
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
-  type JoinBranch[T[_[_]]] = Free[QScriptPure[T, ?], Unit]
 
   def UnitF[T[_[_]]] = Free.point[MapFunc[T, ?], Unit](())
   final case class AbsMerge[T[_[_]], A, Q[_[_[_]]]](
@@ -77,18 +82,13 @@ package object qscript {
     right: Q[T])
 
   type Merge[T[_[_]], A] = AbsMerge[T, A, FreeMap]
-  type MergeJoin[T[_[_]], A] = AbsMerge[T, A, JoinBranch]
+  type MergeJoin[T[_[_]], A] = AbsMerge[T, A, FreeQS]
 
-  // replace Unit in `in` with `field`
-  def rebase[T[_[_]]](in: FreeMap[T], field: FreeMap[T]): FreeMap[T] = in >> field
-
-  // TODO this should be found from matryoshka - why isn't it being found!?!?
-  implicit def NTEqual[F[_], A](implicit F: Delay[Equal, F], A: Equal[A]):
-      Equal[F[A]] =
-    F(A)
-  implicit def NTShow[F[_], A](implicit F: Delay[Show, F], A: Show[A]):
-      Show[F[A]] =
-    F(A)
+  // replace `Unit` in `src` with `replacement`
+  def rebase[T[_[_]], F[_]](
+      src: FreeUnit[T, F],
+      replacement: FreeUnit[T, F]): FreeUnit[T, F] =
+    src >> replacement
 
   implicit def constMergeable[T[_[_]], A](
     implicit ma: Mergeable.Aux[T, A]): Mergeable.Aux[T, Const[A, Unit]] = new Mergeable[Const[A, Unit]] {
@@ -129,5 +129,23 @@ package object qscript {
           case (_, _) => None
         }
       }
+    }
+
+  implicit def constBucketable[T[_[_]], A]:
+      Bucketable.Aux[T, Const[A, ?]] =
+    new Bucketable[Const[A, ?]] {
+      type IT[F[_]] = T[F]
+
+      def digForBucket: Const[A, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = ???
+    }
+
+  implicit def coproductBucketable[T[_[_]], F[_], G[_]](
+    implicit mf: Bucketable.Aux[T, F],
+             mg: Bucketable.Aux[T, G]):
+      Bucketable.Aux[T, Coproduct[F, G, ?]] =
+    new Bucketable[Coproduct[F, G, ?]] {
+      type IT[F[_]] = T[F]
+
+      def digForBucket: Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = ???
     }
 }

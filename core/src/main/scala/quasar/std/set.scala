@@ -82,6 +82,7 @@ trait SetLib extends Library {
     },
     basicUntyper)
 
+  // TODO second param is an Array, third param is Array[String]
   val OrderBy = TernaryFunc(
     Sifting,
     "ORDER BY",

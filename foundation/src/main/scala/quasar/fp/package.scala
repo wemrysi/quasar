@@ -21,6 +21,8 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
+import matryoshka._
+import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
@@ -468,11 +470,18 @@ package object fp
     }
   }
 
+  def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
+      G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig)
+
+  def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
+      G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
 
-  type ∘[F[_], G[_]] = Composition[F, G]
   type Delay[F[_], G[_]] = F ~> (F ∘ G)#λ
 
   // TODO review definition of equal on coproduct
@@ -502,19 +511,6 @@ package object fp
           case \/-(ga) => gShow(sh).show(ga)
         })
     }
-
-  implicit def freeEqual[F[_]: Functor](
-  implicit F: Delay[Equal, F]):
-    Delay[Equal, Free[F, ?]] =
-  new Delay[Equal, Free[F, ?]] {
-    def apply[α](eq: Equal[α]) =
-      Equal.equal((a, b) => (a.resume, b.resume) match {
-        case (-\/(f1), -\/(f2)) =>
-          F(freeEqual[F](scala.Predef.implicitly, F)(eq)).equal(f1, f2)
-        case (\/-(a1), \/-(a2)) => eq.equal(a1, a2)
-        case (_,       _)       => false
-      })
-  }
 
   implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]):
       Delay[Show, Free[F, ?]] =
@@ -550,4 +546,27 @@ package object fp
     Equal.equal((a, b) => true)
 
   implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
+
+  // TODO: Move to Matryoshka
+
+  /** Algebra transformation that allows a standard algebra to be used on a
+    * CoEnv structure (given a function that converts the leaves to the result
+    * type).
+    */
+  def interpret[F[_], A, B](f: A => B, φ: Algebra[F, B]):
+      Algebra[CoEnv[A, F, ?], B] =
+    interpretM[Id, F, A, B](f, φ)
+
+  def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]):
+      AlgebraM[M, CoEnv[A, F, ?], B] =
+    ginterpretM[Id, M, F, A, B](f, φ)
+
+  def ginterpretM[W[_], M[_], F[_], A, B](f: A => M[B], φ: GAlgebraM[W, M, F, B]):
+      GAlgebraM[W, M, CoEnv[A, F, ?], B] =
+    _.run.fold(f, φ)
+
+  /** A specialization of `interpret` where the leaves are of the result type.
+    */
+  def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
+    interpret(ι, φ)
 }
