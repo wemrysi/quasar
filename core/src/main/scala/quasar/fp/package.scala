@@ -21,7 +21,7 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
-import monocle.{Lens, Prism}
+import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
@@ -367,7 +367,6 @@ package object fp
     with JsonOps
     with ProcessOps
     with QFoldableOps
-    with PrismInstances
     with SKI
     with StringOps {
 
@@ -468,15 +467,7 @@ package object fp
     }
   }
 
-  // NB: This should be submitted to mpilquist/monocle
-  /** Create a Prism using an partial function rather than Option.
-    */
-  def pPrism[A, B](out: PartialFunction[A, B])(in: B => A) =
-    Prism[A, B](out.lift)(in)
-
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
-
-  type ∘[F[_], G[_]] = Composition[F, G]
 }

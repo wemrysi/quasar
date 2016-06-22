@@ -18,7 +18,6 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
-import quasar.fp._
 import quasar.fs.prettyPrint
 import quasar.sql._
 

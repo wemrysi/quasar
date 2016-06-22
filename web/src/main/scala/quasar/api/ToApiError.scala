@@ -17,12 +17,11 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.{Data, DataCodec}
-import quasar.{EnvironmentError, Planner, SemanticError}
+import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
 import quasar.RenderTree.ops._
-import quasar.fs._
+import quasar.fp._
+import quasar.fs._, PathyCodecJson._
 import quasar.fs.mount.{Mounting, MountingError}
-import quasar.fp._, PathyCodecJson._
 import quasar.sql._
 
 import argonaut._, Argonaut._
