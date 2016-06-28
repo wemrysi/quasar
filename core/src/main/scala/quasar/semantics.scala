@@ -104,7 +104,7 @@ object SemanticError {
     } (GenericError(_))
 }
 
-trait SemanticAnalysis {
+object SemanticAnalysis {
   import SemanticError._
 
   type Failure = NonEmptyList[SemanticError]
@@ -171,20 +171,20 @@ trait SemanticAnalysis {
     case _ => Nil
   }
 
-  case class BindingScope(scope: Map[String, SqlRelation[Unit]])
+  final case class BindingScope(scope: Map[String, SqlRelation[Unit]])
 
   implicit val ShowBindingScope: Show[BindingScope] = new Show[BindingScope] {
     override def show(v: BindingScope) = v.scope.toString
   }
 
-  case class TableScope(scope: Map[String, SqlRelation[Unit]])
+  final case class TableScope(scope: Map[String, SqlRelation[Unit]])
 
   implicit def ShowTableScope: Show[TableScope] =
     new Show[TableScope] {
       override def show(v: TableScope) = v.scope.toString
     }
 
-  case class Scope(tableScope: TableScope, bindingScope: BindingScope)
+  final case class Scope(tableScope: TableScope, bindingScope: BindingScope)
 
   import Validation.FlatMap._
 
@@ -259,6 +259,8 @@ trait SemanticAnalysis {
 
     def flatten: Set[Provenance] = Set(this)
 
+    // TODO: Implement Order for all sorts of types so we can get Equal (well,
+    //       Order, even) defined properly for Provenance.
     override def equals(that: scala.Any): Boolean = (this, that) match {
       case (x, y) if (x.eq(y.asInstanceOf[AnyRef])) => true
       case (Relation(v1), Relation(v2)) => v1 == v2
@@ -274,10 +276,10 @@ trait SemanticAnalysis {
     }
   }
   trait ProvenanceInstances {
-    implicit val ProvenanceRenderTree: RenderTree[Provenance] =
-      new RenderTree[Provenance] { self =>
-        import Provenance._
+    import Provenance._
 
+    implicit val renderTree: RenderTree[Provenance] =
+      new RenderTree[Provenance] { self =>
         def render(v: Provenance) = {
           val ProvenanceNodeType = List("Provenance")
 
@@ -297,10 +299,8 @@ trait SemanticAnalysis {
       }
     }
 
-    implicit val ProvenanceOrMonoid: Monoid[Provenance] =
+    implicit val orMonoid: Monoid[Provenance] =
       new Monoid[Provenance] {
-        import Provenance._
-
         def zero = Empty
 
         def append(v1: Provenance, v2: => Provenance) = (v1, v2) match {
@@ -310,10 +310,8 @@ trait SemanticAnalysis {
         }
       }
 
-    implicit val ProvenanceAndMonoid: Monoid[Provenance] =
+    implicit val andMonoid: Monoid[Provenance] =
       new Monoid[Provenance] {
-        import Provenance._
-
         def zero = Empty
 
         def append(v1: Provenance, v2: => Provenance) = (v1, v2) match {
@@ -326,8 +324,9 @@ trait SemanticAnalysis {
   object Provenance extends ProvenanceInstances {
     case object Empty extends Provenance
     case object Value extends Provenance
-    case class Relation(value: SqlRelation[Unit]) extends Provenance
-    case class Either(left: Provenance, right: Provenance) extends Provenance {
+    final case class Relation(value: SqlRelation[Unit]) extends Provenance
+    final case class Either(left: Provenance, right: Provenance)
+        extends Provenance {
       override def flatten: Set[Provenance] = {
         def flatten0(x: Provenance): Set[Provenance] = x match {
           case Either(left, right) => flatten0(left) ++ flatten0(right)
@@ -336,7 +335,8 @@ trait SemanticAnalysis {
         flatten0(this)
       }
     }
-    case class Both(left: Provenance, right: Provenance) extends Provenance {
+    final case class Both(left: Provenance, right: Provenance)
+        extends Provenance {
       override def flatten: Set[Provenance] = {
         def flatten0(x: Provenance): Set[Provenance] = x match {
           case Both(left, right) => flatten0(left) ++ flatten0(right)
@@ -347,10 +347,10 @@ trait SemanticAnalysis {
     }
 
     def allOf[F[_]: Foldable](xs: F[Provenance]): Provenance =
-      xs.concatenate(ProvenanceAndMonoid)
+      xs.concatenate(andMonoid)
 
     def anyOf[F[_]: Foldable](xs: F[Provenance]): Provenance =
-      xs.concatenate(ProvenanceOrMonoid)
+      xs.concatenate(orMonoid)
   }
 
   /** This phase infers the provenance of every expression, issuing errors
@@ -383,9 +383,9 @@ trait SemanticAnalysis {
           (Provenance.Relation(_)) ⋙ success)
       case InvokeFunction(_, args) => success(Provenance.allOf(args))
       case Match(_, cases, _)      =>
-        success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
+        success(Provenance.allOf(cases.map(_.expr)))
       case Switch(cases, _)        =>
-        success(cases.map(_.expr).concatenate(Provenance.ProvenanceAndMonoid))
+        success(Provenance.allOf(cases.map(_.expr)))
       case Let(_, form, body)      => success(form & body)
       case IntLiteral(_)           => success(Provenance.Value)
       case FloatLiteral(_)         => success(Provenance.Value)
@@ -417,5 +417,3 @@ trait SemanticAnalysis {
     (Scope(TableScope(Map()), BindingScope(Map())), expr.transCata(orOriginal(projectSortKeysƒ)))
       .coelgotM(addAnnotations, scopeTablesƒ.apply(_).disjunction)
 }
-
-object SemanticAnalysis extends SemanticAnalysis

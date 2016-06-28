@@ -73,8 +73,6 @@ class Interpreter[F[_], M[_]: Monad](val interpretTerm: F ~> M) {
   * @tparam F The type of the `Functor` that represents the algebra to be interpreted
   * @tparam M The `Monad` into which to translate the `Free` Algebra
   */
-// https://github.com/puffnfresh/wartremover/issues/149
-@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 class SpecializedInterpreter[F[_], M[_]: Monad](interpretTerm: F ~> M) extends Interpreter(interpretTerm) {
   def runLog[E,A](p: Process[EitherT[Program,E,?],A])(implicit catchable: Catchable[M]): EitherT[M,E,Vector[A]] = {
     type T[Program[_],A] = EitherT[Program,E,A]

@@ -77,7 +77,8 @@ object ViewMounter {
     (implicit S0: MountConfigs :<: S)
     : SemanticErrsT[Free[S, ?], Fix[LogicalPlan]] = {
 
-    implicit val m = EitherT.eitherTMonad[Free[S, ?], SemanticErrors]
+    implicit val m: Monad[EitherT[Free[S, ?], SemanticErrors, ?]] =
+      EitherT.eitherTMonad[Free[S, ?], SemanticErrors]
 
     def lift(e: Set[FPath], lp: Fix[LogicalPlan]) =
       EitherT.right[Free[S, ?], SemanticErrors, LogicalPlan[(Set[FPath], Fix[LogicalPlan])]](

@@ -102,7 +102,6 @@ object QueryFile {
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
   import EitherT.eitherTMonad
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S: QueryFile :<: S)
     extends LiftedOps[QueryFile, S] {
 
@@ -221,7 +220,6 @@ object QueryFile {
   /** Low-level, unsafe operations. Clients are responsible for resource-safety
     * when using these.
     */
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Unsafe[S[_]](implicit S: QueryFile :<: S)
     extends LiftedOps[QueryFile, S] {
 

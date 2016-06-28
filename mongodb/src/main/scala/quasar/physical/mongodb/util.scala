@@ -85,7 +85,7 @@ object util {
 
     val InvalidHostNameAllowedProp = "invalidHostNameAllowed"
 
-    @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
     def settings(cs: ConnectionString, invalidHostNameAllowed: Boolean): Task[MongoClientSettings] = Task.delay {
       import com.mongodb.connection._
 

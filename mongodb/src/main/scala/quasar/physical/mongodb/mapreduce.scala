@@ -42,7 +42,7 @@ import scalaz._, Scalaz._
   * @param verbose Whether to include additional information, such
   *                as timing, in the results.
   */
-@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.DefaultArguments"))
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 final case class MapReduce(
   map:       Js.Expr, // "function if (...) emit(...) }"
   reduce:    Js.Expr, // "function (key, values) { ...; return ... }"

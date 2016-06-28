@@ -197,31 +197,28 @@ object Bson {
   }
 }
 
-sealed trait BsonType {
-  def ordinal: Int
-}
+sealed abstract class BsonType(val ordinal: Int)
 
 object BsonType {
-  private[BsonType] abstract class AbstractType(val ordinal: Int) extends BsonType
-  final case object Dec extends AbstractType(1)
-  final case object Text extends AbstractType(2)
-  final case object Doc extends AbstractType(3)
-  final case object Arr extends AbstractType(4)
-  final case object Binary extends AbstractType(5)
-  final case object Undefined extends AbstractType(6)
-  final case object ObjectId extends AbstractType(7)
-  final case object Bool extends AbstractType(8)
-  final case object Date extends AbstractType(9)
-  final case object Null extends AbstractType(10)
-  final case object Regex extends AbstractType(11)
-  final case object JavaScript extends AbstractType(13)
-  final case object JavaScriptScope extends AbstractType(15)
-  final case object Symbol extends AbstractType(14)
-  final case object Int32 extends AbstractType(16)
-  final case object Int64 extends AbstractType(18)
-  final case object Timestamp extends AbstractType(17)
-  final case object MinKey extends AbstractType(255)
-  final case object MaxKey extends AbstractType(127)
+  final case object Dec extends BsonType(1)
+  final case object Text extends BsonType(2)
+  final case object Doc extends BsonType(3)
+  final case object Arr extends BsonType(4)
+  final case object Binary extends BsonType(5)
+  final case object Undefined extends BsonType(6)
+  final case object ObjectId extends BsonType(7)
+  final case object Bool extends BsonType(8)
+  final case object Date extends BsonType(9)
+  final case object Null extends BsonType(10)
+  final case object Regex extends BsonType(11)
+  final case object JavaScript extends BsonType(13)
+  final case object JavaScriptScope extends BsonType(15)
+  final case object Symbol extends BsonType(14)
+  final case object Int32 extends BsonType(16)
+  final case object Int64 extends BsonType(18)
+  final case object Timestamp extends BsonType(17)
+  final case object MinKey extends BsonType(255)
+  final case object MaxKey extends BsonType(127)
 }
 
 sealed trait BsonField {

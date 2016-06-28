@@ -33,8 +33,6 @@ import org.bson.{BsonDocument, BsonValue}
 import scalaz._, Scalaz._
 
 /** Implementation class for a WorkflowExecutor in the `MongoDbIO` monad. */
-// https://github.com/puffnfresh/wartremover/issues/149
-@SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
 private[mongodb] final class MongoDbIOWorkflowExecutor
   extends WorkflowExecutor[MongoDbIO, BsonCursor] {
 

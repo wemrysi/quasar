@@ -64,7 +64,19 @@ lazy val commonSettings = Seq(
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
-  wartremoverErrors in (Compile, compile) ++= warts,
+  wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
+    Wart.Any,
+    Wart.AsInstanceOf,
+    Wart.Equals,
+    Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
+    Wart.ImplicitConversion,    // - see puffnfresh/wartremover#242
+    Wart.IsInstanceOf,
+    Wart.NoNeedForMonad,        // - see puffnfresh/wartremover#159
+    Wart.Nothing,
+    Wart.Overloading,
+    Wart.Product,               // _ these two are highly correlated
+    Wart.Serializable,          // /
+    Wart.ToString),
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument("exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
@@ -121,36 +133,6 @@ lazy val noPublishSettings = Seq(
   publishLocal := {},
   publishArtifact := false
 )
-
-// Using a Seq of desired warts instead of Warts.allBut due to an incremental compilation issue.
-// https://github.com/puffnfresh/wartremover/issues/202
-// omissions:
-//   Wart.Any
-//   Wart.AsInstanceOf
-//   Wart.ExplicitImplicitTypes - see mpilquist/simulacrum#35
-//   Wart.IsInstanceOf
-//   Wart.NoNeedForMonad        - see puffnfresh/wartremover#159
-//   Wart.Nothing
-//   Wart.Product               _ these two are highly correlated
-//   Wart.Serializable          /
-//   Wart.Throw
-//   Wart.ToString
-val warts = Seq(
-  Wart.Any2StringAdd,
-  Wart.DefaultArguments,
-  Wart.EitherProjectionPartial,
-  Wart.Enumeration,
-  Wart.FinalCaseClass,
-  Wart.JavaConversions,
-  Wart.ListOps,
-  Wart.MutableDataStructures,
-  Wart.NonUnitStatements,
-  Wart.Null,
-  Wart.Option2Iterable,
-  Wart.OptionPartial,
-  Wart.Return,
-  Wart.TryPartial,
-  Wart.Var)
 
 lazy val oneJarSettings =
   com.github.retronym.SbtOneJar.oneJarSettings ++

@@ -36,8 +36,6 @@ package object query {
       Query(value.value).successNel[ParseFailure]
   }
 
-  // https://github.com/puffnfresh/wartremover/issues/149
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   object QueryParam extends QueryParamDecoderMatcher[Query]("q")
 
   def queryParam(params: Map[String, Seq[String]]): ApiError \/ Query =

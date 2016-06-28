@@ -107,7 +107,6 @@ object ManageFile {
   final case class TempFile(near: APath)
     extends ManageFile[FileSystemError \/ AFile]
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
   final class Ops[S[_]](implicit S: ManageFile :<: S)
     extends LiftedOps[ManageFile, S] {
 

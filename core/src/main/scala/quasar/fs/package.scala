@@ -93,7 +93,7 @@ package object fs {
     *
     * TODO[pathy]: We know this can't fail, remove once Pathy is refactored to be more precise
     */
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.OptionPartial"))
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   def sandboxAbs[T, S](apath: Path[Abs,T,S]): Path[Abs,T,Sandboxed] =
     rootDir[Sandboxed] </> apath.relativeTo(rootDir).get
 
