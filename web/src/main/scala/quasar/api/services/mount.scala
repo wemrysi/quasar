@@ -19,8 +19,8 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._, ToApiError.ops._
 import quasar.effect.KeyValueStore
-import quasar.fp._, PathyCodecJson._
-import quasar.fs.{AbsPath, APath, sandboxAbs, AFile}
+import quasar.fp._
+import quasar.fs.{AbsPath, AFile, APath, PathyCodecJson, sandboxAbs}, PathyCodecJson._
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._

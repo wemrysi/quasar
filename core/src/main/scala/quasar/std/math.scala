@@ -106,6 +106,9 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Timestamp(v1)), Type.Const(Data.Interval(v2)))  => Type.Const(Data.Timestamp(v1.plus(v2)))
       case Sized(Type.Timestamp, Type.Interval)                                  => Type.Timestamp
       case Sized(Type.Const(Data.Timestamp(_)), t2) if t2 contains Type.Interval => Type.Timestamp
+      case Sized(Type.Timestamp, Type.Interval)  => Type.Timestamp
+      case Sized(Type.Date,      Type.Interval)  => Type.Date
+      case Sized(Type.Time,      Type.Interval)  => Type.Time
     }) ||| numericWidening,
     untyper[nat._2](t => Type.typecheck(Type.Timestamp ⨿ Type.Interval, t).fold(
       κ(t match {
@@ -193,8 +196,11 @@ trait MathLib extends Library {
       case Sized(Type.Const(Data.Number(v1)), Type.Const(Data.Number(v2))) => Type.Const(Data.Dec(v1 - v2))
 
       case Sized(Type.Timestamp, Type.Timestamp) => Type.Interval
-      case Sized(Type.Date, Type.Date)           => Type.Interval
-      case Sized(Type.Time, Type.Time)           => Type.Interval
+      case Sized(Type.Timestamp, Type.Interval)  => Type.Timestamp
+      case Sized(Type.Date,      Type.Date)      => Type.Interval
+      case Sized(Type.Date,      Type.Interval)  => Type.Date
+      case Sized(Type.Time,      Type.Time)      => Type.Interval
+      case Sized(Type.Time,      Type.Interval)  => Type.Time
     }) ||| numericWidening,
     untyper[nat._2](t => Type.typecheck(Type.Temporal, t).fold(
       κ(Type.typecheck(Type.Interval, t).fold(

@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package quasar.fp
+package quasar.fs
 
 import quasar.Predef._
-import quasar.fs.{APath, sandboxAbs}
 
 import argonaut._, Argonaut._
 import pathy.Path, Path._

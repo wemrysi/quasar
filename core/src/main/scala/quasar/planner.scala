@@ -32,6 +32,10 @@ object Planner {
   final case class NonRepresentableData(data: Data) extends PlannerError {
     def message = "The back-end has no representation for the constant: " + data
   }
+  final case class NonRepresentableEJson(data: String)
+      extends PlannerError {
+    def message = "The back-end has no representation for the constant: " + data
+  }
   final case class UnsupportedFunction(name: String, hint: Option[String]) extends PlannerError {
     def message = "The function '" + name + "' is recognized but not supported by this back-end." + hint.map(" (" + _ + ")").getOrElse("")
   }

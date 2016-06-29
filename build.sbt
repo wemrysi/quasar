@@ -152,6 +152,11 @@ lazy val oneJarSettings =
         commitReleaseVersion,
         pushChanges))
 
+//      foundation
+//     / / | | \ \
+//
+//        ejson
+//          |
 //        core
 //        /   \
 // mongodb    «other backends»
@@ -169,11 +174,25 @@ lazy val oneJarSettings =
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(noPublishSettings)
-  .aggregate(core, main, mongodb, repl, web, it)
+  .aggregate(foundation, ejson, core, mongodb, main, repl, web, it)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val foundation = project
+  .settings(name := "quasar-foundation-internal")
+  .settings(oneJarSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val ejson = project
+  .settings(name := "quasar-ejson-internal")
+  .dependsOn(foundation % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
+  .dependsOn(ejson % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
