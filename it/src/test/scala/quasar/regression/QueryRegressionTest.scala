@@ -107,7 +107,6 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Fragment = {
     def runTest = (for {
-      _    <- Task.delay(println(test.query))
       _    <- run(test.data.traverse[F,Result](
                 relFile => injectTask(resolveData(loc, relFile).fold(
                           err => Task.fail(new RuntimeException(err)),

@@ -144,7 +144,8 @@ object view {
     val query = QueryFile.Ops[S]
 
     def dirToDirMove(src: ADir, dst: ADir, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] = {
-      implicit val m = EitherT.eitherTMonad[Free[S, ?], FileSystemError]
+      implicit val m: Monad[EitherT[Free[S, ?], FileSystemError, ?]] =
+        EitherT.eitherTMonad[Free[S, ?], FileSystemError]
 
       def move(pathSegments: Set[PathSegment]): Free[S, FileSystemError \/ Unit] =
         pathSegments

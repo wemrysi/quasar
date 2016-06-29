@@ -37,14 +37,14 @@ object CliOptions {
   val default: CliOptions =
     CliOptions(None, None, None, false, false, None)
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   val parser = new CliOptionsParser(Lens.id[CliOptions], "quasar") {
       head("quasar", BuildInfo.version)
 
       help("help") text("prints this usage text")
     }
 
-  @SuppressWarnings(Array("org.brianmckenna.wartremover.warts.NonUnitStatements"))
+  @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   class CliOptionsParser[C](l: Lens[C, CliOptions], cmdName: String)
     extends OptionParser[C](cmdName) {
 

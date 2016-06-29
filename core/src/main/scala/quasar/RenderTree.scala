@@ -344,6 +344,8 @@ object RenderTree extends RenderTreeInstances {
 
   val windowCount = new java.util.concurrent.atomic.AtomicInteger()
 
+  // FIXME: needs puffnfresh/wartremover#226 fixed
+  @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
   implicit def ntRenderTree[F[_], A: RenderTree](
     implicit F: RenderTree ~> (RenderTree ∘ F)#λ):
       RenderTree[F[A]] =
@@ -369,7 +371,7 @@ object RenderTree extends RenderTreeInstances {
 }
 
 sealed abstract class RenderTreeInstances {
-  implicit val renderTreeUnit = new RenderTree[Unit] {
+  implicit val renderTreeUnit: RenderTree[Unit] = new RenderTree[Unit] {
     def render(v: Unit) = Terminal(List("()", "Unit"), None)
   }
 
