@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -69,7 +69,7 @@ object KafkaRelayAgent extends Logging {
 
     val consumerHost = localConfig[String]("broker.host", "localhost")
     val consumerPort = localConfig[String]("broker.port", "9082").toInt
-    val consumer = new SimpleConsumer(consumerHost, consumerPort, 5000, 64 * 1024)
+    val consumer = new SimpleConsumer(host = consumerHost, port = consumerPort, 5000, 64 * 1024, clientId = "???")
 
     val relayAgent = new KafkaRelayAgent(permissionsFinder, eventIdSeq, consumer, localTopic, producer, centralTopic, maxMessageSize)
     val stoppable = Stoppable.fromFuture(relayAgent.stop map { _ => consumer.close; producer.close })
@@ -109,15 +109,19 @@ final class KafkaRelayAgent(
   private def ingestBatch(offset: Long, batch: Long, delay: Long, waitCount: Long, retries: Int = 5): Unit = {
     if (runnable) {
       if(batch % 100 == 0) logger.debug("Processing kafka consumer batch %d [%s]".format(batch, if(waitCount > 0) "IDLE" else "ACTIVE"))
-      val fetchRequest = new FetchRequest(localTopic, 0, offset, bufferSize)
+      val fetchRequest = ( new FetchRequestBuilder()
+        addFetch(topic = localTopic, partition = 0, offset = offset, fetchSize = bufferSize)
+        build
+      )
 
       val ingestStep = for {
-        messages <- Future(consumer.fetch(fetchRequest)) // try/catch is for this line. Okay to wrap in a future & flatMap instead?
-        _ <- forwardAll(messages.toList) 
+        response <- Future(consumer.fetch(fetchRequest)) // try/catch is for this line. Okay to wrap in a future & flatMap instead?
+        messages = response.data.values.toList.flatMap(_.messages)
+        _ <- forwardAll(messages)
       } yield {
-        val newDelay = delayStrategy(messages.sizeInBytes.toInt, delay, waitCount)
+        val newDelay = delayStrategy(response.sizeInBytes.toInt, delay, waitCount)
 
-        val (newOffset, newWaitCount) = if(messages.size > 0) {
+        val (newOffset, newWaitCount) = if(messages.nonEmpty) {
           val o: Long = messages.last.offset
           logger.debug("Kafka consumer batch size: %d offset: %d)".format(messages.size, o))
           (o, 0L)
@@ -128,8 +132,8 @@ final class KafkaRelayAgent(
         Thread.sleep(newDelay)
 
         ingestBatch(newOffset, batch + 1, newDelay, newWaitCount)
-      } 
-      
+      }
+
       ingestStep onFailure { case ex  =>
         if (retries > 0) {
           logger.error("An unexpected error occurred relaying messages from the local queue; retrying from offset %d batch %d.".format(offset, batch), ex)
@@ -200,9 +204,8 @@ final class KafkaRelayAgent(
             sys.error("Unable to establish owner account ID for storage of file " + s)
         }
 
-        producer.send {
-          new ProducerData[String, Message](centralTopic, identified)
-        }
+        producer send (identified map (new KeyedMessage[String, Message](centralTopic, _)): _*)
+
       } onFailure {
         case ex => logger.error("An error occurred forwarding messages from the local queue to central.", ex)
       } onSuccess {

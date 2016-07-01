@@ -34,7 +34,8 @@ wait_until_port_open() {
 
 SUCCESS=0
 FAILEDTARGETS=""
-SBT_JAVA_OPTS="-Dsbt.log.noformat=true"
+SBT_JAVA_OPTS=""
+# SBT_JAVA_OPTS="-Dsbt.log.noformat=true"
 
 function run_sbt() {
     echo "SBT Run: $@"

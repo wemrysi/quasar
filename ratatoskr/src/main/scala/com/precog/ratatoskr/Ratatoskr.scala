@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -56,6 +56,8 @@ import akka.pattern.{ask, gracefulStop}
 import akka.routing.RoundRobinRouter
 
 import _root_.kafka.message._
+import _root_.kafka.log.FileMessageSet
+import _root_.kafka.utils.Utils.openChannel
 
 import au.com.bytecode.opencsv._
 
@@ -152,6 +154,9 @@ object KafkaTools extends Command {
   val name = "kafka"
   val description = "Tools for monitoring and viewing kafka queues"
 
+  private def mutableSet(file: File)   = new FileMessageSet(file, openChannel(file, mutable = true))
+  private def immutableSet(file: File) = new FileMessageSet(file, openChannel(file, mutable = false))
+
   def run(args: Array[String]) {
     val config = new Config
     val parser = new OptionParser("yggutils kafka") {
@@ -203,7 +208,7 @@ object KafkaTools extends Command {
       }
     }
 
-    val ms = new FileMessageSet(file, false)
+    val ms = immutableSet(file)
 
     traverse(ms.iterator, range, format)
   }
@@ -211,10 +216,11 @@ object KafkaTools extends Command {
   def convert(central: String): Unit = convert(new File(central), new File(central + ".local"))
 
   def convert(source: File, destination: File) {
-    val src = new FileMessageSet(source, false)
-    val dest = new FileMessageSet(destination, true)
+    val src  = immutableSet(source)
+    val dest = mutableSet(destination)
+    val arg = new ByteBufferMessageSet(NoCompressionCodec, src.iterator.toSeq.map(_.message): _*)
 
-    dest.append(src)
+    dest.append(arg)
 
     src.close
     dest.close
@@ -365,7 +371,7 @@ object KafkaTools extends Command {
         //println("Got lookup DB:" + accountLookup)
 
         val finalState = config.files.foldLeft(ReportState(0L, Map.empty)) { case (state, file) =>
-          val ms = new FileMessageSet(file, false)
+          val ms = immutableSet(file)
 
           ms.iterator.grouped(1000).flatMap { _.toSeq.par.map(parseEventMessage) }.foldLeft(state) {
             case (state @ ReportState(index, currentPathSize), parsed) => parsed match {

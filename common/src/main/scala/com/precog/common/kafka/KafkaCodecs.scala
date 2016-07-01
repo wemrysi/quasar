@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -72,16 +72,18 @@ trait EncodingFlags {
 }
 
 class KafkaEventCodec extends Encoder[Event] {
-  def toMessage(event: Event) = {
+  def toBytes(event: Event): Array[Byte] = {
     val msgBuf = EventEncoding.toMessageBytes(event)
     val byteArray = new Array[Byte](msgBuf.limit)
     msgBuf.get(byteArray)
-    // If you attempt to simply create the Message passing it the byte buffer,
-    // as one of its constructors permits, the Kafka internal "magic byte"
-    // and checksum do not get integrated, so things blow up deep in the internals
-    // of Kafka. Demand PETA action now to save the kittens!
-    new Message(byteArray)
+    byteArray
   }
+
+  // If you attempt to simply create the Message passing it the byte buffer,
+  // as one of its constructors permits, the Kafka internal "magic byte"
+  // and checksum do not get integrated, so things blow up deep in the internals
+  // of Kafka. Demand PETA action now to save the kittens!
+  def toMessage(event: Event) = new Message(toBytes(event))
 }
 
 object EventEncoding extends EncodingFlags with Logging {
@@ -116,16 +118,17 @@ object EventEncoding extends EncodingFlags with Logging {
 }
 
 class KafkaEventMessageCodec extends Encoder[EventMessage] {
-  def toMessage(msg: EventMessage) = {
+  def toBytes(msg: EventMessage): Array[Byte] = {
     val msgBuf = EventMessageEncoding.toMessageBytes(msg)
     val byteArray = new Array[Byte](msgBuf.limit)
     msgBuf.get(byteArray)
-    // If you attempt to simply create the Message passing it the byte buffer,
-    // as one of its constructors permits, the Kafka internal "magic byte"
-    // and checksum do not get integrated, so things blow up deep in the internals
-    // of Kafka. Demand PETA action now to save the kittens!
-    new Message(byteArray)
+    byteArray
   }
+  // If you attempt to simply create the Message passing it the byte buffer,
+  // as one of its constructors permits, the Kafka internal "magic byte"
+  // and checksum do not get integrated, so things blow up deep in the internals
+  // of Kafka. Demand PETA action now to save the kittens!
+  def toMessage(msg: EventMessage) = new Message(toBytes(msg))
 }
 
 object EventMessageEncoding extends EncodingFlags with Logging {

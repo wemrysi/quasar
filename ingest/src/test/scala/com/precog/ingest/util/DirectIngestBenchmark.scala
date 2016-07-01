@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -49,7 +49,7 @@ object DirectKafkaConsumer extends App {
 
   val topic = "direct_test_topic"
 
-  val simpleConsumer = new SimpleConsumer("localhost", 9092, 5000, 64 * 1024)
+  val simpleConsumer = new SimpleConsumer(host = "localhost", port = 9092, soTimeout = 5000, bufferSize = 64 * 1024, clientId = "???")
 
   var offset: Long = 0
   var batch = 0
@@ -57,11 +57,14 @@ object DirectKafkaConsumer extends App {
   val start = System.nanoTime
   while (true) {
     // create a fetch request for topic “test”, partition 0, current offset, and fetch size of 1MB
-    val fetchRequest = new FetchRequest(topic, 0, offset, 1000000)
+    val fetchRequest = ( new FetchRequestBuilder()
+      addFetch(topic = topic, partition = 0, offset = offset, fetchSize = 1000000)
+      build
+    )
 
     // get the message set from the consumer and print them out
     val messages = simpleConsumer.fetch(fetchRequest)
-    messages foreach { msg =>
+    messages.data.values.flatMap(_.messages) foreach { msg =>
       // advance the offset after consuming each message
       offset = msg.offset
       msgs += 1
@@ -101,7 +104,7 @@ object DirectKafkaProducer extends App {
       println("Message %d time %.02fs throughput %.01f msgs/s".format(i, secs, throughput))
     }
 
-    val data = new ProducerData[String, IngestMessage](topic, msg)
+    val data = new KeyedMessage[String, IngestMessage](topic, msg)
     producer.send(data)
   }
 

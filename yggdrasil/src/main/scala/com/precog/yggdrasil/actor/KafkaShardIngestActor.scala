@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -48,9 +48,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.joda.time.Instant
 
-import _root_.kafka.api.FetchRequest
+import _root_.kafka.api.{ FetchRequest, FetchRequestBuilder }
 import _root_.kafka.consumer.SimpleConsumer
-import _root_.kafka.message.MessageSet
+import _root_.kafka.message.{ MessageSet, MessageAndOffset }
 
 import blueeyes.json._
 import blueeyes.json.serialization._
@@ -386,18 +386,15 @@ abstract class KafkaShardIngestActor(shardId: String,
     }
 
     val read = M.point {
-      val req = new FetchRequest(
-        topic,
-        partition = 0,
-        offset = lastCheckpoint.offset,
-        maxSize = fetchBufferSize
+      val req = ( new FetchRequestBuilder()
+        addFetch(topic = topic, partition = 0, offset = lastCheckpoint.offset, fetchSize = fetchBufferSize)
+        build
       )
-
       // read a fetch buffer worth of messages from kafka, deserializing each one
       // and recording the offset
 
-      val rawMessages = msTime({ t => logger.debug("Kafka fetch from %s:%d in %d ms".format(topic, lastCheckpoint.offset, t))}) {
-        consumer.fetch(req)
+      val rawMessages: Iterable[MessageAndOffset] = msTime({ t => logger.debug("Kafka fetch from %s:%d in %d ms".format(topic, lastCheckpoint.offset, t))}) {
+        consumer.fetch(req).data.values flatMap (_.messages)
       }
 
       val eventMessages: List[Validation[Error, (Long, EventMessage.EventMessageExtraction)]] =
