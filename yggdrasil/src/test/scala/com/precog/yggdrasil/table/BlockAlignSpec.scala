@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -50,7 +50,7 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import SampleData._
 
-trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification with ScalaCheck { self =>
+trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
   def testAlign(sample: SampleData) = {
     val module = emptyTestModule
 
@@ -323,7 +323,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification 
       }).copoint
 
       val (ljsonreversed, rjsonreversed) = (for {
-        aligned <- Table.align(rtable, alignOnR, ltable, alignOnL) 
+        aligned <- Table.align(rtable, alignOnR, ltable, alignOnL)
         ljson <- aligned._1.toJson
         rjson <- aligned._2.toJson
       } yield {
@@ -375,7 +375,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification 
         DerefObjectStatic(
           OuterObjectConcat(
             WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source),CPathIndex(1)),
-                                         CPathField("000001")),"000000"), 
+                                         CPathField("000001")),"000000"),
             WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source),CPathIndex(1)),
                                          CPathField("000000")),"000001")
           ),
@@ -415,7 +415,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification 
         DerefObjectStatic(
           OuterObjectConcat(
             WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source),CPathIndex(1)),
-                                         CPathField("000000")),"000000"), 
+                                         CPathField("000000")),"000000"),
             WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source),CPathIndex(1)),
                                          CPathField("000001")),"000001")
           ),
@@ -445,7 +445,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification 
     }
 
     i match {
-      case 0 => test0 
+      case 0 => test0
       case 1 => test1
       case 2 => test2
     }

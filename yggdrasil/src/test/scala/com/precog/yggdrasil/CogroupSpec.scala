@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -43,7 +43,7 @@ import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 
-trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification with ScalaCheck {
+trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._
@@ -57,7 +57,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification wi
     } yield {
       val (lschema, rschema) = Bifunctor[Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet }
       val (l, r) =  data map {
-                      case (ids, values) => 
+                      case (ids, values) =>
                         val (d1, d2) = values.partition { case (cpath, _) => lschema.contains(cpath) }
                         (toRecord(ids, assemble(d1)), toRecord(ids, assemble(d2)))
                     } unzip
@@ -81,7 +81,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification wi
         }
         case LT => {
           val (leftRun, leftRemain) = l.partition(ord.order(_, rh) == LT)
-          
+
           computeCogroup(leftRemain, r, acc ++ leftRun.map { case v => left3(v) })
         }
         case GT => {
@@ -105,13 +105,13 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification wi
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
       case Left3(jv) => jv
-      case Middle3((jv1, jv2)) => 
+      case Middle3((jv1, jv2)) =>
         JObject(
-          JField("key", jv1 \ "key"), 
-          JField("valueLeft", jv1 \ "value"), 
+          JField("key", jv1 \ "key"),
+          JField("valueLeft", jv1 \ "value"),
           JField("valueRight", jv2 \ "value"))
       case Right3(jv) => jv
-    } 
+    }
 
     val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
       Leaf(Source),
@@ -119,7 +119,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification wi
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), OuterObjectConcat(WrapObject(SourceValue.Left, "valueLeft"), WrapObject(SourceValue.Right, "valueRight"))))
 
     val jsonResult = toJson(result)
-    
+
     jsonResult.copoint must_== expected
   }
 

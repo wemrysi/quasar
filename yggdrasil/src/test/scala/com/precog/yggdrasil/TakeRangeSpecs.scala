@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -31,7 +31,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable._
 import org.scalacheck.Gen
 
-trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specification with ScalaCheck {
+trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 
@@ -47,7 +47,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
       val takeRangeTable = table.takeRange(start, count)
 
       val result = toJson(takeRangeTable).copoint
-      val expected = 
+      val expected =
         if (start < 0) Stream()
         else sample.data.toSeq.drop(start).take(count)
 
@@ -56,7 +56,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }.set(minTestsOk -> 1000)
 
   def testTakeRange = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -76,7 +76,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeNegStart = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -92,7 +92,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeNegNumber = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -108,7 +108,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeNeg = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -124,7 +124,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeLarger = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -144,7 +144,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeEmpty = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -162,7 +162,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeAcrossSlices = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -190,7 +190,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
   }
 
   def testTakeRangeSecondSlice = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
@@ -211,10 +211,10 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
       JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil))
 
     results.copoint must_== expected
-  }  
-  
+  }
+
   def testTakeRangeFirstSliceOnly = {
-    val data: Stream[JValue] = 
+    val data: Stream[JValue] =
       Stream(
         JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
         JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),

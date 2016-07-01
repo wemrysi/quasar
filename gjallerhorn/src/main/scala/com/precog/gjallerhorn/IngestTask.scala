@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -33,7 +33,7 @@ import specs2._
 
 import scalaz._
 
-class IngestTask(settings: Settings) extends Task(settings: Settings) with Specification {
+class IngestTask(settings: Settings) extends Task(settings: Settings) with SpecificationLike {
 
   val simpleData = """
     {"a":1,"b":"Tom"}
@@ -73,28 +73,28 @@ class IngestTask(settings: Settings) extends Task(settings: Settings) with Speci
       (1 to 20) foreach { _ =>
         asyncIngestString(account, simpleData, "application/json")(_ / account.bareRootPath / "foo" / "")
       }
-    
+
       EventuallyResults.eventually(20, 1.second) {
         val json = metadataFor(account.apiKey)(_ / account.bareRootPath / "foo" / "")
         (json \ "size").deserialize[Long] must_== 100
       }
     }
-    
+
     val csvData = """a,b,c,d
                     |1.2,asdf,,
                     |1e-308,"a,b,c",33,43
                     |-1e308,hello world,x,2""".stripMargin
-    
+
     val ssvData = """a;b;c;d
                     |1.2;asdf;;
                     |1e-308;"a,b,c";33;43
                     |-1e308;hello world;x;2""".stripMargin
-    
+
     val tsvData = """a    b    c    d
-                    |1.2    asdf        
+                    |1.2    asdf
                     |1e-308    "a,b,c"    33    43
                     |-1e308    hello world    x    2""".stripMargin
-    
+
     val expected = JParser.parseFromString("""[
       { "a": 1.2, "b": "asdf", "c": null, "d": null },
       { "a": 1e-308, "b": "a,b,c", "c": "33", "d": 43 },
@@ -103,7 +103,7 @@ class IngestTask(settings: Settings) extends Task(settings: Settings) with Speci
 
     //FIXME
     // csv can no longer be ingested this way
-    
+
     //"ingest CSV synchronously" in {
     //  val account = createAccount
     //  ingestString(account, csvData, "text/csv")(_ / account.bareRootPath / "foo" / "")

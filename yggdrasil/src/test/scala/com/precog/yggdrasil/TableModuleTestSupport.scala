@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -39,7 +39,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 
 import org.specs2._
-import org.specs2.mutable.Specification
+import org.specs2.mutable.SpecificationLike
 import org.scalacheck._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -48,9 +48,9 @@ import org.scalacheck.Arbitrary._
 import CValueGenerators.JSchema
 
 trait TestLib[M[+_]] extends TableModule[M] {
-  def lookupF1(namespace: List[String], name: String): F1 
+  def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2
-  def lookupScanner(namespace: List[String], name: String): Scanner 
+  def lookupScanner(namespace: List[String], name: String): Scanner
 }
 
 trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
@@ -62,7 +62,7 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
 }
 
-trait TableModuleSpec[M[+_]] extends Specification with ScalaCheck {
+trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
   import SampleData._
   override val defaultPrettyParams = Pretty.Params(2)
 

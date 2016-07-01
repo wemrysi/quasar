@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -34,12 +34,12 @@ import scalaz.syntax.comonad._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
-trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specification with ScalaCheck {
+trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
-  
+
   def tableStats(table: Table) : List[(Int, Int)] = table match {
-    case cTable: ColumnarTable => 
+    case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint
       val sizes = slices.map(_.size).toList
       val undefined = slices.map { slice =>
@@ -50,17 +50,17 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
       sizes zip undefined
   }
-  
+
   def mkDeref(path: CPath): TransSpec1 = {
     def mkDeref0(nodes: List[CPathNode]): TransSpec1 = nodes match {
       case (f : CPathField) :: rest => DerefObjectStatic(mkDeref0(rest), f)
       case (i : CPathIndex) :: rest => DerefArrayStatic(mkDeref0(rest), i)
       case _ => Leaf(Source)
     }
-    
+
     mkDeref0(path.nodes)
   }
-  
+
   def extractPath(spec: TransSpec1): Option[CPath] = spec match {
     case DerefObjectStatic(TransSpec1.Id, f) => Some(f)
     case DerefObjectStatic(lhs, f) => extractPath(lhs).map(_ \ f)
@@ -68,7 +68,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     case DerefArrayStatic(lhs, f) => extractPath(lhs).map(_ \ f)
     case _ => None
   }
-  
+
   def chooseColumn(table: Table): TransSpec1 = table match {
     case cTable: ColumnarTable =>
       cTable.slices.toStream.copoint.headOption.map { slice =>
@@ -81,7 +81,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
-      
+
       val maskedSlices = slices.map { slice =>
         if(numSlices > 1 && Random.nextDouble < 0.25) {
           new Slice {
@@ -93,14 +93,14 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
             x => if (scala.util.Random.nextDouble < 0.75) Some(x) else None
           }
           new Slice {
-            val size = slice.size 
+            val size = slice.size
             val columns = slice.columns.mapValues {
               col => (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
           }
         }
       }
-      
+
       Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
   }
 
@@ -108,10 +108,10 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
-      
+
       val maskedSlices = slices.map { slice =>
         val colRef = slice.columns.keys.find(_.selector == path)
-        val maskedSlice = colRef.map { colRef => 
+        val maskedSlice = colRef.map { colRef =>
           val col = slice.columns(colRef)
           val maskedCol =
             if(numSlices > 1 && Random.nextDouble < 0.25)
@@ -121,13 +121,13 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
               (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
           new Slice {
-            val size = slice.size 
+            val size = slice.size
             val columns = slice.columns.updated(colRef, maskedCol)
           }
         }
         maskedSlice.getOrElse(slice)
       }
-      
+
       Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
   }
 
@@ -148,7 +148,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     check { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
-      
+
       val compactTable = sampleTable.compact(Leaf(Source))
       val results = toJson(compactTable)
 
@@ -161,7 +161,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     check { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
-      
+
       val compactTable = sampleTable.compact(Leaf(Source))
       val compactStats = tableStats(compactTable)
       val results = toJson(compactTable)
@@ -169,13 +169,13 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       compactStats.map(_._2).foldLeft(0)(_+_) must_== 0
     }
   }
-    
+
   def testCompactSlices = {
     implicit val gen = sample(schema)
     check { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
-      
+
       val compactTable = sampleTable.compact(Leaf(Source))
       val compactStats = tableStats(compactTable)
       val results = toJson(compactTable)
@@ -183,17 +183,17 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       compactStats.map(_._1).count(_ == 0) must_== 0
     }
   }
-  
+
   def testCompactPreserveKey = {
     implicit val gen = sample(schema)
     check { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
-      
+
       val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
       val sampleKey = sampleTable.transform(key)
       val sampleKeyJson = toJson(sampleKey)
-      
+
       val compactTable = sampleTable.compact(key)
       val resultKey = compactTable.transform(key)
       val resultKeyJson = toJson(resultKey)
@@ -207,10 +207,10 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     check { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
-      
+
       val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
       val sampleKey = sampleTable.transform(key)
-      
+
       val compactTable = sampleTable.compact(key)
       val resultKey = compactTable.transform(key)
       val resultKeyStats = tableStats(resultKey)
@@ -224,10 +224,10 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     check { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
-      
+
       val sampleTable = undefineColumn(baseTable, extractPath(key).getOrElse(CPath.Identity))
       val sampleKey = sampleTable.transform(key)
-      
+
       val compactTable = sampleTable.compact(key)
       val resultKey = compactTable.transform(key)
       val resultKeyStats = tableStats(resultKey)

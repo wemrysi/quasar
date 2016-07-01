@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -52,7 +52,7 @@ import SampleData._
 import CValueGenerators._
 
 
-trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification with ScalaCheck { self =>
+trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[M] {
 
     val M = self.M
@@ -60,27 +60,27 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
     val actualSchema = inferSchema(sampleData.data map { _ \ "value" })
 
     val projections = List(actualSchema).map { subschema =>
-    
+
       val stream = sampleData.data flatMap { jv =>
         val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
-          case (obj, (jpath, ctype)) => { 
+          case (obj, (jpath, ctype)) => {
             val vpath = JPath(JPathField("value") :: jpath.nodes)
             val valueAtPath = jv.get(vpath)
-              
+
             if (compliesWithSchema(valueAtPath, ctype)) {
               obj.set(vpath, valueAtPath)
-            } else { 
+            } else {
               obj
             }
           }
         }
-          
+
         if (back \ "value" == JUndefined)
           None
         else
           Some(back)
       }
-    
+
       Path("/test") -> Projection(stream)
     } toMap
 
@@ -88,13 +88,13 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
 
   def testLoadDense(sample: SampleData) = {
     val module = new BlockStoreLoadTestModule(sample)
-    
+
     val expected = sample.data flatMap { jv =>
       val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
-        case (obj, (jpath, ctype)) => { 
+        case (obj, (jpath, ctype)) => {
           val vpath = JPath(JPathField("value") :: jpath.nodes)
           val valueAtPath = jv.get(vpath)
-          
+
           if (module.compliesWithSchema(valueAtPath, ctype)) {
             obj.set(vpath, valueAtPath)
           } else {
@@ -102,7 +102,7 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
           }
         }
       }
-      
+
       (back \ "value" != JUndefined).option(back)
     }
 
@@ -184,9 +184,9 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
          }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (3, List(JPath(".f.bn[0]") -> CNull, 
-                 JPath(".f.wei") -> CLong, 
-                 JPath(".f.wei") -> CDouble, 
+        (3, List(JPath(".f.bn[0]") -> CNull,
+                 JPath(".f.wei") -> CLong,
+                 JPath(".f.wei") -> CDouble,
                  JPath(".ljz[0]") -> CNull,
                  JPath(".ljz[1][0]") -> CString,
                  JPath(".ljz[2]") -> CBoolean,
@@ -206,7 +206,7 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
               "d":true,
               "l":false,
               "vq":{
-                
+
               }
             },
             "oy":{
@@ -218,16 +218,16 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (2, List(JPath(".dV.d") -> CBoolean, 
-                 JPath(".dV.l") -> CBoolean, 
-                 JPath(".dV.vq") -> CEmptyObject, 
-                 JPath(".oy.nm") -> CBoolean, 
+        (2, List(JPath(".dV.d") -> CBoolean,
+                 JPath(".dV.l") -> CBoolean,
+                 JPath(".dV.vq") -> CEmptyObject,
+                 JPath(".oy.nm") -> CBoolean,
                  JPath(".uR") -> CDouble))
       )
-    )   
+    )
 
     testLoadDense(sampleData)
-  } 
+  }
 
   def testLoadSample5 = {
     val sampleData = SampleData(
@@ -321,12 +321,12 @@ trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification w
           "key":[9]
         }
       ]""") --> classOf[JArray]).elements.toStream,
-      Some((1, List((JPath(".o8agyghfjxe") -> CEmptyArray), 
-                    (JPath(".fg[0]") -> CBoolean), 
-                    (JPath(".fg[1]") -> CNum), 
-                    (JPath(".fg[1]") -> CLong), 
-                    (JPath(".fg[2]") -> CNum), 
-                    (JPath(".fg[2]") -> CLong), 
+      Some((1, List((JPath(".o8agyghfjxe") -> CEmptyArray),
+                    (JPath(".fg[0]") -> CBoolean),
+                    (JPath(".fg[1]") -> CNum),
+                    (JPath(".fg[1]") -> CLong),
+                    (JPath(".fg[2]") -> CNum),
+                    (JPath(".fg[2]") -> CLong),
                     (JPath(".cfnYTg92dg") -> CString))))
     )
 
