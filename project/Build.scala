@@ -117,7 +117,28 @@ object PlatformBuild extends Build {
 
   val commonPluginsSettings = commonSettings
   val commonNexusSettings = nexusSettings ++ commonPluginsSettings
-  val commonAssemblySettings = sbtassembly.Plugin.assemblySettings ++ Seq(test in assembly := {}) ++ commonNexusSettings
+
+  // https://github.com/sbt/sbt-assembly
+  //
+  // By the way, the first case pattern in the above using PathList(...) is how
+  // you can pick javax/servlet/* from the first jar. If the default
+  // MergeStrategy.deduplicate is not working for you, that likely means you have
+  // multiple versions of some library pulled by your dependency graph. The real
+  // solution is to fix that dependency graph. You can work around it by
+  // MergeStrategy.first but don't be surprised when you see
+  // ClassNotFoundException.
+  import sbtassembly.Plugin.{ MergeStrategy, PathList }
+  def assemblyMerger(path: String): MergeStrategy = path match {
+    case s if s endsWith ".txt"                    => MergeStrategy.discard
+    case PathList("META-INF", "MANIFEST.MF")       => MergeStrategy.discard
+    case PathList("org", "slf4j", "impl", xs @ _*) => MergeStrategy.first
+    case _                                         => MergeStrategy.deduplicate
+  }
+
+  val commonAssemblySettings = sbtassembly.Plugin.assemblySettings ++ commonNexusSettings ++ Seq(
+             test in assembly := (),
+    mergeStrategy in assembly := assemblyMerger
+  )
 
   // Logging is simply a common project for the test log configuration files
   lazy val logging = Project(id = "logging", base = file("logging")).settings(commonNexusSettings: _*)

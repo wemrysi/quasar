@@ -112,10 +112,8 @@ then
 fi
 
 if [ -z "$SKIPTEST" ]; then
-    # desktop, jdbc, and mongo are not in this list because the functionality they require is already tested in other modules
-    # Their specs are run directly when needed for packaging
-    for PROJECT in util common daze auth accounts ragnarok heimdall ingest bytecode quirrel muspelheim yggdrasil ratatoskr bifrost surtr mirror; do
-		run_sbt "$PROJECT/test"
+    for bsbt in */build.sbt ; do
+        run_sbt "$(dirname $bsbt)/test"
     done
 else
     echo "Skipping test:compile/test"
@@ -123,7 +121,7 @@ fi
 
 if [ $SUCCESS -eq 0 ]; then
     echo "Building assemblies"
-    run_sbt accounts/assembly auth/assembly ingest/assembly ratatoskr/assembly bifrost/assembly heimdall/assembly
+    run_sbt accounts/assembly auth/assembly ingest/assembly ratatoskr/assembly bifrost/assembly
 fi
 
 if [ $SUCCESS -eq 0 -a -z "$SKIPTEST" ]; then
