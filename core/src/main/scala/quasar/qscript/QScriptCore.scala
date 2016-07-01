@@ -19,7 +19,6 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.ejson.{Int => _, _}
 import quasar.fp._
-import quasar.Type
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -28,14 +27,6 @@ import shapeless.{Fin, Nat, Sized, Succ}
 sealed trait QScriptCore[T[_[_]], A] {
   def src: A
 }
-
-// This is _perhaps_ just another MapFunc case.
-final case class PatternGuard[T[_[_]], A](
-  src: A,
-  typ: Type,
-  cont: FreeMap[T],
-  fallback: FreeMap[T])
-    extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
@@ -60,8 +51,6 @@ final case class Reduce[T[_[_]], A, N <: Nat](
   *     (Sort :+: QScript)#λ => QScript
   * so that a backend without a native sort could eliminate this node.
   */
-// Should this operate on a sequence of mf/order pairs? Might be easier for
-// implementers to handle stable sorting that way.
 final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
@@ -103,7 +92,6 @@ object QScriptCore {
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
           case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
           case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
-          case PatternGuard(a, typ, cont, fb) => f(a) ∘ (PatternGuard(_, typ, cont, fb))
         }
     }
 
@@ -131,11 +119,6 @@ object QScriptCore {
             s.show(a) ++ Cord(",") ++
             f.show ++ Cord(",") ++
             c.show ++ Cord(")")
-          case PatternGuard(a, typ, cont, fb) => Cord("PatternGuard(") ++
-            s.show(a) ++ Cord(",") ++
-            typ.show ++ Cord(",") ++
-            cont.show ++ Cord(",") ++
-            fb.show ++ Cord(")")
         }
     }
 

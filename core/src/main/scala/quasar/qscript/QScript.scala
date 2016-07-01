@@ -479,7 +479,10 @@ class Transform[T[_[_]]: Recursive: Corecursive](
             rebase(fm2, Free.roll(ProjectField(UnitF[T], Free.roll(StrLit("tmp1")))))))
       }
 
-    case LogicalPlan.TypecheckF(expr, typ, cont, fallback) => ???  // TODO
+    case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
+      SourcedPathableInternal.inj(merge3Map(
+        Func.Input3(expr, cont, fallback))(
+        Guard(_, typ, _, _)))
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect == Mapping =>
       SourcedPathableInternal.inj(invokeMapping1(func, Func.Input1(a1)))
