@@ -55,8 +55,6 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   def ProjectFieldR[A](src: FreeMap[Fix], field: FreeMap[Fix]): FreeMap[Fix] =
     Free.roll(ProjectField(src, field))
 
-  def StrR[A](s: String): FreeMap[Fix] = Free.roll(StrLit(s))
-
   def lpRead(path: String): Fix[LP] =
     LogicalPlan.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
@@ -64,7 +62,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "convert a very simple read" in {
       callIt(lpRead("/foo")) must
       equal(
-        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrR("foo")))).embed)
+        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed)
     }
 
     "convert a simple read" in {
@@ -76,9 +74,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               ProjectFieldR(
                 ProjectFieldR(
                   UnitF,
-                  StrR("some")),
-                StrR("foo")),
-              StrR("bar")))).embed)
+                  StrLit("some")),
+                StrLit("foo")),
+              StrLit("bar")))).embed)
 
       // Map(Root, ObjectProject(ObjectProject(ObjectProject((), "some"), "foo"), "bar"))
     }
@@ -89,8 +87,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         SourcedPathablePure.inj(
           Map(RootR,
             Free.roll(Add(
-              ProjectFieldR(UnitF, StrR("foo")),
-              ProjectFieldR(UnitF, StrR("bar")))))).embed)
+              ProjectFieldR(UnitF, StrLit("foo")),
+              ProjectFieldR(UnitF, StrLit("bar")))))).embed)
     }
 
     "convert basic join" in {
@@ -112,7 +110,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 structural.ObjectProject[FLP](
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
-      callIt(lp) must equal(SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrR("foo")))).embed)
+      callIt(lp) must equal(SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed)
     }
   }
 }

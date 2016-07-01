@@ -51,7 +51,10 @@ final case class Reduce[T[_[_]], A, N <: Nat](
   *     (Sort :+: QScript)#λ => QScript
   * so that a backend without a native sort could eliminate this node.
   */
-final case class Sort[T[_[_]], A](src: A, bucket: FreeMap[T], order: List[(FreeMap[T], SortDir)])
+final case class Sort[T[_[_]], A](
+  src: A,
+  bucket: FreeMap[T],
+  order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
 /** Eliminates some values from a dataset, based on the result of FilterFunc.

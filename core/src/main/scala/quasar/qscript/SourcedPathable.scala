@@ -116,14 +116,14 @@ object SourcedPathable {
         (p1, p2) match {
           case (Map(_, m1), Map(_, m2)) => {
             val lf =
-              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit[IT, FreeMap[IT]]("tmp1"))))
+              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit("tmp1")))
             val rf =
-              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], Free.roll[MapFunc[IT, ?], Unit](StrLit[IT, FreeMap[IT]]("tmp2"))))
+              Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit("tmp2")))
 
             AbsMerge[IT, SourcedPathable[IT, Unit], FreeMap](Map((), Free.roll[MapFunc[IT, ?], Unit](
               ConcatObjects(
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit[IT, FreeMap[IT]]("tmp1")), rebase(m1, left))),
-                Free.roll[MapFunc[IT, ?], Unit](MakeObject(Free.roll(StrLit[IT, FreeMap[IT]]("tmp2")), rebase(m2, right)))))),
+                Free.roll[MapFunc[IT, ?], Unit](MakeObject(StrLit("tmp1"), rebase(m1, left))),
+                Free.roll[MapFunc[IT, ?], Unit](MakeObject(StrLit("tmp2"), rebase(m2, right)))))),
               lf, rf).some
           }
           case _ => None

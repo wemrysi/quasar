@@ -37,7 +37,7 @@ package object ejson {
 
   type EJson[A] = Coproduct[Extension, Common, A]
 
-  val ObjEJson = implicitly[Extension :<: EJson]
+  val ExtEJson = implicitly[Extension :<: EJson]
   val CommonEJson = implicitly[Common :<: EJson]
 
   object EJson {
