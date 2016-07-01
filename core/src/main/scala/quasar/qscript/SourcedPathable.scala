@@ -22,15 +22,17 @@ import quasar.fp._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait SourcedPathable[T[_[_]], A] {
+sealed abstract class SourcedPathable[T[_[_]], A] {
   def src: A
 }
 
 /** A data-level transformation.
   */
-final case class Map[T[_[_]], A](src: A, f: FreeMap[T]) extends SourcedPathable[T, A]
+@Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
+    extends SourcedPathable[T, A]
 
 /** Flattens nested structure, converting each value into a data set, which are
   * then unioned.
@@ -39,7 +41,7 @@ final case class Map[T[_[_]], A](src: A, f: FreeMap[T]) extends SourcedPathable[
   * then “exploded” into multiple values. `repair` is applied across the new
   * set, integrating the exploded values into the original set.
   */
-final case class LeftShift[T[_[_]], A](
+@Lenses final case class LeftShift[T[_[_]], A](
   src: A,
   struct: FreeMap[T],
   repair: JoinFunc[T])
@@ -52,7 +54,7 @@ final case class LeftShift[T[_[_]], A](
   * (T[EJson] \/ T[EJson] => T[EJson], specifically as `_.merge`), with the
   * condition being `κ(true)`,
   */
-final case class Union[T[_[_]], A](
+@Lenses final case class Union[T[_[_]], A](
   src: A,
   lBranch: FreeQS[T],
   rBranch: FreeQS[T])

@@ -21,10 +21,11 @@ import quasar.ejson.{Int => _, _}
 import quasar.fp._
 
 import matryoshka._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
 
-sealed trait QScriptCore[T[_[_]], A] {
+sealed abstract class QScriptCore[T[_[_]], A] {
   def src: A
 }
 
@@ -37,7 +38,7 @@ sealed trait QScriptCore[T[_[_]], A] {
   *
   * @group MRA
   */
-final case class Reduce[T[_[_]], A, N <: Nat](
+@Lenses final case class Reduce[T[_[_]], A, N <: Nat](
   src: A,
   bucket: FreeMap[T],
   reducers: Sized[List[ReduceFunc[FreeMap[T]]], Succ[N]],
@@ -51,7 +52,7 @@ final case class Reduce[T[_[_]], A, N <: Nat](
   *     (Sort :+: QScript)#λ => QScript
   * so that a backend without a native sort could eliminate this node.
   */
-final case class Sort[T[_[_]], A](
+@Lenses final case class Sort[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
   order: List[(FreeMap[T], SortDir)])
@@ -59,13 +60,13 @@ final case class Sort[T[_[_]], A](
 
 /** Eliminates some values from a dataset, based on the result of FilterFunc.
   */
-final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
+@Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-final case class Take[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
+@Lenses final case class Take[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
-final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
+@Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
 object QScriptCore {

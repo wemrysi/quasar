@@ -24,26 +24,27 @@ import quasar.fp._
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-// TODO all `Free` should be generalized to `T` once we can handle recursive `Free`
-sealed trait MapFunc[T[_[_]], A]
+sealed abstract class MapFunc[T[_[_]], A]
 
 final case class Nullary[T[_[_]], A](ejson: T[EJson]) extends MapFunc[T, A]
 
-sealed trait Unary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Unary[T[_[_]], A] extends MapFunc[T, A] {
   def a1: A
 }
-sealed trait Binary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Binary[T[_[_]], A] extends MapFunc[T, A] {
   def a1: A
   def a2: A
 }
-sealed trait Ternary[T[_[_]], A] extends MapFunc[T, A] {
+sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
   def a1: A
   def a2: A
   def a3: A
 }
 
+// TODO all `Free` should be generalized to `T` once we can handle recursive `Free`
 object MapFunc {
   import MapFuncs._
 
@@ -83,35 +84,25 @@ object MapFunc {
      }
  }
 
-  // TODO: The `T` passed to MapFunc and the `T` wrapping MapFunc should be distinct
-  // def normalize[T[_[_]]: Recursive](implicit EJ: Equal[T[EJson]]):
+  // TODO: The `T` passed to MapFunc and the `T` wrapping MapFunc should be
+  //       distinct. This could be split up as it is in LP, with each function
+  //       containing its own normalization.
+  // def normalize[T[_[_]]: Recursive: Corecursive](implicit EJ: Equal[T[EJson]]):
   //     MapFunc[T, T[MapFunc[T, ?]]] => Option[MapFunc[T, T[MapFunc[T, ?]]]] = {
-  //   val mf = new MapFuncs[T, T[MapFunc[T, ?]]]
-  //   import mf._
-  //   {
-  //     case ConcatArrays(as) =>
-  //       as.find {
-  //         case Embed(ConcatArrays(_)) => true
-  //         case _                      => false
-  //       }.map(_ => ConcatArrays(as >>= {
-  //         case Embed(ConcatArrays(moreAs)) => moreAs
-  //         case a                           => List(a)
-  //       }))
-  //     case ConcatObjects(as) =>
-  //       as.find {
-  //         case Embed(ConcatObjects(_)) => true
-  //         case _                       => false
-  //       }.map(_ => ConcatObjects(as >>= {
-  //         case Embed(ConcatObjects(moreAs)) => moreAs
-  //         case a                            => List(a)
-  //       }))
-  //     case ProjectField(Embed(ConcatObjects(objs)), Embed(Nullary(field))) =>
-  //       objs >>= {
-  //         case Embed(MakeObject(Embed(Nullary(src)), value)) =>
-  //           if (field ≟ src) value else Nil
-  //         case x => List(x)
-  //       }
-  //   }
+  //   case ProjectField(Embed(ConcatObjectsN(as)), f @ Embed(Nullary(field))) =>
+  //     // TODO: This should also handle where the object is a literal, and it
+  //     //       contains the right key. Perhaps we could have an extractor so
+  //     //       they could be handled by the same case
+  //     as.collectFirst {
+  //       case Embed(MakeObject(Embed(Nullary(src)), Embed(value))) if field ≟ src =>
+  //         value
+  //     }.orElse(as.find {
+  //       case Embed(MakeObject(Embed(Nullary(_)), _)) => true
+  //       case _                                       => false
+  //     }.map(_ => ProjectField[T[MapFunc[T, ?]], T[MapFunc[T, ?]]](ConcatObjectsN(as >>= {
+  //       case Embed(MakeObject(Embed(Nullary(_)), _)) => Nil
+  //       case a                                       => List(a)
+  //     }).embed, f)))
   // }
 
   implicit def functor[T[_[_]]]: Functor[MapFunc[T, ?]] = new Functor[MapFunc[T, ?]] {
@@ -224,71 +215,71 @@ object MapFunc {
 // TODO we should statically verify that these have a `DimensionalEffect` of `Mapping`
 object MapFuncs {
   // array
-  final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // date
-  final case class Date[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Time[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Date[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Time[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // math
-  final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Add[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Multiply[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Subtract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Divide[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Modulo[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Power[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Add[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Multiply[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Subtract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Divide[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Modulo[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Power[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // relations
-  final case class Not[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Eq[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Neq[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Lt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Lte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Gt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Gte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  final case class Cond[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Not[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Eq[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Neq[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Lt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Lte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Gt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Gte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Cond[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
 
   // set
-  final case class In[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Within[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class Constantly[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class In[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Within[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Constantly[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // string
-  final case class Lower[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Upper[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Bool[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Integer[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Like[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  final case class Substring[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Lower[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Upper[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Bool[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Integer[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Like[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Substring[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
 
   // structural
-  final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class MakeObject[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class ConcatArrays[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class ConcatObjects[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class ProjectIndex[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class ProjectField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class MakeObject[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ConcatArrays[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ConcatObjects[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ProjectIndex[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ProjectField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // helpers & QScript-specific
-  final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
-  final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]

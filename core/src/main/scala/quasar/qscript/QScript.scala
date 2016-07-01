@@ -29,6 +29,7 @@ import scala.Predef.implicitly
 
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import matryoshka.patterns._
+import monocle.macros.Lenses
 import pathy.Path._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
 import shapeless.{:: => _, Data => _, Coproduct => _, Const => _, _}
@@ -40,9 +41,10 @@ import shapeless.{:: => _, Data => _, Coproduct => _, Const => _, _}
 // - all Reads have a Root (or another Read?) as their source
 // - in `Pathable`, the only `MapFunc` node allowed is a `ProjectField`
 
-sealed trait SortDir
+sealed abstract class SortDir
 
-// TODO: Just reuse the version of this from LP?
+// TODO: LogicalPlan should borrow _this_ SortDir, since this one needs to be
+//       visible to backends, so it has to exist here anyway.
 object SortDir {
   final case object Ascending  extends SortDir
   final case object Descending extends SortDir
@@ -51,7 +53,7 @@ object SortDir {
   implicit val show: Show[SortDir] = Show.showFromToString
 }
 
-sealed trait JoinType
+sealed abstract class JoinType
 final case object Inner extends JoinType
 final case object FullOuter extends JoinType
 final case object LeftOuter extends JoinType
@@ -62,7 +64,13 @@ object JoinType {
   implicit val show: Show[JoinType] = Show.showFromToString
 }
 
-sealed trait DeadEnd
+sealed abstract class DeadEnd
+
+/** The top level of a filesystem. During compilation this represents `/`, but
+  * in the structure a backend sees, it represents the mount point.
+  */
+final case object Root extends DeadEnd
+final case object Empty extends DeadEnd
 
 object DeadEnd {
   implicit def equal: Equal[DeadEnd] = Equal.equalRef
@@ -85,14 +93,8 @@ object DeadEnd {
     }
 }
 
-/** The top level of a filesystem. During compilation this represents `/`, but
-  * in the structure a backend sees, it represents the mount point.
-  */
-final case object Root extends DeadEnd
-final case object Empty extends DeadEnd
-
 /** A backend-resolved `Root`, which is now a path. */
-final case class Read[A](src: A, path: AbsFile[Sandboxed])
+@Lenses final case class Read[A](src: A, path: AbsFile[Sandboxed])
 
 object Read {
   implicit def equal[T[_[_]]]: Delay[Equal, Read] =
@@ -112,7 +114,7 @@ object Read {
 
 // backends can choose to rewrite joins using EquiJoin
 // can rewrite a ThetaJoin as EquiJoin + Filter
-final case class EquiJoin[T[_[_]], A](
+@Lenses final case class EquiJoin[T[_[_]], A](
   lKey: FreeMap[T],
   rKey: FreeMap[T],
   f: JoinType,
@@ -656,17 +658,25 @@ class Transform[T[_[_]]: Recursive: Corecursive](
   }
 }
 
-class Optimize[T[_[_]]: Recursive](
+class Optimize[T[_[_]]: Recursive: Corecursive](
     implicit eqTEj: Equal[T[EJson]]) extends Helpers[T] {
 
-  def elideNopMaps[F[_]: Functor](
+  def elideNopMap[F[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F):
       SourcedPathable[T, T[F]] => F[T[F]] = {
     case Map(src, mf) if mf ≟ UnitF => src.project
     case x                          => SP.inj(x)
   }
 
-  def elideNopJoins[F[_]](
+  // def normalizeMapFunc: SourcedPathable[T, ?] ~> SourcedPathable[T, ?] =
+  //   new (SourcedPathable[T, ?] ~> SourcedPathable[T, ?]) {
+  //     def apply[A](sp: SourcedPathable[T, A]) = sp match {
+  //       case Map(src, f) => Map(src, f.transCata(repeatedly(MapFunc.normalize)))
+  //       case x           => x
+  //     }
+  //   }
+
+  def elideNopJoin[F[_]](
     implicit Th: ThetaJoin[T, ?] :<: F,
     SP: SourcedPathable[T, ?] :<: F):
       ThetaJoin[T, T[F]] => F[T[F]] = {
@@ -677,7 +687,7 @@ class Optimize[T[_[_]]: Recursive](
   }
 
   // TODO write extractor for inject
-  def coalesceMap[F[_]: Functor](
+  def coalesceMaps[F[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F):
       SourcedPathable[T, T[F]] => SourcedPathable[T, T[F]] = {
     case x @ Map(Embed(src), mf) => SP.prj(src) match {

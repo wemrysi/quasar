@@ -42,10 +42,12 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
   def callIt(lp: Fix[LP]): InnerPure =
     lp.transCata(lpToQScript)
-       .transCata(elide.purify)
-       .transCata(liftFG(elideNopJoins[QScriptPure[Fix, ?]]))
-       .transCata(liftFG(elideNopMaps[QScriptPure[Fix, ?]]))
-       .transCata(liftFF(coalesceMap[QScriptPure[Fix, ?]]))
+      .transCata(elide.purify)
+       // .transCata(liftFG(normalizeMapFunc))
+      .transCata(
+        liftFG(elideNopJoin[QScriptPure[Fix, ?]]) ⋙
+        liftFG(elideNopMap[QScriptPure[Fix, ?]]) ⋙
+        liftFF(coalesceMaps[QScriptPure[Fix, ?]]))
 
   val DeadEndPure = implicitly[Const[DeadEnd, ?] :<: QScriptPure[Fix, ?]]
   val SourcedPathablePure = implicitly[SourcedPathable[Fix, ?] :<: QScriptPure[Fix, ?]]

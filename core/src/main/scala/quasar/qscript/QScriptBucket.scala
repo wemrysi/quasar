@@ -21,38 +21,39 @@ import quasar.Predef._
 import quasar.fp._
 
 import matryoshka._, Recursive.ops._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed trait QScriptBucket[T[_[_]], A] {
+sealed abstract class QScriptBucket[T[_[_]], A] {
   def src: A
 }
 
-final case class GroupBy[T[_[_]], A](
+@Lenses final case class GroupBy[T[_[_]], A](
   src: A,
   values: FreeMap[T],
   bucket: FreeMap[T])
     extends QScriptBucket[T, A]
 
-final case class BucketField[T[_[_]], A](
+@Lenses final case class BucketField[T[_[_]], A](
   src: A,
   value: FreeMap[T],
   name: FreeMap[T])
     extends QScriptBucket[T, A]
 
-final case class BucketIndex[T[_[_]], A](
+@Lenses final case class BucketIndex[T[_[_]], A](
   src: A,
   value: FreeMap[T],
   index: FreeMap[T])
     extends QScriptBucket[T, A]
 
-final case class LeftShiftBucket[T[_[_]], A](
+@Lenses final case class LeftShiftBucket[T[_[_]], A](
   src: A,
   struct: FreeMap[T],
   repair: JoinFunc[T],
   bucketShift: FreeMap[T])
     extends QScriptBucket[T, A]
 
-final case class SquashBucket[T[_[_]], A](
+@Lenses final case class SquashBucket[T[_[_]], A](
   src: A)
     extends QScriptBucket[T, A]
 
@@ -68,7 +69,14 @@ object QScriptBucket {
         fa: QScriptBucket[T, A])(
         f: A => G[B])(
         implicit G: Applicative[G]):
-          G[QScriptBucket[T, B]] = ???
+          G[QScriptBucket[T, B]] = fa match {
+        case GroupBy(src, values, bucket) => f(src) ∘ (GroupBy(_, values, bucket))
+        case BucketField(src, values, name) => f(src) ∘ (BucketField(_, values, name))
+        case BucketIndex(src, values, index) => f(src) ∘ (BucketIndex(_, values, index))
+        case LeftShiftBucket(src, struct, repair, bucket) =>
+          f(src) ∘ (LeftShiftBucket(_, struct, repair, bucket))
+        case SquashBucket(src) => f(src) ∘ (SquashBucket(_))
+      }
     }
 
   implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, QScriptBucket[T, ?]] =

@@ -484,32 +484,23 @@ package object fp
 
   type Delay[F[_], G[_]] = F ~> (F ∘ G)#λ
 
-  // TODO review definition of equal on coproduct
   implicit def coproductEqual[F[_], G[_]](
-  implicit fEq: Delay[Equal, F],
-           gEq: Delay[Equal, G]):
-    Delay[Equal, Coproduct[F, G, ?]] =
-  new Delay[Equal, Coproduct[F, G, ?]] {
-    def apply[α](eq: Equal[α]) =
-      Equal.equal { (cp1, cp2) =>
-        (cp1.run, cp2.run) match {
-          case (-\/(f1), -\/(f2)) => fEq(eq).equal(f1, f2)
-          case (\/-(g1), \/-(g2)) => gEq(eq).equal(g1, g2)
-          case (_, _) => false
-        }
-      }
-  }
+    implicit F: Delay[Equal, F], G: Delay[Equal, G]):
+      Delay[Equal, Coproduct[F, G, ?]] =
+    new Delay[Equal, Coproduct[F, G, ?]] {
+      def apply[α](eq: Equal[α]) =
+        Equal.equal((cp1, cp2) => (cp1.run, cp2.run) match {
+          case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
+          case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
+          case (_,       _)       => false
+        })
+    }
 
   implicit def coproductShow[F[_], G[_]](
-    implicit fShow: Delay[Show, F],
-             gShow: Delay[Show, G]):
+    implicit F: Delay[Show, F], G: Delay[Show, G]):
       Delay[Show, Coproduct[F, G, ?]] =
     new Delay[Show, Coproduct[F, G, ?]] {
-      def apply[α](sh: Show[α]): Show[Coproduct[F, G, α]] =
-        Show.show(_.run match {
-          case -\/(fa) => fShow(sh).show(fa)
-          case \/-(ga) => gShow(sh).show(ga)
-        })
+      def apply[α](sh: Show[α]) = Show.show(_.run.fold(F(sh).show, G(sh).show))
     }
 
   implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]):

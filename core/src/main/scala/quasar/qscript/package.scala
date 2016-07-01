@@ -84,26 +84,24 @@ package object qscript {
   type Merge[T[_[_]], A] = AbsMerge[T, A, FreeMap]
   type MergeJoin[T[_[_]], A] = AbsMerge[T, A, FreeQS]
 
-  // replace `Unit` in `src` with `replacement`
-  def rebase[T[_[_]], F[_]](
-      src: FreeUnit[T, F],
-      replacement: FreeUnit[T, F]): FreeUnit[T, F] =
-    src >> replacement
+  // replace Unit in `in` with `field`
+  def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
 
-  implicit def constMergeable[T[_[_]], A](
-    implicit ma: Mergeable.Aux[T, A]): Mergeable.Aux[T, Const[A, Unit]] = new Mergeable[Const[A, Unit]] {
-    type IT[F[_]] = T[F]
+  implicit def constMergeable[T[_[_]], A](implicit ma: Mergeable.Aux[T, A]):
+      Mergeable.Aux[T, Const[A, Unit]] =
+    new Mergeable[Const[A, Unit]] {
+      type IT[F[_]] = T[F]
 
-    def mergeSrcs(
-      left: FreeMap[T],
-      right: FreeMap[T],
-      p1: Const[A, Unit],
-      p2: Const[A, Unit]):
-        Option[Merge[T, Const[A, Unit]]] =
-      ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
-        case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
-      }
-  }
+      def mergeSrcs(
+        left: FreeMap[T],
+        right: FreeMap[T],
+        p1: Const[A, Unit],
+        p2: Const[A, Unit]):
+          Option[Merge[T, Const[A, Unit]]] =
+        ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
+          case AbsMerge(src, l, r) => AbsMerge(Const(src), l, r)
+        }
+    }
 
   implicit def coproductMergeable[T[_[_]], F[_], G[_]](
     implicit mf: Mergeable.Aux[T, F[Unit]],
@@ -116,7 +114,8 @@ package object qscript {
         left: FreeMap[IT],
         right: FreeMap[IT],
         cp1: Coproduct[F, G, Unit],
-        cp2: Coproduct[F, G, Unit]): Option[Merge[IT, Coproduct[F, G, Unit]]] = {
+        cp2: Coproduct[F, G, Unit]):
+          Option[Merge[IT, Coproduct[F, G, Unit]]] = {
         (cp1.run, cp2.run) match {
           case (-\/(left1), -\/(left2)) =>
             mf.mergeSrcs(left, right, left1, left2).map {

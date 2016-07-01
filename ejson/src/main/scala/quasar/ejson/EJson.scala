@@ -19,6 +19,7 @@ package quasar.ejson
 import quasar.Predef._
 import quasar.fp._
 
+import matryoshka._
 import scalaz._, Scalaz._
 
 sealed trait Common[A]
