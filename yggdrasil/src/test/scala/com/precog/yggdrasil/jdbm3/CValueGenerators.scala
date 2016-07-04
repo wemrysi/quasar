@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,7 +32,7 @@ import com.precog.common._
 trait CValueGenerators {
   import Gen._
   import Arbitrary._
-  
+
   def maxArraySize = 16
   def maxArrayDepth = 3
 
@@ -59,20 +59,20 @@ trait CValueGenerators {
   def genCType: Gen[CType] = frequency(7 -> genCValueType(), 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
   def genValueForCValueType[A](cType: CValueType[A]): Gen[CWrappedValue[A]] = cType match {
-    case CString => arbString.arbitrary map (CString(_))
+    case CString  => arbString.arbitrary map (CString(_))
     case CBoolean => Gen.oneOf(true, false) map (CBoolean(_))
-    case CLong => arbLong.arbitrary map (CLong(_))
-    case CDouble => arbDouble.arbitrary map (CDouble(_))
-    case CNum => for {
+    case CLong    => arbLong.arbitrary map (CLong(_))
+    case CDouble  => arbDouble.arbitrary map (CDouble(_))
+    case CNum     => for {
       scale  <- arbInt.arbitrary
       bigInt <- arbBigInt.arbitrary
     } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
-    case CDate =>
-      choose[Long](0, Long.MaxValue) map (new DateTime(_)) map (CDate(_))
+    case CDate                => choose[Long](0, Long.MaxValue) map (new DateTime(_)) map (CDate(_))
     case CArrayType(elemType) =>
       indexedSeqOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.manifest), CArrayType(elemType))
       }
+    case CPeriod => abort("undefined")
   }
 
   def genCValue(tpe: CType): Gen[CValue] = tpe match {

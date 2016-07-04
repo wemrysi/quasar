@@ -64,7 +64,8 @@ trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with S
       val reducer = new Reducer[String] {
         def reduce(schema: CSchema, range: Range): String = {
           schema.columns(JTextT).head match {
-            case col: StrColumn => range.map(col).mkString(";")
+            case col: StrColumn => range map col mkString ";"
+            case _              => abort("Not a StrColumn")
           }
         }
       }

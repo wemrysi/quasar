@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -22,6 +22,7 @@ package com.precog.common
 import blueeyes.json._
 import blueeyes.json.serialization._
 import DefaultSerialization._
+import scala.util.matching.Regex
 
 import scalaz.Order
 import scalaz.Ordering
@@ -75,8 +76,8 @@ sealed trait CPath { self =>
             case _ => None
           }
 
-        case Nil => 
-          if (toDrop.isEmpty) Some(CPath(nodes)) 
+        case Nil =>
+          if (toDrop.isEmpty) Some(CPath(nodes))
           else None
       }
     }
@@ -88,14 +89,11 @@ sealed trait CPath { self =>
 
   def extract(jvalue: JValue): JValue = {
     def extract0(path: List[CPathNode], d: JValue): JValue = path match {
-      case Nil => d
-
-      case head :: tail => head match {
-        case CPathField(name)  => extract0(tail, d \ name)
-        case CPathIndex(index) => extract0(tail, d(index))
-      }
+      case Nil                       => d
+      case CPathField(name) :: tail  => extract0(tail, d \ name)
+      case CPathIndex(index) :: tail => extract0(tail, d(index))
+      case head :: _                 => abort("Unexpected CPathNode " + head)
     }
-
     extract0(nodes, jvalue)
   }
 
@@ -107,28 +105,20 @@ sealed trait CPath { self =>
     def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
 
     def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] = right match {
-      case Nil => CPath(current) :: Nil
-
-      case head :: tail => head match {
-        case x @ CPathIndex(index) => expand0(current :+ x, tail, jvalue(index))
-        case x @ CPathField(name) if (isRegex(name)) => {
-          val R = name.r
-          jvalue match {
-            case JObject(fields) => 
-              fields.toList.flatMap { 
-                case (R(name), value) =>
-                  val expandedNode = CPathField(name)
-                  expand0(current :+ expandedNode, tail, value)
-
-                case _ => Nil
-              }
-
-            case _ => Nil
-          }
+      case Nil                                              => CPath(current) :: Nil
+      case (x @ CPathIndex(index)) :: tail                  => expand0(current :+ x, tail, jvalue(index))
+      case (x @ CPathField(name)) :: tail if !isRegex(name) => expand0(current :+ x, tail, jvalue \ name)
+      case (x @ CPathField(name)) :: tail                   =>
+        val R = name.r
+        val fields = jvalue match {
+          case JObject(fs) => fs.toList
+          case _           => Nil
         }
-
-        case x @ CPathField(name) => expand0(current :+ x, tail, jvalue \ name)
-      }
+        fields flatMap {
+          case (R(name), value) => expand0(current :+ CPathField(name), tail, value)
+          case _                => Nil
+        }
+      case head :: _ => abort("Unexpected CPathNode " + head)
     }
 
     expand0(Nil, nodes, jvalue)
@@ -200,7 +190,7 @@ object CPath {
       obj.validated[String].map(CPath(_))
   }
 
-  private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath 
+  private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
   private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
   private val IndexPattern = """^\[(\d+)\]$""".r
@@ -250,7 +240,7 @@ object CPath {
   case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
   case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
   case class LeafNode[A](value: A) extends CPathTree[A]
-  
+
   case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
     val size: Int = path.length
   }
@@ -263,7 +253,7 @@ object CPath {
         val filtered = paths filterNot { case PathWithLeaf(path, _) => path.isEmpty }
         val grouped = filtered groupBy { case PathWithLeaf(path, _) => path.head }
 
-        def recurse[A](paths: Seq[PathWithLeaf[A]]) = 
+        def recurse[A](paths: Seq[PathWithLeaf[A]]) =
           inner(paths map { case PathWithLeaf(path, v) => PathWithLeaf(path.tail, v) })
 
         val result = grouped.toSeq.sortBy(_._1) map { case (node, paths) =>
@@ -283,7 +273,7 @@ object CPath {
 
     RootNode(inner(leaves))
   }
-  
+
   def makeTree[A](cpaths0: Seq[CPath], values: Seq[A]): CPathTree[A] = {
     if (cpaths0.isEmpty && values.length == 1)
       RootNode(Seq(LeafNode(values.head)))
