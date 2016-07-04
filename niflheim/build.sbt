@@ -20,6 +20,5 @@
 name := "niflheim"
 
 libraryDependencies ++= Seq(
-  "org.spire-math"     % "spire_2.9.2" % "0.3.0",
-  "org.objectweb.howl" % "howl"        % "1.0.1-1"
+  "org.objectweb.howl" % "howl" % "1.0.1-1"
 )

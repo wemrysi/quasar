@@ -17,22 +17,16 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-import sbt._
-import Keys._
+
+import sbt._, Keys._
 import sbtassembly.Plugin.AssemblyKeys._
-import sbt.NameFilter._
 
 object PlatformBuild extends Build {
-  val archiveDir    = SettingKey[String]("archive-dir", "The temporary directory to which deleted projections will be moved")
-  val dataDir       = SettingKey[String]("data-dir", "The temporary directory into which to extract the test data")
-  val profileTask   = InputKey[Unit]("profile", "Runs the given project under JProfiler")
-  val extractData   = TaskKey[String]("extract-data", "Extracts the data files used by the tests and the REPL")
-
+  val profileTask     = InputKey[Unit]("profile", "Runs the given project under JProfiler")
   val blueeyesVersion = "1.0.0-M9.5"
-  val scalazVersion   = "7.0.0"
-  def optimizeOpts    = if (sys.props contains "com.precog.build.optimize") Seq("-optimize") else Seq()
 
-  val commonSettings = Seq(
+  def optimizeOpts   = if (sys.props contains "com.precog.build.optimize") Seq("-optimize") else Seq()
+  def commonSettings = Seq(
                                organization :=  "com.precog",
                                     version :=  "2.6.1-SNAPSHOT",
                               scalacOptions +=  "-g:none",
@@ -48,9 +42,8 @@ object PlatformBuild extends Build {
 
     libraryDependencies ++= Seq(
       "com.weiglewilczek.slf4s"   % "slf4s_2.9.1"    %     "1.0.7",
-      "com.google.guava"          % "guava"          %    "13.0.1",
       "com.google.code.findbugs"  % "jsr305"         %     "1.3.9",
-      "org.scalaz"               %% "scalaz-core"    %  scalazVersion,
+      "org.scalaz"               %% "scalaz-core"    %     "7.0.0",
       "com.reportgrid"           %% "blueeyes-json"  % blueeyesVersion,
       "com.reportgrid"           %% "blueeyes-core"  % blueeyesVersion,
       "com.reportgrid"           %% "blueeyes-mongo" % blueeyesVersion,
@@ -99,7 +92,7 @@ object PlatformBuild extends Build {
   lazy val logging = Project(id = "logging", base = file("logging")).settings(commonSettings: _*)
 
   lazy val platform = Project(id = "platform", base = file(".")).
-    aggregate(yggdrasil, bytecode, util, common)
+    aggregate(util, common, bytecode, niflheim, yggdrasil)
 
   lazy val util = Project(id = "util", base = file("util")).
     settings(commonSettings: _*) dependsOn(logging % "test->test")

@@ -20,23 +20,8 @@
 
 name := "common"
 
-scalacOptions += "-Ydependent-method-types"
-
 libraryDependencies ++= Seq(
-  "ch.qos.logback"    % "logback-classic"       % "1.0.0",
-  "org.streum"        % "configrity-core_2.9.2" % "0.10.2",
-  "org.apache.kafka" %% "kafka"                 % "0.8.0",
-  "com.chuusai"      %% "shapeless"             %  "1.2.3"
+  "org.apache.kafka" %% "kafka"     % "0.8.0" intransitive,
+  "com.chuusai"      %% "shapeless" %       "1.2.3",
+  "com.101tec"        % "zkclient"  %         "0.3"
 )
-
-ivyXML :=
-  <dependencies>
-    <dependency org="org.apache.kafka" name="kafka_2.9.3" rev="0.8.0">
-      <exclude org="com.sun.jdmk"/>
-      <exclude org="com.sun.jmx"/>
-      <exclude org="javax.jms"/>
-      <exclude org="jline"/>
-      <exclude org="org.apache.hadoop"/>
-      <exclude org="org.apache.avro"/>
-    </dependency>
-  </dependencies>

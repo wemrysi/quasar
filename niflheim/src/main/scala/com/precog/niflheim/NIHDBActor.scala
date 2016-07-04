@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -129,10 +129,10 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
   val projectionId = NIHDB.projectionIdGen.getAndIncrement
 
   def insert(batch: Seq[NIHDB.Batch]): IO[PrecogUnit] =
-    IO(actor ! Insert(batch, false)) 
+    IO(actor ! Insert(batch, false))
 
   def insertVerified(batch: Seq[NIHDB.Batch]): Future[InsertResult] =
-    (actor ? Insert(batch, true)).mapTo[InsertResult] 
+    (actor ? Insert(batch, true)).mapTo[InsertResult]
 
   def getSnapshot(): Future[NIHDBSnapshot] =
     (actor ? GetSnapshot).mapTo[NIHDBSnapshot]
@@ -179,7 +179,7 @@ private[niflheim] object NIHDBActor extends Logging {
       } else {
         val state = ProjectionState.empty(authorities)
         for {
-          _ <- IO { logger.info("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
+          _ <- IO { logger.debug("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
           _ <- ProjectionState.toFile(state, descriptorFile)
         } yield {
           success(state)
@@ -279,7 +279,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     // Restore the cooked map
     val cooked = currentState.readers(cookedDir)
 
-    val blockState = BlockState(cooked, pendingCooks, currentLog) 
+    val blockState = BlockState(cooked, pendingCooks, currentLog)
     val currentBlocks = computeBlockMap(blockState)
 
     logger.debug("Initial block state = " + blockState)
@@ -402,7 +402,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     case GetStatus =>
       sender ! Status(state.blockState.cooked.length, state.blockState.pending.size, state.blockState.rawLog.length)
 
-    case Quiesce => 
+    case Quiesce =>
       quiesce.unsafePerformIO
   }
 }
