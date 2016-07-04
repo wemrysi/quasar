@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -42,7 +42,7 @@ import blueeyes.util.Clock
 
 import java.util.UUID
 import org.joda.time.Instant
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import scalaz._
 import scalaz.NonEmptyList.nels
@@ -70,7 +70,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
     final val unsecured = vfs
 
     private def verifyResourceAccess(apiKey: APIKey, path: Path, readMode: ReadMode): Resource => EitherT[M, ResourceError, Resource] = { resource =>
-      logger.debug("Verifying access to %s as %s on %s (mode %s)".format(resource, apiKey, path, readMode))
+      log.debug("Verifying access to %s as %s on %s (mode %s)".format(resource, apiKey, path, readMode))
       import AccessMode._
       val permissions: Set[Permission] = resource.authorities.accountIds map { accountId =>
         val writtenBy = WrittenBy(accountId)
@@ -119,7 +119,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
       // If asked for the root path, we simply determine children
       // based on the api key permissions to avoid a massive tree walk
       case Path.Root =>
-        logger.debug("Defaulting on root-level child browse to account path")
+        log.debug("Defaulting on root-level child browse to account path")
         for {
           children <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
           nonRoot = children.filterNot(_ == Path.Root)
@@ -156,10 +156,10 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
         } yield caching
       }
 
-      logger.debug("Checking on cached result for %s with maxAge = %s and recacheAfter = %s and cacheable = %s".format(path, maxAge, recacheAfter, cacheable))
+      log.debug("Checking on cached result for %s with maxAge = %s and recacheAfter = %s and cacheable = %s".format(path, maxAge, recacheAfter, cacheable))
       EitherT.right(vfs.currentVersion(cachePath)) flatMap {
         case Some(VersionEntry(id, _, timestamp)) if maxAge.forall(ms => timestamp.plus(ms) >= clock.instant()) =>
-          logger.debug("Found fresh cache entry (%s) for query on %s".format(timestamp, path))
+          log.debug("Found fresh cache entry (%s) for query on %s".format(timestamp, path))
           val recacheAction = (recacheAfter.exists(ms => timestamp.plus(ms) < clock.instant())).whenM[({ type l[a] = EitherT[M, EvaluationError, a] })#l, UUID] {
             // if recacheAfter has expired since the head version was cached,
             // then return the cached version and refresh the cache
@@ -167,7 +167,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
               basePath      <- pathPrefix
               queryResource <- readResource(ctx.apiKey, path, Version.Current, AccessMode.Execute) leftMap storageError
               taskId        <- scheduler.addTask(None, ctx.apiKey, queryResource.authorities, ctx, path, cachePath, None) leftMap invalidState
-              _              = logger.debug("Cache refresh scheduled for query %s, as id %s.".format(path.path, taskId))
+              _              = log.debug("Cache refresh scheduled for query %s, as id %s.".format(path.path, taskId))
             } yield taskId
           }
 
@@ -179,23 +179,23 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
           }
 
         case Some(VersionEntry(_, _, timestamp)) =>
-          logger.debug("Cached entry (%s) found for %s, but is not applicable to max-age %s".format(timestamp, path, maxAge))
+          log.debug("Cached entry (%s) found for %s, but is not applicable to max-age %s".format(timestamp, path, maxAge))
           fallBack
 
         case None =>
-          logger.debug("No cached entry found for " + path)
+          log.debug("No cached entry found for " + path)
           fallBack
       }
     }
 
     def executeAndCache(platform: Platform[M, Block, StreamT[M, Block]], path: Path, ctx: EvaluationContext, queryOptions: QueryOptions, cacheAt: Option[Path], jobName: Option[String] = None)(implicit M: Monad[M]): EitherT[M, EvaluationError, StoredQueryResult] = {
       import EvaluationError._
-      logger.debug("Executing query for %s and caching to %s".format(path, cacheAt))
+      log.debug("Executing query for %s and caching to %s".format(path, cacheAt))
       for {
         executor <- platform.executorFor(ctx.apiKey) leftMap { err => systemError(new RuntimeException(err)) }
         queryRes <- readResource(ctx.apiKey, path, Version.Current, AccessMode.Execute) leftMap { storageError _ }
         query    <- Resource.asQuery(path, Version.Current).apply(queryRes) leftMap { storageError _ }
-        _ = logger.debug("Text of stored query at %s: \n%s".format(path.path, query))
+        _ = log.debug("Text of stored query at %s: \n%s".format(path.path, query))
         raw      <- executor.execute(query, ctx, queryOptions)
         result   <- cacheAt match {
           case Some(cachePath) =>
@@ -213,7 +213,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
                 jobManager.createJob(ctx.apiKey, jobName getOrElse "Cache run for path %s".format(path.path), "Cached query run.", None, Some(clock.now()))
               )
             } yield {
-              logger.debug("Building caching stream for path %s writing to %s".format(path.path, cachePath.path))
+              log.debug("Building caching stream for path %s writing to %s".format(path.path, cachePath.path))
               // FIXME: determination of authorities with which to write the cached data needs to be implemented;
               // for right now, simply using the authorities with which the query itself was written is probably
               // best.
@@ -225,7 +225,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
             }
 
           case None =>
-            logger.debug("No caching to be performed for query results of query at path  %s".format(path.path))
+            log.debug("No caching to be performed for query results of query at path  %s".format(path.path))
             EitherT.right(StoredQueryResult(raw, None, None).point[M])
         }
       } yield result
@@ -244,7 +244,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
                 case (v, i) => IngestRecord(EventId(pseudoOffset, i), v)
               }
 
-              logger.debug("Persisting %d stream records (from slice of size %d) to %s".format(ingestRecords.size, VFS.blockSize(x), path))
+              log.debug("Persisting %d stream records (from slice of size %d) to %s".format(ingestRecords.size, VFS.blockSize(x), path))
 
               for {
                 terminal <- xs.isEmpty
@@ -259,7 +259,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
               } yield {
                 par.fold(
                   errors => {
-                    logger.error("Unable to complete persistence of result stream by %s to %s as %s: %s".format(apiKey, path.path, writeAs, errors.shows))
+                    log.error("Unable to complete persistence of result stream by %s to %s as %s: %s".format(apiKey, path.path, writeAs, errors.shows))
                     None
                   },
                   _ => Some((x, (pseudoOffset + 1, xs)))
@@ -267,7 +267,7 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
               }
 
             case None =>
-              logger.debug("Persist stream for query by %s writing to %s complete.".format(apiKey, path.path))
+              log.debug("Persist stream for query by %s writing to %s complete.".format(apiKey, path.path))
               None.point[M]
           }
       }

@@ -38,7 +38,7 @@ import _root_.kafka.consumer._
 import blueeyes.bkka._
 import blueeyes.json._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 import org.streum.configrity.converter.Extra._
 import _root_.kafka.consumer._
 
@@ -124,9 +124,9 @@ trait KafkaIngestActorProjectionSystem extends ShardSystemActorModule {
         implicit val M = new FutureMonad(ExecutionContext.defaultExecutionContext(actorSystem))
 
         def handleBatchComplete(ck: YggCheckpoint) {
-          logger.debug("Complete up to " + ck)
+          log.debug("Complete up to " + ck)
           checkpointCoordination.saveYggCheckpoint(yggConfig.shardId, ck)
-          logger.info("Saved checkpoint: " + ck)
+          log.info("Saved checkpoint: " + ck)
         }
       }), "ingest")
     }

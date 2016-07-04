@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -44,7 +44,7 @@ trait NIHDBSnapshot {
   def blockIds: Array[Long]
   def readers: Array[StorageReader]
 
-  val logger = LoggerFactory.getLogger("com.precog.niflheim.NIHDBSnapshot")
+  val log = LoggerFactory.getLogger("com.precog.niflheim.NIHDBSnapshot")
 
   protected[this] def findReader(id0: Option[Long]): Option[StorageReader] = {
     if (readers.isEmpty) {
@@ -59,8 +59,8 @@ trait NIHDBSnapshot {
     // be careful! the semantics of findReaderAfter are somewhat subtle
     val i = id0.map(Arrays.binarySearch(blockIds, _)) getOrElse -1
     val j = if (i < 0) -i - 1 else i + 1
-    if (logger.isTraceEnabled) {
-      logger.trace("findReaderAfter(%s) has i = %d, j = %d with blockIds.length = %d".format(id0, i, j, blockIds.length))
+    if (log.isTraceEnabled) {
+      log.trace("findReaderAfter(%s) has i = %d, j = %d with blockIds.length = %d".format(id0, i, j, blockIds.length))
     }
     if (j >= blockIds.length) None else Some(readers(j))
   }
@@ -71,13 +71,13 @@ trait NIHDBSnapshot {
   def getBlockAfter(id0: Option[Long], cols: Option[Set[ColumnRef]]): Option[Block] =
     findReaderAfter(id0).map { reader =>
       val snapshot = reader.snapshotRef(cols)
-      if (logger.isTraceEnabled) {
-        logger.trace("Block after %s, %s (%s)\nSnapshot on %s:\n  %s".format(id0, reader, reader.hashCode, cols, snapshot.segments.map(_.toString).mkString("\n  ")))
+      if (log.isTraceEnabled) {
+        log.trace("Block after %s, %s (%s)\nSnapshot on %s:\n  %s".format(id0, reader, reader.hashCode, cols, snapshot.segments.map(_.toString).mkString("\n  ")))
       }
       snapshot
     }.orElse {
-      if (logger.isTraceEnabled) {
-        logger.trace("No block after " + id0)
+      if (log.isTraceEnabled) {
+        log.trace("No block after " + id0)
       }
       None
     }

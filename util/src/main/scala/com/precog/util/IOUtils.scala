@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -26,7 +26,7 @@ import java.util.Properties
 
 import com.google.common.io.Files
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import org.apache.commons.io.FileUtils
 
@@ -94,17 +94,17 @@ object IOUtils extends Logging {
     */
   def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[PrecogUnit] = {
     if (startDir == upTo) {
-      IO { logger.debug("Stopping recursive clean at root: " + upTo); PrecogUnit }
+      IO { log.debug("Stopping recursive clean at root: " + upTo); PrecogUnit }
     } else if (startDir.isDirectory) {
       if (Option(startDir.list).exists(_.length == 0)) {
         IO {
           startDir.delete()
         }.flatMap { _ => recursiveDeleteEmptyDirs(startDir.getParentFile, upTo) }
       } else {
-        IO { logger.debug("Stopping recursive clean on non-empty directory: " + startDir); PrecogUnit }
+        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir); PrecogUnit }
       }
     } else {
-      IO { logger.warn("Asked to clean a non-directory: " + startDir); PrecogUnit }
+      IO { log.warn("Asked to clean a non-directory: " + startDir); PrecogUnit }
     }
   }
 

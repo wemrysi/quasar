@@ -36,7 +36,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import org.objectweb.howl.log._
 
@@ -179,7 +179,7 @@ private[niflheim] object NIHDBActor extends Logging {
       } else {
         val state = ProjectionState.empty(authorities)
         for {
-          _ <- IO { logger.debug("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
+          _ <- IO { log.debug("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
           _ <- ProjectionState.toFile(state, descriptorFile)
         } yield {
           success(state)
@@ -194,7 +194,7 @@ private[niflheim] object NIHDBActor extends Logging {
     if (descriptorFile.exists) {
       ProjectionState.fromFile(descriptorFile) map { Some(_) }
     } else {
-      logger.warn("No projection found at " + baseDir)
+      log.warn("No projection found at " + baseDir)
       IO { None }
     }
   }
@@ -243,9 +243,9 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   }
 
   private def initActorState = IO {
-    logger.debug("Opening log in " + baseDir)
+    log.debug("Opening log in " + baseDir)
     val txLog = new CookStateLog(baseDir, txLogScheduler)
-    logger.debug("Current raw block id = " + txLog.currentBlockId)
+    log.debug("Current raw block id = " + txLog.currentBlockId)
 
     // We'll need to update our current thresholds based on what we read out of any raw logs we open
     var maxOffset = currentState.maxOffset
@@ -254,7 +254,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     val (currentLog, rawLogOffsets) = if (currentRawFile.exists) {
       val (handler, offsets, ok) = RawHandler.load(txLog.currentBlockId, currentRawFile)
       if (!ok) {
-        logger.warn("Corruption detected and recovery performed on " + currentRawFile)
+        log.warn("Corruption detected and recovery performed on " + currentRawFile)
       }
       (handler, offsets)
     } else {
@@ -268,7 +268,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     val pendingCooks = txLog.pendingCookIds.map { id =>
       val (reader, offsets, ok) = RawHandler.load(id, rawFileFor(id))
       if (!ok) {
-        logger.warn("Corruption detected and recovery performed on " + currentRawFile)
+        log.warn("Corruption detected and recovery performed on " + currentRawFile)
       }
       maxOffset = math.max(maxOffset, offsets.max)
       (id, reader)
@@ -282,12 +282,12 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     val blockState = BlockState(cooked, pendingCooks, currentLog)
     val currentBlocks = computeBlockMap(blockState)
 
-    logger.debug("Initial block state = " + blockState)
+    log.debug("Initial block state = " + blockState)
 
     // Re-fire any restored pending cooks
     blockState.pending.foreach {
       case (id, reader) =>
-        logger.debug("Restarting pending cook on block %s:%d".format(baseDir, id))
+        log.debug("Restarting pending cook on block %s:%d".format(baseDir, id))
         chef ! Prepare(id, cookSequence.getAndIncrement, cookedDir, reader)
     }
 
@@ -304,7 +304,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
   private def quiesce = IO {
     actorState foreach { s =>
-      logger.debug("Releasing resources for projection in " + baseDir)
+      log.debug("Releasing resources for projection in " + baseDir)
       s.blockState.rawLog.close
       s.txLog.close
       ProjectionState.toFile(currentState, descriptorFile)
@@ -313,9 +313,9 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   }
 
   private def close = {
-    IO(logger.debug("Closing projection in " + baseDir)) >> quiesce
+    IO(log.debug("Closing projection in " + baseDir)) >> quiesce
   } except { case t: Throwable =>
-    IO { logger.error("Error during close", t) }
+    IO { log.error("Error during close", t) }
   } ensuring {
     IO { workLock.release }
   }
@@ -359,32 +359,32 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
         cookedMap = currentState.cookedMap + (id -> file.getPath)
       )
 
-      logger.debug("Cook complete on %d".format(id))
+      log.debug("Cook complete on %d".format(id))
 
       ProjectionState.toFile(currentState, descriptorFile).unsafePerformIO
       state.txLog.completeCook(id)
 
     case Insert(batch, responseRequested) =>
       if (batch.isEmpty) {
-        logger.warn("Skipping insert with an empty batch on %s".format(baseDir.getCanonicalPath))
+        log.warn("Skipping insert with an empty batch on %s".format(baseDir.getCanonicalPath))
         if (responseRequested) sender ! Skipped
       } else {
         val (skipValues, keepValues) = batch.partition(_.offset <= currentState.maxOffset)
         if (keepValues.isEmpty) {
-          logger.warn("Skipping entirely seen batch of %d rows prior to offset %d".format(batch.flatMap(_.values).size, currentState.maxOffset))
+          log.warn("Skipping entirely seen batch of %d rows prior to offset %d".format(batch.flatMap(_.values).size, currentState.maxOffset))
           if (responseRequested) sender ! Skipped
         } else {
           val values = keepValues.flatMap(_.values)
           val offset = keepValues.map(_.offset).max
 
-          logger.debug("Inserting %d rows, skipping %d rows at offset %d for %s".format(values.length, skipValues.length, offset, baseDir.getCanonicalPath))
+          log.debug("Inserting %d rows, skipping %d rows at offset %d for %s".format(values.length, skipValues.length, offset, baseDir.getCanonicalPath))
           state.blockState.rawLog.write(offset, values)
 
           // Update the producer thresholds for the rows. We know that ids only has one element due to the initial check
           currentState = currentState.copy(maxOffset = offset)
 
           if (state.blockState.rawLog.length >= cookThreshold) {
-            logger.debug("Starting cook on %s after threshold exceeded".format(baseDir.getCanonicalPath))
+            log.debug("Starting cook on %s after threshold exceeded".format(baseDir.getCanonicalPath))
             state.blockState.rawLog.close
             val toCook = state.blockState.rawLog
             val newRaw = RawHandler.empty(toCook.id + 1, rawFileFor(toCook.id + 1))
@@ -394,7 +394,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
             chef ! Prepare(toCook.id, cookSequence.getAndIncrement, cookedDir, toCook)
           }
 
-          logger.debug("Insert complete on %d rows at offset %d for %s".format(values.length, offset, baseDir.getCanonicalPath))
+          log.debug("Insert complete on %d rows at offset %d for %s".format(values.length, offset, baseDir.getCanonicalPath))
           if (responseRequested) sender ! Inserted(offset, values.length)
         }
       }

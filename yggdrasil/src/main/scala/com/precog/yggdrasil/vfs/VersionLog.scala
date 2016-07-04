@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,7 +32,7 @@ import blueeyes.json.serialization.JodaSerializationImplicits._
 import com.precog.common.serialization._
 import com.precog.util.{FileLock, IOUtils, PrecogUnit}
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.io._
 import java.util.UUID
@@ -68,10 +68,10 @@ object VersionLog {
           for {
             jv <- JParser.parseFromFile(currentFile).leftMap(ioError).disjunction
             version <- jv match {
-              case JString(`unsetSentinel`) => 
+              case JString(`unsetSentinel`) =>
                 \/.left(NotFound("No current data for the path %s exists; it has been archived.".format(dir)))
-              case other => 
-                other.validated[VersionEntry].disjunction leftMap { err => Corrupt(err.message) } 
+              case other =>
+                other.validated[VersionEntry].disjunction leftMap { err => Corrupt(err.message) }
             }
           } yield version
         } else {
@@ -90,7 +90,7 @@ object VersionLog {
   def open(baseDir: File): IO[Validation[Error, VersionLog]] = IO {
     if (!baseDir.isDirectory) {
       if (!baseDir.mkdirs) throw new IllegalStateException(baseDir + " cannot be created as a directory.")
-    } 
+    }
 
     val logFiles = new LogFiles(baseDir)
     import logFiles._
@@ -154,7 +154,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   def addVersion(entry: VersionEntry): IO[PrecogUnit] = allVersions.find(_ == entry) map { _ =>
     IO(PrecogUnit)
   } getOrElse {
-    logger.debug("Adding version entry: " + entry)
+    log.debug("Adding version entry: " + entry)
     IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) map { _ =>
       allVersions = allVersions :+ entry
       PrecogUnit
@@ -164,7 +164,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   def completeVersion(version: UUID): IO[PrecogUnit] = {
     if (allVersions.exists(_.id == version)) {
       !isCompleted(version) whenM {
-        logger.debug("Completing version " + version)
+        log.debug("Completing version " + version)
         IOUtils.writeToFile(version.serialize.renderCompact + "\n", completedFile)
       } map { _ => PrecogUnit }
     } else {
@@ -175,7 +175,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
   def setHead(newHead: UUID): IO[PrecogUnit] = {
     currentVersion.exists(_.id == newHead) unlessM {
       allVersions.find(_.id == newHead) traverse { entry =>
-        logger.debug("Setting HEAD to " + newHead)
+        log.debug("Setting HEAD to " + newHead)
         IOUtils.writeToFile(entry.serialize.renderCompact + "\n", headFile) map { _ =>
           currentVersion = Some(entry);
         }

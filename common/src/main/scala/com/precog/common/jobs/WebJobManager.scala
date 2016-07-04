@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -47,7 +47,7 @@ import org.joda.time.DateTime
 
 import org.streum.configrity.Configuration
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import scalaz.{NonEmptyList => NEL, _}
 import scalaz.std.option._
@@ -60,14 +60,14 @@ object WebJobManager {
       config.get[String]("service.protocol").toSuccess(NEL("Configuraiton property service.protocol is required.")) |@|
       config.get[String]("service.host").toSuccess(NEL("Configuration property service.host is required")) |@|
       config.get[Int]("service.port").toSuccess(NEL("Configuration property service.port is required")) |@|
-      config.get[String]("service.path").toSuccess(NEL("Configuration property service.path is required")) 
-    ) { (protocol, host, port, path) => 
+      config.get[String]("service.path").toSuccess(NEL("Configuration property service.path is required"))
+    ) { (protocol, host, port, path) =>
       RealWebJobManager(protocol, host, port, path)
     }
   }
 }
 
-case class RealWebJobManager(protocol: String, host: String, port: Int, path: String)(implicit val executionContext: ExecutionContext) 
+case class RealWebJobManager(protocol: String, host: String, port: Int, path: String)(implicit val executionContext: ExecutionContext)
     extends WebClient(protocol, host, port, path) with WebJobManager {
 
   val M = new blueeyes.bkka.FutureMonad(executionContext)

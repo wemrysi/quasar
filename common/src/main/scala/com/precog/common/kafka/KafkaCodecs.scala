@@ -26,7 +26,7 @@ import blueeyes.json.JParser
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import _root_.kafka.message._
 import _root_.kafka.serializer._
@@ -89,7 +89,7 @@ class KafkaEventCodec extends Encoder[Event] {
 object EventEncoding extends EncodingFlags with Logging {
   def toMessageBytes(event: Event) = {
     val serialized = event.serialize.renderCompact
-    logger.trace("Serialized event " + event + " to " + serialized)
+    log.trace("Serialized event " + event + " to " + serialized)
     val msgBuffer = charset.encode(serialized)
     val bytes = ByteBuffer.allocate(msgBuffer.limit + 3)
     writeHeader(bytes, event.fold(_ => jsonIngestFlag, _ => jsonArchiveFlag, _ => storeFileFlag))
@@ -134,7 +134,7 @@ class KafkaEventMessageCodec extends Encoder[EventMessage] {
 object EventMessageEncoding extends EncodingFlags with Logging {
   def toMessageBytes(msg: EventMessage) = {
     val serialized = msg.serialize.renderCompact
-    logger.trace("Serialized event " + msg + " to " + serialized)
+    log.trace("Serialized event " + msg + " to " + serialized)
     val msgBuffer = charset.encode(serialized)
     val bytes = ByteBuffer.allocate(msgBuffer.limit + 3)
     writeHeader(bytes, msg.fold(_ => jsonIngestMessageFlag, _ => jsonArchiveMessageFlag, _ => storeFileFlag))

@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -27,8 +27,6 @@ import org.objectweb.howl.log._
 import java.nio.ByteBuffer
 import java.io.{ File, FileOutputStream }
 import java.util.Arrays
-
-import com.weiglewilczek.slf4s.Logging
 
 object PersistentJValue {
   sealed abstract class Message(val Flag: Byte) {
@@ -63,11 +61,10 @@ object PersistentJValue {
   }
 }
 
-final case class PersistentJValue(baseDir: File, fileName: String)
-extends Logging {
+final case class PersistentJValue(baseDir: File, fileName: String) extends org.slf4s.Logging {
   import PersistentJValue._
 
-  private val log = open(baseDir, fileName)
+  private val hlog = open(baseDir, fileName)
   private val file: File = new File(baseDir, fileName)
   private var jv: JValue = JUndefined
 
@@ -79,30 +76,30 @@ extends Logging {
   /** Updates and persists (blocking) the `JValue`. */
   def json_=(value: JValue) { jv = value; flush() }
 
-  def close() = log.close()
+  def close() = hlog.close()
 
   private def flush() {
     val rawJson = jv.renderCompact.getBytes("UTF-8")
-    val mark = log.put(Update(rawJson), true)
+    val mark = hlog.put(Update(rawJson), true)
 
     val out = new FileOutputStream(file)
     out.write(rawJson)
     out.close()
-    log.put(Written(fileName.getBytes("UTF-8")), true)
+    hlog.put(Written(fileName.getBytes("UTF-8")), true)
 
-    log.mark(mark, true)
+    hlog.mark(mark, true)
   }
 
   private def replay() {
     var pending: Option[Array[Byte]] = None
     var lastUpdate: Option[Array[Byte]] = None
 
-    log.replay(new ReplayListener {
+    hlog.replay(new ReplayListener {
       def getLogRecord: LogRecord = new LogRecord(1024 * 64)
       def onError(ex: LogException): Unit = throw ex
       def onRecord(rec: LogRecord): Unit = rec.`type` match {
         case LogRecordType.END_OF_LOG =>
-          logger.debug("Versions TX log replay complete in " + baseDir.getCanonicalPath)
+          log.debug("Versions TX log replay complete in " + baseDir.getCanonicalPath)
 
         case LogRecordType.USER =>
           val bytes = rec.getFields()(0)
@@ -117,7 +114,7 @@ extends Logging {
           }
 
         case other =>
-          logger.warn("Unknown LogRecord type: " + other)
+          log.warn("Unknown LogRecord type: " + other)
       }
     })
 

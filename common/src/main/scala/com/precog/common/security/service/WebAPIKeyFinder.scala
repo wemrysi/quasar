@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -41,7 +41,7 @@ import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => 
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.streum.configrity.Configuration
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.net.URLEncoder
 
@@ -98,11 +98,11 @@ trait WebAPIKeyFinder extends BaseClient with APIKeyFinder[Response] {
           (((_: Extractor.Error).message) <-: jvalue.validated[v1.APIKeyDetails] :-> { details => Some(details) }).disjunction
 
         case res @ HttpResponse(HttpStatus(NotFound, _), _, _, _) =>
-          logger.warn("apiKey " + apiKey + " not found:\n" + res)
+          log.warn("apiKey " + apiKey + " not found:\n" + res)
           right(None)
 
         case res =>
-          logger.error("Unexpected response from auth service for apiKey " + apiKey + ":\n" + res)
+          log.error("Unexpected response from auth service for apiKey " + apiKey + ":\n" + res)
           left("Unexpected response from security service; unable to proceed." + res)
       })
     }
@@ -114,7 +114,7 @@ trait WebAPIKeyFinder extends BaseClient with APIKeyFinder[Response] {
         case HttpResponse(HttpStatus(OK, _), _, Some(jvalue), _) =>
           (((_:Extractor.Error).message) <-: jvalue.validated[Set[v1.APIKeyDetails]]).disjunction
         case res =>
-          logger.error("Unexpected response from auth service for apiKey " + fromRoot + ":\n" + res)
+          log.error("Unexpected response from auth service for apiKey " + fromRoot + ":\n" + res)
           left("Unexpected response from security service; unable to proceed." + res)
       })
     }
@@ -129,7 +129,7 @@ trait WebAPIKeyFinder extends BaseClient with APIKeyFinder[Response] {
         case HttpResponse(HttpStatus(OK, _), _, Some(jvalue), _) =>
           (((_:Extractor.Error).message) <-: jvalue.validated[Set[Permission]]).disjunction
         case res =>
-          logger.error("Unexpected response from auth service for apiKey " + apiKey + ":\n" + res)
+          log.error("Unexpected response from auth service for apiKey " + apiKey + ":\n" + res)
           left("Unexpected response from security service; unable to proceed." + res)
       })
     }
@@ -157,7 +157,7 @@ trait WebAPIKeyFinder extends BaseClient with APIKeyFinder[Response] {
           (((_:Extractor.Error).message) <-: wrappedKey.validated[v1.APIKeyDetails]).disjunction
 
         case res =>
-          logger.error("Unexpected response from api provisioning service: " + res)
+          log.error("Unexpected response from api provisioning service: " + res)
           left("Unexpected response from api key provisioning service; unable to proceed." + res)
       })
     }

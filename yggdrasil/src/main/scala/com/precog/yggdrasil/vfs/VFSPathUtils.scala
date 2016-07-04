@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -28,7 +28,7 @@ import com.precog.niflheim.NIHDBActor
 import com.precog.yggdrasil.metadata._
 import ResourceError._
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.io.{File, FileFilter}
 
@@ -86,27 +86,27 @@ object VFSPathUtils extends Logging {
   def findChildren(baseDir: File, path: Path): IO[Set[PathMetadata]] = {
     val pathRoot = pathDir(baseDir, path)
 
-    logger.debug("Checking for children of path %s in dir %s".format(path, pathRoot))
+    log.debug("Checking for children of path %s in dir %s".format(path, pathRoot))
     Option(pathRoot.listFiles(pathFileFilter)) map { files =>
-      logger.debug("Filtering children %s in path %s".format(files.mkString("[", ", ", "]"), path))
-      val childMetadata = files.toList traverse { f => 
+      log.debug("Filtering children %s in path %s".format(files.mkString("[", ", ", "]"), path))
+      val childMetadata = files.toList traverse { f =>
         val childPath = unescapePath(path / Path(f.getName))
         currentPathMetadata(baseDir, childPath).fold[Option[PathMetadata]](
           {
             case NotFound(message) =>
-              logger.trace("No child data found for %s".format(childPath.path))
+              log.trace("No child data found for %s".format(childPath.path))
               None
-            case error => 
-              logger.error("Encountered corruption or error searching child paths: %s".format(error.messages.list.mkString("; ")))
+            case error =>
+              log.error("Encountered corruption or error searching child paths: %s".format(error.messages.list.mkString("; ")))
               None
           },
           pathMetadata => Some(pathMetadata)
-        ) 
+        )
       }
 
       childMetadata.map(_.flatten.toSet): IO[Set[PathMetadata]]
     } getOrElse {
-      logger.debug("Path dir %s for path %s is not a directory!".format(pathRoot, path))
+      log.debug("Path dir %s for path %s is not a directory!".format(pathRoot, path))
       IO(Set.empty)
     }
   }
@@ -124,7 +124,7 @@ object VFSPathUtils extends Logging {
 
     val pathDir0 = pathDir(baseDir, path)
     EitherT {
-      IO(pathDir0.isDirectory) flatMap { 
+      IO(pathDir0.isDirectory) flatMap {
         case true =>
           VersionLog.currentVersionEntry(pathDir0).run flatMap { currentVersionV =>
             currentVersionV.fold[IO[ResourceError \/ PathMetadata]](
@@ -141,8 +141,8 @@ object VFSPathUtils extends Logging {
                 case otherError =>
                   IO(\/.left(otherError))
               },
-              { 
-                case VersionEntry(uuid, dataType, timestamp) => 
+              {
+                case VersionEntry(uuid, dataType, timestamp) =>
                   containsNonemptyChild(Option(pathDir0.listFiles(pathFileFilter)).toList.flatten) map {
                     case true => \/.right(PathMetadata(path, PathMetadata.DataDir(dataType.contentType)))
                     case false => \/.right(PathMetadata(path, PathMetadata.DataOnly(dataType.contentType)))

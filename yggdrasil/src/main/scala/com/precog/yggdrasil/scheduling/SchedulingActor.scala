@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -37,7 +37,7 @@ import akka.util.{Duration, Timeout}
 import blueeyes.bkka.FutureMonad
 import blueeyes.util.Clock
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.util.{Date, UUID}
 import java.util.concurrent.TimeUnit
@@ -80,15 +80,15 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
   }
 
   class SchedulingActor(
-      jobManager: JobManager[Future], 
-      permissionsFinder: PermissionsFinder[Future], 
-      storage: ScheduleStorage[Future], 
-      platform: Platform[Future, Slice, StreamT[Future, Slice]], 
-      clock: Clock, 
-      storageTimeout: Duration = Duration(30, TimeUnit.SECONDS), 
-      resourceTimeout: Timeout = Timeout(10, TimeUnit.SECONDS)) extends Actor with Logging { 
+      jobManager: JobManager[Future],
+      permissionsFinder: PermissionsFinder[Future],
+      storage: ScheduleStorage[Future],
+      platform: Platform[Future, Slice, StreamT[Future, Slice]],
+      clock: Clock,
+      storageTimeout: Duration = Duration(30, TimeUnit.SECONDS),
+      resourceTimeout: Timeout = Timeout(10, TimeUnit.SECONDS)) extends Actor with Logging {
     import SchedulingActor._
-      
+
     private[this] final implicit val scheduleOrder: Ordering[(DateTime, ScheduledTask)] = Ordering.by(_._1.getMillis)
 
     private[this] implicit val M: Monad[Future] = new FutureMonad(context.dispatcher)
@@ -108,7 +108,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
     override def preStart = {
       val now = new Date
 
-      storage.listTasks onSuccess { 
+      storage.listTasks onSuccess {
         case tasks => self ! AddTasksToQueue(tasks)
       }
     }
@@ -146,14 +146,14 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
       val (toRemove, toReschedule) = tasks.partition { task => pendingRemovals.contains(task.id) }
 
       toRemove foreach { task =>
-        logger.info("Removing completed task after run: " + task.id)
+        log.info("Removing completed task after run: " + task.id)
         pendingRemovals -= task.id
       }
 
       scheduleQueue ++= {
         toReschedule flatMap { task =>
-          nextRun(new Date, task) unsafeTap { next => 
-            if (next.isEmpty) logger.warn("No further run times for " + task)
+          nextRun(new Date, task) unsafeTap { next =>
+            if (next.isEmpty) log.warn("No further run times for " + task)
           }
         }
       }
@@ -188,17 +188,17 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         // This cannot occur inside a Future, or we would be exposing Actor state outside of this thread
         running += ((task.source, task.sink) -> TaskInProgress(task, startedAt))
 
-        
+
         val execution = for {
           basePath <- EitherT(M point { task.source.prefix \/> invalidState("Path %s cannot be relativized.".format(task.source.path)) })
           cachingResult <- platform.vfs.executeAndCache(platform, basePath, task.context, QueryOptions(timeout = task.timeout), Some(task.sink), Some(task.taskName))
 
 
         } yield cachingResult
-        
+
         execution.fold[Future[PrecogUnit]](
           failure => M point {
-            logger.error("An error was encountered processing a scheduled query execution: " + failure)
+            log.error("An error was encountered processing a scheduled query execution: " + failure)
             ourself ! TaskComplete(task.id, clock.now(), 0, Some(failure.toString)) : PrecogUnit
           },
           storedQueryResult => {
@@ -210,11 +210,11 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
                 for {
                   _ <- storedQueryResult.cachingJob.traverse { jobId =>
                     jobManager.abort(jobId, t.getMessage) map {
-                      case Right(jobAbortSuccess) => 
-                          ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString))   
+                      case Right(jobAbortSuccess) =>
+                          ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString))
                       case Left(jobAbortFailure) => sys.error(jobAbortFailure.toString)
                     }
-                  } 
+                  }
                 } yield PrecogUnit
             }
           }
@@ -222,7 +222,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
           identity[Future[PrecogUnit]]
         } onFailure {
           case t: Throwable =>
-            logger.error("Scheduled query execution failed by thrown error.", t)
+            log.error("Scheduled query execution failed by thrown error.", t)
             ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString)) : PrecogUnit
         }
       }
@@ -239,13 +239,13 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
 
           case Some(_) =>
             storage.addTask(newTask) map { task =>
-              ourself ! AddTasksToQueue(Seq(task)) 
+              ourself ! AddTasksToQueue(Seq(task))
             }
         }
-        
+
         addResult.run.map(_ => taskId) recover {
           case t: Throwable =>
-            logger.error("Error adding task " + newTask, t)
+            log.error("Error adding task " + newTask, t)
             \/.left("Internal error adding task")
         } pipeTo sender
 
@@ -254,18 +254,18 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         val deleteResult = storage.deleteTask(id) map { result =>
           ourself ! RemoveTaskFromQueue(id)
           result
-        } 
-        
+        }
+
         deleteResult.run recover {
           case t: Throwable =>
-            logger.error("Error deleting task " + id, t)
+            log.error("Error deleting task " + id, t)
             \/.left("Internal error deleting task")
         } pipeTo sender
 
       case StatusForTask(id, limit) =>
         storage.statusFor(id, limit) map(Success(_)) recover {
           case t: Throwable =>
-            logger.error("Error getting status for task " + id, t)
+            log.error("Error getting status for task " + id, t)
             Failure("Internal error getting status for task")
         } pipeTo sender
 
@@ -288,10 +288,10 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
           case Some(TaskInProgress(task, startAt)) =>
             error match {
               case None =>
-                logger.info("Scheduled task %s completed with %d records in %d millis".format(id, total, (new JodaDuration(startAt, endedAt)).getMillis))
+                log.info("Scheduled task %s completed with %d records in %d millis".format(id, total, (new JodaDuration(startAt, endedAt)).getMillis))
 
               case Some(error) =>
-                logger.warn("Scheduled task %s failed after %d millis: %s".format(id, (new JodaDuration(startAt, clock.now())).getMillis, error))
+                log.warn("Scheduled task %s failed after %d millis: %s".format(id, (new JodaDuration(startAt, clock.now())).getMillis, error))
             }
 
             storage.reportRun(ScheduledRunReport(id, startAt, endedAt, total, error.toList))
@@ -299,7 +299,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
             rescheduleTasks(Seq(task))
 
           case None =>
-            logger.error("Task completion reported for unknown task " + id)
+            log.error("Task completion reported for unknown task " + id)
         }
     }
   }

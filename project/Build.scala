@@ -41,7 +41,7 @@ object PlatformBuild extends Build {
                         logBuffered in Test :=  false,
 
     libraryDependencies ++= Seq(
-      "com.weiglewilczek.slf4s"   % "slf4s_2.9.1"    %     "1.0.7",
+      "org.slf4s"                %% "slf4s-api"      %    "1.7.13",
       "com.google.code.findbugs"  % "jsr305"         %     "1.3.9",
       "org.scalaz"               %% "scalaz-core"    %     "7.0.0",
       "com.reportgrid"           %% "blueeyes-json"  % blueeyesVersion,

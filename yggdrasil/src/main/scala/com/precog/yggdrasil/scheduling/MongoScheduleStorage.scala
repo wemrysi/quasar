@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,7 +32,7 @@ import blueeyes.persistence.mongo.dsl._
 
 import com.precog.util.PrecogUnit
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import java.util.UUID
 
@@ -84,10 +84,10 @@ class MongoScheduleStorage private[MongoScheduleStorage] (mongo: Mongo, database
   def addTask(task: ScheduledTask) = EitherT.right(insertTask(-\/(task), settings.tasks)) map { _ => task }
 
   private def insertTask(task: ScheduledTask \/ JObject, collection: String) =
-    database(insert(task.valueOr { st => st.serialize.asInstanceOf[JObject] }).into(collection)) 
+    database(insert(task.valueOr { st => st.serialize.asInstanceOf[JObject] }).into(collection))
 
   def deleteTask(id: UUID) = EitherT {
-    database(selectOne().from(settings.tasks).where(".id" === id.toString)) flatMap { 
+    database(selectOne().from(settings.tasks).where(".id" === id.toString)) flatMap {
       case Some(taskjv) =>
         for {
           _ <- insertTask(\/-(taskjv), settings.deletedTasks)
@@ -95,9 +95,9 @@ class MongoScheduleStorage private[MongoScheduleStorage] (mongo: Mongo, database
         } yield {
           taskjv.validated[ScheduledTask].disjunction leftMap { _.message } map { Some(_) }
         }
-      
+
       case None =>
-        logger.warn("Could not locate task %s for deletion".format(id))
+        log.warn("Could not locate task %s for deletion".format(id))
         Promise successful \/.right(None)
     }
   }

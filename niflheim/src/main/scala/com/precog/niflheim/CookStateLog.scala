@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -21,7 +21,7 @@ package com.precog.niflheim
 
 import com.precog.util.FileLock
 
-import com.weiglewilczek.slf4s.Logging
+// import org.slf4s._
 
 import org.objectweb.howl.log._
 
@@ -36,7 +36,7 @@ object CookStateLog {
   final val logName = "CookStateLog"
 }
 
-class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends Logging {
+class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends org.slf4s.Logging {
   import CookStateLog._
 
   private[this] val workLock = FileLock(baseDir, lockName)
@@ -54,7 +54,7 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
 
   def close = {
     if (pendingCookIds0.size > 0) {
-      logger.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
+      log.warn("Closing txLog with pending cooks: " + pendingCookIds0.keys.mkString("[", ", ", "]"))
     }
     txLog.close()
     workLock.release
@@ -77,13 +77,13 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
 
     def getLogRecord = record
     def onError(e: LogException) = {
-      logger.error("Error reading TX log", e)
+      log.error("Error reading TX log", e)
       throw e
     }
     def onRecord(r: LogRecord) = {
       r.`type` match {
         case LogRecordType.END_OF_LOG =>
-          logger.debug("TXLog Replay complete in " + baseDir.getCanonicalPath)
+          log.debug("TXLog Replay complete in " + baseDir.getCanonicalPath)
 
         case LogRecordType.USER =>
           TXLogEntry(r) match {
@@ -97,7 +97,7 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends L
           }
 
         case other =>
-          logger.warn("Unknown LogRecord type: " + other)
+          log.warn("Unknown LogRecord type: " + other)
       }
     }
   })
@@ -138,14 +138,14 @@ sealed trait TXLogEntry {
 case class StartCook(blockId: Long) extends TXLogEntry
 case class CompleteCook(blockId: Long) extends TXLogEntry
 
-object TXLogEntry extends Logging {
+object TXLogEntry extends org.slf4s.Logging {
   def apply(record: LogRecord) = {
     val buffer = ByteBuffer.wrap(record.getFields()(0))
 
     buffer.getShort match {
       case 0x1 => StartCook(buffer.getLong)
       case 0x2 => CompleteCook(buffer.getLong)
-      case other => logger.error("Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
+      case other => log.error("Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
     }
   }
 

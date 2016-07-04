@@ -1,26 +1,26 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 package com.precog.yggdrasil
 package jdbm3
 
-import com.weiglewilczek.slf4s.Logger
+import org.slf4s.Logger
 
 import org.apache.jdbm._
 import org.joda.time.DateTime
@@ -69,16 +69,16 @@ private[jdbm3] object CTypeMappings {
   }
 
   def fromFlag(b: Byte): CType = b match {
-    case FSTRING       => CString     
-    case FBOOLEAN      => CBoolean    
-    case FLONG         => CLong       
-    case FDOUBLE       => CDouble     
-    case FNUM          => CNum        
-    case FDATE         => CDate       
-    case FPERIOD       => CPeriod       
-    case FNULL         => CNull       
+    case FSTRING       => CString
+    case FBOOLEAN      => CBoolean
+    case FLONG         => CLong
+    case FDOUBLE       => CDouble
+    case FNUM          => CNum
+    case FDATE         => CDate
+    case FPERIOD       => CPeriod
+    case FNULL         => CNull
     case FEMPTYOBJECT  => CEmptyObject
-    case FEMPTYARRAY   => CEmptyArray 
+    case FEMPTYARRAY   => CEmptyArray
     case FARRAY        => sys.error("todo")
     case invalid       => sys.error(invalid + " is not a valid format")
   }
@@ -106,14 +106,14 @@ private[jdbm3] object CTypeMappings {
 //  import CValueSerializerUtil._
 //
 //   //The undefined bitset is encoded as an array of bytes backing the bitset (essentially
-//   //converting from an Array of longs to minimize required space) 
+//   //converting from an Array of longs to minimize required space)
 //  def serializeUndefinedIndices(out: DataOutput, undefined: BitSet) {
 //    if (undefined.isEmpty) {
 //      defaultSerializer.serialize(out, emptyBytes)
 //    } else {
 //      val backingBytes = new Array[Byte](undefined.max / 8 + 1)
 //
-//      undefined.foreach { 
+//      undefined.foreach {
 //        index => backingBytes(index / 8) = (backingBytes(index / 8) | (0x01 << (7 - (index % 8)))).toByte
 //      }
 //
@@ -160,7 +160,7 @@ private[jdbm3] object CTypeMappings {
 //      }
 //
 //      serializeUndefinedIndices(out, undefined)
-//     
+//
 //      i = 0
 //      while (i < format.length) {
 //        if (undefined(i)) {
@@ -184,7 +184,7 @@ private[jdbm3] object CTypeMappings {
 //        i += 1
 //      }
 //    } catch {
-//      case t: Throwable => logger.error("Error during serialization", t)
+//      case t: Throwable => log.error("Error during serialization", t)
 //    }
 //  }
 //
@@ -206,7 +206,7 @@ private[jdbm3] object CTypeMappings {
 //          case FNUM         => CNum(BigDecimal(new java.math.BigDecimal(in.readUTF())))
 //          case FDATE        => CDate(new DateTime(defaultSerializer.deserialize(in).asInstanceOf[java.lang.Long]))
 //          case FNULL        => in.skipBytes(1); CNull         JDBM requires that we write a value, so we have to read one byte back
-//          case FEMPTYOBJECT => in.skipBytes(1); CEmptyObject  JDBM requires that we write a value, so we have to read one byte back 
+//          case FEMPTYOBJECT => in.skipBytes(1); CEmptyObject  JDBM requires that we write a value, so we have to read one byte back
 //          case FEMPTYARRAY  => in.skipBytes(1); CEmptyArray   JDBM requires that we write a value, so we have to read one byte back
 //          case FARRAY       => sys.error("todo")
 //          case invalid      => sys.error("Invalid format flag: " + invalid)

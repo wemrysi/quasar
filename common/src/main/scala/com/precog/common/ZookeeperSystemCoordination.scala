@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -27,7 +27,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 
-import com.weiglewilczek.slf4s._
+import org.slf4s._
 
 import org.streum.configrity.Configuration
 
@@ -71,7 +71,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
   import ZookeeperSystemCoordination._
 
   // Make it difficult to accidentally enable this
-  logger.debug("Testing for create with " + createIfMissingFlag)
+  log.debug("Testing for create with " + createIfMissingFlag)
   val createOk = createIfMissingFlag.exists(_ == "absolutely")
 
   lazy val basePath = delimeter + "precog-" + uid.systemId
@@ -157,11 +157,11 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
           zkc.createPersistent(base, true)
         }
         zkc.createEphemeral(activePath)
-        logger.info("Acquired lock")
+        log.info("Acquired lock")
         Success(())
       } else {
         Thread.sleep(delay)
-        logger.debug("Active path [%s] already registered, retrying in case of stale registration.(%d remain)".format(base, retries))
+        log.debug("Active path [%s] already registered, retrying in case of stale registration.(%d remain)".format(base, retries))
         acquireActivePath(base, retries - 1, delay)
       }
     }
@@ -174,7 +174,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
       val bytes = zkc.readData(agentPath).asInstanceOf[Array[Byte]]
       if (bytes != null && bytes.length != 0) {
         val state = fromNodeData(bytes).validated[EventRelayState]
-        logger.debug("%s: RESTORED".format(state))
+        log.debug("%s: RESTORED".format(state))
         state
       } else {
         val producerId = acquireProducerId()
@@ -187,7 +187,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
           }
         )
 
-        logger.debug("%s: NEW".format(initialState))
+        log.debug("%s: NEW".format(initialState))
         Success(initialState)
       }
     }
@@ -206,7 +206,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
   def renewEventRelayState(agent: String, offset: Long, producerId: Int, blockSize: Int): Validation[Error, EventRelayState] = {
     val block = acquireIdSequenceBlock(producerId, blockSize)
     val newState = EventRelayState(offset, block.firstSequenceId, block)
-    logger.debug("%s: RENEWAL".format(newState))
+    log.debug("%s: RENEWAL".format(newState))
     saveEventRelayState(agent, newState)
   }
 
@@ -218,7 +218,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
       }
     )
 
-    logger.debug("%s: SAVE".format(state))
+    log.debug("%s: SAVE".format(state))
     Success(state)
   }
 
@@ -231,11 +231,11 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
           val bytes = zkc.readData(checkpointPath).asInstanceOf[Array[Byte]]
           if (bytes != null && bytes.length != 0) {
             val checkpoint = fromNodeData(bytes).validated[YggCheckpoint]
-            logger.debug("yggCheckpoint %s: RESTORED".format(checkpoint))
+            log.debug("yggCheckpoint %s: RESTORED".format(checkpoint))
             checkpoint
           } else {
             if (createOk) {
-              logger.warn("Creating initial ingest checkpoint!")
+              log.warn("Creating initial ingest checkpoint!")
               val checkpoint = YggCheckpoint.Empty
               saveYggCheckpoint(bifrost, checkpoint)
               Success(checkpoint)
@@ -248,7 +248,7 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
         }
       )
     } else {
-      logger.debug("Checkpoints disabled, skipping load")
+      log.debug("Checkpoints disabled, skipping load")
       None
     }
   }
@@ -267,9 +267,9 @@ class ZookeeperSystemCoordination(private val zkc: ZkClient, uid: ServiceUID, yg
         }
       )
 
-      logger.debug("%s: SAVE".format(checkpoint))
+      log.debug("%s: SAVE".format(checkpoint))
     } else {
-      logger.debug("Skipping yggCheckpoint save")
+      log.debug("Skipping yggCheckpoint save")
     }
   }
 

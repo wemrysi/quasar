@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -23,12 +23,12 @@ package security
 import service.v1
 import accounts.AccountId
 import accounts.AccountFinder
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import org.joda.time.DateTime
 import org.joda.time.Instant
 
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import scalaz._
 import scalaz.\/._
@@ -43,11 +43,11 @@ object PermissionsFinder {
   import Permission._
   def canWriteAs(permissions: Set[WritePermission], authorities: Authorities): Boolean = {
     val permWriteAs = permissions.map(_.writeAs)
-    permWriteAs.exists(_ == WriteAsAny) || 
+    permWriteAs.exists(_ == WriteAsAny) ||
     {
       val writeAsAlls = permWriteAs.collect({ case WriteAsAll(s) if s.subsetOf(authorities.accountIds) => s })
 
-      permWriteAs.nonEmpty && 
+      permWriteAs.nonEmpty &&
       writeAsAlls.foldLeft(authorities.accountIds)({ case (remaining, s) => remaining diff s }).isEmpty
     }
   }
@@ -61,7 +61,7 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
     keyDetails.grants filter { g =>
       (at exists { g.isValidAt _ }) || g.createdAt.isBefore(timestampRequiredAfter)
     } flatMap {
-      _.permissions collect { 
+      _.permissions collect {
         case perm @ WritePermission(path0, _) if path0.isEqualOrParentOf(path) => perm
       }
     }
@@ -71,9 +71,9 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
     def selectWriter(writePermissions: Set[WritePermission]): M[Option[Authorities]] = {
       lazy val accountWriter: M[Option[Authorities]] = accountFinder.findAccountByAPIKey(apiKey) map { _ map { Authorities(_) } }
       val eithers: List[M[Option[Authorities]] \/ M[Option[Authorities]]] = writePermissions.map({
-        case WritePermission(_, WriteAsAny) => 
+        case WritePermission(_, WriteAsAny) =>
           left(accountWriter)
-        case WritePermission(_, WriteAsAll(accountIds)) => 
+        case WritePermission(_, WriteAsAll(accountIds)) =>
           (Authorities.ifPresent(accountIds).map(a => Some(a).point[M]) \/> accountWriter)
       })(collection.breakOut)
 
@@ -83,7 +83,7 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
         perms collectFirst {
           case -\/(Some(authorities)) => authorities
         } orElse {
-          val allOptions = perms collect { case \/-(Some(authorities)) => authorities } 
+          val allOptions = perms collect { case \/-(Some(authorities)) => authorities }
           if (allOptions.size == 1) allOptions.headOption else None
         }
       }
@@ -97,11 +97,11 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
   def writePermissions(apiKey: APIKey, path: Path, at: Instant): M[Set[WritePermission]] = {
     apiKeyFinder.findAPIKey(apiKey, None) map {
       case Some(details) =>
-        logger.debug("Filtering write grants from " + details + " for " + path + " at " + at)
+        log.debug("Filtering write grants from " + details + " for " + path + " at " + at)
         filterWritePermissions(details, path, Some(at))
-      
+
       case None =>
-        logger.warn("No API key details found for %s %s at %s".format(apiKey, path.path, at.toString))
+        log.warn("No API key details found for %s %s at %s".format(apiKey, path.path, at.toString))
         Set()
     }
   }
@@ -120,7 +120,7 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
     } yield {
       // FIXME: Not comprehensive/exhaustive in terms of finding all possible data you could read
       permissions flatMap {
-        case perm @ WrittenByPermission(p0, _) if p0.isEqualOrParentOf(path) => 
+        case perm @ WrittenByPermission(p0, _) if p0.isEqualOrParentOf(path) =>
           if (perm.path == Path.Root) accountPath.flatten.map(_.rootPath) else Some(perm.path)
 
         case _ => None

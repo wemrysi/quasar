@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -35,7 +35,7 @@ import akka.pattern.gracefulStop
 import blueeyes.json._
 import blueeyes.bkka.Stoppable
 
-import com.weiglewilczek.slf4s._
+import org.slf4s._
 import org.streum.configrity.converter.Extra._
 
 import scalaz.{Failure,Success}
@@ -69,13 +69,13 @@ case class IngestSystem(ingestActor: ActorRef, stoppable: Stoppable)
 object IngestSystem extends Logging {
   def actorStop(config: ShardConfig, actor: ActorRef, name: String)(implicit system: ActorSystem, executor: ExecutionContext): Future[Unit] = {
     for {
-      _ <- Future(logger.debug(config.logPrefix + " Stopping " + name + " actor within " + config.stopTimeout.duration))
+      _ <- Future(log.debug(config.logPrefix + " Stopping " + name + " actor within " + config.stopTimeout.duration))
       b <- gracefulStop(actor, config.stopTimeout.duration)
     } yield {
-      logger.debug(config.logPrefix + " Stop call for " + name + " actor returned " + b)
+      log.debug(config.logPrefix + " Stop call for " + name + " actor returned " + b)
     }
   } recover {
-    case e => logger.error("Error stopping " + name + " actor", e)
+    case e => log.error("Error stopping " + name + " actor", e)
   }
 }
 
@@ -92,7 +92,7 @@ trait ShardSystemActorModule extends YggConfigComponent with Logging {
     def loadCheckpoint() : Option[YggCheckpoint] = yggConfig.ingestConfig flatMap { _ =>
       checkpointCoordination.loadYggCheckpoint(yggConfig.shardId) match {
         case Some(Failure(errors)) =>
-          logger.error("Unable to load Kafka checkpoint: " + errors)
+          log.error("Unable to load Kafka checkpoint: " + errors)
           sys.error("Unable to load Kafka checkpoint: " + errors)
 
         case Some(Success(checkpoint)) => Some(checkpoint)
@@ -106,12 +106,12 @@ trait ShardSystemActorModule extends YggConfigComponent with Logging {
 
     val stoppable = Stoppable.fromFuture({
       import IngestSystem.actorStop
-      logger.info("Stopping bifrost system")
+      log.info("Stopping bifrost system")
       for {
         _ <- ingestActor map { actorStop(yggConfig, _, "ingestActor")(ingestActorSystem, ingestActorSystem.dispatcher) } getOrElse { Future(())(ingestActorSystem.dispatcher) }
       } yield {
         ingestActorSystem.shutdown()
-        logger.info("Shard system stopped.")
+        log.info("Shard system stopped.")
       }
     })
 

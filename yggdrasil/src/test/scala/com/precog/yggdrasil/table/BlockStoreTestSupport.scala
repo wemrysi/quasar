@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -31,14 +31,14 @@ import jdbm3._
 import akka.actor.ActorSystem
 import akka.dispatch._
 import blueeyes.json._
-import com.weiglewilczek.slf4s.Logging
+import org.slf4s.Logging
 
 import scala.annotation.tailrec
 import scala.collection.mutable.LinkedHashSet
 import scala.util.Random
 
 import scalaz._
-import scalaz.effect.IO 
+import scalaz.effect.IO
 import scalaz.syntax.comonad._
 import scalaz.std.anyVal._
 import scalaz.std.list._
@@ -112,11 +112,11 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
       } getOrElse {
         slices.headOption
       }
-      
-      slice map { s => 
+
+      slice map { s =>
         val s0 = new Slice {
           val size = s.size
-          val columns = colSelection.map { reqCols => 
+          val columns = colSelection.map { reqCols =>
             s.columns.filter {
               case (ref @ ColumnRef(jpath, ctype), _) =>
                 jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
@@ -159,7 +159,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 
 object BlockStoreTestModule {
   def empty[M[+_]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
-    val M = M0 
+    val M = M0
     val projections = Map.empty[Path, Projection]
   }
 }
