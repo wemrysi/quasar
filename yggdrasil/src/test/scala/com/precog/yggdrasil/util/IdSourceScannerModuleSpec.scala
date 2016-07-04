@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package util
 
 import com.precog.common._
-import com.precog.yggdrasil.test._
 import com.precog.yggdrasil.table._
 
 import org.specs2.mutable._

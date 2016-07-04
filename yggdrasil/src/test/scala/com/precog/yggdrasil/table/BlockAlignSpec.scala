@@ -21,10 +21,8 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-
 import com.precog.util._
 import com.precog.yggdrasil.util._
-import com.precog.yggdrasil.test._
 
 import blueeyes.json._
 
@@ -452,9 +450,8 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationL
   }
 }
 
-//object BlockAlignSpec extends TableModuleSpec[Free.Trampoline] with BlockAlignSpec[Free.Trampoline] {
-//  implicit def M = Trampoline.trampolineMonad
-object BlockAlignSpec extends TableModuleSpec[YId] with BlockAlignSpec[YId] with YIdInstances {
+object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec[Need] {
+  def M = Need.need
   type YggConfig = IdSourceConfig
   val yggConfig = new IdSourceConfig {
     val idSource = new FreshAtomicIdSource

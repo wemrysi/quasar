@@ -20,9 +20,6 @@
 package com.precog.niflheim
 
 import com.precog.util.FileLock
-
-// import org.slf4s._
-
 import org.objectweb.howl.log._
 
 import java.io.{File, RandomAccessFile}

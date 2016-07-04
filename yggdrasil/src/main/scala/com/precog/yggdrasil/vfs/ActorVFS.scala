@@ -548,6 +548,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
                 nihdbr tap { _.db.insert(data) }
               }
             }
+          case x => abort("Unexpected: " + x)
         }
         _ <- created traverse { resource =>
           for {

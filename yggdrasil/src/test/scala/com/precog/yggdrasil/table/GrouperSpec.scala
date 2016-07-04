@@ -21,9 +21,7 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-
 import com.precog.yggdrasil.util.IdSourceConfig
-import com.precog.yggdrasil.test._
 
 import blueeyes.json._
 
@@ -1022,7 +1020,8 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
   "handle non-trivial group alignment with composite key" in testNonTrivial
 }
 
-object GrouperSpec extends TableModuleSpec[YId] with GrouperSpec[YId] with YIdInstances {
+object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec[Need] {
+  def M = Need.need
   type YggConfig = IdSourceConfig
   val yggConfig = new IdSourceConfig {
     val idSource = new FreshAtomicIdSource

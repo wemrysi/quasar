@@ -29,7 +29,7 @@ object PlatformBuild extends Build {
   def commonSettings = Seq(
                                organization :=  "com.precog",
                                     version :=  "2.6.1-SNAPSHOT",
-                              scalacOptions ++= Seq("-g:none", "-deprecation"),
+                              scalacOptions ++= Seq("-g:none", "-deprecation", "-unchecked"),
                               scalacOptions ++= optimizeOpts,
                                javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
                                scalaVersion :=  "2.9.3",
