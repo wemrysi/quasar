@@ -1,23 +1,5 @@
-##
-##  ____    ____    _____    ____    ___     ____
-## |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
-## | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
-## |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
-## |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
-##
-## This program is free software: you can redistribute it and/or modify it under the terms of the
-## GNU Affero General Public License as published by the Free Software Foundation, either version
-## 3 of the License, or (at your option) any later version.
-##
-## This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-## without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
-## the GNU Affero General Public License for more details.
-##
-## You should have received a copy of the GNU Affero General Public License along with this
-## program. If not, see <http://www.gnu.org/licenses/>.
-##
-##
-#!/bin/bash
+#!/usr/bin/env bash
+#
 
 cd "$(dirname $0)"
 
@@ -69,13 +51,11 @@ while getopts ":m:saokcf" opt; do
 	    FAILFAST=1
 	    ;;
         \?)
-            echo "Usage: `basename $0` [-a] [-o] [-s] [-k] [-m <mongo port>]"
-            echo "  -a: Build assemblies only"
+            echo "Usage: `basename $0` [-o] [-s] [-k] [-m <mongo port>]"
             echo "  -o: Optimized build"
             echo "  -s: Skip all clean/compile setup steps"
             echo "  -k: Skip sbt clean step"
-	    echo "  -c: Do code coverage"
-	    echo "  -f: Fail fast if a module test fails"
+    	    echo "  -f: Fail fast if a module test fails"
             exit 1
             ;;
     esac
@@ -85,9 +65,6 @@ done
 set -e
 
 if [ -z "$SKIPSETUP" ]; then
-    echo "Linking quirrel examples"
-    (cd quirrel && ln -fs ../../research/quirrel/examples)
-
     [ -z "$SKIPCLEAN" ] && find . -type d -name target -prune -exec rm -fr {} \;
     [ -z "$SKIPCLEAN" ] && run_sbt clean
 
@@ -98,10 +75,6 @@ if [ -z "$SKIPSETUP" ]; then
     fi
 else
     echo "Skipping clean/compile"
-fi
-
-if [ ! -f "ratatoskr/target/ratatoskr-assembly-$(git describe).jar" ]; then
-    run_sbt ratatoskr/assembly
 fi
 
 # For the runs, we don't want to terminate early if a particular project fails
@@ -117,17 +90,6 @@ if [ -z "$SKIPTEST" ]; then
     done
 else
     echo "Skipping test:compile/test"
-fi
-
-if [ $SUCCESS -eq 0 ]; then
-    echo "Building assemblies"
-    run_sbt accounts/assembly auth/assembly ingest/assembly ratatoskr/assembly bifrost/assembly
-fi
-
-if [ $SUCCESS -eq 0 -a -z "$SKIPTEST" ]; then
-    echo "Running full bifrost test"
-    bifrost/test.sh
-    SUCCESS=$(($SUCCESS || $?))
 fi
 
 # re-enable errexit

@@ -40,5 +40,3 @@ ivyXML :=
       <exclude org="org.apache.avro"/>
     </dependency>
   </dependencies>
-
-parallelExecution in test := false

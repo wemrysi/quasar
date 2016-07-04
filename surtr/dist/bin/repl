@@ -1,3 +1,0 @@
-#!/bin/bash
-
-java -Xmx1G -jar lib/pandora-assembly-0.0.1-SNAPSHOT.jar $@

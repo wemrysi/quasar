@@ -1,1 +1,0 @@
-java.exe -jar precog.jar --configFile config.cfg
