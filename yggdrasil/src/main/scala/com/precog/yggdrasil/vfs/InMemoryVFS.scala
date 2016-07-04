@@ -181,7 +181,7 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
       }
 
       IO {
-        data = (events groupBy { case (offset, msg) => msg.path }).foldLeft(data) {
+        data = (events groupBy (_._2.path)).foldLeft(data) {
           case (acc, (path, messages)) =>
             val currentKey = (path, Version.Current)
             // We can discard the event IDs for the purposes of this class
@@ -210,14 +210,11 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
                   acc + (currentKey -> JsonRecord(Vector(records.map(_.value): _*), writeAs, id))
                 }
 
-              case (acc, StoreFileMessage(_, _, writeAs, _, _, content, _, StreamRef.Create(id, _))) =>
-                sys.error("todo")
-
-              case (acc, StoreFileMessage(_, _, writeAs, _, _, content, _, StreamRef.Replace(id, _))) =>
-                sys.error("todo")
-
               case (acc, _: ArchiveMessage) =>
                 acc ++ acc.get(currentKey).map(record => (path, Version.Archived(record.versionId)) -> record)
+
+              case _ =>
+                sys.error("todo")
             }
         }
       }

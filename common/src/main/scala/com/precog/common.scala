@@ -23,6 +23,8 @@ package object common {
   type ProducerId = Int
   type SequenceId = Int
 
+  def abort(msg: String): Nothing = throw new RuntimeException(msg)
+
   final class StringExtensions(s: String) {
     def cpath = CPath(s)
   }

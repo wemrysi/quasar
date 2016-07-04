@@ -36,8 +36,6 @@ package object yggdrasil {
   type Identity = Long
   type Identities = Array[Identity]
 
-  def abort(msg: String): Nothing = throw new RuntimeException(msg)
-
   object Identities {
     val Empty = VectorCase.empty[Identity]
   }

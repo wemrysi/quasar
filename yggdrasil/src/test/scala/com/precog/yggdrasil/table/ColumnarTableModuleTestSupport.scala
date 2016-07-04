@@ -125,14 +125,10 @@ trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with 
               val col = prioritized find { _ isDefinedAt i }
 
               val acc2 = col map {
-                case lc: LongColumn =>
-                  acc + lc(i)
-
-                case dc: DoubleColumn =>
-                  acc + dc(i)
-
-                case nc: NumColumn =>
-                  acc + nc(i)
+                case lc: LongColumn   => acc + lc(i)
+                case dc: DoubleColumn => acc + dc(i)
+                case nc: NumColumn    => acc + nc(i)
+                case _                => abort("unreachable")
               }
 
               acc2 foreach { arr(i) = _ }

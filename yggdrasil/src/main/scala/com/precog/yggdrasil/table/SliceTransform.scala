@@ -137,17 +137,13 @@ trait SliceTransforms[M[+_]] extends TableModule[M]
 
             if (s.columns.isEmpty) {
               s
-            } else {
-
+            }
+            else {
               val definedAt = new BitSet
-              filter.columns.values.foreach {
-                case col: BoolColumn => {
-                  cf.util.isSatisfied(col).foreach {
-                    c => definedAt.or(c.definedAt(0, s.size))
-                  }
-                }
+              filter.columns.values foreach {
+                case col: BoolColumn => cf.util.isSatisfied(col) foreach (c => definedAt or c.definedAt(0, s.size))
+                case x               => abort("Unexpected: " + x)
               }
-
               s mapColumns { cf.util.filter(0, s.size, definedAt) }
             }
           }
@@ -205,9 +201,10 @@ trait SliceTransforms[M[+_]] extends TableModule[M]
                 val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
 
                 val simplifiedGroupNonNum = groupedNonNum map {
-                  case (_, Left3(column)) => Left(column)
-                  case (_, Right3(column)) => Left(column)
+                  case (_, Left3(column))                        => Left(column)
+                  case (_, Right3(column))                       => Left(column)
                   case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
+                  case (_, x)                                    => abort("Unexpected: " + x)
                 }
 
                 class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
@@ -622,18 +619,15 @@ trait SliceTransforms[M[+_]] extends TableModule[M]
                   val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
 
                   val joined: Map[ColumnRef, Column] = grouped.map({
-                    case (ref, Left3(col)) =>
-                      ref -> cf.util.filter(0, size, leftMask)(col).get
-
-                    case (ref, Right3(col)) =>
-                      ref -> cf.util.filter(0, size, rightMask)(col).get
-
+                    case (ref, Left3(col))                           => ref -> cf.util.filter(0, size, leftMask)(col).get
+                    case (ref, Right3(col))                          => ref -> cf.util.filter(0, size, rightMask)(col).get
                     case (ref, Middle3((left :: Nil, right :: Nil))) => {
                       val left2 = cf.util.filter(0, size, leftMask)(left).get
                       val right2 = cf.util.filter(0, size, rightMask)(right).get
 
                       ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get    // safe because types are grouped
                     }
+                    case (_, x) => abort("Unexpected: " + x)
                   })(collection.breakOut)
 
                   joined

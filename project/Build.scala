@@ -29,7 +29,7 @@ object PlatformBuild extends Build {
   def commonSettings = Seq(
                                organization :=  "com.precog",
                                     version :=  "2.6.1-SNAPSHOT",
-                              scalacOptions +=  "-g:none",
+                              scalacOptions ++= Seq("-g:none", "-deprecation"),
                               scalacOptions ++= optimizeOpts,
                                javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
                                scalaVersion :=  "2.9.3",
@@ -42,13 +42,13 @@ object PlatformBuild extends Build {
 
     libraryDependencies ++= Seq(
       "org.slf4s"                %% "slf4s-api"      %    "1.7.13",
-      "com.google.code.findbugs"  % "jsr305"         %     "1.3.9",
-      "org.scalaz"               %% "scalaz-core"    %     "7.0.0",
+      "org.scalaz"               %% "scalaz-core"    %     "7.0.9",
       "com.reportgrid"           %% "blueeyes-json"  % blueeyesVersion,
       "com.reportgrid"           %% "blueeyes-core"  % blueeyesVersion,
       "com.reportgrid"           %% "blueeyes-mongo" % blueeyesVersion,
       "com.reportgrid"           %% "akka_testing"   % blueeyesVersion,
       "org.scalacheck"           %% "scalacheck"     %     "1.10.1"     % "test",
+      "com.google.code.findbugs"  % "jsr305"         %     "3.0.1",
       "com.rubiconproject.oss"    % "jchronic"       %     "0.2.6"
     )
   )

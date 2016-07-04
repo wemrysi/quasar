@@ -52,31 +52,22 @@ object CTypeFlags {
 
     def flagForCType(t: CType) {
       @tailrec
-      def flagForCValueType(t: CValueType[_]) {
-        t match {
-          case CString => buffer += FString
-          case CBoolean => buffer += FBoolean
-          case CLong => buffer += FLong
-          case CDouble => buffer += FDouble
-          case CNum => buffer += FBigDecimal
-          case CDate => buffer += FDate
-          case CArrayType(tpe) =>
-            buffer += FArray
-            flagForCValueType(tpe)
-        }
+      def flagForCValueType(t: CValueType[_]): Unit = t match {
+        case CString         => buffer += FString
+        case CBoolean        => buffer += FBoolean
+        case CLong           => buffer += FLong
+        case CDouble         => buffer += FDouble
+        case CNum            => buffer += FBigDecimal
+        case CDate           => buffer += FDate
+        case CArrayType(tpe) => buffer += FArray ; flagForCValueType(tpe)
+        case CPeriod         => abort("CPeriod unexpected")
       }
-
       t match {
-        case t: CValueType[_] =>
-          flagForCValueType(t)
-        case CNull =>
-          buffer += FNull
-        case CEmptyArray =>
-          buffer += FEmptyArray
-        case CEmptyObject =>
-          buffer += FEmptyObject
-        case CUndefined =>
-          sys.error("Unexpected CUndefined type. Undefined segments don't exist!")
+        case t: CValueType[_] => flagForCValueType(t)
+        case CNull            => buffer += FNull
+        case CEmptyArray      => buffer += FEmptyArray
+        case CEmptyObject     => buffer += FEmptyObject
+        case CUndefined       => abort("Unexpected CUndefined type. Undefined segments don't exist!")
       }
     }
 

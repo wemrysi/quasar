@@ -760,17 +760,18 @@ object SortingRowFormat {
   }
 
   def flagForCType(cType: CType): Byte = cType match {
-    case CBoolean => FBoolean
-    case CString => FString
-    case CLong => FLong
-    case CDouble => FDouble
-    case CNum => FBigDecimal
-    case CDate => FDate
-    case CPeriod => FPeriod
-    case CEmptyObject => FEmptyObject
-    case CEmptyArray => FEmptyArray
-    case CNull => FNull
-    case CUndefined => FUndefined
+    case CBoolean      => FBoolean
+    case CString       => FString
+    case CLong         => FLong
+    case CDouble       => FDouble
+    case CNum          => FBigDecimal
+    case CDate         => FDate
+    case CPeriod       => FPeriod
+    case CEmptyObject  => FEmptyObject
+    case CEmptyArray   => FEmptyArray
+    case CNull         => FNull
+    case CUndefined    => FUndefined
+    case CArrayType(_) => abort("Unexpected CArrayType")
   }
 
   def cTypeForFlag(flag: Byte): CType = flag match {
