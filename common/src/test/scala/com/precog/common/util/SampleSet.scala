@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -55,19 +55,19 @@ object AdSamples {
   val eventNames = List("impression", "click", "conversion")
   val timeISO8601 = List("2010-11-04T15:38:12.782+03:00", "2010-04-22T06:22:38.039+06:30", "2009-05-30T12:31:42.462-09:00", "2009-02-11T22:12:18.493-02:00", "2008-09-19T06:28:31.325+10:00")
   val timeZone = List("-12:00", "-11:00", "-10:00", "-09:00", "-08:00", "-07:00", "-06:00", "-05:00", "-04:00", "-03:00", "-02:00", "-01:00", "+00:00", "+01:00", "+02:00", "+03:00", "+04:00", "+05:00", "+06:00", "+07:00", "+08:00", "+09:00", "+10:00", "+11:00", "+12:00", "+13:00", "+14:00")
-  
-  val states = 
-    List("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", 
-    "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MT",  
-    "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR",  
-    "MD", "MA", "MI", "MN", "MS", "MO", "PA", "RI", "SC", "SD", "TN",  
-    "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY") 
+
+  val states =
+    List("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
+    "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MT",
+    "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR",
+    "MD", "MA", "MI", "MN", "MS", "MO", "PA", "RI", "SC", "SD", "TN",
+    "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
 
   val shippingRates = List(5.95,6.95,10.95,24.95)
   val handlingCharges = List(5.00,7.00,10.00,0)
 
   val departments = List("sales", "marketing", "operations", "engineering", "manufacturing", "research")
- 
+
   def gaussianIndex(size: Int): Gen[Int] = {
     Gen( p => {
       def sample: Double = {
@@ -111,7 +111,7 @@ object AdSamples {
     emps <- oneOf(employees)
     rev <- oneOf(revenue)
     cat <- oneOf(category)
-    camp <- gaussianIndex(campaigns.size).map{ campaigns(_) } 
+    camp <- gaussianIndex(campaigns.size).map{ campaigns(_) }
   } yield {
     JObject(
       Map(
@@ -135,7 +135,7 @@ object AdSamples {
         "time" -> JNum(time),
         "timeZone" -> JString(tz),
         "timeString" -> JString(toISO8601(time, tz)),
-        "pageId" -> JString(pid), 
+        "pageId" -> JString(pid),
         "userId" -> JString(uid)
       )
     )
@@ -170,7 +170,7 @@ object AdSamples {
       )
     )
   }
-  
+
   def usersSample = for {
     age <- chooseNum(18,100)
     income <- chooseNum(10,250).map{ _ * 1000 }
@@ -205,13 +205,13 @@ object AdSamples {
     )
   }
 
-  def recipientsSample = listOfN(2, oneOf(departments)).map { list => 
+  def recipientsSample = listOfN(2, oneOf(departments)).map { list =>
     JArray( list.map { JString(_) } )
   }
 
   def paymentsSample = for {
     date <- earlierTimeFrame
-    recipients <- recipientsSample 
+    recipients <- recipientsSample
     amount <- chooseNum(500, 5000).map( _.toDouble / 100)
   } yield {
     JObject(Map("date" -> JNum(date), "recipients" -> recipients,
@@ -237,7 +237,7 @@ object AdSamples {
   def emptyArraySample = JArray(List())
 
   def nullSample = JNull
-  
+
   val millisPerDay: Long = 24L * 60 * 60 * 1000
 
   def earlierTimeFrame = chooseNum(System.currentTimeMillis - (20 * millisPerDay), System.currentTimeMillis - (10 * millisPerDay))

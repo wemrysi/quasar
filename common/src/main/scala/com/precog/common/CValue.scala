@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -45,7 +45,7 @@ import _root_.java.math.MathContext
 sealed trait RValue { self =>
   def toJValue: JValue
 
-  def \(fieldName: String): RValue 
+  def \(fieldName: String): RValue
 
   def unsafeInsert(path: CPath, value: RValue): RValue = {
     RValue.unsafeInsert(self, path, value)
@@ -207,18 +207,18 @@ sealed trait CType extends Serializable {
   def readResolve(): CType
   def isNumeric: Boolean = false
 
-  @inline 
+  @inline
   private[common] final def typeIndex = this match {
     case CUndefined    => 0
 
     case CBoolean      => 1
 
     case CString       => 2
-    
+
     case CLong         => 4
     case CDouble       => 6
     case CNum          => 7
-    
+
     case CEmptyObject  => 8
 
     case CEmptyArray   => 9
@@ -262,7 +262,7 @@ object CType {
     case CDate                  => "Timestamp"
     case CPeriod                => "Period"
     case CUndefined             => sys.error("CUndefined cannot be serialized")
-  } 
+  }
 
   val ArrayName = """Array[(.*)]""".r
 
@@ -283,13 +283,13 @@ object CType {
     case "Period"     => Some(CPeriod)
     case _ => None
   }
-    
+
   implicit val decomposer : Decomposer[CType] = new Decomposer[CType] {
     def decompose(ctype : CType) : JValue = JString(nameOf(ctype))
   }
 
   implicit val extractor : Extractor[CType] = new Extractor[CType] {
-    def validated(obj : JValue) : Validation[Extractor.Error,CType] = 
+    def validated(obj : JValue) : Validation[Extractor.Error,CType] =
       obj.validated[String].map( fromName _ ) match {
         case Success(Some(t)) => Success(t)
         case Success(None)    => Failure(Extractor.Invalid("Unknown type."))
@@ -338,7 +338,7 @@ object CType {
   @inline
   final def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
     case JString(s) => CString(s)
-    
+
     case JNum(d) => {
       val ctype = forJValue(jval)
       ctype match {
@@ -347,7 +347,7 @@ object CType {
         case _ => CNum(d)
       }
     }
-    
+
     case JBool(b)   => CBoolean(b)
     case JNull      => CNull
     case JObject(es) if es.size == 0 => CEmptyObject
@@ -359,7 +359,7 @@ object CType {
   @inline
   final def forJValue(jval: JValue): Option[CType] = jval match {
     case JBool(_)     => Some(CBoolean)
-    
+
     case JNum(d)      => {
       lazy val isLong = try {
         d.toLongExact
@@ -367,13 +367,13 @@ object CType {
       } catch {
         case _: ArithmeticException => false
       }
-      
+
       lazy val isDouble = try {
         BigDecimal(d.toDouble.toString, MathContext.UNLIMITED) == d
       } catch {
         case _: NumberFormatException | _: ArithmeticException => false
       }
-      
+
       if (isLong)
         Some(CLong)
       else if (isDouble)
@@ -381,7 +381,7 @@ object CType {
       else
         Some(CNum)
     }
-    
+
     case JString(_)   => Some(CString)
     case JNull        => Some(CNull)
     case JArray(Nil)  => Some(CEmptyArray)

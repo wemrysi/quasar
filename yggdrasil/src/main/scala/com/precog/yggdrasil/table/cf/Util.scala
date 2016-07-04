@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -35,55 +35,55 @@ object util {
    * Right-biased column union
    */
   val UnionRight = CF2P("builtin::ct::unionRight") {
-    case (c1: BoolColumn, c2: BoolColumn) => new UnionColumn(c1, c2) with BoolColumn { 
+    case (c1: BoolColumn, c2: BoolColumn) => new UnionColumn(c1, c2) with BoolColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: LongColumn, c2: LongColumn) => new UnionColumn(c1, c2) with LongColumn { 
+    case (c1: LongColumn, c2: LongColumn) => new UnionColumn(c1, c2) with LongColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: DoubleColumn, c2: DoubleColumn) => new UnionColumn(c1, c2) with DoubleColumn { 
+    case (c1: DoubleColumn, c2: DoubleColumn) => new UnionColumn(c1, c2) with DoubleColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: NumColumn, c2: NumColumn) => new UnionColumn(c1, c2) with NumColumn { 
+    case (c1: NumColumn, c2: NumColumn) => new UnionColumn(c1, c2) with NumColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: StrColumn, c2: StrColumn) => new UnionColumn(c1, c2) with StrColumn { 
+    case (c1: StrColumn, c2: StrColumn) => new UnionColumn(c1, c2) with StrColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: DateColumn, c2: DateColumn) => new UnionColumn(c1, c2) with DateColumn { 
+    case (c1: DateColumn, c2: DateColumn) => new UnionColumn(c1, c2) with DateColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
-    case (c1: PeriodColumn, c2: PeriodColumn) => new UnionColumn(c1, c2) with PeriodColumn { 
+    case (c1: PeriodColumn, c2: PeriodColumn) => new UnionColumn(c1, c2) with PeriodColumn {
       def apply(row: Int) = {
         if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-      } 
+      }
     }
 
     case (c1: HomogeneousArrayColumn[a], _c2: HomogeneousArrayColumn[_]) if c1.tpe == _c2.tpe =>
       val c2 = _c2.asInstanceOf[HomogeneousArrayColumn[a]]
-      new UnionColumn(c1, c2) with HomogeneousArrayColumn[a] { 
+      new UnionColumn(c1, c2) with HomogeneousArrayColumn[a] {
         val tpe = c1.tpe
         def apply(row: Int) = {
           if (c2.isDefinedAt(row)) c2(row) else if (c1.isDefinedAt(row)) c1(row) else sys.error("Attempt to retrieve undefined value for row: " + row)
-        } 
+        }
       }
 
 
@@ -107,7 +107,7 @@ object util {
       val columns: Array[Column] = sortedCols.map(_._2)(collection.breakOut)
 
       cols match {
-        case (_, _: BoolColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[BoolColumn]) => 
+        case (_, _: BoolColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[BoolColumn]) =>
           val boolColumns = copyCastArray[BoolColumn](columns)
           Some(new NConcatColumn(offsets, boolColumns) with BoolColumn {
             def apply(row: Int) = {
@@ -124,7 +124,7 @@ object util {
               longColumns(i)(row - offsets(i))
             }
           })
-        
+
         case (_, _: DoubleColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DoubleColumn]) =>
           val doubleColumns = copyCastArray[DoubleColumn](columns)
           Some(new NConcatColumn(offsets, doubleColumns) with DoubleColumn {
@@ -210,31 +210,31 @@ object util {
   }
 
   def Concat(at: Int) = CF2P("builtin::ct::concat") {
-    case (c1: BoolColumn, c2: BoolColumn) => new ConcatColumn(at, c1, c2) with BoolColumn { 
+    case (c1: BoolColumn, c2: BoolColumn) => new ConcatColumn(at, c1, c2) with BoolColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: LongColumn, c2: LongColumn) => new ConcatColumn(at, c1, c2) with LongColumn { 
+    case (c1: LongColumn, c2: LongColumn) => new ConcatColumn(at, c1, c2) with LongColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: DoubleColumn, c2: DoubleColumn) => new ConcatColumn(at, c1, c2) with DoubleColumn { 
+    case (c1: DoubleColumn, c2: DoubleColumn) => new ConcatColumn(at, c1, c2) with DoubleColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: NumColumn, c2: NumColumn) => new ConcatColumn(at, c1, c2) with NumColumn { 
+    case (c1: NumColumn, c2: NumColumn) => new ConcatColumn(at, c1, c2) with NumColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: StrColumn, c2: StrColumn) => new ConcatColumn(at, c1, c2) with StrColumn { 
+    case (c1: StrColumn, c2: StrColumn) => new ConcatColumn(at, c1, c2) with StrColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: DateColumn, c2: DateColumn) => new ConcatColumn(at, c1, c2) with DateColumn { 
+    case (c1: DateColumn, c2: DateColumn) => new ConcatColumn(at, c1, c2) with DateColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
-    case (c1: PeriodColumn, c2: PeriodColumn) => new ConcatColumn(at, c1, c2) with PeriodColumn { 
+    case (c1: PeriodColumn, c2: PeriodColumn) => new ConcatColumn(at, c1, c2) with PeriodColumn {
       def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
     }
 
@@ -251,35 +251,35 @@ object util {
   }
 
   def Shift(by: Int) = CF1P("builtin::ct::shift") {
-    case c: BoolColumn => new ShiftColumn(by, c) with BoolColumn { 
+    case c: BoolColumn => new ShiftColumn(by, c) with BoolColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: LongColumn => new ShiftColumn(by, c) with LongColumn { 
+    case c: LongColumn => new ShiftColumn(by, c) with LongColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: DoubleColumn => new ShiftColumn(by, c) with DoubleColumn { 
+    case c: DoubleColumn => new ShiftColumn(by, c) with DoubleColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: NumColumn => new ShiftColumn(by, c) with NumColumn { 
+    case c: NumColumn => new ShiftColumn(by, c) with NumColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: StrColumn => new ShiftColumn(by, c) with StrColumn { 
+    case c: StrColumn => new ShiftColumn(by, c) with StrColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: DateColumn => new ShiftColumn(by, c) with DateColumn { 
+    case c: DateColumn => new ShiftColumn(by, c) with DateColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: PeriodColumn => new ShiftColumn(by, c) with PeriodColumn { 
+    case c: PeriodColumn => new ShiftColumn(by, c) with PeriodColumn {
       def apply(row: Int) = c(row - by)
     }
 
-    case c: HomogeneousArrayColumn[a] => new ShiftColumn(by, c) with HomogeneousArrayColumn[a] { 
+    case c: HomogeneousArrayColumn[a] => new ShiftColumn(by, c) with HomogeneousArrayColumn[a] {
       val tpe = c.tpe
       def apply(row: Int) = c(row - by)
     }
@@ -400,7 +400,7 @@ object util {
   }
 
   def FilterComplement(complement: Column) = CF1P("builtin::ct:filterComplement") {
-    case c: BoolColumn   => new BoolColumn { 
+    case c: BoolColumn   => new BoolColumn {
       def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
       def apply(row: Int) = c(row)
     }
@@ -444,8 +444,8 @@ object util {
       def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
     }
   }
-  
-  def DefinedConst(value: CValue) = CF1("builtin::ct::definedConst") { c => 
+
+  def DefinedConst(value: CValue) = CF1("builtin::ct::definedConst") { c =>
     Some(
       value match {
         case CString(s) => new StrColumn {
@@ -494,41 +494,41 @@ object util {
       }
     )
   }
-  
+
   def MaskedUnion(leftMask: BitSet) = CF2P("builtin::ct::maskedUnion") {
     case (left: BoolColumn, right: BoolColumn) => new UnionColumn(left, right) with BoolColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: LongColumn, right: LongColumn) => new UnionColumn(left, right) with LongColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: DoubleColumn, right: DoubleColumn) => new UnionColumn(left, right) with DoubleColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: NumColumn, right: NumColumn) => new UnionColumn(left, right) with NumColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: StrColumn, right: StrColumn) => new UnionColumn(left, right) with StrColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: DateColumn, right: DateColumn) => new UnionColumn(left, right) with DateColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: PeriodColumn, right: PeriodColumn) => new UnionColumn(left, right) with PeriodColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
     }
-  
+
     case (left: HomogeneousArrayColumn[a], right: HomogeneousArrayColumn[b]) if left.tpe == right.tpe => new UnionColumn(left, right) with HomogeneousArrayColumn[a] {
       val tpe = left.tpe
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row).asInstanceOf[Array[a]]
     }
-  
+
     case (left: EmptyArrayColumn, right: EmptyArrayColumn) => new UnionColumn(left, right) with EmptyArrayColumn
     case (left: EmptyObjectColumn, right: EmptyObjectColumn) => new UnionColumn(left, right) with EmptyObjectColumn
     case (left: NullColumn, right: NullColumn) => new UnionColumn(left, right) with NullColumn

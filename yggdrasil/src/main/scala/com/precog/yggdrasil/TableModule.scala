@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -51,14 +51,14 @@ object TableSize {
 
 case class ExactSize(minSize: Long) extends TableSize {
   val maxSize = minSize
-  
+
   def +(other: TableSize) = other match {
     case ExactSize(n) => ExactSize(minSize + n)
     case EstimateSize(n1, n2) => EstimateSize(minSize + n1, minSize + n2)
     case UnknownSize => UnknownSize
     case InfiniteSize => InfiniteSize
   }
-  
+
   def *(other: TableSize) = other match {
     case ExactSize(n) => ExactSize(minSize * n)
     case EstimateSize(n1, n2) => EstimateSize(minSize * n1, minSize * n2)
@@ -74,7 +74,7 @@ case class EstimateSize(minSize: Long, maxSize: Long) extends TableSize {
     case UnknownSize => UnknownSize
     case InfiniteSize => InfiniteSize
   }
-  
+
   def *(other: TableSize) = other match {
     case ExactSize(n) => EstimateSize(minSize * n, maxSize * n)
     case EstimateSize(n1, n2) => EstimateSize(minSize * n1, maxSize * n2)
@@ -97,7 +97,7 @@ case object InfiniteSize extends TableSize {
 
 object TableModule {
   val paths = TransSpecModule.paths
-  
+
   sealed trait SortOrder
   sealed trait DesiredSortOrder extends SortOrder {
     def isAscending: Boolean
@@ -135,7 +135,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
   type TableCompanion <: TableCompanionLike
 
   val Table: TableCompanion
-  
+
   trait TableCompanionLike {
     import trans._
     //import trans._
@@ -150,7 +150,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
     def constDate(v: Set[org.joda.time.DateTime]): Table
     def constBoolean(v: Set[Boolean]): Table
     def constNull: Table
-    
+
     def constEmptyObject: Table
     def constEmptyArray: Table
 
@@ -190,7 +190,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
      * jtype and concatenate the resulting slices into a new table.
      */
     def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table]
-    
+
     /**
      * Folds over the table to produce a single value (stored in a singleton table).
      */
@@ -208,13 +208,13 @@ trait TableModule[M[+_]] extends TransSpecModule {
      * unknown sort order.
      */
     def transform(spec: TransSpec1): Table
-    
+
     /**
      * Cogroups this table with another table, using equality on the specified
      * transformation on rows of the table.
      */
     def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
-    
+
     /**
      * Performs a full cartesian cross on this table with the specified table,
      * applying the specified transformation to merge the two tables into
@@ -227,13 +227,13 @@ trait TableModule[M[+_]] extends TransSpecModule {
      * over the results.
      */
     def force: M[Table]
-    
+
     def paged(limit: Int): Table
-    
+
     /**
      * Sorts the KV table by ascending or descending order of a transformation
      * applied to the rows.
-     * 
+     *
      * @param sortKey The transspec to use to obtain the values to sort on
      * @param sortOrder Whether to sort ascending or descending
      * @param unique If true, the same key values will sort into a single row, otherwise
@@ -241,7 +241,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
      * preserved
      */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Table]
-    
+
     def distinct(spec: TransSpec1): Table
 
     def concat(t2: Table): Table
@@ -253,7 +253,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
     /**
      * Sorts the KV table by ascending or descending order based on a seq of transformations
      * applied to the rows.
-     * 
+     *
      * @param groupKeys The transspecs to use to obtain the values to sort on
      * @param valueSpec The transspec to use to obtain the non-sorting values
      * @param sortOrder Whether to sort ascending or descending
@@ -264,27 +264,27 @@ trait TableModule[M[+_]] extends TransSpecModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
-    
+
     def takeRange(startIndex: Long, numberToTake: Long): Table
 
     def canonicalize(length: Int, maxLength0: Option[Int] = None): Table
 
     def schemas: M[Set[JType]]
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer] 
+    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
 
     def renderCsv(): StreamT[M, CharBuffer]
-    
+
     // for debugging only!!
     def toJson: M[Iterable[JValue]]
 
     def printer(prelude: String = "", flag: String = ""): Table
-    
+
     def metrics: TableMetrics
   }
 
   sealed trait GroupingSpec {
-    def sources: Vector[GroupingSource] 
+    def sources: Vector[GroupingSource]
     def sorted: M[GroupingSpec]
   }
 
@@ -309,7 +309,7 @@ trait TableModule[M[+_]] extends TransSpecModule {
       GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec)
     }
   }
-  
+
   final case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1, groupKeyRightTrans: trans.TransSpec1, left: GroupingSpec, right: GroupingSpec, alignment: GroupingSpec.Alignment) extends GroupingSpec {
     def sources: Vector[GroupingSource] = left.sources ++ right.sources
     def sorted: M[GroupingAlignment] = (left.sorted |@| right.sorted) { (t1, t2) =>

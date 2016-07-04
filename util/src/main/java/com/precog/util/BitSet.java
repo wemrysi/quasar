@@ -2,7 +2,7 @@
  * Javolution - Java(TM) Solution for Real-Time and Embedded Systems
  * Copyright (C) 2008 - Javolution (http://javolution.org/)
  * All rights reserved.
- * 
+ *
  * Permission to use, copy, modify, and distribute this software is
  * freely granted, provided that this notice is preserved.
  *
@@ -22,14 +22,14 @@ import javolution.lang.MathLib;
 import javolution.lang.Reusable;
 
 /**
- * <p> This class represents either a table of bits or a set of non-negative 
+ * <p> This class represents either a table of bits or a set of non-negative
  *     numbers.</p>
- * 
- * <p> This class is integrated with the collection framework (as 
+ *
+ * <p> This class is integrated with the collection framework (as
  *     a set of {@link Index indices} and obeys the collection semantic
  *     for methods such as {@link #size} (cardinality) or {@link #equals}
  *     (same set of indices).</p>
- * 
+ *
  * @author  <a href="mailto:jean-marie@dautelle.com">Jean-Marie Dautelle</a>
  * @version 5.3, February 24, 2008
  */
@@ -61,7 +61,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     /**
      * Holds the length in words (long) of this bit set.
      * Any word at or above the current length should be ignored (assumed
-     * to be zero). 
+     * to be zero).
      */
     private int _length;
 
@@ -70,7 +70,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Creates a bit set of small initial capacity. All bits are initially 
+     * Creates a bit set of small initial capacity. All bits are initially
      * {@code false}.
      */
     public BitSet() {
@@ -78,11 +78,11 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Creates a bit set of specified initial capacity (in bits). 
+     * Creates a bit set of specified initial capacity (in bits).
      * All bits are initially {@code false}.  This
      * constructor reserves enough space to represent the integers
      * from {@code 0} to {@code bitSize-1}.
-     * 
+     *
      * @param bitSize the initial capacity in bits.
      */
     public BitSet(int bitSize) {
@@ -116,16 +116,16 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     /**
      * Recycles a set {@link #newInstance() instance} immediately
      * (on the stack when executing in a {@link javolution.context.StackContext
-     * StackContext}). 
+     * StackContext}).
      */
     public static void recycle(BitSet instance) {
         FACTORY.recycle(instance);
     }
 
     /**
-     * Adds the specified index to this set. This method is equivalent 
+     * Adds the specified index to this set. This method is equivalent
      * to <code>set(index.intValue())</code>.
-     * 
+     *
      * @param index the integer value to be appended to this set.
      * @return {@code true} if this set did not contains the specified
      *         index; {@code false} otherwise.
@@ -136,7 +136,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
         set(bitIndex);
         return true;
     }
-    
+
     /**
      * Performs the logical AND operation on this bit set and the
      * given bit set. This means it builds the intersection
@@ -168,7 +168,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Returns the number of bits set to {@code true} (or the size of this 
+     * Returns the number of bits set to {@code true} (or the size of this
      * set).
      *
      * @return the number of bits being set.
@@ -197,7 +197,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      */
     public void clear(int bitIndex) {
         int longIndex = bitIndex >> 6;
-        if (longIndex >= _length) 
+        if (longIndex >= _length)
             return;
         bits[longIndex] &= ~(1L << bitIndex);
     }
@@ -208,14 +208,14 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      *
      * @param  fromIndex index of the first bit to be cleared.
      * @param  toIndex index after the last bit to be cleared.
-     * @throws IndexOutOfBoundsException if 
+     * @throws IndexOutOfBoundsException if
      *          {@code (fromIndex < 0) | (toIndex < fromIndex)}
      */
     public void clear(int fromIndex, int toIndex) {
-        if ((fromIndex < 0) || (toIndex < fromIndex)) 
+        if ((fromIndex < 0) || (toIndex < fromIndex))
             throw new IndexOutOfBoundsException();
         int i = fromIndex >>> 6;
-        if (i >= _length) 
+        if (i >= _length)
             return; // Ensures that i < _length
         int j = toIndex >>> 6;
         if (i == j) {
@@ -254,11 +254,11 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      *
      * @param fromIndex the low index (inclusive).
      * @param toIndex the high index (exclusive).
-     * @throws IndexOutOfBoundsException if 
+     * @throws IndexOutOfBoundsException if
      *          {@code (fromIndex < 0) | (toIndex < fromIndex)}
      */
     public void flip(int fromIndex, int toIndex) {
-        if ((fromIndex < 0) || (toIndex < fromIndex)) 
+        if ((fromIndex < 0) || (toIndex < fromIndex))
             throw new IndexOutOfBoundsException();
         int i = fromIndex >>> 6;
         int j = toIndex >>> 6;
@@ -275,7 +275,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Returns {@code true}> if the specified integer is in 
+     * Returns {@code true}> if the specified integer is in
      * this bit set; {@code false } otherwise.
      *
      * @param bitIndex a non-negative integer.
@@ -305,11 +305,11 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      * @param fromIndex the low index (inclusive).
      * @param toIndex the high index (exclusive).
      * @return a context allocated bit set instance.
-     * @throws IndexOutOfBoundsException if 
+     * @throws IndexOutOfBoundsException if
      *          {@code (fromIndex < 0) | (toIndex < fromIndex)}
      */
     public BitSet get(int fromIndex, int toIndex) {
-        if (fromIndex < 0 || fromIndex > toIndex) 
+        if (fromIndex < 0 || fromIndex > toIndex)
             throw new IndexOutOfBoundsException();
         BitSet bitSet = BitSet.newInstance();
         int length = MathLib.min(_length, (toIndex >>> 6) + 1);
@@ -341,11 +341,11 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     //public boolean isEmpty() {
     //    return nextSetBit(0) == -1;
     //}
-    
+
     /**
      * Returns the logical number of bits actually used by this bit
      * set.  It returns the index of the highest set bit plus one.
-     * 
+     *
      * <p> Note: This method does not return the number of set bits
      *           which is returned by {@link #size} </p>
      *
@@ -367,7 +367,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      *
      * @param fromIndex the start location.
      * @return the first {@code false} bit.
-     * @throws IndexOutOfBoundsException if {@code fromIndex < 0} 
+     * @throws IndexOutOfBoundsException if {@code fromIndex < 0}
      */
     public int nextClearBit(int fromIndex) {
         int offset = fromIndex >> 6;
@@ -389,7 +389,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
 
     /**
      * Returns the index of the next {@code true} bit, from the specified bit
-     * (inclusive). If there is none, {@code -1} is returned. 
+     * (inclusive). If there is none, {@code -1} is returned.
      * The following code will iterates through the bit set:[code]
      *    for (int i=nextSetBit(0); i >= 0; i = nextSetBit(i + 1)) {
      *         ...
@@ -397,7 +397,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      *
      * @param fromIndex the start location.
      * @return the first {@code false} bit.
-     * @throws IndexOutOfBoundsException if {@code fromIndex < 0} 
+     * @throws IndexOutOfBoundsException if {@code fromIndex < 0}
      */
     public int nextSetBit(int fromIndex) {
         int offset = fromIndex >> 6;
@@ -405,7 +405,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
         while (offset < _length) {
             long h = bits[offset];
             do {
-                if ((h & mask) != 0) 
+                if ((h & mask) != 0)
                     return fromIndex;
                 mask <<= 1;
                 fromIndex++;
@@ -422,7 +422,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
 
     /**
      * Performs the logical OR operation on this bit set and the one specified.
-     * In other words, builds the union of the two sets.  
+     * In other words, builds the union of the two sets.
      * The result is stored into this bit set.
      *
      * @param that the second bit set.
@@ -437,7 +437,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Adds the specified integer to this set (corresponding bit is set to 
+     * Adds the specified integer to this set (corresponding bit is set to
      * {@code true}.
      *
      * @param bitIndex a non-negative integer.
@@ -481,11 +481,11 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      *
      * @param  fromIndex index of the first bit to be set.
      * @param  toIndex index after the last bit to be set.
-     * @throws IndexOutOfBoundsException if 
+     * @throws IndexOutOfBoundsException if
      *          {@code (fromIndex < 0) | (toIndex < fromIndex)}
      */
     public void set(int fromIndex, int toIndex) {
-        if ((fromIndex < 0) || (toIndex < fromIndex)) 
+        if ((fromIndex < 0) || (toIndex < fromIndex))
             throw new IndexOutOfBoundsException();
         int i = fromIndex >>> 6;
         int j = toIndex >>> 6;
@@ -520,10 +520,10 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
 
     /**
      * Returns the cardinality of this bit set (number of bits set).
-     * 
-     * <P>Note: Unlike {@code java.util.BitSet} this method does not 
-     *          returns an approximation of the number of bits of space 
-     *          actually in use. This method is compliant with 
+     *
+     * <P>Note: Unlike {@code java.util.BitSet} this method does not
+     *          returns an approximation of the number of bits of space
+     *          actually in use. This method is compliant with
      *          java.util.Collection meaning for size().</p>
      *
      * @return the cardinality of this bit set.
@@ -534,8 +534,8 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
 
     /**
      * Performs the logical XOR operation on this bit set and the one specified.
-     * In other words, builds the symmetric remainder of the two sets 
-     * (the elements that are in one set, but not in the other).  
+     * In other words, builds the symmetric remainder of the two sets
+     * (the elements that are in one set, but not in the other).
      * The result is stored into this bit set.
      *
      * @param that the second bit set.
@@ -551,25 +551,25 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
 
     // Optimization.
     public boolean equals(Object obj) {
-        if (!(obj instanceof BitSet)) 
+        if (!(obj instanceof BitSet))
             return super.equals(obj);
         BitSet that = (BitSet) obj;
         int n = MathLib.min(this._length, that._length);
         for (int i = 0; i < n; ++i) {
-            if (bits[i] != that.bits[i]) 
+            if (bits[i] != that.bits[i])
                 return false;
         }
         for (int i = n; i < this._length; i++) {
-            if (this.bits[i] != 0) 
+            if (this.bits[i] != 0)
                 return false;
         }
         for (int i = n; i < that._length; i++) {
-            if (that.bits[i] != 0) 
+            if (that.bits[i] != 0)
                 return false;
         }
         return true;
     }
-    
+
     // Optimization.
     public int hashCode() {
         int h = 0;
@@ -583,12 +583,12 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     public void reset() {
         _length = 0;
     }
-    
+
     // Implements abstract methods.
-    
+
     // Records holds the ordering position of the bit sets.
     // (e.g. first bit set has a position of zero).
-    
+
     public Record head() {
         return Index.valueOf(-1);
     }

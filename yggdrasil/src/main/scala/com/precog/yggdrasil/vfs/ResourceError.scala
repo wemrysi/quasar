@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -28,7 +28,7 @@ sealed trait ResourceError {
   def fold[A](fatalError: ResourceError.FatalError => A, userError: ResourceError.UserError => A): A
   def messages: NonEmptyList[String]
 }
-  
+
 object ResourceError {
   implicit val semigroup = new Semigroup[ResourceError] {
     def append(e1: ResourceError, e2: => ResourceError) = all(nels(e1, e2))
@@ -55,12 +55,12 @@ object ResourceError {
 
   sealed trait FatalError { self: ResourceError =>
     def fold[A](fatalError: FatalError => A, userError: UserError => A) = fatalError(self)
-    def messages: NonEmptyList[String] 
+    def messages: NonEmptyList[String]
   }
 
   sealed trait UserError { self: ResourceError =>
     def fold[A](fatalError: FatalError => A, userError: UserError => A) = userError(self)
-    def messages: NonEmptyList[String] 
+    def messages: NonEmptyList[String]
   }
 
   case class Corrupt(message: String) extends ResourceError with FatalError {

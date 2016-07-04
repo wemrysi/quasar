@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -158,7 +158,7 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
      */
     val tmp3 = tempfile()
     "recover from errors" in new cleanup(tmp3) {
-    
+
       // write a valid event, then a mal-formed event
       val ps = makeps(tmp3)
       RawLoader.writeHeader(ps, blockid)
@@ -166,24 +166,24 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       ps.println("##start 101")
       ps.println("""{"a": 2000, "b": 3.0}""")
       ps.close()
-    
+
       // try to load
       val (h1, events1, ok1) = RawHandler.load(blockid, tmp3)
       h1.length must_== 1
       events1.toSet must_== Set(100)
       ok1 must_== false
-    
+
       // close this handler
       h1.close()
-    
+
       // open a new handler, we should have sanitized the rawlog
       val (h2, events2, ok2) = RawHandler.load(blockid, tmp3)
       h2.length must_== 1
       events2.toSet must_== Set(100)
       ok2 must_== true
     }
-    
-    
+
+
     /**
      * Test missing files.
      *
@@ -193,8 +193,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
     "throw an exception when loading empty logs" in new cleanup(tmp4) {
       RawHandler.load(blockid, tmp4) must throwA[Exception]
     }
-    
-    
+
+
     /**
      * Test file collisions.
      *
@@ -220,8 +220,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       es.isEmpty must_== true
       h.length must_== 0
     }
-    
-    
+
+
     /**
      * Test recovery from totally corrupted rawlog file #2.
      *
@@ -234,8 +234,8 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       ps.close()
       RawHandler.load(blockid, tmp7) must throwA[Exception]
     }
-    
-    
+
+
     /**
      * Test recovery from partially-corrupted rawlog file #3.
      *
@@ -244,19 +244,19 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
     val tmp8 = tempfile()
     "recover when partially corrupted" in new cleanup(tmp8) {
       val range = (0 until 20)
-    
+
       val ps = makeps(tmp8)
       RawLoader.writeHeader(ps, blockid)
       def makejson(i: Int) = json("""{"a": %s, "b": %s}""" format (i * 2, i * 3))
       range.foreach(i => RawLoader.writeEvents(ps, i, makejson(i)))
       ps.println("biewjgwijgjigiwej")
       ps.close()
-    
+
       val (h, events, ok) = RawHandler.load(blockid, tmp8)
       h.length must_== range.length
       events.toSet must_== range.toSet
       ok must_== false
-    
+
       // double-check the data
       val cpa = CPath(".a")
       val cpb = CPath(".b")
@@ -266,7 +266,7 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
 
       val bs = new BitSet()
       range.foreach(i => bs.set(i))
-      
+
       val sa = ArraySegment(blockid, cpa, CNum, bs.copy, range.map(i => BigDecimal(i * 2)).toArray)
       val sb = ArraySegment(blockid, cpb, CNum, bs.copy, range.map(i => BigDecimal(i * 3)).toArray)
 
@@ -355,4 +355,4 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
       a3REmpty.toSet must_== Set()
     }
   }
-} 
+}

@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -51,7 +51,7 @@ trait RowFormat {
 
   def ColumnEncoder(cols: Seq[Column]): ColumnEncoder
   def ColumnDecoder(cols: Seq[ArrayColumn[_]]): ColumnDecoder
-  
+
   def encode(cValues: List[CValue]): Array[Byte]
   def decode(bytes: Array[Byte], offset: Int = 0): List[CValue]
 
@@ -236,7 +236,7 @@ trait RowFormatSupport { self: StdCodecs =>
   }
 
   protected trait ColumnValueDecoder {
-    def decode(row: Int, buf: ByteBuffer): Unit 
+    def decode(row: Int, buf: ByteBuffer): Unit
   }
 
   def getColumnDecoder(cType: CType, col: ArrayColumn[_]): ColumnValueDecoder = (cType, col) match {
@@ -301,7 +301,7 @@ trait RowFormatSupport { self: StdCodecs =>
       val bytes = ByteBufferPool.getBytesFrom(filled.toList)
       all foreach { pool.release(_) }
       bytes
-      
+
     } else {
       buffer.flip()
       val len = buffer.remaining()
@@ -337,7 +337,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
       val colsArray = cols.toArray
       def encodeFromRow(row: Int) = {
         val undefined = RawBitSet.create(colsArray.length)
-        
+
         @inline @tailrec def definedCols(i: Int): Unit = if (i >= 0) {
           if (!colsArray(i).isDefinedAt(row)) RawBitSet.set(undefined, i)
           definedCols(i - 1)
@@ -458,7 +458,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
       case (Left(s), xs) => rawBitSetCodec.writeMore(s, sink) map (s => (Left(s), xs)) orElse writeCValues(xs, sink)
       case (Right(s), xs) => s.more(sink) map (s => (Right(s), xs)) orElse writeCValues(xs, sink)
     }
-    
+
     def read(src: ByteBuffer): List[CValue] = {
       val undefined = rawBitSetCodec.read(src)
       codecs.zipWithIndex collect {

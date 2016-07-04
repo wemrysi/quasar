@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -72,7 +72,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
   import trans._
   import TransSpec.deepMap
   import SliceTransform._
-    
+
   type YggConfig <: IdSourceConfig with ColumnarTableModuleConfig with BlockStoreColumnarTableModuleConfig
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
@@ -100,7 +100,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
           remap(position) = i
           position += 1
         }
-        
+
         position < slice0.size
       }
 
@@ -126,12 +126,12 @@ trait BlockStoreColumnarTableModule[M[+_]]
       // from mergeProjections.
       def state: CellState = {
         val remap0 = new Array[Int](slice0.size)
-        System.arraycopy(remap, 0, remap0, 0, slice0.size) 
+        System.arraycopy(remap, 0, remap0, 0, slice0.size)
         new CellState(index, maxKey, slice0, succf, remap0, position)
       }
     }
 
-    sealed trait CellMatrix { self => 
+    sealed trait CellMatrix { self =>
       def cells: Iterable[Cell]
       def compare(cl: Cell, cr: Cell): Ordering
 
@@ -143,12 +143,12 @@ trait BlockStoreColumnarTableModule[M[+_]]
     object CellMatrix {
       def apply(initialCells: Vector[Cell])(keyf: Slice => Iterable[CPath]): CellMatrix = {
         val size = if (initialCells.isEmpty) 0 else initialCells.map(_.index).max + 1
-        
+
         type ComparatorMatrix = Array[Array[RowComparator]]
         def fillMatrix(initialCells: Vector[Cell]): ComparatorMatrix = {
           val comparatorMatrix = Array.ofDim[RowComparator](size, size)
 
-          for (Cell(i, _, s) <- initialCells; Cell(i0, _, s0) <- initialCells if i != i0) { 
+          for (Cell(i, _, s) <- initialCells; Cell(i0, _, s0) <- initialCells if i != i0) {
             comparatorMatrix(i)(i0) = Slice.rowComparatorFor(s, s0)(keyf)
           }
 
@@ -202,7 +202,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
         }
       }
 
-      StreamT.unfoldM[M, Slice, Stream[CellState]](cellStates) { cellStates => 
+      StreamT.unfoldM[M, Slice, Stream[CellState]](cellStates) { cellStates =>
         val cells: Vector[Cell] = cellStates.map(_.toCell)(collection.breakOut)
 
         // TODO: We should not recompute all of the row comparators every time,
@@ -238,14 +238,14 @@ trait BlockStoreColumnarTableModule[M[+_]]
                   cp
                 }
               }
-            } 
+            }
           }
 
           blockModuleLogger.trace("Emitting a new slice of size " + emission.size)
 
           val successorStatesM = expired.map(_.succ).sequence.map(_.toStream.collect({case Some(cs) => cs}))
 
-          successorStatesM map { successorStates => 
+          successorStatesM map { successorStates =>
             Some((emission, successorStates ++ suffixes))
           }
         }
@@ -312,7 +312,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
         (a + range.end + 1, cols + (ColumnRef(CPath(CPathIndex(1)), CLong) -> globalIdColumn))
       }
     }
-    
+
     def addGlobalId(spec: TransSpec1) = {
       Scan(WrapArray(spec), addGlobalIdScanner)
     }
@@ -354,7 +354,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
           Slice.rowComparatorFor(lkey.deref(CPathIndex(0)), rauth.deref(CPathIndex(0))) {
             _.columns.keys map (_.selector)
           }
-        } 
+        }
 
         def compare(i1: Int, i2: Int) = {
           if (i2 < 0 && rauth != null) auxComparator.compare(i1, rauth.size + i2) else mainComparator.compare(i1, i2)
@@ -370,15 +370,15 @@ trait BlockStoreColumnarTableModule[M[+_]]
         // run out of data, we'll still be hanging on to the last slice on the
         // other side to use as the authority for equality comparisons
         def step(
-          state: AlignState, 
+          state: AlignState,
           lhead: Slice, ltail: StreamT[M, Slice], stepleq: BitSet,
           rhead: Slice, rtail: StreamT[M, Slice], stepreq: BitSet,
-          lstate: A, rstate: B, 
+          lstate: A, rstate: B,
           leftWriteState: JDBMState, rightWriteState: JDBMState
         ): M[(JDBMState, JDBMState)] = {
 
-          @tailrec def buildFilters(comparator: RowComparator, 
-                                    lidx: Int, lsize: Int, lacc: BitSet, 
+          @tailrec def buildFilters(comparator: RowComparator,
+                                    lidx: Int, lsize: Int, lacc: BitSet,
                                     ridx: Int, rsize: Int, racc: BitSet,
                                     span: Span): NextStep = {
             //println((lidx, ridx, span))
@@ -391,13 +391,13 @@ trait BlockStoreColumnarTableModule[M[+_]]
               // We don't need to compare the index on the right, since it will be left unchanged
               // throughout the time that we're advancing left, and even if it's beyond the end of
               // input we can use the next-to-last element for comparison
-              
+
               if (lidx < lsize) {
                 comparator.compare(lidx, ridx - 1) match {
-                  case EQ => 
+                  case EQ =>
                     //println("Found equal on left.")
                     buildFilters(comparator, lidx + 1, lsize, lacc + lidx, ridx, rsize, racc, LeftSpan)
-                  case LT => 
+                  case LT =>
                     sys.error("Inputs to align are not correctly sorted.")
                   case GT =>
                     buildFilters(comparator, lidx, lsize, lacc, ridx, rsize, racc, NoSpan)
@@ -410,10 +410,10 @@ trait BlockStoreColumnarTableModule[M[+_]]
             } else {
               if (lidx < lsize && ridx < rsize) {
                 comparator.compare(lidx, ridx) match {
-                  case EQ => 
+                  case EQ =>
                     //println("Found equal on right.")
                     buildFilters(comparator, lidx, lsize, lacc, ridx + 1, rsize, racc + ridx, RightSpan)
-                  case LT => 
+                  case LT =>
                     if (span eq RightSpan) {
                       // drop into left spanning of equal
                       buildFilters(comparator, lidx, lsize, lacc, ridx, rsize, racc, LeftSpan)
@@ -440,11 +440,11 @@ trait BlockStoreColumnarTableModule[M[+_]]
           // search to skip over big chunks of (or entire) slices if possible.
           def findEqual(comparator: RowComparator, leftRow: Int, leq: BitSet, rightRow: Int, req: BitSet): NextStep = {
             comparator.compare(leftRow, rightRow) match {
-              case EQ => 
+              case EQ =>
                 //println("findEqual is equal at %d, %d".format(leftRow, rightRow))
                 buildFilters(comparator, leftRow, lhead.size, leq, rightRow, rhead.size, req, NoSpan)
 
-              case LT => 
+              case LT =>
                 val leftIdx = comparator.nextLeftIndex(leftRow + 1, lhead.size - 1, 0)
                 //println("found next left index " + leftIdx + " from " + (lhead.size - 1, lhead.size, 0, lhead.size - leftRow - 1))
                 if (leftIdx == lhead.size) {
@@ -452,8 +452,8 @@ trait BlockStoreColumnarTableModule[M[+_]]
                 } else {
                   buildFilters(comparator, leftIdx, lhead.size, leq, rightRow, rhead.size, req, NoSpan)
                 }
-            
-              case GT => 
+
+              case GT =>
                 val rightIdx = comparator.swap.nextLeftIndex(rightRow + 1, rhead.size - 1, 0)
                 //println("found next right index " + rightIdx + " from " + (rhead.size - 1, rhead.size, 0, rhead.size - rightRow - 1))
                 if (rightIdx == rhead.size) {
@@ -465,7 +465,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
             }
           }
 
-          // This function exists so that we can correctly nandle the situation where the right side is out of data 
+          // This function exists so that we can correctly nandle the situation where the right side is out of data
           // and we need to continue in a span on the left.
           def continue(nextStep: NextStep, comparator: RowComparator, lstate: A, lkey: Slice, rstate: B, rkey: Slice, leftWriteState: JDBMState, rightWriteState: JDBMState): M[(JDBMState, JDBMState)] = nextStep match {
             case MoreLeft(span, leq, ridx, req) =>
@@ -487,16 +487,16 @@ trait BlockStoreColumnarTableModule[M[+_]]
                   //println("No more data on left; emitting right based on bitset " + req.toList.mkString("[", ",", "]"))
                   // done on left, and we're not in an equal span on the right (since LeftSpan can only
                   // be emitted if we're not in a right span) so we're entirely done.
-                  val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req))) 
+                  val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req)))
                   (remission map { e => writeAlignedSlices(rkey, e, rbs, "alignRight", SortAscending) } getOrElse rbs.point[M]) map { (lbs, _) }
               }
 
               //println("Requested more left; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
               val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.util.filter(0, lhead.size, leq)))
-              lemission map { e => 
+              lemission map { e =>
                 for {
-                  nextLeftWriteState <- writeAlignedSlices(lkey, e, leftWriteState, "alignLeft", SortAscending) 
-                  resultWriteStates  <- next(nextLeftWriteState, rightWriteState) 
+                  nextLeftWriteState <- writeAlignedSlices(lkey, e, leftWriteState, "alignLeft", SortAscending)
+                  resultWriteStates  <- next(nextLeftWriteState, rightWriteState)
                 } yield resultWriteStates
               } getOrElse {
                 next(leftWriteState, rightWriteState)
@@ -504,7 +504,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
 
             case MoreRight(span, lidx, leq, req) =>
               def next(lbs: JDBMState, rbs: JDBMState): M[(JDBMState, JDBMState)] = rtail.uncons flatMap {
-                case Some((rhead0, rtail0)) => 
+                case Some((rhead0, rtail0)) =>
                   //println("Continuing on right.")
                   val nextState = (span: @unchecked) match {
                     case NoSpan => FindEqualAdvancingRight(lidx, lkey)
@@ -516,13 +516,13 @@ trait BlockStoreColumnarTableModule[M[+_]]
                 case None =>
                   // no need here to check for LeftSpan by the contract of buildFilters
                   (span: @unchecked) match {
-                    case NoSpan => 
+                    case NoSpan =>
                       //println("No more data on right and not in a span; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
-                      // entirely done; just emit both 
+                      // entirely done; just emit both
                       val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.util.filter(0, lhead.size, leq)))
                       (lemission map { e => writeAlignedSlices(lkey, e, lbs, "alignLeft", SortAscending) } getOrElse lbs.point[M]) map { (_, rbs) }
 
-                    case RightSpan => 
+                    case RightSpan =>
                       //println("No more data on right, but in a span so continuing on left.")
                       // if span == RightSpan and no more data exists on the right, we need to continue in buildFilters spanning on the left.
                       val nextState = buildFilters(comparator, lidx, lhead.size, leq, rhead.size, rhead.size, new BitSet, LeftSpan)
@@ -532,10 +532,10 @@ trait BlockStoreColumnarTableModule[M[+_]]
 
               //println("Requested more right; emitting right based on bitset " + req.toList.mkString("[", ",", "]"))
               val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req)))
-              remission map { e => 
+              remission map { e =>
                 for {
-                  nextRightWriteState <- writeAlignedSlices(rkey, e, rightWriteState, "alignRight", SortAscending) 
-                  resultWriteStates   <- next(leftWriteState, nextRightWriteState) 
+                  nextRightWriteState <- writeAlignedSlices(rkey, e, rightWriteState, "alignRight", SortAscending)
+                  resultWriteStates   <- next(leftWriteState, nextRightWriteState)
                 } yield resultWriteStates
               } getOrElse {
                 next(leftWriteState, rightWriteState)
@@ -544,7 +544,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
 
           //println("state: " + state)
           state match {
-            case FindEqualAdvancingRight(leftRow, lkey) => 
+            case FindEqualAdvancingRight(leftRow, lkey) =>
               // whenever we drop into buildFilters in this case, we know that we will be neither
               // in a left span nor a right span because we didn't have an equal case at the
               // last iteration.
@@ -552,15 +552,15 @@ trait BlockStoreColumnarTableModule[M[+_]]
               rightKeyTrans.f(rstate, rhead) flatMap {
                 case (nextB, rkey) => {
                   val comparator = buildRowComparator(lkey, rkey, null)
-                  
+
                   // do some preliminary comparisons to figure out if we even need to look at the current slice
                   val nextState = findEqual(comparator, leftRow, stepleq, 0, stepreq)
                   //println("Next state: " + nextState)
                   continue(nextState, comparator, lstate, lkey, nextB, rkey, leftWriteState, rightWriteState)
                 }
               }
-            
-            case FindEqualAdvancingLeft(rightRow, rkey) => 
+
+            case FindEqualAdvancingLeft(rightRow, rkey) =>
               // whenever we drop into buildFilters in this case, we know that we will be neither
               // in a left span nor a right span because we didn't have an equal case at the
               // last iteration.
@@ -568,35 +568,35 @@ trait BlockStoreColumnarTableModule[M[+_]]
               leftKeyTrans.f(lstate, lhead) flatMap {
                 case (nextA, lkey) => {
                   val comparator = buildRowComparator(lkey, rkey, null)
-                  
+
                   // do some preliminary comparisons to figure out if we even need to look at the current slice
                   val nextState = findEqual(comparator, 0, stepleq, rightRow, stepreq)
                   continue(nextState, comparator, nextA, lkey, rstate, rkey, leftWriteState, rightWriteState)
                 }
               }
-            
+
             case RunRight(leftRow, lkey, rauth) =>
               rightKeyTrans.f(rstate, rhead) flatMap {
                 case (nextB, rkey) => {
                   val comparator = buildRowComparator(lkey, rkey, rauth.orNull)
-    
+
                   val nextState = buildFilters(comparator, leftRow, lhead.size, stepleq, 0, rhead.size, new BitSet, RightSpan)
                   continue(nextState, comparator, lstate, lkey, nextB, rkey, leftWriteState, rightWriteState)
                 }
               }
-            
+
             case RunLeft(rightRow, rkey, rauth) =>
               leftKeyTrans.f(lstate, lhead) flatMap {
                 case (nextA, lkey) => {
                   val comparator = buildRowComparator(lkey, rkey, rauth.orNull)
-    
+
                   val nextState = buildFilters(comparator, 0, lhead.size, new BitSet, rightRow, rhead.size, stepreq, LeftSpan)
                   continue(nextState, comparator, nextA, lkey, rstate, rkey, leftWriteState, rightWriteState)
                 }
               }
           }
         }
-        
+
         left.uncons flatMap {
           case Some((lhead, ltail)) =>
             right.uncons.flatMap {
@@ -606,10 +606,10 @@ trait BlockStoreColumnarTableModule[M[+_]]
                 //println("initial right: \n" + rhead + "\n\n")
                 val stepResult = leftKeyTrans(lhead) flatMap {
                   case (lstate, lkey) => {
-                    step(FindEqualAdvancingRight(0, lkey), 
+                    step(FindEqualAdvancingRight(0, lkey),
                                        lhead, ltail, new BitSet,
                                        rhead, rtail, new BitSet,
-                                       lstate, rightKeyTrans.initial, 
+                                       lstate, rightKeyTrans.initial,
                                        leftWriteState, rightWriteState)
                   }
                 }
@@ -640,8 +640,8 @@ trait BlockStoreColumnarTableModule[M[+_]]
       // We need some id that can be used to memoize then load table for each side.
       val initState = JDBMState.empty("alignSpace")
 
-      writeStreams(reduceSlices(sourceLeft.slices), composeSliceTransform(addGlobalId(alignOnL)), 
-                   reduceSlices(sourceRight.slices), composeSliceTransform(addGlobalId(alignOnR)), 
+      writeStreams(reduceSlices(sourceLeft.slices), composeSliceTransform(addGlobalId(alignOnL)),
+                   reduceSlices(sourceRight.slices), composeSliceTransform(addGlobalId(alignOnR)),
                    initState, initState)
     }
 
@@ -665,7 +665,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
     def writeTables(slices: StreamT[M, Slice], valueTrans: SliceTransform1[_], keyTrans: Seq[SliceTransform1[_]], sortOrder: DesiredSortOrder): M[(List[String], IndexMap)] = {
       def write0(slices: StreamT[M, Slice], state: WriteState): M[(List[String], IndexMap)] = {
         slices.uncons flatMap {
-          case Some((slice, tail)) => 
+          case Some((slice, tail)) =>
             writeSlice(slice, state, sortOrder) flatMap { write0(tail, _) }
 
           case None =>
@@ -687,7 +687,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
           val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
           val dataRowFormat = RowFormat.forValues(vColumnRefs)
           val dataColumnEncoder = dataRowFormat.ColumnEncoder(vColumns)
-    
+
           def storeTransformed(jdbmState: JDBMState, transforms: List[(SliceTransform1[_], String)], updatedTransforms: List[(SliceTransform1[_], String)]): M[(JDBMState, List[(SliceTransform1[_], String)])] = transforms match {
             case (keyTransform, streamId) :: tail =>
               keyTransform.advance(slice) flatMap {
@@ -697,7 +697,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
                     val keyRowFormat = RowFormat.forSortingKey(keyColumnRefs)
                     val keyColumnEncoder = keyRowFormat.ColumnEncoder(keyColumns)
                     val keyComparator = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
-        
+
                     writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder,
                                    streamId, jdbmState) flatMap { newJdbmState =>
                       storeTransformed(newJdbmState, tail, (nextKeyTransform, streamId) :: updatedTransforms)
@@ -707,13 +707,13 @@ trait BlockStoreColumnarTableModule[M[+_]]
                   }
                 }
               }
-    
-            case Nil => 
+
+            case Nil =>
               M.point((jdbmState, updatedTransforms.reverse))
           }
-    
+
           storeTransformed(jdbmState, keyTrans, Nil) map {
-            case (jdbmState0, keyTrans0) => 
+            case (jdbmState0, keyTrans0) =>
               WriteState(jdbmState0, valueTrans0, keyTrans0)
           }
         }
@@ -807,7 +807,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
         val indexName = indexMapKey.name
         val mvslice = vslice.materialized
         val mkslice = kslice.materialized
-        
+
         // TODO Materializing after a sort may help w/ cache hits when traversing a column.
         val (vslice0, kslice0) = mvslice.sortWith(mkslice, sortOrder)
         val sortedSlice = SortedSlice(indexName,
@@ -837,13 +837,13 @@ trait BlockStoreColumnarTableModule[M[+_]]
           // We can actually get the last key, but is that necessary?
           M.point(Some(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => M.point(None))))
 
-        case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) => 
+        case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
           val sortProjection = new JDBMRawSortProjection[M](dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
           val succ: Option[SortingKey] => M[Option[SortBlockData]] = (key: Option[SortingKey]) => sortProjection.getBlockAfter(key)
-          
-          succ(None) map { 
-            _ map { nextBlock => 
-              CellState(index, nextBlock.maxKey, nextBlock.data, (k: SortingKey) => succ(Some(k))) 
+
+          succ(None) map {
+            _ map { nextBlock =>
+              CellState(index, nextBlock.maxKey, nextBlock.data, (k: SortingKey) => succ(Some(k)))
             }
           }
       }
@@ -851,14 +851,14 @@ trait BlockStoreColumnarTableModule[M[+_]]
       val head = StreamT.Skip(
         StreamT.wrapEffect(
           for (cellOptions <- cellsMs.sequence) yield {
-            mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice => 
+            mergeProjections(sortOrder, cellOptions.flatMap(a => a)) { slice =>
               // only need to compare on the group keys (0th element of resulting table) between projections
               slice.columns.keys collect { case ColumnRef(path @ CPath(CPathIndex(0), _ @ _*), _) => path }
             }
           }
         )
       )
-      
+
       Table(StreamT(M.point(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
 
@@ -908,7 +908,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
           })
         }
 
-        
+
         composeSliceTransform(indexKeySpec).advance(index) map { case (_, indexKey) =>
           val hashed = HashedSlice(indexKey)
           Table(joinWithHash(table.slices, initKeyTrans, initJoinTrans, hashed), UnknownSize)
@@ -951,7 +951,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
 
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table]
   }
-  
+
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
 
     /**
@@ -972,7 +972,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
   class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
     import TableModule._
     import TransSpecModule._
-    
+
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] = {
@@ -990,20 +990,20 @@ trait BlockStoreColumnarTableModule[M[+_]]
 
       loop(slices)
     }
-    
+
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       val xform = transform(valueSpec)
       M.point(List.fill(groupKeys.size)(xform))
     }
-    
+
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = M.point(this)
-    
+
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
-    
+
     override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
 
     override def force: M[Table] = M.point(this)
-    
+
     override def paged(limit: Int): Table = this
 
     override def distinct(spec: TransSpec1): Table = this
@@ -1050,7 +1050,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
     import Table._
     import SliceTransform._
     import trans._
-    
+
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
     def toInternalTable(limit0: Int): EitherT[M, ExternalTable, InternalTable] = {
@@ -1082,7 +1082,7 @@ trait BlockStoreColumnarTableModule[M[+_]]
     /**
      * Sorts the KV table by ascending or descending order of a transformation
      * applied to the rows.
-     * 
+     *
      * @see com.precog.yggdrasil.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
      */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = {
@@ -1094,11 +1094,11 @@ trait BlockStoreColumnarTableModule[M[+_]]
     /**
      * Sorts the KV table by ascending or descending order based on a seq of transformations
      * applied to the rows.
-     * 
+     *
      * @see com.precog.yggdrasil.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
      */
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
-      writeSorted(groupKeys, valueSpec, sortOrder, unique) map { case (streamIds, indices) => 
+      writeSorted(groupKeys, valueSpec, sortOrder, unique) map { case (streamIds, indices) =>
         val streams = indices.groupBy(_._1.streamId)
         streamIds.toStream map { streamId =>
           streams get streamId map (loadTable(sortMergeEngine, _, sortOrder)) getOrElse Table.empty
@@ -1114,8 +1114,8 @@ trait BlockStoreColumnarTableModule[M[+_]]
       val (sourceTrans0, keyTrans0, valueTrans0) = if (! unique) {
         (
           addGlobalId(Leaf(Source)),
-          groupKeys map { kt => 
-            OuterObjectConcat(WrapObject(deepMap(kt) { case Leaf(_) => TransSpec1.DerefArray0 }, "0"), WrapObject(TransSpec1.DerefArray1, "1")) 
+          groupKeys map { kt =>
+            OuterObjectConcat(WrapObject(deepMap(kt) { case Leaf(_) => TransSpec1.DerefArray0 }, "0"), WrapObject(TransSpec1.DerefArray1, "1"))
           },
           deepMap(valueSpec) { case Leaf(_) => TransSpec1.DerefArray0 }
         )

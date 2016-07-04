@@ -28,7 +28,7 @@ source project.
 - [Precog-User](https://groups.google.com/a/precog.com/forum/#!forum/user-list) &mdash; An open email list for users of Precog.
 - [\#precog](irc://irc.freenode.net/precog) &mdash; An IRC channel for Precog.
 - [\#quirrel](irc://irc.freenode.net/quirrel) &mdash; An IRC channel for the Quirrel query language.
- 
+
 ## Developer Guide
 
 A few landmarks:
@@ -74,10 +74,10 @@ A few landmarks:
     -   `NIHDBPlatformSpecs`
     -   `REPL`
 
--   **bifrost** - BlueEyes service front-end for the 
+-   **bifrost** - BlueEyes service front-end for the
 
--   **miklagard** - Standalone versions for the desktop and alternate 
-    backend data stores -- see local README.rst. These need a bit of 
+-   **miklagard** - Standalone versions for the desktop and alternate
+    backend data stores -- see local README.rst. These need a bit of
     work to bring them up to date; they were disabled some time ago
     and may have bitrotted.
 
@@ -120,7 +120,7 @@ Altogether, you need to run the following commands:
     $ cd -
     $ cd platform
     $ sbt
-    
+
 From here, you must run the following tasks in order:
 
 - `test:compile`
@@ -137,7 +137,7 @@ supports it. Our filename conventions are…inconsistent.
 
 ## Building and Running
 
-These instructions are at best rudimentary, but should be sufficient to 
+These instructions are at best rudimentary, but should be sufficient to
 get started in a minimal way. More will be coming soon!
 
 The Precog environment is organized in a modular, service-oriented
@@ -152,14 +152,14 @@ Services:
 -   **bifrost** - The primary service for evaluating NIHDB
 -   **auth** - Authentication provider (checks tokens and grants; to be
     merged with accounts in the near term)
--   **accounts** - Account provider (records association between user 
-    information and an account root token; to be merged with auth in 
+-   **accounts** - Account provider (records association between user
+    information and an account root token; to be merged with auth in
     the near term)
 -   **dvergr** - A simple job tracking service that is used to track
-    batch query completion. 
+    batch query completion.
 -   **ingest** - The primary service for adding data to the Precog database.
 
-Runnable jar files for all of these services can be built using the 
+Runnable jar files for all of these services can be built using the
 `sbt assembly` target from the root (platform) project. Sample configuration
 files for each can be found in the `<projectname>/configs/dev` directory
 for each relevant project; to run a simple test instance you can use the
@@ -197,23 +197,23 @@ entirely, and thus the history is not stable.
 
 Do your work on your local branch, committing as frequently as you like,
 squashing and rebasing off of updated `master` (or any other `topic/` or
-`bug/` branch) at your discretion. 
+`bug/` branch) at your discretion.
 
 When you are confident in your changes and ready for them to land, push
 your `topic/` or `bug/` branch to your *own* fork of **platform** (you
-can [create a fork here](https://github.com/precog/platform/fork_select)). 
+can [create a fork here](https://github.com/precog/platform/fork_select)).
 
 Once you have pushed to your fork, submit a Pull Request using GitHub's
 interface. Take a moment to describe your changes as a whole,
 particularly highlighting any API or Quirrel language changes which land
-as part of the changeset. 
+as part of the changeset.
 
-Once your pull request is ready to be merged, it will be brought into the 
+Once your pull request is ready to be merged, it will be brought into the
 `staging` branch, which is a branch on the mainline repository that
 exists *purely* for the purposes of aggregating pull requests. It should
-not be considered a developer branch, but is used to run the full build 
-as a final sanity check before the changes are pushed as a *fast forward* 
-to `master` once the build has completed successfully. 
+not be considered a developer branch, but is used to run the full build
+as a final sanity check before the changes are pushed as a *fast forward*
+to `master` once the build has completed successfully.
 This process ensures a minimum of friction between concurrent tasks
 while simultaneously making it extremely difficult to break the build in
 `master`. Build problems are generally caught and resolved in pull
@@ -279,7 +279,7 @@ In the current roadmap, Phase 1 involves simplifying Precog to the point where
 there are so few moving pieces, anyone can install and launch Precog, and keep
 Precog running without anything more than an occasional restart.
 
-The work is currently tracked in the [Simplified Precog](https://github.com/precog/platform/issues?milestone=1&state=open) 
+The work is currently tracked in the [Simplified Precog](https://github.com/precog/platform/issues?milestone=1&state=open)
 milestone and divided into the following tickets:
 
 - [Remove MongoDB dependency](https://github.com/precog/platform/issues/523)
@@ -292,13 +292,13 @@ milestone and divided into the following tickets:
 - [Merge and simplify auth / accounts](https://github.com/precog/platform/issues/530)
 - [Single process server](https://github.com/precog/platform/issues/531)
 - [Finalize cached queries support](https://github.com/precog/platform/issues/541)
- 
-Many of these tickets indirectly contribute to Phase 2, by bringing the foundations 
+
+Many of these tickets indirectly contribute to Phase 2, by bringing the foundations
 of Precog closer into alignment with HDFS.
 
 ### Phase 2: Support for Big Data
 
-Currently, Precog can only handle the amount of data that can reside on a single machine. 
+Currently, Precog can only handle the amount of data that can reside on a single machine.
 While there are many optimizations that still need to be made (such as support for
 indexes, type-specific columnar compression, etc.), a bigger win with more immediate
 impact will be making Precog "big data-ready", where it can compete head-to-head with Hive,
@@ -307,10 +307,10 @@ Pig, and other analytics options for Hadoop.
 Spark is an in-memory computational framework that runs as a YARN application inside
 a Hadoop cluster. It can read from and write to the Hadoop file system (HDFS), and
 exposes a wide range of primitives for performing data processing. Several high-performance,
-scalable query systems have been built on Spark, such as Shark and BlinkDB. 
+scalable query systems have been built on Spark, such as Shark and BlinkDB.
 
 Given that Spark's emphasis is on fast, in-memory computation, that it's written in Scala,
-and that it has already been used to implement several query languages, it seems an ideal target 
+and that it has already been used to implement several query languages, it seems an ideal target
 for Precog.
 
 The work is currently divided into the following tickets:
@@ -323,7 +323,7 @@ The work is currently divided into the following tickets:
 
 ### Alternate Front-Ends
 
-Support for dynamically-typed, multi-dimensional SQL ("SQL for heterogeneous JSON"), 
+Support for dynamically-typed, multi-dimensional SQL ("SQL for heterogeneous JSON"),
 and possibly other query interfaces such as JSONiq and UNQL.
 
 ## License

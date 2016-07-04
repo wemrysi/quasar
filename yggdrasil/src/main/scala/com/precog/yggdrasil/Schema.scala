@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -60,7 +60,7 @@ object Schema {
   def sample(jtype: JType, size: Int): Option[JType] = {
     val paths = flatten(jtype, Nil) groupBy { _.selector } toSeq
     val sampledPaths: Seq[ColumnRef] = scala.util.Random.shuffle(paths).take(size) flatMap { _._2 }
-    
+
     mkType(sampledPaths)
   }
 
@@ -68,10 +68,10 @@ object Schema {
     def buildPath(nodes: List[CPathNode], refs: List[ColumnRef], jType: JType): List[ColumnRef] = jType match {
       case JArrayFixedT(indices) if indices.isEmpty =>
         ColumnRef(CPath(nodes.reverse), CEmptyArray) :: Nil
-        
+
       case JObjectFixedT(fields) if fields.isEmpty =>
         ColumnRef(CPath(nodes.reverse), CEmptyObject) :: Nil
-        
+
       case JArrayFixedT(indices) =>
         indices.toList.flatMap { case (idx, tpe) =>
           val refs0 = refs collect { case ColumnRef(CPath(CPathIndex(`idx`), rest @ _*), ctype) =>
@@ -90,7 +90,7 @@ object Schema {
       }
 
       case JArrayUnfixedT =>
-        refs collect { 
+        refs collect {
           case ColumnRef(p @ CPath(CPathIndex(i), rest @ _*), ctype) =>
             ColumnRef(CPath(nodes.reverse) \ p, ctype)
           case ColumnRef(CPath(), CEmptyArray) =>
@@ -98,7 +98,7 @@ object Schema {
         }
 
       case JObjectUnfixedT =>
-        refs collect { 
+        refs collect {
           case ColumnRef(p @ CPath(CPathField(i), rest @ _*), ctype) =>
             ColumnRef(CPath(nodes.reverse) \ p, ctype)
           case ColumnRef(CPath(), CEmptyObject) =>
@@ -163,7 +163,7 @@ object Schema {
 
     inner(jtype)
   }
-  
+
   /**
   * returns a function that, for a given (row: Int), produces a Boolean
   * value is true if the given row subsumes the provided `jtpe`
@@ -173,7 +173,7 @@ object Schema {
       val filteredCols = cols filter { case (ColumnRef(path, ctpe), _) =>
         path == seenPath && providedCTypes.contains(ctpe)
       }
-      val bits = filteredCols.values map { 
+      val bits = filteredCols.values map {
         _.definedAt(0, size)
       } reduceOption { _ | _ } getOrElse new BitSet
 
@@ -196,7 +196,7 @@ object Schema {
 
         emptyCrit || nonemptyCrit
       }
-      val objBits = objCols.values map { 
+      val objBits = objCols.values map {
         _.definedAt(0, size)
       } reduceOption { _ | _ } getOrElse new BitSet
 
@@ -236,7 +236,7 @@ object Schema {
         } else {
           val results: Seq[Int => Boolean] = fields.toSeq map { case (field, tpe) =>
             val seenPath0 = CPath(seenPath.nodes :+ CPathField(field))
-            findTypes(tpe, seenPath0, cols, size) 
+            findTypes(tpe, seenPath0, cols, size)
           }
 
           combineFixedResults(results)
@@ -270,7 +270,7 @@ object Schema {
    * supplied sequence is empty.
    */
   def mkType(ctpes: Seq[ColumnRef]): Option[JType] = {
-    
+
     val primitives = ctpes flatMap {
       case ColumnRef(CPath.Identity, t: CValueType[_]) => fromCValueType(t)
       case ColumnRef(CPath.Identity, CNull) => Some(JNullT)
@@ -394,7 +394,7 @@ object Schema {
       val keys = fields.keySet
       keys.forall { key =>
         subsumes(
-          ctpes.collect { case (CPath(CPathField(`key`), tail @ _*), ctpe) => (CPath(tail : _*), ctpe) }, 
+          ctpes.collect { case (CPath(CPathField(`key`), tail @ _*), ctpe) => (CPath(tail : _*), ctpe) },
           fields(key))
       }
     }

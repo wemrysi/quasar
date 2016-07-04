@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -43,7 +43,7 @@ trait MergeSpec[M[+_]] extends
   ColumnarTableModuleTestSupport[M] with
   TableModuleSpec[M] with
   IndicesModule[M] {
-  
+
   type GroupId = Int
   import trans._
   import TableModule._
@@ -58,7 +58,7 @@ trait MergeSpec[M[+_]] extends
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
   }
-  
+
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[M, Slice], size: TableSize) = new Table(slices, size)
 
@@ -69,7 +69,7 @@ trait MergeSpec[M[+_]] extends
   }
 
   object Table extends TableCompanion
-  
+
   "merge" should {
     "avoid crosses in trivial cases" in {
       val fooJson = """
@@ -79,7 +79,7 @@ trait MergeSpec[M[+_]] extends
         | {"key":[5908438637678328473],"value":{"a":3,"b":7}}
         | """.stripMargin
       val foo = fromJson(JParser.parseManyFromString(fooJson).valueOr(throw _).toStream)
-    
+
       val barJson = """
         | {"key":[5908438637678328576],"value":{"a":-1,"c":8,"b":-1}}
         | {"key":[5908438637678328577],"value":{"a":1,"c":9,"b":-1}}
@@ -89,7 +89,7 @@ trait MergeSpec[M[+_]] extends
         | {"key":[5908438637678328581],"value":{"a":0,"c":13,"b":-1}}
         | """.stripMargin
       val bar = fromJson(JParser.parseManyFromString(barJson).valueOr(throw _).toStream)
-    
+
       val resultJson0 = """
         | {"key":[5908438637678328470,5908438637678328580],"value":{"b":4,"c":12,"a":0,"fa":{"b":4,"a":0}}}
         | {"key":[5908438637678328470,5908438637678328581],"value":{"b":4,"c":13,"a":0,"fa":{"b":4,"a":0}}}
@@ -98,15 +98,15 @@ trait MergeSpec[M[+_]] extends
         | {"key":[5908438637678328473,5908438637678328579],"value":{"b":7,"c":11,"a":3,"fa":{"b":7,"a":3}}}
         | """.stripMargin
       val resultJson = JParser.parseManyFromString(resultJson0).valueOr(throw _)
-        
+
       val keyField = CPathField("key")
       val valueField = CPathField("value")
       val aField = CPathField("a")
       val bField = CPathField("b")
       val cField = CPathField("c")
-      val oneField = CPathField("1") 
-      val twoField = CPathField("2") 
-      
+      val oneField = CPathField("1")
+      val twoField = CPathField("2")
+
       val grouping =
         GroupingAlignment(TransSpec1.Id, TransSpec1.Id,
           GroupingSource(
@@ -129,13 +129,13 @@ trait MergeSpec[M[+_]] extends
           ),
           GroupingSpec.Intersection
         )
-  
+
       def evaluator(key: RValue, partition: GroupId => M[Table]) = {
         val K0 = RValue.fromJValue(JParser.parseUnsafe("""{"1":0,"2":4}"""))
         val K1 = RValue.fromJValue(JParser.parseUnsafe("""{"1":1,"2":5}"""))
         val K2 = RValue.fromJValue(JParser.parseUnsafe("""{"1":2,"2":6}"""))
         val K3 = RValue.fromJValue(JParser.parseUnsafe("""{"1":3,"2":7}"""))
-        
+
         val r0Json = """
           | {"key":[5908438637678328470,5908438637678328580],"value":{"b":4,"c":12,"a":0,"fa":{"b":4,"a":0}}}
           | {"key":[5908438637678328470,5908438637678328581],"value":{"b":4,"c":13,"a":0,"fa":{"b":4,"a":0}}}
@@ -149,12 +149,12 @@ trait MergeSpec[M[+_]] extends
         val r3Json = """
           | {"key":[5908438637678328473,5908438637678328579],"value":{"b":7,"c":11,"a":3,"fa":{"b":7,"a":3}}}
           | """.stripMargin
-          
+
         val r0 = fromJson(JParser.parseManyFromString(r0Json).valueOr(throw _).toStream)
         val r1 = fromJson(JParser.parseManyFromString(r1Json).valueOr(throw _).toStream)
         val r2 = fromJson(JParser.parseManyFromString(r2Json).valueOr(throw _).toStream)
         val r3 = fromJson(JParser.parseManyFromString(r3Json).valueOr(throw _).toStream)
-          
+
         (key match {
           case K0 => {
             //println("key: "+keyJson+" partition(0):")
@@ -187,11 +187,11 @@ trait MergeSpec[M[+_]] extends
           case _  => sys.error("Unexpected group key")
         }).point[M]
       }
-      
+
       val result = Table.merge(grouping)(evaluator)
       result.flatMap(_.toJson).copoint.toSet must_== resultJson.toSet
     }
-    
+
     "execute the medals query without a cross" in {
       val medalsJson = """
         | {"key":[5908438637678314371],"value":{"Edition":"2000","Gender":"Men"}}
@@ -211,17 +211,17 @@ trait MergeSpec[M[+_]] extends
         | {"key":[],"value":{"year":"1996","ratio":139.0}}
         | {"key":[],"value":{"year":"2000","ratio":126.0}}
         | {"key":[],"value":{"year":"2004","ratio":122.0}}
-        | {"key":[],"value":{"year":"2008","ratio":119.0}}      
+        | {"key":[],"value":{"year":"2008","ratio":119.0}}
         | """.stripMargin
       val resultJson = JParser.parseManyFromString(resultJson0).valueOr(throw _)
-      
+
       val keyField = CPathField("key")
       val valueField = CPathField("value")
       val genderField = CPathField("Gender")
       val editionField = CPathField("Edition")
       val extra0Field = CPathField("extra0")
-      val extra1Field = CPathField("extra1") 
-      val oneField = CPathField("1") 
+      val extra1Field = CPathField("extra1")
+      val oneField = CPathField("1")
 
       val grouping =
         GroupingAlignment(TransSpec1.Id, TransSpec1.Id,
@@ -251,7 +251,7 @@ trait MergeSpec[M[+_]] extends
         val K1 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"2000","extra0":true,"extra1":true}"""))
         val K2 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"2004","extra0":true,"extra1":true}"""))
         val K3 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"2008","extra0":true,"extra1":true}"""))
-        
+
         val r0Json = """
           | {"key":[],"value":{"year":"1996","ratio":139.0}}
           | """.stripMargin
@@ -262,7 +262,7 @@ trait MergeSpec[M[+_]] extends
           | {"key":[],"value":{"year":"2004","ratio":122.0}}
           | """.stripMargin
         val r3Json = """
-          | {"key":[],"value":{"year":"2008","ratio":119.0}}      
+          | {"key":[],"value":{"year":"2008","ratio":119.0}}
           | """.stripMargin
 
         val r0 = fromJson(JParser.parseManyFromString(r0Json).valueOr(throw _).toStream)
@@ -302,7 +302,7 @@ trait MergeSpec[M[+_]] extends
           case _  => sys.error("Unexpected group key")
         }).point[M]
       }
-      
+
       val result = Table.merge(grouping)(evaluator)
       result.flatMap(_.toJson).copoint.toSet must_== resultJson.toSet
     }
@@ -317,7 +317,7 @@ object MergeSpec extends MergeSpec[Need] {
   val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {
     val maxSliceSize = 10
     val smallSliceSize = 3
-    
+
     val idSource = new FreshAtomicIdSource
   }
 }

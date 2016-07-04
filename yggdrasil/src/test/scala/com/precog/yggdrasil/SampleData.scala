@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -46,7 +46,7 @@ import CValueGenerators.JSchema
 
 case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = None) {
   override def toString = {
-    "SampleData: \ndata = "+data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") + 
+    "SampleData: \ndata = "+data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
     "\nschema: " + schema
   }
 
@@ -67,7 +67,7 @@ object SampleData extends CValueGenerators {
       (idCount, data) <- genEventColumns(jschema)
     } yield {
       try {
-      
+
       SampleData(
         data.sorted.toStream flatMap {
           // Sometimes the assembly process will generate overlapping values which will
@@ -82,31 +82,31 @@ object SampleData extends CValueGenerators {
       }
     }
   )
-  
+
   def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
     val seen = mutable.HashSet[S]()
-    
+
     for (t <- c) {
       if (!seen(key(t))) {
         builder += t
         seen += key(t)
       }
     }
-    
+
     builder.result
   }
-  
+
   def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
-    
+
     for (t <- c)
       if (Random.nextDouble < freq)
         builder += t
-    
+
     builder.result
   }
-  
+
   def sort(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
     Arbitrary(
       for {
@@ -115,8 +115,8 @@ object SampleData extends CValueGenerators {
         SampleData(sampleData.data.sorted, sampleData.schema)
       }
     )
-  }  
-  
+  }
+
   def shuffle(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
     val gen =
       for {
@@ -124,7 +124,7 @@ object SampleData extends CValueGenerators {
       } yield {
         SampleData(Random.shuffle(sampleData.data), sampleData.schema)
       }
-    
+
     Arbitrary(gen)
   }
 
@@ -167,7 +167,7 @@ object SampleData extends CValueGenerators {
         val duplicates = randomSubset(rows, 0.25)
         SampleData(Random.shuffle(rows ++ duplicates), sampleData.schema)
       }
-    
+
     Arbitrary(gen)
   }
 
@@ -178,9 +178,9 @@ object SampleData extends CValueGenerators {
       } yield {
         val rows = for(row <- sampleData.data)
           yield if (Random.nextDouble < 0.25) JUndefined else row
-        SampleData(rows, sampleData.schema) 
+        SampleData(rows, sampleData.schema)
       }
-    
+
     Arbitrary(gen)
   }
 
@@ -197,9 +197,9 @@ object SampleData extends CValueGenerators {
           row
         }
       }
-      SampleData(rows, sampleData.schema) 
+      SampleData(rows, sampleData.schema)
     }
-    
+
     Arbitrary(gen)
   }
 }

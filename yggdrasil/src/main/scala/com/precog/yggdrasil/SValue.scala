@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -35,7 +35,7 @@ import scalaz.syntax.equal._
 import scalaz.std.AllInstances._
 
 sealed trait SValue {
-  def isA(valueType: SType): Boolean 
+  def isA(valueType: SType): Boolean
   def hasProperty(selector: JPath) = (this \ selector).isDefined
 
   def \(selector: JPath): Option[SValue] = {
@@ -43,16 +43,16 @@ sealed trait SValue {
       Some(this)
     } else {
       this match {
-        case SObject(obj) => 
+        case SObject(obj) =>
           (selector.nodes : @unchecked) match {
             case JPathField(name) :: Nil => obj.get(name)
-            case JPathField(name) :: xs  => obj.get(name).flatMap(_ \ JPath(xs)) 
+            case JPathField(name) :: xs  => obj.get(name).flatMap(_ \ JPath(xs))
           }
 
-        case SArray(arr) => 
+        case SArray(arr) =>
           (selector.nodes : @unchecked) match {
-            case JPathIndex(i)    :: Nil => arr.lift(i) 
-            case JPathIndex(i)    :: xs  => arr.lift(i).flatMap(_ \ JPath(xs)) 
+            case JPathIndex(i)    :: Nil => arr.lift(i)
+            case JPathIndex(i)    :: xs  => arr.lift(i).flatMap(_ \ JPath(xs))
           }
 
         case _ => None
@@ -61,71 +61,71 @@ sealed trait SValue {
   }
 
   def set(selector: JPath, value: SValue): Option[SValue] = this match {
-    case SObject(obj) => 
+    case SObject(obj) =>
       (selector.nodes : @unchecked) match {
-        case JPathField(name) :: Nil => Some(SObject(obj + (name -> value))) 
-        case JPathField(name) :: xs  => 
-          val child = xs.head match { 
+        case JPathField(name) :: Nil => Some(SObject(obj + (name -> value)))
+        case JPathField(name) :: xs  =>
+          val child = xs.head match {
             case JPathField(_) => SObject.Empty
             case JPathIndex(_) => SArray.Empty
           }
 
-          obj.getOrElse(name, child).set(JPath(xs), value).map(sv => (SObject(obj + (name -> sv)))) 
+          obj.getOrElse(name, child).set(JPath(xs), value).map(sv => (SObject(obj + (name -> sv))))
       }
 
-    case SArray(arr) => 
+    case SArray(arr) =>
       (selector.nodes : @unchecked) match {
-        case JPathIndex(i) :: Nil => Some(SArray(arr.padTo(i + 1, SNull).updated(i, value))) 
-        case JPathIndex(i) :: xs  => 
-          val child = xs.head match { 
+        case JPathIndex(i) :: Nil => Some(SArray(arr.padTo(i + 1, SNull).updated(i, value)))
+        case JPathIndex(i) :: xs  =>
+          val child = xs.head match {
             case JPathField(_) => SObject.Empty
             case JPathIndex(_) => SArray.Empty
           }
 
-          arr.lift(i).getOrElse(child).set(JPath(xs), value).map(sv => SArray(arr.padTo(i + 1, SNull).updated(i, sv))) 
+          arr.lift(i).getOrElse(child).set(JPath(xs), value).map(sv => SArray(arr.padTo(i + 1, SNull).updated(i, sv)))
       }
 
     case SNull if (selector == JPath.Identity) => Some(value)
 
     case _ => None
   }
-  
+
   def set(selector: JPath, cv: CValue): Option[SValue] =
     if (cv eq null) None else set(selector, SValue.fromCValue(cv))
-  
+
   def structure: Seq[(JPath, CType)] = {
     import SValue._
     val s = this match {
       case SObject(m) =>
         if (m.isEmpty) List((JPath(), CEmptyObject))
         else {
-          m.toSeq.flatMap { 
-            case (name, value) => value.structure map { 
-              case (path, ctype) => (JPathField(name) \ path, ctype) 
+          m.toSeq.flatMap {
+            case (name, value) => value.structure map {
+              case (path, ctype) => (JPathField(name) \ path, ctype)
             }
           }
         }
-      
+
       case SArray(a) =>
         if (a.isEmpty) List((JPath(), CEmptyArray))
         else {
-          a.zipWithIndex.flatMap { 
-            case (value, index) => value.structure map { 
-              case (path, ctype) => (JPathIndex(index) \ path, ctype) 
+          a.zipWithIndex.flatMap {
+            case (value, index) => value.structure map {
+              case (path, ctype) => (JPathIndex(index) \ path, ctype)
             }
           }
         }
-      
+
       case SString(_)     => List((JPath(), CString))
       case STrue | SFalse => List((JPath(), CBoolean))
       case SDecimal(_)    => List((JPath(), CNum))
-      case SNull          => List((JPath(), CNull)) 
+      case SNull          => List((JPath(), CNull))
       case SUndefined     => List((JPath(), CUndefined))
     }
 
     s.sorted
   }
-   
+
   lazy val shash: Long = structure.hashCode
 
   lazy val toJValue: JValue = this match {
@@ -186,14 +186,14 @@ trait SValueInstances {
 
   implicit def order: Order[SValue] = new Order[SValue] {
     private val objectOrder = (o1: Map[String, SValue]) => (o2: Map[String, SValue]) => {
-      (o1.size ?|? o2.size) |+| 
+      (o1.size ?|? o2.size) |+|
       (o1.toSeq.sortBy(_._1) zip o2.toSeq.sortBy(_._1)).foldLeft[Ordering](EQ) {
         case (ord, ((k1, v1), (k2, v2))) => ord |+| (k1 ?|? k2) |+| (v1 ?|? v2)
       }
     }
 
     private val arrayOrder = (o1: Vector[SValue]) => (o2: Vector[SValue]) => {
-      (o1.length ?|? o2.length) |+| 
+      (o1.length ?|? o2.length) |+|
       (o1 zip o2).foldLeft[Ordering](EQ) {
         case (ord, (v1, v2)) => ord |+| (v1 ?|? v2)
       }
@@ -216,13 +216,13 @@ trait SValueInstances {
   }
 
   implicit def equal: Equal[SValue] = new Equal[SValue] {
-    private val objectEqual = (o1: Map[String, SValue]) => (o2: Map[String, SValue]) => 
+    private val objectEqual = (o1: Map[String, SValue]) => (o2: Map[String, SValue]) =>
       (o1.size == o2.size) &&
       (o1.toSeq.sortBy(_._1) zip o2.toSeq.sortBy(_._1)).foldLeft(true) {
         case (eql, ((k1, v1), (k2, v2))) => eql && k1 == k2 && v1 === v2
       }
 
-    private val arrayEqual = (o1: Vector[SValue]) => (o2: Vector[SValue]) => 
+    private val arrayEqual = (o1: Vector[SValue]) => (o2: Vector[SValue]) =>
       (o1.length == o2.length) &&
       (o1 zip o2).foldLeft(true) {
         case (eql, (v1, v2)) => eql && v1 === v2

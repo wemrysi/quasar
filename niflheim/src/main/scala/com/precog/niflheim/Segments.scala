@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -204,7 +204,7 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
       addLong(row, tree, j)
     } else {
       val n = tree.getType(CNum)
-  
+
       if (n >= 0) {
         val seg = a(n).asInstanceOf[ArraySegment[BigDecimal]]
         seg.defined.set(row)
@@ -250,13 +250,13 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
       case JNull => addNull(row, tree)
       case JTrue => addTrue(row, tree)
       case JFalse => addFalse(row, tree)
-  
+
       case JString(s) => addString(row, tree, s)
       case JNumLong(n) => addLong(row, tree, n)
       case JNumDouble(n) => addDouble(row, tree, n)
       case JNumBigDec(n) => addBigDecimal(row, tree, n)
       case JNumStr(s) => addNum(row, tree, s)
-  
+
       case JObject(m) =>
         if (m.isEmpty) {
           addEmptyObject(row, tree)
@@ -266,7 +266,7 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
               initializeSegments(row, j, tree.getField(key))
           }
         }
-  
+
       case JArray(js) =>
         if (js.isEmpty) {
           addEmptyArray(row, tree)
@@ -277,7 +277,7 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
             i += 1
           }
         }
-  
+
       case JUndefined => ()
     }
   }

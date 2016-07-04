@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -40,7 +40,7 @@ trait SamplableTableModule[M[+_]]
   import TableModule._
 
   type Table <: SamplableTable
-  
+
   trait SamplableTable extends TableLike { self: Table =>
     import trans._
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
@@ -80,9 +80,9 @@ trait SamplableColumnarTableModule[M[+_]]
                 transform advance origSlice map {
                   case (nextTransform, slice) => {
                     val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice)
-  
+
                     val defined = slice.definedAt
-                  
+
                     @tailrec
                     def loop(i: Int, len: Int): Int = if (i < slice.size) {
                       // `k` is a number between 0 and number of rows we've seen
@@ -99,18 +99,18 @@ trait SamplableColumnarTableModule[M[+_]]
                         loop(i + 1, len + 1)
                       }
                     } else len
-      
+
                     val newLength = loop(0, len0)
-      
+
                     SampleState(Some(inserter), newLength, nextTransform)
                   }
                 }
             }
-            
+
             Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
 
           case None =>
-            M.point { 
+            M.point {
               states map { case SampleState(inserter, length, _) =>
                 val len = length min sampleSize
                 inserter map { _.toSlice(len) } map { slice =>

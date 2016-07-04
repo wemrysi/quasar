@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -140,7 +140,7 @@ class NIHDBProjectionSpecs extends Specification with ScalaCheck with FutureMatc
 
       val expected: Seq[JValue] = Seq(JNum(0L), JNum(1L), JNum(2L), JNum(3L), JNum(4L))
 
-      val io = 
+      val io =
         nihdb.insert((0L to 2L).toSeq.map { i => NIHDB.Batch(i, Seq(JNum(i))) }) >>
         // Ensure we handle skips/overlap properly. First tests a complete skip, second tests partial
         nihdb.insert((0L to 2L).toSeq.map { i => NIHDB.Batch(i, Seq(JNum(i))) }) >>
@@ -173,8 +173,8 @@ class NIHDBProjectionSpecs extends Specification with ScalaCheck with FutureMatc
 
       val expected: Seq[JValue] = (0L to 1950L).map(JNum(_)).toSeq
 
-      (0L to 1950L).map(JNum(_)).grouped(400).zipWithIndex foreach { 
-        case (values, id) => nihdb.insert(Seq(NIHDB.Batch(id.toLong, values))).unsafePerformIO 
+      (0L to 1950L).map(JNum(_)).grouped(400).zipWithIndex foreach {
+        case (values, id) => nihdb.insert(Seq(NIHDB.Batch(id.toLong, values))).unsafePerformIO
       }
 
       var waits = 10

@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -79,11 +79,11 @@ object Metadata {
       case metadata @ JObject(entries) if entries.size == 1 => {
         val (key, value) = entries.head
         MetadataType.fromName(key).map {
-          case BooleanValueStats     => value.validated[BooleanValueStats] 
-          case LongValueStats        => value.validated[LongValueStats] 
-          case DoubleValueStats      => value.validated[DoubleValueStats] 
-          case BigDecimalValueStats  => value.validated[BigDecimalValueStats] 
-          case StringValueStats      => value.validated[StringValueStats] 
+          case BooleanValueStats     => value.validated[BooleanValueStats]
+          case LongValueStats        => value.validated[LongValueStats]
+          case DoubleValueStats      => value.validated[DoubleValueStats]
+          case BigDecimalValueStats  => value.validated[BigDecimalValueStats]
+          case StringValueStats      => value.validated[StringValueStats]
         } getOrElse { Failure(Invalid("Unknown metadata type: " + key)) }
       }
 
@@ -92,7 +92,7 @@ object Metadata {
   }
 
   def toTypedMap(set: Set[Metadata]): Map[MetadataType, Metadata] = {
-    set.foldLeft(Map[MetadataType, Metadata]()) ( (acc, el) => acc + (el.metadataType -> el) ) 
+    set.foldLeft(Map[MetadataType, Metadata]()) ( (acc, el) => acc + (el.metadataType -> el) )
   }
 
   implicit val MetadataSemigroup = new Semigroup[Map[MetadataType, Metadata]] {
@@ -152,7 +152,7 @@ object LongValueStats extends MetadataType {
 
 case class DoubleValueStats(count: Long, min: Double, max: Double) extends MetadataStats {
   def metadataType = DoubleValueStats
-  
+
   def fold[A](bf: BooleanValueStats => A, lf: LongValueStats => A, df: DoubleValueStats => A, bdf: BigDecimalValueStats => A, sf: StringValueStats => A): A = df(this)
 
   def merge(that: Metadata) = that match {
@@ -169,8 +169,8 @@ object DoubleValueStats extends MetadataType {
 }
 
 case class BigDecimalValueStats(count: Long, min: BigDecimal, max: BigDecimal) extends MetadataStats {
-  def metadataType = BigDecimalValueStats 
-  
+  def metadataType = BigDecimalValueStats
+
   def fold[A](bf: BooleanValueStats => A, lf: LongValueStats => A, df: DoubleValueStats => A, bdf: BigDecimalValueStats => A, sf: StringValueStats => A): A = bdf(this)
 
   def merge(that: Metadata) = that match {
@@ -187,13 +187,13 @@ object BigDecimalValueStats extends MetadataType {
 }
 
 case class StringValueStats(count: Long, min: String, max: String) extends MetadataStats {
-  def metadataType = StringValueStats 
-  
+  def metadataType = StringValueStats
+
   def fold[A](bf: BooleanValueStats => A, lf: LongValueStats => A, df: DoubleValueStats => A, bdf: BigDecimalValueStats => A, sf: StringValueStats => A): A = sf(this)
 
   def merge(that: Metadata) = that match {
-    case StringValueStats(count, min, max) => Some(StringValueStats(this.count + count, 
-                                                                    Order[String].min(this.min, min), 
+    case StringValueStats(count, min, max) => Some(StringValueStats(this.count + count,
+                                                                    Order[String].min(this.min, min),
                                                                     Order[String].max(this.max, max)))
     case _                                 => None
   }

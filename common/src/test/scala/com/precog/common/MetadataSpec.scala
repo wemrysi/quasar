@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -31,7 +31,7 @@ import scalaz.syntax.semigroup._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   import Prop._
-  
+
   val sampleSize = 100
 
   "simple metadata" should {
@@ -43,9 +43,9 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
 
     "merge with like metadata" in check { (sample1: List[Metadata], sample2: List[Metadata]) =>
       val prepared = sample1 zip sample2 map {
-        case (e1, e2) => (e1, e2, e1 merge e2) 
+        case (e1, e2) => (e1, e2, e1 merge e2)
       }
-      
+
       forall(prepared) {
         case (BooleanValueStats(c1, t1), BooleanValueStats(c2, t2), Some(BooleanValueStats(c3, t3))) => {
           c3 must_== c1 + c2
@@ -87,7 +87,7 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
       val prepared = sample1 zip sample2 map {
         case (s1, s2) => (s1, s2, s1 |+| s2)
       }
-      
+
       forall(prepared) {
         case (s1, s2, r) => {
           val keys = s1.keys ++ s2.keys
@@ -108,13 +108,13 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
 trait MetadataGenerators extends util.ArbitraryJValue {
   import Gen._
   import Arbitrary._
-  
+
   implicit val arbMetadata: Arbitrary[Metadata] = Arbitrary(genMetadata)
   implicit val arbMetadataMap: Arbitrary[Map[MetadataType, Metadata]] = Arbitrary(genMetadataMap)
 
   val metadataGenerators = List[Gen[Metadata]](genBooleanMetadata, genLongMetadata, genDoubleMetadata, genBigDecimalMetadata, genStringMetadata)
 
-  def genMetadataList: Gen[List[Metadata]] = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l } 
+  def genMetadataList: Gen[List[Metadata]] = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l }
 
   def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l => Map( l.map( m => (m.metadataType, m) ): _* ) }
 
