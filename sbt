@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 
-sbtVersion="0.12.4"
+sbtVersion="0.13.11"
 
 "$(/usr/libexec/java_home -v 1.7)/bin/java" \
 $SBT_JAVA_OPTS \

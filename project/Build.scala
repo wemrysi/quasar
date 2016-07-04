@@ -18,10 +18,11 @@
  *
  */
 
-import sbt._, Keys._
-import sbtassembly.Plugin.AssemblyKeys._
+package precog
 
-object PlatformBuild extends Build {
+import sbt._, Keys._
+
+object PlatformBuild {
   val profileTask     = InputKey[Unit]("profile", "Runs the given project under JProfiler")
   val blueeyesVersion = "1.0.0-M9.5"
 
@@ -33,11 +34,9 @@ object PlatformBuild extends Build {
                               scalacOptions ++= optimizeOpts,
                                javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
                                scalaVersion :=  "2.9.3",
-                        jarName in assembly <<= (name) map { name => name + "-assembly-" + ("git describe".!!.trim) + ".jar" },
-                         target in assembly <<= target,
     (unmanagedSourceDirectories in Compile) <<= (scalaSource in Compile, javaSource in Compile)(Seq(_) ++ Set(_)),
        (unmanagedSourceDirectories in Test) <<= (scalaSource in Test)(Seq(_)),
-                  parallelExecution in test :=  false,
+                  parallelExecution in Test :=  false,
                         logBuffered in Test :=  false,
 
     libraryDependencies ++= Seq(
@@ -66,46 +65,38 @@ object PlatformBuild extends Build {
     javaOptions in profileTask <<= (javaOptions, baseDirectory) map ((opts, b) => opts :+ jprofilerArg(b))
   )
 
-  // https://github.com/sbt/sbt-assembly
-  //
-  // By the way, the first case pattern in the above using PathList(...) is how
-  // you can pick javax/servlet/* from the first jar. If the default
-  // MergeStrategy.deduplicate is not working for you, that likely means you have
-  // multiple versions of some library pulled by your dependency graph. The real
-  // solution is to fix that dependency graph. You can work around it by
-  // MergeStrategy.first but don't be surprised when you see
-  // ClassNotFoundException.
-  import sbtassembly.Plugin.{ MergeStrategy, PathList }
-  def assemblyMerger(path: String): MergeStrategy = path match {
-    case s if s endsWith ".txt"                    => MergeStrategy.discard
-    case PathList("META-INF", "MANIFEST.MF")       => MergeStrategy.discard
-    case PathList("org", "slf4j", "impl", xs @ _*) => MergeStrategy.first
-    case _                                         => MergeStrategy.deduplicate
+  implicit class ProjectOps(val p: sbt.Project) {
+    import sbtassembly.AssemblyPlugin.assemblySettings
+    import sbtassembly.AssemblyPlugin.autoImport._
+
+    // https://github.com/sbt/sbt-assembly
+    //
+    // By the way, the first case pattern in the above using PathList(...) is how
+    // you can pick javax/servlet/* from the first jar. If the default
+    // MergeStrategy.deduplicate is not working for you, that likely means you have
+    // multiple versions of some library pulled by your dependency graph. The real
+    // solution is to fix that dependency graph. You can work around it by
+    // MergeStrategy.first but don't be surprised when you see
+    // ClassNotFoundException.
+    private def assemblyMerger(path: String) = path match {
+      case s if s endsWith ".txt"                    => MergeStrategy.discard
+      case PathList("META-INF", "MANIFEST.MF")       => MergeStrategy.discard
+      case PathList("org", "slf4j", "impl", xs @ _*) => MergeStrategy.first
+      case _                                         => MergeStrategy.deduplicate
+    }
+
+    def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
+    def also(s: Setting[_], ss: Setting[_]*): Project = also(s +: ss.toSeq)
+    def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
+    def root: Project                                 = p in file(".")
+    def testLogging: Project                          = p dependsOn LocalProject("logging") % "test->test"
+    def usesCommon: Project                           = p dependsOn LocalProject("common") % "compile->compile;test->test"
+    def setup: Project                                = p also commonSettings
+    def assemblyProject: Project                      = p.setup.testLogging also assemblySettings also (
+                       test in assembly :=  (),
+            assemblyJarName in assembly :=  "%s-assembly-%s.jar".format(name.value, "git describe".!!.trim),
+                     target in assembly <<= target,
+      assemblyMergeStrategy in assembly :=  assemblyMerger
+    )
   }
-
-  def commonAssemblySettings = sbtassembly.Plugin.assemblySettings ++ commonSettings ++ Seq(
-             test in assembly := (),
-    mergeStrategy in assembly := assemblyMerger
-  )
-
-  // Logging is simply a common project for the test log configuration files
-  lazy val logging = Project(id = "logging", base = file("logging")).settings(commonSettings: _*)
-
-  lazy val platform = Project(id = "platform", base = file(".")).
-    aggregate(util, common, bytecode, niflheim, yggdrasil)
-
-  lazy val util = Project(id = "util", base = file("util")).
-    settings(commonSettings: _*) dependsOn(logging % "test->test")
-
-  lazy val common = Project(id = "common", base = file("common")).
-    settings(commonSettings: _*) dependsOn (util, logging % "test->test")
-
-  lazy val bytecode = Project(id = "bytecode", base = file("bytecode")).
-    settings(commonSettings: _*) dependsOn(logging % "test->test")
-
-  lazy val niflheim = Project(id = "niflheim", base = file("niflheim")).
-    settings(commonAssemblySettings: _*).dependsOn(common % "compile->compile;test->test", util, logging % "test->test")
-
-  lazy val yggdrasil = Project(id = "yggdrasil", base = file("yggdrasil")).
-    settings(commonAssemblySettings: _*).dependsOn(common % "compile->compile;test->test", bytecode, util, niflheim, logging % "test->test")
 }

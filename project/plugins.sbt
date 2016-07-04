@@ -15,4 +15,4 @@
 // You should have received a copy of the GNU Affero General Public License along with this
 // program. If not, see <http://www.gnu.org/licenses/>.
 
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.8")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.3")
