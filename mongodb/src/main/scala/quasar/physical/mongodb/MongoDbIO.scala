@@ -324,7 +324,7 @@ object MongoDbIO {
     val sortRepr =
       cfg.inputSort map (ts =>
         Bson.Doc(ListMap(
-          ts.list.toList.map(_.bimap(_.asText, _.bson)): _*
+          ts.list.toList.map(_.bimap(_.asText, sortDirToBson(_))): _*
         )).repr)
 
     val configuredIt =

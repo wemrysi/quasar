@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import quasar.Planner._
 import quasar.Predef._
 import quasar.{LogicalPlan, Data, CompilerHelpers}
 import quasar.{LogicalPlan => LP}
@@ -40,14 +41,15 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
   val elide = implicitly[ElideBuckets.Aux[Fix, QScriptInternal[Fix, ?]]]
 
-  def callIt(lp: Fix[LP]): InnerPure =
-    lp.transCata(lpToQScript)
-      .transCata(elide.purify)
+  def callIt(lp: Fix[LP]): PlannerError \/ InnerPure =
+    lp.transCataM(lpToQScript).evalZero.map {
+      _.transCata(elide.purify)
        // .transCata(liftFG(normalizeMapFunc))
       .transCata(
         liftFG(elideNopJoin[QScriptPure[Fix, ?]]) ⋙
         liftFG(elideNopMap[QScriptPure[Fix, ?]]) ⋙
         liftFF(coalesceMaps[QScriptPure[Fix, ?]]))
+    }
 
   val DeadEndPure = implicitly[Const[DeadEnd, ?] :<: QScriptPure[Fix, ?]]
   val SourcedPathablePure = implicitly[SourcedPathable[Fix, ?] :<: QScriptPure[Fix, ?]]
@@ -60,15 +62,18 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   def lpRead(path: String): Fix[LP] =
     LogicalPlan.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
+  // TODO instead of calling `.toOption` on the `\/`
+  // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
     "convert a very simple read" in {
-      callIt(lpRead("/foo")) must
+      callIt(lpRead("/foo")).toOption must
       equal(
-        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed)
+        // Map(Root, ProjectField(Unit, "foo"))
+        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
     }
 
     "convert a simple read" in {
-      callIt(lpRead("/some/foo/bar")) must
+      callIt(lpRead("/some/foo/bar")).toOption must
       equal(
         SourcedPathablePure.inj(
           Map(RootR,
@@ -78,22 +83,22 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                   UnitF,
                   StrLit("some")),
                 StrLit("foo")),
-              StrLit("bar")))).embed)
+              StrLit("bar")))).embed.some)
 
       // Map(Root, ObjectProject(ObjectProject(ObjectProject((), "some"), "foo"), "bar"))
     }
 
-    "convert a basic invoke" in {
-      callIt(math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
+    "convert a basic invoke" in pending {  // TODO normalization
+      callIt(math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
       equal(
         SourcedPathablePure.inj(
           Map(RootR,
             Free.roll(Add(
               ProjectFieldR(UnitF, StrLit("foo")),
-              ProjectFieldR(UnitF, StrLit("bar")))))).embed)
+              ProjectFieldR(UnitF, StrLit("bar")))))).embed.some)
     }
 
-    "convert basic join" in {
+    "convert basic join" in pending {  // TODO normalization
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val lp = LP.Let('__tmp0, lpRead("/foo"),
@@ -112,7 +117,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 structural.ObjectProject[FLP](
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
-      callIt(lp) must equal(SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed)
+      callIt(lp).toOption must equal(
+        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
     }
   }
 }

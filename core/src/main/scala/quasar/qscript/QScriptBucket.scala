@@ -60,7 +60,20 @@ sealed abstract class QScriptBucket[T[_[_]], A] {
 object QScriptBucket {
   implicit def equal[T[_[_]]](implicit eqTEj: Equal[T[EJson]]): Delay[Equal, QScriptBucket[T, ?]] =
     new Delay[Equal, QScriptBucket[T, ?]] {
-      def apply[A](eq: Equal[A]) = ???
+      def apply[A](eq: Equal[A]) =
+        Equal.equal {
+          case (GroupBy(a1, v1, b1), GroupBy(a2, v2, b2)) =>
+            eq.equal(a1, a2) && v1 ≟ v2 && b1 ≟ b2
+          case (BucketField(a1, v1, n1), BucketField(a2, v2, n2)) =>
+            eq.equal(a1, a2) && v1 ≟ v2 && n1 ≟ n2
+          case (BucketIndex(a1, v1, i1), BucketIndex(a2, v2, i2)) =>
+            eq.equal(a1, a2) && v1 ≟ v2 && i1 ≟ i2
+          case (LeftShiftBucket(a1, s1, r1, b1), LeftShiftBucket(a2, s2, r2, b2)) =>
+            eq.equal(a1, a2) && s1 ≟ s2 && r1 ≟ r2 && b1 ≟ b2
+          case (SquashBucket(a1), SquashBucket(a2)) =>
+            eq.equal(a1, a2)
+          case (_, _) => false
+        }
     }
 
   implicit def traverse[T[_[_]]]: Traverse[QScriptBucket[T, ?]] =
@@ -70,18 +83,43 @@ object QScriptBucket {
         f: A => G[B])(
         implicit G: Applicative[G]):
           G[QScriptBucket[T, B]] = fa match {
-        case GroupBy(src, values, bucket) => f(src) ∘ (GroupBy(_, values, bucket))
-        case BucketField(src, values, name) => f(src) ∘ (BucketField(_, values, name))
-        case BucketIndex(src, values, index) => f(src) ∘ (BucketIndex(_, values, index))
+        case GroupBy(src, values, bucket) =>
+          f(src) ∘ (GroupBy(_, values, bucket))
+        case BucketField(src, values, name) =>
+          f(src) ∘ (BucketField(_, values, name))
+        case BucketIndex(src, values, index) =>
+          f(src) ∘ (BucketIndex(_, values, index))
         case LeftShiftBucket(src, struct, repair, bucket) =>
           f(src) ∘ (LeftShiftBucket(_, struct, repair, bucket))
-        case SquashBucket(src) => f(src) ∘ (SquashBucket(_))
+        case SquashBucket(src) =>
+          f(src) ∘ (SquashBucket(_))
       }
     }
 
   implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, QScriptBucket[T, ?]] =
     new Delay[Show, QScriptBucket[T, ?]] {
-      def apply[A](s: Show[A]): Show[QScriptBucket[T, A]] = ???
+      def apply[A](sh: Show[A]): Show[QScriptBucket[T, A]] =
+        Show.show {
+          case GroupBy(a, v, b) => Cord("GroupBy(") ++
+            sh.show(a) ++ Cord(",") ++
+            v.show ++ Cord(",") ++
+            b.show ++ Cord(")")
+          case BucketField(a, v, n) => Cord("BucketField(") ++
+            sh.show(a) ++ Cord(",") ++
+            v.show ++ Cord(",") ++
+            n.show ++ Cord(")")
+          case BucketIndex(a, v, i) => Cord("BucketIndex(") ++
+            sh.show(a) ++ Cord(",") ++
+            v.show ++ Cord(",") ++
+            i.show ++ Cord(")")
+          case LeftShiftBucket(a, s, r, b) => Cord("LeftShiftBucket(") ++
+            sh.show(a) ++ Cord(",") ++
+            s.show ++ Cord(",") ++
+            r.show ++ Cord(",") ++
+            b.show ++ Cord(")")
+          case SquashBucket(a) => Cord("SquashBucket(") ++
+            sh.show(a) ++ Cord(")")
+        }
     }
 
   implicit def mergeable[T[_[_]]: Corecursive]:
@@ -93,7 +131,7 @@ object QScriptBucket {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: QScriptBucket[IT, Unit],
-        p2: QScriptBucket[IT, Unit]): Option[Merge[IT, QScriptBucket[IT, Unit]]] = ???
+        p2: QScriptBucket[IT, Unit]): Option[Merge[IT, QScriptBucket[IT, Unit]]] = None
     }
 
   implicit def bucketable[T[_[_]]: Corecursive]:
@@ -127,7 +165,7 @@ object QScriptBucket {
           else
             ((s - 1, src)).right[QScriptBucket[T, Inner]]
         }
-        case sq @ SquashBucket(_) => StateT { s =>
+        case sq @ SquashBucket(_) => StateT { _ =>
           sq.left[(Int, Inner)]
         }
       }

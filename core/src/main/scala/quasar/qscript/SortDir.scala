@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb
+package quasar.qscript
 
-sealed trait SortType {
-  def bson: Bson = this match {
-    case Ascending => Bson.Int32(1)
-    case Descending => Bson.Int32(-1)
-  }
+import scalaz._
+
+sealed trait SortDir
+
+object SortDir {
+  final case object Ascending extends SortDir
+  final case object Descending extends SortDir
+
+  implicit val equal: Equal[SortDir] = Equal.equalRef
+  implicit val show: Show[SortDir] = Show.showFromToString
 }
-final case object Ascending extends SortType
-final case object Descending extends SortType

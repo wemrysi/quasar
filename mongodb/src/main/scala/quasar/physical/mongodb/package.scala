@@ -20,6 +20,7 @@ import quasar.Predef.Vector
 import quasar.effect.Failure
 import quasar.javascript.Js
 import quasar.namegen._
+import quasar.qscript._
 
 import com.mongodb.MongoException
 import com.mongodb.async.AsyncBatchCursor
@@ -43,4 +44,10 @@ package object mongodb {
   // TODO: parameterize over label (SD-512)
   def freshName: State[NameGen, BsonField.Name] =
     quasar.namegen.freshName("tmp").map(BsonField.Name(_))
+
+  // TODO use implicit class
+  def sortDirToBson(sort: SortDir): Bson = sort match {
+    case SortDir.Ascending => Bson.Int32(1)
+    case SortDir.Descending => Bson.Int32(-1)
+  }
 }

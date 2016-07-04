@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 import quasar.javascript._
+import quasar.qscript.SortDir
 import quasar.sql.{ParsingError, Query}
 import quasar.std._
 import quasar.specs2.PendingWithAccurateCoverage
@@ -1115,14 +1116,14 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
           $project(
             reshape("bar" -> $field("bar")),
             IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("bar") -> Ascending))))
+          $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
     "plan simple sort with wildcard" in {
       plan("select * from zips order by pop") must
         beWorkflow(chain(
           $read(Collection("db", "zips")),
-          $sort(NonEmptyList(BsonField.Name("pop") -> Ascending))))
+          $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
     }
 
     "plan sort with expression in key" in {
@@ -1144,7 +1145,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined))),
             IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("__tmp2") -> Ascending)),
+          $sort(NonEmptyList(BsonField.Name("__tmp2") -> SortDir.Ascending)),
           $project(
             reshape("baz" -> $field("baz")),
             ExcludeId)))
@@ -1260,7 +1261,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   List(ident("__val"), jscore.Literal(Js.Str("__sd__0")))),
               "__tmp3" -> Select(ident("__val"), "__sd__0"))))),
             ListMap()),
-          $sort(NonEmptyList(BsonField.Name("__tmp3") -> Descending)),
+          $sort(NonEmptyList(BsonField.Name("__tmp3") -> SortDir.Descending)),
           $project(
             reshape("value" -> $field("__tmp2")),
             ExcludeId)))
@@ -1275,7 +1276,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               "name"   -> $field("name"),
               "__tmp0" -> $field("height")),
             IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("__tmp0") -> Ascending)),
+          $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
           $project(
             reshape("name" -> $field("name")),
             ExcludeId)))
@@ -1299,7 +1300,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
             IgnoreId),
-          $sort(NonEmptyList(BsonField.Name("popInK") -> Ascending))))
+          $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending))))
     }
 
     "plan sort with filter" in {
@@ -1329,8 +1330,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
               "pop"  -> $field("pop")),
             IgnoreId),
           $sort(NonEmptyList(
-            BsonField.Name("pop") -> Descending,
-            BsonField.Name("city") -> Ascending))))
+            BsonField.Name("pop") -> SortDir.Descending,
+            BsonField.Name("city") -> SortDir.Ascending))))
     }
 
     "plan sort with expression, alias, and filter" in {
@@ -1368,7 +1369,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   $divide($field("pop"), $literal(Bson.Int32(1000))),
                   $literal(Bson.Undefined))),
             ExcludeId),
-          $sort(NonEmptyList(BsonField.Name("popInK") -> Ascending)))
+          $sort(NonEmptyList(BsonField.Name("popInK") -> SortDir.Ascending)))
         )
     }
 
@@ -1377,8 +1378,8 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
        beWorkflow(chain(
          $read(Collection("db", "zips")),
          $sort(NonEmptyList(
-           BsonField.Name("pop") -> Ascending,
-           BsonField.Name("city") -> Descending))))
+           BsonField.Name("pop") -> SortDir.Ascending,
+           BsonField.Name("city") -> SortDir.Descending))))
     }
 
     "plan many sort columns" in {
@@ -1386,12 +1387,12 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
        beWorkflow(chain(
          $read(Collection("db", "zips")),
          $sort(NonEmptyList(
-           BsonField.Name("pop") -> Ascending,
-           BsonField.Name("state") -> Ascending,
-           BsonField.Name("city") -> Ascending,
-           BsonField.Name("a4") -> Ascending,
-           BsonField.Name("a5") -> Ascending,
-           BsonField.Name("a6") -> Ascending))))
+           BsonField.Name("pop") -> SortDir.Ascending,
+           BsonField.Name("state") -> SortDir.Ascending,
+           BsonField.Name("city") -> SortDir.Ascending,
+           BsonField.Name("a4") -> SortDir.Ascending,
+           BsonField.Name("a5") -> SortDir.Ascending,
+           BsonField.Name("a6") -> SortDir.Ascending))))
     }
 
     "plan efficient count and field ref" in {
@@ -1405,7 +1406,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "cnt"  -> $sum($literal(Bson.Int32(1)))),
               \/-($literal(Bson.Null))),
             $unwind(DocField("city")),
-            $sort(NonEmptyList(BsonField.Name("cnt") -> Descending)))
+            $sort(NonEmptyList(BsonField.Name("cnt") -> SortDir.Descending)))
         }
     }
 
@@ -2144,7 +2145,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "zip" -> $field("__tmp3", "_id"),
             "loc" -> $field("__tmp2")),
           IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("loc") -> Ascending))))
+        $sort(NonEmptyList(BsonField.Name("loc") -> SortDir.Ascending))))
     }
 
     "unify flattened with double-flattened" in {
@@ -2206,7 +2207,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "city" -> $field("city"),
                 "pop"  -> $field("pop")),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("pop") -> Descending)),
+            $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Descending)),
             $limit(5))
         }
     }
@@ -2244,7 +2245,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "city" -> $field("_id", "0"),
                 "pop"  -> $include()),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("pop") -> Ascending)))
+            $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending)))
         }
     }
 
@@ -2384,14 +2385,14 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             $project(
               reshape("city" -> $field("city")),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> Ascending)),
+            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)),
             $group(
               grouped(),
               -\/(reshape("0" -> $field("city")))),
             $project(
               reshape("city" -> $field("_id", "0")),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("city") -> Ascending))))
+            $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
     }
 
     "plan distinct with unrelated order by" in {
@@ -2405,7 +2406,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "city"    -> $field("city")),
               IgnoreId),
             $sort(NonEmptyList(
-              BsonField.Name("__sd__0") -> Descending)),
+              BsonField.Name("__sd__0") -> SortDir.Descending)),
             $group(
               grouped("__tmp2" -> $first($$ROOT)),
               -\/(reshape("city" -> $field("city")))),
@@ -2415,7 +2416,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "__tmp0" -> $field("__tmp2", "__sd__0")),
               IgnoreId),
             $sort(NonEmptyList(
-              BsonField.Name("__tmp0") -> Descending)),
+              BsonField.Name("__tmp0") -> SortDir.Descending)),
             $project(
               reshape("city" -> $field("city")),
               ExcludeId)))
@@ -2496,7 +2497,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "state"    -> $include()),
               IgnoreId),
             $unwind(DocField("state")),
-            $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending)),
+            $sort(NonEmptyList(BsonField.Name("totalPop") -> SortDir.Descending)),
             $group(
               grouped(),
               -\/(reshape(
@@ -2509,7 +2510,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                 "city"     -> $field("_id", "1"),
                 "state"    -> $field("_id", "2")),
               IgnoreId),
-            $sort(NonEmptyList(BsonField.Name("totalPop") -> Descending))))
+            $sort(NonEmptyList(BsonField.Name("totalPop") -> SortDir.Descending))))
 
     }
 
@@ -2543,7 +2544,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
                   List(Select(Select(ident("x"), "city"), "length"))),
                 ident("undefined")))))),
             ListMap()),
-          $sort(NonEmptyList(BsonField.Name("__tmp4") -> Ascending)),
+          $sort(NonEmptyList(BsonField.Name("__tmp4") -> SortDir.Ascending)),
           $project(
             reshape(
               "city" -> $field("city"),
@@ -3596,7 +3597,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $project(
           reshape("bar" -> $field("bar")),
           IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("bar") -> Ascending))))
+        $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
     "plan OrderBy with expression" in {
@@ -3617,7 +3618,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "__tmp0" -> $divide($field("bar"), $literal(Bson.Dec(10.0))),
             "__tmp1" -> $$ROOT),
           IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("__tmp0") -> Ascending)),
+        $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
         $project(
           reshape("value" -> $field("__tmp1")),
           ExcludeId)))
@@ -3643,7 +3644,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
         $read(Collection("db", "foo")),
         $match(Selector.Doc(
           BsonField.Name("baz") -> Selector.Eq(Bson.Int32(0)))),
-        $sort(NonEmptyList(BsonField.Name("bar") -> Ascending))))
+        $sort(NonEmptyList(BsonField.Name("bar") -> SortDir.Ascending))))
     }
 
     "plan OrderBy with expression (and extra project)" in {
@@ -3668,7 +3669,7 @@ class PlannerSpec extends Specification with ScalaCheck with CompilerHelpers wit
             "bar"    -> $field("bar"),
             "__tmp0" -> $divide($field("bar"), $literal(Bson.Dec(10.0)))),
           IgnoreId),
-        $sort(NonEmptyList(BsonField.Name("__tmp0") -> Ascending)),
+        $sort(NonEmptyList(BsonField.Name("__tmp0") -> SortDir.Ascending)),
         $project(
           reshape("bar" -> $field("bar")),
           ExcludeId)))

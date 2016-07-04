@@ -18,6 +18,9 @@ package quasar
 
 import quasar.Predef._
 
+import scala.Predef.implicitly
+
+import matryoshka._
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -58,6 +61,12 @@ package object qscript {
     * than to handle full ThetaJoins.
     */
   type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
+
+  def DeadEndInternal[T[_[_]]] = implicitly[Const[DeadEnd, ?] :<: QScriptInternal[T, ?]]
+  def SourcedPathableInternal[T[_[_]]] = implicitly[SourcedPathable[T, ?] :<: QScriptInternal[T, ?]]
+  def QScriptCoreInternal[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QScriptInternal[T, ?]]
+  def ThetaJoinInternal[T[_[_]]] = implicitly[ThetaJoin[T, ?] :<: QScriptInternal[T, ?]]
+  def QScriptBucketInternal[T[_[_]]] = implicitly[QScriptBucket[T, ?] :<: QScriptInternal[T, ?]]
 
   sealed trait JoinSide
   final case object LeftSide extends JoinSide
@@ -130,12 +139,15 @@ package object qscript {
       }
     }
 
-  implicit def constBucketable[T[_[_]], A]:
-      Bucketable.Aux[T, Const[A, ?]] =
-    new Bucketable[Const[A, ?]] {
+  implicit def constBucketable[T[_[_]]: Corecursive]:
+      Bucketable.Aux[T, Const[DeadEnd, ?]] =
+    new Bucketable[Const[DeadEnd, ?]] {
       type IT[F[_]] = T[F]
 
-      def digForBucket: Const[A, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = ???
+      def digForBucket: Const[DeadEnd, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
+        const => StateT { s =>
+          (s, DeadEndInternal[T].inj(const).embed).right[QScriptBucket[T, Inner]]
+        }
     }
 
   implicit def coproductBucketable[T[_[_]], F[_], G[_]](
@@ -145,6 +157,10 @@ package object qscript {
     new Bucketable[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
-      def digForBucket: Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = ???
+      def digForBucket: Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
+        _.run match {
+          case -\/(f) => mf.digForBucket(f)
+          case \/-(g) => mg.digForBucket(g)
+        }
     }
 }

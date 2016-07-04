@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.javascript._
+import quasar.qscript._
 
 import com.mongodb.client.model.MapReduceAction
 import monocle.macros.GenLens
@@ -47,7 +48,7 @@ final case class MapReduce(
   map:       Js.Expr, // "function if (...) emit(...) }"
   reduce:    Js.Expr, // "function (key, values) { ...; return ... }"
   selection: Option[Selector] = None,
-  inputSort: Option[NonEmptyList[(BsonField, SortType)]] = None,
+  inputSort: Option[NonEmptyList[(BsonField, SortDir)]] = None,
   limit:     Option[Long] = None,
   finalizer: Option[Js.Expr] = None, // "function (key, reducedValue) { ...; return ... }"
   scope:     MapReduce.Scope = ListMap(),
@@ -65,8 +66,8 @@ final case class MapReduce(
   ////
 
   private def toBson(out: Bson): Bson.Doc = {
-    def sortBson(xs: NonEmptyList[(BsonField, SortType)]): Bson.Doc =
-      Bson.Doc(ListMap(xs.list.toList.map(_ bimap (_.asText, _.bson)): _*))
+    def sortBson(xs: NonEmptyList[(BsonField, SortDir)]): Bson.Doc =
+      Bson.Doc(ListMap(xs.list.toList.map(_ bimap (_.asText, sortDirToBson(_))): _*))
 
     Bson.Doc(ListMap(("out" -> out) :: List(
       selection        map  ("query"    -> _.bson),

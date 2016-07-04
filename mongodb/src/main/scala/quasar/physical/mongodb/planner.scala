@@ -23,6 +23,7 @@ import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
+import quasar.qscript._
 import quasar.std.StdLib._
 import Type._
 import Workflow._
@@ -629,11 +630,11 @@ object MongoDbPlanner {
       case n                      => n.head._2.map(List(_))
     }
 
-    val HasSortDirs: Ann => OutputM[List[SortType]] = {
-      def isSortDir(node: LogicalPlan[Ann]): OutputM[SortType] =
+    val HasSortDirs: Ann => OutputM[List[SortDir]] = {
+      def isSortDir(node: LogicalPlan[Ann]): OutputM[SortDir] =
         node match {
-          case HasData(Data.Str("ASC"))  => \/-(Ascending)
-          case HasData(Data.Str("DESC")) => \/-(Descending)
+          case HasData(Data.Str("ASC"))  => \/-(SortDir.Ascending)
+          case HasData(Data.Str("DESC")) => \/-(SortDir.Descending)
           case x => -\/(InternalError("malformed sort dir: " + x))
         }
 

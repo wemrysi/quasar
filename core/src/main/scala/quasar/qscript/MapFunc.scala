@@ -105,26 +105,140 @@ object MapFunc {
   //     }).embed, f)))
   // }
 
-  implicit def functor[T[_[_]]]: Functor[MapFunc[T, ?]] = new Functor[MapFunc[T, ?]] {
-    def map[A, B](fa: MapFunc[T, A])(f: A => B): MapFunc[T, B] =
-      fa match {
-        case Nullary(v) => Nullary[T, B](v)
-        case Negate(a1) => Negate(f(a1))
-        case MakeObject(a1, a2) => MakeObject(f(a1), f(a2))
-        case ConcatObjects(a1, a2) => ConcatObjects(f(a1), f(a2))
-        case ProjectField(a1, a2) => ProjectField(f(a1), f(a2))
-        case Eq(a1, a2) => Eq(f(a1), f(a2))
-        case x => { scala.Predef.print(s">>>>>>>>>>> got a functor $x"); ??? }
+  implicit def traverse[T[_[_]]]: Traverse[MapFunc[T, ?]] =
+    new Traverse[MapFunc[T, ?]] {
+      def traverseImpl[G[_], A, B](
+        fa: MapFunc[T, A])(
+        f: A => G[B])(
+        implicit G: Applicative[G]):
+          G[MapFunc[T, B]] = fa match {
+        // nullary
+        case Nullary(v) => G.point(Nullary[T, B](v))
+
+        // unary
+        case Date(a1) => f(a1) ∘ (Date(_))
+        case Time(a1) => f(a1) ∘ (Time(_))
+        case Timestamp(a1) => f(a1) ∘ (Timestamp(_))
+        case Interval(a1) => f(a1) ∘ (Interval(_))
+        case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
+        case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case Negate(a1) => f(a1) ∘ (Negate(_))
+        case Not(a1) => f(a1) ∘ (Not(_))
+        case Length(a1) => f(a1) ∘ (Length(_))
+        case Lower(a1) => f(a1) ∘ (Lower(_))
+        case Upper(a1) => f(a1) ∘ (Upper(_))
+        case Bool(a1) => f(a1) ∘ (Bool(_))
+        case Integer(a1) => f(a1) ∘ (Integer(_))
+        case Decimal(a1) => f(a1) ∘ (Decimal(_))
+        case Null(a1) => f(a1) ∘ (Null(_))
+        case ToString(a1) => f(a1) ∘ (ToString(_))
+        case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
+        case DupArrayIndices(a1) => f(a1) ∘ (DupArrayIndices(_))
+        case DupMapKeys(a1) => f(a1) ∘ (DupMapKeys(_))
+
+        // binary
+        case Extract(a1, a2) => (f(a1) |@| f(a2))(Extract(_, _))
+        case Add(a1, a2) => (f(a1) |@| f(a2))(Add(_, _))
+        case Multiply(a1, a2) => (f(a1) |@| f(a2))(Multiply(_, _))
+        case Subtract(a1, a2) => (f(a1) |@| f(a2))(Subtract(_, _))
+        case Divide(a1, a2) => (f(a1) |@| f(a2))(Divide(_, _))
+        case Modulo(a1, a2) => (f(a1) |@| f(a2))(Modulo(_, _))
+        case Power(a1, a2) => (f(a1) |@| f(a2))(Power(_, _))
+        case Eq(a1, a2) => (f(a1) |@| f(a2))(Eq(_, _))
+        case Neq(a1, a2) => (f(a1) |@| f(a2))(Neq(_, _))
+        case Lt(a1, a2) => (f(a1) |@| f(a2))(Lt(_, _))
+        case Lte(a1, a2) => (f(a1) |@| f(a2))(Lte(_, _))
+        case Gt(a1, a2) => (f(a1) |@| f(a2))(Gt(_, _))
+        case Gte(a1, a2) => (f(a1) |@| f(a2))(Gte(_, _))
+        case IfUndefined(a1, a2) => (f(a1) |@| f(a2))(IfUndefined(_, _))
+        case And(a1, a2) => (f(a1) |@| f(a2))(And(_, _))
+        case Or(a1, a2) => (f(a1) |@| f(a2))(Or(_, _))
+        case Coalesce(a1, a2) => (f(a1) |@| f(a2))(Coalesce(_, _))
+        case In(a1, a2) => (f(a1) |@| f(a2))(In(_, _))
+        case Within(a1, a2) => (f(a1) |@| f(a2))(Within(_, _))
+        case Constantly(a1, a2) => (f(a1) |@| f(a2))(Constantly(_, _))
+        case MakeObject(a1, a2) => (f(a1) |@| f(a2))(MakeObject(_, _))
+        case ConcatObjects(a1, a2) => (f(a1) |@| f(a2))(ConcatObjects(_, _))
+        case ProjectIndex(a1, a2) => (f(a1) |@| f(a2))(ProjectIndex(_, _))
+        case ProjectField(a1, a2) => (f(a1) |@| f(a2))(ProjectField(_, _))
+        case DeleteField(a1, a2) => (f(a1) |@| f(a2))(DeleteField(_, _))
+        case ConcatArrays(a1, a2) => (f(a1) |@| f(a2))(ConcatArrays(_, _))
+        case Range(a1, a2) => (f(a1) |@| f(a2))(Range(_, _))
+
+        //  ternary
+        case Between(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Between(_, _, _))
+        case Cond(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Cond(_, _, _))
+        case Like(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Like(_, _, _))
+        case Search(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Search(_, _, _))
+        case Substring(a1, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Substring(_, _, _))
+        case Guard(a1, tpe, a2, a3) => (f(a1) |@| f(a2) |@| f(a3))(Guard(_, tpe, _, _))
       }
   }
 
   implicit def equal[T[_[_]], A](implicit eqTEj: Equal[T[EJson]]):
       Delay[Equal, MapFunc[T, ?]] =
     new Delay[Equal, MapFunc[T, ?]] {
-      // TODO this is wrong - we need to define equality on a function by function basis
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
+        // nullary
         case (Nullary(v1), Nullary(v2)) => v1.equals(v2)
-        case (Negate(a1), Negate(a2)) => in.equal(a1, a1)
+
+        // unary
+        case (Date(a1), Date(b1)) => in.equal(a1, b1) 
+        case (Time(a1), Time(b1)) => in.equal(a1, b1)
+        case (Timestamp(a1), Timestamp(b1)) => in.equal(a1, b1)
+        case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
+        case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
+        case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
+        case (Not(a1), Not(b1)) => in.equal(a1, b1)
+        case (Length(a1), Length(b1)) => in.equal(a1, b1)
+        case (Lower(a1), Lower(b1)) => in.equal(a1, b1)
+        case (Upper(a1), Upper(b1)) => in.equal(a1, b1)
+        case (Bool(a1), Bool(b1)) => in.equal(a1, b1)
+        case (Integer(a1), Integer(b1)) => in.equal(a1, b1)
+        case (Decimal(a1), Decimal(b1)) => in.equal(a1, b1)
+        case (Null(a1), Null(b1)) => in.equal(a1, b1)
+        case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
+        case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
+        case (DupArrayIndices(a1), DupArrayIndices(b1)) => in.equal(a1, b1)
+        case (DupMapKeys(a1), DupMapKeys(b1)) => in.equal(a1, b1)
+
+        case (Extract(a1, a2), Extract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Subtract(a1, a2), Subtract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Divide(a1, a2), Divide(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Modulo(a1, a2), Modulo(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Power(a1, a2), Power(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Eq(a1, a2), Eq(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Neq(a1, a2), Neq(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Lt(a1, a2), Lt(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Lte(a1, a2), Lte(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Gt(a1, a2), Gt(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Gte(a1, a2), Gte(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (IfUndefined(a1, a2), IfUndefined(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (And(a1, a2), And(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Or(a1, a2), Or(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Coalesce(a1, a2), Coalesce(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (In(a1, a2), In(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Within(a1, a2), Within(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Constantly(a1, a2), Constantly(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (MakeObject(a1, a2), MakeObject(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ConcatObjects(a1, a2), ConcatObjects(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ProjectIndex(a1, a2), ProjectIndex(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ProjectField(a1, a2), ProjectField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (DeleteField(a1, a2), DeleteField(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ConcatArrays(a1, a2), ConcatArrays(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (Range(a1, a2), Range(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+
+        //  ternary
+        case (Between(a1, a2, a3), Between(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Cond(a1, a2, a3), Cond(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => atpe ≟ btpe && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+
         case (_, _) => false
       }
     }
@@ -132,13 +246,66 @@ object MapFunc {
   implicit def show[T[_[_]]](implicit shEj: Show[T[EJson]]): Delay[Show, MapFunc[T, ?]] =
     new Delay[Show, MapFunc[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = Show.show {
+        // nullary
         case Nullary(v) => Cord("Nullary(") ++ shEj.show(v) ++ Cord(")")
+
+        // unary
+        case Date(a1) => Cord("Date(") ++ sh.show(a1) ++ Cord(")")
+        case Time(a1) => Cord("Time(") ++ sh.show(a1) ++ Cord(")")
+        case Timestamp(a1) => Cord("Timestamp(") ++ sh.show(a1) ++ Cord(")")
+        case Interval(a1) => Cord("Interval(") ++ sh.show(a1) ++ Cord(")")
+        case TimeOfDay(a1) => Cord("TimeOfDay(") ++ sh.show(a1) ++ Cord(")")
+        case ToTimestamp(a1) => Cord("ToTimestamp(") ++ sh.show(a1) ++ Cord(")")
         case Negate(a1) => Cord("Negate(") ++ sh.show(a1) ++ Cord(")")
+        case Not(a1) => Cord("Not(") ++ sh.show(a1) ++ Cord(")")
+        case Length(a1) => Cord("Length(") ++ sh.show(a1) ++ Cord(")")
+        case Lower(a1) => Cord("Lower(") ++ sh.show(a1) ++ Cord(")")
+        case Upper(a1) => Cord("Upper(") ++ sh.show(a1) ++ Cord(")")
+        case Bool(a1) => Cord("Bool(") ++ sh.show(a1) ++ Cord(")")
+        case Integer(a1) => Cord("Integer(") ++ sh.show(a1) ++ Cord(")")
+        case Decimal(a1) => Cord("Decimal(") ++ sh.show(a1) ++ Cord(")")
+        case Null(a1) => Cord("Null(") ++ sh.show(a1) ++ Cord(")")
+        case ToString(a1) => Cord("ToString(") ++ sh.show(a1) ++ Cord(")")
+        case MakeArray(a1) => Cord("MakeArray(") ++ sh.show(a1) ++ Cord(")")
+        case DupArrayIndices(a1) => Cord("DupArrayIndices(") ++ sh.show(a1) ++ Cord(")")
+        case DupMapKeys(a1) => Cord("DupMapKeys(") ++ sh.show(a1) ++ Cord(")")
+
+        // binary
+        case Extract(a1, a2) => Cord("Extract(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Add(a1, a2) => Cord("Add(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Multiply(a1, a2) => Cord("Multiply(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Subtract(a1, a2) => Cord("Subtract(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Divide(a1, a2) => Cord("Divide(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Modulo(a1, a2) => Cord("Modulo(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Power(a1, a2) => Cord("Power(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Eq(a1, a2) => Cord("Eq(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Neq(a1, a2) => Cord("Neq(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Lt(a1, a2) => Cord("Lt(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Lte(a1, a2) => Cord("Lte(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Gt(a1, a2) => Cord("Gt(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Gte(a1, a2) => Cord("Gte(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case IfUndefined(a1, a2) => Cord("IfUndefined(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case And(a1, a2) => Cord("And(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Or(a1, a2) => Cord("Or(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Coalesce(a1, a2) => Cord("Coalesce(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case In(a1, a2) => Cord("In(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Within(a1, a2) => Cord("Within(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Constantly(a1, a2) => Cord("Constantly(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case MakeObject(a1, a2) => Cord("MakeObject(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case ConcatObjects(a1, a2) => Cord("ConcatObjects(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case ProjectIndex(a1, a2) => Cord("ProjectIndex(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
         case ProjectField(a1, a2) => Cord("ProjectField(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Eq(a1, a2) => Cord("Eq(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case x => { scala.Predef.print(s">>>>>>>>>>> got a show $x"); ??? }
+        case DeleteField(a1, a2) => Cord("DeleteField(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case ConcatArrays(a1, a2) => Cord("ConcatArrays(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+        case Range(a1, a2) => Cord("Range(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+
+        //  ternary
+        case Between(a1, a2, a3) => Cord("Between(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case Cond(a1, a2, a3) => Cord("Cond(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case Like(a1, a2, a3) => Cord("Like(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case Search(a1, a2, a3) => Cord("Search(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case Substring(a1, a2, a3) => Cord("Substring(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case Guard(a1, tpe, a2, a3) => Cord("Guard(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
       }
     }
 
