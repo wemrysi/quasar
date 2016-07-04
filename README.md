@@ -36,6 +36,8 @@ To compile the project and run tests, execute the following command:
 ./sbt test
 ```
 
+Note: running tests requires a significantly larger JVM heap (>= 4GB), thus either run your tests with `mem` flag (`sbt -mem 4096 test`) or configure your SBT using SBT_OPS
+
 This will lead to failures in the integration test project (`it`). The reason for the failures is the fact that there is no configured
 "backend" to connect to in order to run the integration tests. Currently Quasar only supports MongoDB so in order to run the integration
 tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
