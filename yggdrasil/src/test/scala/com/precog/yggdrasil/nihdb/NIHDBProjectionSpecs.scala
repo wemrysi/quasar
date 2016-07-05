@@ -22,15 +22,10 @@ package nihdb
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 
-import com.precog.common.ingest._
-import com.precog.common.security._
+import com.precog.common._, ingest._, security._
 import com.precog.niflheim._
 import com.precog.yggdrasil.table._
 import com.precog.util.IOUtils
-
-import akka.actor.{ActorSystem, Props}
-import akka.dispatch.{Await, Future}
-import akka.util.Duration
 
 import blueeyes.akka_testing.FutureMatchers
 import blueeyes.bkka.FutureMonad
@@ -52,7 +47,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 class NIHDBProjectionSpecs extends Specification with ScalaCheck with FutureMatchers {
   val actorSystem = ActorSystem("NIHDBActorSystem")
 
-  val chef = actorSystem.actorOf(Props(new Chef(
+  val chef = actorSystem.actorOf(AkkaProps(new Chef(
     VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
     VersionedSegmentFormat(Map(1 -> V1SegmentFormat)))
   ))

@@ -20,8 +20,6 @@
 package com.precog.common
 package accounts
 
-import akka.util.Duration
-
 import com.precog.common.Path
 import com.precog.common.accounts._
 import com.precog.common.security.APIKey

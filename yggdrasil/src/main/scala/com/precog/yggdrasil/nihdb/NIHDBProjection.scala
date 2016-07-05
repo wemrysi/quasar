@@ -20,8 +20,6 @@
 package com.precog.yggdrasil
 package nihdb
 
-import akka.dispatch.Future
-
 import com.precog.common._
 import com.precog.common.security.Authorities
 import com.precog.niflheim._

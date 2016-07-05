@@ -40,9 +40,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 
 import blueeyes.util.Clock
 
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-
 import org.joda.time.DateTime
 
 import org.streum.configrity.Configuration

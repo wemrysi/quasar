@@ -28,8 +28,6 @@ import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.util._
 import jdbm3._
 
-import akka.actor.ActorSystem
-import akka.dispatch._
 import blueeyes.json._
 import org.slf4s.Logging
 

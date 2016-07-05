@@ -23,7 +23,7 @@ import com.precog.common._
 
 import java.lang.ref.SoftReference
 
-import java.io.{ File, IOException }
+import java.io.{ IOException }
 import java.io.FileInputStream
 import java.nio.channels._
 

@@ -20,13 +20,7 @@
 package com.precog.yggdrasil
 package scheduling
 
-import akka.actor.ActorRef
-import akka.dispatch.Future
-import akka.pattern.ask
-import akka.util.Timeout
-
-import com.precog.common.Path
-import com.precog.common.security._
+import com.precog.common._, security._
 import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.execution.EvaluationContext
 

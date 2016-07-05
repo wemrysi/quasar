@@ -24,9 +24,6 @@ package service
 import client._
 import accounts.AccountId
 
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-
 import blueeyes.bkka._
 import blueeyes.core.data._
 import blueeyes.core.data.DefaultBijections._

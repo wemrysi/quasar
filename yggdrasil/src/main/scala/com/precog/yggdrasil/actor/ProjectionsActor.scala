@@ -28,15 +28,6 @@ import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.util._
 
-import akka.actor.Actor
-import akka.actor.Props
-import akka.actor.Scheduler
-import akka.actor.ActorRef
-import akka.actor.PoisonPill
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-import akka.pattern.ask
-import akka.util.{Duration, DurationLong, Timeout}
 import akka.util.duration._
 
 import blueeyes.json._

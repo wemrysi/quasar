@@ -25,22 +25,15 @@ import table.Slice
 import metadata.PathMetadata
 import metadata.PathStructure
 
-import com.precog.common._
+import com.precog.common._, ingest._, security._, jobs._
 import com.precog.common.accounts.AccountId
-import com.precog.common.ingest._
-import com.precog.common.security._
-import com.precog.common.jobs._
 import com.precog.niflheim._
 import com.precog.yggdrasil.actor.IngestData
 import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.yggdrasil.table.ColumnarTableModule
 import com.precog.util._
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props, ReceiveTimeout}
-import akka.dispatch._
-import akka.pattern.ask
-import akka.pattern.pipe
-import akka.util.{Timeout, Duration}
+import akka.actor.{Actor, ReceiveTimeout}
 
 import blueeyes.bkka.FutureMonad
 import blueeyes.core.http.MimeType
@@ -394,7 +387,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
           vlog <- VersionLog.open(pathDir)
           actorV <- vlog traverse { versionLog =>
             log.debug("Creating new PathManagerActor for " + path)
-            context.actorOf(Props(new PathManagerActor(path, VFSPathUtils.versionsSubdir(pathDir), versionLog, shutdownTimeout, quiescenceTimeout, clock, self))) tap { newActor =>
+            context.actorOf(AkkaProps(new PathManagerActor(path, VFSPathUtils.versionsSubdir(pathDir), versionLog, shutdownTimeout, quiescenceTimeout, clock, self))) tap { newActor =>
               IO { pathActors += (path -> newActor); pathLRU += (path -> ()) }
             }
           }

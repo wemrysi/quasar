@@ -20,9 +20,6 @@
 package com.precog.common
 package client
 
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-
 import blueeyes.core.data._
 import blueeyes.core.http.MimeTypes
 import blueeyes.core.http.MimeTypes._

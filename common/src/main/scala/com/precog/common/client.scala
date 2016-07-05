@@ -19,7 +19,6 @@
  */
 package com.precog.common
 
-import akka.dispatch.Future
 import scalaz._
 
 package object client {

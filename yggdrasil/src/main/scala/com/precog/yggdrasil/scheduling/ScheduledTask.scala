@@ -20,14 +20,12 @@
 package com.precog.yggdrasil
 package scheduling
 
-import akka.util.Duration
-
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import com.precog.common.Path
+import com.precog.common._
 import com.precog.common.ingest.JavaSerialization._
 import com.precog.common.security.{APIKey, Authorities}
 import com.precog.yggdrasil.execution.{ QueryOptions, EvaluationContext }

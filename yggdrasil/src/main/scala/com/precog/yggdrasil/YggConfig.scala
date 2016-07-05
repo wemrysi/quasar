@@ -21,10 +21,7 @@ package com.precog
 package yggdrasil
 
 import org.streum.configrity._
-
-import common.Config
-
-import java.io.File
+import common._
 
 trait YggConfigComponent {
   type YggConfig

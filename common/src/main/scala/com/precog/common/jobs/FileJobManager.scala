@@ -20,8 +20,6 @@
 package com.precog.common
 package jobs
 
-import akka.util.Duration
-
 import blueeyes.core.http.MimeTypes
 import blueeyes.json._
 import blueeyes.json.serialization.{ Extractor, Decomposer }

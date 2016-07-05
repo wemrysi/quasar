@@ -23,7 +23,6 @@ package security
 import service._
 import com.precog.common.accounts.{Account, AccountId}
 
-import akka.util.Duration
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
 import org.joda.time.DateTime

@@ -21,9 +21,6 @@ package com.precog.niflheim
 
 import com.precog.common._
 
-
-import java.io.File
-
 import org.specs2.mutable.Specification
 import org.specs2._
 import org.scalacheck._

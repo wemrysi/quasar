@@ -35,11 +35,6 @@ import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.yggdrasil.vfs._
 import com.precog.util._
 
-import akka.dispatch.Future
-import akka.actor.ActorRef
-import akka.pattern.ask
-import akka.util.Timeout
-
 import blueeyes.json._
 import blueeyes.core.http.MimeType
 import blueeyes.util.Clock

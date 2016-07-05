@@ -20,8 +20,7 @@
 package com.precog.yggdrasil
 package scheduling
 
-import akka.dispatch.{ExecutionContext, Future, Promise}
-import akka.util.Timeout
+import com.precog.common._
 
 import blueeyes.bkka._
 import blueeyes.json._

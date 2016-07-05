@@ -30,8 +30,6 @@ import com.precog.yggdrasil.vfs._
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.PoisonPill
-import akka.dispatch.Promise
-import akka.util.Timeout
 
 import org.slf4s.Logging
 

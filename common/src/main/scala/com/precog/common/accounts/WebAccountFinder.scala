@@ -25,8 +25,6 @@ import com.precog.common.client._
 import com.precog.common.security._
 import com.precog.util._
 
-import akka.dispatch.{ ExecutionContext, Future, Promise }
-
 import blueeyes.bkka._
 import blueeyes.core.data.DefaultBijections._
 import blueeyes.core.data.ByteChunk

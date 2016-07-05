@@ -20,9 +20,9 @@
 package com.precog.yggdrasil
 
 import table._
+import com.precog.common._
 import com.precog.util.VectorCase
 
-import akka.dispatch.Future
 import blueeyes.json._
 import blueeyes.akka_testing.FutureMatchers
 

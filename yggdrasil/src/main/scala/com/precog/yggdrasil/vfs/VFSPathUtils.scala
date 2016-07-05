@@ -20,9 +20,7 @@
 package com.precog.yggdrasil
 package vfs
 
-import akka.dispatch.Future
-
-import com.precog.common.Path
+import com.precog.common._
 import com.precog.common.security.{APIKey, PermissionsFinder}
 import com.precog.niflheim.NIHDBActor
 import com.precog.yggdrasil.metadata._

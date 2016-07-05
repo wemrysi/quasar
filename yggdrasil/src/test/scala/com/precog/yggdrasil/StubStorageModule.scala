@@ -31,10 +31,7 @@ import com.precog.common.util._
 
 import com.precog.util._
 
-import akka.actor.ActorSystem
-import akka.dispatch._
 import akka.testkit.TestActorRef
-import akka.util.Timeout
 import akka.util.duration._
 
 import blueeyes.json._

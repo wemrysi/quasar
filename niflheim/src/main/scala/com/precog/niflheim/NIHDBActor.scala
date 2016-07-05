@@ -25,10 +25,8 @@ import com.precog.common.ingest.EventId
 import com.precog.common.security.Authorities
 import com.precog.util._
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.dispatch.{ExecutionContext, Future, Promise}
+import akka.actor.Actor
 import akka.pattern.{AskSupport, GracefulStopSupport}
-import akka.util.{Duration, Timeout}
 
 import blueeyes.json._
 import blueeyes.json.serialization._
@@ -186,7 +184,7 @@ private[niflheim] object NIHDBActor extends Logging {
         }
       }
 
-    currentState map { _ map { s => actorSystem.actorOf(Props(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler))) } }
+    currentState map { _ map { s => actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler))) } }
   }
 
   final def readDescriptor(baseDir: File): IO[Option[Validation[Error, ProjectionState]]] = {
@@ -202,7 +200,7 @@ private[niflheim] object NIHDBActor extends Logging {
   final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Option[Validation[Error, (Authorities, ActorRef)]]] = {
     val currentState: IO[Option[Validation[Error, ProjectionState]]] = readDescriptor(baseDir)
 
-    currentState map { _ map { _ map { s => (s.authorities, actorSystem.actorOf(Props(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler)))) } } }
+    currentState map { _ map { _ map { s => (s.authorities, actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler)))) } } }
   }
 
   final def hasProjection(dir: File) = (new File(dir, descriptorFilename)).exists

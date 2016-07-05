@@ -22,8 +22,6 @@ package accounts
 
 import com.precog.common.security._
 
-import akka.dispatch.{ Future, ExecutionContext }
-
 import blueeyes.core.service._
 import blueeyes.core.http._
 import blueeyes.core.http.HttpStatusCodes._

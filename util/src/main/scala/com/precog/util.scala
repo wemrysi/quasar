@@ -23,7 +23,6 @@ import scalaz.Order
 import scalaz.Monoid
 
 import akka.dispatch.Future
-
 import java.util.Comparator
 import java.nio.ByteBuffer
 
@@ -33,7 +32,7 @@ import scala.collection.mutable
 import scalaz.Bind
 
 package object util {
-  type RawBitSet = Array[Int]
+  type RawBitSet  = Array[Int]
 
   class Order2JComparator[A](order: Order[A]) {
     def toJavaComparator: Comparator[A] = new Comparator[A] {

@@ -21,10 +21,6 @@ package com.precog.yggdrasil
 
 import com.precog.common._
 
-
-import akka.dispatch.Await
-import akka.util.Duration
-
 import blueeyes.json._
 
 import org.specs2.ScalaCheck

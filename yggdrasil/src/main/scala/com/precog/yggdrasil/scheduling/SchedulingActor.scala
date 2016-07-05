@@ -20,19 +20,15 @@
 package com.precog.yggdrasil
 package scheduling
 
-import com.precog.common.Path
+import com.precog.common._, jobs._, security._
 import com.precog.common.accounts.AccountFinder
-import com.precog.common.jobs._
-import com.precog.common.security._
 import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.table.Slice
 import com.precog.yggdrasil.vfs._
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
-import akka.dispatch.{Await, Future, Promise}
-import akka.pattern.{ask, pipe}
-import akka.util.{Duration, Timeout}
+import akka.actor.{Actor, Cancellable}
+import akka.pattern.pipe
 
 import blueeyes.bkka.FutureMonad
 import blueeyes.util.Clock

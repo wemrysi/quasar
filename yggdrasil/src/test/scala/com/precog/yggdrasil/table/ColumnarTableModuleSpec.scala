@@ -25,8 +25,6 @@ import com.precog.common.security._
 import com.precog.bytecode.JType
 import com.precog.yggdrasil.util._
 
-import akka.actor.ActorSystem
-import akka.dispatch._
 import blueeyes.json._
 import org.slf4j.{LoggerFactory, MDC}
 

@@ -26,11 +26,7 @@ import com.precog.common._
 import com.precog.common.security.PermissionsFinder
 import com.precog.common.kafka._
 
-import akka.actor._
-import akka.dispatch._
-import akka.util._
 import akka.util.duration._
-import akka.pattern.ask
 import akka.pattern.gracefulStop
 
 import _root_.kafka.consumer._
@@ -107,7 +103,7 @@ trait KafkaIngestActorProjectionSystem extends ShardSystemActorModule {
                                         yggConfig.kafkaBufferSize,
                                         clientId = "???")
 
-      actorSystem.actorOf(Props(
+      actorSystem.actorOf(AkkaProps(
         new KafkaShardIngestActor( shardId = yggConfig.shardId,
                                    initialCheckpoint = checkpoint,
                                    consumer = consumer,

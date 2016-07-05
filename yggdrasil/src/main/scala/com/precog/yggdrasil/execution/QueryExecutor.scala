@@ -31,8 +31,6 @@ import blueeyes.json._
 import blueeyes.core.http.MimeType
 import blueeyes.core.http.MimeTypes
 
-import akka.util.Duration
-
 import scalaz._
 import scalaz.Validation._
 import scalaz.NonEmptyList.nels

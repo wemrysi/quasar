@@ -19,7 +19,7 @@
  */
 package com.precog.yggdrasil
 
-import akka.dispatch.Future
+import com.precog.common._
 
 import blueeyes.json._
 import blueeyes.akka_testing.FutureMatchers

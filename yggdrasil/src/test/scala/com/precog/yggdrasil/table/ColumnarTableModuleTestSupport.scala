@@ -27,8 +27,6 @@ import com.precog.util._
 import com.precog.util.{BitSetUtil, BitSet, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
-import akka.actor.ActorSystem
-
 import blueeyes.json._
 
 import scala.annotation.tailrec

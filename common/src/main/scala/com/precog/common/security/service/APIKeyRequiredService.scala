@@ -31,9 +31,6 @@ import blueeyes.core.http.MimeTypes._
 import blueeyes.json._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-
 import org.slf4s.Logging
 
 import scalaz._

@@ -20,11 +20,7 @@
 package com.precog.yggdrasil
 package vfs
 
-import com.precog.common._
-import com.precog.common.accounts._
-import com.precog.common.ingest._
-import com.precog.common.security._
-import com.precog.common.jobs._
+import com.precog.common._, accounts._, ingest._, security._, jobs._
 import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.metadata._
 import com.precog.yggdrasil.nihdb._
@@ -32,11 +28,6 @@ import com.precog.yggdrasil.scheduling._
 import com.precog.util._
 import ResourceError._
 import Permission._
-
-import akka.dispatch.Future
-import akka.actor.ActorRef
-import akka.pattern.ask
-import akka.util.Timeout
 
 import blueeyes.util.Clock
 

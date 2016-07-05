@@ -20,16 +20,12 @@
 package com.precog.yggdrasil
 package actor
 
-import com.precog.common.{ CheckpointCoordination, YggCheckpoint, Path }
+import com.precog.common._
 import com.precog.common.security.PermissionsFinder
 import com.precog.common.ingest._
 import com.precog.util.FilesystemFileOps
 
-import akka.actor._
-import akka.dispatch._
-import akka.util._
 import akka.util.duration._
-import akka.pattern.ask
 import akka.pattern.gracefulStop
 
 import blueeyes.json._

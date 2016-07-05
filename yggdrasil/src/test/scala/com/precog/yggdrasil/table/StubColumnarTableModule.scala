@@ -27,8 +27,6 @@ import com.precog.util.VectorCase
 import com.precog.common._
 import com.precog.common.security._
 
-import akka.actor.ActorSystem
-
 import blueeyes.json._
 
 import scala.annotation.tailrec

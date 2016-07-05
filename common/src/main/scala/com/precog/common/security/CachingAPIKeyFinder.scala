@@ -24,8 +24,6 @@ import service.v1
 import accounts.AccountId
 import com.precog.util.cache.Cache
 
-import akka.util.Duration
-
 import java.util.concurrent.TimeUnit._
 import org.joda.time.DateTime
 

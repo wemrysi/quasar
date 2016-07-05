@@ -25,11 +25,7 @@ import com.precog.common._
 import com.precog.common.security._
 import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.yggdrasil.vfs._
-
-import akka.actor.{ActorRef, ActorSystem}
-import akka.dispatch.{Future, Promise}
 import akka.pattern.AskSupport
-import akka.util.Timeout
 
 import org.slf4s.Logging
 

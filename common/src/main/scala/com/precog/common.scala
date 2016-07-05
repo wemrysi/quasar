@@ -23,6 +23,25 @@ package object common {
   type ProducerId = Int
   type SequenceId = Int
 
+  type ActorRef         = akka.actor.ActorRef
+  type ActorSystem      = akka.actor.ActorSystem
+  type Duration         = akka.util.Duration
+  type ExecutionContext = akka.dispatch.ExecutionContext
+  type Future[+A]       = akka.dispatch.Future[A]
+  type Promise[A]       = akka.dispatch.Promise[A]
+  type Timeout          = akka.util.Timeout
+
+  val ActorSystem      = akka.actor.ActorSystem
+  val AkkaProps        = akka.actor.Props
+  val Await            = akka.dispatch.Await
+  val Duration         = akka.util.Duration
+  val ExecutionContext = akka.dispatch.ExecutionContext
+  val Future           = akka.dispatch.Future
+  val Promise          = akka.dispatch.Promise
+  val Timeout          = akka.util.Timeout
+
+  type File = java.io.File
+
   def abort(msg: String): Nothing = throw new RuntimeException(msg)
 
   final class StringExtensions(s: String) {
@@ -31,6 +50,3 @@ package object common {
 
   implicit def stringExtensions(s: String) = new StringExtensions(s)
 }
-
-
-// vim: set ts=4 sw=4 et:

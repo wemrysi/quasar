@@ -24,17 +24,12 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 
 import scala.annotation.tailrec
 
-import com.precog.common.accounts._
-import com.precog.common.ingest._
-import com.precog.common.security._
+import com.precog.common._, accounts._, ingest._, security._
 import com.precog.niflheim._
 import com.precog.yggdrasil.table._
 import com.precog.util.IOUtils
 
-import akka.actor.{ActorSystem, Props}
-import akka.dispatch.{Await, Future}
 import akka.routing._
-import akka.util.Duration
 
 import blueeyes.akka_testing.FutureMatchers
 import blueeyes.bkka.FutureMonad
@@ -57,9 +52,9 @@ class StressTest {
     VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
   )
 
-  val chefs = (1 to 4).map { _ => actorSystem.actorOf(Props(makechef)) }
+  val chefs = (1 to 4).map { _ => actorSystem.actorOf(AkkaProps(makechef)) }
 
-  val chef = actorSystem.actorOf(Props[Chef].withRouter(RoundRobinRouter(chefs)))
+  val chef = actorSystem.actorOf(AkkaProps[Chef].withRouter(RoundRobinRouter(chefs)))
 
   val owner: AccountId = "account999"
 

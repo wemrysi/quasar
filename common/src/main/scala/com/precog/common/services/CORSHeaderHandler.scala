@@ -20,8 +20,6 @@
 package com.precog.common
 package services
 
-import akka.dispatch.{ExecutionContext, Future, Promise}
-
 import blueeyes.core.http._
 import blueeyes.core.service._
 

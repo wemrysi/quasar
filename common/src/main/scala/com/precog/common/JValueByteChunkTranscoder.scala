@@ -28,8 +28,6 @@ import blueeyes.core.data._
 import blueeyes.core.service._
 import blueeyes.core.http._
 
-import akka.dispatch.{ Future, ExecutionContext }
-
 import scalaz._
 
 trait JValueByteChunkTranscoders {

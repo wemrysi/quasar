@@ -32,12 +32,7 @@ import ColumnMetadata.monoid
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
-import akka.actor.PoisonPill
-import akka.dispatch.{Await, ExecutionContext, Future, Promise}
-import akka.pattern.ask
 import akka.util.duration._
-import akka.util.Timeout
-import akka.util.Duration
 
 import org.slf4s._
 

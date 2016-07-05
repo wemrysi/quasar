@@ -21,11 +21,6 @@ package com.precog
 package yggdrasil
 package vfs
 
-import akka.actor.Actor
-import akka.dispatch.{Await, ExecutionContext, Future, Promise}
-import akka.pattern.pipe
-import akka.util.Duration
-
 import blueeyes.bkka.FutureMonad
 import blueeyes.core.http._
 import blueeyes.json._

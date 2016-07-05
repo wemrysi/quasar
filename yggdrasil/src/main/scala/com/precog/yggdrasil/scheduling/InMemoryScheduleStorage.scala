@@ -20,7 +20,7 @@
 package com.precog.yggdrasil
 package scheduling
 
-import akka.dispatch.{ExecutionContext, Future, Promise}
+import com.precog.common._
 
 import com.precog.util.PrecogUnit
 
