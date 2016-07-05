@@ -44,11 +44,10 @@ object PlatformBuild {
       "org.scalaz"               %% "scalaz-core"    %     "7.0.9",
       "com.reportgrid"           %% "blueeyes-json"  % blueeyesVersion,
       "com.reportgrid"           %% "blueeyes-core"  % blueeyesVersion,
-      "com.reportgrid"           %% "blueeyes-mongo" % blueeyesVersion,
+      // "com.reportgrid"           %% "blueeyes-mongo" % blueeyesVersion,
       "com.reportgrid"           %% "akka_testing"   % blueeyesVersion,
       "org.scalacheck"           %% "scalacheck"     %     "1.10.1"     % "test",
-      "com.google.code.findbugs"  % "jsr305"         %     "3.0.1",
-      "com.rubiconproject.oss"    % "jchronic"       %     "0.2.6"
+      "com.google.code.findbugs"  % "jsr305"         %     "3.0.1"
     )
   )
 
