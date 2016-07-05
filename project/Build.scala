@@ -40,14 +40,10 @@ object PlatformBuild {
                         logBuffered in Test :=  false,
 
     libraryDependencies ++= Seq(
-      "org.slf4s"                %% "slf4s-api"      %    "1.7.13",
-      "org.scalaz"               %% "scalaz-core"    %     "7.0.9",
-      "com.reportgrid"           %% "blueeyes-json"  % blueeyesVersion,
-      "com.reportgrid"           %% "blueeyes-core"  % blueeyesVersion,
-      // "com.reportgrid"           %% "blueeyes-mongo" % blueeyesVersion,
-      "com.reportgrid"           %% "akka_testing"   % blueeyesVersion,
-      "org.scalacheck"           %% "scalacheck"     %     "1.10.1"     % "test",
-      "com.google.code.findbugs"  % "jsr305"         %     "3.0.1"
+      "org.slf4s"                %% "slf4s-api"   % "1.7.13",
+      "org.scalaz"               %% "scalaz-core" % "7.0.9",
+      "org.scalacheck"           %% "scalacheck"  % "1.10.1"  % "test",
+      "com.google.code.findbugs"  % "jsr305"      %  "3.0.1"
     )
   )
 
@@ -90,7 +86,7 @@ object PlatformBuild {
     def root: Project                                 = p in file(".")
     def testLogging: Project                          = p dependsOn LocalProject("logging") % "test->test"
     def usesCommon: Project                           = p dependsOn LocalProject("common") % "compile->compile;test->test"
-    def setup: Project                                = p also commonSettings
+    def setup: Project                                = p dependsOn LocalProject("blueeyes") also commonSettings
     def assemblyProject: Project                      = p.setup.testLogging also assemblySettings also (
                        test in assembly :=  (),
             assemblyJarName in assembly :=  "%s-assembly-%s.jar".format(name.value, "git describe".!!.trim),
