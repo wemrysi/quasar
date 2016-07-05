@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+
+set -e
+[[ -d "$HOME/.ivy2" ]] || mkdir -p "$HOME/.ivy2"
+tar -C "$HOME/.ivy2" -x -v -f ./testlib/ivy-local.tgz
+./sbt test

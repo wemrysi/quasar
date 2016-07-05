@@ -2,6 +2,7 @@ sudo: false
 language: scala
 scala: 2.9.3
 jdk: oraclejdk7
+script: ./bin/tests
 
 cache:
   directories:
