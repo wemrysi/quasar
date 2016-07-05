@@ -38,7 +38,7 @@ import blueeyes.json._
 import scalaz.NonEmptyList
 import scalaz.effect.IO
 
-import java.io._
+import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.ScheduledThreadPoolExecutor
 

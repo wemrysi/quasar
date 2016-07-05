@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package scheduling
 
+import akka.pattern.ask
 import com.precog.common._, security._
 import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.execution.EvaluationContext

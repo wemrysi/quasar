@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory
 import org.joda.time.{DateTime, Period}
 
 import java.nio.ByteBuffer
-import java.util.SortedMap
 
 import com.precog.util.Bijection._
 import com.precog.yggdrasil.table._

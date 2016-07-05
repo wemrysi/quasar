@@ -56,7 +56,7 @@ trait BaseConfig extends Config {
 
   def newWorkDir = {
     if(!scratchDir.exists) scratchDir.mkdirs
-    val tempFile = File.createTempFile("ygg", "workdir", scratchDir)
+    val tempFile = java.io.File.createTempFile("ygg", "workdir", scratchDir)
     tempFile.delete
     tempFile.mkdir
     tempFile

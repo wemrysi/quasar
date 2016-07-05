@@ -24,8 +24,6 @@ import scalaz.effect.IO
 import scalaz.Ordering._
 import scalaz.std.anyVal._
 
-import java.io.File
-
 import com.precog.util.VectorCase
 import com.precog.util.PrecogUnit
 

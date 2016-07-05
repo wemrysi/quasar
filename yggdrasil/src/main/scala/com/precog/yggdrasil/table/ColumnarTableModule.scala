@@ -43,8 +43,6 @@ import org.slf4j.Logger
 import org.slf4s.Logging
 
 import org.apache.jdbm.DBMaker
-import java.io.File
-import java.util.SortedMap
 
 import com.precog.util.{BitSet, BitSetUtil, DateTimeUtil, IOUtils, Loop}
 import com.precog.util.BitSetUtil.Implicits._

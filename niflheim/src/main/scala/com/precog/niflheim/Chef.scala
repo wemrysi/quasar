@@ -19,7 +19,7 @@
  */
 package com.precog.niflheim
 
-import com.precog.common._
+import com.precog.common.{ IOException => _, File => _, _ }
 import com.precog.util._
 
 import java.io._
@@ -48,7 +48,7 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
     assert(root.isDirectory)
     assert(root.canWrite)
     val files0 = reader.snapshot(None).segments map { seg =>
-      val file = File.createTempFile(prefix(seg), ".cooked", root)
+      val file = java.io.File.createTempFile(prefix(seg), ".cooked", root)
       val relativized = new File(file.getName)
       val channel: WritableByteChannel = new FileOutputStream(file).getChannel()
       val result = try {
@@ -62,7 +62,7 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
     val files = files0.toList.sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ, (SegmentId, File)]
     files flatMap { segs =>
       val metadata = CookedBlockMetadata(reader.id, reader.length, segs.toArray)
-      val mdFile = File.createTempFile("block-%08x".format(reader.id), ".cookedmeta", root)
+      val mdFile = java.io.File.createTempFile("block-%08x".format(reader.id), ".cookedmeta", root)
       val channel = new FileOutputStream(mdFile).getChannel()
       try {
         blockFormat.writeCookedBlock(channel, metadata).toValidationNel.map { _ : PrecogUnit =>

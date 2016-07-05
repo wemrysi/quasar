@@ -30,7 +30,6 @@ import org.apache.jdbm._
 import org.joda.time.DateTime
 import org.slf4s.Logging
 
-import java.io.File
 import java.util.SortedMap
 import java.nio.ByteBuffer
 

@@ -21,7 +21,7 @@ package com.precog.niflheim
 
 import java.io._
 import blueeyes.json._
-import com.precog.common._
+import com.precog.common.{ File => _, _ }
 
 import com.precog.util.BitSet
 
@@ -44,7 +44,7 @@ abstract class cleanup(f: File) extends After {
 object RawHandlerSpecs extends Specification with ScalaCheck {
   def blockid = 999
   def tempfile(): File = {
-    val f = File.createTempFile("niflheim", ".rawlog")
+    val f = java.io.File.createTempFile("niflheim", ".rawlog")
     f.delete()
     f
   }

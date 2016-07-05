@@ -40,7 +40,8 @@ package object common {
   val Promise          = akka.dispatch.Promise
   val Timeout          = akka.util.Timeout
 
-  type File = java.io.File
+  type File        = java.io.File
+  type IOException = java.io.IOException
 
   def abort(msg: String): Nothing = throw new RuntimeException(msg)
 

@@ -22,7 +22,7 @@ package actor
 
 import metadata.ColumnMetadata
 import com.precog.util._
-import com.precog.common._
+import com.precog.common.{ File => _, _ }
 import com.precog.common.accounts._
 import com.precog.common.ingest._
 import com.precog.common.kafka._
@@ -30,8 +30,6 @@ import com.precog.common.security._
 import ColumnMetadata.monoid
 
 import akka.actor.Actor
-import akka.actor.ActorRef
-import akka.actor.Props
 import akka.util.duration._
 
 import org.slf4s._
@@ -258,7 +256,7 @@ abstract class KafkaShardIngestActor(shardId: String,
       if (totalConsecutiveFailures < maxConsecutiveFailures) {
         log.info("Retrying failed ingest")
         for (messages <- ingestCache.get(checkpoint)) {
-          val batchHandler = context.actorOf(Props(new BatchHandler(self, requestor, checkpoint, ingestTimeout)))
+          val batchHandler = context.actorOf(AkkaProps(new BatchHandler(self, requestor, checkpoint, ingestTimeout)))
           requestor.tell(IngestData(messages), batchHandler)
         }
       } else {
@@ -292,7 +290,7 @@ abstract class KafkaShardIngestActor(shardId: String,
 
                 // create a handler for the batch, then reply to the sender with the message set
                 // using that handler reference as the sender to which the ingest system will reply
-                val batchHandler = context.actorOf(Props(new BatchHandler(self, requestor, checkpoint, ingestTimeout)))
+                val batchHandler = context.actorOf(AkkaProps(new BatchHandler(self, requestor, checkpoint, ingestTimeout)))
                 batchHandler.tell(ProjectionUpdatesExpected(messages.size))
                 requestor.tell(IngestData(messages), batchHandler)
               } else {

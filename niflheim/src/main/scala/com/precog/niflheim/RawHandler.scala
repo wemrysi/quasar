@@ -24,7 +24,7 @@ import scala.collection.mutable
 import org.joda.time.DateTime
 import java.io._
 
-import com.precog.common._
+import com.precog.common.{ File => _, _ }
 import com.precog.util._
 
 object RawHandler {

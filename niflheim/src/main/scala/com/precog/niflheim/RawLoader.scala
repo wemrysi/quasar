@@ -27,7 +27,7 @@ import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 import java.io._
 
-import com.precog.common._
+// import com.precog.common._
 import com.precog.util._
 
 private[niflheim] object RawLoader {
@@ -109,7 +109,7 @@ private[niflheim] object RawLoader {
   def recover1(id: Long, f: File, rows: mutable.ArrayBuffer[JValue], events: mutable.ArrayBuffer[(Long, Int)]) {
 
     // open a tempfile to write a "corrected" rawlog to, and write the header
-    val tmp = File.createTempFile("nilfheim", "recovery")
+    val tmp = java.io.File.createTempFile("nilfheim", "recovery")
     val os = new BufferedOutputStream(new FileOutputStream(tmp, true))
     writeHeader(os, id)
 

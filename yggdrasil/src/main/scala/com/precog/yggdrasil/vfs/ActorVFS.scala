@@ -33,6 +33,8 @@ import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.yggdrasil.table.ColumnarTableModule
 import com.precog.util._
 
+import akka.pattern.ask  // implicit
+import akka.pattern.pipe // implicit
 import akka.actor.{Actor, ReceiveTimeout}
 
 import blueeyes.bkka.FutureMonad

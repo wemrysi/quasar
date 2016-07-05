@@ -29,8 +29,7 @@ import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 
 import com.google.common.cache.RemovalCause
-
-import com.precog.common.security._
+import com.precog.common._, security._
 import com.precog.util._
 import com.precog.util.cache.{Cache, SimpleCache}
 
@@ -45,7 +44,7 @@ import scalaz.syntax.std.option._
 
 import shapeless._
 
-import java.io._
+import java.io.{ FilenameFilter, DataInputStream, DataOutputStream, FileInputStream, FileOutputStream }
 import java.util.UUID
 
 import scala.collection.mutable
