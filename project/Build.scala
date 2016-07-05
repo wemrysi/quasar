@@ -38,7 +38,7 @@ object PlatformBuild {
        (unmanagedSourceDirectories in Test) <<= (scalaSource in Test)(Seq(_)),
                   parallelExecution in Test :=  false,
                         logBuffered in Test :=  false,
-
+              resolvers +=  "Akka Repo" at "http://repo.akka.io/repository",
     libraryDependencies ++= Seq(
       "org.slf4s"                %% "slf4s-api"   % "1.7.13",
       "org.scalaz"               %% "scalaz-core" % "7.0.9",
