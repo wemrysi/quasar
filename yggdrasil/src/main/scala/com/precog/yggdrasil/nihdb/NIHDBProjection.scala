@@ -24,10 +24,8 @@ import com.precog.common._
 import com.precog.common.security.Authorities
 import com.precog.niflheim._
 import com.precog.yggdrasil.table.Slice
-
 import org.slf4s.Logging
-
-import scalaz.{NonEmptyList => NEL, Monad, StreamT}
+import scalaz._
 
 final class NIHDBProjection(snapshot: NIHDBSnapshot, val authorities: Authorities, projectionId: Int) extends ProjectionLike[Future, Slice] with Logging {
   type Key = Long

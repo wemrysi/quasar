@@ -26,12 +26,10 @@ import scala.annotation.tailrec
 
 import com.precog.common._, accounts._, ingest._, security._
 import com.precog.niflheim._
-import com.precog.yggdrasil.table._
 import com.precog.util.IOUtils
 
 import akka.routing._
 
-import blueeyes.akka_testing.FutureMatchers
 import blueeyes.bkka.FutureMonad
 import blueeyes.json._
 

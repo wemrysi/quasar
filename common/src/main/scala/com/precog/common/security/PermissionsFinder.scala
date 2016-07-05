@@ -23,12 +23,8 @@ package security
 import service.v1
 import accounts.AccountId
 import accounts.AccountFinder
-import org.slf4s.Logging
-
 import org.joda.time.DateTime
 import org.joda.time.Instant
-
-import org.slf4s.Logging
 
 import scalaz._
 import scalaz.\/._
@@ -53,7 +49,7 @@ object PermissionsFinder {
   }
 }
 
-class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant) extends Logging {
+class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant) extends org.slf4s.Logging {
   import PermissionsFinder._
   import Permission._
 

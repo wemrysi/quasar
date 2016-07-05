@@ -20,15 +20,10 @@
 package com.precog.common
 package jobs
 
-import blueeyes.core.http._
-import blueeyes.core.http.MimeTypes._
-
+import blueeyes.core.http._, MimeTypes._
 import org.specs2.mutable._
 
-import java.nio._
-
 import scalaz._
-import scalaz.Id.Id
 import scalaz.syntax.monad._
 import scalaz.syntax.comonad._
 

@@ -21,9 +21,7 @@ package com.precog.common
 package jobs
 
 import scala.collection.mutable
-
-import blueeyes.core.http.{ MimeType, MimeTypes }
-
+import blueeyes.core.http.MimeType
 import scalaz._
 
 final class InMemoryFileStorage[M[+_]](implicit M: Monad[M]) extends FileStorage[M] {
