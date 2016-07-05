@@ -23,7 +23,6 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
 import scala.math.Ordering
-import scala.collection.mutable
 
 import blueeyes.json.{JValue, JObject, JField }
 import blueeyes.json.serialization.{ Extractor, Decomposer }

@@ -20,7 +20,6 @@
 package com.precog.niflheim
 
 import blueeyes.json._
-import scala.collection.mutable
 import org.joda.time.DateTime
 import java.io._
 

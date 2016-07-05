@@ -27,7 +27,6 @@ import com.precog.util._
 
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
 import scala.collection.immutable.SortedMap
 
 import java.util.Arrays
