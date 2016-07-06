@@ -1,6 +1,6 @@
 import precog.PlatformBuild._
 
-lazy val platform = project.root aggregate (util, common, bytecode, yggdrasil, mimir)
+lazy val platform = project.root aggregate (util, common, yggdrasil, mimir)
 lazy val logging  = project.setup  // common project for the test log configuration files
 lazy val util     = project.setup.testLogging deps (
 
@@ -16,11 +16,7 @@ lazy val util     = project.setup.testLogging deps (
 lazy val common   = project.setup.testLogging dependsOn util deps (
   "com.chuusai" %% "shapeless" % "1.2.3"
 )
-lazy val bytecode = project.setup.testLogging also (
-  publishArtifact in packageDoc := false
-)
-lazy val yggdrasil = project.assemblyProject.usesCommon dependsOn (bytecode, niflheim) deps (
-
+lazy val yggdrasil = project.assemblyProject.usesCommon deps (
   "com.reportgrid"       %% "blueeyes-mongo"     % blueeyesVersion,
   "org.objectweb.howl"    % "howl"               %    "1.0.1-1",
   "org.slamdata"          % "jdbm"               %     "3.0.0",
@@ -39,4 +35,4 @@ lazy val blueeyes = project also commonSettings deps (
 )
 /** This used to be the evaluator project.
  */
-lazy val mimir = project.setup.usesCommon.testLogging dependsOn (util.inBothScopes, bytecode.inBothScopes, yggdrasil.inBothScopes)
+lazy val mimir = project.setup.usesCommon.testLogging dependsOn (util.inBothScopes, yggdrasil.inBothScopes)
