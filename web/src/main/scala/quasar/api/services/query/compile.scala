@@ -17,6 +17,7 @@
 package quasar.api.services.query
 
 import quasar.Predef._
+import quasar.fp._
 import quasar.RenderTree.ops._
 import quasar._, api._, fs._
 import quasar.api.services._
@@ -60,7 +61,9 @@ object compile {
     ): Free[S, QResponse[S]] =
       respond(queryPlan(expr, vars, offset, limit)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
-          dataResponse(_).toResponse[S].point[Free[S, ?]],
+          κ(Json(
+            "physicalPlan" -> jNull,
+            "inputs"       := List.empty[String]).toResponse[S].point[Free[S, ?]]),
           lp => Q.explain(lp).run.run.map {
             case (phases, \/-(_)) =>
               phaseResultsResponse(phases)
