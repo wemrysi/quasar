@@ -79,7 +79,7 @@ class CompileServiceSpec extends Specification with FileSystemFixture with Scala
         query = Some(Query("4 + 3")),
         state = InMemState.empty,
         status = Status.Ok,
-        response = json => Json.parse(json.nospaces) must_=== json""" { "inputs": [], "physicalPlan": "none" }""")
+        response = json => Json.parse(json.nospaces) must_=== json""" { "inputs": [], "physicalPlan": null }""")
     }
 
   }

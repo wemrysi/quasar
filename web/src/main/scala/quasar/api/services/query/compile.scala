@@ -62,7 +62,7 @@ object compile {
       respond(queryPlan(expr, vars, offset, limit)
         .run.value.traverse[Free[S, ?], SemanticErrors, QResponse[S]](_.fold(
           κ(Json(
-            "physicalPlan" := "none",
+            "physicalPlan" -> jNull,
             "inputs"       := List.empty[String]).toResponse[S].point[Free[S, ?]]),
           lp => Q.explain(lp).run.run.map {
             case (phases, \/-(_)) =>
