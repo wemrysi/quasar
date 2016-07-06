@@ -1,6 +1,6 @@
 import precog.PlatformBuild._
 
-lazy val platform = project.root aggregate (util, common, bytecode, niflheim, yggdrasil)
+lazy val platform = project.root aggregate (util, common, bytecode, niflheim, yggdrasil, mimir)
 lazy val logging  = project.setup  // common project for the test log configuration files
 lazy val util     = project.setup.testLogging deps (
 
@@ -45,4 +45,11 @@ lazy val blueeyes = project also commonSettings deps (
   "com.reportgrid" %% "akka_testing"  % blueeyesVersion excludeAll(
     ExclusionRule(organization = "com.reportgrid")
   )
+)
+
+lazy val mimir = project.setup.testLogging dependsOn (
+  util % "compile->compile;test->test",
+  common,
+  bytecode % "compile->compile;test->test",
+  yggdrasil % "compile->compile;test->test"
 )
