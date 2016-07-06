@@ -1,6 +1,6 @@
 import precog.PlatformBuild._
 
-lazy val platform = project.root aggregate (util, common, bytecode, niflheim, yggdrasil, mimir)
+lazy val platform = project.root aggregate (util, common, bytecode, yggdrasil, mimir)
 lazy val logging  = project.setup  // common project for the test log configuration files
 lazy val util     = project.setup.testLogging deps (
 
@@ -19,12 +19,10 @@ lazy val common   = project.setup.testLogging dependsOn util deps (
 lazy val bytecode = project.setup.testLogging also (
   publishArtifact in packageDoc := false
 )
-lazy val niflheim = project.assemblyProject.usesCommon deps (
-  "org.objectweb.howl" % "howl" % "1.0.1-1"
-)
 lazy val yggdrasil = project.assemblyProject.usesCommon dependsOn (bytecode, niflheim) deps (
 
   "com.reportgrid"       %% "blueeyes-mongo"     % blueeyesVersion,
+  "org.objectweb.howl"    % "howl"               %    "1.0.1-1",
   "org.slamdata"          % "jdbm"               %     "3.0.0",
   "commons-primitives"    % "commons-primitives" %      "1.0",
   "org.quartz-scheduler"  % "quartz"             %     "2.2.3",
