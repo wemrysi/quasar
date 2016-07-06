@@ -14,16 +14,7 @@ lazy val util     = project.setup.testLogging deps (
   "org.fusesource.scalate" % "scalate-core_2.9" %  "1.6.1"
 )
 lazy val common   = project.setup.testLogging dependsOn util deps (
-  "com.chuusai"      %% "shapeless" % "1.2.3",
-  "com.101tec"        % "zkclient"  %  "0.3",
-  "org.apache.kafka" %% "kafka"     % "0.8.0" excludeAll(
-    ExclusionRule(organization = "com.sun.jdmk"),
-    ExclusionRule(organization = "com.sun.jmx"),
-    ExclusionRule(organization = "javax.jms"),
-    ExclusionRule(organization = "jline"),
-    ExclusionRule(organization = "org.apache.hadoop"),
-    ExclusionRule(organization = "org.apache.avro")
-  )
+  "com.chuusai" %% "shapeless" % "1.2.3"
 )
 lazy val bytecode = project.setup.testLogging also (
   publishArtifact in packageDoc := false
