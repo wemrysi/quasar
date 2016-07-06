@@ -33,6 +33,7 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.either._
 import scalaz.syntax.writer._
 import scalaz.syntax.nel._
+import shapeless._
 
 package object quasar {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -102,8 +103,6 @@ package object quasar {
 
   // TODO generalize this and contribute to shapeless-contrib
   implicit class FuncUtils[A, N <: shapeless.Nat](val self: Func.Input[A, N]) extends scala.AnyVal {
-    import shapeless._
-
     def reverse: Func.Input[A, N] =
       Sized.wrap[List[A], N](self.unsized.reverse)
 

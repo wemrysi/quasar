@@ -21,10 +21,13 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
+import matryoshka._
+import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
 import scalaz.iteratee.EnumeratorT
 import scalaz.stream._
+import shapeless.{Fin, Nat, Sized, Succ}
 import simulacrum.typeclass
 
 sealed trait LowerPriorityTreeInstances {
@@ -467,7 +470,94 @@ package object fp
     }
   }
 
+  def liftFG[F[_], G[_], A](orig: F[A] => G[A])(implicit F: F :<: G):
+      G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig)
+
+  def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
+      G[A] => G[A] =
+    ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
+
   implicit final class ListOps[A](val self: List[A]) extends scala.AnyVal {
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
+
+  type Delay[F[_], G[_]] = F ~> (F ∘ G)#λ
+
+  implicit def coproductEqual[F[_], G[_]](
+    implicit F: Delay[Equal, F], G: Delay[Equal, G]):
+      Delay[Equal, Coproduct[F, G, ?]] =
+    new Delay[Equal, Coproduct[F, G, ?]] {
+      def apply[α](eq: Equal[α]) =
+        Equal.equal((cp1, cp2) => (cp1.run, cp2.run) match {
+          case (-\/(f1), -\/(f2)) => F(eq).equal(f1, f2)
+          case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
+          case (_,       _)       => false
+        })
+    }
+
+  implicit def coproductShow[F[_], G[_]](
+    implicit F: Delay[Show, F], G: Delay[Show, G]):
+      Delay[Show, Coproduct[F, G, ?]] =
+    new Delay[Show, Coproduct[F, G, ?]] {
+      def apply[α](sh: Show[α]) = Show.show(_.run.fold(F(sh).show, G(sh).show))
+    }
+
+  implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]):
+      Delay[Show, Free[F, ?]] =
+    new Delay[Show, Free[F, ?]] {
+      def apply[α](sh: Show[α]): Show[Free[F, α]] =
+        Show.show(_.resume.fold(
+          Cord("Roll(") ++ F(freeShow[F].apply(sh)).show(_) ++ Cord(")"),
+          Cord("Point(") ++ sh.show(_) ++ Cord(")")))
+    }
+
+  implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] = new Delay[Equal, Const[A, ?]] {
+    def apply[B](eq: Equal[B]): Equal[Const[A, B]] =
+      Equal.equal((c1, c2) => c1.getConst === c2.getConst)
+  }
+
+  implicit def constShow[A: Show]: Delay[Show, Const[A, ?]] =
+    new Delay[Show, Const[A, ?]] {
+      def apply[B](showB: Show[B]): Show[Const[A, B]] =
+        Show.show(const => Show[A].show(const.getConst))
+    }
+
+  implicit def sizedEqual[A: Equal, N <: Nat]: Equal[Sized[A, N]] =
+    Equal.equal((a, b) => a.unsized ≟ b.unsized)
+
+  implicit def sizedShow[A: Show, N <: Nat]: Show[Sized[A, N]] =
+    Show.showFromToString
+
+  implicit def natEqual[N <: Nat]: Equal[N] = Equal.equal((a, b) => true)
+
+  implicit def natShow[N <: Nat]: Show[N] = Show.showFromToString
+
+  implicit def finEqual[N <: Succ[_]]: Equal[Fin[N]] =
+    Equal.equal((a, b) => true)
+
+  implicit def finShow[N <: Succ[_]]: Show[Fin[N]] = Show.showFromToString
+
+  // TODO: Move to Matryoshka
+
+  /** Algebra transformation that allows a standard algebra to be used on a
+    * CoEnv structure (given a function that converts the leaves to the result
+    * type).
+    */
+  def interpret[F[_], A, B](f: A => B, φ: Algebra[F, B]):
+      Algebra[CoEnv[A, F, ?], B] =
+    interpretM[Id, F, A, B](f, φ)
+
+  def interpretM[M[_], F[_], A, B](f: A => M[B], φ: AlgebraM[M, F, B]):
+      AlgebraM[M, CoEnv[A, F, ?], B] =
+    ginterpretM[Id, M, F, A, B](f, φ)
+
+  def ginterpretM[W[_], M[_], F[_], A, B](f: A => M[B], φ: GAlgebraM[W, M, F, B]):
+      GAlgebraM[W, M, CoEnv[A, F, ?], B] =
+    _.run.fold(f, φ)
+
+  /** A specialization of `interpret` where the leaves are of the result type.
+    */
+  def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
+    interpret(ι, φ)
 }

@@ -38,6 +38,4 @@ package object ejson {
     def fromJsonT[T[_[_]]: FunctorT: Corecursive]: T[Json] => T[EJson] =
       _.transAna(fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
   }
-
-  val significantMetadataPrefix = "$"
 }
