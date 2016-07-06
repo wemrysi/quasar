@@ -1,26 +1,26 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 package com.precog
 package mimir
 
-import scalaz.Monoid
+import scalaz._
 
 import scala.collection.mutable
 
@@ -40,7 +40,7 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
   import CrossOrder._
 
   trait ReductionFinder extends EvaluatorMethods with TransSpecable {
-    import dag._ 
+    import dag._
     import instructions._
 
     case class ReduceInfo(reduce: dag.Reduce, spec: TransSpec1, ancestor: DepGraph)
@@ -88,7 +88,7 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
         parentsByAncestor: Map[DepGraph, List[DepGraph]],
         reducesByParent: Map[DepGraph, List[dag.Reduce]],
         specByParent: Map[DepGraph, TransSpec1]) {
-          
+
       def buildMembers(ancestor: DepGraph): List[(TransSpec1, List[Reduction])] = {
         parentsByAncestor(ancestor) map {
           p => (specByParent(p), reducesByParent(p) map { _.red })
@@ -97,7 +97,7 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
     }
 
     def megaReduce(node: DepGraph, st: MegaReduceState): DepGraph = {
-      val reduceTable = mutable.Map[DepGraph, dag.MegaReduce]() 
+      val reduceTable = mutable.Map[DepGraph, dag.MegaReduce]()
 
       node mapDown { recurse => {
         case graph @ dag.Reduce(red, parent) if st.ancestorByReduce contains graph => {
@@ -113,8 +113,8 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
           val firstIndex = st.parentsByAncestor(ancestor).reverse indexOf parent
           val secondIndex = st.reducesByParent(parent).reverse indexOf graph
 
-          dag.Join(DerefArray, Cross(Some(CrossLeft)), 
-            dag.Join(DerefArray, Cross(Some(CrossLeft)), 
+          dag.Join(DerefArray, Cross(Some(CrossLeft)),
+            dag.Join(DerefArray, Cross(Some(CrossLeft)),
               left,
               Const(CLong(firstIndex))(graph.loc))(graph.loc),
             Const(CLong(secondIndex))(graph.loc))(graph.loc)

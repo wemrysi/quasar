@@ -46,10 +46,10 @@ lazy val blueeyes = project also commonSettings deps (
     ExclusionRule(organization = "com.reportgrid")
   )
 )
-
-lazy val mimir = project.setup.testLogging dependsOn (
-  util % "compile->compile;test->test",
-  common,
-  bytecode % "compile->compile;test->test",
-  yggdrasil % "compile->compile;test->test"
+/** This used to be the evaluator project.
+ */
+lazy val mimir = project.setup.usesCommon.testLogging dependsOn (util % Both, bytecode % Both, yggdrasil % Both) deps (
+  "com.eed3si9n"       % "treehugger_2.9.2"   % "0.1.3",
+  "gov.nist.math"      % "jama"               % "1.0.2",
+  "org.apache.commons" % "commons-math3"      % "3.1.1"
 )

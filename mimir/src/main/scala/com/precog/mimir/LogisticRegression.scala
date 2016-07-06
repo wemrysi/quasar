@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -25,11 +25,10 @@ import yggdrasil.table._
 
 import common._
 
-
 import bytecode._
 import TableModule._
 
-import math.{exp, log, pow}
+import math.{exp, pow}
 
 import scala.util.Random
 
@@ -108,11 +107,11 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
               assert(xs.length == theta.length)
 
               if (y == 1) {
-                val result = log(sigmoid(dotProduct(theta, xs)))
+                val result = math.log(sigmoid(dotProduct(theta, xs)))
 
                 sum + checkValue(result)
               } else if (y == 0) {
-                val result = log(1 - sigmoid(dotProduct(theta, xs)))
+                val result = math.log(1 - sigmoid(dotProduct(theta, xs)))
 
                 sum + checkValue(result)
               } else {
@@ -120,16 +119,16 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
               }
             }
           }
-      
+
           -result
         }
       }
-      
-      def gradient(seq: Seq[ColumnValues], theta: Theta, alpha: Double): Theta = { 
+
+      def gradient(seq: Seq[ColumnValues], theta: Theta, alpha: Double): Theta = {
         if (seq.isEmpty) {
           sys.error("empty sequence should never occur")
         } else {
-          seq.foldLeft(theta) { 
+          seq.foldLeft(theta) {
             case (theta, colVal) => {
               val xs = colVal.take(colVal.length - 1)
               val y = colVal.last
@@ -145,7 +144,7 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
           }
         }
       }
-      
+
       def reduceDouble(seq0: Seq[ColumnValues]): Result = {
         val seq = seq0 filter { arr => arr.last == 0 || arr.last == 1 }
 
@@ -172,7 +171,7 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
       @tailrec
       def gradloop(seq: Seq[ColumnValues], theta0: Theta, alpha: Double): Theta = {
         val theta = gradient(seq, theta0, alpha)
-        
+
         val diffs = theta0.zip(theta) map { case (t0, t) => math.abs(t0 - t) }
         val sum = diffs.sum
 
@@ -181,9 +180,9 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
         } else if (cost(seq, theta) > cost(seq, theta0)) {
           if (alpha > Double.MinValue * 2.0)
             gradloop(seq, theta0, alpha / 2.0)
-          else 
+          else
             theta0
-        } else { 
+        } else {
           gradloop(seq, theta, alpha)
         }
       }
@@ -251,7 +250,7 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
           val table = table0.transform(valueSpec).transform(arraySpec)
 
           val schemas: M[Seq[JType]] = table.schemas map { _.toSeq }
-          
+
           val specs: M[Seq[TransSpec1]] = schemas map {
             _ map { jtype => trans.Typed(trans.DeepMap1(TransSpec1.Id, cf.util.CoerceToDouble) , jtype) }
           }
@@ -265,14 +264,14 @@ trait LogisticRegressionLibModule[M[+_]] extends ColumnarTableLibModule[M] with 
             samples zip jtypes
           }
 
-          val tableReducer: (Table, JType) => M[Table] = 
+          val tableReducer: (Table, JType) => M[Table] =
             (table, jtype) => table.toArray[Double].reduce(reducer).map(res => extract(res, jtype))
 
-          val reducedTables: M[Seq[Table]] = tablesWithType flatMap { 
+          val reducedTables: M[Seq[Table]] = tablesWithType flatMap {
             _.map { case (table, jtype) => tableReducer(table, jtype) }.toStream.sequence map(_.toSeq)
           }
 
-          val objectTables: M[Seq[Table]] = reducedTables map { 
+          val objectTables: M[Seq[Table]] = reducedTables map {
             _.zipWithIndex map { case (tbl, idx) =>
               val modelId = "model" + (idx + 1)
               tbl.transform(liftToValues(trans.WrapObject(TransSpec1.Id, modelId)))

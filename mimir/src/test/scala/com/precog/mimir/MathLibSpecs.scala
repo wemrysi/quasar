@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -29,12 +29,11 @@ import scalaz.std.list._
 
 import com.precog.util.IdGen
 
-trait MathLibSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-      
+
   import Function._
-  
+
   import dag._
   import instructions._
   import library._
@@ -47,7 +46,7 @@ trait MathLibSpecs[M[+_]] extends Specification
       dag.AbsoluteLoad(Const(CString(loadFrom))(line))(line),
       Const(const)(line))(line)
   }
-        
+
   def testEval(graph: DepGraph): Set[SEvent] = {
     consumeEval(graph, defaultEvaluationContext) match {
       case Success(results) => results
@@ -59,15 +58,15 @@ trait MathLibSpecs[M[+_]] extends Specification
     "compute cos only of the numeric value" in {
       val input = dag.Operate(BuiltInFunction1Op(cos),
         dag.AbsoluteLoad(Const(CString("/het/numbers7"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1)
     }
   }
@@ -76,527 +75,527 @@ trait MathLibSpecs[M[+_]] extends Specification
     "compute sinh" in {
       val input = dag.Operate(BuiltInFunction1Op(sinh),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1.1752011936438014, -1.1752011936438014, 8.696374707602505E17, -4.872401723124452E9)
-    }     
+    }
     "compute sinh on two large(ish) values" in {
       val input = dag.Operate(BuiltInFunction1Op(sinh),
         dag.AbsoluteLoad(Const(CString("/hom/number"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(0)
-    }  
+    }
     "compute toDegrees" in {
       val input = dag.Operate(BuiltInFunction1Op(toDegrees),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 57.29577951308232, -57.29577951308232, 2406.4227395494577, -1317.8029288008934)
-    }  
+    }
     "compute expm1" in {
       val input = dag.Operate(BuiltInFunction1Op(expm1),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.718281828459045, -0.6321205588285577, 1.73927494152050099E18, -0.9999999998973812)
-    }      
+    }
     "compute expm1 on two large(ish) values" in {
       val input = dag.Operate(BuiltInFunction1Op(expm1),
         dag.AbsoluteLoad(Const(CString("/hom/number"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
 
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(-1.0)
-    }  
+    }
     "compute getExponent" in {
       val input = dag.Operate(BuiltInFunction1Op(getExponent),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 5)
-    }  
+    }
     "compute asin" in {
       val input = dag.Operate(BuiltInFunction1Op(asin),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.5707963267948966, -1.5707963267948966)
-    }  
+    }
     "compute log10" in {
       val input = dag.Operate(BuiltInFunction1Op(log10),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.6232492903979006)
-    }  
+    }
     "compute cos" in {
       val input = dag.Operate(BuiltInFunction1Op(cos),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 0.5403023058681398, 0.5403023058681398, -0.39998531498835127, -0.5328330203333975)
-    }  
+    }
     "compute exp" in {
       val input = dag.Operate(BuiltInFunction1Op(exp),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 2.7182818284590455, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
-    }  
+    }
     "compute exp on two large(ish) values" in {
       val input = dag.Operate(BuiltInFunction1Op(exp),
         dag.AbsoluteLoad(Const(CString("/hom/number"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
 
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0)
-    } 
+    }
     "compute cbrt" in {
       val input = dag.Operate(BuiltInFunction1Op(cbrt),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 3.4760266448864496, -2.8438669798515654)
-    }  
+    }
     "compute atan" in {
       val input = dag.Operate(BuiltInFunction1Op(atan),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.7853981633974483, -0.7853981633974483, 1.5469913006098266, -1.5273454314033659)
-    }  
+    }
     "compute ceil" in {
       val input = dag.Operate(BuiltInFunction1Op(ceil),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute rint" in {
       val input = dag.Operate(BuiltInFunction1Op(rint),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute log1p" in {
       val input = dag.Operate(BuiltInFunction1Op(log1p),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.6931471805599453, 3.7612001156935624)
-    }  
+    }
     "compute sqrt" in {
       val input = dag.Operate(BuiltInFunction1Op(sqrt),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, 6.48074069840786)
-    }  
+    }
     "compute floor" in {
       val input = dag.Operate(BuiltInFunction1Op(floor),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute toRadians" in {
       val input = dag.Operate(BuiltInFunction1Op(toRadians),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.017453292519943295, -0.017453292519943295, 0.7330382858376184, -0.40142572795869574)
-    }  
+    }
     "compute tanh" in {
       val input = dag.Operate(BuiltInFunction1Op(tanh),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.7615941559557649, -0.7615941559557649, 1.0, -1.0)
-    }  
+    }
     "compute round" in {
       val input = dag.Operate(BuiltInFunction1Op(round),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, -1, 42, -23)
-    }  
+    }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 1.543080634815244, 1.543080634815244, 8.696374707602505E17, 4.872401723124452E9)
-    }  
+    }
     "compute cosh on two large(ish) values" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
         dag.AbsoluteLoad(Const(CString("/hom/number"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(0)
-    } 
+    }
     "compute tan" in {
       val input = dag.Operate(BuiltInFunction1Op(tan),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.5574077246549023, -1.5574077246549023, 2.2913879924374863, -1.5881530833912738)
-    }  
+    }
     "compute abs" in {
       val input = dag.Operate(BuiltInFunction1Op(abs),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, 42, 23)
-    }  
+    }
     "compute sin" in {
       val input = dag.Operate(BuiltInFunction1Op(sin),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.8414709848078965, -0.8414709848078965, -0.9165215479156338, 0.8462204041751706)
-    }  
+    }
     "compute log" in {
-      val input = dag.Operate(BuiltInFunction1Op(log),
+      val input = dag.Operate(BuiltInFunction1Op(mathlog),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 3.7376696182833684)
-    }  
+    }
     "compute signum" in {
       val input = dag.Operate(BuiltInFunction1Op(signum),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0)
-    }  
+    }
     "compute acos" in {
       val input = dag.Operate(BuiltInFunction1Op(acos),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.5707963267948966, 0.0, 3.141592653589793)
-    }  
+    }
     "compute ulp" in {
       val input = dag.Operate(BuiltInFunction1Op(ulp),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(4.9E-324, 2.220446049250313E-16, 2.220446049250313E-16, 7.105427357601002E-15, 3.552713678800501E-15)
     }
     "compute min" in {
       val input = Join(BuiltInFunction2Op(min), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, -1, 7, -23)
     }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(7.0, 7.0710678118654755, 7.0710678118654755, 42.579337712087536, 24.041630560342615)
     }
     "compute pow" in {
       val input = Join(BuiltInFunction2Op(pow), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 2.30539333248E11, -3.404825447E9)
     }
     "compute maxOf" in {
       val input = Join(BuiltInFunction2Op(maxOf), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(7, 42)
     }
     "compute atan2" in {
       val input = Join(BuiltInFunction2Op(atan2), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.1418970546041639, -0.1418970546041639, 1.4056476493802699, -1.2753554896511767)
     }
     "compute copySign" in {
       val input = Join(BuiltInFunction2Op(copySign), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, 42.0, 23.0)
     }
     "compute IEEEremainder" in {
       val input = Join(BuiltInFunction2Op(IEEEremainder), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, -2.0)
     }
     "compute roundTo" in {
       val input = inputOp2(roundTo, "/hom/decimals", CLong(2))
-      
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.24, 123.19, 100.00, 0, 0.50)
     }
     "round to evenly in the face of repeating decimals" in {
@@ -609,15 +608,15 @@ trait MathLibSpecs[M[+_]] extends Specification
                 Const(CLong(3168))(line))(line),
               Const(CLong(100))(line))(line),
             Const(CLong(2))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
-      
+
       val result2 = result collect {
         case (ids, SString(str)) if ids.isEmpty => str
       }
-      
+
       result2 must contain("0.47")
     }
   }
@@ -626,528 +625,528 @@ trait MathLibSpecs[M[+_]] extends Specification
     "compute sinh" in {
       val input = dag.Operate(BuiltInFunction1Op(sinh),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1.1752011936438014, -1.1752011936438014, 8.696374707602505E17, -4.872401723124452E9)
-    }  
+    }
     "compute toDegrees" in {
       val input = dag.Operate(BuiltInFunction1Op(toDegrees),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 57.29577951308232, -57.29577951308232, 2406.4227395494577, -1317.8029288008934)
-    }  
+    }
     "compute expm1" in {
       val input = dag.Operate(BuiltInFunction1Op(expm1),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.718281828459045, -0.6321205588285577, 1.73927494152050099E18, -0.9999999998973812)
-    }  
+    }
     "compute getExponent" in {
       val input = dag.Operate(BuiltInFunction1Op(getExponent),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 5)
-    }  
+    }
     "compute asin" in {
       val input = dag.Operate(BuiltInFunction1Op(asin),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.5707963267948966, -1.5707963267948966)
-    }  
+    }
     "compute log10" in {
       val input = dag.Operate(BuiltInFunction1Op(log10),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.6232492903979006)
-    }  
+    }
     "compute cos" in {
       val input = dag.Operate(BuiltInFunction1Op(cos),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 0.5403023058681398, 0.5403023058681398, -0.39998531498835127, -0.5328330203333975)
-    }  
+    }
     "compute exp" in {
       val input = dag.Operate(BuiltInFunction1Op(exp),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 2.7182818284590455, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
-    }  
+    }
     "compute cbrt" in {
       val input = dag.Operate(BuiltInFunction1Op(cbrt),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 3.4760266448864496, -2.8438669798515654)
-    }  
+    }
     "compute atan" in {
       val input = dag.Operate(BuiltInFunction1Op(atan),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.7853981633974483, -0.7853981633974483, 1.5469913006098266, -1.5273454314033659)
-    }  
+    }
     "compute ceil" in {
       val input = dag.Operate(BuiltInFunction1Op(ceil),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute rint" in {
       val input = dag.Operate(BuiltInFunction1Op(rint),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute log1p" in {
       val input = dag.Operate(BuiltInFunction1Op(log1p),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.6931471805599453, 3.7612001156935624)
-    }  
+    }
     "compute sqrt" in {
       val input = dag.Operate(BuiltInFunction1Op(sqrt),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, 6.48074069840786)
-    }  
+    }
     "compute floor" in {
       val input = dag.Operate(BuiltInFunction1Op(floor),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 42.0, -23.0)
-    }  
+    }
     "compute toRadians" in {
       val input = dag.Operate(BuiltInFunction1Op(toRadians),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.017453292519943295, -0.017453292519943295, 0.7330382858376184, -0.40142572795869574)
-    }  
+    }
     "compute tanh" in {
       val input = dag.Operate(BuiltInFunction1Op(tanh),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.7615941559557649, -0.7615941559557649, 1.0, -1.0)
-    }  
+    }
     "compute round" in {
       val input = dag.Operate(BuiltInFunction1Op(round),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, -1, 42, -23)
-    }  
+    }
     "compute cosh" in {
       val input = dag.Operate(BuiltInFunction1Op(cosh),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.0, 1.543080634815244, 1.543080634815244, 8.696374707602505E17, 4.872401723124452E9)
-    }  
+    }
     "compute tan" in {
       val input = dag.Operate(BuiltInFunction1Op(tan),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.5574077246549023, -1.5574077246549023, 2.2913879924374863, -1.5881530833912738)
-    }  
+    }
     "compute abs" in {
       val input = dag.Operate(BuiltInFunction1Op(abs),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, 42, 23)
-    }  
+    }
     "compute sin" in {
       val input = dag.Operate(BuiltInFunction1Op(sin),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.8414709848078965, -0.8414709848078965, -0.9165215479156338, 0.8462204041751706)
-    }  
+    }
     "compute log" in {
-      val input = dag.Operate(BuiltInFunction1Op(log),
+      val input = dag.Operate(BuiltInFunction1Op(mathlog),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(3)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 3.7376696182833684)
-    }  
+    }
     "compute signum" in {
       val input = dag.Operate(BuiltInFunction1Op(signum),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0)
-    }  
+    }
     "compute acos" in {
       val input = dag.Operate(BuiltInFunction1Op(acos),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(4)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(1.5707963267948966, 0.0, 3.141592653589793)
-    }  
+    }
     "compute ulp" in {
       val input = dag.Operate(BuiltInFunction1Op(ulp),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(4.9E-324, 2.220446049250313E-16, 2.220446049250313E-16, 7.105427357601002E-15, 3.552713678800501E-15)
     }
     "compute min" in {
       val input = Join(BuiltInFunction2Op(min), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 1, -1, 7, -23)
     }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(7.0, 7.0710678118654755, 7.0710678118654755, 42.579337712087536, 24.041630560342615)
     }
     "compute pow" in {
       val input = Join(BuiltInFunction2Op(pow), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, 2.30539333248E11, -3.404825447E9)
     }
     "compute maxOf" in {
       val input = Join(BuiltInFunction2Op(maxOf), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(7, 42)
-    }    
+    }
     "compute maxOf over numeric arrays (doesn't map over arrays)" in {
       val input = Join(BuiltInFunction2Op(maxOf), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/arrays"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(47)
-    }    
+    }
     "compute maxOf over numeric arrays and numeric objects (doesn't map over arrays or objects)" in {
       val input = Join(BuiltInFunction2Op(maxOf), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers7"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(7)
-    }    
+    }
     "compute maxOf over numeric arrays and numeric objects (using Map2)" in {
       val input = Join(BuiltInFunction2Op(maxOf), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers7"))(line))(line),
         dag.AbsoluteLoad(Const(CString("/het/arrays"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(1)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 2  => d
       }
-      
+
       result2 must contain(47)
     }
     "compute atan2" in {
       val input = Join(BuiltInFunction2Op(atan2), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 0.1418970546041639, -0.1418970546041639, 1.4056476493802699, -1.2753554896511767)
     }
     "compute copySign" in {
       val input = Join(BuiltInFunction2Op(copySign), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, 42.0, 23.0)
     }
     "compute IEEEremainder" in {
       val input = Join(BuiltInFunction2Op(IEEEremainder), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
         Const(CLong(7))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0.0, 1.0, -1.0, -2.0)
     }
     "compute roundTo" in {
       val input = inputOp2(roundTo, "/het/numbers4", CLong(-1))
-      
+
       val result = testEval(input)
-      
+
       result must haveSize(6)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(0, 0, 40, -20)
     }
   }
@@ -1462,7 +1461,7 @@ trait MathLibSpecs[M[+_]] extends Specification
       result2 must contain(0.0, 0.5365729180004349, -0.4121184852417566, -0.6569865987187891, 0.6569865987187891, -0.9999902065507035, 0.9906073556948704, -0.9906073556948704, -0.5440211108893698, 0.6502878401571168, 0.9589242746631385, 0.4201670368266409, -0.4201670368266409, -0.1411200080598672, -0.27941549819892586)
     }
     "compute log" in {
-      val input = dag.Operate(BuiltInFunction1Op(log),
+      val input = dag.Operate(BuiltInFunction1Op(mathlog),
         dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))(line))(line))(line)
 
       val result = testEval(input)
@@ -1624,15 +1623,15 @@ trait MathLibSpecs[M[+_]] extends Specification
     }
     "compute roundTo" in {
       val input = inputOp2(roundTo, "/hom/numbersAcrossSlices", CLong(0))
-      
+
       val result = testEval(input)
-      
+
       result must haveSize(22)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(-7, 15, -13, 11, 7, 11, -7, 0, 14, -3, 6, -12, 10, -9, 15, -5, -13, -14, 11, -5, -5, 13)
     }
   }
@@ -1947,7 +1946,7 @@ trait MathLibSpecs[M[+_]] extends Specification
       result2 must contain(0.0, -0.5365729180004349, 0.8414709848078965, -0.8414709848078965, 0.9092974268256817, -0.9589242746631385, -0.1411200080598672)
     }
     "compute log" in {
-      val input = dag.Operate(BuiltInFunction1Op(log),
+      val input = dag.Operate(BuiltInFunction1Op(mathlog),
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices"))(line))(line))(line)
 
       val result = testEval(input)
@@ -2109,18 +2108,18 @@ trait MathLibSpecs[M[+_]] extends Specification
     }
     "compute roundTo" in {
       val input = inputOp2(roundTo, "/het/numbersAcrossSlices", CLong(0))
-      
+
       val result = testEval(input)
-      
+
       result must haveSize(9)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
-      
+
       result2 must contain(5, 0, 1, -1, 1, 12, 0, 2, -3)
     }
   }
 }
 
-object MathLibSpecs extends MathLibSpecs[test.YId] with test.YIdInstances
+object MathLibSpecs extends MathLibSpecs[Need]

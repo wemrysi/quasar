@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -33,8 +33,7 @@ import blueeyes.json._
 
 import scalaz._
 
-trait ClusteringLibSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with ClusteringTestSupport
     with LongIdMemoryDatasetConsumer[M]{ self =>
 
@@ -84,7 +83,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
     }).toArray
 
     val cost = kMediansCost(points, clusters)
-    
+
     cost must be_<(3 * targetCost)
   }
 
@@ -107,7 +106,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
         result must haveSize(1)
 
-        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
           obj.keys mustEqual Set("model1")
           obj("model1") must beLike {
             case SObject(clusterMap) => isGoodCluster(clusterMap, points, centers, k, dimension)
@@ -129,14 +128,14 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
       result must haveSize(1)
 
-      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
         obj.keys mustEqual Set("model1")
-        obj("model1") must beLike { 
-          case SObject(clusterMap) => 
+        obj("model1") must beLike {
+          case SObject(clusterMap) =>
             clusterMap.keys mustEqual clusterIds
-            clusterIds.map(clusterMap(_)) must haveAllElementsLike { 
+            clusterIds.map(clusterMap(_)) must haveAllElementsLike {
               case SDecimal(d) => d mustEqual(4.4)
-            } 
+            }
         }
       }
     }
@@ -157,14 +156,14 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
       val expected = resultNumbers collect { case (_, SDecimal(num)) => num }
 
-      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
         obj.keys mustEqual Set("model1")
-        obj("model1") must beLike { 
-          case SObject(clusterMap) => 
+        obj("model1") must beLike {
+          case SObject(clusterMap) =>
             clusterMap.keys mustEqual clusterIds
-            clusterIds.map(clusterMap(_)) must haveAllElementsLike { 
+            clusterIds.map(clusterMap(_)) must haveAllElementsLike {
               case SDecimal(d) => expected must contain(d)
-            } 
+            }
 
             val actual = clusterIds.map(clusterMap(_)) collect { case SDecimal(d) => d }
             actual.toSet mustEqual expected
@@ -188,14 +187,14 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
       val expected = resultData collect { case (_, SObject(obj)) => obj }
 
-      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+      result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
         obj.keys mustEqual Set("model1")
-        obj("model1") must beLike { 
-          case SObject(clusterMap) => 
+        obj("model1") must beLike {
+          case SObject(clusterMap) =>
             clusterMap.keys mustEqual clusterIds
-            clusterIds.map(clusterMap(_)) must haveAllElementsLike { 
+            clusterIds.map(clusterMap(_)) must haveAllElementsLike {
               case SObject(obj) => expected must contain(obj)
-            } 
+            }
 
             val actual = clusterIds.map(clusterMap(_)) collect { case SObject(obj) => obj }
             actual.toSet mustEqual expected
@@ -222,9 +221,9 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
         result must haveSize(1)
 
-        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
           obj.keys mustEqual Set("model1", "model2")
-          
+
           def checkmodel(model: SValue) = model must beLike {
             case SObject(clusterMap) =>
               clusterMap("cluster1") must beLike { case SObject(schemadCluster) =>
@@ -260,9 +259,9 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
 
         result must haveSize(1)
 
-        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 => 
+        result must haveAllElementsLike { case (ids, SObject(obj)) if ids.size == 0 =>
           obj.keys mustEqual Set("model1", "model2")
-          
+
           def checkmodel(model: SValue) = model must beLike {
             case SObject(clusterMap) =>
               clusterMap("cluster1") must beLike {
@@ -288,7 +287,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
   }
 
   def makeClusters(centers: Array[Array[Double]]) = {
-    RObject(pointsToJson(centers).zipWithIndex.map { case (ctr, idx) => 
+    RObject(pointsToJson(centers).zipWithIndex.map { case (ctr, idx) =>
       ("cluster" + (idx + 1), ctr)
     }.toMap)
   }
@@ -316,7 +315,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
     }
 
     model("clusterCenter") must beLike { case SArray(arr0) =>
-      val arr = arr0 collect { case SDecimal(d) => d } 
+      val arr = arr0 collect { case SDecimal(d) => d }
 
       val rvalue = clusterMap((model("clusterId"): @unchecked) match {
         case SString(s) => s
@@ -340,7 +339,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
       val clusters = makeClusters(centers)
 
       val clusterMap = clusters match { case RObject(xs) => xs }
-      
+
       val model1 = RObject(Map("model1" -> clusters))
       val assignments = assign(points, centers)
 
@@ -397,7 +396,7 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
           result must haveAllElementsLike { case (ids, SObject(obj)) =>
             ids.length mustEqual 2
 
-            (obj.keySet mustEqual Set("point", "model1")) or 
+            (obj.keySet mustEqual Set("point", "model1")) or
               (obj.keySet mustEqual Set("point", "model1", "model2"))
 
             val point = obj("point")
@@ -478,13 +477,13 @@ trait ClusteringLibSpecs[M[+_]] extends Specification
       val result = result0 collect { case (ids, value) if ids.size == 2 => value }
 
       result mustEqual Set(
-        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster2"), "clusterCenter" -> SObject(Map("bar" -> SDecimal(9.0), "foo" -> SDecimal(4.4))))))), 
-        SObject(Map("model2" -> SObject(Map("clusterId" -> SString("cluster1"), "clusterCenter" -> SObject(Map("baz" -> SDecimal(4.0))))))), 
-        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster2"), "clusterCenter" -> SArray(Vector(SDecimal(6.0), SDecimal(3.0), SDecimal(2.0))))))), 
-        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster3"), "clusterCenter" -> SArray(Vector(SDecimal(0.0), SDecimal(3.2), SDecimal(5.1))))))), 
+        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster2"), "clusterCenter" -> SObject(Map("bar" -> SDecimal(9.0), "foo" -> SDecimal(4.4))))))),
+        SObject(Map("model2" -> SObject(Map("clusterId" -> SString("cluster1"), "clusterCenter" -> SObject(Map("baz" -> SDecimal(4.0))))))),
+        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster2"), "clusterCenter" -> SArray(Vector(SDecimal(6.0), SDecimal(3.0), SDecimal(2.0))))))),
+        SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster3"), "clusterCenter" -> SArray(Vector(SDecimal(0.0), SDecimal(3.2), SDecimal(5.1))))))),
         SObject(Map("model1" -> SObject(Map("clusterId" -> SString("cluster1"), "clusterCenter" -> SArray(Vector(SDecimal(2.1), SDecimal(3.3), SDecimal(4.0))))))))
     }
   }
 }
 
-object ClusteringLibSpecs extends ClusteringLibSpecs[test.YId] with test.YIdInstances
+object ClusteringLibSpecs extends ClusteringLibSpecs[Need]

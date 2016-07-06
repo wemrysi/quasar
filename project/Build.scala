@@ -23,6 +23,7 @@ package precog
 import sbt._, Keys._
 
 object PlatformBuild {
+  val Both            = "compile->compile;test->test"
   val profileTask     = InputKey[Unit]("profile", "Runs the given project under JProfiler")
   val blueeyesVersion = "1.0.0-M9.5"
 
@@ -85,7 +86,7 @@ object PlatformBuild {
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
     def root: Project                                 = p in file(".")
     def testLogging: Project                          = p dependsOn LocalProject("logging") % "test->test"
-    def usesCommon: Project                           = p dependsOn LocalProject("common") % "compile->compile;test->test"
+    def usesCommon: Project                           = p dependsOn LocalProject("common") % Both
     def setup: Project                                = p dependsOn LocalProject("blueeyes") also commonSettings
     def assemblyProject: Project                      = p.setup.testLogging also assemblySettings also (
                        test in assembly :=  (),

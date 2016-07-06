@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -64,20 +64,19 @@ trait LinearRegressionTestSupport[M[+_]]
     val deciders = Seq.fill(noSamples)(Random.nextDouble)
 
     val testSeqY = {
-      testSeqX map { 
+      testSeqX map {
         case xs => {
           val yvalue = dotProduct(actualThetas, 1.0 +: xs)
           yvalue + Random.nextGaussian
         }
       }
     }
-  
+
     testSeqX zip testSeqY
   }
 }
 
-trait LinearRegressionSpecs[M[+_]] extends Specification 
-    with EvaluatorTestSupport[M]
+trait LinearRegressionSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LinearRegressionTestSupport[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
 
@@ -185,7 +184,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
           val (SDecimal(theta0), SDecimal(error0)) = (arr(1): @unchecked) match {
             case SObject(obj) => returnValues(obj)
           }
-              
+
           (List(theta0.toDouble, theta1.toDouble),
             List(error0.toDouble, error1.toDouble),
             rSquared.toDouble)
@@ -198,7 +197,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
 
       i += 1
     }
-    
+
     val combinedThetas = combineResults(num, thetas)
     val combinedErrors = combineResults(num, errors)
 
@@ -217,7 +216,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
     val ys = sampleValues map { _.map { _._2 } }
     val expectedRSquared = computeRSquared(ys)
 
-    isOk(expectedRSquared, rSquareds) mustEqual true 
+    isOk(expectedRSquared, rSquareds) mustEqual true
   }
 
   def testThreeFeatures = {
@@ -304,7 +303,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
     val ys = sampleValues map { _.map { _._2 } }
     val expectedRSquared = computeRSquared(ys)
 
-    isOk(expectedRSquared, rSquareds) mustEqual true 
+    isOk(expectedRSquared, rSquareds) mustEqual true
   }
 
   def testThreeSchemata = {
@@ -350,8 +349,8 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
 
       val pointsString0 = "filesystem" + tmpFile.toString
       val pointsString = pointsString0.take(pointsString0.length - suffix.length)
-      
-      val input = makeDAG(pointsString) 
+
+      val input = makeDAG(pointsString)
 
       val result = testEval(input)
       tmpFile.delete()
@@ -367,8 +366,8 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
           val SArray(arr) = fields("coefficients")
           val SDecimal(rSquared) = fields("RSquared")
 
-          val (SDecimal(theta1), SDecimal(error1)) = (arr(0): @unchecked) match { case SObject(map) => 
-            (map("bar"): @unchecked) match { case SObject(map) => 
+          val (SDecimal(theta1), SDecimal(error1)) = (arr(0): @unchecked) match { case SObject(map) =>
+            (map("bar"): @unchecked) match { case SObject(map) =>
               (map("baz"): @unchecked) match { case SArray(Vector(SObject(obj))) =>
                 returnValues(obj)
               }
@@ -386,7 +385,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
               returnValues(obj)
           }
 
-          (List(theta0.toDouble, theta1.toDouble, theta2.toDouble), 
+          (List(theta0.toDouble, theta1.toDouble, theta2.toDouble),
             List(error0.toDouble, error1.toDouble, error2.toDouble),
             rSquared.toDouble)
       }
@@ -429,7 +428,7 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
     val zipped = actualErrors zip errors
 
     val resultErrors = zipped map { case (actual, err) =>
-      val z = actual zip combineResults(num, err) 
+      val z = actual zip combineResults(num, err)
       z map { case (e, es) => isOk(e, es) }
     }
 
@@ -466,4 +465,4 @@ trait LinearRegressionSpecs[M[+_]] extends Specification
   }
 }
 
-object LinearRegressionSpecs extends LinearRegressionSpecs[test.YId] with test.YIdInstances
+object LinearRegressionSpecs extends LinearRegressionSpecs[Need]

@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -29,18 +29,14 @@ import org.specs2.mutable.Specification
 import com.precog.bytecode.JType.JUniverseT
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
-import com.precog.yggdrasil.test.YId
 import com.precog.util.IdGen
 
 import scala.Function._
+import scalaz._
 
-import scalaz.Failure
-import scalaz.Success
-
-trait JoinOptimizerSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-  
+
   import TableModule.CrossOrder._ // TODO: Move CrossOrder out somewhere else.
   import dag._
   import instructions._
@@ -58,7 +54,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     (consumeEval(graph, defaultEvaluationContext) match {
       case Success(results) => test(results)
       case Failure(error) => throw error
-    }) 
+    })
   }
 
   "join optimization" should {
@@ -66,7 +62,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
       val line = Line(1, 1, "")
       val numbers = dag.AbsoluteLoad(Const(CString("/het/numbers"))(line))(line)
 
-      def makeFilter(lhs1: DepGraph, rhs1: DepGraph, lhs2: DepGraph, rhs2: DepGraph) = 
+      def makeFilter(lhs1: DepGraph, rhs1: DepGraph, lhs2: DepGraph, rhs2: DepGraph) =
         Filter(IdentitySort,
           Join(Eq, Cross(None),
             lhs1,
@@ -92,13 +88,13 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in trivial object join cases" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   { name: a.name, height: b.height } where a.userid = b.userId """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -116,7 +112,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), heightWeight, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, heightWeight)(line))(line),
           "key", "value", 0)
-        
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -125,7 +121,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), users, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, users)(line))(line),
           "key", "value", 0)
-          
+
       val input =
         Filter(IdentitySort,
           Join(JoinObject, Cross(None),
@@ -141,10 +137,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               userId)(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(JoinObject, ValueSort(0),
           Join(WrapObject, Cross(None),
@@ -158,13 +154,13 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in trivial object join case with non order-preserving op in equal" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   { name: a.name, height: b.height } where std::string::toLowerCase(a.userId) = b.userId """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -182,7 +178,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), heightWeight, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, heightWeight)(line))(line),
           "key", "value", 0)
-        
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -192,7 +188,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
                 Join(DerefObject, Cross(None), users, userId)(line))(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, users)(line))(line),
           "key", "value", 0)
-          
+
       val input =
         Filter(IdentitySort,
           Join(JoinObject, Cross(None),
@@ -203,16 +199,16 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               name,
               Join(DerefObject, Cross(None), users, name)(line))(line))(line),
           Join(Eq, Cross(None),
-            Operate(BuiltInFunction1Op(toLowerCase), 
+            Operate(BuiltInFunction1Op(toLowerCase),
               Join(DerefObject, Cross(None),
                 users,
                 userId)(line))(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(JoinObject, ValueSort(0),
           Join(WrapObject, Cross(None),
@@ -226,13 +222,13 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in trivial op2 join cases" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   std::math::hypot(a.weight, b.height) where a.userid = b.userId """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -271,10 +267,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               userId)(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(BuiltInFunction2Op(hypot), ValueSort(0),
           Join(DerefObject, Cross(None), liftedLHS, weight)(line),
@@ -284,14 +280,14 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in object join followed by object deref" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   std::string::toLowerCase({ name: a.name, height: b.height }.height) where a.userId = b.userId
         """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -309,7 +305,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), heightWeight, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, heightWeight)(line))(line),
           "key", "value", 0)
-        
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -318,7 +314,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), users, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, users)(line))(line),
           "key", "value", 0)
-          
+
       val input =
         Filter(IdentitySort,
           Operate(BuiltInFunction1Op(toLowerCase),
@@ -337,10 +333,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               userId)(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Operate(BuiltInFunction1Op(toLowerCase),
           Join(DerefObject, Cross(None),
@@ -381,14 +377,14 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "fail to eliminate cartesian products wrapped in non row-level transformation" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   std::stats::indexedRank({ name: a.name, height: b.height }.height) where a.userId = b.userId
         """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -416,10 +412,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               userId)(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       opt must_== input
     }
 
@@ -428,11 +424,11 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
       val rawInput = """
         | clicks := //clicks
         | conversions := //conversions
-        | 
+        |
         | clicks ~ conversions
         | {clicks: clicks,  price : conversions.product.ID} where conversions.product.price = clicks.product.price
       """.stripMargin
-      
+
       val line = Line(1, 1, "")
       val clicksData = dag.AbsoluteLoad(Const(CString("/clicks"))(line), JUniverseT)(line)
       val conversionsData = dag.AbsoluteLoad(Const(CString("/conversions"))(line), JUniverseT)(line)
@@ -442,7 +438,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
       val product = Const(CString("product"))(line)
       val key = Const(CString("key"))(line)
       val value = Const(CString("value"))(line)
-        
+
       val liftedLHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -468,7 +464,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
                 price)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, conversionsData)(line))(line),
           "key", "value", 0)
-        
+
       val input =
         Filter(IdentitySort,
           Join(JoinObject,Cross(None),
@@ -493,9 +489,9 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
                 clicksData,
                 product)(line),
               price)(line))(line))(line)
-          
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(JoinObject, ValueSort(0),
           Join(WrapObject, Cross(None),
@@ -514,13 +510,13 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in trivial array join cases" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   [b.height, a.name] where a.userId = b.userId """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/hom/users"))(line), JUniverseT)(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/hom/heightWeight"))(line), JUniverseT)(line)
@@ -538,7 +534,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), heightWeight, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, heightWeight)(line))(line),
           "key", "value", 0)
-        
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -547,7 +543,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Join(DerefObject, Cross(None), users, userId)(line))(line),
             Join(WrapObject, Cross(Some(CrossRight)), value, users)(line))(line),
           "key", "value", 0)
-          
+
       val input =
         Filter(IdentitySort,
           Join(JoinArray, Cross(None),
@@ -561,10 +557,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               userId)(line),
             Join(DerefObject, Cross(None),
               heightWeight,
-              userId)(line))(line))(line)    
-      
+              userId)(line))(line))(line)
+
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(JoinArray, ValueSort(0),
           Operate(WrapArray,
@@ -576,13 +572,13 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in slightly less trivial cases (1)" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
         | a ~ b
         |   { name: a.name, height: b.height, weight: b.weight } where a.userId = b.userId """.stripMargin
-        
+
       val line = Line(1, 1, "")
       val users = dag.AbsoluteLoad(Const(CString("/users"))(line))(line)
       val heightWeight = dag.AbsoluteLoad(Const(CString("/heightWeight"))(line))(line)
@@ -603,7 +599,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Const(CString("value"))(line),
               value)(line))(line),
           "key", "value", 0)
-        
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -613,7 +609,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
             Join(WrapObject, Cross(Some(CrossRight)), value, users)(line))(line),
           "key", "value", 0)
 
-      val lhs = 
+      val lhs =
         Join(JoinObject, IdentitySort,
           Join(WrapObject, Cross(None),
             height,
@@ -622,7 +618,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
             weight,
             Join(DerefObject, Cross(None), heightWeight, weight)(line))(line))(line)
 
-          
+
       val input =
         Filter(IdentitySort,
           Join(JoinObject, Cross(None),
@@ -636,7 +632,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
 
       val hwid = Join(DerefObject, Cross(None), heightWeight, userId)(line)
       val opt = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expectedOpt =
         Join(JoinObject, ValueSort(0),
           makeAddSortKey(hwid, lhs),
@@ -648,7 +644,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
     }
 
     "eliminate naive cartesian products in slightly less trivial cases (2)" in {
-      
+
       val rawInput = """
         | a := //users
         | b := //heightWeight
@@ -656,14 +652,14 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
         |   ({ name: a.name } with b) where a.userId = b.userId """.stripMargin
 
       val line = Line(1, 1, "")
-      
+
       lazy val users = dag.AbsoluteLoad(Const(CString("/users"))(line))(line)
       lazy val heightWeight = dag.AbsoluteLoad(Const(CString("/heightWeight"))(line))(line)
       lazy val userId = Const(CString("userId"))(line)
       lazy val name = Const(CString("name"))(line)
       lazy val key = Const(CString("key"))(line)
       lazy val value = Const(CString("value"))(line)
-      
+
       lazy val input =
         Filter(IdentitySort,
           Join(JoinObject, Cross(None),
@@ -709,7 +705,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
       val query = """
         | medals' := //summer_games/london_medals
         | medals'' := new medals'
-        | 
+        |
         | medals'' ~ medals'
         | [medals'.Name, medals''.Name] where medals'.Name = medals''.Name
       """.stripMargin
@@ -793,10 +789,10 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
       val country = Const(CString("Country"))(line)
       val total = Const(CString("Total"))(line)
       val medals = dag.AbsoluteLoad(Const(CString("/summer_games/london_medals"))(line))(line)
-      val medalsP = 
+      val medalsP =
         dag.Filter(IdentitySort,
           medals,
-          Join(Eq, Cross(None), 
+          Join(Eq, Cross(None),
             Join(DerefObject, Cross(None), medals, country)(line),
             Const(CString("India"))(line))(line))(line)
       val medalsPP = dag.New(medalsP)(line)
@@ -850,7 +846,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
 
       opt must_== expectedOpt
     }
-    
+
     "eliminate cartesian in medal winners query" in {
       // note: query will not return expected results on actual data because
       // `medals.Name` and `athletes.Name` return (First Last) and (Last First), resp.
@@ -863,14 +859,14 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
        *
        * medals' := medals with { name: toLowerCase(medals.name) }
        * athletes' := athletes with { name: toLowerCase(athletes.name) }
-       * 
+       *
        * medals' ~ athletes'
        *   { winner: medals'.`Medal winner`, country: athletes'.Countryname }
        *     where medals'.name = athletes'.name
        */
-       
+
       val line = Line(1, 1, "")
-      
+
       val medals = dag.AbsoluteLoad(Const(CString("/summer_games/london_medals"))(line))(line)
       val athletes = dag.AbsoluteLoad(Const(CString("/summer_games/athletes"))(line))(line)
 
@@ -879,15 +875,15 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
           Const(CString("name"))(line),
           Operate(BuiltInFunction1Op(toLowerCase),
             Join(DerefObject, Cross(None), graph, Const(CString("name"))(line))(line))(line))(line)
-      
+
       val medalsPrime = Join(JoinObject, IdentitySort,
         medals,
         wrapName(medals))(line)
-          
+
       val athletesPrime = Join(JoinObject, IdentitySort,
         athletes,
         wrapName(athletes))(line)
-            
+
       val input = Filter(IdentitySort,
         Join(JoinObject, Cross(None),
           Join(WrapObject, Cross(Some(CrossRight)),
@@ -920,7 +916,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Const(CString("value"))(line),
               medalsPrime)(line))(line),
           "key", "value", 0)
-      
+
       val liftedRHS =
         AddSortKey(
           Join(JoinObject, IdentitySort,
@@ -933,9 +929,9 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
               Const(CString("value"))(line),
               athletesPrime)(line))(line),
           "key", "value", 0)
-            
+
       val result = optimizeJoins(input, ctx, new IdGen)
-      
+
       val expected =
         Join(JoinObject, ValueSort(0),
           Join(WrapObject, Cross(Some(CrossRight)),
@@ -948,24 +944,24 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
             Join(DerefObject, Cross(None),
               liftedRHS,
               Const(CString("Countryname"))(line))(line))(line))(line)
-            
+
       result mustEqual expected
     }
 
     "produce a valid dag for a ternary object-literal cartesian" in {
       /*
        * clicks := //clicks
-       * 
+       *
        * clicks' := new clicks
        * clicks ~ clicks'
        *   { a: clicks, b: clicks', c: clicks } where clicks'.pageId = clicks.pageId
        */
-      
+
       val line = Line(1, 1, "")
-      
+
       lazy val clicks = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
       lazy val clicksP = dag.New(clicks)(line)
-      
+
       lazy val input =
         Filter(IdentitySort,
           Join(JoinObject, Cross(None),
@@ -1001,7 +997,7 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
         val clicksid = Join(DerefObject, Cross(None), clicks, Const(CString("pageId"))(line))(line)
         val clicksPid = Join(DerefObject, Cross(None), clicksP, Const(CString("pageId"))(line))(line)
 
-        val clicksV = 
+        val clicksV =
           Join(JoinObject, IdentitySort,
             Join(WrapObject, Cross(None),
               Const(CString("a"))(line),
@@ -1009,17 +1005,17 @@ trait JoinOptimizerSpecs[M[+_]] extends Specification
             Join(WrapObject, Cross(None),
               Const(CString("c"))(line),
               clicks)(line))(line)
-        
+
         lazy val expected =
           Join(JoinObject, ValueSort(0),
             makeAddSortKey(clicksid, clicksV),
             Join(WrapObject, Cross(None),
               Const(CString("b"))(line),
               makeAddSortKey(clicksPid, clicksP))(line))(line)
-        
+
       optimizeJoins(input, ctx, new IdGen) mustEqual expected
     }
   }
 }
 
-object JoinOptimizerSpecs extends JoinOptimizerSpecs[YId] with yggdrasil.test.YIdInstances 
+object JoinOptimizerSpecs extends JoinOptimizerSpecs[Need]

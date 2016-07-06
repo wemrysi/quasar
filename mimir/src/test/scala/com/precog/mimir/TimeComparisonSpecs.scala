@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,12 +32,11 @@ import com.precog.util.IdGen
 import org.joda.time._
 import org.joda.time.format._
 
-trait TimeComparisonSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait TimeComparisonSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-      
+
   import Function._
-  
+
   import dag._
   import instructions._
   import library._
@@ -57,9 +56,9 @@ trait TimeComparisonSpecs[M[+_]] extends Specification
 
   def basicComparison(input: DepGraph, expected: Boolean) = {
     val result = testEval(input)
-    
+
     result must haveSize(1)
-    
+
     result must haveAllElementsLike {
       case (ids, SBoolean(d)) =>
         ids must haveSize(0)
@@ -202,9 +201,9 @@ trait TimeComparisonSpecs[M[+_]] extends Specification
 
   def extremeComparison(input: DepGraph, expected: String) = {
     val result = testEval(input)
-    
+
     result must haveSize(1)
-    
+
     result must haveAllElementsLike {
       case (ids, SString(str)) =>
         ids must haveSize(0)
@@ -308,4 +307,4 @@ trait TimeComparisonSpecs[M[+_]] extends Specification
   }
 }
 
-object TimeComparisonSpecs extends TimeComparisonSpecs[test.YId] with test.YIdInstances
+object TimeComparisonSpecs extends TimeComparisonSpecs[Need]

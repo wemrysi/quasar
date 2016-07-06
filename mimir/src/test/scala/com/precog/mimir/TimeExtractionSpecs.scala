@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -31,12 +31,11 @@ import com.precog.util.IdGen
 import org.joda.time._
 import org.joda.time.format._
 
-trait TimeExtractionSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait TimeExtractionSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-      
+
   import Function._
-  
+
   import dag._
   import instructions._
   import library._
@@ -54,202 +53,202 @@ trait TimeExtractionSpecs[M[+_]] extends Specification
     "extract time zone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeZone),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d.toString
       }
-      
+
       result2 must contain("+08:00", "+09:00", "-10:00", "-07:00", "+06:00")
-    }     
-  
+    }
+
     "compute season" in {
       val input = dag.Operate(BuiltInFunction1Op(Season),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d.toString
       }
-      
+
       result2 must contain("spring", "winter", "summer")
     }
 
     "compute year" in {
       val input = dag.Operate(BuiltInFunction1Op(Year),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(2010, 2011, 2012)
     }
 
     "compute quarter" in {
       val input = dag.Operate(BuiltInFunction1Op(QuarterOfYear),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(1, 2, 3, 4)
     }
 
     "compute month of year" in {
       val input = dag.Operate(BuiltInFunction1Op(MonthOfYear),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(4, 2, 9, 12)
     }
-    
+
     "compute week of year" in {
       val input = dag.Operate(BuiltInFunction1Op(WeekOfYear),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(17, 8, 36, 6, 52)
     }
     "compute week of month" in {
       val input = dag.Operate(BuiltInFunction1Op(WeekOfMonth),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(2, 5, 4)
     }
     "compute day of year" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfYear),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(52, 119, 42, 249, 363)
     }
     "compute day of month" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfMonth),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-        
+
       result2 must contain(21, 29, 11, 6, 28)
     }
     "compute day of week" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfWeek),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(1, 2, 6, 5, 4)
     }
     "compute hour of day" in {
       val input = dag.Operate(BuiltInFunction1Op(HourOfDay),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(20, 6, 9)
     }
     "compute minute of hour" in {
       val input = dag.Operate(BuiltInFunction1Op(MinuteOfHour),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(9, 44, 11, 37, 38)
     }
     "compute second of minute" in {
       val input = dag.Operate(BuiltInFunction1Op(SecondOfMinute),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(19, 59, 52, 33)
     }
     "compute millis of second" in {
       val input = dag.Operate(BuiltInFunction1Op(MillisOfSecond),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(430, 165, 848, 394, 599)
     }
   }
@@ -258,202 +257,202 @@ trait TimeExtractionSpecs[M[+_]] extends Specification
     "extract time zone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeZone),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d.toString
       }
-      
+
       result2 must contain("+08:00", "+09:00", "-10:00", "-07:00", "+06:00")
-    }     
-  
+    }
+
     "compute season" in {
       val input = dag.Operate(BuiltInFunction1Op(Season),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d.toString
       }
-      
+
       result2 must contain("spring", "winter", "summer")
     }
 
     "compute year" in {
       val input = dag.Operate(BuiltInFunction1Op(Year),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(2010, 2011, 2012)
     }
 
     "compute quarter" in {
       val input = dag.Operate(BuiltInFunction1Op(QuarterOfYear),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(1, 2, 3, 4)
     }
 
     "compute month of year" in {
       val input = dag.Operate(BuiltInFunction1Op(MonthOfYear),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(4, 2, 9, 12)
     }
-    
+
     "compute week of year" in {
       val input = dag.Operate(BuiltInFunction1Op(WeekOfYear),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(17, 8, 36, 6, 52)
     }
     "compute week of month" in {
       val input = dag.Operate(BuiltInFunction1Op(WeekOfMonth),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(2, 5, 4)
     }
     "compute day of year" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfYear),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(52, 119, 42, 249, 363)
     }
     "compute day of month" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfMonth),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-        
+
       result2 must contain(21, 29, 11, 6, 28)
     }
     "compute day of week" in {
       val input = dag.Operate(BuiltInFunction1Op(DayOfWeek),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(1, 2, 6, 5, 4)
     }
     "compute hour of day" in {
       val input = dag.Operate(BuiltInFunction1Op(HourOfDay),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(20, 6, 9)
     }
     "compute minute of hour" in {
       val input = dag.Operate(BuiltInFunction1Op(MinuteOfHour),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(9, 44, 11, 37, 38)
     }
     "compute second of minute" in {
       val input = dag.Operate(BuiltInFunction1Op(SecondOfMinute),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(19, 59, 52, 33)
     }
     "compute millis of second" in {
       val input = dag.Operate(BuiltInFunction1Op(MillisOfSecond),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
-      
+
       result2 must contain(430, 165, 848, 394, 599)
     }
   }
@@ -867,4 +866,4 @@ trait TimeExtractionSpecs[M[+_]] extends Specification
   }
 }
 
-object TimeExtractionSpecs extends TimeExtractionSpecs[test.YId] with test.YIdInstances
+object TimeExtractionSpecs extends TimeExtractionSpecs[Need]

@@ -1,37 +1,35 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 package com.precog
 package mimir
 
+import scalaz._
 import com.precog.common._
 import com.precog.util.Identifier
 import bytecode._
 import org.specs2.mutable._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
-
-
 import scala.collection.mutable
 
-trait ReductionFinderSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M] {
+trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
   import instructions._
   import dag._
@@ -69,7 +67,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
     "in a single reduction" in {
       val line = Line(1, 1, "")
 
-      val input = dag.Reduce(Count, 
+      val input = dag.Reduce(Count,
         dag.AbsoluteLoad(Const(CString("/foo"))(line))(line))(line)
 
 
@@ -80,7 +78,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       val expected = joinDeref(megaR, 0, 0, line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
-    } 
+    }
 
     "in joins where transpecs are eq, wrap object, operate, filter" in {
       val line = Line(1, 1, "")
@@ -90,24 +88,24 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       val notEq = Join(NotEq, Cross(None),
         Join(DerefObject, Cross(None),
           clicks,
-          Const(CString("foo"))(line))(line), 
+          Const(CString("foo"))(line))(line),
         Const(CNum(5))(line))(line)
 
       val obj = Join(WrapObject, Cross(None),
         Const(CString("bar"))(line),
         clicks)(line)
 
-      val op = Operate(Neg, 
+      val op = Operate(Neg,
         Join(DerefArray, Cross(None),
           clicks,
           Const(CNum(1))(line))(line))(line)
 
-      val filter = Filter(IdentitySort, 
+      val filter = Filter(IdentitySort,
         clicks,
         Join(Eq, Cross(None),
           Join(DerefObject, Cross(None),
             clicks,
-            Const(CString("baz"))(line))(line), 
+            Const(CString("baz"))(line))(line),
           Const(CNum(12))(line))(line))(line)
 
       val fooDerefTrans = trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("foo"))
@@ -142,7 +140,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
-    
+
     "in a join of two reductions on the same dataset" in {
       val line = Line(1, 1, "")
 
@@ -223,8 +221,8 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
         joinDeref(megaR2, 0, 0, line))(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
-    }    
-    
+    }
+
     "where two different sets are being reduced" in {
       val line = Line(1, 1, "")
 
@@ -237,16 +235,16 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       val r4 = dag.Reduce(Max, load2)(line)
       val r5 = dag.Reduce(Min, load2)(line)
 
-      val input = Join(Add, Cross(Some(CrossRight)), 
-        r1, 
-        Join(Add, Cross(Some(CrossRight)), 
+      val input = Join(Add, Cross(Some(CrossRight)),
+        r1,
+        Join(Add, Cross(Some(CrossRight)),
           r2,
           Join(Add, Cross(Some(CrossRight)),
             r3,
             Join(Add, Cross(Some(CrossRight)),
               r4,
               r5)(line))(line))(line))(line)
-            
+
       val spec = trans.Leaf(trans.Source)
 
       val megaR1 = dag.MegaReduce(List((spec, List(Sum, Max))), load1)
@@ -268,23 +266,23 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
     "where a single set is being reduced three times" in {
       val line = Line(1, 1, "")
       val load = dag.AbsoluteLoad(Const(CString("/foo"))(line))(line)
-    
+
       val red1 = Count
       val r1 = dag.Reduce(red1, load)(line)
-    
+
       val red3 = StdDev
       val r3 = dag.Reduce(red3, load)(line)
-      
+
       val input = Join(Add, Cross(Some(CrossRight)), r1, Join(Sub, Cross(Some(CrossRight)), r1, r3)(line))(line)
-    
+
       val leaf = trans.Leaf(trans.Source)
       val megaR = MegaReduce(List((leaf, List(red1, red3))), load)
-    
+
       val expected = Join(Add, Cross(Some(CrossRight)),
         joinDeref(megaR, 0, 1, line),
         Join(Sub, Cross(Some(CrossRight)),
-          joinDeref(megaR, 0, 1, line), 
-          joinDeref(megaR, 0, 0, line))(line))(line) 
+          joinDeref(megaR, 0, 1, line),
+          joinDeref(megaR, 0, 0, line))(line))(line)
 
       megaReduce(input, findReductions(input, evalCtx)) mustEqual expected
     }
@@ -439,25 +437,25 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
 
     "in a split" in {
       val line = Line(1, 1, "")
-      // 
+      //
       // nums := dataset(//hom/numbers)
       // sums('n) :=
       //   m := max(nums where nums < 'n)
       //   (nums where nums = 'n) + m     -- actually, we used split root, but close enough
       // sums
-      // 
-       
+      //
+
       val nums = dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line)
-      
+
       val reduction = Max
-      
+
       val id = new Identifier
 
       val input = dag.Split(
         dag.Group(1, nums, UnfixedSolution(0, nums)),
         Join(Add, Cross(None),
           SplitGroup(1, nums.identities, id)(line),
-          dag.Reduce(reduction, 
+          dag.Reduce(reduction,
             Filter(IdentitySort,
               nums,
               Join(Lt, Cross(None),
@@ -483,19 +481,19 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
 
     "in a split that contains two reductions of the same dataset" in {
       val line = Line(1, 1, "")
-      
-      // 
+
+      //
       // clicks := dataset(//clicks)
       // histogram := solve 'user
-      //   { user: 'user, min: min(clicks.foo where clicks.user = 'user), max: max(clicks.foo where clicks.user = 'user) }  
-      //  
+      //   { user: 'user, min: min(clicks.foo where clicks.user = 'user), max: max(clicks.foo where clicks.user = 'user) }
+      //
       //  --if max is taken instead of clicks.bar, the change in the DAG not show up inside the Reduce, and so is hard to track the reductions
       // histogram
-      
+
       val clicks = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
-      
+
       val id = new Identifier
-       
+
       val input = dag.Split(
         dag.Group(1,
           Join(DerefObject, Cross(None), clicks, Const(CString("foo"))(line))(line),
@@ -575,7 +573,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       )
 
       findReductions(r, evalCtx) mustEqual expected
-    }   
+    }
 
     "in a join of two reductions on the same dataset #2" in {
       val line = Line(1, 1, "")
@@ -611,7 +609,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       )
 
       findReductions(r2, evalCtx) mustEqual expected
-    }     
+    }
 
     "findReductions given two reductions inside a reduction" in {
       val line = Line(1, 1, "")
@@ -653,7 +651,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       val clicks = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
       val red = Count
       val count = dag.Reduce(red, clicks)(line)
-      
+
       val id = new Identifier
 
       val input = dag.Split(
@@ -661,7 +659,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
           clicks,
           UnfixedSolution(0, count)),
         SplitParam(1, id)(line), id)(line)
-        
+
       val expected = MegaReduceState(
         Map(count -> clicks),
         Map(clicks -> List(clicks)),
@@ -704,7 +702,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
         findReductions(input, evalCtx) mustEqual expected
       }
     }
-    
+
     "in a split" in {
       val line = Line(1, 1, "")
 
@@ -715,7 +713,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       // sums
 
       val nums = dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line)
-      
+
       val id = new Identifier
 
       lazy val j = Join(Lt, Cross(None), nums, SplitParam(0, id)(line))(line)
@@ -740,17 +738,17 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
 
     "in a split that contains two reductions of the same dataset #2" in {
       val line = Line(1, 1, "")
-      
+
       // clicks := dataset(//clicks)
       // histogram('user) :=
       //   { user: 'user,
       //     min: min(clicks.foo where clicks.user = 'user),
       //     max: max(clicks.foo where clicks.user = 'user) }
       // histogram
-      //  
+      //
       // -- if max is taken instead of clicks.bar, the change in the DAG does
       // -- not show up inside the Reduce, so it's hard to track the reductions
-      
+
       val clicks = dag.AbsoluteLoad(Const(CString("/clicks"))(line))(line)
 
       val fooRoot = Const(CString("foo"))(line)
@@ -761,7 +759,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
       val clicksFoo = Join(DerefObject, Cross(None), clicks, fooRoot)(line)
       val clicksUser = Join(DerefObject, Cross(None), clicks, userRoot)(line)
       val group1 = dag.Group(1, clicksFoo, UnfixedSolution(0, clicksUser))
-      
+
       val id = new Identifier
 
       lazy val parent = SplitGroup(1, Identities.Specs(Vector(LoadIds("/clicks"))), id)(line)
@@ -789,7 +787,7 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
     }
   }
 
-  def joinDeref(left: DepGraph, first: Int, second: Int, line: Line): DepGraph = 
+  def joinDeref(left: DepGraph, first: Int, second: Int, line: Line): DepGraph =
     Join(DerefArray, Cross(Some(CrossLeft)),
       Join(DerefArray, Cross(Some(CrossLeft)),
         left,
@@ -798,4 +796,4 @@ trait ReductionFinderSpecs[M[+_]] extends Specification
 }
 
 
-object ReductionFinderSpecs extends ReductionFinderSpecs[test.YId] with test.YIdInstances 
+object ReductionFinderSpecs extends ReductionFinderSpecs[Need]

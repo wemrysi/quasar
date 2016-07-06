@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -41,12 +41,12 @@ import scalaz.std.stream._
 import scalaz.std.set._
 import scalaz.syntax.traverse._
 
-trait LinearRegressionLibModule[M[+_]] 
+trait LinearRegressionLibModule[M[+_]]
     extends ColumnarTableLibModule[M]
     with ReductionLibModule[M]
     with PredictionLibModule[M] {
 
-  trait LinearRegressionLib 
+  trait LinearRegressionLib
       extends ColumnarTableLib
       with RegressionSupport
       with PredictionSupport
@@ -64,7 +64,7 @@ trait LinearRegressionLibModule[M[+_]]
       type Beta = Array[Double]
 
       // `beta`: current weighted value for coefficients
-      // `count`: number of rows seen 
+      // `count`: number of rows seen
       // `removed`: indices of columns removed due to their dependence on other columns
       case class CoeffAcc(beta: Beta, count: Long, removed: Set[Int])
 
@@ -77,8 +77,8 @@ trait LinearRegressionLibModule[M[+_]]
        * http://adrem.ua.ac.be/sites/adrem.ua.ac.be/files/StreamFitter.pdf
        *
        * First slice size is made consistent. Then the slices are fed to the reducer, one by one.
-       * The reducer calculates the Ordinary Least Squares regression for each Slice. 
-       * The results of each of these regressions are then combined incrementally using `monoid`. 
+       * The reducer calculates the Ordinary Least Squares regression for each Slice.
+       * The results of each of these regressions are then combined incrementally using `monoid`.
        * `alpha` (a value between 0 and 1) is the paramater which determines the weighting of the
        * data in the stream. A value of 0.5 means that current values and past values
        * are equally weighted. The paper above outlines how `alpha` relates to the half-life
@@ -132,10 +132,10 @@ trait LinearRegressionLibModule[M[+_]]
               t2.product
             } else if (isEmpty(t2.product)) {
               t1.product
-            } else { 
+            } else {
               assert(
                 t1.product.getColumnDimension == t2.product.getColumnDimension &&
-                t1.product.getRowDimension == t2.product.getRowDimension) 
+                t1.product.getRowDimension == t2.product.getRowDimension)
 
               t1.product plus t2.product
             }
@@ -217,8 +217,8 @@ trait LinearRegressionLibModule[M[+_]]
           case c: HomogeneousArrayColumn[_] if c.tpe.manifest.erasure == classOf[Array[Double]] =>
             val mapped = range.toArray filter { r => c.isDefinedAt(r) } map { i => c.asInstanceOf[HomogeneousArrayColumn[Double]](i) }
             Some(mapped)
-          case other => 
-            logger.warn("Features were not correctly put into a homogeneous array of doubles; returning empty.")
+          case other =>
+            log.warn("Features were not correctly put into a homogeneous array of doubles; returning empty.")
             None
         }
 
@@ -228,7 +228,7 @@ trait LinearRegressionLibModule[M[+_]]
         }
 
         val xs = arrays collect { case mx if !mx.isEmpty =>
-          mx collect { case arr if !arr.isEmpty => 
+          mx collect { case arr if !arr.isEmpty =>
             1.0 +: (java.util.Arrays.copyOf(arr, arr.length - 1))
           }
         }
@@ -323,7 +323,7 @@ trait LinearRegressionLibModule[M[+_]]
           val weightedRes0 = res map { _ * count }
 
           val removed = cleaned map { _._2 } getOrElse Set.empty[Int]
-          val weightedRes = insertZeroAt(weightedRes0, removed.toArray) 
+          val weightedRes = insertZeroAt(weightedRes0, removed.toArray)
 
           CoeffAcc(weightedRes, count, removed)
         }
@@ -388,7 +388,7 @@ trait LinearRegressionLibModule[M[+_]]
 
         val degOfFreedom = coeffs.count - colDim
         val varianceEst = errors.rss / degOfFreedom
-        
+
         val inverse = errors.product.inverse()
         val varianceCovariance = inverse.times(varianceEst)
 
@@ -451,7 +451,7 @@ trait LinearRegressionLibModule[M[+_]]
           val table = table0.transform(valueSpec).transform(arraySpec)
 
           val schemas: M[Seq[JType]] = table.schemas map { _.toSeq }
-          
+
           val specs: M[Seq[TransSpec1]] = schemas map {
             _ map { jtype => trans.Typed(TransSpec1.Id, jtype) }
           }
@@ -485,11 +485,11 @@ trait LinearRegressionLibModule[M[+_]]
             }
           }
 
-          val reducedTables: M[Seq[Table]] = tablesWithType flatMap { 
+          val reducedTables: M[Seq[Table]] = tablesWithType flatMap {
             _.map { case (table, jtype) => tableReducer(table, jtype) }.toStream.sequence map(_.toSeq)
           }
 
-          val objectTables: M[Seq[Table]] = reducedTables map { 
+          val objectTables: M[Seq[Table]] = reducedTables map {
             _.zipWithIndex map { case (tbl, idx) =>
               val modelId = "model" + (idx + 1)
               tbl.transform(liftToValues(trans.WrapObject(TransSpec1.Id, modelId)))

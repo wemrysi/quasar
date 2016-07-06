@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,12 +32,11 @@ import com.precog.util.IdGen
 import org.joda.time._
 import org.joda.time.format._
 
-trait TimePlusSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait TimePlusSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-      
+
   import Function._
-  
+
   import dag._
   import instructions._
   import library._
@@ -56,17 +55,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(YearsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2015-04-29T09:37:52.599+08:00", 
+        "2015-04-29T09:37:52.599+08:00",
         "2016-02-21T20:09:59.165+09:00",
         "2016-09-06T06:44:52.848-10:00",
         "2017-02-11T09:11:33.394-07:00",
@@ -76,17 +75,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(YearsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(-5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2005-04-29T09:37:52.599+08:00", 
+        "2005-04-29T09:37:52.599+08:00",
         "2006-02-21T20:09:59.165+09:00",
         "2006-09-06T06:44:52.848-10:00",
         "2007-02-11T09:11:33.394-07:00",
@@ -96,17 +95,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(YearsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(0))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:37:52.599+08:00", 
+        "2010-04-29T09:37:52.599+08:00",
         "2011-02-21T20:09:59.165+09:00",
         "2011-09-06T06:44:52.848-10:00",
         "2012-02-11T09:11:33.394-07:00",
@@ -117,17 +116,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MonthsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-09-29T09:37:52.599+08:00", 
+        "2010-09-29T09:37:52.599+08:00",
         "2011-07-21T20:09:59.165+09:00",
         "2012-02-06T06:44:52.848-10:00",
         "2012-07-11T09:11:33.394-07:00",
@@ -138,19 +137,19 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(WeeksPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2011-10-11T06:44:52.848-10:00", 
-        "2012-03-17T09:11:33.394-07:00", 
-        "2011-03-28T20:09:59.165+09:00", 
+        "2011-10-11T06:44:52.848-10:00",
+        "2012-03-17T09:11:33.394-07:00",
+        "2011-03-28T20:09:59.165+09:00",
         "2013-02-01T22:38:19.430+06:00",
         "2010-06-03T09:37:52.599+08:00")
     }
@@ -158,17 +157,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(DaysPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-05-04T09:37:52.599+08:00", 
+        "2010-05-04T09:37:52.599+08:00",
         "2011-02-26T20:09:59.165+09:00",
         "2011-09-11T06:44:52.848-10:00",
         "2012-02-16T09:11:33.394-07:00",
@@ -178,15 +177,15 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(HoursPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
         "2010-04-29T14:37:52.599+08:00",
         "2011-02-22T01:09:59.165+09:00",
@@ -198,17 +197,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MinutesPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:42:52.599+08:00", 
+        "2010-04-29T09:42:52.599+08:00",
         "2011-02-21T20:14:59.165+09:00",
         "2011-09-06T06:49:52.848-10:00",
         "2012-02-11T09:16:33.394-07:00",
@@ -218,17 +217,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(SecondsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:37:57.599+08:00", 
+        "2010-04-29T09:37:57.599+08:00",
         "2011-02-21T20:10:04.165+09:00",
         "2011-09-06T06:44:57.848-10:00",
         "2012-02-11T09:11:38.394-07:00",
@@ -238,17 +237,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MillisPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:37:52.604+08:00", 
+        "2010-04-29T09:37:52.604+08:00",
         "2011-02-21T20:09:59.170+09:00",
         "2011-09-06T06:44:52.853-10:00",
         "2012-02-11T09:11:33.399-07:00",
@@ -261,17 +260,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(YearsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2015-04-29T09:37:52.599+08:00", 
+        "2015-04-29T09:37:52.599+08:00",
         "2016-02-21T20:09:59.165+09:00",
         "2016-09-06T06:44:52.848-10:00",
         "2017-02-11T09:11:33.394-07:00",
@@ -282,17 +281,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MonthsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-09-29T09:37:52.599+08:00", 
+        "2010-09-29T09:37:52.599+08:00",
         "2011-07-21T20:09:59.165+09:00",
         "2012-02-06T06:44:52.848-10:00",
         "2012-07-11T09:11:33.394-07:00",
@@ -303,19 +302,19 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(WeeksPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2011-10-11T06:44:52.848-10:00", 
-        "2012-03-17T09:11:33.394-07:00", 
-        "2011-03-28T20:09:59.165+09:00", 
+        "2011-10-11T06:44:52.848-10:00",
+        "2012-03-17T09:11:33.394-07:00",
+        "2011-03-28T20:09:59.165+09:00",
         "2013-02-01T22:38:19.430+06:00",
         "2010-06-03T09:37:52.599+08:00")
     }
@@ -323,17 +322,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(DaysPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-05-04T09:37:52.599+08:00", 
+        "2010-05-04T09:37:52.599+08:00",
         "2011-02-26T20:09:59.165+09:00",
         "2011-09-11T06:44:52.848-10:00",
         "2012-02-16T09:11:33.394-07:00",
@@ -343,15 +342,15 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(HoursPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
         "2010-04-29T14:37:52.599+08:00",
         "2011-02-22T01:09:59.165+09:00",
@@ -363,17 +362,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MinutesPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:42:52.599+08:00", 
+        "2010-04-29T09:42:52.599+08:00",
         "2011-02-21T20:14:59.165+09:00",
         "2011-09-06T06:49:52.848-10:00",
         "2012-02-11T09:16:33.394-07:00",
@@ -383,17 +382,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(SecondsPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:37:57.599+08:00", 
+        "2010-04-29T09:37:57.599+08:00",
         "2011-02-21T20:10:04.165+09:00",
         "2011-09-06T06:44:57.848-10:00",
         "2012-02-11T09:11:38.394-07:00",
@@ -403,17 +402,17 @@ trait TimePlusSpecs[M[+_]] extends Specification
       val input = Join(BuiltInFunction2Op(MillisPlus), Cross(None),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line),
         Const(CLong(5))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(s)) if ids.length == 1 => s
       }
-      
+
       result2 must contain(
-        "2010-04-29T09:37:52.604+08:00", 
+        "2010-04-29T09:37:52.604+08:00",
         "2011-02-21T20:09:59.170+09:00",
         "2011-09-06T06:44:52.853-10:00",
         "2012-02-11T09:11:33.399-07:00",
@@ -1002,4 +1001,4 @@ trait TimePlusSpecs[M[+_]] extends Specification
   }
 }
 
-object TimePlusSpecs extends TimePlusSpecs[test.YId] with test.YIdInstances
+object TimePlusSpecs extends TimePlusSpecs[Need]

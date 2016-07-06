@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -32,12 +32,11 @@ import com.precog.util.IdGen
 import org.joda.time._
 import org.joda.time.format._
 
-trait TimeTruncationSpecs[M[+_]] extends Specification
-    with EvaluatorTestSupport[M]
+trait TimeTruncationSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-      
+
   import Function._
-  
+
   import dag._
   import instructions._
   import library._
@@ -55,169 +54,169 @@ trait TimeTruncationSpecs[M[+_]] extends Specification
     "determine date" in {
       val input = dag.Operate(BuiltInFunction1Op(Date),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29","2011-02-21","2011-09-06","2012-02-11","2012-12-28")
     }
     "determine year and month" in {
       val input = dag.Operate(BuiltInFunction1Op(YearMonth),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04","2011-02","2011-09","2012-02","2012-12")
     }
     "determine year and day of year" in {
       val input = dag.Operate(BuiltInFunction1Op(YearDayOfYear),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2012-363", "2011-249", "2012-042", "2010-119", "2011-052")
     }
     "determine month and day" in {
       val input = dag.Operate(BuiltInFunction1Op(MonthDay),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("04-29","02-21","09-06","02-11","12-28")
     }
     "determine date and hour" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHour),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09","2011-02-21T20","2011-09-06T06","2012-02-11T09","2012-12-28T22")
     }
     "determine date, hour, and minute" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinute),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37","2011-02-21T20:09","2011-09-06T06:44","2012-02-11T09:11","2012-12-28T22:38")
     }
     "determine date, hour, minute, and second" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinuteSecond),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37:52","2011-02-21T20:09:59","2011-09-06T06:44:52","2012-02-11T09:11:33","2012-12-28T22:38:19")
     }
     "determine date, hour, minute, second, and ms" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinuteSecondMillis),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37:52.599","2011-02-21T20:09:59.165","2011-09-06T06:44:52.848","2012-02-11T09:11:33.394","2012-12-28T22:38:19.430")
     }
     "determine time with timezone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeWithZone),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52.599+08:00","20:09:59.165+09:00","06:44:52.848-10:00","09:11:33.394-07:00","22:38:19.430+06:00")
     }
     "determine time without timezone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeWithoutZone),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52.599","20:09:59.165","06:44:52.848","09:11:33.394","22:38:19.430")
     }
     "determine hour and minute" in {
       val input = dag.Operate(BuiltInFunction1Op(HourMinute),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37","20:09","06:44","09:11","22:38")
     }
     "determine hour, minute, and second" in {
       val input = dag.Operate(BuiltInFunction1Op(HourMinuteSecond),
         dag.AbsoluteLoad(Const(CString("/hom/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52","20:09:59","06:44:52","09:11:33","22:38:19")
     }
   }
@@ -226,169 +225,169 @@ trait TimeTruncationSpecs[M[+_]] extends Specification
     "determine date" in {
       val input = dag.Operate(BuiltInFunction1Op(Date),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29","2011-02-21","2011-09-06","2012-02-11","2012-12-28")
     }
     "determine year and month" in {
       val input = dag.Operate(BuiltInFunction1Op(YearMonth),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04","2011-02","2011-09","2012-02","2012-12")
     }
     "determine year and day of year" in {
       val input = dag.Operate(BuiltInFunction1Op(YearDayOfYear),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2012-363", "2011-249", "2012-042", "2010-119", "2011-052")
     }
     "determine month and day" in {
       val input = dag.Operate(BuiltInFunction1Op(MonthDay),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("04-29","02-21","09-06","02-11","12-28")
     }
     "determine date and hour" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHour),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09","2011-02-21T20","2011-09-06T06","2012-02-11T09","2012-12-28T22")
     }
     "determine date, hour, and minute" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinute),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37","2011-02-21T20:09","2011-09-06T06:44","2012-02-11T09:11","2012-12-28T22:38")
     }
     "determine date, hour, minute, and second" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinuteSecond),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37:52","2011-02-21T20:09:59","2011-09-06T06:44:52","2012-02-11T09:11:33","2012-12-28T22:38:19")
     }
     "determine date, hour, minute, second, and ms" in {
       val input = dag.Operate(BuiltInFunction1Op(DateHourMinuteSecondMillis),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("2010-04-29T09:37:52.599","2011-02-21T20:09:59.165","2011-09-06T06:44:52.848","2012-02-11T09:11:33.394","2012-12-28T22:38:19.430")
     }
     "determine time with timezone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeWithZone),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52.599+08:00","20:09:59.165+09:00","06:44:52.848-10:00","09:11:33.394-07:00","22:38:19.430+06:00")
     }
     "determine time without timezone" in {
       val input = dag.Operate(BuiltInFunction1Op(TimeWithoutZone),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52.599","20:09:59.165","06:44:52.848","09:11:33.394","22:38:19.430")
     }
     "determine hour and minute" in {
       val input = dag.Operate(BuiltInFunction1Op(HourMinute),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37","20:09","06:44","09:11","22:38")
     }
     "determine hour, minute, and second" in {
       val input = dag.Operate(BuiltInFunction1Op(HourMinuteSecond),
         dag.AbsoluteLoad(Const(CString("/het/iso8601"))(line))(line))(line)
-        
+
       val result = testEval(input)
-      
+
       result must haveSize(5)
-      
+
       val result2 = result collect {
         case (ids, SString(d)) if ids.length == 1 => d
       }
-      
+
       result2 must contain("09:37:52","20:09:59","06:44:52","09:11:33","22:38:19")
     }
   }
@@ -736,4 +735,4 @@ trait TimeTruncationSpecs[M[+_]] extends Specification
   }
 }
 
-object TimeTruncationSpecs extends TimeTruncationSpecs[test.YId] with test.YIdInstances
+object TimeTruncationSpecs extends TimeTruncationSpecs[Need]

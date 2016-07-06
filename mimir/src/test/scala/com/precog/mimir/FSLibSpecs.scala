@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -61,8 +61,8 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
     Path("/foo/bar2/baz/quux1")   -> Map(ColumnRef(CPath.Identity, CString) -> 20L),
     Path("/foo/bar2/baz/quux2")   -> Map(ColumnRef(CPath.Identity, CString) -> 30L),
     Path("/foo2/bar1/baz/quux1" ) -> Map(ColumnRef(CPath.Identity, CString) -> 40L)
-  )                                       
-                                          
+  )
+
   val vfs = new StubVFSMetadata[M](projectionMetadata)
 
   def pathTable(path: String) = {
@@ -90,13 +90,13 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
       val expected: List[JValue] = List(JString("/foo/bar/baz/"))
       runExpansion(table) must_== expected
     }
-    
+
     "not alter un-globbed relative paths" in {
       val table = pathTable("foo")
       val expected: List[JValue] = List(JString("/foo/"))
       runExpansion(table) mustEqual expected
     }
-    
+
     "expand a leading glob" in {
       val table = pathTable("/*/bar1")
       val expected: List[JValue] = List(JString("/foo/bar1/"), JString("/foo2/bar1/"))
@@ -114,7 +114,7 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
       val expected: List[JValue] = List(JString("/foo/bar1/baz/quux1/"), JString("/foo/bar2/baz/quux1/"))
       runExpansion(table) must_== expected
     }
-    
+
     "expand multiple globbed segments" in {
       val table = pathTable("/foo/*/baz/*")
       val expected: List[JValue] = List(JString("/foo/bar1/baz/quux1/"), JString("/foo/bar2/baz/quux1/"), JString("/foo/bar2/baz/quux2/"))
@@ -123,4 +123,6 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
   }
 }
 
-object FSLibSpecs extends FSLibSpecs[test.YId] with test.YIdInstances
+object FSLibSpecs extends FSLibSpecs[Need] {
+  def M = Need.need
+}
