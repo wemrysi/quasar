@@ -204,7 +204,7 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
 
-      result2 must contain(1.0, 2.7182818284590455, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
+      result2 must contain(1.0, 2.718281828459045, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
     }
     "compute exp on two large(ish) values" in {
       val input = dag.Operate(BuiltInFunction1Op(exp),
@@ -732,7 +732,7 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1  => d
       }
 
-      result2 must contain(1.0, 2.7182818284590455, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
+      result2 must contain(1.0, 2.718281828459045, 0.36787944117144233, 1.73927494152050099E18, 1.026187963170189E-10)
     }
     "compute cbrt" in {
       val input = dag.Operate(BuiltInFunction1Op(cbrt),
@@ -1747,7 +1747,7 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d
       }
 
-      result2 must contain(1.0, 0.049787068367863944, 2.7182818284590455, 162754.79141900392, 148.4131591025766, 0.36787944117144233, 7.38905609893065)
+      result2 must contain(1.0, 0.049787068367863944, 2.718281828459045, 162754.79141900392, 148.4131591025766, 0.36787944117144233, 7.38905609893065)
     }
     "compute cbrt" in {
       val input = dag.Operate(BuiltInFunction1Op(cbrt),

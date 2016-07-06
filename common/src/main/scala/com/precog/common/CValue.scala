@@ -368,11 +368,10 @@ object CType {
         case _: ArithmeticException => false
       }
 
-      lazy val isDouble = try {
-        BigDecimal(d.toDouble.toString, MathContext.UNLIMITED) == d
-      } catch {
-        case _: NumberFormatException | _: ArithmeticException => false
-      }
+      lazy val isDouble = (
+        try decimal(d.toDouble.toString) == d
+        catch { case _: NumberFormatException | _: ArithmeticException => false }
+      )
 
       if (isLong)
         Some(CLong)
@@ -529,11 +528,11 @@ case class CLong(value: Long) extends CNumericValue[Long] {
 }
 
 case object CLong extends CNumericType[Long] {
-  val manifest: Manifest[Long] = implicitly[Manifest[Long]]
-  def readResolve() = CLong
-  def order(v1: Long, v2: Long) = longInstance.order(v1, v2)
-  def jValueFor(v: Long): JValue = JNum(BigDecimal(v, MathContext.UNLIMITED))
-  def bigDecimalFor(v: Long) = BigDecimal(v, MathContext.UNLIMITED)
+  val manifest: Manifest[Long]   = implicitly[Manifest[Long]]
+  def readResolve()              = CLong
+  def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
+  def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
+  def bigDecimalFor(v: Long)     = BigDecimal(v, MathContext.UNLIMITED)
 }
 
 case class CDouble(value: Double) extends CNumericValue[Double] {
@@ -545,7 +544,7 @@ case object CDouble extends CNumericType[Double] {
   def readResolve() = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
   def jValueFor(v: Double) = JNum(BigDecimal(v.toString, MathContext.UNLIMITED))
-  def bigDecimalFor(v: Double) = BigDecimal(v, MathContext.UNLIMITED)
+  def bigDecimalFor(v: Double) = BigDecimal(v.toString, MathContext.UNLIMITED)
 }
 
 case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {

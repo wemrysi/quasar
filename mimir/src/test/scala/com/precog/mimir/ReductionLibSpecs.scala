@@ -89,7 +89,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val input = dag.Reduce(GeometricMean,
         dag.AbsoluteLoad(Const(CString("/hom/numbers"))(line))(line))(line)
 
-      determineResult(input, 13.822064739747386)
+      determineResult(input, 13.822064739747384)
     }
 
     "mean" >> {
@@ -252,7 +252,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val input = dag.Reduce(GeometricMean,
         dag.AbsoluteLoad(Const(CString("/het/numbers"))(line))(line))(line)
 
-      determineResult(input, 13.822064739747386)
+      determineResult(input, 13.822064739747384)
     }
 
     "mean" >> {

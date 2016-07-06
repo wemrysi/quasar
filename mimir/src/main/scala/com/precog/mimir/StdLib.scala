@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -85,7 +85,7 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
 
     sealed trait MorphismAlignment
     object MorphismAlignment {
-      case class Match(morph: M[Morph1Apply]) extends MorphismAlignment 
+      case class Match(morph: M[Morph1Apply]) extends MorphismAlignment
       case class Cross(morph: M[Morph1Apply]) extends MorphismAlignment
       case class Custom(alignment: IdentityPolicy, f: (Table, Table) => M[(Table, Morph1Apply)]) extends MorphismAlignment
     }
@@ -94,7 +94,7 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
       val opcode: Int = defaultMorphism1Opcode.getAndIncrement
       val rowLevel: Boolean = false
     }
-    
+
     abstract class Morphism2(val namespace: Vector[String], val name: String) extends Morphism2Like {
       val opcode: Int = defaultMorphism1Opcode.getAndIncrement
       val rowLevel: Boolean = false
@@ -118,17 +118,17 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
     abstract class Op1F1(namespace: Vector[String], name: String) extends Op1(namespace, name) {
       def spec[A <: SourceType](ctx: MorphContext)(source: TransSpec[A]): TransSpec[A] =
         trans.Map1(source, f1(ctx))
-      
+
       def f1(ctx: MorphContext): F1
 
       override val rowLevel: Boolean = true
 
       override def fold[A](op1: Op1 => A, op1F1: Op1F1 => A): A = op1F1(this)
     }
-    
+
     abstract class Op2(namespace: Vector[String], name: String) extends Morphism2(namespace, name) with Op2Like {
       val alignment = MorphismAlignment.Match(M.point {
-        new Morph1Apply { 
+        new Morph1Apply {
           def apply(input: Table, ctx: MorphContext) = sys.error("morphism application of an op2 is wrong")
         }
       })
@@ -137,7 +137,7 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
 
       def fold[A](op2: Op2 => A, op2F2: Op2F2 => A): A = op2(this)
     }
-    
+
     trait Op2Array extends Op2 {
       def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = {
         trans.MapWith(
@@ -148,16 +148,16 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
               trans.Map1(right, prepare))),
           mapper)
       }
-      
+
       def prepare: F1
-      
+
       def mapper: Mapper
     }
 
     abstract class Op2F2(namespace: Vector[String], name: String) extends Op2(namespace, name) {
       def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] =
         trans.Map2(left, right, f2(ctx))
-      
+
       def f2(ctx: MorphContext): F2
 
       override val rowLevel: Boolean = true
@@ -199,7 +199,7 @@ trait ColumnarTableLibModule[M[+_]] extends TableLibModule[M] with ColumnarTable
                 def columns(tpe: JType) = schema.columns(f(tpe))
               }
               r.reducer(ctx).reduce(cols0, range)
-            case None => 
+            case None =>
               r.reducer(ctx).reduce(schema, range)
           }
         }
@@ -227,7 +227,7 @@ trait ColumnarTableLibModule[M[+_]] extends TableLibModule[M] with ColumnarTable
                       def columns(tpe: JType) = schema.columns(f(tpe))
                     }
                     (x.reducer(ctx).reduce(cols0, range), acc.reducer(ctx).reduce(schema, range))
-                  case None => 
+                  case None =>
                     (x.reducer(ctx).reduce(schema, range), acc.reducer(ctx).reduce(schema, range))
                 }
               }
@@ -254,7 +254,7 @@ trait ColumnarTableLibModule[M[+_]] extends TableLibModule[M] with ColumnarTable
             def extractValue(res: Result) = None
 
             val tpe = UnaryOperationType(
-              JUnionT(x.tpe.arg, acc.tpe.arg), 
+              JUnionT(x.tpe.arg, acc.tpe.arg),
               JArrayUnfixedT)
             }
 
@@ -264,14 +264,14 @@ trait ColumnarTableLibModule[M[+_]] extends TableLibModule[M] with ColumnarTable
           case Nil => acc
         }
       }
-    
+
       val (impl1, jtype1) = reductions.head
       rec(reductions.tail, new WrapArrayTableReduction(impl1, jtype1))
     }
   }
 }
 
-trait StdLibModule[M[+_]] 
+trait StdLibModule[M[+_]]
     extends InfixLibModule[M]
     with UnaryLibModule[M]
     with ArrayLibModule[M]
@@ -282,10 +282,10 @@ trait StdLibModule[M[+_]]
     with StatsLibModule[M]
     with SummaryLibModule[M]
     with NormalizationLibModule[M]
-    with ClusteringLibModule[M] 
-    with RandomForestLibModule[M] 
-    with LogisticRegressionLibModule[M]
-    with LinearRegressionLibModule[M]
+    with ClusteringLibModule[M]
+    with RandomForestLibModule[M]
+    // with LogisticRegressionLibModule[M]
+    // with LinearRegressionLibModule[M]
     with FSLibModule[M]
     with RandomLibModule[M]
     with PrecogLibModule[M] {
@@ -304,8 +304,8 @@ trait StdLibModule[M[+_]]
       with NormalizationLib
       with ClusteringLib
       with RandomForestLib
-      with LogisticRegressionLib
-      with LinearRegressionLib
+      // with LogisticRegressionLib
+      // with LinearRegressionLib
       with FSLib
       with RandomLib
       with PrecogLib
@@ -550,7 +550,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class DL(
       c1: DoubleColumn, c2: LongColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -562,7 +562,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row).toDouble)
     }
-  
+
     class DN(
       c1: DoubleColumn, c2: NumColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -574,7 +574,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row).toDouble)
     }
-  
+
     class LD(
       c1: LongColumn, c2: DoubleColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -586,7 +586,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row).toDouble, c2(row))
     }
-  
+
     class LL(
       c1: LongColumn, c2: LongColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -610,7 +610,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row).toDouble, c2(row).toDouble)
     }
-  
+
     class ND(
       c1: NumColumn, c2: DoubleColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -622,7 +622,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row).toDouble, c2(row))
     }
-  
+
     class NL(
       c1: NumColumn, c2: LongColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -634,7 +634,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row).toDouble, c2(row).toDouble)
     }
-  
+
     class NN(
       c1: NumColumn, c2: NumColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Double)
@@ -671,7 +671,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), BigDecimal(c2(row)))
     }
-  
+
     class DL(
       c1: DoubleColumn, c2: LongColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -684,7 +684,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), BigDecimal(c2(row)))
     }
-  
+
     class DN(
       c1: DoubleColumn, c2: NumColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -697,7 +697,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), c2(row))
     }
-  
+
     class LD(
       c1: LongColumn, c2: DoubleColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -710,7 +710,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), BigDecimal(c2(row)))
     }
-  
+
     class LL(
       c1: LongColumn, c2: LongColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -723,7 +723,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), BigDecimal(c2(row).toDouble))
     }
-  
+
     class LN(
       c1: LongColumn, c2: NumColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -736,7 +736,7 @@ object StdLib {
 
       def apply(row: Int) = f(BigDecimal(c1(row)), c2(row))
     }
-  
+
     class ND(
       c1: NumColumn, c2: DoubleColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -749,7 +749,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), BigDecimal(c2(row)))
     }
-  
+
     class NL(
       c1: NumColumn, c2: LongColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -762,7 +762,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), BigDecimal(c2(row)))
     }
-  
+
     class NN(
       c1: NumColumn, c2: NumColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,
@@ -813,7 +813,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class DD(
       c1: DoubleColumn, c2: DoubleColumn, defined: (Double, Double) => Boolean,
       f: (Double, Double) => Boolean)
@@ -825,7 +825,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class DL(
       c1: DoubleColumn, c2: LongColumn, defined: (Double, Long) => Boolean,
       f: (Double, Long) => Boolean)
@@ -837,7 +837,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class DN(
       c1: DoubleColumn, c2: NumColumn,
       defined: (Double, BigDecimal) => Boolean,
@@ -850,7 +850,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class LD(
       c1: LongColumn, c2: DoubleColumn, defined: (Long, Double) => Boolean,
       f: (Long, Double) => Boolean)
@@ -862,7 +862,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class LL(
       c1: LongColumn, c2: LongColumn, defined: (Long, Long) => Boolean,
       f: (Long, Long) => Boolean)
@@ -874,7 +874,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class LN(
       c1: LongColumn, c2: NumColumn, defined: (Long, BigDecimal) => Boolean,
       f: (Long, BigDecimal) => Boolean)
@@ -886,7 +886,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class ND(
       c1: NumColumn, c2: DoubleColumn,
       defined: (BigDecimal, Double) => Boolean,
@@ -899,7 +899,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class NL(
       c1: NumColumn, c2: LongColumn, defined: (BigDecimal, Long) => Boolean,
       f: (BigDecimal, Long) => Boolean)
@@ -911,7 +911,7 @@ object StdLib {
 
       def apply(row: Int) = f(c1(row), c2(row))
     }
-  
+
     class NN(
       c1: NumColumn, c2: NumColumn,
       defined: (BigDecimal, BigDecimal) => Boolean,

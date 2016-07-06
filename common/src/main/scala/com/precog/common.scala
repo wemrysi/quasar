@@ -45,6 +45,8 @@ package object common {
 
   def abort(msg: String): Nothing = throw new RuntimeException(msg)
 
+  def decimal(d: String) = BigDecimal(d, java.math.MathContext.UNLIMITED)
+
   final class StringExtensions(s: String) {
     def cpath = CPath(s)
   }

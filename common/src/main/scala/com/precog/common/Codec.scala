@@ -34,8 +34,6 @@ import scala.annotation.tailrec
 import scala.{ specialized => spec }
 
 import java.math.{ BigDecimal => BigDec }
-import java.math.MathContext
-
 
 /**
  * Codecs allow a writer to deal with the case where we have a buffer overflow
@@ -478,7 +476,7 @@ object Codec {
     x => (x.unscaledValue.toByteArray, x.scale.toLong),
     (u, s) => new BigDec(new java.math.BigInteger(u), s.toInt))
 
-  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, BigDecimal(_, MathContext.UNLIMITED))
+  implicit val BigDecimalCodec = JBigDecimalCodec.as[BigDecimal](_.underlying, BigDecimal(_, java.math.MathContext.UNLIMITED))
 
   final class IndexedSeqCodec[A](val elemCodec: Codec[A]) extends Codec[IndexedSeq[A]] {
 

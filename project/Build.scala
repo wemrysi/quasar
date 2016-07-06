@@ -94,5 +94,6 @@ object PlatformBuild {
                      target in assembly <<= target,
       assemblyMergeStrategy in assembly :=  assemblyMerger
     )
+    def inBothScopes: ClasspathDependency = p % Both
   }
 }

@@ -48,8 +48,4 @@ lazy val blueeyes = project also commonSettings deps (
 )
 /** This used to be the evaluator project.
  */
-lazy val mimir = project.setup.usesCommon.testLogging dependsOn (util % Both, bytecode % Both, yggdrasil % Both) deps (
-  "com.eed3si9n"       % "treehugger_2.9.2"   % "0.1.3",
-  "gov.nist.math"      % "jama"               % "1.0.2",
-  "org.apache.commons" % "commons-math3"      % "3.1.1"
-)
+lazy val mimir = project.setup.usesCommon.testLogging dependsOn (util.inBothScopes, bytecode.inBothScopes, yggdrasil.inBothScopes)

@@ -38,7 +38,7 @@ class CodecSpec extends Specification with ScalaCheck {
   import ByteBufferPool._
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
-    Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_)))
+    Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_, java.math.MathContext.UNLIMITED)))
 
   //implicit def arbBitSet = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map (BitSet(_: _*)))
   implicit def arbBitSet = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
