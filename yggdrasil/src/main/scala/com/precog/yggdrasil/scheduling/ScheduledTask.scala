@@ -33,8 +33,6 @@ import com.precog.yggdrasil.execution.{ QueryOptions, EvaluationContext }
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-import org.quartz.CronExpression
-
 import scalaz._
 
 import shapeless._

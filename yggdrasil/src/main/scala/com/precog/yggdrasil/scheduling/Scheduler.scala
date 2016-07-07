@@ -27,8 +27,6 @@ import com.precog.yggdrasil.execution.EvaluationContext
 
 import java.util.UUID
 
-import org.quartz.CronExpression
-
 import scalaz._
 
 trait Scheduler[M[+_]] {

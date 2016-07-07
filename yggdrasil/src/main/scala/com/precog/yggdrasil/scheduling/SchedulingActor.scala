@@ -40,8 +40,6 @@ import java.util.concurrent.TimeUnit
 
 import org.joda.time.{Duration => JodaDuration, DateTime}
 
-import org.quartz.CronExpression
-
 import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
 
 import scalaz.{Ordering => _, idInstance => _, _}

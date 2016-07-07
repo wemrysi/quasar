@@ -12,6 +12,9 @@ package object yggdrasil {
   // only usage of commons-primitives
   type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
 
+  // only usage of quartz
+  type CronExpression = org.quartz.CronExpression
+
   type Identity     = Long
   type Identities   = Array[Identity]
   object Identities {
