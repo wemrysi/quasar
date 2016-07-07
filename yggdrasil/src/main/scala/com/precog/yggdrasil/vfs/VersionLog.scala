@@ -155,7 +155,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
     IO(PrecogUnit)
   } getOrElse {
     log.debug("Adding version entry: " + entry)
-    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, true) map { _ =>
+    IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, append = true) map { _ =>
       allVersions = allVersions :+ entry
       PrecogUnit
     }
@@ -165,7 +165,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
     if (allVersions.exists(_.id == version)) {
       !isCompleted(version) whenM {
         log.debug("Completing version " + version)
-        IOUtils.writeToFile(version.serialize.renderCompact + "\n", completedFile)
+        IOUtils.overwriteFile(version.serialize.renderCompact + "\n", completedFile)
       } map { _ => PrecogUnit }
     } else {
       IO.throwIO(new IllegalStateException("Cannot make nonexistent version %s current" format version))
@@ -176,7 +176,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
     currentVersion.exists(_.id == newHead) unlessM {
       allVersions.find(_.id == newHead) traverse { entry =>
         log.debug("Setting HEAD to " + newHead)
-        IOUtils.writeToFile(entry.serialize.renderCompact + "\n", headFile) map { _ =>
+        IOUtils.overwriteFile(entry.serialize.renderCompact + "\n", headFile) map { _ =>
           currentVersion = Some(entry);
         }
       } flatMap {
@@ -185,7 +185,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
     } map { _ => PrecogUnit }
   }
 
-  def clearHead = IOUtils.writeToFile(unsetSentinelJV, headFile).map { _ =>
+  def clearHead = IOUtils.overwriteFile(unsetSentinelJV, headFile).map { _ =>
     currentVersion = None
   }
 }

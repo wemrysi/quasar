@@ -20,20 +20,13 @@
 package com.precog.util
 
 import java.io._
-import java.nio.charset._
-import java.nio.channels._
 import java.util.Properties
 
 import com.google.common.io.Files
-
 import org.slf4s.Logging
-
 import org.apache.commons.io.FileUtils
-
-import scalaz._
+import scala.collection.JavaConverters._
 import scalaz.effect.IO
-
-import scala.collection.JavaConversions.{seqAsJavaList}
 
 object IOUtils extends Logging {
   final val UTF8 = "UTF-8"
@@ -58,13 +51,14 @@ object IOUtils extends Logging {
     props
   }
 
-  def writeToFile(s: String, f: File, append: Boolean = false): IO[PrecogUnit] = IO {
+  def overwriteFile(s: String, f: File): IO[PrecogUnit] = writeToFile(s, f, append = false)
+  def writeToFile(s: String, f: File, append: Boolean): IO[PrecogUnit] = IO {
     FileUtils.writeStringToFile(f, s, UTF8, append)
     PrecogUnit
   }
 
   def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
-    val s = seqAsJavaList(s0)
+    val s = s0.asJava
     FileUtils.writeLines(f, s)
   }
 
@@ -74,7 +68,7 @@ object IOUtils extends Logging {
   def safeWriteToFile(s: String, f: File): IO[Boolean] = {
     val tmpFile = new File(f.getParentFile, f.getName + "-" + System.nanoTime + ".tmp")
 
-    writeToFile(s, tmpFile) flatMap {
+    overwriteFile(s, tmpFile) flatMap {
       _ => IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
     }
   }

@@ -24,20 +24,14 @@ import com.precog.util._
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.Versioned._
 
 import org.joda.time.DateTime
 import org.joda.time.Period
 
 import scalaz._
 import scalaz.Ordering._
-import scalaz.syntax.order._
-import scalaz.std._
-import scalaz.std.math._
 import scalaz.std.AllInstances._
-
-import _root_.java.io.{Externalizable,ObjectInput,ObjectOutput}
-import _root_.java.math.MathContext
+import java.math.MathContext.UNLIMITED
 
 sealed trait RValue { self =>
   def toJValue: JValue
@@ -529,7 +523,7 @@ case object CLong extends CNumericType[Long] {
   def readResolve()              = CLong
   def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
   def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
-  def bigDecimalFor(v: Long)     = BigDecimal(v, MathContext.UNLIMITED)
+  def bigDecimalFor(v: Long)     = BigDecimal(v, UNLIMITED)
 }
 
 case class CDouble(value: Double) extends CNumericValue[Double] {
@@ -540,8 +534,8 @@ case object CDouble extends CNumericType[Double] {
   val manifest: Manifest[Double] = implicitly[Manifest[Double]]
   def readResolve() = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
-  def jValueFor(v: Double) = JNum(BigDecimal(v.toString, MathContext.UNLIMITED))
-  def bigDecimalFor(v: Double) = BigDecimal(v.toString, MathContext.UNLIMITED)
+  def jValueFor(v: Double) = JNum(BigDecimal(v.toString, UNLIMITED))
+  def bigDecimalFor(v: Double) = BigDecimal(v.toString, UNLIMITED)
 }
 
 case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {

@@ -21,17 +21,12 @@ package com.precog.util
 package cache
 
 import akka.util.Duration
-
 import com.google.common.cache.{Cache => GCache, _}
-
-import java.util.concurrent.ExecutionException
-
-import scalaz.{Failure, Success, Validation}
-
+import scalaz.Validation
 import scala.collection.JavaConverters._
-import scala.collection.mutable.Map
+import scala.collection.mutable
 
-class SimpleCache[K, V] (private val backing: GCache[K, V]) extends Map[K, V] {
+class SimpleCache[K, V] (private val backing: GCache[K, V]) extends mutable.Map[K, V] {
   def += (kv: (K, V)) = { backing.put(kv._1, kv._2); this }
   def -= (key: K) = { backing.invalidate(key); this }
   def get(key: K): Option[V] = Option(backing.getIfPresent(key))
@@ -39,7 +34,7 @@ class SimpleCache[K, V] (private val backing: GCache[K, V]) extends Map[K, V] {
   def invalidateAll = backing.invalidateAll
 }
 
-class AutoCache[K, V] (private val backing: LoadingCache[K, V]) extends Map[K, V] {
+class AutoCache[K, V] (private val backing: LoadingCache[K, V]) extends mutable.Map[K, V] {
   def += (kv: (K, V)) = { backing.put(kv._1, kv._2); this }
   def -= (key: K) = { backing.invalidate(key); this }
   def get (key: K): Option[V] = getFull(key).toOption

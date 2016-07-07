@@ -193,7 +193,7 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
             val metadata = BlobMetadata(mimeType, size, clock.now(), authorities)
             //val metadataStore = PersistentJValue(versionDir, blobMetadataFilename)
             //metadataStore.json = metadata.serialize
-            IOUtils.writeToFile(metadata.serialize.renderCompact, new File(versionDir, blobMetadataFilename)) map { _ =>
+            IOUtils.overwriteFile(metadata.serialize.renderCompact, new File(versionDir, blobMetadataFilename)) map { _ =>
               FileBlobResource(file, metadata)
             }
           }

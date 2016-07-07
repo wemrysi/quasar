@@ -22,8 +22,6 @@ package com.precog.common
 import blueeyes.json._
 import blueeyes.json.serialization._
 import DefaultSerialization._
-import scala.util.matching.Regex
-
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
 
