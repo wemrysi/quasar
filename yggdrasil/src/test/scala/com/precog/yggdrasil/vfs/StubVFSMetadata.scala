@@ -29,7 +29,6 @@ import ResourceError._
 import com.precog.common._, accounts._, ingest._, security._, util._
 
 import com.precog.util._
-import akka.testkit.TestActorRef
 import akka.util.duration._
 
 import blueeyes.json._

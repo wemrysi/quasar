@@ -35,6 +35,11 @@ import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 import TableModule._
 
+/** Ugh, without this import it still compiles but the tests
+ *  no longer pass (specifically "heterogeneous sort keys case 2")
+ */
+import PrecogJValueOrder._
+
 trait BlockSortSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty[M]
@@ -58,10 +63,6 @@ trait BlockSortSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLi
     }.sortBy { v =>
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList
-
-    //def xyz(v: JValue): JValue = {
-    //  JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId"))
-    //}
 
     val cSortKeys = sortKeys map { CPath(_) }
 

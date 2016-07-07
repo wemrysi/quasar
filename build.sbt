@@ -1,7 +1,6 @@
 import precog.PlatformBuild._
 
 lazy val platform = project.root aggregate (blueeyes, common, yggdrasil, mimir)
-lazy val logging  = project.setup  // common project for the test log configuration files
 
 /** This used to be the evaluator project.
  */
@@ -13,10 +12,9 @@ lazy val yggdrasil = project.setupAssembly dependsOn common.inBothScopes deps (
   "org.slamdata"          % "jdbm"               %     "3.0.0",
   "commons-primitives"    % "commons-primitives" %      "1.0",
   "org.quartz-scheduler"  % "quartz"             %     "2.2.3",
-  "org.spire-math"        % "spire_2.9.2"        %     "0.3.0",
-  "com.typesafe.akka"     % "akka-testkit"       %     "2.0.5"      % "test"
+  "org.spire-math"        % "spire_2.9.2"        %     "0.3.0"
 )
-lazy val common = project.setup dependsOn (logging.inTestScope, blueeyes) deps (
+lazy val common = project.setup dependsOn blueeyes deps (
   "com.chuusai"            %% "shapeless"        % "1.2.3",
   "joda-time"               % "joda-time"        % "1.6.2",
   "javolution"              % "javolution"       % "5.5.1",
@@ -29,8 +27,5 @@ lazy val common = project.setup dependsOn (logging.inTestScope, blueeyes) deps (
 )
 lazy val blueeyes = project.setup deps (
   "com.reportgrid" %% "blueeyes-json" % blueeyesVersion,
-  "com.reportgrid" %% "blueeyes-core" % blueeyesVersion,
-  "com.reportgrid" %% "akka_testing"  % blueeyesVersion excludeAll(
-    ExclusionRule(organization = "com.reportgrid")
-  )
+  "com.reportgrid" %% "blueeyes-core" % blueeyesVersion
 )

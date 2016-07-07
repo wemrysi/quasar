@@ -25,7 +25,7 @@ import com.precog.util._
 
 import org.joda.time.{DateTime, Period}
 
-import java.nio.{ ByteBuffer, CharBuffer }
+import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 
 import com.precog.util.BitSetUtil.Implicits._
