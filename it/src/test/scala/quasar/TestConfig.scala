@@ -45,9 +45,10 @@ object TestConfig {
   val MONGO_READ_ONLY = BackendName("mongodb_read_only")
   val SKELETON = BackendName("skeleton")
   val POSTGRESQL = BackendName("postgresql")
+  val SPARK_LOCAL = BackendName("spark_local")
 
   lazy val backendNames: List[BackendName] =
-    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL)
+    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL)
 
   /** True if this backend configuration is for a mongo connection where the
     * user has the "read-only" role.

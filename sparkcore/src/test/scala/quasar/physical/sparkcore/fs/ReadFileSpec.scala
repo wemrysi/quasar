@@ -25,6 +25,7 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
+// import quasar.physical.sparkcore.fs.local.readfile
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
