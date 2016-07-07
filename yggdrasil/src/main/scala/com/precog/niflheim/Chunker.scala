@@ -19,9 +19,8 @@
  */
 package com.precog.niflheim
 
-import java.io.IOException
-import java.nio.ByteBuffer
-import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
+import com.precog.common._
+import java.nio.channels._
 import java.util.zip.Adler32
 
 import scalaz._
@@ -35,7 +34,7 @@ trait Chunker {
   def verify: Boolean
   val ChunkSize = 4096
 
-  private def allocate(size: Int): ByteBuffer = ByteBuffer.allocate(size)
+  private def allocate(size: Int): ByteBuffer = java.nio.ByteBuffer.allocate(size)
 
   private def takeChunk(buffer: ByteBuffer): ByteBuffer = {
     val bytes = new Array[Byte](ChunkSize)
@@ -46,7 +45,7 @@ trait Chunker {
     val checksum = new Adler32()
     checksum.update(bytes, 4, ChunkSize - 12)
 
-    val chunk = ByteBuffer.wrap(bytes)
+    val chunk = ByteBufferWrap(bytes)
     chunk.putInt(0, remaining)
     chunk.putLong(ChunkSize - 8, checksum.getValue())
     chunk

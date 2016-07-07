@@ -22,15 +22,9 @@ package table
 
 import vfs.ResourceError
 import com.precog.bytecode.JType
-import com.precog.common.Path
-import com.precog.util.VectorCase
-import com.precog.common._
-import com.precog.common.security._
+import com.precog.common._, security._
 
 import blueeyes.json._
-
-import scala.annotation.tailrec
-
 import scalaz._
 import scalaz.Validation._
 import scalaz.std.stream._
@@ -38,8 +32,6 @@ import scalaz.syntax.comonad._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
-import scalaz.std.anyVal._
-
 import TableModule._
 
 trait StubColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {

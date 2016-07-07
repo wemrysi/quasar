@@ -20,19 +20,14 @@
 package com.precog.common
 package ingest
 
-import accounts.AccountId
-import security._
-import util.ArbitraryJValue
-
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
-
-import blueeyes.json._
-
 import org.joda.time.Instant
-import org.scalacheck._
-import Gen._
-import Arbitrary.arbitrary
+import com.precog.common.util.ArbitraryJValue
+
+import security._
+import blueeyes.json._
+import org.scalacheck._, Gen._, Arbitrary._
 
 trait ArbitraryEventMessage extends ArbitraryJValue {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen.resultOf[Int, Option[UUID]](_ => Some(UUID.randomUUID)), None)

@@ -21,15 +21,9 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary._
-
+import org.scalacheck._, Gen._, Arbitrary._
 import org.joda.time.{DateTime, Period}
-
-import com.precog.util.{BitSet, BitSetUtil, Loop}
-import com.precog.util.BitSetUtil.Implicits._
+import com.precog.util.{BitSet, BitSetUtil}
 
 trait ArbitrarySlice {
   def arbitraryBitSet(size: Int): Gen[BitSet] = {

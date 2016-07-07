@@ -21,28 +21,20 @@ package com.precog.niflheim
 
 import com.precog.common._
 
-import com.precog.util._
-import com.precog.util.BitSetUtil.Implicits._
+import com.precog.util._, BitSetUtil.Implicits._
 
-import org.joda.time.DateTime
-
-import scala.collection.mutable
-
-import java.io.IOException
-import java.nio.ByteBuffer
 import java.nio.channels._
-
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
-import org.scalacheck._
+import org.scalacheck._, Gen._, Arbitrary._
 
 import scalaz._
 
-import org.joda.time.Period
+import org.joda.time.{ Period, DateTime }
 
 trait SegmentFormatSupport {
-  import Gen._
-  import Arbitrary.arbitrary
+  // import Gen._
+  // import Arbitrary.arbitrary
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_)))
@@ -53,7 +45,7 @@ trait SegmentFormatSupport {
   } yield CPath(parts mkString ".")
 
   def genBitSet(length: Int, density: Double): Gen[BitSet] = Gen { params =>
-    val bits = new mutable.ArrayBuffer[Int]
+    val bits = new ArrayBuffer[Int]
     Loop.range(0, bits.length) { row =>
       if (params.rng.nextDouble < density)
         bits += row
@@ -183,7 +175,7 @@ final class StubSegmentFormat extends SegmentFormat {
 }
 
 final class InMemoryReadableByteChannel(bytes: Array[Byte]) extends ReadableByteChannel {
-  val buffer = ByteBuffer.wrap(bytes)
+  val buffer = ByteBufferWrap(bytes)
 
   var isOpen = true
   def close() { isOpen = false }
@@ -199,7 +191,7 @@ final class InMemoryReadableByteChannel(bytes: Array[Byte]) extends ReadableByte
 }
 
 final class InMemoryWritableByteChannel extends WritableByteChannel {
-  val buffer = new mutable.ArrayBuffer[Byte]
+  val buffer = new ArrayBuffer[Byte]
 
   def write(buf: ByteBuffer): Int = {
     val read = buf.remaining()

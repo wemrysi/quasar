@@ -19,29 +19,17 @@
  */
 package com.precog.yggdrasil
 
-import table._
-import com.precog.util._
 import com.precog.common._
-
 import blueeyes.json._
 
-import scalaz.{NonEmptyList => NEL, _}
+import scalaz._
 import scalaz.Ordering._
 import scalaz.Either3._
 import scalaz.std.tuple._
-import scalaz.std.function._
-import scalaz.syntax.arrow._
-import scalaz.syntax.bifunctor._
 import scalaz.syntax.comonad._
-import scala.annotation.tailrec
 
 import org.specs2._
-import org.specs2.mutable.Specification
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
+import org.scalacheck._, Gen._, Arbitrary._
 
 trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._

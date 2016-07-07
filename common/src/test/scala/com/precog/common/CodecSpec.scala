@@ -23,8 +23,6 @@ import com.precog.util.{ ByteBufferPool, RawBitSet }
 
 import org.joda.time.DateTime
 
-import java.nio.ByteBuffer
-
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil
 import com.precog.util.BitSetUtil.Implicits._
@@ -100,15 +98,15 @@ class CodecSpec extends Specification with ScalaCheck {
       _ <- release
     } yield bytes)
     bytes.length must_== codec.encodedSize(a)
-    codec.read(ByteBuffer.wrap(bytes)) must_== a
+    codec.read(ByteBufferWrap(bytes)) must_== a
   }
 
   "constant codec" should {
     "write 0 bytes" in {
       val codec = Codec.ConstCodec(true)
       codec.encodedSize(true) must_== 0
-      codec.read(ByteBuffer.wrap(new Array[Byte](0))) must_== true
-      codec.writeUnsafe(true, ByteBuffer.allocate(0))
+      codec.read(ByteBufferWrap(new Array[Byte](0))) must_== true
+      codec.writeUnsafe(true, java.nio.ByteBuffer.allocate(0))
     }
   }
 

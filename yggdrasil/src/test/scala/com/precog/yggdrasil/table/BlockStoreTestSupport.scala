@@ -20,38 +20,15 @@
 package com.precog.yggdrasil
 package table
 
-import com.precog.bytecode.JType
 import com.precog.common._
-
 import com.precog.common.security.APIKey
-import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.util._
-import jdbm3._
 
 import blueeyes.json._
-import org.slf4s.Logging
-
-import scala.annotation.tailrec
-import scala.collection.mutable.LinkedHashSet
-import scala.util.Random
 
 import scalaz._
-import scalaz.effect.IO
 import scalaz.syntax.comonad._
-import scalaz.std.anyVal._
 import scalaz.std.list._
-
-import org.specs2._
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
-
-import TableModule._
-
 
 trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   type GroupId = String
@@ -167,6 +144,3 @@ trait BlockStoreTestSupport[M[+_]] { self =>
 
   def emptyTestModule = BlockStoreTestModule.empty[M]
 }
-
-
-// vim: set ts=4 sw=4 et:

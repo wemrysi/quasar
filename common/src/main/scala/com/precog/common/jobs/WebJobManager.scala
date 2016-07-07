@@ -25,8 +25,6 @@ import com.precog.common.security._
 import com.precog.common.client._
 import com.precog.common.JValueByteChunkTranscoders._
 
-import java.nio.ByteBuffer
-
 import blueeyes._
 import blueeyes.core.data._
 import blueeyes.core.http._

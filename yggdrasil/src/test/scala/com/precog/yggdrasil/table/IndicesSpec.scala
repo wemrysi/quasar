@@ -20,36 +20,14 @@
 package com.precog.yggdrasil
 package table
 
-import com.precog.common._
-
-import com.precog.common.security._
-import com.precog.bytecode.JType
+import com.precog.common._, security._
 import com.precog.yggdrasil.util._
+import com.precog.bytecode.JType
 
 import blueeyes.json._
-import org.slf4j.{LoggerFactory, MDC}
-
-import scala.annotation.tailrec
-import scala.collection.mutable.LinkedHashSet
-import scala.util.Random
-
 import scalaz._
-import scalaz.effect.IO
 import scalaz.syntax.comonad._
-import scalaz.std.anyVal._
 import scalaz.std.stream._
-
-import org.specs2._
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
-
-import TableModule._
-import SampleData._
 
 // TODO: mix in a trait rather than defining Table directly
 
@@ -58,16 +36,9 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M]
     with IndicesModule[M] { spec =>
 
   type GroupId = Int
-  import trans._
-  import constants._
 
   import TableModule._
   import trans._
-  import trans.constants._
-
-  import Table._
-  import SliceTransform._
-  import TransSpec.deepMap
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
@@ -256,5 +227,3 @@ object IndicesSpec extends IndicesSpec[Need] {
     val idSource = new FreshAtomicIdSource
   }
 }
-
-// vim: set ts=4 sw=4 et:

@@ -26,14 +26,10 @@ import blueeyes.json._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
+import scala.util.Random
+import org.scalacheck._, Gen._, Arbitrary._
 
 import com.precog.bytecode._
-import scala.util.Random
 import scalaz.syntax.comonad._
 
 trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
@@ -2292,5 +2288,3 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     }
   }
 }
-
-// vim: set ts=4 sw=4 et:

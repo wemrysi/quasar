@@ -23,8 +23,6 @@ import com.precog.common._
 
 import com.precog.util.PrecogUnit
 
-import java.nio.ByteBuffer
-
 import scala.collection.mutable
 
 import scalaz.{ Validation, Success, Failure }
@@ -74,27 +72,27 @@ object CTypeFlags {
   }
 
   def cTypeForFlag(flag: Array[Byte]): CType =
-    readCType(ByteBuffer.wrap(flag)).fold(throw _, identity)
+    readCType(ByteBufferWrap(flag)).fold(throw _, identity)
 
   def readCType(buffer: ByteBuffer): Validation[IOException, CType] = {
     import Flags._
 
     def readCValueType(flag: Byte): Validation[IOException, CValueType[_]] = flag match {
-      case FBoolean => Success(CBoolean)
-      case FString => Success(CString)
-      case FLong => Success(CLong)
-      case FDouble => Success(CDouble)
+      case FBoolean    => Success(CBoolean)
+      case FString     => Success(CString)
+      case FLong       => Success(CLong)
+      case FDouble     => Success(CDouble)
       case FBigDecimal => Success(CNum)
-      case FDate => Success(CDate)
-      case FArray => readCValueType(buffer.get()) map (CArrayType(_))
-      case flag => Failure(new IOException("Unexpected segment type flag: %x" format flag))
+      case FDate       => Success(CDate)
+      case FArray      => readCValueType(buffer.get()) map (CArrayType(_))
+      case flag        => Failure(new IOException("Unexpected segment type flag: %x" format flag))
     }
 
     buffer.get() match {
-      case FNull => Success(CNull)
-      case FEmptyArray => Success(CEmptyArray)
+      case FNull        => Success(CNull)
+      case FEmptyArray  => Success(CEmptyArray)
       case FEmptyObject => Success(CEmptyObject)
-      case flag => readCValueType(flag)
+      case flag         => readCValueType(flag)
     }
   }
 }

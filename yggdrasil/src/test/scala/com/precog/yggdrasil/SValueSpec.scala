@@ -21,11 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes.json._
 import com.precog.common._
-
 import org.specs2.mutable.Specification
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary._
 
 class SValueSpec extends Specification {
   "set" should {

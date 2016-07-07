@@ -19,6 +19,7 @@
  */
 package com.precog.niflheim
 
+import com.precog.common._
 import com.precog.util.FileLock
 import org.objectweb.howl.log._
 
@@ -137,7 +138,7 @@ case class CompleteCook(blockId: Long) extends TXLogEntry
 
 object TXLogEntry extends org.slf4s.Logging {
   def apply(record: LogRecord) = {
-    val buffer = ByteBuffer.wrap(record.getFields()(0))
+    val buffer = ByteBufferWrap(record.getFields()(0))
 
     buffer.getShort match {
       case 0x1 => StartCook(buffer.getLong)
@@ -153,7 +154,7 @@ object TXLogEntry extends org.slf4s.Logging {
     }
 
     val record = new Array[Byte](size)
-    val buffer = ByteBuffer.wrap(record)
+    val buffer = ByteBufferWrap(record)
     buffer.clear
     buffer.putShort(tpe.toShort)
     buffer.putLong(entry.blockId)

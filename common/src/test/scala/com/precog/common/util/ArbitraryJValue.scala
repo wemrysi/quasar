@@ -20,9 +20,7 @@
 package com.precog.common.util
 
 import blueeyes.json._
-import org.scalacheck._
-import Gen._
-import Arbitrary.arbitrary
+import org.scalacheck._, Gen._, Arbitrary._
 
 trait ArbitraryJValue {
   def genJValue:  Gen[JValue]  = frequency((10, genSimple), (1, wrap(choose(0, 5) flatMap genArray)), (1, wrap(choose(0, 5) flatMap genObject)))

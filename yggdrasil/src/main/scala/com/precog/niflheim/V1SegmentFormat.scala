@@ -20,15 +20,10 @@
 package com.precog.niflheim
 
 import com.precog.common._
+import com.precog.util._, BitSetUtil.Implicits._
 
-import com.precog.util.PrecogUnit
-import com.precog.util.BitSet
-import com.precog.util.BitSetUtil.Implicits._
-
-import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
-import java.nio.ByteBuffer
-import scala.collection.mutable
-import scalaz.{ Validation, Success, Failure }
+import java.nio.channels._
+import scalaz._
 import org.joda.time.Period
 
 object V1SegmentFormat extends SegmentFormat {
@@ -166,7 +161,7 @@ object V1SegmentFormat extends SegmentFormat {
     }
   }
 
-  private def allocate(size: Int): ByteBuffer = ByteBuffer.allocate(size)
+  private def allocate(size: Int): ByteBuffer = java.nio.ByteBuffer.allocate(size)
 
   def writeChunk[A](channel: WritableByteChannel, maxSize: Int)(f: ByteBuffer => A): Validation[IOException, A] = {
     val buffer = allocate(maxSize + 4)

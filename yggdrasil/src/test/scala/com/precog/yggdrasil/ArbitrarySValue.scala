@@ -19,23 +19,10 @@
  */
 package com.precog.yggdrasil
 
-import scala.collection.mutable
-
-import blueeyes.json._
-
 import com.precog.common._
-
-
-import org.specs2.mutable.Specification
-import org.scalacheck.Gen
-import org.scalacheck.Arbitrary
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary._
-
+import blueeyes.json._
 import java.math.MathContext
-
-import scalaz.std.list._
-import scalaz.std.anyVal._
+import org.scalacheck._, Gen._, Arbitrary._
 
 object CValueGenerators {
   type JSchema = Seq[(JPath, CType)]
@@ -247,6 +234,3 @@ trait ArbitraryBigDecimal {
       exponent
   } yield BigDecimal(mantissa, adjusted, java.math.MathContext.UNLIMITED))
 }
-
-
-// vim: set ts=4 sw=4 et:

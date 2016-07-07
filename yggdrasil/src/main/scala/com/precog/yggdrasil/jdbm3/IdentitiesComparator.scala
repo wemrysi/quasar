@@ -20,13 +20,7 @@
 package com.precog.yggdrasil
 package jdbm3
 
-import org.apache.jdbm.Serializer
-
-import java.io.{DataInput,DataOutput}
 import java.util.Comparator
-
-import com.precog.util.{Vector0,Vector1,Vector2,Vector3,Vector4}
-import com.precog.util.VectorCase
 
 object IdentitiesComparator {
   private final val serialVersionUID = 20120724l

@@ -21,9 +21,6 @@ package com.precog.common
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
-import org.scalacheck._
-import org.scalacheck.Gen._
-import org.scalacheck.Prop._
 
 class PathSpec extends Specification with ScalaCheck {
   "rollups for a path" should {

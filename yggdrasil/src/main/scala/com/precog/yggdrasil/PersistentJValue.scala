@@ -20,19 +20,18 @@
 package com.precog
 package yggdrasil
 
+import com.precog.common._
 import blueeyes.json._
-
 import org.objectweb.howl.log._
 
-import java.nio.ByteBuffer
-import java.io.{ File, FileOutputStream }
+import java.io.FileOutputStream
 import java.util.Arrays
 
 object PersistentJValue {
   sealed abstract class Message(val Flag: Byte) {
     def apply(bytes0: Array[Byte]): Array[Byte] = {
       val bytes = new Array[Byte](bytes0.length + 1)
-      ByteBuffer.wrap(bytes).put(bytes0).put(Flag)
+      ByteBufferWrap(bytes).put(bytes0).put(Flag)
       bytes
     }
 

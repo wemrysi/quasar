@@ -20,34 +20,11 @@
 package com.precog.yggdrasil
 package table
 
-import com.precog.common.Path
-import com.precog.util.VectorCase
-import com.precog.bytecode.JType
+import com.precog.common._
 import com.precog.yggdrasil.util._
-
-import blueeyes.json._
-import org.slf4s.Logging
-
-import scala.annotation.tailrec
-import scala.collection.mutable.LinkedHashSet
-import scala.util.Random
-
-import scalaz._
-import scalaz.effect.IO
-import scalaz.syntax.comonad._
-import scalaz.std.anyVal._
-
-import org.specs2._
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
-
+import scalaz.Need
+import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
-import TableModule.paths._
 
 trait BlockStoreColumnarTableModuleSpec[M[+_]] extends TableModuleSpec[M]
     with BlockLoadSpec[M]

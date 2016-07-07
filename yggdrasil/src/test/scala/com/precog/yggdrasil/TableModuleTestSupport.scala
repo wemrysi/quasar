@@ -21,30 +21,16 @@ package com.precog.yggdrasil
 
 import table._
 import com.precog.common._
-import com.precog.util.VectorCase
 
 import blueeyes.json._
 import blueeyes.akka_testing.FutureMatchers
 
 import scalaz.{Ordering => _, NonEmptyList => NEL, _}
-import scalaz.std.tuple._
-import scalaz.std.function._
-import scalaz.syntax.arrow._
-import scalaz.syntax.bifunctor._
 import scalaz.syntax.comonad._
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.generic.CanBuildFrom
-import scala.util.Random
 
 import org.specs2._
 import org.specs2.mutable.SpecificationLike
-import org.scalacheck._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
-import org.scalacheck.Arbitrary._
+import org.scalacheck._, Gen._, Arbitrary._
 import CValueGenerators.JSchema
 
 trait TestLib[M[+_]] extends TableModule[M] {

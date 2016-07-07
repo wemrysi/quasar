@@ -34,10 +34,8 @@ import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.JodaSerializationImplicits.{InstantExtractor, InstantDecomposer}
 
-import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.util.UUID
-
 import org.joda.time.Instant
 
 import scalaz._

@@ -69,11 +69,6 @@ private[precog] sealed trait VectorCase[+A] extends IndexedSeq[A] with IndexedSe
 }
 
 private[precog] object VectorCase {
-//  implicit def canBuildFrom[A]: CanBuildFrom[Traversable[_], A, VectorCase[A]] = new CanBuildFrom[Traversable[_], A, VectorCase[A]] {
-//    def apply() = newBuilder[A]
-//    def apply(from: Traversable[_]) = newBuilder[A]
-//  }
-
   def empty[A]: VectorCase[A] = Vector0
 
   def newBuilder[A]: Builder[A, VectorCase[A]] = new Builder[A, VectorCase[A]] { this: Builder[A, VectorCase[A]] =>

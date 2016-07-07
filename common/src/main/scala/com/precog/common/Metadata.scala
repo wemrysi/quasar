@@ -19,7 +19,6 @@
  */
 package com.precog.common
 
-import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
 import blueeyes.json.{JValue, JObject, JField }

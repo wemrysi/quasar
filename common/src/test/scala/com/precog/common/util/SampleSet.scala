@@ -19,13 +19,9 @@
  */
 package com.precog.common.util
 
-import org.joda.time._
-import org.joda.time.format._
-import org.joda.time.DateTimeZone
-
+import org.joda.time._, format._
 import blueeyes.json._
-import org.scalacheck.Gen
-import org.scalacheck.Gen._
+import org.scalacheck._, Gen._, Arbitrary._
 import scalaz.syntax.std.boolean._
 
 trait SampleSet[T] {
@@ -288,6 +284,3 @@ object DistributedSampleSet {
     (data, sampleSet.queriableSamples)
   }
 }
-
-
-// vim: set ts=4 sw=4 et:

@@ -48,13 +48,19 @@ package object common {
   type ScalaMathOrdering[A] = scala.math.Ordering[A]
 
   // scala stdlib encapsulation
-  type spec    = scala.specialized
-  type tailrec = scala.annotation.tailrec
-  type switch  = scala.annotation.switch
+  type spec           = scala.specialized
+  type tailrec        = scala.annotation.tailrec
+  type switch         = scala.annotation.switch
+  type ArrayBuffer[A] = scala.collection.mutable.ArrayBuffer[A]
 
   // java stdlib encapsulation
   type File        = java.io.File
   type IOException = java.io.IOException
+  type ByteBuffer  = java.nio.ByteBuffer
+
+  // Can't overload in package objects in scala 2.9!
+  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)
+  def ByteBufferWrap2(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
 
   def abort(msg: String): Nothing = throw new RuntimeException(msg)
 

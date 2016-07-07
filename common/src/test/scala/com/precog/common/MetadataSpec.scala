@@ -21,13 +21,12 @@ package com.precog.common
 
 import blueeyes.json.serialization.DefaultSerialization._
 
-import org.specs2.mutable.Specification
-import org.specs2._
-
-import org.scalacheck._
-
 import scalaz._
 import scalaz.syntax.semigroup._
+
+import org.specs2.mutable.Specification
+import org.specs2._
+import org.scalacheck._, Gen._, Arbitrary._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   import Prop._
@@ -106,9 +105,6 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
 }
 
 trait MetadataGenerators extends util.ArbitraryJValue {
-  import Gen._
-  import Arbitrary._
-
   implicit val arbMetadata: Arbitrary[Metadata] = Arbitrary(genMetadata)
   implicit val arbMetadataMap: Arbitrary[Map[MetadataType, Metadata]] = Arbitrary(genMetadataMap)
 
