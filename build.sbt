@@ -265,7 +265,9 @@ lazy val sparkcore = project
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies +=
-    "org.apache.spark" % "spark-core_2.11" % "1.6.2")
+    "org.apache.spark"  %  "spark-core_2.11"           % "1.6.2")
+  .settings(libraryDependencies +=
+    "commons-io" % "commons-io" % "2.5")
   .enablePlugins(AutomateHeaderPlugin)
 */
 
