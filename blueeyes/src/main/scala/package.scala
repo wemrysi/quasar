@@ -17,8 +17,6 @@ object core {
 object persistence {
   object cache {
   }
-  object mongo {
-  }
 }
 object util {
 }
@@ -81,6 +79,4 @@ object util {
 // import blueeyes.persistence.cache.Cache
 // import blueeyes.persistence.cache.CacheSettings
 // import blueeyes.persistence.cache.ExpirationPolicy
-// import blueeyes.persistence.mongo._
-// import blueeyes.persistence.mongo.dsl._
 // import blueeyes.util.Clock

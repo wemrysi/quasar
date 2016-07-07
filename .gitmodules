@@ -1,3 +1,0 @@
-[submodule "mongo/quirrelide"]
-	path = mongo/quirrelide
-	url = git@github.com:precog/quirrelide.git

@@ -60,6 +60,8 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       case JUnionT(left, right) => flattenAux(left) ++ flattenAux(right)
 
       case u @ (JArrayUnfixedT | JObjectUnfixedT) => Set((JPath.Identity, None))
+
+      case x => sys.error("Unexpected: " + x)
     }
 
     flattenAux(jtpe).groupBy(_._1).mapValues(_.flatMap(_._2))
@@ -92,33 +94,21 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     graph match {
-      case _ : Root => Map()
-
-      case New(parent) => extractLoads(parent)
-
+      case _ : Root                                 => Map()
+      case New(parent)                              => extractLoads(parent)
       case AbsoluteLoad(Const(CString(path)), jtpe) => Map(path -> flattenType(jtpe))
-
-      case Operate(_, parent) => extractLoads(parent)
-
-      case Reduce(_, parent) => extractLoads(parent)
-
-      case Morph1(_, parent) => extractLoads(parent)
-
-      case Morph2(_, left, right) => merge(extractLoads(left), extractLoads(right))
-
-      case Join(_, joinSort, left, right) => merge(extractLoads(left), extractLoads(right))
-
-      case Filter(_, target, boolean) => merge(extractLoads(target), extractLoads(boolean))
-
-      case AddSortKey(parent, _, _, _) => extractLoads(parent)
-
-      case Memoize(parent, _) => extractLoads(parent)
-
-      case Distinct(parent) => extractLoads(parent)
-
-      case Split(spec, child, _) => merge(extractSpecLoads(spec), extractLoads(child))
-
-      case _: SplitGroup | _: SplitParam => Map()
+      case Operate(_, parent)                       => extractLoads(parent)
+      case Reduce(_, parent)                        => extractLoads(parent)
+      case Morph1(_, parent)                        => extractLoads(parent)
+      case Morph2(_, left, right)                   => merge(extractLoads(left), extractLoads(right))
+      case Join(_, joinSort, left, right)           => merge(extractLoads(left), extractLoads(right))
+      case Filter(_, target, boolean)               => merge(extractLoads(target), extractLoads(boolean))
+      case AddSortKey(parent, _, _, _)              => extractLoads(parent)
+      case Memoize(parent, _)                       => extractLoads(parent)
+      case Distinct(parent)                         => extractLoads(parent)
+      case Split(spec, child, _)                    => merge(extractSpecLoads(spec), extractLoads(child))
+      case _: SplitGroup | _: SplitParam            => Map()
+      case x                                        => sys.error("Unexpected: " + x)
     }
   }
 

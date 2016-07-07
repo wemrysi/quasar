@@ -99,20 +99,3 @@ trait LongIdMemoryDatasetConsumer[M[+_]] extends MemoryDatasetConsumer[M] {
   type IdType = SValue
   def extractIds(jv: JValue): Seq[SValue] = (jv --> classOf[JArray]).elements map jvalueToSValue
 }
-
-/**
-  * String Identities are used for MongoDB collections, where the "_id" field
-  * represents the event identity. We still need to handle JNum entries in the
-  * case of reductions.
-  */
-trait StringIdMemoryDatasetConsumer[M[+_]] extends MemoryDatasetConsumer[M] {
-  type IdType = String
-  //
-  def extractIds(jv: JValue): Seq[String] =
-    (jv --> classOf[JArray]).elements collect {
-      case JString(s) => s
-      case JNum(i)    => i.toString
-    }
-}
-
-// vim: set ts=4 sw=4 et:
