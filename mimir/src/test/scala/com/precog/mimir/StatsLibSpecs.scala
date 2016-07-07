@@ -244,7 +244,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val ordering = scala.math.Ordering.by[(SValue, _), SValue](_._1)
 
       // this is ugly, but so is the structure coming out of testEval :/
-      val result: List[Map[String, SValue]] = testEval(input).toList.map {
+      val result: List[Map[String, SValue]] = testEval(input).toList.collect {
         case (Vector(k), SObject(v)) => (k, v)
       }.sorted(ordering).map(_._2)
 
@@ -294,7 +294,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val ordering = scala.math.Ordering.by[(SValue, _), SValue](_._1)
 
       // this is ugly, but so is the structure coming out of testEval :/
-      val result: List[Map[String, SValue]] = testEval(input).toList.map {
+      val result: List[Map[String, SValue]] = testEval(input).toList.collect {
         case (Vector(k), SObject(v)) => (k, v)
       }.sorted(ordering).map(_._2)
 

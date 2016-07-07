@@ -82,9 +82,8 @@ trait PrecogLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       val result = testEval(input)
       result must haveSize(6)
-      val numbers = result flatMap { case (_, SObject(fields)) =>
-        fields get "abc" collect { case SDecimal(n) => n }
-      }
+
+      val numbers = result collect { case (_, SObject(fields)) => fields get "abc" collect { case SDecimal(n) => n } } flatten;
       numbers must_== Set(0, -1, 1, 42, 1, -23)
     }
 

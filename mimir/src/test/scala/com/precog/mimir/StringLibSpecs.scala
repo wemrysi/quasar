@@ -885,9 +885,9 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     val o = scala.math.Ordering.by[(SValue, _), SValue](_._1)
 
     def mogrify(result: Set[(Vector[SValue], SValue)]): List[Vector[String]] =
-      result.toList.map {
+      result.toList.collect {
         case (Vector(n), SArray(elems)) => (n, elems)
-      }.sorted(o).map(_._2.map { case SString(s) => s })
+      }.sorted(o).map(_._2 collect { case SString(s) => s })
 
     def mktree(f: Op2, path: String, sep: String) =
       Join(BuiltInFunction2Op(f), Cross(None),
