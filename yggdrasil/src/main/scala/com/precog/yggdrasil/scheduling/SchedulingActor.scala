@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package scheduling
 
 import com.precog.common._, jobs._, security._
-import com.precog.common.accounts.AccountFinder
 import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.table.Slice
@@ -38,17 +37,15 @@ import org.slf4s.Logging
 import java.util.{Date, UUID}
 import java.util.concurrent.TimeUnit
 
-import org.joda.time.{Duration => JodaDuration, DateTime}
+import org.joda.time.{ Duration => JodaDuration }
 
-import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
+import scala.collection.mutable.PriorityQueue
 
 import scalaz.{Ordering => _, idInstance => _, _}
 import scalaz.std.option._
 import scalaz.syntax.id._
 import scalaz.syntax.traverse._
-import scalaz.syntax.std.either._
 import scalaz.syntax.std.option._
-import scalaz.effect.IO
 
 sealed trait SchedulingMessage
 

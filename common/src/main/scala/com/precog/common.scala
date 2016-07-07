@@ -52,6 +52,7 @@ package object common {
   type tailrec        = scala.annotation.tailrec
   type switch         = scala.annotation.switch
   type ArrayBuffer[A] = scala.collection.mutable.ArrayBuffer[A]
+  type ListBuffer[A]  = scala.collection.mutable.ListBuffer[A]
 
   // java stdlib encapsulation
   type File        = java.io.File

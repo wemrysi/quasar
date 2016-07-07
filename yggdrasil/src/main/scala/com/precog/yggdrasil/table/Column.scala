@@ -20,21 +20,10 @@
 package com.precog.yggdrasil
 package table
 
-import cf._
-
 import blueeyes.json._
-import org.joda.time.{DateTime, Period}
-
-import java.math.MathContext
-
 import com.precog.common._
-import com.precog.yggdrasil.table._
-import com.precog.util.{BitSet, BitSetUtil, Loop}
-import com.precog.util.BitSetUtil.Implicits._
-
+import com.precog.util.{BitSet, BitSetUtil}
 import scalaz.Semigroup
-import scalaz.std.option._
-import scalaz.syntax.apply._
 
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean

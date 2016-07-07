@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import org.joda.time.{DateTime, Period}
 import com.precog.common._
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil.Implicits._

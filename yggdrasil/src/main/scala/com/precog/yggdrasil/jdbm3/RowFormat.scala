@@ -23,16 +23,6 @@ package jdbm3
 import table._
 import com.precog.common._
 import com.precog.util._
-import com.precog.util.BitSet
-import com.precog.util.BitSetUtil
-import com.precog.util.BitSetUtil.Implicits._
-
-import org.joda.time.{DateTime, Period}
-import java.nio.ByteBuffer
-
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
-import scalaz._
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]

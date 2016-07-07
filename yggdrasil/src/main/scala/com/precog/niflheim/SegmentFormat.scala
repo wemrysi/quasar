@@ -23,7 +23,6 @@ import com.precog.util.PrecogUnit
 
 import java.io.{ File, IOException }
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
-
 import scalaz.Validation
 
 trait SegmentWriter {

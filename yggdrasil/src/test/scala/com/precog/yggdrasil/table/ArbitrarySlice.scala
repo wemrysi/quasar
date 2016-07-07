@@ -22,8 +22,7 @@ package table
 
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
-import org.joda.time.{DateTime, Period}
-import com.precog.util.{BitSet, BitSetUtil}
+import com.precog.util.{ BitSet, BitSetUtil }
 
 trait ArbitrarySlice {
   def arbitraryBitSet(size: Int): Gen[BitSet] = {

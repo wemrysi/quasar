@@ -20,17 +20,12 @@
 package com.precog.niflheim
 
 import com.precog.common._
-
 import com.precog.util._, BitSetUtil.Implicits._
-
 import java.nio.channels._
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._, Arbitrary._
-
 import scalaz._
-
-import org.joda.time.{ Period, DateTime }
 
 trait SegmentFormatSupport {
   // import Gen._

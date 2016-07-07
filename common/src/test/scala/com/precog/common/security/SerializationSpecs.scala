@@ -28,13 +28,12 @@ import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
 import org.specs2.mutable.Specification
-
 import scalaz._
 
 class SerializationSpecs extends Specification {
   import Permission._
 
-  val i0 = new org.joda.time.Instant(0L)
+  val i0 = new Instant(0L)
 
   "APIKeyRecord deserialization" should {
     "Handle V0 formats" in {

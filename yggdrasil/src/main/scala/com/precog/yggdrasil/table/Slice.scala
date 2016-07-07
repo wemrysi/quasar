@@ -21,37 +21,19 @@ package com.precog.yggdrasil
 package table
 
 import util.CPathUtils
-
 import com.precog.common._
-import com.precog.util.VectorCase
 import com.precog.bytecode._
 import com.precog.util._
-import com.precog.yggdrasil.util._
 
 import TransSpecModule._
-
 import blueeyes.json._
 
-import org.joda.time.{DateTime, Period}
-
-import org.slf4j.LoggerFactory
-
-import com.precog.util.{BitSet, BitSetUtil, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
-import org.slf4s.Logging
-
-import scala.collection.{breakOut, mutable}
 import scalaz._
 import scalaz.Ordering._
-import scalaz.Validation._
 import scalaz.syntax.id._
-import scalaz.syntax.foldable._
-import scalaz.syntax.semigroup._
-import scalaz.std.iterable._
-
 import java.nio.CharBuffer
-
 
 trait Slice { source =>
   import Slice._
@@ -1076,7 +1058,7 @@ trait Slice { source =>
         // we have the schema, now emit
 
         var buffer = CharBuffer.allocate(BufferSize)
-        val vector = new mutable.ArrayBuffer[CharBuffer](math.max(1, size / 10))
+        val vector = new ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
         def checkPush(length: Int) {
