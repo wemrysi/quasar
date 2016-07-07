@@ -21,23 +21,12 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-import com.precog.bytecode.JType
-
 import com.precog.util._
-import com.precog.util.{BitSetUtil, BitSet, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
 import blueeyes.json._
-
-import scala.annotation.tailrec
-
 import scalaz._
-import scalaz.std.anyVal._
-import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
-
-
-import TableModule._
 
 trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with TableModuleTestSupport[M] {
   def newGroupId: GroupId
@@ -143,6 +132,3 @@ trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with 
     lib(name)
   }
 }
-
-
-// vim: set ts=4 sw=4 et:

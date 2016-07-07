@@ -30,9 +30,6 @@ import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 
 import com.precog.util.BitSetUtil.Implicits._
 
-import scala.annotation.tailrec
-import scala.{ specialized => spec }
-
 import java.math.{ BigDecimal => BigDec }
 
 /**

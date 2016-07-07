@@ -25,8 +25,6 @@ import java.util.concurrent._
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.concurrent.locks.ReentrantLock
 
-import scala.annotation.tailrec
-
 class AuditExecutor(val name: String, minThreads: Int, maxThreads: Int, maxQueueDepth: Option[Int], idleTimeout: Long) extends Executor {
   private[this] val workQueue : BlockingQueue[Runnable] = maxQueueDepth.map { depth =>
     new ArrayBlockingQueue[Runnable](depth)

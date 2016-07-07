@@ -23,10 +23,8 @@ import com.precog.common._
 
 import com.precog.util.PrecogUnit
 
-import java.io.IOException
 import java.nio.ByteBuffer
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 
 import scalaz.{ Validation, Success, Failure }

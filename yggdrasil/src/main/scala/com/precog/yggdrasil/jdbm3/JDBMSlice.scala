@@ -22,21 +22,7 @@ package jdbm3
 
 import com.precog.common._
 import org.slf4j.LoggerFactory
-
-import org.joda.time.{DateTime, Period}
-
-import java.nio.ByteBuffer
-
-import com.precog.util.Bijection._
 import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.serialization.bijections._
-
-import scala.collection.JavaConverters._
-
-import blueeyes.json.JPath
-
-import scala.annotation.tailrec
-import JDBMProjection._
 
 object JDBMSlice {
   private lazy val log = LoggerFactory.getLogger("com.precog.yggdrasil.jdbm3.JDBMSlice")
@@ -88,19 +74,18 @@ object JDBMSlice {
   }
 
   def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): (ColumnRef, ArrayColumn[_]) =
-    (ref.copy(selector = (prefix \ ref.selector)), (ref.ctype match {
-      case CString      => ArrayStrColumn.empty(sliceSize)
-      case CBoolean     => ArrayBoolColumn.empty()
-      case CLong        => ArrayLongColumn.empty(sliceSize)
-      case CDouble      => ArrayDoubleColumn.empty(sliceSize)
-      case CNum         => ArrayNumColumn.empty(sliceSize)
-      case CDate        => ArrayDateColumn.empty(sliceSize)
-      case CPeriod      => ArrayPeriodColumn.empty(sliceSize)
-      case CNull        => MutableNullColumn.empty()
-      case CEmptyObject => MutableEmptyObjectColumn.empty()
-      case CEmptyArray  => MutableEmptyArrayColumn.empty()
+    (ref.copy(selector = (prefix \ ref.selector)), ref.ctype match {
+      case CString              => ArrayStrColumn.empty(sliceSize)
+      case CBoolean             => ArrayBoolColumn.empty()
+      case CLong                => ArrayLongColumn.empty(sliceSize)
+      case CDouble              => ArrayDoubleColumn.empty(sliceSize)
+      case CNum                 => ArrayNumColumn.empty(sliceSize)
+      case CDate                => ArrayDateColumn.empty(sliceSize)
+      case CPeriod              => ArrayPeriodColumn.empty(sliceSize)
+      case CNull                => MutableNullColumn.empty()
+      case CEmptyObject         => MutableEmptyObjectColumn.empty()
+      case CEmptyArray          => MutableEmptyArrayColumn.empty()
       case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
-      case CUndefined   => sys.error("CUndefined cannot be serialized")
-    }))
+      case CUndefined           => sys.error("CUndefined cannot be serialized")
+    })
 }
-

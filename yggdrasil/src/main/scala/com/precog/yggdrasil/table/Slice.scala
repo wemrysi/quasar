@@ -41,11 +41,8 @@ import com.precog.util.BitSetUtil.Implicits._
 
 import org.slf4s.Logging
 
-import scala.annotation.{switch, tailrec}
-
 import scala.collection.{breakOut, mutable}
 import scalaz._
-import scala.{ specialized => spec }
 import scalaz.Ordering._
 import scalaz.Validation._
 import scalaz.syntax.id._

@@ -21,20 +21,17 @@ package com.precog.yggdrasil
 package util
 
 import com.precog.util.NumericComparisons
-
-import scala.{ specialized => spec }
-
 import org.joda.time.DateTime
 
 /**
  * Compare values of different types.
  */
-trait HetOrder[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B] {
+trait HetOrder[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B] {
   def compare(a: A, b: B): Int
 }
 
 trait HetOrderLow {
-  implicit def reverse[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](
+  implicit def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](
       implicit ho: HetOrder[A, B]) = new HetOrder[B, A] {
     def compare(b: B, a: A) = {
       val cmp = ho.compare(a, b)
@@ -42,7 +39,7 @@ trait HetOrderLow {
     }
   }
 
-  implicit def fromOrder[@spec(Boolean, Long, Double, AnyRef) A](implicit o: SpireOrder[A]) = new HetOrder[A, A] {
+  implicit def fromOrder[@specialized(Boolean, Long, Double, AnyRef) A](implicit o: SpireOrder[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A) = o.compare(a, b)
   }
 }
@@ -60,7 +57,7 @@ object HetOrder extends HetOrderLow {
     def compare(a: Double, b: BigDecimal): Int = NumericComparisons.compare(a, b)
   }
 
-  @inline final def apply[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](implicit ho: HetOrder[A, B]) = ho
+  @inline final def apply[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](implicit ho: HetOrder[A, B]) = ho
 }
 
 /**

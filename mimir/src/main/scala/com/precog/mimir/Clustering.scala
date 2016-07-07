@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -38,8 +38,6 @@ import scalaz.{Monad, Monoid, StreamT}
 import scalaz.std.list._
 import scalaz.syntax.monad._
 
-import scala.annotation.tailrec 
-
 trait KMediansCoreSetClustering {
   type CoreSet = (Array[Array[Double]], Array[Long])
 
@@ -48,7 +46,7 @@ trait KMediansCoreSetClustering {
       val threshold = (k / epsilon) * math.log(points.length)
 
       if (points.length < threshold) {
-        (points, weights) 
+        (points, weights)
       } else {
         val centers = createCenters(points, weights)
         //System.err.println("*** centers.length=%s" format centers.length)
@@ -68,7 +66,7 @@ trait KMediansCoreSetClustering {
   def epsilon: Double
 
   // Remove once we get next RC of Spire.
-  implicit def arrayOps[@specialized(Double) A](lhs: Array[A]) = new ArrayOps(lhs)
+  implicit def arrayOps[@spec(Double) A](lhs: Array[A]) = new ArrayOps(lhs)
 
   case class CoreSetTree(tree: List[(Int, CoreSet)], k: Int) {
     def coreSet: CoreSet = {
@@ -96,7 +94,7 @@ trait KMediansCoreSetClustering {
 
       def rec(tree0: List[(Int, CoreSet)], coreset0: CoreSet, level0: Int): List[(Int, CoreSet)] = {
         tree0 match {
-          case (`level0`, coreset1) :: tail => 
+          case (`level0`, coreset1) :: tail =>
             rec(tail, mergeCoreSets(coreset0, coreset1, level0), level0 + 1)
           case _ =>
             (level0, coreset0) :: tree0
@@ -151,7 +149,7 @@ trait KMediansCoreSetClustering {
    * points must also be associated with a set of weights.
    */
   def kMediansCost(points: Array[Array[Double]], weights: Array[Long], centers: Array[Array[Double]], threshold: Double): Double = {
-    var i = 0    
+    var i = 0
     var total = 0.0
     while (i < points.length && total < threshold) {
       var minDistSq = Double.PositiveInfinity
@@ -203,7 +201,7 @@ trait KMediansCoreSetClustering {
       }
       i += 1
     }
-    
+
     (minCost, centers)
   }
 
@@ -361,7 +359,7 @@ trait KMediansCoreSetClustering {
 
       i += 1
     }
-    
+
     (distances.qsum, reps, isCenter)
   }
 
@@ -542,7 +540,7 @@ trait ClusteringLibModule[M[+_]] extends ColumnarTableModule[M] with AssignClust
       type KS = List[Int]
       val epsilon = 0.1
 
-      implicit def monoidKS = new Monoid[KS] { 
+      implicit def monoidKS = new Monoid[KS] {
         def zero: KS = List.empty[Int]
         def append(ks1: KS, ks2: => KS) = ks1 ++ ks2
       }
@@ -557,7 +555,7 @@ trait ClusteringLibModule[M[+_]] extends ColumnarTableModule[M] with AssignClust
               }
 
             case dc: DoubleColumn =>
-              range flatMap { i => 
+              range flatMap { i =>
                 if (dc.isDefinedAt(i)) {
                   val n = dc(i)
                   if (n.isValidInt && n > 0) {
@@ -628,7 +626,7 @@ trait ClusteringLibModule[M[+_]] extends ColumnarTableModule[M] with AssignClust
           case (tbl, idx) => tbl.transform(trans.WrapObject(TransSpec1.Id, "cluster" + (idx + 1)))
         }
 
-        val table = wrappedTables reduce { 
+        val table = wrappedTables reduce {
           (t1, t2) => t1.cross(t2)(trans.InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
         }
 
@@ -648,7 +646,7 @@ trait ClusteringLibModule[M[+_]] extends ColumnarTableModule[M] with AssignClust
 
           val res = ks map { k =>
             val schemas: M[Seq[JType]] = table.schemas map { _.toSeq }
-            
+
             val specs: M[Seq[(TransSpec1, JType)]] = schemas map {
               _ map { jtype => (trans.Typed(TransSpec1.Id, jtype), jtype) }
             }

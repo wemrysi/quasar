@@ -19,10 +19,9 @@
  */
 package com.precog.yggdrasil.jdbm3
 
-import scala.annotation.tailrec
-import java.io._
+import com.precog.common._
+import java.io.{ DataInput, DataOutput }
 import org.apache.jdbm.Serializer
-
 
 object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
 

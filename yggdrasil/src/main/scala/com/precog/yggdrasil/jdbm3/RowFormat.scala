@@ -30,12 +30,9 @@ import com.precog.util.BitSetUtil.Implicits._
 import org.joda.time.{DateTime, Period}
 import java.nio.ByteBuffer
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.{ specialized => spec }
 import scalaz._
-
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]

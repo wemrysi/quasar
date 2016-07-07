@@ -23,19 +23,9 @@ package jdbm3
 import com.precog.common._
 import com.precog.yggdrasil.table._
 import com.precog.util.ByteBufferPool
-
-
-import blueeyes.json.{ JPath, JPathIndex }
-
-import org.joda.time.DateTime
-
-import java.nio.ByteBuffer
-
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{ Shrink, Arbitrary, Gen, Pretty }
-
-import scala.annotation.tailrec
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._

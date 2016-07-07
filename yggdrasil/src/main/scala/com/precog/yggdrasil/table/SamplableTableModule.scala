@@ -21,16 +21,8 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.util._
-
-import com.precog.util.{BitSet, BitSetUtil, IOUtils, Loop}
-import com.precog.util.BitSetUtil.Implicits._
-
 import scala.collection.mutable
-import scala.annotation.tailrec
 import scala.util.Random
-
 import scalaz._
 import scalaz.std.list._
 import scalaz.syntax.monad._

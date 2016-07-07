@@ -20,8 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import scala.annotation.tailrec
-
 import blueeyes.json._
 
 import com.precog.common._
@@ -34,7 +32,6 @@ import TransSpecModule._
 
 import scalaz._
 import scalaz.syntax.monad._
-
 import scala.collection.{Set => GenSet}
 import scala.collection.mutable
 import org.slf4s.Logging

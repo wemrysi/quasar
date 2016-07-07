@@ -30,14 +30,13 @@ import com.precog.yggdrasil.vfs._
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.PoisonPill
-
 import org.slf4s.Logging
-
-import scalaz.{NonEmptyList => NEL, _}
-import scalaz.syntax.monoid._
 
 case class BatchComplete(requestor: ActorRef, checkpoint: YggCheckpoint)
 case class BatchFailed(requestor: ActorRef, checkpoint: YggCheckpoint)
+
+case class InsertComplete(path: Path)
+case class ArchiveComplete(path: Path)
 
 class BatchCompleteNotifier(p: Promise[BatchComplete]) extends Actor {
   def receive = {

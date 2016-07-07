@@ -26,8 +26,6 @@ import com.precog.yggdrasil.util._
 import org.joda.time.DateTime
 
 import scala.collection.mutable
-import scala.annotation.tailrec
-
 
 /**
  * Represents a way to traverse a list of CPaths in sorted order. This takes

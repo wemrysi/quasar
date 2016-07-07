@@ -25,16 +25,10 @@ import com.precog.util.PrecogUnit
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil.Implicits._
 
-import java.io.{ File, IOException }
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
 import java.nio.ByteBuffer
-
-import scala.{ specialized => spec }
-import scala.annotation.tailrec
 import scala.collection.mutable
-
 import scalaz.{ Validation, Success, Failure }
-
 import org.joda.time.Period
 
 object V1SegmentFormat extends SegmentFormat {

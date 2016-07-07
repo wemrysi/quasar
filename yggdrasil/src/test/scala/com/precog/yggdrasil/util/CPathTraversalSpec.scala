@@ -31,8 +31,6 @@ import org.scalacheck.{ Shrink, Arbitrary, Gen, Pretty }
 
 import org.joda.time.DateTime
 
-import scala.{ specialized => spec }
-
 
 class CPathTraversalSpec extends Specification {
   import CPathTraversal.{ Done, Sequence, Select, Loop }

@@ -24,7 +24,6 @@ import com.precog.util._
 import com.precog.common._
 
 import scala.collection.mutable
-import scala.annotation.tailrec
 
 /**
  * Creates an efficient hash for a slice. From this, when given another slice, we can

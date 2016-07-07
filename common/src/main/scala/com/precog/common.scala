@@ -47,6 +47,11 @@ package object common {
   val ScalazOrdering        = scalaz.Ordering
   type ScalaMathOrdering[A] = scala.math.Ordering[A]
 
+  // scala stdlib encapsulation
+  type spec    = scala.specialized
+  type tailrec = scala.annotation.tailrec
+  type switch  = scala.annotation.switch
+
   // java stdlib encapsulation
   type File        = java.io.File
   type IOException = java.io.IOException

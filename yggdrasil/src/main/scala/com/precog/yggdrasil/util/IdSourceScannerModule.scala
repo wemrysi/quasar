@@ -19,8 +19,6 @@
  */
 package com.precog.yggdrasil.util
 
-import scala.annotation.tailrec
-
 import com.precog.common._
 import com.precog.yggdrasil.{ IdSource, TableModule, YggConfigComponent }
 import com.precog.yggdrasil.table._

@@ -21,13 +21,8 @@ package com.precog.yggdrasil
 package jdbm3
 
 import org.joda.time.DateTime
-
 import org.scalacheck.{Arbitrary, Gen}
-
-import scala.{ specialized => spec }
-
 import com.precog.common._
-
 
 trait CValueGenerators {
   import Gen._

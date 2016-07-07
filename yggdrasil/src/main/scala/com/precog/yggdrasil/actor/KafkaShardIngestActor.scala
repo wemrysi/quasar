@@ -51,7 +51,6 @@ import scalaz.syntax.monoid._
 import scalaz.syntax.traverse._
 import Validation._
 
-import scala.annotation.tailrec
 import scala.collection.immutable.TreeMap
 
 import scalaz._

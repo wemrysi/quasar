@@ -24,11 +24,7 @@ import com.precog.common._
 import blueeyes.json._
 
 import scala.collection.mutable
-import scala.annotation.tailrec
-
 import scalaz._
-import scalaz.Ordering.{ LT, EQ, GT }
-
 
 object CPathUtils {
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {

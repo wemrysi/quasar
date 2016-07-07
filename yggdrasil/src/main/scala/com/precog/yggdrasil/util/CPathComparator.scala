@@ -25,9 +25,6 @@ import com.precog.yggdrasil.table._
 
 import org.joda.time.DateTime
 
-import scala.annotation.tailrec
-import scala.{ specialized => spec }
-
 /**
  * Represents the result of an ordering, but with the possibility that no
  * ordering exists. This is isomorphic to Option[Ordering] (and a partial

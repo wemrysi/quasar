@@ -33,8 +33,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._
 import scalaz.syntax.std.boolean._
 
-import scala.annotation.tailrec
-
 case class Authorities private (accountIds: Set[AccountId]) {
   def expand(ownerAccountId: AccountId) =
     this.copy(accountIds = this.accountIds + ownerAccountId)

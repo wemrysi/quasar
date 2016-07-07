@@ -36,9 +36,6 @@ import scalaz.std._
 import scalaz.std.math._
 import scalaz.std.AllInstances._
 
-import scala.{ specialized => spec }
-import scala.annotation.tailrec
-
 import _root_.java.io.{Externalizable,ObjectInput,ObjectOutput}
 import _root_.java.math.MathContext
 

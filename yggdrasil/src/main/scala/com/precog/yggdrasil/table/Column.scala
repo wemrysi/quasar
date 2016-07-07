@@ -32,9 +32,6 @@ import com.precog.yggdrasil.table._
 import com.precog.util.{BitSet, BitSetUtil, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
-import scala.{ specialized => spec }
-import scala.annotation.tailrec
-
 import scalaz.Semigroup
 import scalaz.std.option._
 import scalaz.syntax.apply._

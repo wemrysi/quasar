@@ -19,8 +19,6 @@
  */
 package com.precog.niflheim
 
-import scala.{specialized => spec}
-
 import blueeyes.json._
 import scala.collection.mutable
 import org.joda.time.DateTime

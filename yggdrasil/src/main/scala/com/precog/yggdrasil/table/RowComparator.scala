@@ -21,14 +21,11 @@ package com.precog
 package yggdrasil
 package table
 
-import com.precog.util.NumericComparisons
-import scalaz._
+import common._
 import scalaz.Ordering._
 
-import scala.annotation.tailrec
-
 trait RowComparator { self =>
-  def compare(i1: Int, i2: Int): Ordering
+  def compare(i1: Int, i2: Int): ScalazOrdering
 
   def swap: RowComparator = new RowComparator {
     def compare(i1: Int, i2: Int) = self.compare(i2, i1).complement

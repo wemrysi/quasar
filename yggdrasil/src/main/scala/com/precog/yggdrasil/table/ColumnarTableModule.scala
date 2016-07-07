@@ -47,14 +47,12 @@ import com.precog.util.{BitSet, BitSetUtil, DateTimeUtil, IOUtils, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
 import scala.collection.mutable
-import scala.annotation.tailrec
 
 import scalaz._
 import scalaz.Ordering._
 import scalaz.std.function._
 import scalaz.std.list._
 import scalaz.std.tuple._
-//import scalaz.std.iterable._
 import scalaz.std.option._
 import scalaz.std.map._
 import scalaz.std.set._
