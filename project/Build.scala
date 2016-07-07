@@ -25,9 +25,8 @@ import sbtassembly.AssemblyPlugin.assemblySettings
 import sbtassembly.AssemblyPlugin.autoImport._
 
 object PlatformBuild {
-  val Both            = "compile->compile;test->test"
-  val profileTask     = InputKey[Unit]("profile", "Runs the given project under JProfiler")
-  val blueeyesVersion = "1.0.0-M9.5"
+  val Both        = "compile->compile;test->test"
+  val profileTask = InputKey[Unit]("profile", "Runs the given project under JProfiler")
 
   def optimizeOpts   = if (sys.props contains "com.precog.build.optimize") Seq("-optimize") else Seq()
   def commonSettings = Seq(
@@ -49,6 +48,8 @@ object PlatformBuild {
       "com.google.code.findbugs"  % "jsr305"      %  "3.0.1"
     )
   )
+
+  def blueeyesModule(name: String): ModuleID = "com.reportgrid" %% s"blueeyes-$name" % "1.0.0-M9.5"
 
   def jprofilerArg(base: File) = "-agentpath:%s=offline,config=%s/%s,id=%s".format(
     "/Applications/jprofiler7/bin/macos/libjprofilerti.jnilib",

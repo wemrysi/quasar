@@ -48,6 +48,3 @@ abstract class WebClient(protocol: String, host: String, port: Int, path: String
     f(client.protocol(protocol).host(host).port(port).path(path))
   }
 }
-
-
-// vim: set ts=4 sw=4 et:
