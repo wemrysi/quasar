@@ -39,7 +39,7 @@ object FileSystemError {
     lp: Fix[LogicalPlan],
     reason: String,
     detail: JsonObject,
-    cause: Option[Throwable]
+    cause: Option[PhysicalError]
   ) extends FileSystemError
   final case class PathErr private (e: PathError)
     extends FileSystemError
@@ -58,7 +58,7 @@ object FileSystemError {
   final case class WriteFailed private (data: Data, reason: String)
     extends FileSystemError
 
-  val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[Throwable])] {
+  val executionFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], String, JsonObject, Option[PhysicalError])] {
     case ExecutionFailed(lp, rsn, det, cs) => (lp, rsn, det, cs)
   } (ExecutionFailed.tupled)
 
@@ -96,7 +96,7 @@ object FileSystemError {
   implicit def fileSystemErrorShow: Show[FileSystemError] =
     Show.shows {
       case ExecutionFailed(_, rsn, _, c) =>
-        s"Plan execution failed: $rsn, cause=${c.map(_.getMessage)}"
+        s"Plan execution failed: $rsn, cause=${c.map(_.cause.getMessage)}"
       case PathErr(e) =>
         e.shows
       case PlanningFailed(_, e) =>

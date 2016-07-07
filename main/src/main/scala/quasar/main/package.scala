@@ -17,16 +17,13 @@
 package quasar
 
 import quasar.Predef._
-
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.hierarchical._
-import quasar.physical.mongodb._
 
-import com.mongodb.MongoException
 import monocle.Lens
 import pathy.Path.posixCodec
 import scalaz.{Failure => _, Lens => _, _}, Scalaz._
@@ -46,13 +43,13 @@ package object main {
 
   /** Effects that physical filesystems require.
     */
-  type PhysFsEff[A]  = Coproduct[MongoErr, Task, A]
+  type PhysFsEff[A]  = Coproduct[PhysErr, Task, A]
   type PhysFsEffM[A] = Free[PhysFsEff, A]
 
   object PhysFsEff {
     // Lift into FsEvalIOM
     val toFsEvalIOM: PhysFsEff ~> FsEvalIOM =
-      injectFT[MongoErr, FsEvalIO] :+:
+      injectFT[PhysErr, FsEvalIO] :+:
       injectFT[Task, FsEvalIO]
   }
 
@@ -62,6 +59,7 @@ package object main {
     * to a fixed set of effects that filesystems must interpret into.
     */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] =
+    quasar.physical.skeleton.fs.definition[PhysFsEff] |+|
     quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff]
 
   /** The intermediate effect FileSystem operations are interpreted into.
@@ -112,7 +110,7 @@ package object main {
     * configuration based on the final context of interpretation
     * (i.e. web service vs cmd line).
     */
-  type FsEval[A]    = Coproduct[MongoErr, MountConfigs, A]
+  type FsEval[A]    = Coproduct[PhysErr, MountConfigs, A]
   type FsEvalIO[A]  = Coproduct[Task, FsEval, A]
   type FsEvalIOM[A] = Free[FsEvalIO, A]
 
@@ -177,7 +175,7 @@ package object main {
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.
     */
-  type CfgsErrs0[A]   = Coproduct[MongoErr, MountConfigs, A]
+  type CfgsErrs0[A]   = Coproduct[PhysErr, MountConfigs, A]
   type CfgsErrs[A]    = Coproduct[FileSystemFailure, CfgsErrs0, A]
 
   object CfgsErrs {
@@ -185,7 +183,7 @@ package object main {
       eval: MountConfigs ~> F
     ): CfgsErrs ~> F =
       Failure.toRuntimeError[F, FileSystemError] :+:
-      Failure.toCatchable[F, MongoException]     :+:
+      Failure.toRuntimeError[F, PhysicalError] :+:
       eval
   }
 
@@ -232,7 +230,7 @@ package object main {
         val translateFsErrs: FsEvalIOM ~> CfgsErrsIOM =
           free.foldMapNT[FsEvalIO, CfgsErrsIOM](
             liftTask                           :+:
-            injectFT[MongoErr, CfgsErrsIO]     :+:
+            injectFT[PhysErr, CfgsErrsIO]     :+:
             injectFT[MountConfigs, CfgsErrsIO])
 
         val mnt: CompleteFsEff ~> CfgsErrsIOM =

@@ -7,7 +7,6 @@ import sbt._, Keys._
 object Dependencies {
   private val argonautVersion = "6.2-M2"
   private val http4sVersion   = "0.13.2a"
-  private val mongoVersion    = "3.2.2"
   private val monocleVersion  = "1.2.2"
   private val nettyVersion    = "4.0.36.Final"
   private val pathyVersion    = "0.2.1"
@@ -29,7 +28,6 @@ object Dependencies {
     "com.github.julien-truffaut" %% "monocle-macro"    % monocleVersion          % "compile, test",
     "com.github.scopt"  %% "scopt"                     % "3.5.0"                 % "compile, test",
     "org.threeten"      %  "threetenbp"                % "1.3.1"                 % "compile, test",
-    "org.mongodb"       %  "mongodb-driver-async"      % mongoVersion            % "compile, test",
     "io.netty"          %  "netty-buffer"              % nettyVersion            % "compile, test",
     "io.netty"          %  "netty-transport"           % nettyVersion            % "compile, test",
     "io.netty"          %  "netty-handler"             % nettyVersion            % "compile, test",

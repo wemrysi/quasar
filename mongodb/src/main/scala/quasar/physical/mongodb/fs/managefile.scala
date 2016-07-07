@@ -76,7 +76,7 @@ object managefile {
     client: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: MongoErr :<: S
+    S1: PhysErr :<: S
   ): Task[MongoManage ~> Free[S, ?]] =
     (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
       new (MongoManage ~> Free[S, ?]) {

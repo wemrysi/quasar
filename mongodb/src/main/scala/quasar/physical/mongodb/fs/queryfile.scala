@@ -54,7 +54,7 @@ object queryfile {
     defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
-    S1: MongoErr :<: S
+    S1: PhysErr :<: S
   ): Task[MongoQuery[C, ?] ~> Free[S, ?]] = {
     type MQ[A] = MongoQuery[C, A]
     type F[A]  = Free[S, A]
@@ -226,7 +226,7 @@ private final class QueryFileInterpreter[C](
                   .leftMap(wfErrToFsErr(lp))
                   .run.mapK(_.attemptMongo.leftMap(err =>
                     executionFailed(lp,
-                      s"MongoDB Error: ${err.getMessage}",
+                      s"MongoDB Error: ${err.cause.getMessage}",
                       JsonObject.empty,
                       some(err)).left[A]
                     ).merge)
