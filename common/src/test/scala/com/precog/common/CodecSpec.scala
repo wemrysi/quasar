@@ -21,7 +21,6 @@ package com.precog.common
 
 import com.precog.util.{ ByteBufferPool, RawBitSet }
 
-import org.joda.time.DateTime
 
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil

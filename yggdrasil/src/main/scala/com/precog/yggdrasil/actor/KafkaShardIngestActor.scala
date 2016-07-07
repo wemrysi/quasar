@@ -37,7 +37,6 @@ import java.io._
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.joda.time.Instant
 
 import blueeyes.json._
 import blueeyes.json.serialization._

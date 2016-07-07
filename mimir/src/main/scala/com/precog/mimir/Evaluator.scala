@@ -20,46 +20,24 @@
 package com.precog
 package mimir
 
-import annotation.tailrec
-
-import com.precog.common._
-import com.precog.common.security._
-import com.precog.common.accounts._
+import com.precog.common._, security._, accounts._
 import com.precog.bytecode._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.TableModule._
-import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.table.ColumnarTableModuleConfig
-import com.precog.yggdrasil.serialization._
 import com.precog.yggdrasil.util.IdSourceConfig
 import com.precog.yggdrasil.vfs._
 import com.precog.util._
 
-import org.joda.time._
-import org.joda.time.format._
-import org.joda.time.DateTimeZone
-
-import java.lang.Math._
-import collection.immutable.ListSet
-
 import org.slf4j.LoggerFactory
+import scala.collection.immutable.Queue
 
-import akka.dispatch.Future
-
-import scalaz.{NonEmptyList => NEL, _}
+import scalaz._
 import scalaz.StateT.{StateMonadTrans, stateTMonadState}
-import scalaz.std.anyVal._
 import scalaz.std.list._
-import scalaz.std.map._
 import scalaz.std.set._
-import scalaz.std.partialFunction._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
-import scalaz.syntax.std.function2._
-
-import scala.Function._
-import scala.collection.immutable.Queue
 
 trait EvaluatorConfig extends IdSourceConfig {
   def maxSliceSize: Int

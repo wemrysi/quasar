@@ -32,7 +32,6 @@ import Permission._
 import blueeyes.util.Clock
 
 import java.util.UUID
-import org.joda.time.Instant
 import org.slf4s.Logging
 
 import scalaz._

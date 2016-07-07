@@ -23,7 +23,6 @@ package table
 import com.precog.common._
 
 import blueeyes.json._
-import org.joda.time.DateTime
 
 class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extends Slice {
 

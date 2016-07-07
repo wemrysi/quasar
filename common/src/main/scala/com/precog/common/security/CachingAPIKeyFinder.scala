@@ -25,7 +25,6 @@ import accounts.AccountId
 import com.precog.util.cache.Cache
 
 import java.util.concurrent.TimeUnit._
-import org.joda.time.DateTime
 
 import scalaz._
 import scalaz.effect._

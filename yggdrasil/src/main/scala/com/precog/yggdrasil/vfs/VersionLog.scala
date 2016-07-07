@@ -29,14 +29,14 @@ import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.JodaSerializationImplicits._
 
+import com.precog.common._
 import com.precog.common.serialization._
 import com.precog.util.{FileLock, IOUtils, PrecogUnit}
 
 import org.slf4s.Logging
 
-import java.io._
+import java.io.{ File => _, _ }
 import java.util.UUID
-import org.joda.time.Instant
 
 import scalaz.{NonEmptyList => NEL, _}
 import scalaz.effect.IO

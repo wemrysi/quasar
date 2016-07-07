@@ -39,7 +39,6 @@ import akka.util.duration._
 
 import java.util.concurrent.Executors
 
-import org.joda.time.DateTime
 
 import scalaz._
 import scalaz.Validation._

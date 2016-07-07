@@ -29,7 +29,6 @@ import com.precog.yggdrasil.table._
 import akka.dispatch.Await
 import akka.util.Duration
 
-import org.joda.time.DateTime
 
 import scalaz._
 import scalaz.Validation

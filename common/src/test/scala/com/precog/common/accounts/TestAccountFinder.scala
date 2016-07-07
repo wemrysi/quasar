@@ -24,7 +24,6 @@ import security._
 
 import blueeyes.json._
 
-import org.joda.time.DateTime
 import scalaz._
 import scalaz.syntax.monad._
 

@@ -31,7 +31,6 @@ import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
 import com.precog.common.security.{TZDateTimeDecomposer, TZDateTimeExtractor}
 
-import org.joda.time.DateTime
 
 import shapeless._
 

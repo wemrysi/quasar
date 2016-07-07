@@ -35,7 +35,6 @@ import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 
-import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.streum.configrity.Configuration
 import org.slf4s.Logging

@@ -23,7 +23,6 @@ package table
 import com.precog.common._
 import com.precog.yggdrasil.util._
 
-import org.joda.time.DateTime
 
 import scala.collection.mutable
 

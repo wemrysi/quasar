@@ -22,7 +22,6 @@ package security
 
 import org.specs2.mutable._
 
-import org.joda.time.DateTime
 
 import scala.collection.mutable
 

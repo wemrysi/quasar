@@ -20,6 +20,8 @@
 package com.precog.yggdrasil
 package scheduling
 
+import com.precog.common._
+
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Versioned._
@@ -27,10 +29,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 
 import java.util.UUID
 
-import org.joda.time.DateTime
-
 import scalaz._
-
 import shapeless._
 
 object ScheduledRunReport {

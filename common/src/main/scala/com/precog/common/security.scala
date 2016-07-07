@@ -24,7 +24,6 @@ import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.DefaultSerialization.{DateTimeDecomposer => _, DateTimeExtractor => _, _}
 import blueeyes.json.serialization.Extractor._
 
-import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
 import scalaz._

@@ -37,7 +37,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 
 import blueeyes.util.Clock
 
-import org.joda.time.DateTime
 
 import org.streum.configrity.Configuration
 

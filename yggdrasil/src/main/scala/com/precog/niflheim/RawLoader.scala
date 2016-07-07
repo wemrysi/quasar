@@ -19,11 +19,11 @@
  */
 package com.precog.niflheim
 
+import com.precog.common._
 import blueeyes.json._
 import scala.collection.mutable
-import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
-import java.io._
+import java.io.{ File => _, _ }
 
 // import com.precog.common._
 import com.precog.util._

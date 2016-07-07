@@ -33,7 +33,6 @@ import blueeyes.json.serialization.Versioned._
 import com.google.common.base.Charsets
 import com.google.common.hash.Hashing
 
-import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 
 import scalaz.Validation

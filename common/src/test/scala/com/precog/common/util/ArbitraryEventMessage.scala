@@ -22,7 +22,6 @@ package ingest
 
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
-import org.joda.time.Instant
 import com.precog.common.util.ArbitraryJValue
 
 import security._

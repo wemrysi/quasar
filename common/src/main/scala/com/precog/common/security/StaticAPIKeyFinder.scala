@@ -24,8 +24,6 @@ package security
 import com.precog.common.accounts._
 import com.precog.common.security.service._
 
-import org.joda.time.DateTime
-import org.joda.time.Instant
 
 import org.slf4s.Logging
 

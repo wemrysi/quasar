@@ -28,7 +28,6 @@ import com.precog.util.cache._
 
 import java.util.UUID
 
-import org.joda.time.DateTime
 
 import scala.collection.mutable
 

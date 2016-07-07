@@ -23,7 +23,6 @@ package jdbm3
 import org.slf4s.Logger
 
 import org.apache.jdbm._
-import org.joda.time.DateTime
 
 import java.io.{DataInput,DataOutput}
 

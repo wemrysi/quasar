@@ -36,7 +36,6 @@ import blueeyes.json.serialization.JodaSerializationImplicits.{InstantExtractor,
 
 import java.nio.charset.Charset
 import java.util.UUID
-import org.joda.time.Instant
 
 import scalaz._
 import scalaz.Validation._

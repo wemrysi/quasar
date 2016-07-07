@@ -29,7 +29,6 @@ import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{ Shrink, Arbitrary, Gen, Pretty }
 
-import org.joda.time.DateTime
 
 
 class CPathTraversalSpec extends Specification {

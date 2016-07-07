@@ -41,7 +41,6 @@ import com.precog.util.cache.Cache
 
 import java.util.UUID
 
-import org.joda.time.DateTime
 
 import scalaz.{NonEmptyList => NEL, _}
 import scalaz.Validation._

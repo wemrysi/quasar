@@ -26,7 +26,6 @@ import com.precog.common.security.service._
 import blueeyes.util.Clock
 
 import org.specs2.mutable.Specification
-import org.joda.time.DateTime
 
 import scalaz._
 import scalaz.syntax.monad._

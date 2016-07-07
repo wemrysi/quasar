@@ -22,7 +22,6 @@ package accounts
 
 import org.slf4s.Logging
 
-import org.joda.time.DateTime
 
 import org.streum.configrity.Configuration
 

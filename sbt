@@ -2,7 +2,6 @@
 #
 
 sbtVersion="0.13.11"
-
 # -Dprecog.optimize
 # -Dprecog.dev
 
@@ -16,5 +15,5 @@ runSbt () {
 }
 
 [[ -d target ]] || mkdir target
+
 runSbt "$@"
-# |& egrep --line-buffered -v '^(Ignoring unparsed versions)'

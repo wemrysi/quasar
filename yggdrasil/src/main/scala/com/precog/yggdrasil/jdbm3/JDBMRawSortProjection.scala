@@ -27,7 +27,6 @@ import com.precog.yggdrasil.TableModule._
 import blueeyes.json._
 
 import org.apache.jdbm._
-import org.joda.time.DateTime
 import org.slf4s.Logging
 
 import java.util.SortedMap

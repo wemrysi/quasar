@@ -24,7 +24,6 @@ import com.precog.common._
 import com.precog.util._
 import com.precog.util.BitSetUtil.Implicits._
 
-import org.joda.time.DateTime
 
 import org.specs2._
 import org.specs2.mutable.Specification

@@ -21,12 +21,10 @@ package com.precog
 
 import scalaz.Monoid
 
+import org.joda.time.Instant
 import akka.dispatch.Future
 import java.util.Comparator
 import java.nio.ByteBuffer
-
-import org.joda.time.Instant
-
 import scala.collection.mutable
 import scalaz.Bind
 

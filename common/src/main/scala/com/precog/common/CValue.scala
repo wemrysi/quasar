@@ -25,9 +25,6 @@ import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import org.joda.time.DateTime
-import org.joda.time.Period
-
 import scalaz._
 import scalaz.Ordering._
 import scalaz.std.AllInstances._

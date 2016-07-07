@@ -25,7 +25,6 @@ import blueeyes.core.http.MimeType
 
 import com.precog.common.security._
 
-import org.joda.time.DateTime
 
 import scalaz._
 

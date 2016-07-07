@@ -19,18 +19,12 @@
  */
 package com.precog.common
 
-import scalaz._
-
 import com.precog.util._
-
-import org.joda.time.{DateTime, Period}
-
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
-
 import com.precog.util.BitSetUtil.Implicits._
-
 import java.math.{ BigDecimal => BigDec }
+import scalaz._
 
 /**
  * Codecs allow a writer to deal with the case where we have a buffer overflow

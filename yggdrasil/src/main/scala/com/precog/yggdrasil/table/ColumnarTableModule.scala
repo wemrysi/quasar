@@ -35,7 +35,6 @@ import blueeyes.bkka._
 import blueeyes.json._
 import blueeyes.core.http.{MimeType, MimeTypes}
 
-import org.joda.time.DateTime
 import com.google.common.io.Files
 
 import org.slf4j.Logger

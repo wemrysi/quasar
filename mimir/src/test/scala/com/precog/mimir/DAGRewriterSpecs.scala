@@ -23,7 +23,6 @@ import org.specs2.mutable._
 
 import com.precog.common._
 import com.precog.yggdrasil._
-import org.joda.time.DateTime
 
 import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction

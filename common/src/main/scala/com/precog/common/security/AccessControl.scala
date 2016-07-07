@@ -20,7 +20,6 @@
 package com.precog.common
 package security
 
-import org.joda.time.DateTime
 
 import org.slf4s.Logging
 

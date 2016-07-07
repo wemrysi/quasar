@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -26,14 +26,14 @@ import util.BitSetUtil
 
 import bytecode._
 
-import common._
+import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
+import org.joda.time._
+import org.joda.time.format._
 
 
 import yggdrasil._
 import yggdrasil.table._
 
-import org.joda.time._
-import org.joda.time.format._
 
 import com.precog.util.DateTimeUtil.{parseDateTime, parseDateTimeFlexibly, isDateTimeFlexibly}
 import com.precog.util.{BitSet, BitSetUtil}
@@ -261,12 +261,12 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           def defined(idx: Int): BitSet = {
             val bools = dateTimes map { _.length > idx }
             val indices = bools.zipWithIndex collect { case (true, idx) => idx }
-            
+
             BitSetUtil.create(indices)
           }
 
           // creates the DateTime values for each array-column with index `idx`
-          def dateCol(idx: Int): Array[DateTime] = dateTimes map { arr => 
+          def dateCol(idx: Int): Array[DateTime] = dateTimes map { arr =>
             if (arr.length > idx) arr(idx)
             else new DateTime()
           }
@@ -274,7 +274,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           val result = {
             val lengths = dateTimes map { _.length }
 
-            (0 until lengths.max) map { idx => 
+            (0 until lengths.max) map { idx =>
               val colRef = ColumnRef(CPathIndex(idx), CDate)
               val col = ArrayDateColumn(defined(idx), dateCol(idx))
               (colRef, col)
@@ -322,7 +322,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       def computeExtreme(t1: DateTime, t2: DateTime): DateTime
     }
 
-    object MinTimeOf extends Op2F2(TimeNamespace, "minTimeOf") with ExtremeTime { 
+    object MinTimeOf extends Op2F2(TimeNamespace, "minTimeOf") with ExtremeTime {
       def computeExtreme(t1: DateTime, t2: DateTime): DateTime = {
         val res: Int = NumericComparisons.compare(t1, t2)
         if (res < 0) t1
@@ -330,7 +330,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    object MaxTimeOf extends Op2F2(TimeNamespace, "maxTimeOf") with ExtremeTime { 
+    object MaxTimeOf extends Op2F2(TimeNamespace, "maxTimeOf") with ExtremeTime {
       def computeExtreme(t1: DateTime, t2: DateTime): DateTime = {
         val res: Int = NumericComparisons.compare(t1, t2)
         if (res > 0) t1
@@ -346,29 +346,29 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
           new Map2Column(dateCol1, c2) with DateColumn {
             def apply(row: Int) = plus(dateCol1(row), c2(row).toInt)
-          }      
+          }
 
         case (c1: StrColumn, c2: NumColumn) =>
           val dateCol1 = createDateCol(c1)
 
           new Map2Column(dateCol1, c2) with DateColumn {
             def apply(row: Int) = plus(dateCol1(row), c2(row).toInt)
-          }      
+          }
 
         case (c1: StrColumn, c2: DoubleColumn) =>
           val dateCol1 = createDateCol(c1)
 
           new Map2Column(dateCol1, c2) with DateColumn {
             def apply(row: Int) = plus(dateCol1(row), c2(row).toInt)
-          }      
+          }
 
         case (c1: DateColumn, c2: LongColumn) => new Map2Column(c1, c2) with DateColumn {
           def apply(row: Int) = plus(c1(row), c2(row).toInt)
-        }      
+        }
 
         case (c1: DateColumn, c2: NumColumn) => new Map2Column(c1, c2) with DateColumn {
           def apply(row: Int) = plus(c1(row), c2(row).toInt)
-        }      
+        }
 
         case (c1: DateColumn, c2: DoubleColumn) => new Map2Column(c1, c2) with DateColumn {
           def apply(row: Int) = plus(c1(row), c2(row).toInt)
@@ -378,38 +378,38 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       def plus(d: DateTime, i: Int): DateTime
     }
 
-    object YearsPlus extends Op2F2(TimeNamespace, "yearsPlus") with TimePlus{ 
+    object YearsPlus extends Op2F2(TimeNamespace, "yearsPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.years(i))
     }
 
-    object MonthsPlus extends Op2F2(TimeNamespace, "monthsPlus") with TimePlus{ 
+    object MonthsPlus extends Op2F2(TimeNamespace, "monthsPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.months(i))
     }
 
-    object WeeksPlus extends Op2F2(TimeNamespace, "weeksPlus") with TimePlus{ 
+    object WeeksPlus extends Op2F2(TimeNamespace, "weeksPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.weeks(i))
     }
 
-    object DaysPlus extends Op2F2(TimeNamespace, "daysPlus") with TimePlus{ 
+    object DaysPlus extends Op2F2(TimeNamespace, "daysPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.days(i))
     }
 
-    object HoursPlus extends Op2F2(TimeNamespace, "hoursPlus") with TimePlus{ 
+    object HoursPlus extends Op2F2(TimeNamespace, "hoursPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.hours(i))
     }
 
-    object MinutesPlus extends Op2F2(TimeNamespace, "minutesPlus") with TimePlus{ 
+    object MinutesPlus extends Op2F2(TimeNamespace, "minutesPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.minutes(i))
     }
 
-    object SecondsPlus extends Op2F2(TimeNamespace, "secondsPlus") with TimePlus{ 
+    object SecondsPlus extends Op2F2(TimeNamespace, "secondsPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.seconds(i))
     }
 
     object MillisPlus extends Op2F2(TimeNamespace, "millisPlus") with TimePlus{
       def plus(d: DateTime, i: Int) = d.plus(Period.millis(i))
     }
-    
+
     trait TimeBetween extends Op2F2 {
       val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JNumberT)
       def f2(ctx: MorphContext): F2 = CF2P("builtin::time::timeBetween") {
@@ -484,19 +484,19 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         case (c1: LongColumn, c2: StrColumn) => new DateColumn {
           def isDefinedAt(row: Int) = checkDefined(c1, c2, row)
 
-          def apply(row: Int) = { 
+          def apply(row: Int) = {
             val time = c1(row)
             val tz = c2(row)
 
             val timeZone = DateTimeZone.forID(tz)
             new DateTime(time.toLong, timeZone)
           }
-        }      
+        }
 
         case (c1: NumColumn, c2: StrColumn) => new DateColumn {
           def isDefinedAt(row: Int) = checkDefined(c1, c2, row) && c1(row) >= Long.MinValue && c1(row) <= Long.MaxValue
 
-          def apply(row: Int) = { 
+          def apply(row: Int) = {
             val time = c1(row)
             val tz = c2(row)
 
@@ -508,7 +508,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         case (c1: DoubleColumn, c2: StrColumn) => new DateColumn {
           def isDefinedAt(row: Int) = checkDefined(c1, c2, row) && c1(row) >= Long.MinValue && c1(row) <= Long.MaxValue
 
-          def apply(row: Int) = { 
+          def apply(row: Int) = {
             val time = c1(row)
             val tz = c2(row)
 
@@ -522,7 +522,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     object GetMillis extends Op1F1(TimeNamespace, "getMillis") {
       val tpe = UnaryOperationType(StrAndDateT, JNumberT)
       def f1(ctx: MorphContext): F1 = CF1P("builtin::time::getMillis") {
-        case (c: StrColumn) =>  
+        case (c: StrColumn) =>
           val dateCol = createDateCol(c)
 
           new Map1Column(dateCol) with LongColumn {
@@ -549,7 +549,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
             }
           }
         case (c: DateColumn) => new Map1Column(c) with StrColumn {
-          def apply(row: Int) = { 
+          def apply(row: Int) = {
             val time = c(row)
             val format = DateTimeFormat.forPattern("ZZ")
 
@@ -560,15 +560,15 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     }
 
     object Season extends Op1F1(TimeNamespace, "season") {
-      def determineSeason(time: DateTime): String = { 
+      def determineSeason(time: DateTime): String = {
         val day = time.dayOfYear.get
-        
+
         if (day >= 79 & day < 171) "spring"
         else if (day >= 171 & day < 265) "summer"
         else if (day >= 265 & day < 355) "fall"
         else "winter"
       }
-    
+
       val tpe = UnaryOperationType(StrAndDateT, JTextT)
       def f1(ctx: MorphContext): F1 = CF1P("builtin::time::season") {
         case (c: StrColumn) =>
@@ -581,7 +581,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           def apply(row: Int) = determineSeason(c(row))
         }
       }
-    } 
+    }
 
     trait TimeFraction extends Op1F1 {
       val tpe = UnaryOperationType(StrAndDateT, JNumberT)
@@ -614,7 +614,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
     object WeekOfYear extends Op1F1(TimeNamespace, "weekOfYear") with TimeFraction {
       def fraction(d: DateTime) = d.weekOfWeekyear.get
-    } 
+    }
 
     object WeekOfMonth extends Op1F1(TimeNamespace, "weekOfMonth") with TimeFraction {
       def fraction(newTime: DateTime) = {
@@ -623,9 +623,9 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         val firstDayOfWeek = firstDate.dayOfWeek().get
         val offset = firstDayOfWeek - 1
         ((dayOfMonth + offset) / 7) + 1
-      } 
+      }
     }
-   
+
     object DayOfYear extends Op1F1(TimeNamespace, "dayOfYear") with TimeFraction {
       def fraction(d: DateTime) = d.dayOfYear.get
     }
@@ -649,7 +649,7 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     object SecondOfMinute extends Op1F1(TimeNamespace, "secondOfMinute") with TimeFraction {
       def fraction(d: DateTime) = d.secondOfMinute.get
     }
-      
+
     object MillisOfSecond extends Op1F1(TimeNamespace, "millisOfSecond") with TimeFraction {
       def fraction(d: DateTime) = d.millisOfSecond.get
     }

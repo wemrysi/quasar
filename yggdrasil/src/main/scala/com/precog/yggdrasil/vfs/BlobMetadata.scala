@@ -20,9 +20,8 @@
 package com.precog.yggdrasil
 package vfs
 
+import com.precog.common._
 import com.precog.common.security.Authorities
-
-import org.joda.time.DateTime
 
 import blueeyes.core.http.{MimeType, MimeTypes}
 import blueeyes.json._
@@ -30,7 +29,6 @@ import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
-//import blueeyes.json.serialization.IsoSerialization._
 
 import shapeless.{ Iso, HNil }
 import scalaz.syntax.std.option._

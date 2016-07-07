@@ -20,13 +20,8 @@
 package com.precog.yggdrasil
 package table
 
-import org.joda.time.{DateTime, Period}
-
 import com.precog.common._
-import com.precog.util.{BitSet, BitSetUtil, Loop}
-
-import scala.{ specialized => spec }
-import scala.collection._
+import com.precog.util.{ BitSet, BitSetUtil }
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet

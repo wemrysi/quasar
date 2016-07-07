@@ -32,7 +32,6 @@ import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.util._
 import com.precog.yggdrasil.vfs._
 
-import org.joda.time.DateTime
 import org.specs2.mutable.Specification
 
 import blueeyes.json._

@@ -20,7 +20,6 @@
 package com.precog
 package mimir
 
-import org.joda.time.DateTime
 
 import bytecode._
 import bytecode.Library

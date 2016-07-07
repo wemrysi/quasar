@@ -25,7 +25,6 @@ import com.precog.common.accounts.{Account, AccountId}
 
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
-import org.joda.time.DateTime
 
 import scalaz.{NonEmptyList => NEL, _}
 import scalaz.std.option._

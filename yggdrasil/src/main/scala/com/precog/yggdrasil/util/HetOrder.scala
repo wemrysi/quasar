@@ -20,8 +20,8 @@
 package com.precog.yggdrasil
 package util
 
+import com.precog.common._
 import com.precog.util.NumericComparisons
-import org.joda.time.DateTime
 
 /**
  * Compare values of different types.

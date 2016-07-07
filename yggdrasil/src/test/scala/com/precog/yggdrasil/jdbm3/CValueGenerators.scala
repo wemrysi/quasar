@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package jdbm3
 
-import org.joda.time.DateTime
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
 

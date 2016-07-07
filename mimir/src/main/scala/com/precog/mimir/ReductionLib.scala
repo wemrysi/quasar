@@ -1,31 +1,30 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 package com.precog
 package mimir
 
-import org.joda.time._
-
 import util.NumericComparisons
 
-import com.precog.common._
 import bytecode._
+import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
+import org.joda.time._
 
 import yggdrasil._
 import yggdrasil.table._
@@ -80,11 +79,11 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     object Count extends Reduction(ReductionNamespace, "count") {
       // limiting ourselves to 9.2e18 rows doesn't seem like a problem.
       type Result = Long
-      
+
       implicit val monoid = CountMonoid
 
       val tpe = UnaryOperationType(JType.JUniverseT, JNumberT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
           val cx = schema.columns(JType.JUniverseT).toArray
@@ -107,11 +106,11 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       implicit val monoid = new Monoid[Result] {
         def zero = None
         def append(left: Result, right: => Result): Result = {
-          (for { 
+          (for {
             l <- left
             r <- right
           } yield {
-            val res = NumericComparisons.compare(l, r) 
+            val res = NumericComparisons.compare(l, r)
             if (res > 0) l
             else r
           }) orElse left orElse right
@@ -119,7 +118,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
 
       val tpe = UnaryOperationType(JDateT, JDateT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
@@ -155,11 +154,11 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       implicit val monoid = new Monoid[Result] {
         def zero = None
         def append(left: Result, right: => Result): Result = {
-          (for { 
+          (for {
             l <- left
             r <- right
           } yield {
-            val res = NumericComparisons.compare(l, r) 
+            val res = NumericComparisons.compare(l, r)
             if (res < 0) l
             else r
           }) orElse left orElse right
@@ -167,7 +166,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
 
       val tpe = UnaryOperationType(JDateT, JDateT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
@@ -209,7 +208,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JNumberT) map {
@@ -269,7 +268,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val mins = schema.columns(JNumberT) map {
@@ -363,9 +362,9 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     object Mean extends Reduction(ReductionNamespace, "mean") {
       type Result = Option[InitialResult]
       type InitialResult = (BigDecimal, Long) // (sum, count)
-      
+
       implicit val monoid = MeanMonoid
-      
+
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
@@ -416,11 +415,11 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = perform(res) map { CNum(_) }
     }
-    
+
     object GeometricMean extends Reduction(ReductionNamespace, "geometricMean") {
       type Result = Option[InitialResult]
       type InitialResult = (BigDecimal, Long)
-      
+
       implicit val monoid = new Monoid[Result] {
         def zero = None
         def append(left: Result, right: => Result) = {
@@ -480,7 +479,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = perform(res).map(CNum(_))
     }
-    
+
     val SumSqMonoid = implicitly[Monoid[SumSq.Result]]
     object SumSq extends Reduction(ReductionNamespace, "sumSq") {
       type Result = Option[BigDecimal]
@@ -516,7 +515,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
             case _ => None
           }
-            
+
           if (result.isEmpty) None else result.suml(monoid)
         }
       }
@@ -581,12 +580,12 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
     object Variance extends Reduction(ReductionNamespace, "variance") {
       type Result = Option[InitialResult]
 
-      type InitialResult = (Long, BigDecimal, BigDecimal) 
+      type InitialResult = (Long, BigDecimal, BigDecimal)
 
       implicit val monoid = VarianceMonoid
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CountSumSumSqReducer()
 
       def perform(res: Result) = res flatMap {
@@ -603,12 +602,12 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = perform(res) map { CNum(_) }
     }
-    
+
     val StdDevMonoid = implicitly[Monoid[StdDev.Result]]
     object StdDev extends Reduction(ReductionNamespace, "stdDev") {
       type Result = Option[InitialResult]
       type InitialResult = (Long, BigDecimal, BigDecimal) // (count, sum, sumsq)
-      
+
       implicit val monoid = StdDevMonoid
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
@@ -630,21 +629,21 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       // todo using toDouble is BAD
       def extractValue(res: Result) = perform(res) map { CNum(_) }
     }
-    
+
     object Forall extends Reduction(ReductionNamespace, "forall") {
       type Result = Option[Boolean]
-      
+
       val tpe = UnaryOperationType(JBooleanT, JBooleanT)
-      
+
       implicit val monoid = new Monoid[Option[Boolean]] {
         def zero = None
-        
+
         def append(left: Option[Boolean], right: => Option[Boolean]) = {
           val both = for (l <- left; r <- right) yield l && r
           both orElse left orElse right
         }
       }
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
           if (range.isEmpty) {
@@ -652,22 +651,22 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           } else {
             var back = true
             var defined = false
-            
+
             schema.columns(JBooleanT) foreach { c =>
               val bc = c.asInstanceOf[BoolColumn]
               var acc = back
-              
+
               val idef = RangeUtil.loopDefined(range, bc) { i =>
                 acc &&= bc(i)
               }
-              
+
               back &&= acc
-              
+
               if (idef) {
                 defined = true
               }
             }
-            
+
             if (defined)
               Some(back)
             else
@@ -683,21 +682,21 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
       def extractValue(res: Result) = Some(CBoolean(perform(res)))
     }
-    
+
     object Exists extends Reduction(ReductionNamespace, "exists") {
       type Result = Option[Boolean]
-      
+
       val tpe = UnaryOperationType(JBooleanT, JBooleanT)
-      
+
       implicit val monoid = new Monoid[Option[Boolean]] {
         def zero = None
-        
+
         def append(left: Option[Boolean], right: => Option[Boolean]) = {
           val both = for (l <- left; r <- right) yield l || r
           both orElse left orElse right
         }
       }
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new CReducer[Result] {
         def reduce(schema: CSchema, range: Range) = {
           if (range.isEmpty) {
@@ -705,22 +704,22 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           } else {
             var back = false
             var defined = false
-            
+
             schema.columns(JBooleanT) foreach { c =>
               val bc = c.asInstanceOf[BoolColumn]
               var acc = back
-              
+
               val idef = RangeUtil.loopDefined(range, bc) { i =>
                 acc ||= bc(i)
               }
-              
+
               back ||= acc
-              
+
               if (idef) {
                 defined = true
               }
             }
-            
+
             if (defined)
               Some(back)
             else
@@ -728,7 +727,7 @@ trait ReductionLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           }
         }
       }
-        
+
       private val default = false
       private def perform(res: Result) = res getOrElse default
 

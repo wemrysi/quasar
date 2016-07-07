@@ -36,8 +36,6 @@ import blueeyes.json.serialization.JodaSerializationImplicits.InstantExtractor
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 
-import org.joda.time.DateTime
-import org.joda.time.Instant
 
 import shapeless._
 import scalaz.{NonEmptyList => NEL}

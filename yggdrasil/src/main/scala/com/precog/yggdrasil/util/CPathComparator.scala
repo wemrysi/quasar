@@ -23,7 +23,6 @@ package util
 import com.precog.common._
 import com.precog.yggdrasil.table._
 
-import org.joda.time.DateTime
 
 /**
  * Represents the result of an ordering, but with the possibility that no

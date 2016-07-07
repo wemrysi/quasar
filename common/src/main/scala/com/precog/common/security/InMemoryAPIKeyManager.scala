@@ -21,8 +21,6 @@ package com.precog.common
 package security
 
 import accounts.AccountId
-import org.joda.time.DateTime
-import org.joda.time.Instant
 
 import blueeyes.util.Clock
 

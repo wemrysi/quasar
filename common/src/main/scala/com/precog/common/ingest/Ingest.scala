@@ -32,7 +32,6 @@ import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.JodaSerializationImplicits.{InstantExtractor, InstantDecomposer}
 
-import org.joda.time.Instant
 import java.util.UUID
 
 import scalaz._

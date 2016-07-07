@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package execution
 
-import org.joda.time.DateTime
 
 import blueeyes.json._
 import blueeyes.json.serialization._
