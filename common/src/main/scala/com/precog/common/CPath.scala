@@ -24,8 +24,6 @@ import blueeyes.json.serialization._
 import DefaultSerialization._
 import scala.util.matching.Regex
 
-import scalaz.Order
-import scalaz.Ordering
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._
 
@@ -142,9 +140,9 @@ object CPathNode {
   implicit def s2PathNode(name: String): CPathNode = CPathField(name)
   implicit def i2PathNode(index: Int): CPathNode = CPathIndex(index)
 
-  implicit object CPathNodeOrder extends Order[CPathNode] {
-    def order(n1: CPathNode, n2: CPathNode): Ordering = (n1, n2) match {
-      case (CPathField(s1), CPathField(s2)) => Ordering.fromInt(s1.compare(s2))
+  implicit object CPathNodeOrder extends ScalazOrder[CPathNode] {
+    def order(n1: CPathNode, n2: CPathNode): ScalazOrdering = (n1, n2) match {
+      case (CPathField(s1), CPathField(s2)) => ScalazOrdering.fromInt(s1.compare(s2))
       case (CPathField(_) , _) => GT
       case (_, CPathField(_)) => LT
 
@@ -156,7 +154,7 @@ object CPathNode {
       case (CPathIndex(_), _) => GT
       case (_, CPathIndex(_)) => LT
 
-      case (CPathMeta(m1) , CPathMeta(m2) ) => Ordering.fromInt(m1.compare(m2))
+      case (CPathMeta(m1) , CPathMeta(m2) ) => ScalazOrdering.fromInt(m1.compare(m2))
     }
   }
 
@@ -285,14 +283,14 @@ object CPath {
 
   implicit def singleNodePath(node: CPathNode) = CPath(node)
 
-  implicit object CPathOrder extends Order[CPath] {
-    def order(v1: CPath, v2: CPath): Ordering = {
-      def compare0(n1: List[CPathNode], n2: List[CPathNode]): Ordering = (n1, n2) match {
+  implicit object CPathOrder extends ScalazOrder[CPath] {
+    def order(v1: CPath, v2: CPath): ScalazOrdering = {
+      def compare0(n1: List[CPathNode], n2: List[CPathNode]): ScalazOrdering = (n1, n2) match {
         case (Nil    , Nil)     => EQ
         case (Nil    , _  )     => LT
         case (_      , Nil)     => GT
         case (n1::ns1, n2::ns2) =>
-          val ncomp = Order[CPathNode].order(n1, n2)
+          val ncomp = ScalazOrder[CPathNode].order(n1, n2)
           if(ncomp != EQ) ncomp else compare0(ns1, ns2)
       }
 

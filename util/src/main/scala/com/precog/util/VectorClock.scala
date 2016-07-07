@@ -25,7 +25,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 
 import scalaz.Validation
-import scalaz.Order
 import scalaz.Semigroup
 import scalaz.Ordering._
 
@@ -59,7 +58,7 @@ trait VectorClockSerialization {
 object VectorClock extends VectorClockSerialization {
   def empty = apply(Map.empty)
 
-  implicit object order extends Order[VectorClock] {
+  implicit object order extends scalaz.Order[VectorClock] {
     def order(c1: VectorClock, c2: VectorClock) =
       if (c2.isDominatedBy(c1)) {
         if (c1.isDominatedBy(c2)) EQ else GT

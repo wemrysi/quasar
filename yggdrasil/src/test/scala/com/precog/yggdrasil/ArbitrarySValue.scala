@@ -34,7 +34,6 @@ import org.scalacheck.Arbitrary._
 
 import java.math.MathContext
 
-import scalaz.Order
 import scalaz.std.list._
 import scalaz.std.anyVal._
 
@@ -226,7 +225,7 @@ trait ArbitrarySValue extends SValueGenerators {
 
   implicit val listLongOrder = scalaz.std.list.listOrder[Long]
 
-  implicit val SEventIdentityOrder: Order[SEvent] = Order[List[Long]].contramap((_: SEvent)._1.toList)
+  implicit val SEventIdentityOrder: ScalazOrder[SEvent] = ScalazOrder[List[Long]].contramap((_: SEvent)._1.toList)
   implicit val SEventOrdering = SEventIdentityOrder.toScalaOrdering
 
   implicit val SEventChunkGen: Gen[Vector[SEvent]] = chunk(3, 3, 2)

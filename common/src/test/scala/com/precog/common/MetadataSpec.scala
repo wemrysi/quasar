@@ -68,8 +68,8 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
         }
         case (StringValueStats(c1, mn1, mx1), StringValueStats(c2, mn2, mx2), Some(StringValueStats(c3, mn3, mx3))) => {
           c3 must_== c1 + c2
-          mn3 must_== Order[String].min(mn1, mn2)
-          mx3 must_== Order[String].max(mx1, mx2)
+          mn3 must_== ScalazOrder[String].min(mn1, mn2)
+          mx3 must_== ScalazOrder[String].max(mx1, mx2)
         }
         case (e1, e2, r) => r must beNone
       }
@@ -124,5 +124,5 @@ trait MetadataGenerators extends util.ArbitraryJValue {
   def genLongMetadata: Gen[LongValueStats] = for(count <- choose(0, 1000); a <- arbLong.arbitrary; b <- arbLong.arbitrary) yield LongValueStats(count, a min b,a max b)
   def genDoubleMetadata: Gen[DoubleValueStats] = for(count <- choose(0, 1000); a <- arbDouble.arbitrary; b <- arbDouble.arbitrary) yield DoubleValueStats(count, a min b,a max b)
   def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- choose(0, 1000); a <- arbBigDecimal.arbitrary; b <- arbBigDecimal.arbitrary) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats] = for(count <- choose(0, 1000); a <- arbString.arbitrary; b <- arbString.arbitrary) yield StringValueStats(count, Order[String].min(a,b), Order[String].max(a,b))
+  def genStringMetadata: Gen[StringValueStats] = for(count <- choose(0, 1000); a <- arbString.arbitrary; b <- arbString.arbitrary) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
 }

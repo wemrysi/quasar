@@ -22,8 +22,6 @@ package com.precog.common
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
-import scala.math.Ordering
-
 import blueeyes.json.{JValue, JObject, JField }
 import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.DefaultSerialization._
@@ -192,8 +190,8 @@ case class StringValueStats(count: Long, min: String, max: String) extends Metad
 
   def merge(that: Metadata) = that match {
     case StringValueStats(count, min, max) => Some(StringValueStats(this.count + count,
-                                                                    Order[String].min(this.min, min),
-                                                                    Order[String].max(this.max, max)))
+                                                                    ScalazOrder[String].min(this.min, min),
+                                                                    ScalazOrder[String].max(this.max, max)))
     case _                                 => None
   }
 }

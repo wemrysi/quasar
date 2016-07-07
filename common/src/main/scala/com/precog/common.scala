@@ -23,6 +23,7 @@ package object common {
   type ProducerId = Int
   type SequenceId = Int
 
+  // akka encapsulation
   type ActorRef         = akka.actor.ActorRef
   type ActorSystem      = akka.actor.ActorSystem
   type Duration         = akka.util.Duration
@@ -30,16 +31,23 @@ package object common {
   type Future[+A]       = akka.dispatch.Future[A]
   type Promise[A]       = akka.dispatch.Promise[A]
   type Timeout          = akka.util.Timeout
+  val ActorSystem       = akka.actor.ActorSystem
+  val AkkaProps         = akka.actor.Props
+  val Await             = akka.dispatch.Await
+  val Duration          = akka.util.Duration
+  val ExecutionContext  = akka.dispatch.ExecutionContext
+  val Future            = akka.dispatch.Future
+  val Promise           = akka.dispatch.Promise
+  val Timeout           = akka.util.Timeout
 
-  val ActorSystem      = akka.actor.ActorSystem
-  val AkkaProps        = akka.actor.Props
-  val Await            = akka.dispatch.Await
-  val Duration         = akka.util.Duration
-  val ExecutionContext = akka.dispatch.ExecutionContext
-  val Future           = akka.dispatch.Future
-  val Promise          = akka.dispatch.Promise
-  val Timeout          = akka.util.Timeout
+  // scalaz encapsulation
+  type ScalazOrder[A]       = scalaz.Order[A]
+  type ScalazOrdering       = scalaz.Ordering
+  val ScalazOrder           = scalaz.Order
+  val ScalazOrdering        = scalaz.Ordering
+  type ScalaMathOrdering[A] = scala.math.Ordering[A]
 
+  // java stdlib encapsulation
   type File        = java.io.File
   type IOException = java.io.IOException
 

@@ -56,7 +56,7 @@ trait BlockSortSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLi
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty[M]
 
-    val jvalueOrdering = Order[JValue].toScalaOrdering
+    val jvalueOrdering     = ScalazOrder[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 
     val globalIdPath = JPath(".globalId")

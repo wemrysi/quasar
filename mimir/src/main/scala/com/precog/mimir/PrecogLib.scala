@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -33,8 +33,6 @@ import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import spire.math.Order
-
 import scalaz.std.tuple._
 import scalaz.std.list._
 import scalaz.std.option._
@@ -47,14 +45,14 @@ import scala.collection.mutable
 
 trait PrecogLibModule[M[+_]] extends ColumnarTableLibModule[M] with TransSpecModule with HttpClientModule[M] {
   val PrecogNamespace = Vector("precog")
-  
+
   trait PrecogLib extends ColumnarTableLib {
     import trans._
 
     override def _lib2 = super._lib2 ++ Set(Enrichment)
 
     object Enrichment extends Op2(PrecogNamespace, "enrichment") {
-      
+
       val tpe = BinaryOperationType(
         JObjectUnfixedT,
         JUnionT(
@@ -64,7 +62,7 @@ trait PrecogLibModule[M[+_]] extends ColumnarTableLibModule[M] with TransSpecMod
               "options" -> JObjectUnfixedT)),
           JObjectFixedT(Map("url" -> JTextT))),
         JObjectUnfixedT)
-      
+
       def spec[A <: SourceType](ctx: MorphContext)(left: TransSpec[A], right: TransSpec[A]): TransSpec[A] = {
         trans.MapWith(
           trans.InnerArrayConcat(
@@ -80,7 +78,7 @@ trait PrecogLibModule[M[+_]] extends ColumnarTableLibModule[M] with TransSpecMod
         private val httpError: HttpClientError => HttpClientError \/ Error = -\/(_)
         private val jsonError: Error => HttpClientError \/ Error = \/-(_)
 
-        private def addOrCreate(row: Int, unique: List[(Int, BitSet)], order: Order[Int]): Option[(Int, BitSet)] = {
+        private def addOrCreate(row: Int, unique: List[(Int, BitSet)], order: SpireOrder[Int]): Option[(Int, BitSet)] = {
           unique match {
             case (row0, defined) :: tail if order.eqv(row, row0) =>
               defined.set(row)
@@ -176,7 +174,7 @@ trait PrecogLibModule[M[+_]] extends ColumnarTableLibModule[M] with TransSpecMod
               }
             }
           }
-          
+
           resultsM map (_.sequence: Result[List[Slice]]) flatMap {
             case Success(slices) =>
               val resultSlice = slices.foldLeft(Slice(Map.empty, slice.size))(_ zip _).columns

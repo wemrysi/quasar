@@ -24,8 +24,6 @@ import com.precog.util.NumericComparisons
 
 import scala.{ specialized => spec }
 
-import spire.math.Order
-
 import org.joda.time.DateTime
 
 /**
@@ -44,7 +42,7 @@ trait HetOrderLow {
     }
   }
 
-  implicit def fromOrder[@spec(Boolean, Long, Double, AnyRef) A](implicit o: Order[A]) = new HetOrder[A, A] {
+  implicit def fromOrder[@spec(Boolean, Long, Double, AnyRef) A](implicit o: SpireOrder[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A) = o.compare(a, b)
   }
 }
@@ -66,20 +64,20 @@ object HetOrder extends HetOrderLow {
 }
 
 /**
- * Extra `spire.math.Order`s that fill out the rest of our value types.
+ * Extra SpireOrders that fill out the rest of our value types.
  */
 object ExtraOrders {
-  implicit object BooleanOrder extends Order[Boolean] {
+  implicit object BooleanOrder extends SpireOrder[Boolean] {
     def eqv(a: Boolean, b: Boolean) = a == b
     def compare(a: Boolean, b: Boolean) = if (a == b) 0 else if (a) 1 else -1
   }
 
-  implicit object StringOrder extends Order[String] {
+  implicit object StringOrder extends SpireOrder[String] {
     def eqv(a: String, b: String) = a == b
     def compare(a: String, b: String) = a compareTo b
   }
 
-  implicit object DateTimeOrder extends Order[DateTime] {
+  implicit object DateTimeOrder extends SpireOrder[DateTime] {
     def eqv(a: DateTime, b: DateTime) = compare(a, b) == 0
     def compare(a: DateTime, b: DateTime) = a compareTo b
   }

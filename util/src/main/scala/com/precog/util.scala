@@ -19,7 +19,6 @@
  */
 package com.precog
 
-import scalaz.Order
 import scalaz.Monoid
 
 import akka.dispatch.Future
@@ -34,7 +33,7 @@ import scalaz.Bind
 package object util {
   type RawBitSet  = Array[Int]
 
-  class Order2JComparator[A](order: Order[A]) {
+  class Order2JComparator[A](order: scalaz.Order[A]) {
     def toJavaComparator: Comparator[A] = new Comparator[A] {
       def compare(a1: A, a2: A) = {
         order.order(a1, a2).toInt
@@ -42,7 +41,7 @@ package object util {
     }
   }
 
-  implicit def Order2JComparator[A](order: Order[A]): Order2JComparator[A] = new Order2JComparator(order)
+  implicit def Order2JComparator[A](order: scalaz.Order[A]): Order2JComparator[A] = new Order2JComparator(order)
 
   def using[A, B](a: A)(f: A => B)(implicit close: Close[A]): B = {
     val result = f(a)

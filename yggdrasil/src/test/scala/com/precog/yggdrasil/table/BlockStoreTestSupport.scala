@@ -93,7 +93,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
     }
     def structure(implicit M: Monad[M]) = M.point(xyz)
 
-    private implicit val keyOrder: Order[JArray] = Order[List[JValue]].contramap((_: JArray).elements)
+    private implicit val keyOrder: ScalazOrder[JArray] = ScalazOrder[List[JValue]].contramap((_: JArray).elements)
 
     def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {

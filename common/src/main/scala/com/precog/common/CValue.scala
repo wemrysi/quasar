@@ -193,7 +193,7 @@ object CValue {
     case (a, b) => a.cType.typeIndex - b.cType.typeIndex
   }
 
-  implicit object CValueOrder extends Order[CValue] {
+  implicit object CValueOrder extends ScalazOrder[CValue] {
     def order(a: CValue, b: CValue): Ordering = if (a.cType == b.cType) {
       Ordering.fromInt(compareValues(a, b))
     } else {
@@ -239,7 +239,7 @@ sealed trait CValueType[@spec(Boolean, Long, Double) A] extends CType { self =>
 
   def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
-  def order(a: A, b: A): Ordering
+  def order(a: A, b: A): ScalazOrdering
   def jValueFor(a: A): JValue
 }
 
@@ -389,10 +389,10 @@ object CType {
     case _            => None
   }
 
-  implicit object CTypeOrder extends Order[CType] {
+  implicit object CTypeOrder extends ScalazOrder[CType] {
     def order(t1: CType, t2: CType): Ordering = (t1, t2) match {
       case (CArrayType(t1), CArrayType(t2)) => order(t1, t2)
-      case (_, _) => Order[Int].order(t1.typeIndex, t2.typeIndex)
+      case (_, _)                           => ScalazOrder[Int].order(t1.typeIndex, t2.typeIndex)
     }
   }
 }
