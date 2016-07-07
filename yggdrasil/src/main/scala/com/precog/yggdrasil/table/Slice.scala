@@ -31,7 +31,6 @@ import com.precog.yggdrasil.util._
 import TransSpecModule._
 
 import blueeyes.json._
-import org.apache.commons.collections.primitives.ArrayIntList
 
 import org.joda.time.{DateTime, Period}
 

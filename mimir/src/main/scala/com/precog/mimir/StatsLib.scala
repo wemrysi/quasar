@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -33,7 +33,6 @@ import com.precog.common._
 import com.precog.util.IdGen
 import com.precog.util._
 
-import org.apache.commons.collections.primitives.ArrayIntList
 
 import com.precog.util.{BitSet, BitSetUtil}
 
@@ -59,16 +58,16 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
   trait StatsLib extends ColumnarTableLib with ReductionLib {
     import BigDecimalOperations._
     import TableModule.paths
-    
+
     val StatsNamespace = Vector("std", "stats")
     val EmptyNamespace = Vector()
 
     override def _libMorphism1 = super._libMorphism1 ++ Set(Median, Mode, Rank, DenseRank, IndexedRank, Dummy)
     override def _libMorphism2 = super._libMorphism2 ++ Set(Covariance, LinearCorrelation, LinearRegression, LogarithmicRegression, SimpleExponentialSmoothing, DoubleExponentialSmoothing)
-    
+
     object Median extends Morphism1(EmptyNamespace, "median") {
       import Mean._
-      
+
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
       def apply(table: Table, ctx: MorphContext) = {  //TODO write tests for the empty table case
@@ -90,16 +89,16 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         } yield {
           val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
           val valueTable = median.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
-          
+
           valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
         }
       }
     }
-  
+
     object Mode extends Morphism1(EmptyNamespace, "mode") {
-      
+
       type Result = Set[BigDecimal]  //(currentRunValue, curentCount, listOfModes, maxCount)
-      
+
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
       implicit def monoid = new Monoid[BigDecimal] {
@@ -386,14 +385,14 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
     object LinearCorrelation extends Morphism2(StatsNamespace, "corr") {
       val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-      
+
       lazy val alignment = MorphismAlignment.Match(M.point(morph1))
 
       type InitialResult = (BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal) // (count, sum1, sum2, sumsq1, sumsq2, productSum)
       type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
           val left = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
@@ -508,7 +507,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
           else result.suml(monoid)
         }
       }
-      
+
       def extract(res: Result): Table = {
         res filter (_._1 > 0) map { case (count, sum1, sum2, sumsq1, sumsq2, productSum) =>
             val unscaledVar1 = count * sumsq1 - sum1 * sum1
@@ -547,7 +546,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
@@ -664,12 +663,12 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
           else result.suml(monoid)
         }
       }
-      
+
       def extract(res: Result): Table = {
         val res2 = res filter {
           case (count, _, _, _) => count != 0
         }
-        
+
         res2 map {
           case (count, sum1, sum2, productSum) => {
             val cov = (productSum - ((sum1 * sum2) / count)) / count
@@ -700,7 +699,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
@@ -812,17 +811,17 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
             case _ => None
           }
-          
+
           if (result.isEmpty) None
           else result.suml(monoid)
         }
       }
-      
+
       def extract(res: Result): Table = {
         val res2 = res filter {
           case (count, _, _, _, _) => count != 0
         }
-        
+
         res2 map {
           case (count, sum1, sum2, sumsq1, productSum) => {
             val cov = (productSum - ((sum1 * sum2) / count)) / count
@@ -863,7 +862,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
-      
+
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
@@ -1025,12 +1024,12 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
           else result.suml(monoid)
         }
       }
-      
+
       def extract(res: Result): Table = {
         val res2 = res filter {
           case (count, _, _, _, _) => count != 0
         }
-        
+
         res2 map {
           case (count, sum1, sum2, sumsq1, productSum) => {
             val cov = (productSum - ((sum1 * sum2) / count)) / count
@@ -1231,22 +1230,22 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         val row = findFirstDefined(defined, range)
 
         // if none of our rows are defined let's short-circuit out of here!
-        val back = if (row == end) { 
+        val back = if (row == end) {
           (ctxt, Map.empty[ColumnRef, Column])
         } else {
           // build the actual rank array
           val (values, curr, lastRow) = buildRankArrayIndexed(defined, range, ctxt)
-  
+
           // build the context to be used for the next slice
           val ctxt2 = buildRankContext(m, lastRow, curr, curr + 1L)
-  
+
           // construct the column ref and column to return
           val col2: Column = shiftColumn(ArrayLongColumn(defined, values), start)
           val data = Map(ColumnRef(CPath.Identity, CLong) -> col2)
-  
+
           (ctxt2, data)
         }
-        
+
         back
       }
     }
@@ -1372,20 +1371,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         } else {
           // find a bitset of duplicate rows and the last defined row
           val (duplicateRows, lastRow) = findDuplicates(defined, definedCols, cols, range, row)
-  
+
           // build the actual rank array
           val (values, curr, next) = buildRankArrayUnique(defined, duplicateRows, range, ctxt)
-  
+
           // build the context to be used for the next slice
           val ctxt2 = buildRankContext(m, lastRow, curr, next)
-  
+
           // construct the column ref and column to return
           val col2 = shiftColumn(ArrayLongColumn(defined, values), start)
           val data = Map(ColumnRef(CPath.Identity, CLong) -> col2)
-  
+
           (ctxt2, data)
         }
-        
+
         back
       }
     }
@@ -1475,9 +1474,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     abstract class BaseRank(name: String, retType: JType = JNumberT) extends Morphism1(StatsNamespace, name) {
       val tpe = UnaryOperationType(JType.JUniverseT, retType)
       override val idPolicy = IdentityPolicy.Retain.Merge
-      
+
       def rankScanner(size: Long): CScanner
-      
+
       private val sortByValue = DerefObjectStatic(Leaf(Source), paths.Value)
       private val sortByKey = DerefObjectStatic(Leaf(Source), paths.Key)
 

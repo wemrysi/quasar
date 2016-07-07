@@ -36,7 +36,6 @@ import java.io.File
 import java.util.SortedMap
 import java.util.Comparator
 
-import org.apache.commons.collections.primitives.ArrayIntList
 
 import org.apache.jdbm.DBMaker
 import org.apache.jdbm.DB

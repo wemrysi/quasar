@@ -27,7 +27,6 @@ import com.precog.util.{BitSet, BitSetUtil, Loop}
 import com.precog.util.BitSetUtil.Implicits._
 
 import scala.annotation.tailrec
-import org.apache.commons.collections.primitives.ArrayIntList
 
 class BitsetColumn(definedAt: BitSet) { this: Column =>
   def isDefinedAt(row: Int): Boolean = definedAt(row)

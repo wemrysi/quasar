@@ -30,7 +30,6 @@ import com.precog.util._
 
 import blueeyes.bkka._
 import blueeyes.json._
-import org.apache.commons.collections.primitives.ArrayIntList
 import org.joda.time.DateTime
 import com.google.common.io.Files
 import org.slf4s.Logging

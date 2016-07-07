@@ -37,7 +37,6 @@ import scalaz.syntax.monad._
 
 import scala.collection.{Set => GenSet}
 import scala.collection.mutable
-import org.apache.commons.collections.primitives.ArrayIntList
 import org.slf4s.Logging
 
 // TODO: does not deal well with tables too big to fit in memory
