@@ -204,6 +204,8 @@ object SemanticAnalysis {
             case IdentRelationAST(name, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(name) ->
                 IdentRelationAST(name, aliasOpt)))
+            case VariRelationAST(vari, aliasOpt) =>
+              failure((UnboundVariable(VarName(vari.symbol)): SemanticError).wrapNel)
             case TableRelationAST(file, aliasOpt) =>
               success(Map(aliasOpt.getOrElse(prettyPrint(file)) -> TableRelationAST(file, aliasOpt)))
             case ExprRelationAST(_, alias) =>
