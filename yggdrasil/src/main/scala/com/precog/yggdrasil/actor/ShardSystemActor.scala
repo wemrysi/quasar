@@ -23,7 +23,6 @@ package actor
 import com.precog.common._
 import com.precog.common.security.PermissionsFinder
 import com.precog.common.ingest._
-import com.precog.util.FilesystemFileOps
 
 import akka.util.duration._
 import akka.pattern.gracefulStop
