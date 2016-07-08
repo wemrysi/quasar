@@ -28,30 +28,56 @@ import yggdrasil._
 import yggdrasil.table._
 import TransSpecModule._
 
-trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {
+trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {
   trait MathLib extends ColumnarTableLib with InfixLib {
     import trans._
 
     val MathNamespace = Vector("std", "math")
 
-    override def _lib1 = super._lib1 ++ Set(sinh, toDegrees, expm1, getExponent, asin, log10, cos, exp, cbrt, atan, ceil, rint, log1p, sqrt, floor, toRadians, tanh, round, cosh, tan, abs, sin, mathlog, signum, acos, ulp)
+    override def _lib1 =
+      super._lib1 ++ Set(
+        sinh,
+        toDegrees,
+        expm1,
+        getExponent,
+        asin,
+        log10,
+        cos,
+        exp,
+        cbrt,
+        atan,
+        ceil,
+        rint,
+        log1p,
+        sqrt,
+        floor,
+        toRadians,
+        tanh,
+        round,
+        cosh,
+        tan,
+        abs,
+        sin,
+        mathlog,
+        signum,
+        acos,
+        ulp)
 
     override def _lib2 = super._lib2 ++ Set(minOf, min, hypot, pow, maxOf, max, atan2, copySign, roundTo, IEEEremainder)
 
-    import StdLib.{DoubleFrom, doubleIsDefined}
+    import StdLib.{ DoubleFrom, doubleIsDefined }
     import java.lang.Math
 
     object pow extends Op2F2(MathNamespace, "pow") with Infix.Power {
       val cf2pName = "builtin::math::op2dd::pow"
     }
 
-    abstract class Op1DD(name: String, defined: Double => Boolean, f: Double => Double)
-    extends Op1F1(MathNamespace, name) {
+    abstract class Op1DD(name: String, defined: Double => Boolean, f: Double => Double) extends Op1F1(MathNamespace, name) {
       val tpe = UnaryOperationType(JNumberT, JNumberT)
       def f1(ctx: MorphContext): F1 = CF1P("builtin::math::op1dd::" + name) {
-       case c: DoubleColumn => new DoubleFrom.D(c, defined, f)
-       case c: LongColumn => new DoubleFrom.L(c, defined, f)
-       case c: NumColumn => new DoubleFrom.N(c, defined, f)
+        case c: DoubleColumn => new DoubleFrom.D(c, defined, f)
+        case c: LongColumn   => new DoubleFrom.L(c, defined, f)
+        case c: NumColumn    => new DoubleFrom.N(c, defined, f)
       }
     }
 
@@ -61,13 +87,11 @@ trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule
 
     object expm1 extends Op1DD("expm1", doubleIsDefined, Math.expm1)
 
-    object getExponent extends Op1DD("getExponent",
-      n => doubleIsDefined(n) && n > 0.0, n => Math.getExponent(n).toDouble)
+    object getExponent extends Op1DD("getExponent", n => doubleIsDefined(n) && n > 0.0, n => Math.getExponent(n).toDouble)
 
     object asin extends Op1DD("asin", n => -1.0 <= n && n <= 1.0, Math.asin)
 
-    object log10 extends Op1DD("log10",
-      n => doubleIsDefined(n) && n > 0.0, Math.log10)
+    object log10 extends Op1DD("log10", n => doubleIsDefined(n) && n > 0.0, Math.log10)
 
     object cos extends Op1DD("cos", doubleIsDefined, Math.cos)
 
@@ -81,11 +105,9 @@ trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule
 
     object rint extends Op1DD("rint", doubleIsDefined, Math.rint)
 
-    object log1p extends Op1DD("log1p",
-      n => doubleIsDefined(n) && n > -1.0, Math.log1p)
+    object log1p extends Op1DD("log1p", n => doubleIsDefined(n) && n > -1.0, Math.log1p)
 
-    object sqrt extends Op1DD("sqrt",
-      n => doubleIsDefined(n) && n >= 0.0, Math.sqrt)
+    object sqrt extends Op1DD("sqrt", n => doubleIsDefined(n) && n >= 0.0, Math.sqrt)
 
     object floor extends Op1DD("floor", doubleIsDefined, Math.floor)
 
@@ -96,8 +118,7 @@ trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule
     // Math.round returns Long, so we have to improvise.
     // 4503599627370496.0 is the point where Double can't represent fractional
     // values anymore, so beyond that we just pass the value through
-    object round extends Op1DD("round", doubleIsDefined,
-      n => if (Math.abs(n) >= 4503599627370496.0) n else Math.round(n))
+    object round extends Op1DD("round", doubleIsDefined, n => if (Math.abs(n) >= 4503599627370496.0) n else Math.round(n))
 
     object cosh extends Op1DD("cosh", doubleIsDefined, Math.cosh)
 
@@ -111,17 +132,15 @@ trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule
 
     object signum extends Op1DD("signum", doubleIsDefined, Math.signum)
 
-    object acos extends Op1DD("acos",
-      n => doubleIsDefined(n) && -1.0 <= n && n <= 1.0, Math.acos)
+    object acos extends Op1DD("acos", n => doubleIsDefined(n) && -1.0 <= n && n <= 1.0, Math.acos)
 
     object ulp extends Op1DD("ulp", doubleIsDefined, Math.ulp)
 
-    abstract class Op2DDD(name: String, defined:(Double, Double) => Boolean,
-      f:(Double, Double) => Double) extends Op2F2(MathNamespace, name) {
+    abstract class Op2DDD(name: String, defined: (Double, Double) => Boolean, f: (Double, Double) => Double) extends Op2F2(MathNamespace, name) {
       val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
       def f2(ctx: MorphContext): F2 = CF2P("builtin::math::op2dd::" + name) {
         case (c1: DoubleColumn, c2: DoubleColumn) =>
-            new DoubleFrom.DD(c1, c2, defined, f)
+          new DoubleFrom.DD(c1, c2, defined, f)
 
         case (c1: DoubleColumn, c2: LongColumn) =>
           new DoubleFrom.DL(c1, c2, defined, f)
@@ -169,15 +188,14 @@ trait MathLibModule[M[+_]] extends ColumnarTableLibModule[M] with InfixLibModule
 
     object copySign extends Op2DDD("copySign", bothDefined, Math.copySign)
 
-    object IEEEremainder extends Op2DDD("IEEEremainder", bothDefined,
-      Math.IEEEremainder)
+    object IEEEremainder extends Op2DDD("IEEEremainder", bothDefined, Math.IEEEremainder)
 
-    object roundTo extends Op2DDD("roundTo", bothDefined, { (n, digits) =>
-      val adjusted = n * math.pow(10, digits)
-      val rounded = if (Math.abs(n) >= 4503599627370496.0) adjusted else Math.round(adjusted)
+    object roundTo
+        extends Op2DDD("roundTo", bothDefined, { (n, digits) =>
+          val adjusted = n * math.pow(10, digits)
+          val rounded  = if (Math.abs(n) >= 4503599627370496.0) adjusted else Math.round(adjusted)
 
-      rounded / math.pow(10, digits)
-    })
+          rounded / math.pow(10, digits)
+        })
   }
 }
-

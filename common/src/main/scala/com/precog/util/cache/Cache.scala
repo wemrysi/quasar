@@ -21,31 +21,34 @@ package com.precog.util
 package cache
 
 import akka.util.Duration
-import com.google.common.cache.{Cache => GCache, _}
+import com.google.common.cache.{ Cache => GCache, _ }
 import scalaz.Validation
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class SimpleCache[K, V] (private val backing: GCache[K, V]) extends mutable.Map[K, V] {
-  def += (kv: (K, V)) = { backing.put(kv._1, kv._2); this }
-  def -= (key: K) = { backing.invalidate(key); this }
+class SimpleCache[K, V](private val backing: GCache[K, V]) extends mutable.Map[K, V] {
+  def +=(kv: (K, V))         = { backing.put(kv._1, kv._2); this }
+  def -=(key: K)             = { backing.invalidate(key); this }
   def get(key: K): Option[V] = Option(backing.getIfPresent(key))
-  def iterator: Iterator[(K, V)] = backing.asMap.entrySet.iterator.asScala.map { kv => (kv.getKey, kv.getValue) }
+  def iterator: Iterator[(K, V)] = backing.asMap.entrySet.iterator.asScala.map { kv =>
+    (kv.getKey, kv.getValue)
+  }
   def invalidateAll = backing.invalidateAll
 }
 
-class AutoCache[K, V] (private val backing: LoadingCache[K, V]) extends mutable.Map[K, V] {
-  def += (kv: (K, V)) = { backing.put(kv._1, kv._2); this }
-  def -= (key: K) = { backing.invalidate(key); this }
-  def get (key: K): Option[V] = getFull(key).toOption
-  def iterator: Iterator[(K, V)] = backing.asMap.entrySet.iterator.asScala.map { kv => (kv.getKey, kv.getValue) }
+class AutoCache[K, V](private val backing: LoadingCache[K, V]) extends mutable.Map[K, V] {
+  def +=(kv: (K, V))         = { backing.put(kv._1, kv._2); this }
+  def -=(key: K)             = { backing.invalidate(key); this }
+  def get(key: K): Option[V] = getFull(key).toOption
+  def iterator: Iterator[(K, V)] = backing.asMap.entrySet.iterator.asScala.map { kv =>
+    (kv.getKey, kv.getValue)
+  }
   def invalidateAll = backing.invalidateAll
 
   def getFull(key: K): Validation[Throwable, V] = Validation.fromTryCatch {
     backing.get(key)
   }
 }
-
 
 object Cache {
   sealed trait CacheOption[K, V] {
@@ -65,9 +68,10 @@ object Cache {
   }
 
   case class OnRemoval[K, V](onRemove: (K, V, RemovalCause) => PrecogUnit) extends CacheOption[K, V] {
-    def apply(builder: CacheBuilder[K, V]) = builder.removalListener(new RemovalListener[K, V] {
-      def onRemoval(notification: RemovalNotification[K, V]) = onRemove(notification.getKey, notification.getValue, notification.getCause)
-    })
+    def apply(builder: CacheBuilder[K, V]) =
+      builder.removalListener(new RemovalListener[K, V] {
+        def onRemoval(notification: RemovalNotification[K, V]) = onRemove(notification.getKey, notification.getValue, notification.getCause)
+      })
   }
 
   private def createBuilder[K, V](options: Seq[CacheOption[K, V]]): CacheBuilder[K, V] =
@@ -75,7 +79,7 @@ object Cache {
       case (acc, opt) => opt.apply(acc)
     }
 
-  def simple[K, V] (options: CacheOption[K, V]*): SimpleCache[K, V] = {
+  def simple[K, V](options: CacheOption[K, V]*): SimpleCache[K, V] = {
     new SimpleCache[K, V](createBuilder(options).build())
   }
 }

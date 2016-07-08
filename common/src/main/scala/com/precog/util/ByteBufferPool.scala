@@ -30,30 +30,28 @@ import java.lang.ref.SoftReference
 import scalaz._
 import scalaz.State
 
-
 /**
- * A `Monad` for working with `ByteBuffer`s.
- */
-trait ByteBufferMonad[M[+_]] extends Monad[M] {
+  * A `Monad` for working with `ByteBuffer`s.
+  */
+trait ByteBufferMonad[M[+ _]] extends Monad[M] {
   def getBuffer(min: Int): M[ByteBuffer]
 }
-
 
 final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int = 8, direct: Boolean = false) {
   import ByteBufferPool._
 
-  private val _hits = new AtomicLong()
+  private val _hits   = new AtomicLong()
   private val _misses = new AtomicLong()
 
-  val fixedBufferQueue: BlockingQueue[ByteBuffer] = new ArrayBlockingQueue(fixedBufferCount)
+  val fixedBufferQueue: BlockingQueue[ByteBuffer]               = new ArrayBlockingQueue(fixedBufferCount)
   val flexBufferQueue: BlockingQueue[SoftReference[ByteBuffer]] = new LinkedBlockingQueue()
 
-  def hits = _hits.get()
+  def hits   = _hits.get()
   def misses = _hits.get()
 
   /**
-   * Returns a cleared `ByteBuffer` that can store `capacity` bytes.
-   */
+    * Returns a cleared `ByteBuffer` that can store `capacity` bytes.
+    */
   def acquire: ByteBuffer = {
     var buffer = fixedBufferQueue.poll()
 
@@ -78,10 +76,10 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
   }
 
   /**
-   * Releases a `ByteBuffer` back into the pool for re-use later on. This isn't
-   * strictly required, but if `direct` is `true`, then you most certainly
-   * should.
-   */
+    * Releases a `ByteBuffer` back into the pool for re-use later on. This isn't
+    * strictly required, but if `direct` is `true`, then you most certainly
+    * should.
+    */
   def release(buffer: ByteBuffer): Unit = {
     if (!(fixedBufferQueue offer buffer)) {
       flexBufferQueue offer (new SoftReference(buffer))
@@ -93,27 +91,26 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
   def run[A](a: ByteBufferPoolS[A]): A = a.eval((this, Nil))
 }
 
-
 object ByteBufferPool {
 
   type ByteBufferPoolS[+A] = State[(ByteBufferPool, List[ByteBuffer]), A]
 
-  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS]
-      with Monad[ByteBufferPoolS] {
+  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
 
     def point[A](a: => A): ByteBufferPoolS[A] = State.state(a)
 
     def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] =
-      State(s => fa(s) match {
-        case (s, a) => f(a)(s)
+      State(s =>
+          fa(s) match {
+          case (s, a) => f(a)(s)
       })
 
     def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer] = ByteBufferPool.acquire(min)
   }
 
   /**
-   * Acquire a `ByteBuffer` and add it to the state.
-   */
+    * Acquire a `ByteBuffer` and add it to the state.
+    */
   def acquire(min: Int): ByteBufferPoolS[ByteBuffer] = State {
     case (pool, buffers @ (buf :: _)) if buf.remaining() >= min =>
       ((pool, buffers), buf)
@@ -126,20 +123,22 @@ object ByteBufferPool {
   def acquire: ByteBufferPoolS[ByteBuffer] = acquire(512)
 
   /**
-   * Reverses the state (list of `ByteBuffer`s) and returns an `Array[Byte]` of
-   * the contiguous bytes in all the buffers.
-   */
-  def flipBytes: ByteBufferPoolS[Array[Byte]] = State { case (pool, sreffub) =>
-    val buffers = sreffub.reverse
-    ((pool, buffers), getBytesFrom(buffers))
+    * Reverses the state (list of `ByteBuffer`s) and returns an `Array[Byte]` of
+    * the contiguous bytes in all the buffers.
+    */
+  def flipBytes: ByteBufferPoolS[Array[Byte]] = State {
+    case (pool, sreffub) =>
+      val buffers = sreffub.reverse
+      ((pool, buffers), getBytesFrom(buffers))
   }
 
   /**
-   * Removes and releases all `ByteBuffer`s in the state to the pool.
-   */
-  def release: ByteBufferPoolS[Unit] = State { case (pool, buffers) =>
-    buffers foreach (pool.release(_))
-    ((pool, Nil), ())
+    * Removes and releases all `ByteBuffer`s in the state to the pool.
+    */
+  def release: ByteBufferPoolS[Unit] = State {
+    case (pool, buffers) =>
+      buffers foreach (pool.release(_))
+      ((pool, Nil), ())
   }
 
   def getBytesFrom(buffers: List[ByteBuffer]): Array[Byte] = {
@@ -156,5 +155,3 @@ object ByteBufferPool {
     bytes
   }
 }
-
-

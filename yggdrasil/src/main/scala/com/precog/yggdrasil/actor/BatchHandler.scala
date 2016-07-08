@@ -40,7 +40,7 @@ case class ArchiveComplete(path: Path)
 
 class BatchCompleteNotifier(p: Promise[BatchComplete]) extends Actor {
   def receive = {
-    case complete : BatchComplete =>
+    case complete: BatchComplete =>
       p.complete(Right(complete))
       self ! PoisonPill
 
@@ -50,11 +50,10 @@ class BatchCompleteNotifier(p: Promise[BatchComplete]) extends Actor {
   }
 }
 
-
 /**
- * A batch handler actor is responsible for tracking confirmation of persistence for
- * all the messages in a specific batch. It sends
- */
+  * A batch handler actor is responsible for tracking confirmation of persistence for
+  * all the messages in a specific batch. It sends
+  */
 class BatchHandler(ingestActor: ActorRef, requestor: ActorRef, checkpoint: YggCheckpoint, ingestTimeout: Timeout) extends Actor with Logging {
   private var remaining = -1
 
@@ -79,7 +78,7 @@ class BatchHandler(ingestActor: ActorRef, requestor: ActorRef, checkpoint: YggCh
       remaining -= 1
       if (remaining == 0) self ! PoisonPill
 
-      // These next two cases are errors that should not terminate the batch
+    // These next two cases are errors that should not terminate the batch
     case PathOpFailure(path, ResourceError.PermissionsError(msg)) =>
       log.warn("Permissions failure on %s: %s".format(path, msg))
       remaining -= 1
@@ -116,6 +115,4 @@ class BatchHandler(ingestActor: ActorRef, requestor: ActorRef, checkpoint: YggCh
     }
   }
 }
-
-
 // vim: set ts=4 sw=4 et:

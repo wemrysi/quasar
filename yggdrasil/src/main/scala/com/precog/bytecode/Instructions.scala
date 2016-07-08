@@ -35,25 +35,25 @@ trait Instructions {
 
     sealed trait JoinInstr extends Instruction
 
-    case class Map1(op: UnaryOperation) extends Instruction
+    case class Map1(op: UnaryOperation)       extends Instruction
     case class Map2Match(op: BinaryOperation) extends Instruction with JoinInstr
     case class Map2Cross(op: BinaryOperation) extends Instruction with JoinInstr
 
     case class Reduce(red: BuiltInReduction) extends Instruction
-    case class Morph1(m1: BuiltInMorphism1) extends Instruction
-    case class Morph2(m2: BuiltInMorphism2) extends Instruction
+    case class Morph1(m1: BuiltInMorphism1)  extends Instruction
+    case class Morph2(m2: BuiltInMorphism2)  extends Instruction
 
     case object Observe extends Instruction with JoinInstr
 
     case object Assert extends Instruction with JoinInstr
 
-    case object IUnion extends Instruction with JoinInstr
-    case object IIntersect extends Instruction with JoinInstr
+    case object IUnion        extends Instruction with JoinInstr
+    case object IIntersect    extends Instruction with JoinInstr
     case object SetDifference extends Instruction with JoinInstr
 
-    case class Group(id: Int) extends Instruction
+    case class Group(id: Int)             extends Instruction
     case class MergeBuckets(and: Boolean) extends Instruction
-    case class KeyPart(id: Int) extends Instruction
+    case class KeyPart(id: Int)           extends Instruction
     case object Extra extends Instruction
 
     case object Split extends Instruction
@@ -62,7 +62,7 @@ trait Instructions {
     case object FilterMatch extends Instruction with DataInstr
     case object FilterCross extends Instruction with DataInstr
 
-    case object Dup extends Instruction
+    case object Dup  extends Instruction
     case object Drop extends Instruction
     case class Swap(depth: Int) extends Instruction with DataInstr
 
@@ -72,32 +72,32 @@ trait Instructions {
 
     case object AbsoluteLoad extends Instruction
     case object RelativeLoad extends Instruction
-    case object Distinct extends Instruction
+    case object Distinct     extends Instruction
 
     sealed trait RootInstr extends Instruction
 
     case class PushString(str: String) extends Instruction with DataInstr with RootInstr
-    case class PushNum(num: String) extends Instruction with DataInstr with RootInstr
-    case object PushTrue extends Instruction with RootInstr
-    case object PushFalse extends Instruction with RootInstr
-    case object PushNull extends Instruction with RootInstr
+    case class PushNum(num: String)    extends Instruction with DataInstr with RootInstr
+    case object PushTrue   extends Instruction with RootInstr
+    case object PushFalse  extends Instruction with RootInstr
+    case object PushNull   extends Instruction with RootInstr
     case object PushObject extends Instruction with RootInstr
-    case object PushArray extends Instruction with RootInstr
+    case object PushArray  extends Instruction with RootInstr
 
     case object PushUndefined extends Instruction
     case class PushGroup(id: Int) extends Instruction
-    case class PushKey(id: Int) extends Instruction
+    case class PushKey(id: Int)   extends Instruction
 
     object Map2 {
       def unapply(instr: JoinInstr): Option[BinaryOperationType] = instr match {
         case Map2Match(op) => Some(op.tpe)
         case Map2Cross(op) => Some(op.tpe)
-        case _ => None
+        case _             => None
       }
     }
 
     sealed trait UnaryOperation {
-      val tpe : UnaryOperationType
+      val tpe: UnaryOperationType
     }
 
     trait NumericUnaryOperation extends UnaryOperation {
@@ -113,7 +113,7 @@ trait Instructions {
     }
 
     sealed trait BinaryOperation {
-      val tpe : BinaryOperationType
+      val tpe: BinaryOperationType
     }
 
     trait NumericBinaryOperation extends BinaryOperation {
@@ -122,7 +122,7 @@ trait Instructions {
 
     trait NumericComparisonOperation extends BinaryOperation {
       val dateAndNum = JUnionT(JNumberT, JDateT)
-      val tpe = BinaryOperationType(dateAndNum, dateAndNum, JBooleanT)
+      val tpe        = BinaryOperationType(dateAndNum, dateAndNum, JBooleanT)
     }
 
     trait BooleanBinaryOperation extends BinaryOperation {
@@ -164,20 +164,20 @@ trait Instructions {
     case object Mod extends NumericBinaryOperation
     case object Pow extends NumericBinaryOperation
 
-    case object Lt extends NumericComparisonOperation
+    case object Lt   extends NumericComparisonOperation
     case object LtEq extends NumericComparisonOperation
-    case object Gt extends NumericComparisonOperation
+    case object Gt   extends NumericComparisonOperation
     case object GtEq extends NumericComparisonOperation
 
-    case object Eq extends EqualityOperation
+    case object Eq    extends EqualityOperation
     case object NotEq extends EqualityOperation
 
-    case object Or extends BooleanBinaryOperation
+    case object Or  extends BooleanBinaryOperation
     case object And extends BooleanBinaryOperation
 
-    case object New extends UnfixedUnaryOperation
+    case object New  extends UnfixedUnaryOperation
     case object Comp extends BooleanUnaryOperation
-    case object Neg extends NumericUnaryOperation
+    case object Neg  extends NumericUnaryOperation
 
     case object WrapObject extends BinaryOperation {
       val tpe = BinaryOperationType(JTextT, JType.JUniverseT, JObjectUnfixedT)

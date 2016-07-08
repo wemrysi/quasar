@@ -49,8 +49,8 @@ package com.precog.util
 
 import scala.collection.IndexedSeqLike
 import scala.collection.generic.CanBuildFrom
-import scala.collection.immutable.{IndexedSeq, VectorBuilder}
-import scala.collection.mutable.{ArrayBuffer, Builder}
+import scala.collection.immutable.{ IndexedSeq, VectorBuilder }
+import scala.collection.mutable.{ ArrayBuffer, Builder }
 import scala.math.Ordering
 
 private[precog] sealed trait VectorCase[+A] extends IndexedSeq[A] with IndexedSeqLike[A, VectorCase[A]] with Serializable {
@@ -71,7 +71,8 @@ private[precog] sealed trait VectorCase[+A] extends IndexedSeq[A] with IndexedSe
 private[precog] object VectorCase {
   def empty[A]: VectorCase[A] = Vector0
 
-  def newBuilder[A]: Builder[A, VectorCase[A]] = new Builder[A, VectorCase[A]] { this: Builder[A, VectorCase[A]] =>
+  def newBuilder[A]: Builder[A, VectorCase[A]] = new Builder[A, VectorCase[A]] {
+    this: Builder[A, VectorCase[A]] =>
     val small = new ArrayBuffer[A](4)
     var builder: VectorBuilder[A] = _
 
@@ -122,17 +123,17 @@ private[precog] object VectorCase {
 
   def apply[A](as: A*) = fromSeq(as)
 
-  def unapplySeq[A](x: VectorCase[A]) : Option[IndexedSeq[A]] = Some(x)
+  def unapplySeq[A](x: VectorCase[A]): Option[IndexedSeq[A]] = Some(x)
 
   def fromSeq[A](seq: Seq[A]): VectorCase[A] = seq match {
-    case c: VectorCase[_] => c
+    case c: VectorCase[_]               => c
     case _ if seq.lengthCompare(0) <= 0 => Vector0
     case _ if seq.lengthCompare(1) <= 0 => Vector1(seq(0))
     case _ if seq.lengthCompare(2) <= 0 => Vector2(seq(0), seq(1))
     case _ if seq.lengthCompare(3) <= 0 => Vector3(seq(0), seq(1), seq(2))
     case _ if seq.lengthCompare(4) <= 0 => Vector4(seq(0), seq(1), seq(2), seq(3))
-    case vec: Vector[_] => VectorN(vec)
-    case _ => VectorN(Vector(seq: _*))
+    case vec: Vector[_]                 => VectorN(vec)
+    case _                              => VectorN(Vector(seq: _*))
   }
 }
 
@@ -142,7 +143,7 @@ private[precog] case object Vector0 extends VectorCase[Nothing] {
   def +:[B](b: B) = Vector1(b)
   def :+[B](b: B) = Vector1(b)
 
-  def apply(index: Int) = sys.error("Apply on empty vector")
+  def apply(index: Int)            = sys.error("Apply on empty vector")
   def updated[B](index: Int, b: B) = sys.error("Updated on empty vector")
 
   def ++[B](that: VectorCase[B]) = that
@@ -175,9 +176,9 @@ private[precog] case class Vector1[+A](_1: A) extends VectorCase[A] {
   }
 
   def ++[B >: A](that: VectorCase[B]) = that match {
-    case Vector0 => this
-    case Vector1(_2) => Vector2(_1, _2)
-    case Vector2(_2, _3) => Vector3(_1, _2, _3)
+    case Vector0             => this
+    case Vector1(_2)         => Vector2(_1, _2)
+    case Vector2(_2, _3)     => Vector3(_1, _2, _3)
     case Vector3(_2, _3, _4) => Vector4(_1, _2, _3, _4)
     case _: Vector4[_] | _: VectorN[_] =>
       VectorN(_1 +: that.toVector)
@@ -210,9 +211,9 @@ private[precog] case class Vector2[+A](_1: A, _2: A) extends VectorCase[A] {
     case _ => throw new IndexOutOfBoundsException(index.toString)
   }
 
-  def ++[B >: A](that: VectorCase[B]) : VectorCase[B] = that match {
-    case Vector0 => this
-    case Vector1(_3) => Vector3(_1, _2, _3)
+  def ++[B >: A](that: VectorCase[B]): VectorCase[B] = that match {
+    case Vector0         => this
+    case Vector1(_3)     => Vector3(_1, _2, _3)
     case Vector2(_3, _4) => Vector4(_1, _2, _3, _4)
     case _: Vector3[_] | _: Vector4[_] | _: VectorN[_] =>
       VectorN(Vector(_1, _2) ++ that.toVector)
@@ -248,8 +249,8 @@ private[precog] case class Vector3[+A](_1: A, _2: A, _3: A) extends VectorCase[A
     case _ => throw new IndexOutOfBoundsException(index.toString)
   }
 
-  def ++[B >: A](that: VectorCase[B]) : VectorCase[B] = that match {
-    case Vector0 => this
+  def ++[B >: A](that: VectorCase[B]): VectorCase[B] = that match {
+    case Vector0     => this
     case Vector1(_4) => Vector4(_1, _2, _3, _4)
     case _: Vector2[_] | _: Vector3[_] | _: Vector4[_] | _: VectorN[_] =>
       VectorN(Vector(_1, _2, _3) ++ that.toVector)
@@ -309,10 +310,10 @@ private[precog] case class Vector4[+A](_1: A, _2: A, _3: A, _4: A) extends Vecto
 private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] {
   def length = vector.length
 
-  def +:[B >:A](b: B) = VectorN(b +: vector)
-  def :+[B >:A](b: B) = VectorN(vector :+ b)
+  def +:[B >: A](b: B) = VectorN(b +: vector)
+  def :+[B >: A](b: B) = VectorN(vector :+ b)
 
-  def apply(index: Int) = vector(index)
+  def apply(index: Int)                 = vector(index)
   def updated[B >: A](index: Int, b: B) = VectorN(vector.updated(index, b))
 
   def ++[B >: A](that: VectorCase[B]) = VectorN(vector ++ that.toVector)
@@ -323,11 +324,11 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
     } else {
       (vector.length - n) match {
         case x if x <= 0 => Vector0
-        case 1 => Vector1(vector(vector.length - 1))
-        case 2 => Vector2(vector(vector.length - 2), vector(vector.length - 1))
-        case 3 => Vector3(vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
-        case 4 => Vector4(vector(vector.length - 4), vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
-        case _ => VectorN(vector drop n)
+        case 1           => Vector1(vector(vector.length - 1))
+        case 2           => Vector2(vector(vector.length - 2), vector(vector.length - 1))
+        case 3           => Vector3(vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
+        case 4           => Vector4(vector(vector.length - 4), vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
+        case _           => VectorN(vector drop n)
       }
     }
   }
@@ -338,22 +339,22 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
     } else {
       (vector.length - n) match {
         case x if x <= 0 => Vector0
-        case 1 => Vector1(vector(0))
-        case 2 => Vector2(vector(0), vector(1))
-        case 3 => Vector3(vector(0), vector(1), vector(2))
-        case 4 => Vector4(vector(0), vector(1), vector(2), vector(3))
-        case _ => VectorN(vector dropRight n)
+        case 1           => Vector1(vector(0))
+        case 2           => Vector2(vector(0), vector(1))
+        case 3           => Vector3(vector(0), vector(1), vector(2))
+        case 4           => Vector4(vector(0), vector(1), vector(2), vector(3))
+        case _           => VectorN(vector dropRight n)
       }
     }
   }
 
   override def init = (vector.length - 1) match {
     case x if x <= 0 => Vector0
-    case 1 => Vector1(vector(0))
-    case 2 => Vector2(vector(0), vector(1))
-    case 3 => Vector3(vector(0), vector(1), vector(2))
-    case 4 => Vector4(vector(0), vector(1), vector(2), vector(3))
-    case _ => VectorN(vector.init)
+    case 1           => Vector1(vector(0))
+    case 2           => Vector2(vector(0), vector(1))
+    case 3           => Vector3(vector(0), vector(1), vector(2))
+    case 4           => Vector4(vector(0), vector(1), vector(2), vector(3))
+    case _           => VectorN(vector.init)
   }
 
   override def slice(from: Int, until: Int) = take(until).drop(from)
@@ -362,11 +363,11 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
 
   override def tail = (vector.length - 1) match {
     case x if x <= 0 => Vector0
-    case 1 => Vector1(vector(1))
-    case 2 => Vector2(vector(1), vector(2))
-    case 3 => Vector3(vector(1), vector(2), vector(3))
-    case 4 => Vector4(vector(1), vector(2), vector(3), vector(4))
-    case _ => VectorN(vector.tail)
+    case 1           => Vector1(vector(1))
+    case 2           => Vector2(vector(1), vector(2))
+    case 3           => Vector3(vector(1), vector(2), vector(3))
+    case 4           => Vector4(vector(1), vector(2), vector(3), vector(4))
+    case _           => VectorN(vector.tail)
   }
 
   override def take(n: Int) = {
@@ -375,11 +376,11 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
     } else {
       n match {
         case x if x <= 0 => Vector0
-        case 1 => Vector1(vector(0))
-        case 2 => Vector2(vector(0), vector(1))
-        case 3 => Vector3(vector(0), vector(1), vector(2))
-        case 4 => Vector4(vector(0), vector(1), vector(2), vector(3))
-        case _ => VectorN(vector take n)
+        case 1           => Vector1(vector(0))
+        case 2           => Vector2(vector(0), vector(1))
+        case 3           => Vector3(vector(0), vector(1), vector(2))
+        case 4           => Vector4(vector(0), vector(1), vector(2), vector(3))
+        case _           => VectorN(vector take n)
       }
     }
   }
@@ -390,11 +391,11 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
     } else {
       n match {
         case x if x <= 0 => Vector0
-        case 1 => Vector1(vector(vector.length - 1))
-        case 2 => Vector2(vector(vector.length - 2), vector(vector.length - 1))
-        case 3 => Vector3(vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
-        case 4 => Vector4(vector(vector.length - 4), vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
-        case _ => VectorN(vector takeRight n)
+        case 1           => Vector1(vector(vector.length - 1))
+        case 2           => Vector2(vector(vector.length - 2), vector(vector.length - 1))
+        case 3           => Vector3(vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
+        case 4           => Vector4(vector(vector.length - 4), vector(vector.length - 3), vector(vector.length - 2), vector(vector.length - 1))
+        case _           => VectorN(vector takeRight n)
       }
     }
   }
@@ -402,7 +403,7 @@ private[precog] case class VectorN[+A](vector: Vector[A]) extends VectorCase[A] 
   // note: this actually defeats a HotSpot optimization in trivial micro-benchmarks
   override def iterator = vector.iterator
 
-  override def foreach[U](f: A => U) {vector.foreach(f)}
+  override def foreach[U](f: A => U) { vector.foreach(f) }
 
   def toVector = vector
 }

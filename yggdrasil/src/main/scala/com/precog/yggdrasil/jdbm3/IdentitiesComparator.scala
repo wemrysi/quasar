@@ -28,11 +28,11 @@ object IdentitiesComparator {
   def apply(ascending: Boolean) = new IdentitiesComparator(ascending)
 }
 
-class IdentitiesComparator private[jdbm3](val ascending: Boolean) extends Comparator[Identities] with Serializable {
-  def compare (a: Identities, b: Identities) = {
+class IdentitiesComparator private[jdbm3] (val ascending: Boolean) extends Comparator[Identities] with Serializable {
+  def compare(a: Identities, b: Identities) = {
     val len = if (a.length < b.length) a.length else b.length
 
-    var i = 0
+    var i   = 0
     var cmp = 0
     while (cmp != 0 && i < len) {
       val x = a(i)

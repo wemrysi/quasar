@@ -54,7 +54,7 @@ import scalaz.syntax.std.list._
 import scalaz.syntax.std.option._
 import scalaz.effect.IO
 
-trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
+trait InMemoryVFSModule[M[+ _]] extends VFSModule[M, Slice] { moduleSelf =>
   class Projection(slices0: Vector[Slice]) extends ProjectionLike[M, Slice] {
     type Key = Int
 
@@ -62,11 +62,17 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
     private[InMemoryVFSModule] def append(slice: Slice) = synchronized { slices = slices :+ slice }
 
     def structure(implicit M: Monad[M]): M[Set[ColumnRef]] = M.point(slices.flatMap(_.columns.keySet).toSet)
-    def length: Long = slices.map(_.size).sum.toLong
+    def length: Long                                       = slices.map(_.size).sum.toLong
     def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None)(implicit M: Monad[M]): M[Option[BlockProjectionData[Key, Slice]]] = M point {
       id match {
-        case Some(i) => slices.lift(i+1) map { s => BlockProjectionData(i+1, i+1, s) }
-        case None => slices.headOption map { s => BlockProjectionData(0, 0, s) }
+        case Some(i) =>
+          slices.lift(i + 1) map { s =>
+            BlockProjectionData(i + 1, i + 1, s)
+          }
+        case None =>
+          slices.headOption map { s =>
+            BlockProjectionData(0, 0, s)
+          }
       }
     }
   }
@@ -78,7 +84,7 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
       proj.append(Slice.fromJValues(data.values.toStream))
     }
 
-    def recordCount(implicit M: Monad[M]): M[Long] = M point { proj.length }
+    def recordCount(implicit M: Monad[M]): M[Long]      = M point { proj.length }
     def projection(implicit M: Monad[M]): M[Projection] = M point { proj }
     def asByteStream(mimeType: MimeType)(implicit M: Monad[M]) = OptionT {
       M.point {
@@ -90,9 +96,10 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
   case class InMemoryBlobResource(data: Array[Byte], mimeType: MimeType, authorities: Authorities) extends BlobResource {
     def byteLength = data.length.toLong
 
-    def asString(implicit M: Monad[M]): OptionT[M, String] = OptionT(M point {
-      FileContent.stringTypes.contains(mimeType).option(new String(data, "UTF-8"))
-    })
+    def asString(implicit M: Monad[M]): OptionT[M, String] =
+      OptionT(M point {
+        FileContent.stringTypes.contains(mimeType).option(new String(data, "UTF-8"))
+      })
 
     def asByteStream(mimeType: MimeType)(implicit M: Monad[M]) = OptionT {
       M.point {
@@ -103,15 +110,15 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
 
   class VFSCompanion extends VFSCompanionLike {
     def toJsonElements(slice: Slice) = slice.toJsonElements
-    def derefValue(slice: Slice) = slice.deref(TransSpecModule.paths.Value)
-    def blockSize(slice: Slice) = slice.size
+    def derefValue(slice: Slice)     = slice.deref(TransSpecModule.paths.Value)
+    def blockSize(slice: Slice)      = slice.size
     def pathStructure(selector: CPath)(implicit M: Monad[M]) = { (projection: Projection) =>
       EitherT.right(
         for (columnRefs <- projection.structure) yield {
-          val types : Map[CType, Long] = columnRefs.collect {
+          val types: Map[CType, Long] = columnRefs.collect {
             // FIXME: This should use real counts
             case ColumnRef(selector, ctype) if selector.hasPrefix(selector) => (ctype, 0L)
-          }.groupBy(_._1).map { case (tpe, values) => (tpe, values.map(_._2).sum) }
+          }.groupBy(_._1).map { case (tpe, values)                          => (tpe, values.map(_._2).sum) }
 
           PathStructure(types, columnRefs.map(_.selector))
         }
@@ -186,7 +193,7 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
 
               case (acc, IngestMessage(_, _, writeAs, records, _, _, StreamRef.Create(id, _))) =>
                 val archiveKey = (path, Version.Archived(id))
-                val appendTo = acc.get(archiveKey).orElse(acc.get(currentKey).filter(_.versionId == id))
+                val appendTo   = acc.get(archiveKey).orElse(acc.get(currentKey).filter(_.versionId == id))
                 updated(acc, appendTo, if (acc.contains(currentKey)) currentKey else archiveKey, writeAs, records.map(_.value))
 
               case (acc, IngestMessage(_, _, writeAs, records, _, _, StreamRef.Replace(id, _))) =>
@@ -228,7 +235,7 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
     private def childMetadata(path: Path): Set[PathMetadata] = {
       data.keySet.map(_._1) flatMap { _ - path } flatMap { p0 =>
         val childPath = path / Path(p0.elements.headOption.toList)
-        val isDir = p0.length > 1
+        val isDir     = p0.length > 1
         data.get((childPath, Version.Current)) map { record =>
           Set(PathMetadata(p0, if (isDir) DataDir(record.resource.mimeType) else DataOnly(record.resource.mimeType)))
         } getOrElse {
@@ -260,7 +267,7 @@ trait InMemoryVFSModule[M[+_]] extends VFSModule[M, Slice] { moduleSelf =>
     def currentVersion(path: Path): M[Option[VersionEntry]] = M point {
       data.get((path, Version.Current)) map {
         case BinaryRecord(resource, id) => VersionEntry(id, PathData.BLOB(resource.mimeType), clock.instant)
-        case JsonRecord(_, id) => VersionEntry(id, PathData.NIHDB, clock.instant)
+        case JsonRecord(_, id)          => VersionEntry(id, PathData.NIHDB, clock.instant)
       }
     }
   }

@@ -26,7 +26,7 @@ import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.table.Slice
 import com.precog.yggdrasil.vfs._
 
-import akka.actor.{Actor, Cancellable}
+import akka.actor.{ Actor, Cancellable }
 import akka.pattern.pipe
 
 import blueeyes.bkka.FutureMonad
@@ -34,14 +34,14 @@ import blueeyes.util.Clock
 
 import org.slf4s.Logging
 
-import java.util.{Date, UUID}
+import java.util.{ Date, UUID }
 import java.util.concurrent.TimeUnit
 
 import org.joda.time.{ Duration => JodaDuration }
 
 import scala.collection.mutable.PriorityQueue
 
-import scalaz.{Ordering => _, idInstance => _, _}
+import scalaz.{ Ordering => _, idInstance => _, _ }
 import scalaz.std.option._
 import scalaz.syntax.id._
 import scalaz.syntax.traverse._
@@ -49,7 +49,13 @@ import scalaz.syntax.std.option._
 
 sealed trait SchedulingMessage
 
-case class AddTask(repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long])
+case class AddTask(repeat: Option[CronExpression],
+                   apiKey: APIKey,
+                   authorities: Authorities,
+                   context: EvaluationContext,
+                   source: Path,
+                   sink: Path,
+                   timeoutMillis: Option[Long])
 
 case class DeleteTask(id: UUID)
 
@@ -70,14 +76,15 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
     private[SchedulingActor] case class TaskInProgress(task: ScheduledTask, startedAt: DateTime)
   }
 
-  class SchedulingActor(
-      jobManager: JobManager[Future],
-      permissionsFinder: PermissionsFinder[Future],
-      storage: ScheduleStorage[Future],
-      platform: Platform[Future, Slice, StreamT[Future, Slice]],
-      clock: Clock,
-      storageTimeout: Duration = Duration(30, TimeUnit.SECONDS),
-      resourceTimeout: Timeout = Timeout(10, TimeUnit.SECONDS)) extends Actor with Logging {
+  class SchedulingActor(jobManager: JobManager[Future],
+                        permissionsFinder: PermissionsFinder[Future],
+                        storage: ScheduleStorage[Future],
+                        platform: Platform[Future, Slice, StreamT[Future, Slice]],
+                        clock: Clock,
+                        storageTimeout: Duration = Duration(30, TimeUnit.SECONDS),
+                        resourceTimeout: Timeout = Timeout(10, TimeUnit.SECONDS))
+      extends Actor
+      with Logging {
     import SchedulingActor._
 
     private[this] final implicit val scheduleOrder: Ordering[(DateTime, ScheduledTask)] = Ordering.by(_._1.getMillis)
@@ -106,7 +113,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
 
     override def postStop = {
       scheduledAwake foreach { sa =>
-        if (! sa.isCancelled) {
+        if (!sa.isCancelled) {
           sa.cancel()
         }
       }
@@ -115,7 +122,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
     def scheduleNextTask(): Unit = {
       // Just make sure we don't multi-schedule
       scheduledAwake foreach { sa =>
-        if (! sa.isCancelled) {
+        if (!sa.isCancelled) {
           sa.cancel()
         }
       }
@@ -128,13 +135,17 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
     }
 
     def nextRun(threshold: Date, task: ScheduledTask) = {
-      task.repeat.flatMap { sched => Option(sched.getNextValidTimeAfter(threshold)) } map { nextTime =>
+      task.repeat.flatMap { sched =>
+        Option(sched.getNextValidTimeAfter(threshold))
+      } map { nextTime =>
         (new DateTime(nextTime), task)
       }
     }
 
     def rescheduleTasks(tasks: Seq[ScheduledTask]): Unit = {
-      val (toRemove, toReschedule) = tasks.partition { task => pendingRemovals.contains(task.id) }
+      val (toRemove, toReschedule) = tasks.partition { task =>
+        pendingRemovals.contains(task.id)
+      }
 
       toRemove foreach { task =>
         log.info("Removing completed task after run: " + task.id)
@@ -167,11 +178,11 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         def consumeStream(totalSize: Long, stream: StreamT[Future, Slice]): Future[Long] = {
           stream.uncons flatMap {
             case Some((x, xs)) => consumeStream(totalSize + x.size, xs)
-            case None => M.point(totalSize)
+            case None          => M.point(totalSize)
           }
         }
 
-        val ourself = self
+        val ourself   = self
         val startedAt = new DateTime
 
         implicit val readTimeout = resourceTimeout
@@ -179,18 +190,18 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         // This cannot occur inside a Future, or we would be exposing Actor state outside of this thread
         running += ((task.source, task.sink) -> TaskInProgress(task, startedAt))
 
-
         val execution = for {
           basePath <- EitherT(M point { task.source.prefix \/> invalidState("Path %s cannot be relativized.".format(task.source.path)) })
-          cachingResult <- platform.vfs.executeAndCache(platform, basePath, task.context, QueryOptions(timeout = task.timeout), Some(task.sink), Some(task.taskName))
-
+          cachingResult <- platform.vfs
+                            .executeAndCache(platform, basePath, task.context, QueryOptions(timeout = task.timeout), Some(task.sink), Some(task.taskName))
 
         } yield cachingResult
 
         execution.fold[Future[PrecogUnit]](
-          failure => M point {
-            log.error("An error was encountered processing a scheduled query execution: " + failure)
-            ourself ! TaskComplete(task.id, clock.now(), 0, Some(failure.toString)) : PrecogUnit
+          failure =>
+            M point {
+              log.error("An error was encountered processing a scheduled query execution: " + failure)
+              ourself ! TaskComplete(task.id, clock.now(), 0, Some(failure.toString)): PrecogUnit
           },
           storedQueryResult => {
             consumeStream(0, storedQueryResult.data) map { totalSize =>
@@ -200,12 +211,12 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
               case t: Throwable =>
                 for {
                   _ <- storedQueryResult.cachingJob.traverse { jobId =>
-                    jobManager.abort(jobId, t.getMessage) map {
-                      case Right(jobAbortSuccess) =>
-                          ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString))
-                      case Left(jobAbortFailure) => sys.error(jobAbortFailure.toString)
-                    }
-                  }
+                        jobManager.abort(jobId, t.getMessage) map {
+                          case Right(jobAbortSuccess) =>
+                            ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString))
+                          case Left(jobAbortFailure) => sys.error(jobAbortFailure.toString)
+                        }
+                      }
                 } yield PrecogUnit
             }
           }
@@ -214,7 +225,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         } onFailure {
           case t: Throwable =>
             log.error("Scheduled query execution failed by thrown error.", t)
-            ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString)) : PrecogUnit
+            ourself ! TaskComplete(task.id, clock.now(), 0, Option(t.getMessage) orElse Some(t.getClass.toString)): PrecogUnit
         }
       }
     }
@@ -222,7 +233,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
     def receive = {
       case AddTask(repeat, apiKey, authorities, context, source, sink, timeout) =>
         val ourself = self
-        val taskId = UUID.randomUUID()
+        val taskId  = UUID.randomUUID()
         val newTask = ScheduledTask(taskId, repeat, apiKey, authorities, context, source, sink, timeout)
         val addResult: EitherT[Future, String, PrecogUnit] = repeat match {
           case None =>
@@ -254,7 +265,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         } pipeTo sender
 
       case StatusForTask(id, limit) =>
-        storage.statusFor(id, limit) map(Success(_)) recover {
+        storage.statusFor(id, limit) map (Success(_)) recover {
           case t: Throwable =>
             log.error("Error getting status for task " + id, t)
             Failure("Internal error getting status for task")
@@ -267,7 +278,7 @@ trait SchedulingActorModule extends SecureVFSModule[Future, Slice] {
         removeTask(id)
 
       case WakeForRun =>
-        val now = new DateTime
+        val now               = new DateTime
         val (toRun, newQueue) = scheduleQueue.partition(_._1.isAfter(now))
         scheduleQueue = newQueue
         toRun.map(_._2).foreach(executeTask)

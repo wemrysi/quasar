@@ -34,7 +34,7 @@ import blueeyes.bkka.Stoppable
 import org.slf4s._
 import org.streum.configrity.converter.Extra._
 
-import scalaz.{Failure,Success}
+import scalaz.{ Failure, Success }
 import scalaz.syntax.applicative._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.std.boolean._
@@ -54,7 +54,7 @@ trait ShardConfig extends BaseConfig {
 
   def stopTimeout: Timeout = config[Long]("actors.stop.timeout", 300) seconds
 
-  def batchStoreDelay: Duration    = config[Long]("actors.store.idle_millis", 1000) millis
+  def batchStoreDelay: Duration = config[Long]("actors.store.idle_millis", 1000) millis
 }
 
 // The ingest system consists of the ingest supervisor and ingest actor(s)

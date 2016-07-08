@@ -26,7 +26,6 @@ import com.precog.util.cache.Cache
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
 
-
 import scalaz._
 import scalaz.effect._
 import scalaz.std.option._
@@ -36,9 +35,9 @@ import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
 case class CachingAPIKeyManagerSettings(
-  apiKeyCacheSettings: Seq[Cache.CacheOption[APIKey, APIKeyRecord]],
-  childCacheSettings: Seq[Cache.CacheOption[APIKey, Set[APIKeyRecord]]],
-  grantCacheSettings: Seq[Cache.CacheOption[GrantId, Grant]]
+    apiKeyCacheSettings: Seq[Cache.CacheOption[APIKey, APIKeyRecord]],
+    childCacheSettings: Seq[Cache.CacheOption[APIKey, Set[APIKeyRecord]]],
+    grantCacheSettings: Seq[Cache.CacheOption[GrantId, Grant]]
 )
 
 object CachingAPIKeyManagerSettings {
@@ -49,13 +48,14 @@ object CachingAPIKeyManagerSettings {
   )
 }
 
-class CachingAPIKeyManager[M[+_]](manager: APIKeyManager[M], settings: CachingAPIKeyManagerSettings = CachingAPIKeyManagerSettings.Default) extends APIKeyManager[M]
+class CachingAPIKeyManager[M[+ _]](manager: APIKeyManager[M], settings: CachingAPIKeyManagerSettings = CachingAPIKeyManagerSettings.Default)
+    extends APIKeyManager[M]
     with Logging {
   implicit val M = manager.M
 
   private val apiKeyCache = Cache.simple[APIKey, APIKeyRecord](settings.apiKeyCacheSettings: _*)
-  private val childCache = Cache.simple[APIKey, Set[APIKeyRecord]](settings.childCacheSettings: _*)
-  private val grantCache = Cache.simple[GrantId, Grant](settings.grantCacheSettings: _*)
+  private val childCache  = Cache.simple[APIKey, Set[APIKeyRecord]](settings.childCacheSettings: _*)
+  private val grantCache  = Cache.simple[GrantId, Grant](settings.grantCacheSettings: _*)
 
   protected def add(r: APIKeyRecord) = IO {
     @inline def addChildren(k: APIKey, c: Set[APIKeyRecord]) =
@@ -82,12 +82,17 @@ class CachingAPIKeyManager[M[+_]](manager: APIKeyManager[M], settings: CachingAP
   }
 
   def rootGrantId: M[GrantId] = manager.rootGrantId
-  def rootAPIKey: M[APIKey] = manager.rootAPIKey
+  def rootAPIKey: M[APIKey]   = manager.rootAPIKey
 
   def createAPIKey(name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId]) =
     manager.createAPIKey(name, description, issuerKey, grants) map { _ tap add unsafePerformIO }
 
-  def createGrant(name: Option[String], description: Option[String], issuerKey: APIKey, parentIds: Set[GrantId], perms: Set[Permission], expiration: Option[DateTime]) =
+  def createGrant(name: Option[String],
+                  description: Option[String],
+                  issuerKey: APIKey,
+                  parentIds: Set[GrantId],
+                  perms: Set[Permission],
+                  expiration: Option[DateTime]) =
     manager.createGrant(name, description, issuerKey, parentIds, perms, expiration) map { _ tap add unsafePerformIO }
 
   def findAPIKey(tid: APIKey) = apiKeyCache.get(tid) match {
@@ -95,11 +100,11 @@ class CachingAPIKeyManager[M[+_]](manager: APIKeyManager[M], settings: CachingAP
       log.debug("Cache miss on api key " + tid)
       manager.findAPIKey(tid) map { _.traverse(_ tap add).unsafePerformIO }
 
-    case t    => M.point(t)
+    case t => M.point(t)
   }
 
   def findGrant(gid: GrantId) = grantCache.get(gid) match {
-    case None        =>
+    case None =>
       log.debug("Cache miss on grant " + gid)
       manager.findGrant(gid) map { _.traverse(_ tap add).unsafePerformIO }
 
@@ -112,15 +117,15 @@ class CachingAPIKeyManager[M[+_]](manager: APIKeyManager[M], settings: CachingAP
   }
 
   def listAPIKeys = manager.listAPIKeys
-  def listGrants = manager.listGrants
+  def listGrants  = manager.listGrants
 
   def listDeletedAPIKeys = manager.listDeletedAPIKeys
-  def listDeletedGrants = manager.listDeletedGrants
+  def listDeletedGrants  = manager.listDeletedGrants
 
   def findGrantChildren(gid: GrantId) = manager.findGrantChildren(gid)
 
-  def findDeletedAPIKey(tid: APIKey) = manager.findDeletedAPIKey(tid)
-  def findDeletedGrant(gid: GrantId) = manager.findDeletedGrant(gid)
+  def findDeletedAPIKey(tid: APIKey)         = manager.findDeletedAPIKey(tid)
+  def findDeletedGrant(gid: GrantId)         = manager.findDeletedGrant(gid)
   def findDeletedGrantChildren(gid: GrantId) = manager.findDeletedGrantChildren(gid)
 
   def addGrants(tid: APIKey, grants: Set[GrantId]) =

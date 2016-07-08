@@ -30,68 +30,77 @@ object V1SegmentFormat extends SegmentFormat {
   private val checksum = true
 
   object reader extends SegmentReader {
-    private def wrapException[A](f: => A): Validation[IOException, A] = try {
-      Success(f)
-    } catch { case e: Exception =>
-      Failure(new IOException(e))
-    }
+    private def wrapException[A](f: => A): Validation[IOException, A] =
+      try {
+        Success(f)
+      } catch {
+        case e: Exception =>
+          Failure(new IOException(e))
+      }
 
-    def readSegmentId(channel: ReadableByteChannel): Validation[IOException, SegmentId] = for {
-      buffer <- readChunk(channel)
-      blockId <- wrapException(buffer.getLong())
-      cpath <- wrapException(CPath(Codec.Utf8Codec.read(buffer)))
-      ctype <- CTypeFlags.readCType(buffer)
-    } yield SegmentId(blockId, cpath, ctype)
+    def readSegmentId(channel: ReadableByteChannel): Validation[IOException, SegmentId] =
+      for {
+        buffer <- readChunk(channel)
+        blockId <- wrapException(buffer.getLong())
+        cpath <- wrapException(CPath(Codec.Utf8Codec.read(buffer)))
+        ctype <- CTypeFlags.readCType(buffer)
+      } yield SegmentId(blockId, cpath, ctype)
 
     def readSegment(channel: ReadableByteChannel): Validation[IOException, Segment] = {
-      def readArray[A](ctype: CValueType[A]): Validation[IOException, (BitSet, Array[A])] = for {
-        buffer <- readChunk(channel)
-      } yield {
-        val length = buffer.getInt()
-        val defined = Codec.BitSetCodec.read(buffer)
-        val codec = getCodecFor(ctype)
-        val values = ctype.manifest.newArray(length)
-        defined.foreach { row =>
-          values(row) = codec.read(buffer)
+      def readArray[A](ctype: CValueType[A]): Validation[IOException, (BitSet, Array[A])] =
+        for {
+          buffer <- readChunk(channel)
+        } yield {
+          val length  = buffer.getInt()
+          val defined = Codec.BitSetCodec.read(buffer)
+          val codec   = getCodecFor(ctype)
+          val values  = ctype.manifest.newArray(length)
+          defined.foreach { row =>
+            values(row) = codec.read(buffer)
+          }
+          (defined, values)
         }
-        (defined, values)
-      }
 
-      def readNull(ctype: CNullType): Validation[IOException, (BitSet, Int)] = for {
-        buffer <- readChunk(channel)
-      } yield {
-        val length = buffer.getInt()
-        val defined = Codec.BitSetCodec.read(buffer)
-        (defined, length)
-      }
+      def readNull(ctype: CNullType): Validation[IOException, (BitSet, Int)] =
+        for {
+          buffer <- readChunk(channel)
+        } yield {
+          val length  = buffer.getInt()
+          val defined = Codec.BitSetCodec.read(buffer)
+          (defined, length)
+        }
 
-      def readBoolean(): Validation[IOException, (BitSet, Int, BitSet)] = for {
-        buffer <- readChunk(channel)
-      } yield {
-        val length = buffer.getInt()
-        val defined = Codec.BitSetCodec.read(buffer)
-        val values = Codec.BitSetCodec.read(buffer)
-        (defined, length, values)
-      }
+      def readBoolean(): Validation[IOException, (BitSet, Int, BitSet)] =
+        for {
+          buffer <- readChunk(channel)
+        } yield {
+          val length  = buffer.getInt()
+          val defined = Codec.BitSetCodec.read(buffer)
+          val values  = Codec.BitSetCodec.read(buffer)
+          (defined, length, values)
+        }
 
       for {
         header <- readSegmentId(channel)
         segment <- header match {
-          case SegmentId(blockid, cpath, CBoolean) =>
-            readBoolean() map { case (defined, length, values) =>
-              BooleanSegment(blockid, cpath, defined, values, length)
-            }
+                    case SegmentId(blockid, cpath, CBoolean) =>
+                      readBoolean() map {
+                        case (defined, length, values) =>
+                          BooleanSegment(blockid, cpath, defined, values, length)
+                      }
 
-          case SegmentId(blockid, cpath, ctype: CValueType[a]) =>
-            readArray(ctype) map { case (defined, values) =>
-              ArraySegment(blockid, cpath, ctype, defined, values)
-            }
+                    case SegmentId(blockid, cpath, ctype: CValueType[a]) =>
+                      readArray(ctype) map {
+                        case (defined, values) =>
+                          ArraySegment(blockid, cpath, ctype, defined, values)
+                      }
 
-          case SegmentId(blockid, cpath, ctype: CNullType) =>
-            readNull(ctype) map { case (defined, length) =>
-              NullSegment(blockid, cpath, ctype, defined, length)
-            }
-        }
+                    case SegmentId(blockid, cpath, ctype: CNullType) =>
+                      readNull(ctype) map {
+                        case (defined, length) =>
+                          NullSegment(blockid, cpath, ctype, defined, length)
+                      }
+                  }
       } yield segment
     }
   }
@@ -101,13 +110,13 @@ object V1SegmentFormat extends SegmentFormat {
       for {
         _ <- writeSegmentId(channel, segment)
         _ <- segment match {
-          case seg: ArraySegment[a] =>
-            writeArraySegment(channel, seg, getCodecFor(seg.ctype))
-          case seg: BooleanSegment =>
-            writeBooleanSegment(channel, seg)
-          case seg: NullSegment =>
-            writeNullSegment(channel, seg)
-        }
+              case seg: ArraySegment[a] =>
+                writeArraySegment(channel, seg, getCodecFor(seg.ctype))
+              case seg: BooleanSegment =>
+                writeBooleanSegment(channel, seg)
+              case seg: NullSegment =>
+                writeNullSegment(channel, seg)
+            }
       } yield PrecogUnit
     }
 
@@ -124,8 +133,9 @@ object V1SegmentFormat extends SegmentFormat {
       }
     }
 
-    private def writeArraySegment[@spec(Boolean,Long,Double) A](channel: WritableByteChannel,
-        segment: ArraySegment[A], codec: Codec[A]): Validation[IOException, PrecogUnit] = {
+    private def writeArraySegment[@spec(Boolean, Long, Double) A](channel: WritableByteChannel,
+                                                                  segment: ArraySegment[A],
+                                                                  codec: Codec[A]): Validation[IOException, PrecogUnit] = {
       var maxSize = Codec.BitSetCodec.maxSize(segment.defined) + 4
       segment.defined.foreach { row =>
         maxSize += codec.maxSize(segment.values(row))
@@ -205,15 +215,14 @@ object V1SegmentFormat extends SegmentFormat {
   }
 
   private def getCodecFor[A](ctype: CValueType[A]): Codec[A] = ctype match {
-    case CPeriod => Codec.LongCodec.as[Period](_.toStandardDuration.getMillis, new Period(_))
+    case CPeriod  => Codec.LongCodec.as[Period](_.toStandardDuration.getMillis, new Period(_))
     case CBoolean => Codec.BooleanCodec
-    case CString => Codec.Utf8Codec
-    case CLong => Codec.PackedLongCodec
-    case CDouble => Codec.DoubleCodec
-    case CNum => Codec.BigDecimalCodec
-    case CDate => Codec.DateCodec
+    case CString  => Codec.Utf8Codec
+    case CLong    => Codec.PackedLongCodec
+    case CDouble  => Codec.DoubleCodec
+    case CNum     => Codec.BigDecimalCodec
+    case CDate    => Codec.DateCodec
     case CArrayType(elemType) =>
       Codec.ArrayCodec(getCodecFor(elemType))(elemType.manifest)
   }
 }
-

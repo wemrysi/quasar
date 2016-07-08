@@ -21,7 +21,7 @@ package com.precog.common
 
 import blueeyes.json._
 import blueeyes.json.serialization.{ Extractor, Decomposer }
-import blueeyes.json.serialization.DefaultSerialization.{DateTimeDecomposer => _, DateTimeExtractor => _, _}
+import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.Extractor._
 
 import org.joda.time.format.ISODateTimeFormat
@@ -30,8 +30,8 @@ import scalaz._
 import scalaz.syntax.bifunctor._
 
 package object security {
-  type APIKey    = String
-  type GrantId   = String
+  type APIKey  = String
+  type GrantId = String
 
   private val isoFormat = ISODateTimeFormat.dateTime
 

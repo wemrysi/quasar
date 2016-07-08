@@ -29,15 +29,15 @@ import scalaz.{ Validation, Success, Failure }
 
 object CTypeFlags {
   object Flags {
-    val FBoolean: Byte = 1
-    val FString: Byte = 2
-    val FLong: Byte = 3
-    val FDouble: Byte = 4
-    val FBigDecimal: Byte = 5
-    val FDate: Byte = 6
-    val FArray: Byte = 7
-    val FNull: Byte = 16
-    val FEmptyArray: Byte = 17
+    val FBoolean: Byte     = 1
+    val FString: Byte      = 2
+    val FLong: Byte        = 3
+    val FDouble: Byte      = 4
+    val FBigDecimal: Byte  = 5
+    val FDate: Byte        = 6
+    val FArray: Byte       = 7
+    val FNull: Byte        = 16
+    val FEmptyArray: Byte  = 17
     val FEmptyObject: Byte = 18
   }
 
@@ -55,7 +55,7 @@ object CTypeFlags {
         case CDouble         => buffer += FDouble
         case CNum            => buffer += FBigDecimal
         case CDate           => buffer += FDate
-        case CArrayType(tpe) => buffer += FArray ; flagForCValueType(tpe)
+        case CArrayType(tpe) => buffer += FArray; flagForCValueType(tpe)
         case CPeriod         => abort("CPeriod unexpected")
       }
       t match {
@@ -96,4 +96,3 @@ object CTypeFlags {
     }
   }
 }
-

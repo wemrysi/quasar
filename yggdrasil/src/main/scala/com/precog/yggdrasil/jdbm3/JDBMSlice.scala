@@ -27,14 +27,17 @@ import com.precog.yggdrasil.table._
 object JDBMSlice {
   private lazy val log = LoggerFactory.getLogger("com.precog.yggdrasil.jdbm3.JDBMSlice")
 
-  def load(size: Int, source: () => Iterator[java.util.Map.Entry[Array[Byte],Array[Byte]]], keyDecoder: ColumnDecoder, valDecoder: ColumnDecoder): (Array[Byte], Array[Byte], Int) = {
+  def load(size: Int,
+           source: () => Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]],
+           keyDecoder: ColumnDecoder,
+           valDecoder: ColumnDecoder): (Array[Byte], Array[Byte], Int) = {
     var firstKey: Array[Byte] = null.asInstanceOf[Array[Byte]]
     var lastKey: Array[Byte]  = null.asInstanceOf[Array[Byte]]
 
     @tailrec
     def consumeRows(source: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]], row: Int): Int = {
       if (source.hasNext) {
-        val entry = source.next
+        val entry  = source.next
         val rowKey = entry.getKey
         if (row == 0) { firstKey = rowKey }
         lastKey = rowKey
@@ -52,7 +55,7 @@ object JDBMSlice {
       // FIXME: Looping here is a blatantly poor way to work around ConcurrentModificationExceptions
       // From the Javadoc for CME, the exception is an indication of a bug
       var finalCount = -1
-      var tries = 0
+      var tries      = 0
       while (tries < JDBMProjection.MAX_SPINS && finalCount == -1) {
         try {
           finalCount = consumeRows(source().take(size), 0)

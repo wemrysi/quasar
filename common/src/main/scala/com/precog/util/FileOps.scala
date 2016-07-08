@@ -60,11 +60,9 @@ object FilesystemFileOps extends FileOps {
 
   def copy(src: File, dest: File) = IOUtils.copyFile(src, dest)
 
-  def read(src: File) = IOUtils.readFileToString(src)
+  def read(src: File)                    = IOUtils.readFileToString(src)
   def write(dest: File, content: String) = IOUtils.overwriteFile(content, dest)
 
   def mkdir(dir: File): IO[Boolean] = IO { dir.mkdirs() }
 }
-
-
 // vim: set ts=4 sw=4 et:

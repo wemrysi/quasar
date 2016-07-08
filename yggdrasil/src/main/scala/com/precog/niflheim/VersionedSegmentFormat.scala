@@ -28,14 +28,14 @@ import java.nio.ByteBuffer
 import scalaz.{ Validation, Success, Failure }
 
 /**
- * A `VersionedSegmentFormat` wraps formats and is used to deal with multiple
- * versions for `SegmentFormat`s. The version of a segment format is always
- * written first, followed by the actual segment. The format with the highest
- * version number is always used for writing. For reads, the version is read
- * first and the format corresponding to this version is used to read the rest
- * of the segment. If no format exists for that version, then we return an
- * error.
- */
+  * A `VersionedSegmentFormat` wraps formats and is used to deal with multiple
+  * versions for `SegmentFormat`s. The version of a segment format is always
+  * written first, followed by the actual segment. The format with the highest
+  * version number is always used for writing. For reads, the version is read
+  * first and the format corresponding to this version is used to read the rest
+  * of the segment. If no format exists for that version, then we return an
+  * error.
+  */
 case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends SegmentFormat with Versioning {
   val magic: Short = 0x0536.toShort
   val (version, format) = {
@@ -58,8 +58,7 @@ case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends Segm
         formats get version map { format =>
           format.reader.readSegmentId(channel)
         } getOrElse {
-          Failure(new IOException(
-            "Invalid version found. Expected one of %s, found %d." format (formats.keys mkString ",", version)))
+          Failure(new IOException("Invalid version found. Expected one of %s, found %d." format (formats.keys mkString ",", version)))
         }
       }
     }
@@ -69,8 +68,7 @@ case class VersionedSegmentFormat(formats: Map[Int, SegmentFormat]) extends Segm
         formats get version map { format =>
           format.reader.readSegment(channel)
         } getOrElse {
-          Failure(new IOException(
-            "Invalid version found. Expected one of %s, found %d." format (formats.keys mkString ",", version)))
+          Failure(new IOException("Invalid version found. Expected one of %s, found %d." format (formats.keys mkString ",", version)))
         }
       }
     }

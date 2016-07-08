@@ -23,7 +23,7 @@ import com.precog.util.IOUtils
 
 import java.util.concurrent.ScheduledThreadPoolExecutor
 
-import org.specs2.mutable.{After, Specification}
+import org.specs2.mutable.{ After, Specification }
 
 class CookStateLogSpecs extends Specification {
   val txLogScheduler = new ScheduledThreadPoolExecutor(5)

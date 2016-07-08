@@ -53,32 +53,33 @@ case class SegmentsWrapper(segments: Seq[Segment], projectionId: Int, blockId: L
   private def buildColumn(seg: Segment): Column = seg match {
     case segment: ArraySegment[a] =>
       val ctype: CValueType[a] = segment.ctype
-      val defined: BitSet = segment.defined
-      val values: Array[a] = segment.values
+      val defined: BitSet      = segment.defined
+      val values: Array[a]     = segment.values
       ctype match {
-        case CString => new ArrayStrColumn(defined, values)
-        case CDate => new ArrayDateColumn(defined, values)
-        case CPeriod => new ArrayPeriodColumn(defined, values)
-        case CNum => new ArrayNumColumn(defined, values)
-        case CDouble => new ArrayDoubleColumn(defined, values)
-        case CLong => new ArrayLongColumn(defined, values)
+        case CString            => new ArrayStrColumn(defined, values)
+        case CDate              => new ArrayDateColumn(defined, values)
+        case CPeriod            => new ArrayPeriodColumn(defined, values)
+        case CNum               => new ArrayNumColumn(defined, values)
+        case CDouble            => new ArrayDoubleColumn(defined, values)
+        case CLong              => new ArrayLongColumn(defined, values)
         case cat: CArrayType[_] => new ArrayHomogeneousArrayColumn(defined, values)(cat)
-        case CBoolean => sys.error("impossible")
+        case CBoolean           => sys.error("impossible")
       }
 
     case BooleanSegment(_, _, defined, values, _) =>
       new ArrayBoolColumn(defined, values)
 
-    case NullSegment(_, _, ctype, defined, _) => ctype match {
-      case CNull =>
-        NullColumn(defined)
-      case CEmptyObject =>
-        new MutableEmptyObjectColumn(defined)
-      case CEmptyArray =>
-        new MutableEmptyArrayColumn(defined)
-      case CUndefined =>
-        sys.error("also impossible")
-    }
+    case NullSegment(_, _, ctype, defined, _) =>
+      ctype match {
+        case CNull =>
+          NullColumn(defined)
+        case CEmptyObject =>
+          new MutableEmptyObjectColumn(defined)
+        case CEmptyArray =>
+          new MutableEmptyArrayColumn(defined)
+        case CUndefined =>
+          sys.error("also impossible")
+      }
   }
 
   private def buildMap(segments: Seq[Segment]): Map[ColumnRef, Column] =

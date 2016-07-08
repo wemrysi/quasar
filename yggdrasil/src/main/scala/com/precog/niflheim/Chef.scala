@@ -48,11 +48,13 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
     assert(root.isDirectory)
     assert(root.canWrite)
     val files0 = reader.snapshot(None).segments map { seg =>
-      val file = java.io.File.createTempFile(prefix(seg), ".cooked", root)
-      val relativized = new File(file.getName)
+      val file                         = java.io.File.createTempFile(prefix(seg), ".cooked", root)
+      val relativized                  = new File(file.getName)
       val channel: WritableByteChannel = new FileOutputStream(file).getChannel()
       val result = try {
-        format.writer.writeSegment(channel, seg) map { _ => (seg.id, relativized) }
+        format.writer.writeSegment(channel, seg) map { _ =>
+          (seg.id, relativized)
+        }
       } finally {
         channel.close()
       }
@@ -62,10 +64,10 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
     val files = files0.toList.sequence[({ type λ[α] = ValidationNel[IOException, α] })#λ, (SegmentId, File)]
     files flatMap { segs =>
       val metadata = CookedBlockMetadata(reader.id, reader.length, segs.toArray)
-      val mdFile = java.io.File.createTempFile("block-%08x".format(reader.id), ".cookedmeta", root)
-      val channel = new FileOutputStream(mdFile).getChannel()
+      val mdFile   = java.io.File.createTempFile("block-%08x".format(reader.id), ".cookedmeta", root)
+      val channel  = new FileOutputStream(mdFile).getChannel()
       try {
-        blockFormat.writeCookedBlock(channel, metadata).toValidationNel.map { _ : PrecogUnit =>
+        blockFormat.writeCookedBlock(channel, metadata).toValidationNel.map { _: PrecogUnit =>
           new File(mdFile.getName)
         }
       } finally {
@@ -84,4 +86,3 @@ final case class Chef(blockFormat: CookedBlockFormat, format: SegmentFormat) ext
       }
   }
 }
-

@@ -32,7 +32,9 @@ trait ArrayColumn[@spec(Boolean, Long, Double) A] extends DefinedAtIndex with Ex
   def update(row: Int, value: A): Unit
 }
 
-class ArrayHomogeneousArrayColumn[@spec(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(val tpe: CArrayType[A]) extends HomogeneousArrayColumn[A] with ArrayColumn[Array[A]] {
+class ArrayHomogeneousArrayColumn[@spec(Boolean, Long, Double) A](val defined: BitSet, values: Array[Array[A]])(val tpe: CArrayType[A])
+    extends HomogeneousArrayColumn[A]
+    with ArrayColumn[Array[A]] {
   def apply(row: Int) = values(row)
 
   def update(row: Int, value: Array[A]) {

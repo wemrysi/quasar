@@ -22,7 +22,7 @@ package jdbm3
 
 import org.apache.jdbm.Serializer
 
-import java.io.{DataInput,DataOutput,Externalizable,ObjectInput,ObjectInputStream,ObjectOutput}
+import java.io.{ DataInput, DataOutput, Externalizable, ObjectInput, ObjectInputStream, ObjectOutput }
 import java.util.Comparator
 
 object SortingKeyComparator {
@@ -31,8 +31,7 @@ object SortingKeyComparator {
   def apply(rowFormat: RowFormat, ascending: Boolean) = new SortingKeyComparator(rowFormat, ascending)
 }
 
-class SortingKeyComparator private[SortingKeyComparator] (rowFormat: RowFormat, ascending: Boolean)
-    extends Comparator[Array[Byte]] with Serializable {
+class SortingKeyComparator private[SortingKeyComparator] (rowFormat: RowFormat, ascending: Boolean) extends Comparator[Array[Byte]] with Serializable {
 
   def compare(a: Array[Byte], b: Array[Byte]) = {
     val ret = rowFormat.compare(a, b)

@@ -37,13 +37,12 @@ import java.io._
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicInteger
 
-
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import scalaz.{NonEmptyList => NEL, _}
+import scalaz.{ NonEmptyList => NEL, _ }
 import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
@@ -67,7 +66,7 @@ case class GetMessages(sendTo: ActorRef)
 
 sealed trait ShardIngestAction
 sealed trait IngestResult extends ShardIngestAction
-case class IngestErrors(errors: Seq[String]) extends IngestResult
+case class IngestErrors(errors: Seq[String])               extends IngestResult
 case class IngestData(messages: Seq[(Long, EventMessage)]) extends IngestResult
 
 case class ProjectionUpdatesExpected(projections: Int)
@@ -83,7 +82,8 @@ trait IngestFailureLog {
   def persist: IO[IngestFailureLog]
 }
 
-case class FilesystemIngestFailureLog(failureLog: Map[EventMessage, FilesystemIngestFailureLog.LogRecord], restoreFrom: YggCheckpoint, persistDir: File) extends IngestFailureLog {
+case class FilesystemIngestFailureLog(failureLog: Map[EventMessage, FilesystemIngestFailureLog.LogRecord], restoreFrom: YggCheckpoint, persistDir: File)
+    extends IngestFailureLog {
   import scala.math.Ordering.Implicits._
   import FilesystemIngestFailureLog._
   import FilesystemIngestFailureLog.LogRecord._
@@ -96,7 +96,7 @@ case class FilesystemIngestFailureLog(failureLog: Map[EventMessage, FilesystemIn
 
   def persist: IO[IngestFailureLog] = IO {
     val logFile = new File(persistDir, FilePrefix + System.currentTimeMillis + ".tmp")
-    val out = new PrintWriter(new FileWriter(logFile))
+    val out     = new PrintWriter(new FileWriter(logFile))
     try {
       for (rec <- failureLog.values) out.println(rec.serialize.renderCompact)
     } finally {
@@ -117,8 +117,9 @@ object FilesystemIngestFailureLog {
 
     def readAll(reader: BufferedReader, into: Map[EventMessage, LogRecord]): Map[EventMessage, LogRecord] = {
       val line = reader.readLine()
-      if (line == null) into else {
-        val logRecord = ((Thrown(_:Throwable)) <-: JParser.parseFromString(line)).flatMap(_.validated[LogRecord]).valueOr(err => sys.error(err.message))
+      if (line == null) into
+      else {
+        val logRecord = ((Thrown(_: Throwable)) <-: JParser.parseFromString(line)).flatMap(_.validated[LogRecord]).valueOr(err => sys.error(err.message))
 
         readAll(reader, into + (logRecord.message -> logRecord))
       }
@@ -130,7 +131,10 @@ object FilesystemIngestFailureLog {
       val reader = new BufferedReader(new FileReader(logFiles.maxBy(_.getName.substring(FilePrefix.length).dropRight(4).toLong)))
       try {
         val failureLog = readAll(reader, Map.empty[EventMessage, LogRecord])
-        new FilesystemIngestFailureLog(failureLog, if (failureLog.isEmpty) initialCheckpoint else failureLog.values.minBy(_.lastKnownGood).lastKnownGood, persistDir)
+        new FilesystemIngestFailureLog(
+          failureLog,
+          if (failureLog.isEmpty) initialCheckpoint else failureLog.values.minBy(_.lastKnownGood).lastKnownGood,
+          persistDir)
       } finally {
         reader.close()
       }
@@ -141,9 +145,9 @@ object FilesystemIngestFailureLog {
   object LogRecord {
     implicit val decomposer: Decomposer[LogRecord] = new Decomposer[LogRecord] {
       def decompose(rec: LogRecord) = JObject(
-        "offset" -> rec.offset.serialize,
-        "messageType" -> rec.message.fold(_ => "ingest", _ => "archive", _ => "storeFile").serialize,
-        "message" -> rec.message.serialize,
+        "offset"        -> rec.offset.serialize,
+        "messageType"   -> rec.message.fold(_ => "ingest", _ => "archive", _ => "storeFile").serialize,
+        "message"       -> rec.message.serialize,
         "lastKnownGood" -> rec.lastKnownGood.serialize
       )
     }
@@ -151,15 +155,16 @@ object FilesystemIngestFailureLog {
     implicit val extractor: Extractor[LogRecord] = new Extractor[LogRecord] {
       def validated(jv: JValue) = {
         for {
-          offset  <- jv.validated[Long]("offset")
+          offset <- jv.validated[Long]("offset")
           msgType <- jv.validated[String]("messageType")
           message <- msgType match {
-                       case "ingest" => jv.validated[EventMessage.EventMessageExtraction]("message")(IngestMessage.Extractor).flatMap {
-                         _.map(Success(_)).getOrElse(Failure(Invalid("Incomplete ingest message")))
-                       }
+                      case "ingest" =>
+                        jv.validated[EventMessage.EventMessageExtraction]("message")(IngestMessage.Extractor).flatMap {
+                          _.map(Success(_)).getOrElse(Failure(Invalid("Incomplete ingest message")))
+                        }
 
-                       case "archive" => jv.validated[ArchiveMessage]("message")
-                     }
+                      case "archive" => jv.validated[ArchiveMessage]("message")
+                    }
           checkpoint <- jv.validated[YggCheckpoint]("lastKnownGood")
         } yield LogRecord(offset, message, checkpoint)
       }

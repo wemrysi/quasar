@@ -59,13 +59,13 @@ object IOUtils extends Logging {
   }
 
   /** Performs a safe write to the file. Returns true
-   * if the file was completely written, false otherwise
-   */
+    * if the file was completely written, false otherwise
+    */
   def safeWriteToFile(s: String, f: File): IO[Boolean] = {
     val tmpFile = new File(f.getParentFile, f.getName + "-" + System.nanoTime + ".tmp")
 
-    overwriteFile(s, tmpFile) flatMap {
-      _ => IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
+    overwriteFile(s, tmpFile) flatMap { _ =>
+      IO(tmpFile.renameTo(f)) // TODO: This is only atomic on POSIX systems
     }
   }
 
@@ -89,7 +89,9 @@ object IOUtils extends Logging {
       if (Option(startDir.list).exists(_.length == 0)) {
         IO {
           startDir.delete()
-        }.flatMap { _ => recursiveDeleteEmptyDirs(startDir.getParentFile, upTo) }
+        }.flatMap { _ =>
+          recursiveDeleteEmptyDirs(startDir.getParentFile, upTo)
+        }
       } else {
         IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir); PrecogUnit }
       }
@@ -102,7 +104,7 @@ object IOUtils extends Logging {
     val tmpDir = Files.createTempDir()
     Option(tmpDir.getParentFile).map { parent =>
       val newTmpDir = new File(parent, prefix + tmpDir.getName)
-      if (! tmpDir.renameTo(newTmpDir)) {
+      if (!tmpDir.renameTo(newTmpDir)) {
         sys.error("Error on tmpdir creation: rename to prefixed failed")
       }
       newTmpDir

@@ -23,7 +23,7 @@ package vfs
 import com.precog.common._
 import com.precog.common.security.Authorities
 
-import blueeyes.core.http.{MimeType, MimeTypes}
+import blueeyes.core.http.{ MimeType, MimeTypes }
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
@@ -48,10 +48,7 @@ object BlobMetadata {
     }
   }
 
-  val schema = "mimeType" :: "size" :: "created" :: "authorities" :: HNil
+  val schema              = "mimeType" :: "size" :: "created" :: "authorities" :: HNil
   implicit val decomposer = decomposerV[BlobMetadata](schema, Some("1.0".v))
-  implicit val extractor = extractorV[BlobMetadata](schema, Some("1.0".v))
+  implicit val extractor  = extractorV[BlobMetadata](schema, Some("1.0".v))
 }
-
-
-

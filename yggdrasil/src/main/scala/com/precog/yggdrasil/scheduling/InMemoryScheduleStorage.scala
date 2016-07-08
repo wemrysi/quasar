@@ -30,7 +30,7 @@ import scalaz.EitherT
 
 class InMemoryScheduleStorage(implicit executor: ExecutionContext) extends ScheduleStorage[Future] {
   private implicit val M = new blueeyes.bkka.FutureMonad(executor)
-  private[this] var tasks = Map.empty[UUID, ScheduledTask]
+  private[this] var tasks   = Map.empty[UUID, ScheduledTask]
   private[this] var history = Map.empty[UUID, Seq[ScheduledRunReport]]
 
   def addTask(task: ScheduledTask) = EitherT.right {
@@ -56,7 +56,7 @@ class InMemoryScheduleStorage(implicit executor: ExecutionContext) extends Sched
   def statusFor(id: UUID, limit: Option[Int]) = Promise successful {
     tasks.get(id) map { task =>
       val reports = history.getOrElse(id, Seq.empty[ScheduledRunReport])
-      (task, limit map(reports.take) getOrElse reports)
+      (task, limit map (reports.take) getOrElse reports)
     }
   }
 

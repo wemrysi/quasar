@@ -24,10 +24,10 @@ import java.net.URL
 import scalaz._
 
 /**
- * Very stupid-simple HTTP client.  If we need something more powerful, speak
- * to the management.
- */
-trait HttpClientModule[M[+_]] {
+  * Very stupid-simple HTTP client.  If we need something more powerful, speak
+  * to the management.
+  */
+trait HttpClientModule[M[+ _]] {
   implicit def M: Monad[M]
 
   type HttpClient <: HttpClientLike
@@ -40,7 +40,7 @@ trait HttpClientModule[M[+_]] {
 
   sealed trait HttpMethod
   object HttpMethod {
-    object GET extends HttpMethod
+    object GET  extends HttpMethod
     object POST extends HttpMethod
   }
 
@@ -60,13 +60,9 @@ trait HttpClientModule[M[+_]] {
     }
   }
 
-  case class Request[+A](
-      method: HttpMethod = HttpMethod.GET,
-      path: String = "",
-      params: List[(String, String)] = Nil,
-      body: Option[Request.Body[A]] = None) {
+  case class Request[+A](method: HttpMethod = HttpMethod.GET, path: String = "", params: List[(String, String)] = Nil, body: Option[Request.Body[A]] = None) {
 
-    def /(part: String): Request[A] = copy(path = path + "/" + part)
+    def /(part: String): Request[A]        = copy(path = path + "/" + part)
     def ?(p: (String, String)): Request[A] = copy(params = p :: params)
     def &(p: (String, String)): Request[A] = copy(params = p :: params)
 
@@ -86,8 +82,9 @@ trait HttpClientModule[M[+_]] {
 
     def map[B](f: A => B): Response[B] = Response(code, message, body map f)
 
-    def ok: HttpClientError \/ A = body map { data =>
-      if (code / 200 != 1) -\/(NotOk(code, message)) else \/-(data)
-    } getOrElse -\/(EmptyBody)
+    def ok: HttpClientError \/ A =
+      body map { data =>
+        if (code / 200 != 1) -\/(NotOk(code, message)) else \/-(data)
+      } getOrElse -\/(EmptyBody)
   }
 }

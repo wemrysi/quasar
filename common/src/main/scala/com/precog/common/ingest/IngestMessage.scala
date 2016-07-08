@@ -32,7 +32,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
-import blueeyes.json.serialization.JodaSerializationImplicits.{InstantExtractor, InstantDecomposer}
+import blueeyes.json.serialization.JodaSerializationImplicits.{ InstantExtractor, InstantDecomposer }
 
 import java.nio.charset.Charset
 import java.util.UUID
@@ -95,14 +95,21 @@ object IngestRecord {
 }
 
 /**
- * ownerAccountId must be determined before the message is sent to the central queue; we have to
- * accept records for processing in the local queue.
- */
-case class IngestMessage(apiKey: APIKey, path: Path, writeAs: Authorities, data: Seq[IngestRecord], jobId: Option[JobId], timestamp: Instant, streamRef: StreamRef) extends EventMessage {
+  * ownerAccountId must be determined before the message is sent to the central queue; we have to
+  * accept records for processing in the local queue.
+  */
+case class IngestMessage(apiKey: APIKey,
+                         path: Path,
+                         writeAs: Authorities,
+                         data: Seq[IngestRecord],
+                         jobId: Option[JobId],
+                         timestamp: Instant,
+                         streamRef: StreamRef)
+    extends EventMessage {
   def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = im(this)
   def split: Seq[IngestMessage] = {
     if (data.size > 1) {
-      val (dataA, dataB) = data.splitAt(data.size / 2)
+      val (dataA, dataB)  = data.splitAt(data.size / 2)
       val Seq(refA, refB) = streamRef.split(2)
       List(this.copy(data = dataA, streamRef = refA), this.copy(data = dataB, streamRef = refB))
     } else {
@@ -118,7 +125,7 @@ object IngestMessage {
 
   implicit val ingestMessageIso = Iso.hlist(IngestMessage.apply _, IngestMessage.unapply _)
 
-  val schemaV1 = "apiKey"  :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
+  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
   implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
 
   val decomposerV1: Decomposer[IngestMessage] = decomposerV[IngestMessage](schemaV1, Some("1.1".v))
@@ -131,22 +138,26 @@ object IngestMessage {
     override def validated(obj: JValue): Validation[Error, EventMessageExtraction] =
       obj.validated[Ingest]("event").flatMap { ingest =>
         (obj.validated[Int]("producerId") |@|
-         obj.validated[Int]("eventId")) { (producerId, sequenceId) =>
-          val eventRecords = ingest.data map { jv => IngestRecord(EventId(producerId, sequenceId), jv) }
+              obj.validated[Int]("eventId")) { (producerId, sequenceId) =>
+          val eventRecords = ingest.data map { jv =>
+            IngestRecord(EventId(producerId, sequenceId), jv)
+          }
           ingest.writeAs map { authorities =>
             assert(ingest.data.size == 1)
             \/.right(IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
           } getOrElse {
             \/.left(
-              (ingest.apiKey, ingest.path, (authorities: Authorities) =>
-                IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
+              (ingest.apiKey,
+               ingest.path,
+               (authorities: Authorities) =>
+                 IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
             )
           }
         }
-    }
+      }
   }
 
-  implicit val Decomposer: Decomposer[IngestMessage] = decomposerV1
+  implicit val Decomposer: Decomposer[IngestMessage]        = decomposerV1
   implicit val Extractor: Extractor[EventMessageExtraction] = extractorV1 <+> extractorV0
 }
 
@@ -161,22 +172,30 @@ object ArchiveMessage {
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
 
   val decomposerV1: Decomposer[ArchiveMessage] = decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
-  val extractorV1: Extractor[ArchiveMessage] = extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
+  val extractorV1: Extractor[ArchiveMessage]   = extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
   val extractorV0: Extractor[ArchiveMessage] = new Extractor[ArchiveMessage] {
     override def validated(obj: JValue): Validation[Error, ArchiveMessage] = {
       (obj.validated[Int]("producerId") |@|
-       obj.validated[Int]("deletionId") |@|
-       obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
+            obj.validated[Int]("deletionId") |@|
+            obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
         ArchiveMessage(archive.apiKey, archive.path, archive.jobId, EventId(producerId, sequenceId), defaultTimestamp)
       }
     }
   }
 
   implicit val Decomposer: Decomposer[ArchiveMessage] = decomposerV1
-  implicit val Extractor: Extractor[ArchiveMessage] = extractorV1 <+> extractorV0
+  implicit val Extractor: Extractor[ArchiveMessage]   = extractorV1 <+> extractorV0
 }
 
-case class StoreFileMessage(apiKey: APIKey, path: Path, writeAs: Authorities, jobId: Option[JobId], eventId: EventId, content: FileContent, timestamp: Instant, streamRef: StreamRef) extends EventMessage {
+case class StoreFileMessage(apiKey: APIKey,
+                            path: Path,
+                            writeAs: Authorities,
+                            jobId: Option[JobId],
+                            eventId: EventId,
+                            content: FileContent,
+                            timestamp: Instant,
+                            streamRef: StreamRef)
+    extends EventMessage {
   def fold[A](im: IngestMessage => A, am: ArchiveMessage => A, sf: StoreFileMessage => A): A = sf(this)
 }
 
@@ -189,4 +208,3 @@ object StoreFileMessage {
 
   implicit val Extractor: Extractor[StoreFileMessage] = extractorV[StoreFileMessage](schemaV1, Some("1.0".v))
 }
-

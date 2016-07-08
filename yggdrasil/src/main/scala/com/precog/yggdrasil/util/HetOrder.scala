@@ -24,20 +24,20 @@ import com.precog.common._
 import com.precog.util.NumericComparisons
 
 /**
- * Compare values of different types.
- */
+  * Compare values of different types.
+  */
 trait HetOrder[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B] {
   def compare(a: A, b: B): Int
 }
 
 trait HetOrderLow {
-  implicit def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](
-      implicit ho: HetOrder[A, B]) = new HetOrder[B, A] {
-    def compare(b: B, a: A) = {
-      val cmp = ho.compare(a, b)
-      if (cmp < 0) 1 else if (cmp == 0) 0 else -1
+  implicit def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](implicit ho: HetOrder[A, B]) =
+    new HetOrder[B, A] {
+      def compare(b: B, a: A) = {
+        val cmp = ho.compare(a, b)
+        if (cmp < 0) 1 else if (cmp == 0) 0 else -1
+      }
     }
-  }
 
   implicit def fromOrder[@specialized(Boolean, Long, Double, AnyRef) A](implicit o: SpireOrder[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A) = o.compare(a, b)
@@ -61,21 +61,21 @@ object HetOrder extends HetOrderLow {
 }
 
 /**
- * Extra SpireOrders that fill out the rest of our value types.
- */
+  * Extra SpireOrders that fill out the rest of our value types.
+  */
 object ExtraOrders {
   implicit object BooleanOrder extends SpireOrder[Boolean] {
-    def eqv(a: Boolean, b: Boolean) = a == b
+    def eqv(a: Boolean, b: Boolean)     = a == b
     def compare(a: Boolean, b: Boolean) = if (a == b) 0 else if (a) 1 else -1
   }
 
   implicit object StringOrder extends SpireOrder[String] {
-    def eqv(a: String, b: String) = a == b
+    def eqv(a: String, b: String)     = a == b
     def compare(a: String, b: String) = a compareTo b
   }
 
   implicit object DateTimeOrder extends SpireOrder[DateTime] {
-    def eqv(a: DateTime, b: DateTime) = compare(a, b) == 0
+    def eqv(a: DateTime, b: DateTime)     = compare(a, b) == 0
     def compare(a: DateTime, b: DateTime) = a compareTo b
   }
 }

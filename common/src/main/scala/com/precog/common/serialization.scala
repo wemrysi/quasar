@@ -19,14 +19,14 @@
  */
 package com.precog.common
 
-import blueeyes.core.http.{MimeType, MimeTypes}
+import blueeyes.core.http.{ MimeType, MimeTypes }
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
 import java.util.UUID
 
-import scalaz.{Failure, Success}
+import scalaz.{ Failure, Success }
 
 package object serialization {
   implicit val uuidDecomposer: Decomposer[UUID] = new Decomposer[UUID] {
@@ -42,7 +42,7 @@ package object serialization {
   }
 
   implicit val mimeTypeExtractor: Extractor[MimeType] = new Extractor[MimeType] {
-    def validated(jv: JValue) = jv.validated[String] map(MimeTypes.parseMimeTypes(_).toList) flatMap {
+    def validated(jv: JValue) = jv.validated[String] map (MimeTypes.parseMimeTypes(_).toList) flatMap {
       case Nil =>
         Failure(Extractor.Error.invalid("No mime types found in " + jv.renderCompact))
 

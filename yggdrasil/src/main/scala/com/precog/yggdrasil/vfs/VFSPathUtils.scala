@@ -21,14 +21,14 @@ package com.precog.yggdrasil
 package vfs
 
 import com.precog.common._
-import com.precog.common.security.{APIKey, PermissionsFinder}
+import com.precog.common.security.{ APIKey, PermissionsFinder }
 import com.precog.niflheim.NIHDBActor
 import com.precog.yggdrasil.metadata._
 import ResourceError._
 
 import org.slf4s.Logging
 
-import java.io.{File, FileFilter}
+import java.io.{ File, FileFilter }
 
 import org.apache.commons.io.filefilter.FileFilterUtils
 
@@ -51,7 +51,7 @@ object VFSPathUtils extends Logging {
   private[yggdrasil] final val escapeSuffix = "_byUser"
 
   private final val pathFileFilter: FileFilter = {
-    import FileFilterUtils.{notFileFilter => not, _}
+    import FileFilterUtils.{ notFileFilter => not, _ }
     and(not(nameFileFilter(versionsSubdir)), not(nameFileFilter(perAuthProjectionsDir)))
   }
 
@@ -138,11 +138,10 @@ object VFSPathUtils extends Logging {
 
                 case otherError =>
                   IO(\/.left(otherError))
-              },
-              {
+              }, {
                 case VersionEntry(uuid, dataType, timestamp) =>
                   containsNonemptyChild(Option(pathDir0.listFiles(pathFileFilter)).toList.flatten) map {
-                    case true => \/.right(PathMetadata(path, PathMetadata.DataDir(dataType.contentType)))
+                    case true  => \/.right(PathMetadata(path, PathMetadata.DataDir(dataType.contentType)))
                     case false => \/.right(PathMetadata(path, PathMetadata.DataOnly(dataType.contentType)))
                   }
               }

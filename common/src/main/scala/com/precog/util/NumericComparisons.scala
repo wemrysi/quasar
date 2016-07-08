@@ -64,7 +64,6 @@ object NumericComparisons {
     if (a + aError < b - bError) -1 else if (a - aError > b + bError) 1 else 0
   }
 
-
   import scalaz.Ordering.{ LT, GT, EQ }
 
   @inline def order(a: Long, b: Long): scalaz.Ordering =

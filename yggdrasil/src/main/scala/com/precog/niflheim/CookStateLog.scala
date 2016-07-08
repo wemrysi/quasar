@@ -23,7 +23,7 @@ import com.precog.common._
 import com.precog.util.FileLock
 import org.objectweb.howl.log._
 
-import java.io.{File, RandomAccessFile}
+import java.io.{ File, RandomAccessFile }
 import java.nio.ByteBuffer
 import java.util.concurrent.ScheduledExecutorService
 
@@ -31,7 +31,7 @@ import scala.collection.immutable.SortedMap
 
 object CookStateLog {
   final val lockName = "txLog"
-  final val logName = "CookStateLog"
+  final val logName  = "CookStateLog"
 }
 
 class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends org.slf4s.Logging {
@@ -123,17 +123,16 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends o
 
     txLog.mark(pendingCookIds0.headOption match {
       case Some((_, txKey)) => txKey
-      case None => completeTxKey
+      case None             => completeTxKey
     })
   }
 }
-
 
 sealed trait TXLogEntry {
   def blockId: Long
 }
 
-case class StartCook(blockId: Long) extends TXLogEntry
+case class StartCook(blockId: Long)    extends TXLogEntry
 case class CompleteCook(blockId: Long) extends TXLogEntry
 
 object TXLogEntry extends org.slf4s.Logging {
@@ -143,13 +142,15 @@ object TXLogEntry extends org.slf4s.Logging {
     buffer.getShort match {
       case 0x1 => StartCook(buffer.getLong)
       case 0x2 => CompleteCook(buffer.getLong)
-      case other => log.error("Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
+      case other =>
+        log.error(
+          "Unknown TX log record type = %d, isCTRL = %s, isEOB = %s from %s".format(other, record.isCTRL, record.isEOB, record.data.mkString("[", ", ", "]")))
     }
   }
 
   def toBytes(entry: TXLogEntry): Array[Array[Byte]] = {
     val (tpe, size) = entry match {
-      case StartCook(blockId) => (0x1, 42)
+      case StartCook(blockId)    => (0x1, 42)
       case CompleteCook(blockId) => (0x2, 42)
     }
 
@@ -162,5 +163,3 @@ object TXLogEntry extends org.slf4s.Logging {
     Array[Array[Byte]](record)
   }
 }
-
-

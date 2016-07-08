@@ -30,7 +30,7 @@ import scalaz.syntax.monad._
 
 trait JValueByteChunkTranscoders {
   private implicit val seqJValueMonoid = new Monoid[Seq[JValue]] {
-    def zero = Seq.empty[JValue]
+    def zero                                        = Seq.empty[JValue]
     def append(xs: Seq[JValue], ys: => Seq[JValue]) = xs ++ ys
   }
 
@@ -44,8 +44,7 @@ trait JValueByteChunkTranscoders {
       fres.flatMap { res =>
         res.content match {
           case Some(bc) =>
-            val fv: Future[Validation[Seq[Throwable], JValue]] =
-              JsonUtil.parseSingleFromByteChunk(bc)
+            val fv: Future[Validation[Seq[Throwable], JValue]] = JsonUtil.parseSingleFromByteChunk(bc)
             fv.map(v => res.copy(content = v.toOption))
           case None =>
             M.point(res.copy(content = None))
@@ -61,7 +60,7 @@ object JsonUtil {
   def parseSingleFromByteChunk(bc: ByteChunk)(implicit M: Monad[Future]): Future[Validation[Seq[Throwable], JValue]] =
     parseSingleFromStream[Future](bc.fold(_ :: StreamT.empty, identity))
 
-  def parseSingleFromStream[M[+_]: Monad](stream: StreamT[M, Array[Byte]]): M[Validation[Seq[Throwable], JValue]] = {
+  def parseSingleFromStream[M[+ _]: Monad](stream: StreamT[M, Array[Byte]]): M[Validation[Seq[Throwable], JValue]] = {
     def rec(stream: StreamT[M, Array[Byte]], parser: AsyncParser): M[Validation[Seq[Throwable], JValue]] = {
       def handle(ap: AsyncParse, next: => M[Validation[Seq[Throwable], JValue]]): M[Validation[Seq[Throwable], JValue]] = ap match {
         case AsyncParse(errors, _) if errors.nonEmpty =>
@@ -85,24 +84,24 @@ object JsonUtil {
     rec(stream, AsyncParser.json())
   }
 
-
   def parseManyFromByteChunk(bc: ByteChunk)(implicit M: Monad[Future]): StreamT[Future, AsyncParse] =
     parseManyFromStream[Future](bc.fold(_ :: StreamT.empty, identity))
 
-  def parseManyFromStream[M[+_]: Monad](stream: StreamT[M, Array[Byte]]): StreamT[M, AsyncParse] = {
+  def parseManyFromStream[M[+ _]: Monad](stream: StreamT[M, Array[Byte]]): StreamT[M, AsyncParse] = {
     // create a new stream, using the current stream and parser
     StreamT.unfoldM((stream, AsyncParser.stream())) {
-      case (stream, parser) => stream.uncons map {
-        case Some((bytes, tail)) =>
-          // parse the current byte buffer, keeping track of the
-          // new parser instance we were given back
-          val (r, parser2) = parser(More(ByteBufferWrap(bytes)))
-          Some((r, (tail, parser2)))
-        case None =>
-          // once we're out of byte buffers, send None to signal EOF
-          val (r, parser2) = parser(Done)
-          Some((r, (StreamT.empty, parser2)))
-      }
+      case (stream, parser) =>
+        stream.uncons map {
+          case Some((bytes, tail)) =>
+            // parse the current byte buffer, keeping track of the
+            // new parser instance we were given back
+            val (r, parser2) = parser(More(ByteBufferWrap(bytes)))
+            Some((r, (tail, parser2)))
+          case None =>
+            // once we're out of byte buffers, send None to signal EOF
+            val (r, parser2) = parser(Done)
+            Some((r, (StreamT.empty, parser2)))
+        }
     }
   }
 }

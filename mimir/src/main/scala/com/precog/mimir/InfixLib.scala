@@ -27,27 +27,25 @@ import yggdrasil.table._
 
 import com.precog.util.NumericComparisons
 
-trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
+trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {
-    import StdLib.{BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined, StrAndDateT, dateToStrCol}
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined, StrAndDateT, dateToStrCol }
 
     object Infix {
       val InfixNamespace = Vector("std", "infix")
 
-      final def longOk(x: Long, y: Long) = true
-      final def doubleOk(x: Double, y: Double) = true
+      final def longOk(x: Long, y: Long)            = true
+      final def doubleOk(x: Double, y: Double)      = true
       final def numOk(x: BigDecimal, y: BigDecimal) = true
 
-      final def longNeZero(x: Long, y: Long) = y != 0
-      final def doubleNeZero(x: Double, y: Double) = y != 0.0
+      final def longNeZero(x: Long, y: Long)            = y != 0
+      final def doubleNeZero(x: Double, y: Double)      = y != 0.0
       final def numNeZero(x: BigDecimal, y: BigDecimal) = y != 0
 
-      class InfixOp2(name: String, longf: (Long, Long) => Long,
-        doublef: (Double, Double) => Double,
-        numf: (BigDecimal, BigDecimal) => BigDecimal)
-      extends Op2F2(InfixNamespace, name) {
+      class InfixOp2(name: String, longf: (Long, Long) => Long, doublef: (Double, Double) => Double, numf: (BigDecimal, BigDecimal) => BigDecimal)
+          extends Op2F2(InfixNamespace, name) {
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-        def f2(ctx: MorphContext): F2 = CF2P("builtin::infix::op2::"+name) {
+        def f2(ctx: MorphContext): F2 = CF2P("builtin::infix::op2::" + name) {
           case (c1: LongColumn, c2: LongColumn) =>
             new LongFrom.LL(c1, c2, longOk, longf)
 
@@ -236,9 +234,9 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         }
       }
 
-      val Lt = new CompareOp2("lt", _ < 0)
+      val Lt   = new CompareOp2("lt", _ < 0)
       val LtEq = new CompareOp2("lte", _ <= 0)
-      val Gt = new CompareOp2("gt", _ > 0)
+      val Gt   = new CompareOp2("gt", _ > 0)
       val GtEq = new CompareOp2("gte", _ >= 0)
 
       class BoolOp2(name: String, f: (Boolean, Boolean) => Boolean) extends Op2F2(InfixNamespace, name) {
@@ -249,7 +247,7 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       }
 
       val And = new BoolOp2("and", _ && _)
-      val Or = new BoolOp2("or", _ || _)
+      val Or  = new BoolOp2("or", _ || _)
 
       val concatString = new Op2F2(InfixNamespace, "concatString") {
         //@deprecated, see the DEPRECATED comment in StringLib
@@ -259,9 +257,9 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           new StrFrom.SS(c1, c2, _ != null && _ != null, _ + _)
 
         def f2(ctx: MorphContext): F2 = CF2P("builtin::infix:concatString") {
-          case (c1: StrColumn, c2: StrColumn) => build(c1, c2)
-          case (c1: DateColumn, c2: StrColumn) => build(dateToStrCol(c1), c2)
-          case (c1: StrColumn, c2: DateColumn) => build(c1, dateToStrCol(c2))
+          case (c1: StrColumn, c2: StrColumn)   => build(c1, c2)
+          case (c1: DateColumn, c2: StrColumn)  => build(dateToStrCol(c1), c2)
+          case (c1: StrColumn, c2: DateColumn)  => build(c1, dateToStrCol(c2))
           case (c1: DateColumn, c2: DateColumn) => build(dateToStrCol(c1), dateToStrCol(c2))
         }
       }

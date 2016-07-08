@@ -36,15 +36,15 @@ object ResourceError {
 
   implicit val show = Show.showFromToString[ResourceError]
 
-  def corrupt(message: String): ResourceError with FatalError = Corrupt(message)
-  def ioError(ex: Throwable): ResourceError with FatalError = IOError(ex)
+  def corrupt(message: String): ResourceError with FatalError         = Corrupt(message)
+  def ioError(ex: Throwable): ResourceError with FatalError           = IOError(ex)
   def permissionsError(message: String): ResourceError with UserError = PermissionsError(message)
-  def notFound(message: String): ResourceError with UserError = NotFound(message)
+  def notFound(message: String): ResourceError with UserError         = NotFound(message)
 
   def all(errors: NonEmptyList[ResourceError]): ResourceError with FatalError with UserError = new ResourceErrors(
     errors flatMap {
       case ResourceErrors(e0) => e0
-      case other => NonEmptyList(other)
+      case other              => NonEmptyList(other)
     }
   )
 
@@ -89,4 +89,3 @@ object ResourceError {
     def messages: NonEmptyList[String] = errors.flatMap(_.messages)
   }
 }
-

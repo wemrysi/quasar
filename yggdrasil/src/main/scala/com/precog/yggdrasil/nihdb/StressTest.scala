@@ -45,10 +45,12 @@ class StressTest {
 
   def makechef = new Chef(
     VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
-    VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
+    VersionedSegmentFormat(Map(1     -> V1SegmentFormat))
   )
 
-  val chefs = (1 to 4).map { _ => actorSystem.actorOf(AkkaProps(makechef)) }
+  val chefs = (1 to 4).map { _ =>
+    actorSystem.actorOf(AkkaProps(makechef))
+  }
 
   val chef = actorSystem.actorOf(AkkaProps[Chef].withRouter(RoundRobinRouter(chefs)))
 
@@ -59,7 +61,9 @@ class StressTest {
   val txLogScheduler = new ScheduledThreadPoolExecutor(10, (new ThreadFactoryBuilder()).setNameFormat("HOWL-sched-%03d").build())
 
   def newNihdb(workDir: File, threshold: Int = 1000): NIHDB =
-    NIHDB.create(chef, authorities, workDir, threshold, Duration(60, "seconds"), txLogScheduler)(actorSystem).unsafePerformIO.valueOr { e => throw new Exception(e.message) }
+    NIHDB.create(chef, authorities, workDir, threshold, Duration(60, "seconds"), txLogScheduler)(actorSystem).unsafePerformIO.valueOr { e =>
+      throw new Exception(e.message)
+    }
 
   implicit val M = new FutureMonad(actorSystem.dispatcher)
 
@@ -69,15 +73,15 @@ class StressTest {
     def fromFuture[A](f: Future[A]): A = Await.result(f, Duration(60, "seconds"))
 
     val workDir = IOUtils.createTmpDir("nihdbspecs").unsafePerformIO
-    val nihdb = newNihdb(workDir)
+    val nihdb   = newNihdb(workDir)
 
     def close(proj: NIHDB) = fromFuture(proj.close(actorSystem))
 
     def finish() = {
-        (for {
-          _ <- IO { close(nihdb) }
-          _ <- IOUtils.recursiveDelete(workDir)
-        } yield ()).unsafePerformIO
+      (for {
+        _ <- IO { close(nihdb) }
+        _ <- IOUtils.recursiveDelete(workDir)
+      } yield ()).unsafePerformIO
     }
 
     def runNihAsync(i: Int, f: File, bufSize: Int, _eventid: Long): Long = {
@@ -92,7 +96,7 @@ class StressTest {
 
       def timeit2(s: String) {
         val tt = System.currentTimeMillis()
-        val d = (tt - t) * 0.001
+        val d  = (tt - t) * 0.001
         println("%s in %.3fs (%.3fs/M)" format (s, d, d / i))
         t = tt
       }
@@ -104,17 +108,17 @@ class StressTest {
       val ch = new FileInputStream(f).getChannel
       val bb = ByteBuffer.allocate(bufSize)
 
-      @tailrec def loop(p: AsyncParser) {
+      @tailrec
+      def loop(p: AsyncParser) {
         val n = ch.read(bb)
         bb.flip()
 
-        val input = if (n >= 0) More(bb) else Done
+        val input                                 = if (n >= 0) More(bb) else Done
         val (AsyncParse(errors, results), parser) = p(input)
         if (!errors.isEmpty) sys.error("errors: %s" format errors)
         //projection.insert(Array(eventid), results)
         val eventidobj = EventId.fromLong(eventid)
         nihdb.insert(Seq(NIHDB.Batch(eventid, results)))
-
 
         eventid += 1L
         bb.flip()
@@ -146,10 +150,10 @@ class StressTest {
     }
   }
 
- def main(args: Array[String]) {
+  def main(args: Array[String]) {
     var eventid: Long = 1L
     val ctxt = new TempContext()
-    val f = new File("yggdrasil/src/test/resources/z1m_nl.json")
+    val f    = new File("yggdrasil/src/test/resources/z1m_nl.json")
     //val f = new File("yggdrasil/src/test/resources/z100k_nl.json")
 
     val t0 = System.currentTimeMillis()

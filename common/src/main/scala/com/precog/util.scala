@@ -29,7 +29,7 @@ import scala.collection.mutable
 import scalaz.Bind
 
 package object util {
-  type RawBitSet  = Array[Int]
+  type RawBitSet = Array[Int]
 
   class Order2JComparator[A](order: scalaz.Order[A]) {
     def toJavaComparator: Comparator[A] = new Comparator[A] {
@@ -49,12 +49,12 @@ package object util {
   }
 
   implicit def vectorMonoid[A]: Monoid[Vector[A]] = new Monoid[Vector[A]] {
-    def zero: Vector[A] = Vector.empty[A]
+    def zero: Vector[A]                         = Vector.empty[A]
     def append(v1: Vector[A], v2: => Vector[A]) = v1 ++ v2
   }
 
   implicit def bigDecimalMonoid: Monoid[BigDecimal] = new Monoid[BigDecimal] {
-    def zero: BigDecimal = BigDecimal(0)
+    def zero: BigDecimal                                      = BigDecimal(0)
     def append(v1: BigDecimal, v2: => BigDecimal): BigDecimal = v1 + v2
   }
 
@@ -63,18 +63,20 @@ package object util {
 
     private val m: mutable.ConcurrentMap[A, C] = new java.util.concurrent.ConcurrentHashMap[A, C]().asScala
 
-    def iterator: Iterator[(A, C)] = source.keysIterator map { a => (a, apply(a)) }
+    def iterator: Iterator[(A, C)] = source.keysIterator map { a =>
+      (a, apply(a))
+    }
 
     def get(a: A): Option[C] = {
       m get a orElse (source get a map { b =>
-        val c = f(b)
-        m.putIfAbsent(a, c)
-        c
-      })
+            val c = f(b)
+            m.putIfAbsent(a, c)
+            c
+          })
     }
 
-    def + [C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
-    def - (a: A): Map[A, C] = iterator.toMap - a
+    def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
+    def -(a: A): Map[A, C]                  = iterator.toMap - a
   }
 
   sealed trait LazyMapValues[A, B] {
@@ -98,7 +100,7 @@ package object util {
   implicit val InstantOrdering: Ordering[Instant] = Ordering.Long.on[Instant](_.getMillis)
 
   implicit val FutureBind: Bind[Future] = new Bind[Future] {
-    def map[A, B](fut: Future[A])(f: A => B) = fut.map(f)
+    def map[A, B](fut: Future[A])(f: A => B)          = fut.map(f)
     def bind[A, B](fut: Future[A])(f: A => Future[B]) = fut.flatMap(f)
   }
 }

@@ -33,8 +33,7 @@ import com.precog.common._
 import com.precog.util.IdGen
 import com.precog.util._
 
-
-import com.precog.util.{BitSet, BitSetUtil}
+import com.precog.util.{ BitSet, BitSetUtil }
 
 import blueeyes.json._
 
@@ -50,7 +49,7 @@ import scalaz.syntax.std.boolean._
 
 import TableModule._
 
-trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
+trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
   //import library._
   import trans._
   import constants._
@@ -63,14 +62,21 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     val EmptyNamespace = Vector()
 
     override def _libMorphism1 = super._libMorphism1 ++ Set(Median, Mode, Rank, DenseRank, IndexedRank, Dummy)
-    override def _libMorphism2 = super._libMorphism2 ++ Set(Covariance, LinearCorrelation, LinearRegression, LogarithmicRegression, SimpleExponentialSmoothing, DoubleExponentialSmoothing)
+    override def _libMorphism2 =
+      super._libMorphism2 ++ Set(
+        Covariance,
+        LinearCorrelation,
+        LinearRegression,
+        LogarithmicRegression,
+        SimpleExponentialSmoothing,
+        DoubleExponentialSmoothing)
 
     object Median extends Morphism1(EmptyNamespace, "median") {
       import Mean._
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
-      def apply(table: Table, ctx: MorphContext) = {  //TODO write tests for the empty table case
+      def apply(table: Table, ctx: MorphContext) = { //TODO write tests for the empty table case
         val compactedTable = table.compact(WrapObject(Typed(DerefObjectStatic(Leaf(Source), paths.Value), JNumberT), paths.Value.name))
 
         val sortKey = DerefObjectStatic(Leaf(Source), paths.Value)
@@ -79,15 +85,15 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
           sortedTable <- compactedTable.sort(sortKey, SortAscending)
           count <- sortedTable.reduce(Count.reducer(ctx))
           median <- if (count % 2 == 0) {
-            val middleValues = sortedTable.takeRange((count.toLong / 2) - 1, 2)
-            val transformedTable = middleValues.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value))  //todo make function for this
-            Mean(transformedTable, ctx)
-          } else {
-            val middleValue = M.point(sortedTable.takeRange((count.toLong / 2), 1))
-            middleValue map { _.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value)) }
-          }
+                     val middleValues     = sortedTable.takeRange((count.toLong / 2) - 1, 2)
+                     val transformedTable = middleValues.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value)) //todo make function for this
+                     Mean(transformedTable, ctx)
+                   } else {
+                     val middleValue = M.point(sortedTable.takeRange((count.toLong / 2), 1))
+                     middleValue map { _.transform(trans.DerefObjectStatic(Leaf(Source), paths.Value)) }
+                   }
         } yield {
-          val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
+          val keyTable   = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
           val valueTable = median.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
 
           valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
@@ -97,60 +103,64 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
     object Mode extends Morphism1(EmptyNamespace, "mode") {
 
-      type Result = Set[BigDecimal]  //(currentRunValue, curentCount, listOfModes, maxCount)
+      type Result = Set[BigDecimal] //(currentRunValue, curentCount, listOfModes, maxCount)
 
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
       implicit def monoid = new Monoid[BigDecimal] {
-        def zero = BigDecimal(0)
+        def zero                                           = BigDecimal(0)
         def append(left: BigDecimal, right: => BigDecimal) = left + right
       }
 
-      implicit def setMonoid[A] = new Monoid[Set[A]] {  //TODO this is WAY WRONG - it needs to deal with slice boundaries properly!!
-        def zero = Set.empty[A]
+      implicit def setMonoid[A] = new Monoid[Set[A]] { //TODO this is WAY WRONG - it needs to deal with slice boundaries properly!!
+        def zero                                   = Set.empty[A]
         def append(left: Set[A], right: => Set[A]) = left ++ right
       }
 
-      def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {  //TODO add cases for other column types; get information necessary for dealing with slice boundaries and unsoretd slices in the Iterable[Slice] that's used in table.reduce
-        def reduce(schema: CSchema, range: Range): Result = {
-          schema.columns(JNumberT) flatMap {
-            case col: LongColumn =>
-              val mapped = range filter col.isDefinedAt map { x => col(x) }
-              if (mapped.isEmpty) {
-                Set.empty[BigDecimal]
-              } else {
-                val foldedMapped: (Option[BigDecimal], BigDecimal, Set[BigDecimal], BigDecimal) = mapped.foldLeft(Option.empty[BigDecimal], BigDecimal(0), Set.empty[BigDecimal], BigDecimal(0)) {
-                  case ((None, count, modes, maxCount), sv) => ((Some(sv), count + 1, Set(sv), maxCount + 1))
-                  case ((Some(currentRun), count, modes, maxCount), sv) => {
-                    if (currentRun == sv) {
-                      if (count >= maxCount)
-                        (Some(sv), count + 1, Set(sv), maxCount + 1)
-                      else if (count + 1 == maxCount)
-                        (Some(sv), count + 1, modes + BigDecimal(sv), maxCount)
-                      else
-                        (Some(sv), count + 1, modes, maxCount)
-                    } else {
-                      if (maxCount == 1)
-                        (Some(sv), 1, modes + BigDecimal(sv), maxCount)
-                      else
-                        (Some(sv), 1, modes, maxCount)
+      def reducer(ctx: MorphContext): Reducer[Result] =
+        new Reducer[Result] { //TODO add cases for other column types; get information necessary for dealing with slice boundaries and unsoretd slices in the Iterable[Slice] that's used in table.reduce
+          def reduce(schema: CSchema, range: Range): Result = {
+            schema.columns(JNumberT) flatMap {
+              case col: LongColumn =>
+                val mapped = range filter col.isDefinedAt map { x =>
+                  col(x)
+                }
+                if (mapped.isEmpty) {
+                  Set.empty[BigDecimal]
+                } else {
+                  val foldedMapped: (Option[BigDecimal], BigDecimal, Set[BigDecimal], BigDecimal) =
+                    mapped.foldLeft(Option.empty[BigDecimal], BigDecimal(0), Set.empty[BigDecimal], BigDecimal(0)) {
+                      case ((None, count, modes, maxCount), sv) => ((Some(sv), count + 1, Set(sv), maxCount + 1))
+                      case ((Some(currentRun), count, modes, maxCount), sv) => {
+                        if (currentRun == sv) {
+                          if (count >= maxCount)
+                            (Some(sv), count + 1, Set(sv), maxCount + 1)
+                          else if (count + 1 == maxCount)
+                            (Some(sv), count + 1, modes + BigDecimal(sv), maxCount)
+                          else
+                            (Some(sv), count + 1, modes, maxCount)
+                        } else {
+                          if (maxCount == 1)
+                            (Some(sv), 1, modes + BigDecimal(sv), maxCount)
+                          else
+                            (Some(sv), 1, modes, maxCount)
+                        }
+                      }
                     }
-                  }
+
+                  val (_, _, result, _) = foldedMapped
+                  result
                 }
 
-                val (_, _, result, _) = foldedMapped
-                result
-              }
-
-            case _ => Set.empty[BigDecimal]
+              case _ => Set.empty[BigDecimal]
+            }
           }
         }
-      }
 
       def extract(res: Result): Table = Table.constDecimal(res)
 
       def apply(table: Table, ctx: MorphContext) = {
-        val sortKey = DerefObjectStatic(Leaf(Source), paths.Value)
+        val sortKey               = DerefObjectStatic(Leaf(Source), paths.Value)
         val sortedTable: M[Table] = table.sort(sortKey, SortAscending)
 
         sortedTable.flatMap(_.reduce(reducer(ctx)).map(extract))
@@ -189,26 +199,19 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
       def alignment = MorphismAlignment.Match(M.point(morph1))
 
-      val keySpec = DerefObjectStatic(TransSpec1.Id, paths.Key)
-      val sortSpec = DerefObjectStatic(
-        DerefArrayStatic(
-          DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(0)),
-        CPathField(smoother))
-      val valueSpec = DerefObjectStatic(
-        DerefArrayStatic(
-          DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(0)),
-        CPathField(smoothee))
+      val keySpec   = DerefObjectStatic(TransSpec1.Id, paths.Key)
+      val sortSpec  = DerefObjectStatic(DerefArrayStatic(DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(0)), CPathField(smoother))
+      val valueSpec = DerefObjectStatic(DerefArrayStatic(DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(0)), CPathField(smoothee))
 
       def smoothSpec: TransSpec1
-      def spec = InnerObjectConcat(
-        WrapObject(keySpec, paths.Key.name),
-        WrapObject(smoothSpec, paths.Value.name))
+      def spec = InnerObjectConcat(WrapObject(keySpec, paths.Key.name), WrapObject(smoothSpec, paths.Value.name))
 
       private val morph1 = new Morph1Apply {
-        def apply(table: Table, ctx: MorphContext): M[Table] = for {
-          sorted <- table.sort(sortSpec)
-          smoothed <- sorted.transform(spec).sort(keySpec)
-        } yield smoothed
+        def apply(table: Table, ctx: MorphContext): M[Table] =
+          for {
+            sorted <- table.sort(sortSpec)
+            smoothed <- sorted.transform(spec).sort(keySpec)
+          } yield smoothed
       }
     }
 
@@ -216,10 +219,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       private val ValuePath = CPath(CPathIndex(0))
       private val AlphaPath = CPath(CPathIndex(1))
 
-      val tpe = BinaryOperationType(
-        JObjectFixedT(Map(smoother -> JType.JUniverseT, smoothee -> JNumberT)),
-        JNumberT,
-        JNumberT)
+      val tpe = BinaryOperationType(JObjectFixedT(Map(smoother -> JType.JUniverseT, smoothee -> JNumberT)), JNumberT, JNumberT)
 
       object ExpSmoothingScanner extends CScanner {
         type A = Option[BigDecimal]
@@ -239,9 +239,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
           init orElse findFirst(values, range.start, range.end) map { init0 =>
             val smoothed = new Array[BigDecimal](range.end)
-            val defined = BitSetUtil.create()
+            val defined  = BitSetUtil.create()
             var row = range.start
-            var s = init0
+            var s   = init0
             while (row < smoothed.length) {
               if (values.isDefinedAt(row) && alphas.isDefinedAt(row)) {
                 defined.set(row)
@@ -261,26 +261,24 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       }
 
       val alphaSpec = DerefArrayStatic(DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(1))
-      def smoothSpec = Scan(
-        InnerArrayConcat(WrapArray(valueSpec), WrapArray(alphaSpec)),
-        ExpSmoothingScanner)
+      def smoothSpec = Scan(InnerArrayConcat(WrapArray(valueSpec), WrapArray(alphaSpec)), ExpSmoothingScanner)
     }
 
     object DoubleExponentialSmoothing extends Smoothing("doubleExpSmoothing") {
       private val ValuePath = CPath(CPathIndex(0))
       private val AlphaPath = CPath(CPathIndex(1))
-      private val BetaPath = CPath(CPathIndex(2))
-      private val alpha = "alpha"
-      private val beta = "beta"
+      private val BetaPath  = CPath(CPathIndex(2))
+      private val alpha     = "alpha"
+      private val beta      = "beta"
 
       val tpe = BinaryOperationType(
         JObjectFixedT(Map(smoother -> JType.JUniverseT, smoothee -> JNumberT)),
-        JObjectFixedT(Map(alpha -> JNumberT, beta -> JNumberT)),
+        JObjectFixedT(Map(alpha    -> JNumberT, beta             -> JNumberT)),
         JNumberT)
 
       private sealed trait ScannerState
       private case object FindFirst extends ScannerState
-      private case class FindSecond(x0: BigDecimal) extends ScannerState
+      private case class FindSecond(x0: BigDecimal)                                       extends ScannerState
       private case class Continue(s0: BigDecimal, b0: BigDecimal, first: Boolean = false) extends ScannerState
 
       private object DoubleExpSmoothingScanner extends CScanner {
@@ -298,7 +296,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         def scan(state0: ScannerState, cols: Map[ColumnRef, Column], range: Range): (ScannerState, Map[ColumnRef, Column]) = {
           val values = unifyNumColumns(cols.collect { case (ColumnRef(ValuePath, _), col) => col })
           val alphas = unifyNumColumns(cols.collect { case (ColumnRef(AlphaPath, _), col) => col })
-          val betas = unifyNumColumns(cols.collect { case (ColumnRef(BetaPath, _), col) => col })
+          val betas  = unifyNumColumns(cols.collect { case (ColumnRef(BetaPath, _), col)  => col })
 
           // This is a bit messy, but it's because we need the first 2 values
           // in order to initialize s_1 and b_1. Since a slice may have 0 or
@@ -312,7 +310,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
             case FindFirst =>
               findFirst(values, range.start, range.end) match {
                 case Some((row, x0)) => loop(FindSecond(x0), Some(row + 1))
-                case None => (FindFirst, Map.empty)
+                case None            => (FindFirst, Map.empty)
               }
 
             case FindSecond(x0) =>
@@ -320,12 +318,11 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 case Some((_, x1)) => loop(Continue(x0, x1 - x0, true), None)
                 case None =>
                   rowM map { row =>
-
                     // In this case, we found a single value in this slice, but
                     // failed to find a second one. So, we still need to output
                     // this value in this slice, due to the contract of Scanner.
 
-                    val defined = BitSetUtil.create()
+                    val defined  = BitSetUtil.create()
                     val smoothed = new Array[BigDecimal](range.end)
                     defined.set(row)
                     smoothed(row) = x0
@@ -337,10 +334,10 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
             case Continue(s00, b00, first0) =>
               val smoothed = new Array[BigDecimal](range.end)
-              val defined = BitSetUtil.create()
-              var row = range.start
-              var s0 = s00
-              var b0 = b00
+              val defined  = BitSetUtil.create()
+              var row   = range.start
+              var s0    = s00
+              var b0    = b00
               var first = first0
 
               while (row < smoothed.length) {
@@ -351,9 +348,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                     smoothed(row) = s0
                     first = false
                   } else {
-                    val x = values(row)
-                    val a = alphas(row)
-                    val b = betas(row)
+                    val x  = values(row)
+                    val a  = alphas(row)
+                    val b  = betas(row)
                     val s1 = a * x + (BigDecimal(1) - a) * (s0 + b0)
                     b0 = b * (s1 - s0) + (BigDecimal(1) - b) * b0
                     s0 = s1
@@ -369,18 +366,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         }
       }
 
-
-      val alphaSpec = DerefObjectStatic(
-        DerefArrayStatic(
-          DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(1)),
-          CPathField(alpha))
-      val betaSpec = DerefObjectStatic(
-        DerefArrayStatic(
-          DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(1)),
-          CPathField(beta))
-      def smoothSpec = Scan(
-        InnerArrayConcat(WrapArray(valueSpec), WrapArray(alphaSpec), WrapArray(betaSpec)),
-        DoubleExpSmoothingScanner)
+      val alphaSpec = DerefObjectStatic(DerefArrayStatic(DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(1)), CPathField(alpha))
+      val betaSpec  = DerefObjectStatic(DerefArrayStatic(DerefObjectStatic(TransSpec1.Id, paths.Value), CPathIndex(1)), CPathField(beta))
+      def smoothSpec = Scan(InnerArrayConcat(WrapArray(valueSpec), WrapArray(alphaSpec), WrapArray(betaSpec)), DoubleExpSmoothingScanner)
     }
 
     object LinearCorrelation extends Morphism2(StatsNamespace, "corr") {
@@ -389,113 +377,158 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       lazy val alignment = MorphismAlignment.Match(M.point(morph1))
 
       type InitialResult = (BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal) // (count, sum1, sum2, sumsq1, sumsq2, productSum)
-      type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
+      type Result        = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
 
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
-          val left = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
+          val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
           val right = schema.columns(JArrayFixedT(Map(1 -> JNumberT)))
 
           val cross = for (l <- left; r <- right) yield (l, r)
 
           val result: Set[Result] = cross map {
             case (c1: LongColumn, c2: LongColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: NumColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: DoubleColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: NumColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: DoubleColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: LongColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: DoubleColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: LongColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: NumColumn) =>
-              val mapped = range filter { r => c1.isDefinedAt(r) && c2.isDefinedAt(r) } map { i => (c1(i), c2(i)) }
+              val mapped = range filter { r =>
+                c1.isDefinedAt(r) && c2.isDefinedAt(r)
+              } map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
-                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) => (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
+                  case ((count, sum1, sum2, sumsq1, sumsq2, productSum), (v1, v2)) =>
+                    (count + 1, sum1 + v1, sum2 + v2, sumsq1 + (v1 * v1), sumsq2 + (v2 * v2), productSum + (v1 * v2))
                 }
 
                 Some(foldedMapped)
@@ -509,18 +542,19 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       }
 
       def extract(res: Result): Table = {
-        res filter (_._1 > 0) map { case (count, sum1, sum2, sumsq1, sumsq2, productSum) =>
+        res filter (_._1 > 0) map {
+          case (count, sum1, sum2, sumsq1, sumsq2, productSum) =>
             val unscaledVar1 = count * sumsq1 - sum1 * sum1
             val unscaledVar2 = count * sumsq2 - sum2 * sum2
             if (unscaledVar1 != 0 && unscaledVar2 != 0) {
-              val cov = (productSum - ((sum1 * sum2) / count)) / count
-              val stdDev1 = sqrt(unscaledVar1) / count
-              val stdDev2 = sqrt(unscaledVar2) / count
+              val cov         = (productSum - ((sum1 * sum2) / count)) / count
+              val stdDev1     = sqrt(unscaledVar1) / count
+              val stdDev2     = sqrt(unscaledVar2) / count
               val correlation = cov / (stdDev1 * stdDev2)
 
-              val resultTable = Table.constDecimal(Set(correlation))  //TODO the following lines are used throughout. refactor!
-              val valueTable = resultTable.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
-              val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
+              val resultTable = Table.constDecimal(Set(correlation)) //TODO the following lines are used throughout. refactor!
+              val valueTable  = resultTable.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
+              val keyTable    = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
 
               valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
             } else {
@@ -543,21 +577,23 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       lazy val alignment = MorphismAlignment.Match(M.point(morph1))
 
       type InitialResult = (BigDecimal, BigDecimal, BigDecimal, BigDecimal) // (count, sum1, sum2, productSum)
-      type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
+      type Result        = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
 
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
-          val left = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
+          val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
           val right = schema.columns(JArrayFixedT(Map(1 -> JNumberT)))
 
           val cross = for (l <- left; r <- right) yield (l, r)
 
           val result = cross map {
             case (c1: LongColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -568,7 +604,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -579,7 +617,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -590,7 +630,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -601,7 +643,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -612,7 +656,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -623,7 +669,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -634,7 +682,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -645,7 +695,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -674,8 +726,8 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
             val cov = (productSum - ((sum1 * sum2) / count)) / count
 
             val resultTable = Table.constDecimal(Set(cov))
-            val valueTable = resultTable.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
-            val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
+            val valueTable  = resultTable.transform(trans.WrapObject(Leaf(Source), paths.Value.name))
+            val keyTable    = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
 
             valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
           }
@@ -696,21 +748,23 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       lazy val alignment = MorphismAlignment.Match(M.point(morph1))
 
       type InitialResult = (BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal) // (count, sum1, sum2, sumsq1, productSum)
-      type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
+      type Result        = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
 
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
-          val left = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
+          val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
           val right = schema.columns(JArrayFixedT(Map(1 -> JNumberT)))
 
           val cross = for (l <- left; r <- right) yield (l, r)
 
           val result = cross map {
             case (c1: LongColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -721,7 +775,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -732,7 +788,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -743,7 +801,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -754,7 +814,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -765,7 +827,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -776,7 +840,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -787,7 +853,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -798,7 +866,9 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
@@ -824,21 +894,21 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
         res2 map {
           case (count, sum1, sum2, sumsq1, productSum) => {
-            val cov = (productSum - ((sum1 * sum2) / count)) / count
+            val cov  = (productSum - ((sum1 * sum2) / count)) / count
             val vari = (sumsq1 - (sum1 * (sum1 / count))) / count
 
             val slope = cov / vari
-            val yint = (sum2 / count) - (slope * (sum1 / count))
+            val yint  = (sum2 / count) - (slope * (sum1 / count))
 
-            val constSlope = Table.constDecimal(Set(slope))
+            val constSlope     = Table.constDecimal(Set(slope))
             val constIntercept = Table.constDecimal(Set(yint))
 
-            val slopeSpec = trans.WrapObject(Leaf(SourceLeft), "slope")
-            val yintSpec = trans.WrapObject(Leaf(SourceRight), "intercept")
+            val slopeSpec  = trans.WrapObject(Leaf(SourceLeft), "slope")
+            val yintSpec   = trans.WrapObject(Leaf(SourceRight), "intercept")
             val concatSpec = trans.InnerObjectConcat(slopeSpec, yintSpec)
 
             val valueTable = constSlope.cross(constIntercept)(trans.WrapObject(concatSpec, paths.Value.name))
-            val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
+            val keyTable   = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
 
             valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
           }
@@ -859,28 +929,34 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       lazy val alignment = MorphismAlignment.Match(M.point(morph1))
 
       type InitialResult = (BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal) // (count, sum1, sum2, sumsq1, productSum)
-      type Result = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
+      type Result        = Option[(BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal)]
 
       implicit def monoid = implicitly[Monoid[Result]]
 
       def reducer(ctx: MorphContext): Reducer[Result] = new Reducer[Result] {
         def reduce(schema: CSchema, range: Range): Result = {
 
-          val left = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
+          val left  = schema.columns(JArrayFixedT(Map(0 -> JNumberT)))
           val right = schema.columns(JArrayFixedT(Map(1 -> JNumberT)))
 
           val cross = for (l <- left; r <- right) yield (l, r)
 
           val result = cross map {
             case (c1: LongColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -889,14 +965,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -905,14 +987,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -921,14 +1009,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -937,14 +1031,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: LongColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -953,14 +1053,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -969,14 +1075,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: DoubleColumn, c2: NumColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -985,14 +1097,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: LongColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -1001,14 +1119,20 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
                 Some(foldedMapped)
               }
             case (c1: NumColumn, c2: DoubleColumn) =>
-              val mapped = range filter ( r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i => (c1(i), c2(i)) }
+              val mapped = range filter (r => c1.isDefinedAt(r) && c2.isDefinedAt(r)) map { i =>
+                (c1(i), c2(i))
+              }
               if (mapped.isEmpty) {
                 None
               } else {
                 val foldedMapped: InitialResult = mapped.foldLeft((BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0), BigDecimal(0))) {
                   case ((count, sum1, sum2, sumsq1, productSum), (v1, v2)) => {
                     if (v1 > 0) {
-                      (count + 1, sum1 + math.log(v1.toDouble), sum2 + v2, sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)), productSum + (math.log(v1.toDouble) * v2))
+                      (count + 1,
+                       sum1 + math.log(v1.toDouble),
+                       sum2 + v2,
+                       sumsq1 + (math.log(v1.toDouble) * math.log(v1.toDouble)),
+                       productSum + (math.log(v1.toDouble) * v2))
                     } else {
                       (count, sum1, sum2, sumsq1, productSum)
                     }
@@ -1032,21 +1156,21 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
         res2 map {
           case (count, sum1, sum2, sumsq1, productSum) => {
-            val cov = (productSum - ((sum1 * sum2) / count)) / count
+            val cov  = (productSum - ((sum1 * sum2) / count)) / count
             val vari = (sumsq1 - (sum1 * (sum1 / count))) / count
 
             val slope = cov / vari
-            val yint = (sum2 / count) - (slope * (sum1 / count))
+            val yint  = (sum2 / count) - (slope * (sum1 / count))
 
-            val constSlope = Table.constDecimal(Set(slope))
+            val constSlope     = Table.constDecimal(Set(slope))
             val constIntercept = Table.constDecimal(Set(yint))
 
-            val slopeSpec = trans.WrapObject(Leaf(SourceLeft), "slope")
-            val yintSpec = trans.WrapObject(Leaf(SourceRight), "intercept")
+            val slopeSpec  = trans.WrapObject(Leaf(SourceLeft), "slope")
+            val yintSpec   = trans.WrapObject(Leaf(SourceRight), "intercept")
             val concatSpec = trans.InnerObjectConcat(slopeSpec, yintSpec)
 
             val valueTable = constSlope.cross(constIntercept)(trans.WrapObject(concatSpec, paths.Value.name))
-            val keyTable = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
+            val keyTable   = Table.constEmptyArray.transform(trans.WrapObject(Leaf(Source), paths.Key.name))
 
             valueTable.cross(keyTable)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight)))
           }
@@ -1062,10 +1186,10 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     }
 
     /**
-     * Base trait for all Rank-scanners.
-     *
-     * This provides scaffolding that is useful in all cases.
-     */
+      * Base trait for all Rank-scanners.
+      *
+      * This provides scaffolding that is useful in all cases.
+      */
     trait BaseRankScanner extends CScanner {
       import scala.collection.mutable
 
@@ -1075,24 +1199,25 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       // decimals are going to be a significant performance problem for rank
       // (compared to sorting) and this simplifies the algorithm a lot.
       protected def decimalize(m: Map[ColumnRef, Column], r: Range): Map[ColumnRef, Column] = {
-        val m2 = mutable.Map.empty[ColumnRef, Column]
+        val m2   = mutable.Map.empty[ColumnRef, Column]
         val nums = mutable.Map.empty[CPath, List[Column]]
 
-        m.foreach { case (ref @ ColumnRef(path, ctype), col) =>
-          if (ctype == CLong || ctype == CDouble || ctype == CNum) {
-            nums(path) = col :: nums.getOrElse(path, Nil)
-          } else {
-            m2(ref) = col
-          }
+        m.foreach {
+          case (ref @ ColumnRef(path, ctype), col) =>
+            if (ctype == CLong || ctype == CDouble || ctype == CNum) {
+              nums(path) = col :: nums.getOrElse(path, Nil)
+            } else {
+              m2(ref) = col
+            }
         }
 
         val start = r.start
-        val end = r.end
-        val len = r.size
+        val end   = r.end
+        val len   = r.size
 
         nums.foreach {
           case (path, cols) =>
-            val bs = new BitSet()
+            val bs  = new BitSet()
             val arr = new Array[BigDecimal](len)
             cols.foreach {
               case col: LongColumn =>
@@ -1117,12 +1242,12 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       }
 
       /**
-       * Represents the state of the scanner at the end of a slice.
-       *
-       * The n is the last rank number used (-1 means we haven't started).
-       * The iterable items are the refs/cvalues defined by that row (which
-       * will only be empty when we haven't started).
-       */
+        * Represents the state of the scanner at the end of a slice.
+        *
+        * The n is the last rank number used (-1 means we haven't started).
+        * The iterable items are the refs/cvalues defined by that row (which
+        * will only be empty when we haven't started).
+        */
       case class RankContext(curr: Long, next: Long, items: Iterable[(ColumnRef, CValue)])
 
       type A = RankContext
@@ -1130,24 +1255,24 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       def init = RankContext(-1L, 0L, Nil)
 
       /**
-       * Builds a bitset for each column we were given. Each bitset contains
-       * (end-start) boolean values.
-       */
+        * Builds a bitset for each column we were given. Each bitset contains
+        * (end-start) boolean values.
+        */
       def initDefinedCols(cols: Array[Column], r: Range): Array[BitSet] = {
         val start = r.start
-        val end = r.end
+        val end   = r.end
         val ncols = cols.length
-        val arr = new Array[BitSet](ncols)
+        val arr   = new Array[BitSet](ncols)
         var i = 0
         while (i < ncols) { arr(i) = cols(i).definedAt(start, end); i += 1 }
         arr
       }
 
       /**
-       * Builds a bitset with a boolean value for each row. This value for a row
-       * will be true if at least one column is defined for that row and false
-       * otherwise.
-       */
+        * Builds a bitset with a boolean value for each row. This value for a row
+        * will be true if at least one column is defined for that row and false
+        * otherwise.
+        */
       def initDefined(definedCols: Array[BitSet]): BitSet = {
         val ncols = definedCols.length
         if (ncols == 0) return new BitSet()
@@ -1179,17 +1304,17 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     }
 
     /**
-     * This class works for the indexed rank case (where we are not worried
-     * about row uniqueness). It is much faster than the traits based on
-     * UniqueRankScanner.
-     */
+      * This class works for the indexed rank case (where we are not worried
+      * about row uniqueness). It is much faster than the traits based on
+      * UniqueRankScanner.
+      */
     class IndexedRankScanner extends BaseRankScanner {
       def buildRankArrayIndexed(defined: BitSet, r: Range, ctxt: RankContext): (Array[Long], Long, Int) = {
         var curr = ctxt.next
 
         val start = r.start
-        val end = r.end
-        val len = end - start
+        val end   = r.end
+        val len   = end - start
         var i = 0
         val values = new Array[Long](len)
 
@@ -1207,15 +1332,15 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       }
 
       /**
-       *
-       */
+        *
+        */
       def scan(ctxt: RankContext, _m: Map[ColumnRef, Column], range: Range): (RankContext, Map[ColumnRef, Column]) = {
 
         val m = decimalize(_m, range)
 
         val start = range.start
-        val end = range.end
-        val len = end - start
+        val end   = range.end
+        val len   = end - start
 
         val cols = m.values.toArray
 
@@ -1241,7 +1366,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
           // construct the column ref and column to return
           val col2: Column = shiftColumn(ArrayLongColumn(defined, values), start)
-          val data = Map(ColumnRef(CPath.Identity, CLong) -> col2)
+          val data         = Map(ColumnRef(CPath.Identity, CLong) -> col2)
 
           (ctxt2, data)
         }
@@ -1251,28 +1376,28 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     }
 
     /**
-     * This trait works for cases where the rank should be shared for adjacent
-     * rows that are identical.
-     */
+      * This trait works for cases where the rank should be shared for adjacent
+      * rows that are identical.
+      */
     trait UniqueRankScanner extends BaseRankScanner {
       import scala.collection.mutable
 
       /**
-       * Determines whether row is a duplicate of lastRow.
-       * The method returns true if the two rows differ, e.g.:
-       *
-       * 1. There is a column that is defined for one row but not another.
-       * 2. There is a column that is defined for both but has different values.
-       *
-       * If we make it through all the columns without either of those being
-       * true then we can return false, since the rows are not duplicates.
-       */
+        * Determines whether row is a duplicate of lastRow.
+        * The method returns true if the two rows differ, e.g.:
+        *
+        * 1. There is a column that is defined for one row but not another.
+        * 2. There is a column that is defined for both but has different values.
+        *
+        * If we make it through all the columns without either of those being
+        * true then we can return false, since the rows are not duplicates.
+        */
       @tailrec
       private def isDuplicate(cols: Array[Column], definedCols: Array[BitSet], lastRow: Int, row: Int, index: Int): Boolean = {
         if (index >= cols.length) {
           true
         } else {
-          val dc = definedCols(index)
+          val dc         = definedCols(index)
           val wasDefined = dc.get(lastRow)
           if (wasDefined != dc.get(row)) {
             false
@@ -1286,8 +1411,8 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
       def findDuplicates(defined: BitSet, definedCols: Array[BitSet], cols: Array[Column], r: Range, _row: Int): (BitSet, Int) = {
         val start = r.start
-        val end = r.end
-        val len = end - start
+        val end   = r.end
+        val len   = end - start
         var row = _row
 
         // start assuming all rows are dupes until we find out otherwise
@@ -1314,14 +1439,14 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       def buildRankArrayUnique(defined: BitSet, duplicateRows: BitSet, r: Range, ctxt: RankContext): (Array[Long], Long, Long)
 
       /**
-       *
-       */
+        *
+        */
       def scan(ctxt: RankContext, _m: Map[ColumnRef, Column], range: Range): (RankContext, Map[ColumnRef, Column]) = {
         val m = decimalize(_m, range)
 
         val start = range.start
-        val end = range.end
-        val len = end - start
+        val end   = range.end
+        val len   = end - start
 
         val cols = m.values.toArray
 
@@ -1365,8 +1490,8 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         var next = ctxt.next
 
         val start = r.start
-        val end = r.end
-        val len = end - start
+        val end   = r.end
+        val len   = end - start
         var i = 0
         val values = new Array[Long](len)
 
@@ -1388,8 +1513,8 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         var curr = ctxt.curr
 
         val start = r.start
-        val end = r.end
-        val len = end - start
+        val end   = r.end
+        val len   = end - start
         var i = 0
         val values = new Array[Long](len)
 
@@ -1416,7 +1541,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         }
 
         val indices = new Array[Long](range.size)
-        var i = 0
+        var i       = 0
         var n: Long = a
         while (i < indices.length) {
           if (defined(i)) {
@@ -1430,7 +1555,7 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
 
         def makeColumn(idx: Int) = new LongColumn {
           def isDefinedAt(row: Int) = defined(row)
-          def apply(row: Int) = if (indices(row) == idx) 1L else 0L
+          def apply(row: Int)       = if (indices(row) == idx) 1L else 0L
         }
 
         val cols0: Map[ColumnRef, Column] = (0 until length.toInt).map({ idx =>
@@ -1442,13 +1567,13 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
     }
 
     abstract class BaseRank(name: String, retType: JType = JNumberT) extends Morphism1(StatsNamespace, name) {
-      val tpe = UnaryOperationType(JType.JUniverseT, retType)
+      val tpe               = UnaryOperationType(JType.JUniverseT, retType)
       override val idPolicy = IdentityPolicy.Retain.Merge
 
       def rankScanner(size: Long): CScanner
 
       private val sortByValue = DerefObjectStatic(Leaf(Source), paths.Value)
-      private val sortByKey = DerefObjectStatic(Leaf(Source), paths.Key)
+      private val sortByKey   = DerefObjectStatic(Leaf(Source), paths.Key)
 
       // TODO: sorting the data twice is kind of awful.
       //
@@ -1458,14 +1583,14 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
       def apply(table: Table, ctx: MorphContext): M[Table] = {
         def count(tbl: Table): M[Long] = tbl.size match {
           case ExactSize(n) => M.point(n)
-          case _ => table.reduce(Count.reducer(ctx))
+          case _            => table.reduce(Count.reducer(ctx))
         }
 
         for {
           valueSortedTable <- table.sort(sortByValue, SortAscending)
           size <- count(valueSortedTable)
           rankedTable = {
-            val m = Map(paths.Value -> Scan(Leaf(Source), rankScanner(size)))
+            val m    = Map(paths.Value -> Scan(Leaf(Source), rankScanner(size)))
             val scan = makeTableTrans(m)
             valueSortedTable.transform(ObjectDelete(scan, Set(paths.SortKey)))
           }

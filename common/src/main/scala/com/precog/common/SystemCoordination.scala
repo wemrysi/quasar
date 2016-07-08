@@ -45,7 +45,7 @@ trait CheckpointCoordination {
 object CheckpointCoordination {
   object Noop extends CheckpointCoordination {
     def loadYggCheckpoint(bifrost: String): Option[Validation[Error, YggCheckpoint]] = None
-    def saveYggCheckpoint(bifrost: String, checkpoint: YggCheckpoint): Unit = ()
+    def saveYggCheckpoint(bifrost: String, checkpoint: YggCheckpoint): Unit          = ()
   }
 }
 
@@ -56,9 +56,8 @@ sealed trait IdSequence {
 
 case object EmptyIdSequence extends IdSequence {
   def isEmpty(): Boolean = true
-  def next() = sys.error("No ids available from empty id sequence block")
+  def next()             = sys.error("No ids available from empty id sequence block")
 }
-
 
 case class IdSequenceBlock(producerId: Int, firstSequenceId: Int, lastSequenceId: Int) extends IdSequence {
   private val currentSequenceId = new AtomicInteger(firstSequenceId)
@@ -67,62 +66,66 @@ case class IdSequenceBlock(producerId: Int, firstSequenceId: Int, lastSequenceId
 
   def next() = {
     val sequenceId = currentSequenceId.getAndIncrement
-    if(sequenceId > lastSequenceId) sys.error("Id sequence block is exhausted no more ids available.")
+    if (sequenceId > lastSequenceId) sys.error("Id sequence block is exhausted no more ids available.")
     (producerId, sequenceId)
   }
 }
 
 object IdSequenceBlock {
-  implicit val iso = Iso.hlist(IdSequenceBlock.apply _ , IdSequenceBlock.unapply _)
-  val schemaV1 = "producerId" :: "firstSequenceId" :: "lastSequenceId" :: HNil
-  val extractorPreV = extractorV[IdSequenceBlock](schemaV1, None)
+  implicit val iso                = Iso.hlist(IdSequenceBlock.apply _, IdSequenceBlock.unapply _)
+  val schemaV1                    = "producerId" :: "firstSequenceId" :: "lastSequenceId" :: HNil
+  val extractorPreV               = extractorV[IdSequenceBlock](schemaV1, None)
   val (decomposerV1, extractorV1) = serializationV[IdSequenceBlock](schemaV1, Some("1.0".v))
-  implicit val decomposer = decomposerV1
-  implicit val extractor = extractorV1 <+> extractorPreV
+  implicit val decomposer         = decomposerV1
+  implicit val extractor          = extractorV1 <+> extractorPreV
 }
 
 case class EventRelayState(offset: Long, nextSequenceId: Int, idSequenceBlock: IdSequenceBlock) {
   override def toString() = "EventRelayState[ offset: %d prodId: %d seqId: %d in [%d,%d] ]".format(
-    offset, idSequenceBlock.producerId, nextSequenceId, idSequenceBlock.firstSequenceId, idSequenceBlock.lastSequenceId
+    offset,
+    idSequenceBlock.producerId,
+    nextSequenceId,
+    idSequenceBlock.firstSequenceId,
+    idSequenceBlock.lastSequenceId
   )
 }
 
 object EventRelayState {
-  implicit val iso = Iso.hlist(EventRelayState.apply _ , EventRelayState.unapply _)
-  val schemaV1 = "offset" :: "nextSequenceId" :: "idSequenceBlock" :: HNil
-  val extractorPreV = extractorV[EventRelayState](schemaV1, None)
+  implicit val iso                = Iso.hlist(EventRelayState.apply _, EventRelayState.unapply _)
+  val schemaV1                    = "offset" :: "nextSequenceId" :: "idSequenceBlock" :: HNil
+  val extractorPreV               = extractorV[EventRelayState](schemaV1, None)
   val (decomposerV1, extractorV1) = serializationV[EventRelayState](schemaV1, Some("1.0".v))
-  implicit val decomposer = decomposerV1
-  implicit val extractor = extractorV1 <+> extractorPreV
+  implicit val decomposer         = decomposerV1
+  implicit val extractor          = extractorV1 <+> extractorPreV
 }
 
 case class ProducerState(lastSequenceId: Int)
 
 object ProducerState {
-  implicit val ProducerStateDecomposer = implicitly[Decomposer[Int]].contramap((_:ProducerState).lastSequenceId)
-  implicit val ProducerStateExtractor = implicitly[Extractor[Int]].map(ProducerState.apply _)
+  implicit val ProducerStateDecomposer = implicitly[Decomposer[Int]].contramap((_: ProducerState).lastSequenceId)
+  implicit val ProducerStateExtractor  = implicitly[Extractor[Int]].map(ProducerState.apply _)
 }
 
 case class YggCheckpoint(offset: Long, messageClock: VectorClock) {
   def update(newOffset: Long, newPid: Int, newSid: Int) = this.copy(offset max newOffset, messageClock.update(newPid, newSid))
-  def skipTo(newOffset: Long) = this.copy(offset max newOffset, messageClock)
+  def skipTo(newOffset: Long)                           = this.copy(offset max newOffset, messageClock)
 }
 
 object YggCheckpoint {
   val Empty = YggCheckpoint(0, VectorClock.empty)
 
   sealed trait LoadError
-  case class CheckpointParseError(message: String) extends LoadError
+  case class CheckpointParseError(message: String)   extends LoadError
   case class ShardCheckpointMissing(shardId: String) extends LoadError
 
-  implicit val iso = Iso.hlist(YggCheckpoint.apply _ , YggCheckpoint.unapply _)
-  val schemaV1 = "offset" :: "messageClock" :: HNil
+  implicit val iso = Iso.hlist(YggCheckpoint.apply _, YggCheckpoint.unapply _)
+  val schemaV1     = "offset" :: "messageClock" :: HNil
 
-  val extractorPreV = extractorV[YggCheckpoint](schemaV1, None)
+  val extractorPreV               = extractorV[YggCheckpoint](schemaV1, None)
   val (decomposerV1, extractorV1) = serializationV[YggCheckpoint](schemaV1, Some("1.0".v))
 
   implicit val decomposer = decomposerV1
-  implicit val extractor = extractorV1 <+> extractorPreV
+  implicit val extractor  = extractorV1 <+> extractorPreV
 
   implicit val ordering = scala.math.Ordering.by((_: YggCheckpoint).offset)
 }

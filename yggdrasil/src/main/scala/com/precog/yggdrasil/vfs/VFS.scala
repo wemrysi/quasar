@@ -44,7 +44,7 @@ import java.util.UUID
 import java.nio.ByteBuffer
 import java.util.Arrays
 import java.nio.CharBuffer
-import java.nio.charset.{Charset, CoderResult}
+import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
 
@@ -65,7 +65,9 @@ object Version {
 }
 
 object VFSModule {
-  def bufferOutput[M[+_]: Monad](stream0: StreamT[M, CharBuffer], charset: Charset = Charset.forName("UTF-8"), bufferSize: Int = 64 * 1024): StreamT[M, Array[Byte]] = {
+  def bufferOutput[M[+ _]: Monad](stream0: StreamT[M, CharBuffer],
+                                  charset: Charset = Charset.forName("UTF-8"),
+                                  bufferSize: Int = 64 * 1024): StreamT[M, Array[Byte]] = {
     val encoder = charset.newEncoder()
 
     def loop(stream: StreamT[M, CharBuffer], buf: ByteBuffer, arr: Array[Byte]): StreamT[M, Array[Byte]] = {
@@ -95,7 +97,7 @@ object VFSModule {
   }
 }
 
-trait VFSModule[M[+_], Block] extends Logging {
+trait VFSModule[M[+ _], Block] extends Logging {
   import ResourceError._
 
   type Projection <: ProjectionLike[M, Block]
@@ -141,8 +143,10 @@ trait VFSModule[M[+_], Block] extends Logging {
       import FileContent._
       // Map to the type we'll use for conversion and the type we report to the user
       // FIXME: We're dealing with MimeType in too many places here
-      val acceptableMimeTypes = ((Seq(ApplicationJson, XJsonStream, TextCSV).map { mt => mt -> (mt, mt) }) ++
-        Seq(AnyMimeType -> (XJsonStream, XJsonStream), OctetStream -> (XJsonStream, OctetStream))).toMap
+      val acceptableMimeTypes = ((Seq(ApplicationJson, XJsonStream, TextCSV).map { mt =>
+            mt -> (mt, mt)
+          }) ++
+            Seq(AnyMimeType -> (XJsonStream, XJsonStream), OctetStream -> (XJsonStream, OctetStream))).toMap
       for {
         selectedMT <- OptionT(M.point(requestedMimeTypes.find(acceptableMimeTypes.contains)))
         (conversionMT, returnMT) = acceptableMimeTypes(selectedMT)
@@ -162,7 +166,7 @@ trait VFSModule[M[+_], Block] extends Logging {
       val acceptableMimeTypes = Map(mimeType -> mimeType, AnyMimeType -> mimeType, OctetStream -> OctetStream)
       for {
         selectedMT <- OptionT(M.point(requestedMimeTypes.find(acceptableMimeTypes.contains)))
-        stream     <- asByteStream(selectedMT)
+        stream <- asByteStream(selectedMT)
       } yield (selectedMT, stream)
     }
   }
@@ -178,8 +182,8 @@ trait VFSModule[M[+_], Block] extends Logging {
   def VFS: VFSCompanion
 
   /**
-   * VFS is an unsecured interface to the virtual filesystem; validation must be performed higher in the stack.
-   */
+    * VFS is an unsecured interface to the virtual filesystem; validation must be performed higher in the stack.
+    */
   abstract class VFS(implicit M: Monad[M]) {
     def writeAll(data: Seq[(Long, EventMessage)]): IO[PrecogUnit]
 
@@ -188,12 +192,12 @@ trait VFSModule[M[+_], Block] extends Logging {
     def readResource(path: Path, version: Version): EitherT[M, ResourceError, Resource]
 
     /**
-     * Returns the direct children of path.
-     *
-     * The results are the basenames of the children. So for example, if
-     * we have /foo/bar/qux and /foo/baz/duh, and path=/foo, we will
-     * return (bar, baz).
-     */
+      * Returns the direct children of path.
+      *
+      * The results are the basenames of the children. So for example, if
+      * we have /foo/bar/qux and /foo/baz/duh, and path=/foo, we will
+      * return (bar, baz).
+      */
     def findDirectChildren(path: Path): EitherT[M, ResourceError, Set[PathMetadata]]
 
     def findPathMetadata(path: Path): EitherT[M, ResourceError, PathMetadata]
@@ -201,5 +205,3 @@ trait VFSModule[M[+_], Block] extends Logging {
     def currentVersion(path: Path): M[Option[VersionEntry]]
   }
 }
-
-

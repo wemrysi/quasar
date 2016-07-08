@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package execution
 
-
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Versioned._
@@ -40,5 +39,5 @@ object EvaluationContext {
   val schemaV1 = "apiKey" :: "account" :: "basePath" :: "scriptPath" :: "startTime" :: HNil
 
   implicit val decomposer: Decomposer[EvaluationContext] = decomposerV(schemaV1, Some("1.0".v))
-  implicit val extractor:  Extractor[EvaluationContext]  = extractorV(schemaV1, Some("1.0".v))
+  implicit val extractor: Extractor[EvaluationContext]   = extractorV(schemaV1, Some("1.0".v))
 }

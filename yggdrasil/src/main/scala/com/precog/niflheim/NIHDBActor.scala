@@ -26,7 +26,7 @@ import com.precog.common.security.Authorities
 import com.precog.util._
 
 import akka.actor.Actor
-import akka.pattern.{AskSupport, GracefulStopSupport}
+import akka.pattern.{ AskSupport, GracefulStopSupport }
 
 import blueeyes.json._
 import blueeyes.json.serialization._
@@ -44,7 +44,7 @@ import scalaz.effect.IO
 import scalaz.syntax.monad._
 import scalaz.syntax.monoid._
 
-import java.io.{File, FileNotFoundException, IOException}
+import java.io.{ File, FileNotFoundException, IOException }
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
 
@@ -76,12 +76,20 @@ object NIHDB {
 
   final val projectionIdGen = new AtomicInteger()
 
-  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] = {
-    NIHDBActor.create(chef, authorities, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { actor => new NIHDBImpl(actor, timeout, authorities) } }
+  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(
+      implicit actorSystem: ActorSystem): IO[Validation[Error, NIHDB]] = {
+    NIHDBActor.create(chef, authorities, baseDir, cookThreshold, timeout, txLogScheduler) map {
+      _ map { actor =>
+        new NIHDBImpl(actor, timeout, authorities)
+      }
+    }
   }
 
-  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem) = {
-    NIHDBActor.open(chef, baseDir, cookThreshold, timeout, txLogScheduler) map { _ map { _ map { case (authorities, actor) => new NIHDBImpl(actor, timeout, authorities) } } }
+  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(
+      implicit actorSystem: ActorSystem) = {
+    NIHDBActor.open(chef, baseDir, cookThreshold, timeout, txLogScheduler) map {
+      _ map { _ map { case (authorities, actor) => new NIHDBImpl(actor, timeout, authorities) } }
+    }
   }
 
   final def hasProjection(dir: File) = NIHDBActor.hasProjection(dir)
@@ -109,11 +117,11 @@ trait NIHDB {
   def structure: Future[Set[ColumnRef]]
 
   /**
-   * Returns the total number of defined objects for a given `CPath` *mask*.
-   * Since this punches holes in our rows, it is not simply the length of the
-   * block. Instead we count the number of rows that have at least one defined
-   * value at each path (and their children).
-   */
+    * Returns the total number of defined objects for a given `CPath` *mask*.
+    * Since this punches holes in our rows, it is not simply the length of the
+    * block. Instead we count the number of rows that have at least one defined
+    * value at each path (and their children).
+    */
   def count(paths0: Option[Set[CPath]]): Future[Long]
 
   def quiesce: IO[PrecogUnit]
@@ -121,7 +129,10 @@ trait NIHDB {
   def close(implicit actorSystem: ActorSystem): Future[PrecogUnit]
 }
 
-private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: Timeout, val authorities: Authorities)(implicit executor: ExecutionContext) extends NIHDB with GracefulStopSupport with AskSupport {
+private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: Timeout, val authorities: Authorities)(implicit executor: ExecutionContext)
+    extends NIHDB
+    with GracefulStopSupport
+    with AskSupport {
   private implicit val impTimeout = timeout
 
   val projectionId = NIHDB.projectionIdGen.getAndIncrement
@@ -157,7 +168,9 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
     IO(actor ! Quiesce)
 
   def close(implicit actorSystem: ActorSystem): Future[PrecogUnit] =
-    gracefulStop(actor, timeout.duration)(actorSystem).map { _ => PrecogUnit }
+    gracefulStop(actor, timeout.duration)(actorSystem).map { _ =>
+      PrecogUnit
+    }
 }
 
 private[niflheim] object NIHDBActor extends Logging {
@@ -166,22 +179,26 @@ private[niflheim] object NIHDBActor extends Logging {
   final val rawSubdir          = "raw_blocks"
   final val lockName           = "NIHDBProjection"
 
-  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, ActorRef]] = {
+  final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(
+      implicit actorSystem: ActorSystem): IO[Validation[Error, ActorRef]] = {
     val descriptorFile = new File(baseDir, descriptorFilename)
-    val currentState: IO[Validation[Error, ProjectionState]] =
-      if (descriptorFile.exists) {
-        ProjectionState.fromFile(descriptorFile)
-      } else {
-        val state = ProjectionState.empty(authorities)
-        for {
-          _ <- IO { log.debug("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
-          _ <- ProjectionState.toFile(state, descriptorFile)
-        } yield {
-          success(state)
-        }
+    val currentState: IO[Validation[Error, ProjectionState]] = if (descriptorFile.exists) {
+      ProjectionState.fromFile(descriptorFile)
+    } else {
+      val state = ProjectionState.empty(authorities)
+      for {
+        _ <- IO { log.debug("No current descriptor found for " + baseDir + "; " + authorities + ", creating fresh descriptor") }
+        _ <- ProjectionState.toFile(state, descriptorFile)
+      } yield {
+        success(state)
       }
+    }
 
-    currentState map { _ map { s => actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler))) } }
+    currentState map {
+      _ map { s =>
+        actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler)))
+      }
+    }
   }
 
   final def readDescriptor(baseDir: File): IO[Option[Validation[Error, ProjectionState]]] = {
@@ -194,10 +211,17 @@ private[niflheim] object NIHDBActor extends Logging {
     }
   }
 
-  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Option[Validation[Error, (Authorities, ActorRef)]]] = {
+  final def open(chef: ActorRef, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(
+      implicit actorSystem: ActorSystem): IO[Option[Validation[Error, (Authorities, ActorRef)]]] = {
     val currentState: IO[Option[Validation[Error, ProjectionState]]] = readDescriptor(baseDir)
 
-    currentState map { _ map { _ map { s => (s.authorities, actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler)))) } } }
+    currentState map {
+      _ map {
+        _ map { s =>
+          (s.authorities, actorSystem.actorOf(AkkaProps(new NIHDBActor(s, baseDir, chef, cookThreshold, txLogScheduler))))
+        }
+      }
+    }
   }
 
   final def hasProjection(dir: File) = (new File(dir, descriptorFilename)).exists
@@ -206,7 +230,11 @@ private[niflheim] object NIHDBActor extends Logging {
   private class State(val txLog: CookStateLog, var blockState: BlockState, var currentBlocks: SortedMap[Long, StorageReader])
 }
 
-private[niflheim] class NIHDBActor private (private var currentState: ProjectionState, baseDir: File, chef: ActorRef, cookThreshold: Int, txLogScheduler: ScheduledExecutorService)
+private[niflheim] class NIHDBActor private (private var currentState: ProjectionState,
+                                            baseDir: File,
+                                            chef: ActorRef,
+                                            cookThreshold: Int,
+                                            txLogScheduler: ScheduledExecutorService)
     extends Actor
     with Logging {
 
@@ -217,8 +245,8 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
   private[this] val workLock = FileLock(baseDir, lockName)
 
-  private[this] val cookedDir = new File(baseDir, cookedSubdir)
-  private[this] val rawDir    = new File(baseDir, rawSubdir)
+  private[this] val cookedDir      = new File(baseDir, cookedSubdir)
+  private[this] val rawDir         = new File(baseDir, rawSubdir)
   private[this] val descriptorFile = new File(baseDir, descriptorFilename)
 
   private[this] val cookSequence = new AtomicLong
@@ -256,7 +284,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
       (RawHandler.empty(txLog.currentBlockId, currentRawFile), Seq.empty[Long])
     }
 
-    rawLogOffsets.sortBy(- _).headOption.foreach { newMaxOffset =>
+    rawLogOffsets.sortBy(-_).headOption.foreach { newMaxOffset =>
       maxOffset = maxOffset max newMaxOffset
     }
 
@@ -274,7 +302,7 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
     // Restore the cooked map
     val cooked = currentState.readers(cookedDir)
 
-    val blockState = BlockState(cooked, pendingCooks, currentLog)
+    val blockState    = BlockState(cooked, pendingCooks, currentLog)
     val currentBlocks = computeBlockMap(blockState)
 
     log.debug("Initial block state = " + blockState)
@@ -309,8 +337,9 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
   private def close = {
     IO(log.debug("Closing projection in " + baseDir)) >> quiesce
-  } except { case t: Throwable =>
-    IO { log.error("Error during close", t) }
+  } except {
+    case t: Throwable =>
+      IO { log.error("Error during close", t) }
   } ensuring {
     IO { workLock.release }
   }
@@ -325,7 +354,9 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
 
   private def computeBlockMap(current: BlockState) = {
     val allBlocks: List[StorageReader] = (current.cooked ++ current.pending.values :+ current.rawLog)
-    SortedMap(allBlocks.map { r => r.id -> r }.toSeq: _*)
+    SortedMap(allBlocks.map { r =>
+      r.id -> r
+    }.toSeq: _*)
   }
 
   override def receive = {

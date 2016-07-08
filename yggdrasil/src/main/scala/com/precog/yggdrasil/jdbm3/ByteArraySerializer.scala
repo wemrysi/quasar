@@ -26,12 +26,13 @@ import org.apache.jdbm.Serializer
 object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
 
   @tailrec
-  private def writePackedInt(out: DataOutput, n: Int): Unit = if ((n & ~0x7F) != 0) {
-    out.writeByte(n & 0x7F | 0x80)
-    writePackedInt(out, n >> 7)
-  } else {
-    out.writeByte(n & 0x7F)
-  }
+  private def writePackedInt(out: DataOutput, n: Int): Unit =
+    if ((n & ~0x7F) != 0) {
+      out.writeByte(n & 0x7F | 0x80)
+      writePackedInt(out, n >> 7)
+    } else {
+      out.writeByte(n & 0x7F)
+    }
 
   private def readPackedInt(in: DataInput): Int = {
     @tailrec def loop(n: Int, offset: Int): Int = {
@@ -52,10 +53,8 @@ object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
 
   def deserialize(in: DataInput): Array[Byte] = {
     val length = readPackedInt(in)
-    val bytes = new Array[Byte](length)
+    val bytes  = new Array[Byte](length)
     in.readFully(bytes)
     bytes
   }
 }
-
-

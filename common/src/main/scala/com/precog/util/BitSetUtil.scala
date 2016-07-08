@@ -27,18 +27,18 @@ object BitSetUtil {
   class BitSetOperations(bs: BitSet) {
     def toList(): List[Int] = bitSetToList(bs)
 
-    def +(elem: Int) = { val b = bs.copy; b.set(elem); b }
-    def -(elem: Int) = { val b = bs.copy; b.clear(elem); b }
-    def &(other: BitSet) = { val b = bs.copy; b.and(other); b }
+    def +(elem: Int)      = { val b = bs.copy; b.set(elem); b }
+    def -(elem: Int)      = { val b = bs.copy; b.clear(elem); b }
+    def &(other: BitSet)  = { val b = bs.copy; b.and(other); b }
     def &~(other: BitSet) = { val b = bs.copy; b.andNot(other); b }
-    def |(other: BitSet) = { val b = bs.copy; b.or(other); b }
+    def |(other: BitSet)  = { val b = bs.copy; b.or(other); b }
     def ++(other: BitSet) = { val b = bs.copy; b.or(other); b }
 
-    def +=(elem: Int) = bs.set(elem)
-    def -=(elem: Int) = bs.clear(elem)
-    def &=(other: BitSet) = bs.and(other)
+    def +=(elem: Int)      = bs.set(elem)
+    def -=(elem: Int)      = bs.clear(elem)
+    def &=(other: BitSet)  = bs.and(other)
     def &~=(other: BitSet) = bs.andNot(other)
-    def |=(other: BitSet) = bs.or(other)
+    def |=(other: BitSet)  = bs.or(other)
     def ++=(other: BitSet) = bs.or(other)
 
     def isEmpty(): Boolean =
@@ -113,7 +113,8 @@ object BitSetUtil {
     val len = bitset.length
     if (from <= 0) {
       val bits = bitset.copy()
-      if (to >= len) bits else {
+      if (to >= len) bits
+      else {
         bits.clear(to, len)
         bits
       }
@@ -139,7 +140,8 @@ object BitSetUtil {
 
   def filteredSeq[A](as: List[A])(pred: A => Boolean): BitSet = {
     val bs = new BitSet
-    @inline @tailrec def loop(lst: List[A], i: Int): Unit = lst match {
+    @inline
+    @tailrec def loop(lst: List[A], i: Int): Unit = lst match {
       case h :: t =>
         if (pred(h)) bs.set(i)
         loop(t, i + 1)

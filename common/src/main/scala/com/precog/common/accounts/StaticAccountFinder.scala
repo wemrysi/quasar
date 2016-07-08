@@ -22,7 +22,6 @@ package accounts
 
 import org.slf4s.Logging
 
-
 import org.streum.configrity.Configuration
 
 import scalaz.Monad
@@ -31,7 +30,9 @@ import scalaz.syntax.monad._
 import com.precog.common._
 import com.precog.common.security._
 
-class StaticAccountFinder[M[+_]: Monad](accountId: AccountId, apiKey: APIKey, rootPath: Option[String] = None, email: String = "static@precog.com") extends AccountFinder[M] with Logging {
+class StaticAccountFinder[M[+ _]: Monad](accountId: AccountId, apiKey: APIKey, rootPath: Option[String] = None, email: String = "static@precog.com")
+    extends AccountFinder[M]
+    with Logging {
   private[this] val details = Some(AccountDetails(accountId, email, new DateTime(0), apiKey, Path(rootPath.getOrElse("/" + accountId)), AccountPlan.Root))
 
   log.debug("Constructed new static account manager. All queries resolve to \"%s\"".format(details.get))

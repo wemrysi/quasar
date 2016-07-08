@@ -29,12 +29,12 @@ import scalaz._
 object CPathUtils {
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {
     case (CPathField(name) :: tail, _) => addComponent(JPathField(name), cPathToJPaths(CPath(tail), value))
-    case (CPathIndex(i) :: tail, _) => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))
+    case (CPathIndex(i) :: tail, _)    => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))
     case (CPathArray :: tail, es: CArray[_]) =>
       val CArrayType(elemType) = es.cType
       es.value.toList.zipWithIndex flatMap { case (e, i) => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
     // case (CPathMeta(_) :: _, _) => Nil
-    case (Nil, _) => List((JPath.Identity, value))
+    case (Nil, _)  => List((JPath.Identity, value))
     case (path, _) => sys.error("Bad news, bob! " + path)
   }
 
@@ -43,15 +43,15 @@ object CPathUtils {
   }
 
   /**
-   * Returns the intersection of `cPath1` and `cPath2`. If there are no
-   * `CPathArray` components in the 2 paths, then the intersection is non-empty
-   * iff `cPath1 === cPath2`. However, if `cPath1` and/or `cPath2` contain some
-   * `CPathArray` components, then they intersect if we can replace some of the
-   * `CPathArray`s with `CPathIndex(i)` and have them be equal. This is `CPath`
-   * is their intersection.
-   *
-   * For instance, `intersect(CPath("a.b[*].c[0]"), CPath(CPath("a.b[3].c[*]")) === CPath("a.b[3].c[0]")`.
-   */
+    * Returns the intersection of `cPath1` and `cPath2`. If there are no
+    * `CPathArray` components in the 2 paths, then the intersection is non-empty
+    * iff `cPath1 === cPath2`. However, if `cPath1` and/or `cPath2` contain some
+    * `CPathArray` components, then they intersect if we can replace some of the
+    * `CPathArray`s with `CPathIndex(i)` and have them be equal. This is `CPath`
+    * is their intersection.
+    *
+    * For instance, `intersect(CPath("a.b[*].c[0]"), CPath(CPath("a.b[3].c[*]")) === CPath("a.b[3].c[0]")`.
+    */
   def intersect(cPath1: CPath, cPath2: CPath): Option[CPath] = {
 
     @scala.annotation.tailrec
@@ -70,7 +70,6 @@ object CPathUtils {
 
     loop(cPath1.nodes, cPath2.nodes, Nil)
   }
-
 
   // TODO Not really a union.
   def union(cPath1: CPath, cPath2: CPath): Option[CPath] = {

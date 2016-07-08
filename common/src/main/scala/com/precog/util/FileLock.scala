@@ -19,8 +19,8 @@
  */
 package com.precog.util
 
-import java.io.{File, RandomAccessFile}
-import java.nio.channels.{FileChannel, FileLock => JFileLock}
+import java.io.{ File, RandomAccessFile }
+import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 
 trait FileLock {
   def release: Unit
@@ -38,7 +38,6 @@ object FileLock {
     }
   }
 
-
   def apply(target: File, lockPrefix: String = "LOCKFILE"): FileLock = {
     val (lockFile, removeFile) = if (target.isDirectory) {
       val lockFile = new File(target, lockPrefix + ".lock")
@@ -49,7 +48,7 @@ object FileLock {
     }
 
     val channel = new RandomAccessFile(lockFile, "rw").getChannel
-    val lock = channel.tryLock
+    val lock    = channel.tryLock
 
     if (lock == null) {
       throw new FileLockException("Could not lock. Previous lock exists on " + target)

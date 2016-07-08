@@ -25,14 +25,13 @@ import accounts.AccountId
 import accounts.AccountFinder
 import org.slf4s.Logging
 
-
 import scalaz._
 import scalaz.std.option.optionInstance
 import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
-trait APIKeyFinder[M[+_]] extends AccessControl[M] with Logging { self =>
+trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
   def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]): M[Option[v1.APIKeyDetails]]
 
   def findAllAPIKeys(fromRoot: APIKey): M[Set[v1.APIKeyDetails]]
@@ -41,7 +40,7 @@ trait APIKeyFinder[M[+_]] extends AccessControl[M] with Logging { self =>
 
   def addGrant(accountKey: APIKey, grantId: GrantId): M[Boolean]
 
-  def withM[N[+_]](implicit t: M ~> N) = new APIKeyFinder[N] {
+  def withM[N[+ _]](implicit t: M ~> N) = new APIKeyFinder[N] {
     def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]) =
       t(self.findAPIKey(apiKey, rootKey))
 
@@ -59,7 +58,7 @@ trait APIKeyFinder[M[+_]] extends AccessControl[M] with Logging { self =>
   }
 }
 
-class DirectAPIKeyFinder[M[+_]](underlying: APIKeyManager[M])(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging {
+class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging {
   val grantDetails: Grant => v1.GrantDetails = {
     case Grant(gid, gname, gdesc, _, _, perms, createdAt, exp) => v1.GrantDetails(gid, gname, gdesc, perms, createdAt, exp)
   }
@@ -69,7 +68,9 @@ class DirectAPIKeyFinder[M[+_]](underlying: APIKeyManager[M])(implicit val M: Mo
       underlying.findAPIKeyAncestry(apiKey).flatMap { ancestors =>
         val ancestorKeys = ancestors.drop(1).map(_.apiKey) // The first element of ancestors is the key itself, so we drop it
         grantIds.map(underlying.findGrant).toList.sequence map { grants =>
-          val divulgedIssuers = rootKey.map { rk => ancestorKeys.reverse.dropWhile(_ != rk).reverse }.getOrElse(Nil)
+          val divulgedIssuers = rootKey.map { rk =>
+            ancestorKeys.reverse.dropWhile(_ != rk).reverse
+          }.getOrElse(Nil)
           log.debug("Divulging issuers %s for key %s based on root key %s and ancestors %s".format(divulgedIssuers, apiKey, rootKey, ancestorKeys))
           v1.APIKeyDetails(apiKey, name, description, grants.flatten.map(grantDetails)(collection.breakOut), divulgedIssuers)
         }

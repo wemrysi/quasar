@@ -52,7 +52,7 @@ class Atom[A] extends Source[A] with Sink[A] {
   @volatile
   private var targets = Set[Sink[A]]()
 
-  private val lock = new ReentrantLock
+  private val lock      = new ReentrantLock
   private val semaphore = new AnyRef
 
   protected def populate() {
@@ -80,7 +80,7 @@ class Atom[A] extends Source[A] with Sink[A] {
       lock.lock()
       try {
         if (!isForced || setterThread != null) {
-          val builder = if (value == null) {        // TODO gross!
+          val builder = if (value == null) { // TODO gross!
             cbf()
           } else {
             val back = cbf(value)
@@ -107,7 +107,7 @@ class Atom[A] extends Source[A] with Sink[A] {
       lock.lock()
       try {
         if (!isForced || setterThread != null) {
-          val builder = if (value == null) {        // TODO gross!
+          val builder = if (value == null) { // TODO gross!
             cbf()
           } else {
             val back = cbf(value)
@@ -134,11 +134,11 @@ class Atom[A] extends Source[A] with Sink[A] {
       lock.lock()
       try {
         if (!isForced || setterThread != null) {
-          val builder = if (value == null) {        // TODO gross!
+          val builder = if (value == null) { // TODO gross!
             cbf()
           } else {
             val current = evidence(value)
-            val back = cbf(current)
+            val back    = cbf(current)
             back ++= current
             back
           }
@@ -230,7 +230,7 @@ class Atom[A] extends Source[A] with Sink[A] {
     if (!targets.isEmpty) {
       lock.lock()
       try {
-        targets foreach { _() = value }
+        targets foreach { _ () = value }
         targets = Set()
       } finally {
         lock.unlock()
@@ -242,7 +242,7 @@ class Atom[A] extends Source[A] with Sink[A] {
 }
 
 object Atom {
-  def atom[A](f: =>Unit): Atom[A] = new Atom[A] {
+  def atom[A](f: => Unit): Atom[A] = new Atom[A] {
     override def populate() = {
       f
     }
@@ -254,6 +254,6 @@ object Atom {
 class Unpack[C, E]
 
 object Unpack {
-  implicit def unpack1[CC[_], T] = new Unpack[CC[T], T]
+  implicit def unpack1[CC[_], T]       = new Unpack[CC[T], T]
   implicit def unpack2[CC[_, _], T, U] = new Unpack[CC[T, U], (T, U)]
 }

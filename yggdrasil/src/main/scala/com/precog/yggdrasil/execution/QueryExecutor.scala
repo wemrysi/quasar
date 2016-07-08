@@ -30,34 +30,34 @@ import scalaz._
 import scalaz.NonEmptyList.nels
 
 sealed trait EvaluationError
-case class InvalidStateError(message: String) extends EvaluationError
-case class StorageError(error: ResourceError) extends EvaluationError
-case class SystemError(error: Throwable) extends EvaluationError
+case class InvalidStateError(message: String)                       extends EvaluationError
+case class StorageError(error: ResourceError)                       extends EvaluationError
+case class SystemError(error: Throwable)                            extends EvaluationError
 case class AccumulatedErrors(errors: NonEmptyList[EvaluationError]) extends EvaluationError
 
 object EvaluationError {
-  def invalidState(message: String): EvaluationError = InvalidStateError(message)
-  def storageError(error: ResourceError): EvaluationError = StorageError(error)
-  def systemError(error: Throwable): EvaluationError = SystemError(error)
+  def invalidState(message: String): EvaluationError              = InvalidStateError(message)
+  def storageError(error: ResourceError): EvaluationError         = StorageError(error)
+  def systemError(error: Throwable): EvaluationError              = SystemError(error)
   def acc(errors: NonEmptyList[EvaluationError]): EvaluationError = AccumulatedErrors(errors)
 
   implicit val semigroup: Semigroup[EvaluationError] = new Semigroup[EvaluationError] {
     def append(a: EvaluationError, b: => EvaluationError) = (a, b) match {
       case (AccumulatedErrors(a0), AccumulatedErrors(b0)) => AccumulatedErrors(a0 append b0)
-      case (a0, AccumulatedErrors(b0)) => AccumulatedErrors(a0 <:: b0)
-      case (AccumulatedErrors(a0), b0) => AccumulatedErrors(b0 <:: a0)
-      case (a0, b0) => AccumulatedErrors(nels(a0, b0))
+      case (a0, AccumulatedErrors(b0))                    => AccumulatedErrors(a0 <:: b0)
+      case (AccumulatedErrors(a0), b0)                    => AccumulatedErrors(b0 <:: a0)
+      case (a0, b0)                                       => AccumulatedErrors(nels(a0, b0))
     }
   }
 }
 
 case class QueryOptions(
-  page: Option[(Long, Long)] = None,
-  sortOn: List[CPath] = Nil,
-  sortOrder: TableModule.DesiredSortOrder = TableModule.SortAscending,
-  timeout: Option[Duration] = None,
-  output: MimeType = MimeTypes.application/MimeTypes.json,
-  cacheControl: CacheControl = CacheControl.NoCache
+    page: Option[(Long, Long)] = None,
+    sortOn: List[CPath] = Nil,
+    sortOrder: TableModule.DesiredSortOrder = TableModule.SortAscending,
+    timeout: Option[Duration] = None,
+    output: MimeType = MimeTypes.application / MimeTypes.json,
+    cacheControl: CacheControl = CacheControl.NoCache
 )
 
 case class CacheControl(maxAge: Option[Long], recacheAfter: Option[Long], cacheable: Boolean, onlyIfCached: Boolean)
@@ -66,7 +66,7 @@ object CacheControl {
   val NoCache = CacheControl(None, None, false, false)
 }
 
-trait QueryExecutor[M[+_], +A] { self =>
+trait QueryExecutor[M[+ _], +A] { self =>
   def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, A]
 
   def map[B](f: A => B)(implicit M: Functor[M]): QueryExecutor[M, B] = new QueryExecutor[M, B] {

@@ -29,7 +29,6 @@ import akka.pattern.AskSupport
 
 import org.slf4s.Logging
 
-
 import java.io.File
 
 import scalaz._
@@ -45,15 +44,17 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Future, ResourceError, Table] = {
       for {
-        _ <- EitherT.right(table.toJson map { json => log.trace("Starting load from " + json.toList.map(_.renderCompact)) })
+        _ <- EitherT.right(table.toJson map { json =>
+              log.trace("Starting load from " + json.toList.map(_.renderCompact))
+            })
         paths <- EitherT.right(pathsM(table))
         projections <- paths.toList.traverse[({ type l[a] = EitherT[Future, ResourceError, a] })#l, ProjectionLike[Future, Slice]] { path =>
-          log.debug("Loading path: " + path)
-          vfs.readProjection(apiKey, path, Version.Current, AccessMode.Read) leftMap { error =>
-            log.warn("An error was encountered in loading path %s: %s".format(path, error))
-            error
-          }
-        }
+                        log.debug("Loading path: " + path)
+                        vfs.readProjection(apiKey, path, Version.Current, AccessMode.Read) leftMap { error =>
+                          log.warn("An error was encountered in loading path %s: %s".format(path, error))
+                          error
+                        }
+                      }
       } yield {
         val length = projections.map(_.length).sum
         val stream = projections.foldLeft(StreamT.empty[Future, Slice]) { (acc, proj) =>
@@ -63,7 +64,9 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
           }
 
           log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
+          acc ++ StreamT.wrapEffect(constraints map { c =>
+            proj.getBlockStream(c)
+          })
         }
 
         Table(stream, ExactSize(length))

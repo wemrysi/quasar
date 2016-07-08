@@ -44,7 +44,7 @@ object PersistentJValue {
     }
   }
 
-  object Update extends Message(1: Byte)
+  object Update  extends Message(1: Byte)
   object Written extends Message(2: Byte)
 
   private def open(baseDir: File, fileName: String): Logger = {
@@ -63,7 +63,7 @@ object PersistentJValue {
 final case class PersistentJValue(baseDir: File, fileName: String) extends org.slf4s.Logging {
   import PersistentJValue._
 
-  private val hlog = open(baseDir, fileName)
+  private val hlog       = open(baseDir, fileName)
   private val file: File = new File(baseDir, fileName)
   private var jv: JValue = JUndefined
 
@@ -79,7 +79,7 @@ final case class PersistentJValue(baseDir: File, fileName: String) extends org.s
 
   private def flush() {
     val rawJson = jv.renderCompact.getBytes("UTF-8")
-    val mark = hlog.put(Update(rawJson), true)
+    val mark    = hlog.put(Update(rawJson), true)
 
     val out = new FileOutputStream(file)
     out.write(rawJson)
@@ -90,11 +90,11 @@ final case class PersistentJValue(baseDir: File, fileName: String) extends org.s
   }
 
   private def replay() {
-    var pending: Option[Array[Byte]] = None
+    var pending: Option[Array[Byte]]    = None
     var lastUpdate: Option[Array[Byte]] = None
 
     hlog.replay(new ReplayListener {
-      def getLogRecord: LogRecord = new LogRecord(1024 * 64)
+      def getLogRecord: LogRecord         = new LogRecord(1024 * 64)
       def onError(ex: LogException): Unit = throw ex
       def onRecord(rec: LogRecord): Unit = rec.`type` match {
         case LogRecordType.END_OF_LOG =>

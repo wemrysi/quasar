@@ -38,18 +38,26 @@ import scalaz._
 import scalaz.syntax.monad._
 
 /**
- * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
- * the index has been created and filled prior to creating this wrapper.
- */
-class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: String, sortKeyRefs: Seq[ColumnRef], valRefs: Seq[ColumnRef], sortOrder: DesiredSortOrder, sliceSize: Int, val length: Long) extends ProjectionLike[M, Slice] with Logging {
+  * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
+  * the index has been created and filled prior to creating this wrapper.
+  */
+class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
+                                                        indexName: String,
+                                                        sortKeyRefs: Seq[ColumnRef],
+                                                        valRefs: Seq[ColumnRef],
+                                                        sortOrder: DesiredSortOrder,
+                                                        sliceSize: Int,
+                                                        val length: Long)
+    extends ProjectionLike[M, Slice]
+    with Logging {
   import JDBMProjection._
   type Key = Array[Byte]
 
   def structure(implicit M: Monad[M]) = M.point((sortKeyRefs ++ valRefs).toSet)
 
-  def foreach(f : java.util.Map.Entry[Array[Byte], Array[Byte]] => Unit) {
-    val DB = DBMaker.openFile(dbFile.getCanonicalPath).make()
-    val index: SortedMap[Array[Byte],Array[Byte]] = DB.getTreeMap(indexName)
+  def foreach(f: java.util.Map.Entry[Array[Byte], Array[Byte]] => Unit) {
+    val DB                                         = DBMaker.openFile(dbFile.getCanonicalPath).make()
+    val index: SortedMap[Array[Byte], Array[Byte]] = DB.getTreeMap(indexName)
 
     index.entrySet().iterator().asScala.foreach(f)
 
@@ -59,7 +67,8 @@ class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: 
   val rowFormat = RowFormat.forValues(valRefs)
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
-  override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])(implicit M: Monad[M]): M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
+  override def getBlockAfter(id: Option[Array[Byte]], columns: Option[Set[ColumnRef]])(
+      implicit M: Monad[M]): M[Option[BlockProjectionData[Array[Byte], Slice]]] = M.point {
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {
       throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")
@@ -69,13 +78,15 @@ class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: 
     //println("opening: " + dbFile.getCanonicalPath)
     val db = DBMaker.openFile(dbFile.getCanonicalPath).readonly().disableLocking().make()
     try {
-      val index: SortedMap[Array[Byte],Array[Byte]] = db.getTreeMap(indexName)
+      val index: SortedMap[Array[Byte], Array[Byte]] = db.getTreeMap(indexName)
 
       if (index == null) {
         throw new IllegalArgumentException("No such index in DB: %s:%s".format(dbFile, indexName))
       }
 
-      val constrainedMap = id.map { idKey => index.tailMap(idKey) }.getOrElse(index)
+      val constrainedMap = id.map { idKey =>
+        index.tailMap(idKey)
+      }.getOrElse(index)
       val iteratorSetup = () => {
         val rawIterator = constrainedMap.entrySet.iterator.asScala
         // Since our key to retrieve after was the last key we retrieved, we know it exists,
@@ -86,8 +97,8 @@ class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: 
 
       // FIXME: this is brokenness in JDBM somewhere
       val iterator = {
-        var initial: Iterator[java.util.Map.Entry[Array[Byte],Array[Byte]]] = null
-        var tries = 0
+        var initial: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]] = null
+        var tries                                                            = 0
         while (tries < MAX_SPINS && initial == null) {
           try {
             initial = iteratorSetup()
@@ -115,7 +126,7 @@ class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: 
         val (firstKey, lastKey, rows) = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
 
         val slice = new Slice {
-          val size = rows
+          val size    = rows
           val columns = keyColumns.toMap ++ valColumns
         }
 

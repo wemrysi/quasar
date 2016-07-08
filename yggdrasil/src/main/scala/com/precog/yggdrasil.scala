@@ -18,8 +18,8 @@ package object yggdrasil {
   // spire vs. scalaz order
   type SpireOrder[A] = spire.math.Order[A]
 
-  type Identity     = Long
-  type Identities   = Array[Identity]
+  type Identity   = Long
+  type Identities = Array[Identity]
   object Identities {
     val Empty = VectorCase.empty[Identity]
   }
@@ -33,7 +33,7 @@ package object yggdrasil {
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): ScalazOrdering = {
     var result: ScalazOrdering = EQ
-    var i = 0
+    var i                      = 0
     while (i < prefixLength && (result eq EQ)) {
       result = longInstance.order(ids1(i), ids2(i))
       i += 1
@@ -58,7 +58,7 @@ package object yggdrasil {
     new ScalazOrder[Identities] {
       def order(ids1: Identities, ids2: Identities): ScalazOrdering = {
         var result: ScalazOrdering = EQ
-        var i = 0
+        var i                      = 0
         while (i < indices.length && (result eq EQ)) {
           result = longInstance.order(ids1(indices(i)), ids2(indices(i)))
           i += 1

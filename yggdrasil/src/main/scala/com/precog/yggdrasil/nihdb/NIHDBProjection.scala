@@ -38,21 +38,22 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, val authorities: Authoritie
 
   def structure(implicit M: Monad[Future]) = M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
 
-  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] = MP.point {
-    val id = id0.map(_ + 1)
-    val index = id getOrElse 0L
-    getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
-      case Block(_, segments, _) =>
-        val slice = SegmentsWrapper(segments, projectionId, index)
-        BlockProjectionData(index, index, slice)
+  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] =
+    MP.point {
+      val id    = id0.map(_ + 1)
+      val index = id getOrElse 0L
+      getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
+        case Block(_, segments, _) =>
+          val slice = SegmentsWrapper(segments, projectionId, index)
+          BlockProjectionData(index, index, slice)
+      }
     }
-  }
 
   def reduce[A](reduction: Reduction[A], path: CPath): Map[CType, A] = {
     readers.foldLeft(Map.empty[CType, A]) { (acc, reader) =>
       reader.snapshot(Some(Set(path))).segments.foldLeft(acc) { (acc, segment) =>
         reduction.reduce(segment, None) map { a =>
-          val key = segment.ctype
+          val key   = segment.ctype
           val value = acc.get(key).map(reduction.semigroup.append(_, a)).getOrElse(a)
           acc + (key -> value)
         } getOrElse acc

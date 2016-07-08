@@ -46,8 +46,8 @@ object AccountPlan {
   val Root = AccountPlan("Root")
   val Free = AccountPlan("Free")
 
-  implicit val iso = Iso.hlist(AccountPlan.apply _, AccountPlan.unapply _)
-  val schema = "type" :: HNil
+  implicit val iso                     = Iso.hlist(AccountPlan.apply _, AccountPlan.unapply _)
+  val schema                           = "type" :: HNil
   implicit val (decomposer, extractor) = serializationV[AccountPlan](schema, None)
 }
 
@@ -67,8 +67,8 @@ object Account {
   implicit val iso = Iso.hlist(Account.apply _, Account.unapply _)
   val schemaV1     = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
 
-  val extractorPreV = extractorV[Account](schemaV1, None)
-  val extractorV1 = extractorV[Account](schemaV1, Some("1.1".v))
+  val extractorPreV             = extractorV[Account](schemaV1, None)
+  val extractorV1               = extractorV[Account](schemaV1, Some("1.1".v))
   implicit val accountExtractor = extractorV1 <+> extractorPreV
 
   implicit val decomposerV1 = decomposerV[Account](schemaV1, Some("1.1".v))
@@ -78,7 +78,7 @@ object Account {
   def randomSalt() = {
     val saltBytes = new Array[Byte](256)
     randomSource.nextBytes(saltBytes)
-    saltBytes.flatMap(byte => Integer.toHexString(0xFF & byte))(collection.breakOut) : String
+    saltBytes.flatMap(byte => Integer.toHexString(0xFF & byte))(collection.breakOut): String
   }
 
   def saltAndHashSHA256(password: String, salt: String): String = {
@@ -105,4 +105,3 @@ object WrappedAccountId {
 
   implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) = serializationV[WrappedAccountId](schema, None)
 }
-

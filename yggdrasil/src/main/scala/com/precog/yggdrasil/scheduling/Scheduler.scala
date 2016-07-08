@@ -29,10 +29,16 @@ import java.util.UUID
 
 import scalaz._
 
-trait Scheduler[M[+_]] {
+trait Scheduler[M[+ _]] {
   def enabled: Boolean
 
-  def addTask(repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]): EitherT[M, String, UUID]
+  def addTask(repeat: Option[CronExpression],
+              apiKey: APIKey,
+              authorities: Authorities,
+              context: EvaluationContext,
+              source: Path,
+              sink: Path,
+              timeoutMillis: Option[Long]): EitherT[M, String, UUID]
 
   def deleteTask(id: UUID): EitherT[M, String, PrecogUnit]
 
@@ -41,9 +47,15 @@ trait Scheduler[M[+_]] {
 
 class ActorScheduler(scheduler: ActorRef, timeout: Timeout) extends Scheduler[Future] {
   implicit val requestTimeout = timeout
-  val enabled = true
+  val enabled                 = true
 
-  def addTask(repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]): EitherT[Future, String, UUID] = EitherT {
+  def addTask(repeat: Option[CronExpression],
+              apiKey: APIKey,
+              authorities: Authorities,
+              context: EvaluationContext,
+              source: Path,
+              sink: Path,
+              timeoutMillis: Option[Long]): EitherT[Future, String, UUID] = EitherT {
     (scheduler ? AddTask(repeat, apiKey, authorities, context, source, sink, timeoutMillis)).mapTo[String \/ UUID]
   }
 
@@ -57,13 +69,19 @@ class ActorScheduler(scheduler: ActorRef, timeout: Timeout) extends Scheduler[Fu
 }
 
 object NoopScheduler {
-  def apply[M[+_]: Monad] = new NoopScheduler[M]
+  def apply[M[+ _]: Monad] = new NoopScheduler[M]
 }
 
-class NoopScheduler[M[+_]](implicit M: Monad[M]) extends Scheduler[M] {
+class NoopScheduler[M[+ _]](implicit M: Monad[M]) extends Scheduler[M] {
   val enabled = false
 
-  def addTask(repeat: Option[CronExpression], apiKey: APIKey, authorities: Authorities, context: EvaluationContext, source: Path, sink: Path, timeoutMillis: Option[Long]) = sys.error("No scheduling available")
+  def addTask(repeat: Option[CronExpression],
+              apiKey: APIKey,
+              authorities: Authorities,
+              context: EvaluationContext,
+              source: Path,
+              sink: Path,
+              timeoutMillis: Option[Long]) = sys.error("No scheduling available")
 
   def deleteTask(id: UUID) = sys.error("No scheduling available")
 

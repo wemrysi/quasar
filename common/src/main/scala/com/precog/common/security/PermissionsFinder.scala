@@ -37,8 +37,7 @@ object PermissionsFinder {
   import Permission._
   def canWriteAs(permissions: Set[WritePermission], authorities: Authorities): Boolean = {
     val permWriteAs = permissions.map(_.writeAs)
-    permWriteAs.exists(_ == WriteAsAny) ||
-    {
+    permWriteAs.exists(_ == WriteAsAny) || {
       val writeAsAlls = permWriteAs.collect({ case WriteAsAll(s) if s.subsetOf(authorities.accountIds) => s })
 
       permWriteAs.nonEmpty &&
@@ -47,7 +46,8 @@ object PermissionsFinder {
   }
 }
 
-class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant) extends org.slf4s.Logging {
+class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant)
+    extends org.slf4s.Logging {
   import PermissionsFinder._
   import Permission._
 
@@ -76,8 +76,8 @@ class PermissionsFinder[M[+_]: Monad](val apiKeyFinder: APIKeyFinder[M], val acc
   def findBrowsableChildren(apiKey: APIKey, path: Path): M[Set[Path]] = {
     for {
       permissions <- apiKeyFinder.findAPIKey(apiKey, None) map { details =>
-        details.toSet.flatMap(_.grants).flatMap(_.permissions)
-      }
+                      details.toSet.flatMap(_.grants).flatMap(_.permissions)
+                    }
       accountId <- accountFinder.findAccountByAPIKey(apiKey)
       accountPath <- accountId.traverse(accountFinder.findAccountDetailsById)
     } yield {

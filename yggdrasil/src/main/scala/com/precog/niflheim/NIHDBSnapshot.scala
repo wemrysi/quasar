@@ -34,7 +34,7 @@ import java.util.Arrays
 object NIHDBSnapshot {
   def apply(m: SortedMap[Long, StorageReader]): NIHDBSnapshot =
     new NIHDBSnapshot {
-      val readers = m.values.filter(_.length > 0).toArray
+      val readers  = m.values.filter(_.length > 0).toArray
       val blockIds = readers.map(_.id)
     }
 }
@@ -71,7 +71,8 @@ trait NIHDBSnapshot {
     findReaderAfter(id0).map { reader =>
       val snapshot = reader.snapshotRef(cols)
       if (log.isTraceEnabled) {
-        log.trace("Block after %s, %s (%s)\nSnapshot on %s:\n  %s".format(id0, reader, reader.hashCode, cols, snapshot.segments.map(_.toString).mkString("\n  ")))
+        log.trace(
+          "Block after %s, %s (%s)\nSnapshot on %s:\n  %s".format(id0, reader, reader.hashCode, cols, snapshot.segments.map(_.toString).mkString("\n  ")))
       }
       snapshot
     }.orElse {
@@ -90,20 +91,23 @@ trait NIHDBSnapshot {
   }
 
   /**
-   * Returns the total number of defined objects for a given `CPath` *mask*.
-   * Since this punches holes in our rows, it is not simply the length of the
-   * block. Instead we count the number of rows that have at least one defined
-   * value at each path (and their children).
-   */
+    * Returns the total number of defined objects for a given `CPath` *mask*.
+    * Since this punches holes in our rows, it is not simply the length of the
+    * block. Instead we count the number of rows that have at least one defined
+    * value at each path (and their children).
+    */
   def count(id: Option[Long], paths0: Option[Set[CPath]]): Option[Long] = {
-    def countSegments(segs: Seq[Segment]): Long = segs.foldLeft(new BitSet) { (acc, seg) =>
-      acc.or(seg.defined)
-      acc
-    }.cardinality
+    def countSegments(segs: Seq[Segment]): Long =
+      segs
+        .foldLeft(new BitSet) { (acc, seg) =>
+          acc.or(seg.defined)
+          acc
+        }
+        .cardinality
 
     findReader(id).map { reader =>
       paths0 map { paths =>
-        val constraints = getConstraints(reader.structure, paths)
+        val constraints       = getConstraints(reader.structure, paths)
         val Block(_, cols, _) = reader.snapshot(Some(constraints.toSet))
         countSegments(cols)
       } getOrElse {
@@ -120,14 +124,15 @@ trait NIHDBSnapshot {
 
   def reduce[A](reduction: Reduction[A], path: CPath): Map[CType, A] = {
     blockIds.foldLeft(Map.empty[CType, A]) { (acc, id) =>
-      getBlock(Some(id), Some(Set(path))) map { case Block(_, segments, _) =>
-        segments.foldLeft(acc) { (acc, segment) =>
-          reduction.reduce(segment, None) map { a =>
-            val key = segment.ctype
-            val value = acc.get(key).map(reduction.semigroup.append(_, a)).getOrElse(a)
-            acc + (key -> value)
-          } getOrElse acc
-        }
+      getBlock(Some(id), Some(Set(path))) map {
+        case Block(_, segments, _) =>
+          segments.foldLeft(acc) { (acc, segment) =>
+            reduction.reduce(segment, None) map { a =>
+              val key   = segment.ctype
+              val value = acc.get(key).map(reduction.semigroup.append(_, a)).getOrElse(a)
+              acc + (key -> value)
+            } getOrElse acc
+          }
       } getOrElse acc
     }
   }

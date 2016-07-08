@@ -32,7 +32,7 @@ import com.precog.yggdrasil.execution.EvaluationContext
 
 import scalaz.std.map._
 
-trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
+trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
   type TS1 = trans.TransSpec1
   import library._
   import trans._
@@ -52,12 +52,13 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
 
     def findReductions(node: DepGraph, ctx: EvaluationContext): MegaReduceState = {
       implicit val m = new Monoid[List[dag.Reduce]] {
-        def zero: List[dag.Reduce] = Nil
+        def zero: List[dag.Reduce]                              = Nil
         def append(x: List[dag.Reduce], y: => List[dag.Reduce]) = x ::: y
       }
 
-      val reduces = node.foldDown[List[dag.Reduce]](true) {
-        case r: dag.Reduce => List(r)
+      val reduces = node
+        .foldDown[List[dag.Reduce]](true) {
+          case r: dag.Reduce => List(r)
       } distinct
 
       val info: List[ReduceInfo] = reduces map { buildReduceInfo(_: dag.Reduce, ctx) }
@@ -83,15 +84,14 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
       MegaReduceState(ancestorByReduce, parentsByAncestor, reducesByParent, specByParent)
     }
 
-    case class MegaReduceState(
-        ancestorByReduce: Map[dag.Reduce, DepGraph],
-        parentsByAncestor: Map[DepGraph, List[DepGraph]],
-        reducesByParent: Map[DepGraph, List[dag.Reduce]],
-        specByParent: Map[DepGraph, TransSpec1]) {
+    case class MegaReduceState(ancestorByReduce: Map[dag.Reduce, DepGraph],
+                               parentsByAncestor: Map[DepGraph, List[DepGraph]],
+                               reducesByParent: Map[DepGraph, List[dag.Reduce]],
+                               specByParent: Map[DepGraph, TransSpec1]) {
 
       def buildMembers(ancestor: DepGraph): List[(TransSpec1, List[Reduction])] = {
-        parentsByAncestor(ancestor) map {
-          p => (specByParent(p), reducesByParent(p) map { _.red })
+        parentsByAncestor(ancestor) map { p =>
+          (specByParent(p), reducesByParent(p) map { _.red })
         }
       }
     }
@@ -99,27 +99,29 @@ trait ReductionFinderModule[M[+_]] extends DAG with EvaluatorMethodsModule[M] wi
     def megaReduce(node: DepGraph, st: MegaReduceState): DepGraph = {
       val reduceTable = mutable.Map[DepGraph, dag.MegaReduce]()
 
-      node mapDown { recurse => {
-        case graph @ dag.Reduce(red, parent) if st.ancestorByReduce contains graph => {
-          val ancestor = st.ancestorByReduce(graph)
-          val members = st.buildMembers(ancestor)
+      node mapDown { recurse =>
+        {
+          case graph @ dag.Reduce(red, parent) if st.ancestorByReduce contains graph => {
+            val ancestor = st.ancestorByReduce(graph)
+            val members  = st.buildMembers(ancestor)
 
-          val left = reduceTable get ancestor getOrElse {
-            val result = dag.MegaReduce(members, recurse(ancestor))
-            reduceTable(ancestor) = result
-            result
+            val left = reduceTable get ancestor getOrElse {
+              val result = dag.MegaReduce(members, recurse(ancestor))
+              reduceTable(ancestor) = result
+              result
+            }
+
+            val firstIndex  = st.parentsByAncestor(ancestor).reverse indexOf parent
+            val secondIndex = st.reducesByParent(parent).reverse indexOf graph
+
+            dag.Join(
+              DerefArray,
+              Cross(Some(CrossLeft)),
+              dag.Join(DerefArray, Cross(Some(CrossLeft)), left, Const(CLong(firstIndex))(graph.loc))(graph.loc),
+              Const(CLong(secondIndex))(graph.loc))(graph.loc)
           }
-
-          val firstIndex = st.parentsByAncestor(ancestor).reverse indexOf parent
-          val secondIndex = st.reducesByParent(parent).reverse indexOf graph
-
-          dag.Join(DerefArray, Cross(Some(CrossLeft)),
-            dag.Join(DerefArray, Cross(Some(CrossLeft)),
-              left,
-              Const(CLong(firstIndex))(graph.loc))(graph.loc),
-            Const(CLong(secondIndex))(graph.loc))(graph.loc)
         }
-      }}
+      }
     }
   }
 }

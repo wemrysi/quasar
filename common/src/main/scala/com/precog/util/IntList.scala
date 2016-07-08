@@ -36,7 +36,7 @@ sealed trait IntList extends LinearSeq[Int] with LinearSeqOptimized[Int, IntList
   override def foreach[@specialized B](f: Int => B): Unit = {
     @tailrec def loop(xs: IntList): Unit = xs match {
       case IntCons(h, t) => f(h); loop(t)
-      case _ =>
+      case _             =>
     }
     loop(this)
   }
@@ -54,7 +54,7 @@ sealed trait IntList extends LinearSeq[Int] with LinearSeqOptimized[Int, IntList
   override def length: Int = {
     @tailrec def loop(xs: IntList, len: Int): Int = xs match {
       case IntCons(x, xs0) => loop(xs0, len + 1)
-      case IntNil => len
+      case IntNil          => len
     }
     loop(this, 0)
   }
@@ -72,7 +72,7 @@ sealed trait IntList extends LinearSeq[Int] with LinearSeqOptimized[Int, IntList
   override def reverse: IntList = {
     @tailrec def loop(xs: IntList, ys: IntList): IntList = xs match {
       case IntCons(x, xs0) => loop(xs0, x :: ys)
-      case IntNil => ys
+      case IntNil          => ys
     }
     loop(this, IntNil)
   }
@@ -85,8 +85,8 @@ final case class IntCons(override val head: Int, override val tail: IntList) ext
 }
 
 final case object IntNil extends IntList {
-  override def head: Int = sys.error("no head on empty IntList")
-  override def tail: IntList = IntNil
+  override def head: Int        = sys.error("no head on empty IntList")
+  override def tail: IntList    = IntNil
   override def isEmpty: Boolean = true
 }
 
@@ -99,7 +99,7 @@ final class IntListBuilder extends Builder[Int, IntList] {
 
 object IntList {
   implicit def cbf = new CanBuildFrom[IntList, Int, IntList] {
-    def apply(): Builder[Int, IntList] = new IntListBuilder
+    def apply(): Builder[Int, IntList]              = new IntListBuilder
     def apply(from: IntList): Builder[Int, IntList] = apply()
   }
 }

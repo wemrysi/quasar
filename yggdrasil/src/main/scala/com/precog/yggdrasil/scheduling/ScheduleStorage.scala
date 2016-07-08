@@ -28,7 +28,7 @@ import java.util.UUID
 
 import scalaz.EitherT
 
-trait ScheduleStorage[M[+_]] {
+trait ScheduleStorage[M[+ _]] {
   def addTask(task: ScheduledTask): EitherT[M, String, ScheduledTask]
 
   def deleteTask(id: UUID): EitherT[M, String, Option[ScheduledTask]]

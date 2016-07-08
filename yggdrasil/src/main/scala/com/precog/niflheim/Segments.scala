@@ -25,7 +25,7 @@ import java.io._
 import com.precog.common._
 import com.precog.util._
 
-import scala.collection.mutable.{Map => MMap}
+import scala.collection.mutable.{ Map => MMap }
 import scala.collection.mutable.ArrayBuffer
 
 case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[CTree], types: MMap[CType, Int]) {
@@ -38,7 +38,7 @@ case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[
     }
     indices(n)
   }
-  def getType(ctype: CType): Int = types.getOrElse(ctype, -1)
+  def getType(ctype: CType): Int          = types.getOrElse(ctype, -1)
   def setType(ctype: CType, n: Int): Unit = types(ctype) = n
 
   override def equals(that: Any): Boolean = that match {
@@ -245,15 +245,15 @@ case class Segments(id: Long, var length: Int, t: CTree, a: ArrayBuffer[Segment]
 
   def initializeSegments(row: Int, j: JValue, tree: CTree): Unit = {
     j match {
-      case JNull => addNull(row, tree)
-      case JTrue => addTrue(row, tree)
+      case JNull  => addNull(row, tree)
+      case JTrue  => addTrue(row, tree)
       case JFalse => addFalse(row, tree)
 
-      case JString(s) => addString(row, tree, s)
-      case JNumLong(n) => addLong(row, tree, n)
+      case JString(s)    => addString(row, tree, s)
+      case JNumLong(n)   => addLong(row, tree, n)
       case JNumDouble(n) => addDouble(row, tree, n)
       case JNumBigDec(n) => addBigDecimal(row, tree, n)
-      case JNumStr(s) => addNum(row, tree, s)
+      case JNumStr(s)    => addNum(row, tree, s)
 
       case JObject(m) =>
         if (m.isEmpty) {

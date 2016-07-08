@@ -32,7 +32,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.effect.id._
 
 case class CachingAPIKeyFinderSettings(
-  apiKeyCacheSettings: Seq[Cache.CacheOption[APIKey, v1.APIKeyDetails]]
+    apiKeyCacheSettings: Seq[Cache.CacheOption[APIKey, v1.APIKeyDetails]]
 )
 
 object CachingAPIKeyFinderSettings {
@@ -41,7 +41,8 @@ object CachingAPIKeyFinderSettings {
   )
 }
 
-class CachingAPIKeyFinder[M[+_]: Monad](delegate: APIKeyFinder[M], settings: CachingAPIKeyFinderSettings = CachingAPIKeyFinderSettings.Default) extends APIKeyFinder[M] {
+class CachingAPIKeyFinder[M[+ _]: Monad](delegate: APIKeyFinder[M], settings: CachingAPIKeyFinderSettings = CachingAPIKeyFinderSettings.Default)
+    extends APIKeyFinder[M] {
   private val apiKeyCache = Cache.simple[APIKey, v1.APIKeyDetails](settings.apiKeyCacheSettings: _*)
 
   protected def add(r: v1.APIKeyDetails) = IO { apiKeyCache.put(r.apiKey, r) }

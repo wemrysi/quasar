@@ -27,10 +27,10 @@ import yggdrasil.table._
 
 import TransSpecModule._
 
-trait UnaryLibModule[M[+_]] extends ColumnarTableLibModule[M] {
+trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
     import trans._
-    import StdLib.{BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined}
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined }
 
     object Unary {
       val UnaryNamespace = Vector("std", "unary")
@@ -41,8 +41,8 @@ trait UnaryLibModule[M[+_]] extends ColumnarTableLibModule[M] {
           case c: BoolColumn => new BoolFrom.B(c, !_)
         }
 
-        def spec[A <: SourceType](ctx: MorphContext): TransSpec[A] => TransSpec[A] = {
-          transSpec => trans.Map1(transSpec, f1(ctx))
+        def spec[A <: SourceType](ctx: MorphContext): TransSpec[A] => TransSpec[A] = { transSpec =>
+          trans.Map1(transSpec, f1(ctx))
         }
       }
 
@@ -50,12 +50,12 @@ trait UnaryLibModule[M[+_]] extends ColumnarTableLibModule[M] {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1(ctx: MorphContext): F1 = CF1P("builtin::unary::neg") {
           case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, -_)
-          case c: LongColumn => new LongFrom.L(c, n => true, -_)
-          case c: NumColumn => new NumFrom.N(c, n => true, -_)
+          case c: LongColumn   => new LongFrom.L(c, n => true, -_)
+          case c: NumColumn    => new NumFrom.N(c, n => true, -_)
         }
 
-        def spec[A <: SourceType](ctx: MorphContext): TransSpec[A] => TransSpec[A] = {
-          transSpec => trans.Map1(transSpec, f1(ctx))
+        def spec[A <: SourceType](ctx: MorphContext): TransSpec[A] => TransSpec[A] = { transSpec =>
+          trans.Map1(transSpec, f1(ctx))
         }
       }
     }

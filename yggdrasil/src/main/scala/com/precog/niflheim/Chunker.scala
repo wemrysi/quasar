@@ -26,10 +26,10 @@ import java.util.zip.Adler32
 import scalaz._
 
 /**
- * This class provides some nice method for writing/reading bytes to channels.
- * It does this by writing the data out in chunks. These chunks are fixed and
- * can use a checksum to ensure our data isn't corrupted.
- */
+  * This class provides some nice method for writing/reading bytes to channels.
+  * It does this by writing the data out in chunks. These chunks are fixed and
+  * can use a checksum to ensure our data isn't corrupted.
+  */
 trait Chunker {
   def verify: Boolean
   val ChunkSize = 4096
@@ -37,9 +37,9 @@ trait Chunker {
   private def allocate(size: Int): ByteBuffer = java.nio.ByteBuffer.allocate(size)
 
   private def takeChunk(buffer: ByteBuffer): ByteBuffer = {
-    val bytes = new Array[Byte](ChunkSize)
+    val bytes     = new Array[Byte](ChunkSize)
     val remaining = buffer.remaining()
-    val len = math.min(ChunkSize - 12, remaining)
+    val len       = math.min(ChunkSize - 12, remaining)
     buffer.get(bytes, 4, len)
 
     val checksum = new Adler32()
@@ -54,8 +54,8 @@ trait Chunker {
   private def readChunk(chunk: ByteBuffer, buffer: ByteBuffer): Int = {
     chunk.mark()
     val remaining = chunk.getInt()
-    val bytes = new Array[Byte](ChunkSize - 12)
-    val len = math.min(remaining, bytes.length)
+    val bytes     = new Array[Byte](ChunkSize - 12)
+    val len       = math.min(remaining, bytes.length)
     chunk.get(bytes, 0, len)
     chunk.reset()
 
@@ -85,8 +85,9 @@ trait Chunker {
         }
       }
       Success(result)
-    } catch { case ex: IOException =>
-      Failure(ex)
+    } catch {
+      case ex: IOException =>
+        Failure(ex)
     }
   }
 
@@ -110,8 +111,9 @@ trait Chunker {
       buffer.flip()
 
       Success(buffer)
-    } catch { case ioe: IOException =>
-      Failure(ioe)
+    } catch {
+      case ioe: IOException =>
+        Failure(ioe)
     }
   }
 }

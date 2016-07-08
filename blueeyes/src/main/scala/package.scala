@@ -1,21 +1,15 @@
 package blueeyes1
 
 object json {
-  object serialization {
-  }
+  object serialization {}
 }
-object bkka {
-}
+object bkka {}
 object core {
-  object data {
-  }
-  object http {
-  }
-  object service {
-  }
+  object data {}
+  object http {}
+  object service {}
 }
-object util {
-}
+object util {}
 
 // 104 import blueeyes.json._
 //  26 import blueeyes.json.serialization._

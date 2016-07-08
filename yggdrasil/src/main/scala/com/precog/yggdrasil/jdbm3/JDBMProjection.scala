@@ -26,4 +26,3 @@ object JDBMProjection {
 
 // FIXME: Again, related to JDBM concurent mod exception
 class VicciniException(message: String) extends java.io.IOException("Inconceivable! " + message)
-

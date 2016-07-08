@@ -23,19 +23,19 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 
 /**
- * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
- * of the operations on this datastructure are checked for bounds.  You are
- * trusted to get this right on your own.  If you do something weird, you could
- * end up overwriting data, reading old results, etc.  Don't do that.
- *
- * No objects were allocated in the making of this film.
- */
+  * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
+  * of the operations on this datastructure are checked for bounds.  You are
+  * trusted to get this right on your own.  If you do something weird, you could
+  * end up overwriting data, reading old results, etc.  Don't do that.
+  *
+  * No objects were allocated in the making of this film.
+  */
 final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: ClassManifest](_bound: Int) {
   val bound = _bound + 1
 
   private val ring = new Array[A](bound)
   private var front = 0
-  private var back = rotate(front, 1)
+  private var back  = rotate(front, 1)
 
   def isEmpty = front == rotate(back, -1)
 

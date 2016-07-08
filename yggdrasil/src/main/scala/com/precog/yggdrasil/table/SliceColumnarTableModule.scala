@@ -29,13 +29,13 @@ import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
-trait SliceColumnarTableModule[M[+_]] extends BlockStoreColumnarTableModule[M] with ProjectionModule[M, Slice] {
+trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] with ProjectionModule[M, Slice] {
   type TableCompanion <: SliceColumnarTableCompanion
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table] = EitherT.right {
       for {
-        paths       <- pathsM(table)
+        paths <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
@@ -50,14 +50,15 @@ trait SliceColumnarTableModule[M[+_]] extends BlockStoreColumnarTableModule[M] w
           }
         }
 
-        val stream = projections.foldLeft(StreamT.empty[M, Slice]) {
-          (acc, proj) =>
+        val stream = projections.foldLeft(StreamT.empty[M, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
           val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
             Some(Schema.flatten(tpe, struct.toList).toSet)
           }
 
-          acc ++ StreamT.wrapEffect(constraints map { c => slices(proj, c) })
+          acc ++ StreamT.wrapEffect(constraints map { c =>
+            slices(proj, c)
+          })
         }
 
         Table(stream, ExactSize(totalLength))

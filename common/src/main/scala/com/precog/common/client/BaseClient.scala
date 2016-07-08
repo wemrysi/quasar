@@ -31,14 +31,14 @@ import scalaz._
 trait BaseClient {
   implicit def M: Monad[Future]
 
-  def Response[A](a: Future[A]): Response[A] = EitherT.right(a)
+  def Response[A](a: Future[A]): Response[A]      = EitherT.right(a)
   def BadResponse(msg: String): Response[Nothing] = EitherT.left(M.point(msg))
 
   protected def withRawClient[A](f: HttpClient[ByteChunk] => A): A
 
   // This could be JValue, but too many problems arise w/ ambiguous implicits.
   final protected def withJsonClient[A](f: HttpClient[ByteChunk] => A): A = withRawClient { client =>
-    f(client.contentType[ByteChunk](application/MimeTypes.json))
+    f(client.contentType[ByteChunk](application / MimeTypes.json))
   }
 }
 

@@ -33,7 +33,12 @@ import blueeyes.json.serialization.JodaSerializationImplicits.InstantExtractor
 import shapeless._
 
 object v1 {
-  case class GrantDetails(grantId: GrantId, name: Option[String], description: Option[String], permissions: Set[Permission], createdAt: Instant, expirationDate: Option[DateTime]) {
+  case class GrantDetails(grantId: GrantId,
+                          name: Option[String],
+                          description: Option[String],
+                          permissions: Set[Permission],
+                          createdAt: Instant,
+                          expirationDate: Option[DateTime]) {
     def isValidAt(timestamp: Instant) = {
       createdAt.isBefore(timestamp) && expirationDate.forall(_.isAfter(timestamp))
     }
@@ -55,22 +60,26 @@ object v1 {
     implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[APIKeyDetails](schema)
   }
 
-  case class NewGrantRequest(name: Option[String], description: Option[String], parentIds: Set[GrantId], permissions: Set[Permission], expirationDate: Option[DateTime]) {
+  case class NewGrantRequest(name: Option[String],
+                             description: Option[String],
+                             parentIds: Set[GrantId],
+                             permissions: Set[Permission],
+                             expirationDate: Option[DateTime]) {
     def isExpired(at: Option[DateTime]) = (expirationDate, at) match {
-      case (None, _) => false
-      case (_, None) => true
+      case (None, _)                 => false
+      case (_, None)                 => true
       case (Some(expiry), Some(ref)) => expiry.isBefore(ref)
     }
   }
 
   object NewGrantRequest {
     private implicit val reqPermDecomposer = Permission.decomposerV1Base
-    implicit val newGrantRequestIso = Iso.hlist(NewGrantRequest.apply _, NewGrantRequest.unapply _)
+    implicit val newGrantRequestIso        = Iso.hlist(NewGrantRequest.apply _, NewGrantRequest.unapply _)
 
     val schemaV1 = "name" :: "description" :: ("parentIds" ||| Set.empty[GrantId]) :: "permissions" :: "expirationDate" :: HNil
 
     implicit val decomposerV1 = IsoSerialization.decomposer[NewGrantRequest](schemaV1)
-    implicit val extractorV1 = IsoSerialization.extractor[NewGrantRequest](schemaV1)
+    implicit val extractorV1  = IsoSerialization.extractor[NewGrantRequest](schemaV1)
   }
 
   case class NewAPIKeyRequest(name: Option[String], description: Option[String], grants: Set[NewGrantRequest])

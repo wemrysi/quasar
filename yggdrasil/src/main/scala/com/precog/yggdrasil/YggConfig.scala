@@ -30,7 +30,8 @@ trait YggConfigComponent {
 }
 
 trait BaseConfig extends Config {
-  private val localDefaults = Configuration.parse("""
+  private val localDefaults = Configuration.parse(
+    """
     precog {
       storage {
         root = ./data
@@ -43,7 +44,8 @@ trait BaseConfig extends Config {
         }
       }
     }
- """, io.BlockFormat)
+ """,
+    io.BlockFormat)
 
   lazy private val cfg = localDefaults ++ config
 
