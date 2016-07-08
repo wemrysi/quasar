@@ -22,23 +22,15 @@ package security
 package service
 
 import com.precog.common.accounts._
-import com.precog.common.security._
 
-import blueeyes.core.http._
-import blueeyes.core.http.HttpStatusCodes._
-import blueeyes.core.service._
 import blueeyes.json._
 import blueeyes.json.serialization.{ Extractor, Decomposer, IsoSerialization }
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.JodaSerializationImplicits.InstantDecomposer
 import blueeyes.json.serialization.JodaSerializationImplicits.InstantExtractor
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.Versioned._
-
 
 import shapeless._
-import scalaz.{NonEmptyList => NEL}
 
 object v1 {
   case class GrantDetails(grantId: GrantId, name: Option[String], description: Option[String], permissions: Set[Permission], createdAt: Instant, expirationDate: Option[DateTime]) {
@@ -99,5 +91,3 @@ object v1 {
     }
   }
 }
-
-// vim: set ts=4 sw=4 et:
