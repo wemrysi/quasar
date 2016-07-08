@@ -20,7 +20,6 @@
 package com.precog.util
 
 import scala.annotation.tailrec
-import scala.{ specialized => spec }
 
 /**
   * This object contains some methods to do faster iteration over primitives.
@@ -37,10 +36,8 @@ object Loop {
     }
   }
 
-  final def forall[@spec A](as: Array[A])(f: A => Boolean): Boolean = {
-    @tailrec def loop(i: Int): Boolean = {
-      if (i == as.length) true else if (f(as(i))) loop(i + 1) else false
-    }
+  final def forall[@specialized A](as: Array[A])(f: A => Boolean): Boolean = {
+    @tailrec def loop(i: Int): Boolean = i == as.length || f(as(i)) && loop(i + 1)
 
     loop(0)
   }

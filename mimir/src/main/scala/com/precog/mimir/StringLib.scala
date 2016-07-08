@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -78,8 +78,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         equals,
         indexOf,
         split,
-        splitRegex,
-        editDistance)
+        splitRegex)
 
     private def isValidInt(num: BigDecimal): Boolean = {
       try {
@@ -187,7 +186,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
                   case _ =>
                 }
               } catch {
-                case _: java.util.regex.PatternSyntaxException => // yay, scala 
+                case _: java.util.regex.PatternSyntaxException => // yay, scala
               }
             }
           }
@@ -370,23 +369,6 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       lazy val prepare = UnifyStrDate
 
       lazy val mapper = splitMapper(true)
-    }
-
-    object editDistance extends Op2F2(StringNamespace, "editDistance") {
-      //@deprecated, see the DEPRECATED comment in StringLib
-      val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JNumberT)
-
-      private def build(c1: StrColumn, c2: StrColumn) =
-        new Map2Column(c1, c2) with LongColumn {
-          def apply(row: Int): Long = Levenshtein.distance(c1(row), c2(row))
-        }
-
-      def f2(ctx: MorphContext): F2 = CF2P("builtin::str::parseNum") {
-        case (c1: StrColumn, c2: StrColumn)   => build(c1, c2)
-        case (c1: DateColumn, c2: StrColumn)  => build(dateToStrCol(c1), c2)
-        case (c1: StrColumn, c2: DateColumn)  => build(c1, dateToStrCol(c2))
-        case (c1: DateColumn, c2: DateColumn) => build(dateToStrCol(c1), dateToStrCol(c2))
-      }
     }
 
     object splitRegex extends Op2(StringNamespace, "splitRegex") with Op2Array {
