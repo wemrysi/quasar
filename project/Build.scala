@@ -1,7 +1,7 @@
 package precog
 
 import sbt._, Keys._
-import org.scalafmt.sbt.ScalaFmtPlugin.autoImport._
+// import org.scalafmt.sbt.ScalaFmtPlugin.autoImport._
 
 object PlatformBuild {
   def blueeyesModule(name: String): ModuleID = "com.reportgrid" %% s"blueeyes-$name" % "1.0.0-M9.5"
@@ -17,8 +17,8 @@ object PlatformBuild {
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
 
     def setup: Project = also(
-                      resolvers ++= Seq(Opts.resolver.sonatypeReleases, JCenterRepository),
-                 scalafmtConfig :=  Some((baseDirectory in ThisBuild).value / ".scalafmt"),
+                      // resolvers ++= Seq(Opts.resolver.sonatypeReleases, JCenterRepository),
+                 // scalafmtConfig :=  Some((baseDirectory in ThisBuild).value / ".scalafmt"),
                    organization :=  "com.precog",
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:none") ++ optimizeOpts ++ debugOpts,
