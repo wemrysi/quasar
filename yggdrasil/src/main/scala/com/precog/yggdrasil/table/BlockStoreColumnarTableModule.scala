@@ -30,7 +30,6 @@ import Schema._
 import metadata._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
-import com.precog.util.BitSetUtil.Implicits._
 
 import java.io.File
 import java.util.SortedMap

@@ -22,7 +22,6 @@ package com.precog.yggdrasil
 import table._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
-import com.precog.util.BitSetUtil.Implicits._
 
 import com.precog.common._
 import com.precog.bytecode._

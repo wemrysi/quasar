@@ -43,7 +43,6 @@ import org.slf4s.Logging
 import org.apache.jdbm.DBMaker
 
 import com.precog.util.{ BitSet, BitSetUtil, IOUtils, Loop }
-import com.precog.util.BitSetUtil.Implicits._
 
 import scala.collection.mutable
 

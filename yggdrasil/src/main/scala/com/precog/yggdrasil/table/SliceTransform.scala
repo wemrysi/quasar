@@ -23,7 +23,6 @@ package table
 import com.precog.common._
 import com.precog.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
 import com.precog.util._
-import com.precog.util.BitSetUtil.Implicits._
 
 import scalaz._
 import scalaz.std.tuple._

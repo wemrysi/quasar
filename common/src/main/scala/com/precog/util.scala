@@ -27,9 +27,22 @@ import java.util.Comparator
 import java.nio.ByteBuffer
 import scala.collection.mutable
 import scalaz.Bind
+import scala.collection.JavaConverters._
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentHashMap
 
-package object util {
-  type RawBitSet = Array[Int]
+package util {
+  /**
+    * Opaque symbolic identifier (like Int, but better!).
+    */
+  final class Identifier extends AnyRef
+
+  // Shared Int could easily overflow: Unshare? Extend to a Long? Different approach?
+  object IdGen extends IdGen
+  class IdGen {
+    private[this] val currentId = new AtomicInteger(0)
+    def nextInt(): Int = currentId.getAndIncrement()
+  }
 
   class Order2JComparator[A](order: scalaz.Order[A]) {
     def toJavaComparator: Comparator[A] = new Comparator[A] {
@@ -39,29 +52,8 @@ package object util {
     }
   }
 
-  implicit def Order2JComparator[A](order: scalaz.Order[A]): Order2JComparator[A] = new Order2JComparator(order)
-
-  final def flipBytes(buffer: ByteBuffer): Array[Byte] = {
-    val bytes = new Array[Byte](buffer.remaining())
-    buffer.get(bytes)
-    buffer.flip()
-    bytes
-  }
-
-  implicit def vectorMonoid[A]: Monoid[Vector[A]] = new Monoid[Vector[A]] {
-    def zero: Vector[A]                         = Vector.empty[A]
-    def append(v1: Vector[A], v2: => Vector[A]) = v1 ++ v2
-  }
-
-  implicit def bigDecimalMonoid: Monoid[BigDecimal] = new Monoid[BigDecimal] {
-    def zero: BigDecimal                                      = BigDecimal(0)
-    def append(v1: BigDecimal, v2: => BigDecimal): BigDecimal = v1 + v2
-  }
-
   final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
-    import scala.collection.JavaConverters._
-
-    private val m: mutable.ConcurrentMap[A, C] = new java.util.concurrent.ConcurrentHashMap[A, C]().asScala
+    private val m: mutable.ConcurrentMap[A, C] = new ConcurrentHashMap[A, C]().asScala
 
     def iterator: Iterator[(A, C)] = source.keysIterator map { a =>
       (a, apply(a))
@@ -83,9 +75,17 @@ package object util {
     protected def source: Map[A, B]
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
+}
 
-  implicit def lazyValueMapper[A, B](m: Map[A, B]) = new LazyMapValues[A, B] { val source = m }
+package object util {
+  type RawBitSet = Array[Int]
 
+  def flipBytes(buffer: ByteBuffer): Array[Byte] = {
+    val bytes = new Array[Byte](buffer.remaining())
+    buffer.get(bytes)
+    buffer.flip()
+    bytes
+  }
   def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
     val len = a1.length
     if (len != a2.length) return false
@@ -97,6 +97,21 @@ package object util {
     true
   }
 
+  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
+
+  implicit def Order2JComparator[A](order: scalaz.Order[A]): Order2JComparator[A] = new Order2JComparator(order)
+
+  implicit def vectorMonoid[A]: Monoid[Vector[A]] = new Monoid[Vector[A]] {
+    def zero: Vector[A]                         = Vector.empty[A]
+    def append(v1: Vector[A], v2: => Vector[A]) = v1 ++ v2
+  }
+
+  implicit def bigDecimalMonoid: Monoid[BigDecimal] = new Monoid[BigDecimal] {
+    def zero: BigDecimal                                      = BigDecimal(0)
+    def append(v1: BigDecimal, v2: => BigDecimal): BigDecimal = v1 + v2
+  }
+
+  implicit def lazyValueMapper[A, B](m: Map[A, B]) = new LazyMapValues[A, B] { val source = m }
   implicit val InstantOrdering: Ordering[Instant] = Ordering.Long.on[Instant](_.getMillis)
 
   implicit val FutureBind: Bind[Future] = new Bind[Future] {
@@ -104,5 +119,3 @@ package object util {
     def bind[A, B](fut: Future[A])(f: A => Future[B]) = fut.flatMap(f)
   }
 }
-
-// vim: set ts=4 sw=4 et:

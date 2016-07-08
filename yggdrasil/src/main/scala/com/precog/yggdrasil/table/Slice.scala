@@ -28,7 +28,6 @@ import com.precog.util._
 import TransSpecModule._
 import blueeyes.json._
 
-import com.precog.util.BitSetUtil.Implicits._
 
 import scalaz._
 import scalaz.Ordering._

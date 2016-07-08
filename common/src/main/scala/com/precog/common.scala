@@ -53,6 +53,7 @@ package object common {
   type switch         = scala.annotation.switch
   type ArrayBuffer[A] = scala.collection.mutable.ArrayBuffer[A]
   type ListBuffer[A]  = scala.collection.mutable.ListBuffer[A]
+  val ArrayBuffer     = scala.collection.mutable.ArrayBuffer
 
   // java stdlib encapsulation
   type File        = java.io.File

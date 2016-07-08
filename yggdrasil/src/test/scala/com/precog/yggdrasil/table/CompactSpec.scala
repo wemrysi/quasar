@@ -24,7 +24,6 @@ import com.precog.common._
 import scala.util.Random
 
 import com.precog.util.{BitSet, BitSetUtil, Loop}
-import com.precog.util.BitSetUtil.Implicits._
 
 import blueeyes.json._
 

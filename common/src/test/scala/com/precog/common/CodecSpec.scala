@@ -24,7 +24,6 @@ import com.precog.util.{ ByteBufferPool, RawBitSet }
 
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil
-import com.precog.util.BitSetUtil.Implicits._
 
 import org.specs2._
 import org.specs2.mutable.Specification

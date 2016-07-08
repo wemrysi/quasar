@@ -20,10 +20,7 @@
 package com.precog
 package mimir
 
-import util.NumericComparisons
-import util.DateTimeUtil._
-import util.BitSetUtil
-
+import com.precog.util._, DateTimeUtil._
 import bytecode._
 
 import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
@@ -33,12 +30,12 @@ import org.joda.time.format._
 import yggdrasil._
 import yggdrasil.table._
 
-import com.precog.util.DateTimeUtil.{ parseDateTime, parseDateTimeFlexibly, isDateTimeFlexibly }
-import com.precog.util.{ BitSet, BitSetUtil }
+// import com.precog.util.DateTimeUtil.{ parseDateTime, parseDateTimeFlexibly, isDateTimeFlexibly }
+// import com.precog.util.{ BitSet, BitSetUtil }
 
 import TransSpecModule._
 
-import scala.collection.mutable.ArrayBuffer
+// import scala.collection.mutable.ArrayBuffer
 
 trait TimeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait TimeLib extends ColumnarTableLib {

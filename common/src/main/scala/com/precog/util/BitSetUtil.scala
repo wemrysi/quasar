@@ -24,6 +24,10 @@ import scala.collection.mutable
 import scala.annotation.tailrec
 
 object BitSetUtil {
+  object Implicits {
+    // implicit def bitSetOps(bs: BitSet): BitSetOperations = new BitSetOperations(bs)
+  }
+
   class BitSetOperations(bs: BitSet) {
     def toList(): List[Int] = bitSetToList(bs)
 
@@ -72,10 +76,6 @@ object BitSetUtil {
         b = bs.nextSetBit(b + 1)
       }
     }
-  }
-
-  object Implicits {
-    implicit def bitSetOps(bs: BitSet) = new BitSetOperations(bs)
   }
 
   def fromArray(arr: Array[Long]) = {

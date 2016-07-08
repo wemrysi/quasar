@@ -20,16 +20,12 @@
 package com.precog
 package mimir
 
-import util.NumericComparisons
-
 import bytecode._
+import com.precog.util._
 import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
 import org.joda.time._
 
-import yggdrasil._
 import yggdrasil.table._
-
-import com.precog.util._
 
 import scalaz._
 import scalaz.std.anyVal._
@@ -37,15 +33,10 @@ import scalaz.std.option._
 import scalaz.std.set._
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
-import scalaz.syntax.std.option._
-import scalaz.syntax.std.boolean._
-
-import scala.annotation.tailrec
-import scala.collection.mutable
 
 class LongAdder {
   var t = 0L
-  val ts = mutable.ArrayBuffer.empty[BigDecimal]
+  val ts = ArrayBuffer.empty[BigDecimal]
 
   final def maxLongSqrt = 3037000499L
 

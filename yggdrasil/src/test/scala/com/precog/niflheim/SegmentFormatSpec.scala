@@ -22,7 +22,6 @@ package com.precog.niflheim
 import com.precog.common._
 
 import com.precog.util._
-import com.precog.util.BitSetUtil.Implicits._
 
 
 import org.specs2._

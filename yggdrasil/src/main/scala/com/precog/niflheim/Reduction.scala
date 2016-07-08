@@ -20,7 +20,6 @@
 package com.precog.niflheim
 
 import com.precog.util._
-import com.precog.util.BitSetUtil.Implicits._
 import com.precog.common._
 
 import scala.{ specialized => sepc }

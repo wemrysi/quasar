@@ -20,7 +20,7 @@
 package com.precog.niflheim
 
 import com.precog.common._
-import com.precog.util._, BitSetUtil.Implicits._
+import com.precog.util._
 import java.nio.channels._
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification

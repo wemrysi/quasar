@@ -20,13 +20,11 @@
 package com.precog.niflheim
 
 import blueeyes.json._
-import java.io._
 
 import com.precog.common._
 import com.precog.util._
 
 import scala.collection.mutable.{ Map => MMap }
-import scala.collection.mutable.ArrayBuffer
 
 case class CTree(path: CPath, fields: MMap[String, CTree], indices: ArrayBuffer[CTree], types: MMap[CType, Int]) {
   def getField(s: String): CTree = fields.getOrElseUpdate(s, CTree.empty(CPath(path.nodes :+ CPathField(s))))

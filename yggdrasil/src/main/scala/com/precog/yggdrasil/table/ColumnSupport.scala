@@ -22,7 +22,6 @@ package table
 
 import com.precog.common._
 import com.precog.util.BitSet
-import com.precog.util.BitSetUtil.Implicits._
 
 class BitsetColumn(definedAt: BitSet) {
   this: Column =>

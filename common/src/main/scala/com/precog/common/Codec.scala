@@ -22,7 +22,6 @@ package com.precog.common
 import com.precog.util._
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
-import com.precog.util.BitSetUtil.Implicits._
 import java.math.{ BigDecimal => BigDec }
 import scalaz._
 

@@ -22,7 +22,6 @@ package table
 
 import com.precog.common._
 import com.precog.util._
-import com.precog.util.BitSetUtil.Implicits._
 
 import blueeyes.json._
 import scalaz._
