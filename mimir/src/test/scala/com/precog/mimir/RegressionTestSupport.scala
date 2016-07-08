@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -49,8 +49,8 @@ trait RegressionTestSupport[M[+_]] {
     seq.toArray
   }
 
-  def jvalues(samples: Seq[(Array[Double], Double)], cpaths: Seq[CPath], mod: Int = 1): Seq[JValue] = samples.zipWithIndex map { case ((xs, y), idx) => 
-    val cvalues = xs.map { x => CDouble(x).asInstanceOf[CValue] } :+ CDouble(y.toDouble).asInstanceOf[CValue] 
+  def jvalues(samples: Seq[(Array[Double], Double)], cpaths: Seq[CPath], mod: Int = 1): Seq[JValue] = samples.zipWithIndex map { case ((xs, y), idx) =>
+    val cvalues = xs.map { x => CDouble(x).asInstanceOf[CValue] } :+ CDouble(y.toDouble).asInstanceOf[CValue]
     val withCPath = {
       if (idx % mod == 0) cpaths zip cvalues.toSeq
       else if (idx % mod == 1) cpaths.tail zip cvalues.tail.toSeq
@@ -59,7 +59,7 @@ trait RegressionTestSupport[M[+_]] {
     val withJPath = withCPath map { case (cpath, cvalue) => cPathToJPaths(cpath, cvalue) head }  // `head` is only okay if we don't have any homogeneous arrays
     val withJValue = withJPath map { case (jpath, cvalue) => (jpath, cvalue.toJValue) }
     withJValue.foldLeft(JArray(Nil).asInstanceOf[JValue]) { case (target, (jpath, jvalue)) => target.unsafeInsert(jpath, jvalue) }
-  } 
+  }
 
   def stdDevMean(values: List[Double]): (Double, Double) = {
     val count = values.size
@@ -90,16 +90,16 @@ trait RegressionTestSupport[M[+_]] {
       }
     }
 
-    val median = computeMedian(values) 
+    val median = computeMedian(values)
 
     val diffs = values map { v => math.abs(v - median) }
     val mad = computeMedian(diffs) / constant
 
-    (mad, median) 
+    (mad, median)
   }
 
   def combineResults(num: Int, thetas: List[List[Double]]) = {
-    thetas.foldLeft(mutable.Seq.fill(num)(List.empty[Double])) { case (acc, li) => 
+    thetas.foldLeft(mutable.Seq.fill(num)(List.empty[Double])) { case (acc, li) =>
       var i = 0
       while (i < li.length) {
         acc(i) = acc(i) :+ li(i)
@@ -109,7 +109,7 @@ trait RegressionTestSupport[M[+_]] {
     }
   }
 
-  def isOk(actual: Double, computed: List[Double]): Boolean = {  
+  def isOk(actual: Double, computed: List[Double]): Boolean = {
     val (mad, median) = madMedian(computed)
     val diff = math.abs(median - actual)
     val numStdDev = 4D
