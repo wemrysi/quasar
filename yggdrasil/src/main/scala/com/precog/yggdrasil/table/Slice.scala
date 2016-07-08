@@ -764,7 +764,7 @@ trait Slice { source =>
     (sortedSlice.distinct(None, sortedKeySlice), sortedKeySlice.distinct(None, sortedKeySlice))
   }
 
-  def sortBy(prefixes: VectorCase[CPath], sortOrder: DesiredSortOrder = SortAscending): Slice = {
+  def sortBy(prefixes: Vector[CPath], sortOrder: DesiredSortOrder = SortAscending): Slice = {
     // TODO This is slow... Faster would require a prefix map or something... argh.
     val keySlice = new Slice {
       val size = source.size

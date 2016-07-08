@@ -5,7 +5,6 @@ import scalaz.effect.IO
 import scalaz.Ordering._
 import scalaz.std.anyVal._
 
-import com.precog.util.VectorCase
 import com.precog.util.PrecogUnit
 
 package object yggdrasil {
@@ -21,7 +20,7 @@ package object yggdrasil {
   type Identity   = Long
   type Identities = Array[Identity]
   object Identities {
-    val Empty = VectorCase.empty[Identity]
+    val Empty = Vector.empty[Identity]
   }
 
   type SEvent = (Identities, SValue)

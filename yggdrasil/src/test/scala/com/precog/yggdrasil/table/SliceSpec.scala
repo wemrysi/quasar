@@ -23,11 +23,7 @@ package table
 
 import scala.util.Random
 
-import com.precog.common._
-import com.precog.util.VectorCase
-
-import com.precog.common.security._
-
+import com.precog.common._, security._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck._
@@ -49,16 +45,16 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     byCPath.mapValues(_.map(_._2).toList)
   }
 
-  def sortableCValues(slice: Slice, cpaths: VectorCase[CPath]): List[(List[CValue], List[CValue])] = {
+  def sortableCValues(slice: Slice, cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
     val byCPath = columnsByCPath(slice)
     (0 until slice.size).map({ row =>
       (extractCValues(cpaths.map(byCPath).toList, row), extractCValues(byCPath.values.toList, row))
     })(collection.breakOut)
   }
 
-  def toCValues(slice: Slice) = sortableCValues(slice, VectorCase.empty) map (_._2)
+  def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)
 
-  def fakeSort(slice: Slice, sortKey: VectorCase[CPath]) =
+  def fakeSort(slice: Slice, sortKey: Vector[CPath]) =
     sortableCValues(slice, sortKey).sortBy(_._1).map(_._2)
 
   def fakeConcat(slices: List[Slice]) = {
