@@ -10,7 +10,6 @@ lazy val yggdrasil = project.setup dependsOn common.inBothScopes deps (
   "org.objectweb.howl"   % "howl"               % "1.0.1-1",
   "org.slamdata"         % "jdbm"               %  "3.0.0",
   "commons-primitives"   % "commons-primitives" %   "1.0",
-  "org.quartz-scheduler" % "quartz"             %  "2.2.3",
   "org.spire-math"       % "spire_2.9.2"        %  "0.3.0"
 )
 lazy val common = project.setup dependsOn blueeyes deps (
