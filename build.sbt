@@ -7,10 +7,9 @@ lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, 
 lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil.inBothScopes
 
 lazy val yggdrasil = project.setup dependsOn common.inBothScopes deps (
-  "org.objectweb.howl"   % "howl"               % "1.0.1-1",
-  "org.slamdata"         % "jdbm"               %  "3.0.0",
-  "commons-primitives"   % "commons-primitives" %   "1.0",
-  "org.spire-math"       % "spire_2.9.2"        %  "0.3.0"
+  "org.objectweb.howl" % "howl"        % "1.0.1-1",
+  "org.slamdata"       % "jdbm"        %  "3.0.0",
+  "org.spire-math"     % "spire_2.9.2" %  "0.3.0"
 )
 lazy val common = project.setup dependsOn blueeyes deps (
   "com.chuusai"              %% "shapeless"        % "1.2.3",

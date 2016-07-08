@@ -11,7 +11,7 @@ package object yggdrasil {
   // only usage of commons-primitives
   type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
 
-  // only usage of quartz
+  // imported from quartz
   type CronExpression = org.quartz.CronExpression
 
   // spire vs. scalaz order
