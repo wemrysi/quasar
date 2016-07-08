@@ -32,7 +32,6 @@ import org.slf4s._
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import shapeless._
 import scalaz._
 import scalaz.syntax.apply._
 import scalaz.syntax.plus._

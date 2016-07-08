@@ -30,7 +30,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 
-import shapeless.{ Iso, HNil }
 import scalaz.syntax.std.option._
 
 case class BlobMetadata(mimeType: MimeType, size: Long, created: DateTime, authorities: Authorities)

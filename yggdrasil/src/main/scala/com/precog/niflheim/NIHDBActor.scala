@@ -51,8 +51,6 @@ import java.util.concurrent.atomic._
 import scala.collection.immutable.SortedMap
 import scala.collection.JavaConverters._
 
-import shapeless._
-
 case class Insert(batch: Seq[NIHDB.Batch], responseRequested: Boolean)
 
 case object GetSnapshot

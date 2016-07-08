@@ -38,17 +38,13 @@ import org.slf4s.Logging
 import java.io.{ File => _, _ }
 import java.util.UUID
 
-import scalaz.{ NonEmptyList => NEL, _ }
+import scalaz._
 import scalaz.effect.IO
 import scalaz.std.list._
 import scalaz.std.option._
-import scalaz.syntax.std.option._
 import scalaz.syntax.traverse._
 import scalaz.syntax.applicative._
-import scalaz.syntax.effect.id._
 import scalaz.syntax.std.boolean._
-
-import shapeless._
 
 object VersionLog {
   final val lockName               = "versionLog"

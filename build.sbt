@@ -1,6 +1,6 @@
 import precog.PlatformBuild._
 
-lazy val platform = project.root aggregate (blueeyes, common, yggdrasil, mimir)
+lazy val platform = project.root.noArtifacts aggregate (blueeyes, common, yggdrasil, mimir)
 
 /** This used to be the evaluator project.
  */

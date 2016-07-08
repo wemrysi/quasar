@@ -29,8 +29,6 @@ import blueeyes.json.serialization.Versioned._
 import scalaz.Scalaz._
 import scalaz.Validation
 
-import shapeless._
-
 case class APIKeyRecord(apiKey: APIKey, name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId], isRoot: Boolean)
 
 object APIKeyRecord {

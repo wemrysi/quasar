@@ -31,8 +31,6 @@ import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => 
 import blueeyes.json.serialization.JodaSerializationImplicits.{ InstantExtractor, InstantDecomposer }
 import blueeyes.json.serialization.Versioned._
 
-import shapeless._
-
 import scalaz._
 import scalaz.syntax.plus._
 import scalaz.syntax.applicative._

@@ -54,21 +54,6 @@ package object yggdrasil {
     }
   }
 
-  def indexedIdentitiesOrder(indices: Vector[Int]): ScalazOrder[Identities] = {
-    new ScalazOrder[Identities] {
-      def order(ids1: Identities, ids2: Identities): ScalazOrdering = {
-        var result: ScalazOrdering = EQ
-        var i                      = 0
-        while (i < indices.length && (result eq EQ)) {
-          result = longInstance.order(ids1(indices(i)), ids2(indices(i)))
-          i += 1
-        }
-
-        result
-      }
-    }
-  }
-
   def tupledIdentitiesOrder[A](idOrder: ScalazOrder[Identities]): ScalazOrder[(Identities, A)] =
     idOrder.contramap((_: (Identities, A))._1)
 

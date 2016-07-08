@@ -31,8 +31,6 @@ import blueeyes.json.serialization.Versioned._
 import scalaz._
 import scalaz.syntax.apply._
 
-import shapeless._
-
 sealed trait MetadataType
 
 object MetadataType {

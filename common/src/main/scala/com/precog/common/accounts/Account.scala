@@ -39,8 +39,6 @@ import scalaz.Validation
 import scalaz.syntax.apply._
 import scalaz.syntax.plus._
 
-import shapeless._
-
 case class AccountPlan(planType: String)
 object AccountPlan {
   val Root = AccountPlan("Root")

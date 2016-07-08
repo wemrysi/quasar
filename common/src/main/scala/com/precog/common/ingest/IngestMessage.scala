@@ -44,8 +44,6 @@ import scalaz.syntax.bifunctor._
 import scalaz.syntax.plus._
 import scalaz.syntax.validation._
 
-import shapeless._
-
 sealed trait EventMessage {
   def apiKey: APIKey
   def path: Path

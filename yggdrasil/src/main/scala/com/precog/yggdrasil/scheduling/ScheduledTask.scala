@@ -35,8 +35,6 @@ import java.util.concurrent.TimeUnit
 
 import scalaz._
 
-import shapeless._
-
 object CronExpressionSerialization {
   implicit val cronExpressionDecomposer = new Decomposer[CronExpression] {
     def decompose(expr: CronExpression) = JString(expr.toString)

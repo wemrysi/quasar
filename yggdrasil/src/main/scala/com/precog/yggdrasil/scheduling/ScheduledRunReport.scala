@@ -30,7 +30,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 import java.util.UUID
 
 import scalaz._
-import shapeless._
 
 object ScheduledRunReport {
   import com.precog.common.ingest.JavaSerialization._

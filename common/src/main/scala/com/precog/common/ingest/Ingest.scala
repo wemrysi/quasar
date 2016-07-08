@@ -41,8 +41,6 @@ import scalaz.syntax.plus._
 import scalaz.syntax.applicative._
 import scalaz.syntax.validation._
 
-import shapeless._
-
 object JavaSerialization {
   implicit val uuidDecomposer: Decomposer[UUID] = implicitly[Decomposer[String]].contramap((_: UUID).toString)
   implicit val uuidExtractor: Extractor[UUID]   = implicitly[Extractor[String]].map(UUID.fromString)

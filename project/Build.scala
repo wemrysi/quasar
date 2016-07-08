@@ -9,6 +9,13 @@ object PlatformBuild {
   def debugOpts                              = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
 
   implicit class ProjectOps(val p: sbt.Project) {
+    def noArtifacts: Project = also(
+                publish := (()),
+           publishLocal := (()),
+         Keys.`package` := file(""),
+             packageBin := file(""),
+      packagedArtifacts := Map()
+    )
     def root: Project                                 = p in file(".")
     def inBothScopes: ClasspathDependency             = p % "compile->compile;test->test"
     def inTestScope: ClasspathDependency              = p % "test->test"
@@ -17,8 +24,8 @@ object PlatformBuild {
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
 
     def setup: Project = also(
-                      // resolvers ++= Seq(Opts.resolver.sonatypeReleases, JCenterRepository),
-                 // scalafmtConfig :=  Some((baseDirectory in ThisBuild).value / ".scalafmt"),
+                   // resolvers ++= Seq(Opts.resolver.sonatypeReleases, JCenterRepository),
+              // scalafmtConfig :=  Some((baseDirectory in ThisBuild).value / ".scalafmt"),
                    organization :=  "com.precog",
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:none") ++ optimizeOpts ++ debugOpts,

@@ -30,8 +30,6 @@ import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => 
 import blueeyes.json.serialization.JodaSerializationImplicits.InstantDecomposer
 import blueeyes.json.serialization.JodaSerializationImplicits.InstantExtractor
 
-import shapeless._
-
 object v1 {
   case class GrantDetails(grantId: GrantId,
                           name: Option[String],

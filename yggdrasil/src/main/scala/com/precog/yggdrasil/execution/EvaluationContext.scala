@@ -29,8 +29,6 @@ import com.precog.common._
 import com.precog.common.security._
 import com.precog.common.accounts._
 
-import shapeless._
-
 case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
 
 object EvaluationContext {

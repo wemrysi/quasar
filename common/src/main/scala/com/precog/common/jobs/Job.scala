@@ -31,8 +31,6 @@ import blueeyes.json.serialization.Versioned._
 import blueeyes.json.{ serialization => _, _ }
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
 
-import shapeless._
-
 import scalaz._
 import scalaz.syntax.std.boolean._
 
