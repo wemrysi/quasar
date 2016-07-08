@@ -208,47 +208,6 @@ object util {
     }
   }
 
-  def Concat(at: Int) = CF2P("builtin::ct::concat") {
-    case (c1: BoolColumn, c2: BoolColumn) => new ConcatColumn(at, c1, c2) with BoolColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: LongColumn, c2: LongColumn) => new ConcatColumn(at, c1, c2) with LongColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: DoubleColumn, c2: DoubleColumn) => new ConcatColumn(at, c1, c2) with DoubleColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: NumColumn, c2: NumColumn) => new ConcatColumn(at, c1, c2) with NumColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: StrColumn, c2: StrColumn) => new ConcatColumn(at, c1, c2) with StrColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: DateColumn, c2: DateColumn) => new ConcatColumn(at, c1, c2) with DateColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: PeriodColumn, c2: PeriodColumn) => new ConcatColumn(at, c1, c2) with PeriodColumn {
-      def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-    }
-
-    case (c1: HomogeneousArrayColumn[a], _c2: HomogeneousArrayColumn[_]) if c1.tpe == _c2.tpe =>
-      val c2 = _c2.asInstanceOf[HomogeneousArrayColumn[a]]
-      new ConcatColumn(at, c1, c2) with HomogeneousArrayColumn[a] {
-        val tpe = c1.tpe
-        def apply(row: Int) = if (row < at) c1(row) else c2(row - at)
-      }
-
-    case (c1: EmptyArrayColumn, c2: EmptyArrayColumn) => new ConcatColumn(at, c1, c2) with EmptyArrayColumn
-    case (c1: EmptyObjectColumn, c2: EmptyObjectColumn) => new ConcatColumn(at, c1, c2) with EmptyObjectColumn
-    case (c1: NullColumn, c2: NullColumn) => new ConcatColumn(at, c1, c2) with NullColumn
-  }
-
   def Shift(by: Int) = CF1P("builtin::ct::shift") {
     case c: BoolColumn => new ShiftColumn(by, c) with BoolColumn {
       def apply(row: Int) = c(row - by)
@@ -398,102 +357,6 @@ object util {
     }
   }
 
-  def FilterComplement(complement: Column) = CF1P("builtin::ct:filterComplement") {
-    case c: BoolColumn   => new BoolColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-
-    case c: LongColumn   => new LongColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: DoubleColumn => new DoubleColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: NumColumn    => new NumColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: StrColumn    => new StrColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: DateColumn   => new DateColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: PeriodColumn => new PeriodColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: HomogeneousArrayColumn[a] => new HomogeneousArrayColumn[a] {
-      val tpe = c.tpe
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-      def apply(row: Int) = c(row)
-    }
-    case c: EmptyArrayColumn  => new EmptyArrayColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-    }
-    case c: EmptyObjectColumn => new EmptyObjectColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-    }
-    case c: NullColumn => new NullColumn {
-      def isDefinedAt(row: Int) = c.isDefinedAt(row) && !complement.isDefinedAt(row)
-    }
-  }
-
-  def DefinedConst(value: CValue) = CF1("builtin::ct::definedConst") { c =>
-    Some(
-      value match {
-        case CString(s) => new StrColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = s
-        }
-        case CBoolean(b) => new BoolColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = b
-        }
-        case CLong(l) => new LongColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = l
-        }
-        case CDouble(d) => new DoubleColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = d
-        }
-        case CNum(n) => new NumColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = n
-        }
-        case CDate(d) => new DateColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = d
-        }
-        case CPeriod(p) => new PeriodColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = p
-        }
-        case value: CArray[a] => new HomogeneousArrayColumn[a] {
-          val tpe = value.cType
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-          def apply(row: Int) = value.value
-        }
-        case CNull => new NullColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-        }
-        case CEmptyObject => new EmptyObjectColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-        }
-        case CEmptyArray => new EmptyArrayColumn {
-          def isDefinedAt(row: Int) = c.isDefinedAt(row)
-        }
-        case CUndefined => UndefinedColumn(c)
-      }
-    )
-  }
-
   def MaskedUnion(leftMask: BitSet) = CF2P("builtin::ct::maskedUnion") {
     case (left: BoolColumn, right: BoolColumn) => new UnionColumn(left, right) with BoolColumn {
       def apply(row: Int) = if (leftMask.get(row)) left(row) else right(row)
@@ -533,5 +396,3 @@ object util {
     case (left: NullColumn, right: NullColumn) => new UnionColumn(left, right) with NullColumn
   }
 }
-
-// vim: set ts=4 sw=4 et:

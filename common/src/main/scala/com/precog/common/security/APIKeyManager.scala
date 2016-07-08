@@ -145,16 +145,6 @@ trait APIKeyManager[M[+_]] extends Logging { self =>
     }
   }
 
-  def deriveSingleParentGrant(name: Option[String], description: Option[String], issuerKey: APIKey, parentId: GrantId, perms: Set[Permission], expiration: Option[DateTime] = None): M[Option[Grant]] = {
-    validGrants(issuerKey, expiration).flatMap { validGrants =>
-      validGrants.find(_.grantId == parentId) match {
-        case Some(parent) if parent.implies(perms, expiration) =>
-          createGrant(name, description, issuerKey, Set(parentId), perms, expiration) map { some }
-        case _ => none[Grant].point[M]
-      }
-    }
-  }
-
   def deriveAndAddGrant(name: Option[String], description: Option[String], issuerKey: APIKey, perms: Set[Permission], recipientKey: APIKey, expiration: Option[DateTime] = None): M[Option[Grant]] = {
     deriveGrant(name, description, issuerKey, perms, expiration) flatMap {
       case Some(grant) => addGrants(recipientKey, Set(grant.grantId)) map { _ map { _ => grant } }

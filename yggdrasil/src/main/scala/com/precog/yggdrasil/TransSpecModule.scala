@@ -32,11 +32,10 @@ import java.nio.CharBuffer
 
 object TransSpecModule {
   object paths {
-    val Key   = CPathField("key")
-    val Value = CPathField("value")
-    val Group = CPathField("group")
+    val Key     = CPathField("key")
+    val Value   = CPathField("value")
+    val Group   = CPathField("group")
     val SortKey = CPathField("sortkey")
-    val SortGlobalId = CPathField("globalid")
   }
 
   sealed trait Definedness
@@ -283,7 +282,6 @@ trait TransSpecModule extends FNModule {
 
     object TransSpec2 {
       val LeftId = Leaf(SourceLeft)
-      val RightId = Leaf(SourceRight)
 
       /** Flips all `SourceLeft`s to `SourceRight`s and vice versa. */
       def flip(spec: TransSpec2): TransSpec2 = TransSpec.mapSources(spec) {
@@ -398,9 +396,5 @@ trait TransSpecModule extends FNModule {
   def buildConstantWrapSpec[A <: SourceType](source: TransSpec[A]): TransSpec[A] = {
     val bottomWrapped = trans.WrapObject(trans.ConstLiteral(CEmptyArray, source), paths.Key.name)
     trans.InnerObjectConcat(bottomWrapped, trans.WrapObject(source, paths.Value.name))
-  }
-
-  def buildValueWrapSpec[A <: SourceType](source: TransSpec[A]): TransSpec[A] = {
-    trans.WrapObject(source, paths.Value.name)
   }
 }

@@ -27,61 +27,7 @@ trait Instructions {
 
   import library._
 
-  sealed trait Instruction { self =>
-    import instructions._
-
-    def operandStackDelta: (Int, Int) = self match {
-      case Map1(_) => (1, 1)
-      case Map2Match(_) => (2, 1)
-      case Map2Cross(_) => (2, 1)
-
-      case Reduce(_) => (1, 1)
-      case Morph1(_) => (1, 1)
-      case Morph2(_) => (2, 1)
-
-      case Observe => (2, 1)
-
-      case Assert => (2, 1)
-
-      case IUnion => (2, 1)
-      case IIntersect => (2, 1)
-      case SetDifference => (2, 1)
-
-      case FilterMatch => (2, 1)
-      case FilterCross => (2, 1)
-
-      case Group(_) => (2, 1)
-      case MergeBuckets(_) => (2, 1)
-      case KeyPart(_) => (1, 1)
-      case Extra => (1, 1)
-
-      case Split => (1, 0)
-      case Merge => (1, 1)
-
-      case Dup => (1, 2)
-      case Drop => (1, 0)
-      case Swap(depth) => (depth + 1, depth + 1)
-
-      case Line(_, _, _) => (0, 0)
-
-      case AbsoluteLoad => (1, 1)
-      case RelativeLoad => (1, 1)
-
-      case Distinct => (1, 1)
-
-      case PushString(_) => (0, 1)
-      case PushNum(_) => (0, 1)
-      case PushTrue => (0, 1)
-      case PushFalse => (0, 1)
-      case PushNull => (0, 1)
-      case PushUndefined => (0, 1)
-      case PushObject => (0, 1)
-      case PushArray => (0, 1)
-
-      case PushGroup(_) => (0, 1)
-      case PushKey(_) => (0, 1)
-    }
-  }
+  sealed trait Instruction
 
   // namespace
   object instructions {

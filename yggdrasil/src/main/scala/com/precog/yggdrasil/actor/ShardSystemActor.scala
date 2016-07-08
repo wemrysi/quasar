@@ -52,11 +52,9 @@ trait ShardConfig extends BaseConfig {
 
   def ingestConfig: Option[IngestConfig]
 
-  def statusTimeout: Long = config[Long]("actors.status.timeout", 30000)
   def stopTimeout: Timeout = config[Long]("actors.stop.timeout", 300) seconds
 
   def batchStoreDelay: Duration    = config[Long]("actors.store.idle_millis", 1000) millis
-  def batchShutdownCheckInterval: Duration = config[Int]("actors.store.shutdown_check_seconds", 1) seconds
 }
 
 // The ingest system consists of the ingest supervisor and ingest actor(s)
@@ -72,45 +70,5 @@ object IngestSystem extends Logging {
     }
   } recover {
     case e => log.error("Error stopping " + name + " actor", e)
-  }
-}
-
-trait ShardSystemActorModule extends YggConfigComponent with Logging {
-  type YggConfig <: ShardConfig
-
-  protected def checkpointCoordination: CheckpointCoordination
-
-  protected def initIngestActor(actorSystem: ActorSystem, routingActor: ActorRef, checkpoint: YggCheckpoint, checkpointCoordination: CheckpointCoordination, permissionsFinder: PermissionsFinder[Future]): Option[ActorRef]
-
-  def initShardActors(permissionsFinder: PermissionsFinder[Future], routingActor: ActorRef): Option[IngestSystem] = {
-    val ingestActorSystem: ActorSystem = ActorSystem("Ingest")
-
-    def loadCheckpoint() : Option[YggCheckpoint] = yggConfig.ingestConfig flatMap { _ =>
-      checkpointCoordination.loadYggCheckpoint(yggConfig.shardId) match {
-        case Some(Failure(errors)) =>
-          log.error("Unable to load Kafka checkpoint: " + errors)
-          sys.error("Unable to load Kafka checkpoint: " + errors)
-
-        case Some(Success(checkpoint)) => Some(checkpoint)
-        case None => None
-      }
-    }
-
-    val initialCheckpoint = loadCheckpoint()
-
-    val ingestActor = for (checkpoint <- initialCheckpoint; init <- initIngestActor(ingestActorSystem, routingActor, checkpoint, checkpointCoordination, permissionsFinder)) yield init
-
-    val stoppable = Stoppable.fromFuture({
-      import IngestSystem.actorStop
-      log.info("Stopping bifrost system")
-      for {
-        _ <- ingestActor map { actorStop(yggConfig, _, "ingestActor")(ingestActorSystem, ingestActorSystem.dispatcher) } getOrElse { Future(())(ingestActorSystem.dispatcher) }
-      } yield {
-        ingestActorSystem.shutdown()
-        log.info("Shard system stopped.")
-      }
-    })
-
-    ingestActor map { IngestSystem(_, stoppable) }
   }
 }

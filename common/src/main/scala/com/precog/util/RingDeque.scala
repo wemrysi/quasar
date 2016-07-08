@@ -54,10 +54,6 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
     ring(front) = a
   }
 
-  def removeFront(length: Int) {
-    moveFront(length)
-  }
-
   def popBack(): A = {
     moveBack(-1)
     ring(rotate(back, -1))

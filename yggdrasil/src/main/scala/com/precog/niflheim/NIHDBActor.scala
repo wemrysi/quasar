@@ -162,12 +162,9 @@ private[niflheim] class NIHDBImpl private[niflheim] (actor: ActorRef, timeout: T
 
 private[niflheim] object NIHDBActor extends Logging {
   final val descriptorFilename = "NIHDBDescriptor.json"
-  final val cookedSubdir = "cooked_blocks"
-  final val rawSubdir = "raw_blocks"
-  final val lockName = "NIHDBProjection"
-
-  private[niflheim] final val internalDirs =
-    Set(cookedSubdir, rawSubdir, descriptorFilename, CookStateLog.logName + "_1.log", CookStateLog.logName + "_2.log",  lockName + ".lock", CookStateLog.lockName + ".lock")
+  final val cookedSubdir       = "cooked_blocks"
+  final val rawSubdir          = "raw_blocks"
+  final val lockName           = "NIHDBProjection"
 
   final def create(chef: ActorRef, authorities: Authorities, baseDir: File, cookThreshold: Int, timeout: Timeout, txLogScheduler: ScheduledExecutorService)(implicit actorSystem: ActorSystem): IO[Validation[Error, ActorRef]] = {
     val descriptorFile = new File(baseDir, descriptorFilename)
@@ -329,12 +326,6 @@ private[niflheim] class NIHDBActor private (private var currentState: Projection
   private def computeBlockMap(current: BlockState) = {
     val allBlocks: List[StorageReader] = (current.cooked ++ current.pending.values :+ current.rawLog)
     SortedMap(allBlocks.map { r => r.id -> r }.toSeq: _*)
-  }
-
-  def updatedThresholds(current: Map[Int, Int], ids: Seq[Long]): Map[Int, Int] = {
-    (current.toSeq ++ ids.map {
-      i => val EventId(p, s) = EventId.fromLong(i); (p -> s)
-    }).groupBy(_._1).map { case (p, ids) => (p -> ids.map(_._2).max) }
   }
 
   override def receive = {

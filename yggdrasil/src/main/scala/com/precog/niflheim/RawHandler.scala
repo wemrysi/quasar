@@ -42,11 +42,6 @@ object RawHandler {
     val os = new BufferedOutputStream(new FileOutputStream(f, true))
     (new RawHandler(id, f, rows, os), events, ok)
   }
-
-  def loadReadonly(id: Long, f: File): (RawReader, Seq[Long], Boolean) = {
-    val (rows, events, ok) = RawLoader.load(id, f)
-    (new RawReader(id, f, rows), events, ok)
-  }
 }
 
 class RawReader private[niflheim] (val id: Long, val log: File, rs: Seq[JValue]) extends StorageReader {

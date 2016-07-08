@@ -118,8 +118,6 @@ trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       MaxTimeOf
     )
 
-    //val textAndDate = JUnionT(JTextT, JDateT)
-
     DateTimeZone.setDefault(DateTimeZone.UTC)
 
     object ParseDateTime extends Op2F2(TimeNamespace, "parseDateTime") {

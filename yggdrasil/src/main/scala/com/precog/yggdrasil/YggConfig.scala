@@ -47,20 +47,7 @@ trait BaseConfig extends Config {
 
   lazy private val cfg = localDefaults ++ config
 
-  lazy val rootDir = new File(cfg[String]("precog.storage.root"))
-
-  lazy val dataDir = new File(rootDir, "data")
-  lazy val archiveDir = new File(rootDir, "archive")
-  lazy val cacheDir = new File(rootDir, "cache")
+  lazy val rootDir    = new File(cfg[String]("precog.storage.root"))
   lazy val scratchDir = new File(rootDir, "scratch")
-
-  def newWorkDir = {
-    if(!scratchDir.exists) scratchDir.mkdirs
-    val tempFile = java.io.File.createTempFile("ygg", "workdir", scratchDir)
-    tempFile.delete
-    tempFile.mkdir
-    tempFile
-  }
-
-  lazy val sortBufferSize: Int = cfg[Int]("precog.storage.sortBufferSize")
+  // lazy val sortBufferSize: Int = cfg[Int]("precog.storage.sortBufferSize")
 }

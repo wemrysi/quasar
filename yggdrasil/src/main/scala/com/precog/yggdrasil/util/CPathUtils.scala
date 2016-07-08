@@ -89,38 +89,4 @@ object CPathUtils {
 
     loop(cPath1.nodes, cPath2.nodes, Nil)
   }
-
-
-  /**
-   * Returns a list of possible "next" `CPath`s from `cPath`, by incrementing
-   * `CPathIndex`es. If `cpath == CPath("a[1].b[3].c[0]")`, then the possible
-   * candidates returned are `a[1].b[3].c[1]`, `a[1].b[4].c[0]`, and
-   * `a[2].b[0].c[0]`.
-   */
-  def incIndices(cPath: CPath): List[CPath] = {
-
-    // zero out the remainin indices in ps.
-    @tailrec
-    def zero(ps: List[CPathNode], acc: List[CPathNode] = Nil): List[CPathNode] = ps match {
-      case CPathIndex(i) :: ps => zero(ps, CPathIndex(0) :: acc)
-      case p :: ps => zero(ps, p :: acc)
-      case Nil => acc.reverse
-    }
-
-    @tailrec
-    def cand(left: List[CPathNode], right: List[CPathNode], candidates: List[CPath]): List[CPath] = right match {
-      case (p @ CPathIndex(i)) :: right =>
-        cand(p :: left, right, CPath(left.foldLeft(CPathIndex(i + 1) :: zero(right)) { (acc, p) =>
-          p :: acc
-        }) :: candidates)
-
-      case p :: right =>
-        cand(p :: left, right, candidates)
-
-      case Nil =>
-        candidates
-    }
-
-    cand(Nil, cPath.nodes, Nil)
-  }
 }

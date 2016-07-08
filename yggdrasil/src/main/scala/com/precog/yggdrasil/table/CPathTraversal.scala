@@ -286,16 +286,6 @@ object CPathTraversal {
       }
     }
 
-    def pretty(ps: List[CPathPosition]): String = {
-      ps map {
-        case CPathRange(_, 0, None) => "[*]"
-        case CPathRange(_, i, None) => "[%d+]" format i
-        case CPathRange(_, i, Some(j)) if i == j  => "[%d]" format i
-        case CPathRange(_, i, Some(j)) => "[%d..%d]" format (i, j)
-        case CPathPoint(a) => a.toString
-      } mkString ""
-    }
-
     /**
      * Returns a `p` as a positioned CPath.
      */

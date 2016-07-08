@@ -49,7 +49,6 @@ case class Message(job: JobId, id: MessageId, channel: String, value: JValue)
 object Message {
   object channels {
     val Status = "status"
-    val Errors = "errors"
     val Warnings = "warnings"
   }
 
@@ -79,14 +78,5 @@ object Status {
     } flatMap {
       _.toOption
     }
-  }
-
-  def toMessage(status: Status): Message = {
-    Message(status.job, status.id, channels.Status, JObject(
-      jfield("message", status.message) ::
-      jfield("progress", status.progress) ::
-      jfield("unit", status.unit) ::
-      (status.info map (jfield("info", _) :: Nil) getOrElse Nil)
-    ))
   }
 }

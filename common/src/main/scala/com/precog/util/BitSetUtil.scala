@@ -25,7 +25,6 @@ import scala.annotation.tailrec
 
 object BitSetUtil {
   class BitSetOperations(bs: BitSet) {
-    def toUnboxedArray(): Array[Long] = bitSetToArray(bs)
     def toList(): List[Int] = bitSetToList(bs)
 
     def +(elem: Int) = { val b = bs.copy; b.set(elem); b }
@@ -138,18 +137,6 @@ object BitSetUtil {
   @inline final def filteredRange(r: Range)(pred: Int => Boolean): BitSet =
     filteredRange(r.start, r.end)(pred)
 
-  def filteredList[A](as: List[A])(pred: A => Boolean): BitSet = {
-    val bs = new BitSet
-    @inline @tailrec def loop(lst: List[A], i: Int): Unit = lst match {
-      case h :: t =>
-        if (pred(h)) bs.set(i)
-        loop(t, i + 1)
-      case Nil =>
-    }
-    loop(as, 0)
-    bs
-  }
-
   def filteredSeq[A](as: List[A])(pred: A => Boolean): BitSet = {
     val bs = new BitSet
     @inline @tailrec def loop(lst: List[A], i: Int): Unit = lst match {
@@ -160,31 +147,6 @@ object BitSetUtil {
     }
     loop(as, 0)
     bs
-  }
-
-  def bitSetToArray(bs: BitSet): Array[Long] = {
-    var j = 0
-    val arr = new Array[Long](bs.size)
-
-    @tailrec
-    def loopBits(long: Long, bit: Int, base: Int) {
-      if (((long >> bit) & 1) == 1) {
-        arr(j) = base + bit
-        j += 1
-      }
-      if (bit < 63)
-        loopBits(long, bit + 1, base)
-    }
-
-    @tailrec
-    def loopLongs(i: Int, longs: Array[Long], last: Int, base: Int) {
-      loopBits(longs(i), 0, base)
-      if (i < last)
-        loopLongs(i + 1, longs, last, base + 64)
-    }
-
-    loopLongs(0, bs.getBits, bs.getBitsLength - 1, 0)
-    arr
   }
 
   def bitSetToList(bs: BitSet): List[Int] = {

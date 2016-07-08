@@ -78,11 +78,4 @@ object Cache {
   def simple[K, V] (options: CacheOption[K, V]*): SimpleCache[K, V] = {
     new SimpleCache[K, V](createBuilder(options).build())
   }
-
-  def auto[K, V] (options: CacheOption[K, V]*)(loader: K => V): AutoCache[K, V] = {
-    val backing = createBuilder(options).build(new CacheLoader[K, V] {
-      def load(key : K) = loader(key)
-    })
-    new AutoCache[K, V](backing)
-  }
 }

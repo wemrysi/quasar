@@ -38,7 +38,6 @@ import java.nio.CharBuffer
 
 sealed trait TableSize {
   def maxSize: Long
-  def lessThan (other: TableSize): Boolean = maxSize < other.maxSize
   def +(other: TableSize): TableSize
   def *(other: TableSize): TableSize
 }

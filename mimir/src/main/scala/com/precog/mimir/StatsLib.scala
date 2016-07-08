@@ -1284,36 +1284,6 @@ trait StatsLibModule[M[+_]] extends ColumnarTableLibModule[M] with ReductionLibM
         }
       }
 
-      /**
-       * Determines whether row is a duplicate of the row in RankContext.
-       *
-       * The basic idea is the same as isDuplicate() but in this case we're
-       * comparing this row to a row from another slice. The easiest way to
-       * do this is to just create a map of the old slice's column refs and
-       * values. Then we can remove the refs/values for the current row and
-       * see if any are missing from one or the other.
-       *
-       * We remove ref/cvalue pairs as we find them in the current row. If
-       * we are missing a key, or find a key whose values differ we return
-       * false. At the end, if the map is empty, we can return true (since
-       * all the map's values were accounted for by this row). Otherwise we
-       * return false.
-       */
-      def isDuplicateFromContext(ctxt: RankContext, refs: Array[ColumnRef], cols: Array[Column], row: Int): Boolean = {
-        val m = mutable.Map.empty[ColumnRef, CValue]
-        ctxt.items.foreach { case (ref, cvalue) => m(ref) = cvalue }
-        var i = 0
-        while (i < cols.length) {
-          val col = cols(i)
-          if (col.isDefinedAt(row)) {
-            val opt = m.remove(refs(i))
-            if (!opt.isDefined || opt.get != col.cValue(row)) return false
-          }
-          i += 1
-        }
-        m.isEmpty
-      }
-
       def findDuplicates(defined: BitSet, definedCols: Array[BitSet], cols: Array[Column], r: Range, _row: Int): (BitSet, Int) = {
         val start = r.start
         val end = r.end

@@ -35,10 +35,6 @@ object IOUtils extends Logging {
 
   def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)
 
-  def walkSubdirs(root: File): IO[Seq[File]] = IO {
-    if(!root.isDirectory) List.empty else root.listFiles.filter( isNormalDirectory )
-  }
-
   def readFileToString(f: File): IO[String] = IO {
     FileUtils.readFileToString(f, UTF8)
   }

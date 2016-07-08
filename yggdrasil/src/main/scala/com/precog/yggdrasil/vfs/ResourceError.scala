@@ -38,7 +38,6 @@ object ResourceError {
 
   def corrupt(message: String): ResourceError with FatalError = Corrupt(message)
   def ioError(ex: Throwable): ResourceError with FatalError = IOError(ex)
-  def illegalWrite(message: String): ResourceError with UserError = IllegalWriteRequestError(message)
   def permissionsError(message: String): ResourceError with UserError = PermissionsError(message)
   def notFound(message: String): ResourceError with UserError = NotFound(message)
 

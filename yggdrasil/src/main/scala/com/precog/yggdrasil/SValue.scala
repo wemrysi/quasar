@@ -36,7 +36,6 @@ import scalaz.std.AllInstances._
 
 sealed trait SValue {
   def isA(valueType: SType): Boolean
-  def hasProperty(selector: JPath) = (this \ selector).isDefined
 
   def \(selector: JPath): Option[SValue] = {
     if (selector == JPath.Identity) {
@@ -125,8 +124,6 @@ sealed trait SValue {
 
     s.sorted
   }
-
-  lazy val shash: Long = structure.hashCode
 
   lazy val toJValue: JValue = this match {
     case SObject(obj) => JObject(obj.map({ case (k, v) => JField(k, v.toJValue) })(collection.breakOut))
@@ -300,23 +297,6 @@ object SValue extends SValueInstances {
 sealed trait SType {
   def =~(v: SValue): Boolean
 }
-
-object SType {
-  @inline
-  def fromCType(ct: CType): SType = ct match {
-    case CString => SString
-    case CBoolean => SBoolean
-    case (_: CNumericType[_]) => SDecimal
-    case CDate => sys.error("todo")
-    case CPeriod => sys.error("todo")
-    case CNull => SNull
-    case CArrayType(_) => SArray
-    case CEmptyObject => SObject
-    case CEmptyArray => SArray
-    case CUndefined => SUndefined
-  }
-}
-
 
 case class SObject(fields: Map[String, SValue]) extends SValue {
   def isA(stype: SType) = stype == SObject

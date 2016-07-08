@@ -41,14 +41,6 @@ package object util {
 
   implicit def Order2JComparator[A](order: scalaz.Order[A]): Order2JComparator[A] = new Order2JComparator(order)
 
-  private val MAX_LONG = BigInt(Long.MaxValue)
-  private val MIN_LONG = BigInt(Long.MinValue)
-
-  @inline
-  final def isValidLong(i: BigInt): Boolean = {
-    MIN_LONG <= i && i <= MAX_LONG
-  }
-
   final def flipBytes(buffer: ByteBuffer): Array[Byte] = {
     val bytes = new Array[Byte](buffer.remaining())
     buffer.get(bytes)
@@ -101,13 +93,6 @@ package object util {
       i += 1
     }
     true
-  }
-
-  def msTime[A](log: Long => Unit)(f : => A): A = {
-    val start = System.currentTimeMillis
-    val result = f
-    log(System.currentTimeMillis - start)
-    result
   }
 
   implicit val InstantOrdering: Ordering[Instant] = Ordering.Long.on[Instant](_.getMillis)

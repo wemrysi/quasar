@@ -81,13 +81,5 @@ object v1 {
     val schemaV1 = "name" :: "description" :: "grants" :: HNil
 
     implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[NewAPIKeyRequest](schemaV1)
-
-    def newAccount(accountId: AccountId, name: Option[String] = None, description: Option[String] = None, parentIds: Set[GrantId] = Set()) = {
-      val path = Path("/%s/".format(accountId))
-      val permissions = Account.newAccountPermissions(accountId, path)
-      val grantRequest = NewGrantRequest(name.map(_+"-grant"), description.map(_+" standard account grant"), parentIds, permissions, None)
-
-      NewAPIKeyRequest(name, description, Set(grantRequest))
-    }
   }
 }

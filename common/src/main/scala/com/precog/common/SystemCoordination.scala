@@ -49,16 +49,6 @@ object CheckpointCoordination {
   }
 }
 
-trait SystemCoordination extends CheckpointCoordination {
-  def registerRelayAgent(agent: String, blockSize: Int): Validation[Error, EventRelayState]
-  def unregisterRelayAgent(agent: String, state: EventRelayState): Unit
-
-  def renewEventRelayState(agent: String, offset: Long, producerId: Int, blockSize: Int): Validation[Error, EventRelayState]
-  def saveEventRelayState(agent: String, state: EventRelayState): Validation[Error, EventRelayState]
-
-  def close(): Unit
-}
-
 sealed trait IdSequence {
   def isEmpty(): Boolean
   def next(): (Int, Int)

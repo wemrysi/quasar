@@ -143,8 +143,6 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
 
     final val blobMetadataFilename = "blob_metadata"
 
-    def isBlob(versionDir: File): Boolean = (new File(versionDir, blobMetadataFilename)).exists
-
     /**
      * Open the blob for reading in `baseDir`.
      */
@@ -491,15 +489,6 @@ trait ActorVFSModule extends VFSModule[Future, Slice] {
     private def canCreate(path: Path, permissions: Set[WritePermission], authorities: Authorities): Boolean = {
       log.trace("Checking write permission for " + path + " as " + authorities + " among " + permissions)
       PermissionsFinder.canWriteAs(permissions filter { _.path.isEqualOrParentOf(path) }, authorities)
-    }
-
-    private def promoteVersion(version: UUID): IO[PrecogUnit] = {
-      // we only promote if the requested version is in progress
-      if (versionLog.isCompleted(version)) {
-        IO(PrecogUnit)
-      } else {
-        versionLog.completeVersion(version)
-      }
     }
 
     private def openResource(version: UUID): EitherT[IO, ResourceError, Resource] = {

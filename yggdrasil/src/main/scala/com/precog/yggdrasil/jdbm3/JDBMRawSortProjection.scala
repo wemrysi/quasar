@@ -56,8 +56,6 @@ class JDBMRawSortProjection[M[+_]] private[yggdrasil] (dbFile: File, indexName: 
     DB.close()
   }
 
-  val keyAfterDelta = if (sortOrder.isAscending) 1 else -1
-
   val rowFormat = RowFormat.forValues(valRefs)
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 

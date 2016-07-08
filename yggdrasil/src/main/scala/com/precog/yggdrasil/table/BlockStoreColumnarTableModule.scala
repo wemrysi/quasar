@@ -107,8 +107,6 @@ trait BlockStoreColumnarTableModule[M[+_]]
         slice0.sparsen(remap, if (position > 0) remap(position - 1) + 1 else 0)
       }
 
-      def currentJson = slice0.toJson(position)
-
       def succ: M[Option[CellState]] = {
         for (blockOpt <- succf(maxKey)) yield {
           blockOpt map { block => CellState(index, block.maxKey, block.data, succf) }

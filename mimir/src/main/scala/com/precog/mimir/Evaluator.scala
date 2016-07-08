@@ -833,8 +833,6 @@ trait EvaluatorModule[M[+_]] extends CrossOrdering
 
         type EvaluatorStateT[+A] = StateT[N, EvaluatorState, A]
 
-        val splitNodes = splits.keys.toSet
-
         def stage(toEval: List[StagingPoint], graph: DepGraph): EvaluatorStateT[DepGraph] = {
           for {
             state <- monadState gets identity
@@ -1124,20 +1122,6 @@ trait EvaluatorModule[M[+_]] extends CrossOrdering
 
       case UnfixedSolution(_, graph) => Set(graph)
       case dag.Extra(graph) => Set(graph)
-    }
-
-
-    private def svalueToCValue(sv: SValue) = sv match {
-      case STrue => CBoolean(true)
-      case SFalse => CBoolean(false)
-      case SString(str) => CString(str)
-      case SDecimal(d) => CNum(d)
-      // case SLong(l) => CLong(l)
-      // case SDouble(d) => CDouble(d)
-      case SNull => CNull
-      case SObject(obj) if obj.isEmpty => CEmptyObject
-      case SArray(Vector()) => CEmptyArray
-      case _ => sys.error("die a horrible death: " + sv)
     }
 
     private def simpleJoin(left: Table, right: Table)(leftKey: TransSpec1, rightKey: TransSpec1, spec: TransSpec2): Table = {

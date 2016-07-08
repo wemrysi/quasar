@@ -70,8 +70,6 @@ object RowFormat {
 
   def forValues(columnRefs: Seq[ColumnRef]): RowFormat = ValueRowFormatV1(columnRefs)
 
-  def forIdentities(columnRefs: Seq[ColumnRef]): RowFormat = IdentitiesRowFormatV1(columnRefs)
-
   case class ValueRowFormatV1(_columnRefs: Seq[ColumnRef]) extends ValueRowFormat with RowFormatCodecs {
     // This is really stupid, but required to work w/ JDBM.
     @transient lazy val columnRefs: Seq[ColumnRef] = _columnRefs map { ref =>
@@ -368,7 +366,6 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
   case object RowCodec extends Codec[List[CValue]] {
     import Codec.{ StatefulCodec, wrappedWriteInit }
 
-    // @transient lazy val bitSetCodec = Codec[BitSet]
     @transient lazy val rawBitSetCodec = Codec[RawBitSet]
 
     @transient private lazy val codecs: List[Codec[_ <: CValue]] = columnRefs.toList map {

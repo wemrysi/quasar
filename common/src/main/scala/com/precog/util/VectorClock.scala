@@ -30,7 +30,6 @@ import scalaz.Ordering._
 
 case class VectorClock(map: Map[Int, Int]) {
   def get(producerId: Int): Option[Int] = map.get(producerId)
-  def hasId(producerId: Int): Boolean = map.contains(producerId)
 
   def update(producerId: Int, sequenceId: Int): VectorClock =
     if (map.get(producerId) forall { _ <= sequenceId }) {

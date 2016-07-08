@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -105,7 +105,7 @@ trait ModelLibModule[M[+_]] {
       }
     }
 
-    trait RegressionModelBase extends ModelBase with RegressionSupport {
+    trait RegressionModelBase extends ModelBase {
       type Model <: RegressionModelLike
       def Model: RegressionModelCompanion
 
@@ -141,36 +141,11 @@ trait ModelLibModule[M[+_]] {
 
         case class ScannerPrelims(
           includedModel: Map[ColumnRef, Column],
-          definedModel: BitSet,  
+          definedModel: BitSet,
           cpaths: Seq[CPath],
           includedCols: Map[CPath, DoubleColumn],
           resultArray: Array[Double])
-
-        def makePrelims(model: Model, cols: Map[ColumnRef, Column], range: Range, trans: Double => Double): ScannerPrelims = {
-          val includedModel = included(model, cols)
-          val definedModel = defined(includedModel, range)
-
-          val cpaths = includedModel.map { case (ColumnRef(cpath, _), _) => cpath }.toSeq sorted
-          val modelDoubles = cpaths map { model.featureValues(_) }
-
-          val includedCols = includedModel.collect { case (ColumnRef(cpath, _), col: DoubleColumn) => (cpath, col) }.toMap
-
-          val resultArray = filteredRange(includedModel, range).foldLeft( new Array[Double](range.end)) { case (arr, i) =>
-            val includedDoubles = cpaths map { includedCols(_).apply(i) }
-
-            if (modelDoubles.length == includedDoubles.length) {
-              val res = dotProduct(modelDoubles.toArray, includedDoubles.toArray) + model.constant
-              arr(i) = trans(res)
-              arr
-            } else {
-              sys.error("Incorrect number of feature values.") 
-            }
-          }
-
-          ScannerPrelims(includedModel, definedModel, cpaths, includedCols, resultArray)
-        }
       }
-
     }
 
     def determineColumns(schema: CSchema, cpaths: Set[CPath]): Map[CPath, DoubleColumn] = {
@@ -237,7 +212,7 @@ trait ModelLibModule[M[+_]] {
           }.groupBy(_._1) map { case (modelName, paths) =>
             (modelName, paths.map(_._2))
           }
-          
+
           val featuresPaths = schema.columnRefs.collect {
             case ColumnRef(path @ CPath(paths.Value, CPathField(modelName), CPathField(`coefficients`), CPathIndex(0), rest @ _*), _)
               if rest.length > 0 && rest.last == CPathField(`estimate`) => (modelName, path)
@@ -254,16 +229,16 @@ trait ModelLibModule[M[+_]] {
           //error prone; ideally determine common keys earlier
           val commonKeys = interceptCols.keySet & stdErrCols.keySet & dofCols.keySet & covarCols.keySet & featuresCols.keySet
 
-          val joined0 = commonKeys map { case field => 
+          val joined0 = commonKeys map { case field =>
             (field, List(interceptCols(field), stdErrCols(field), dofCols(field), covarCols(field), featuresCols(field)))
           } toMap
 
-          val rowModels: Int => Set[Model] = (i: Int) => { 
+          val rowModels: Int => Set[Model] = (i: Int) => {
             val joined = joined0 filterNot { case (_, cols) =>
               val definedCols = cols map { _ filter { case (_, col) => col.isDefinedAt(i) } }
               definedCols.exists(_.isEmpty)
             }
-            
+
             joined.collect { case (field, cols @ List(constant, resStdErr, degs, varCovar, values)) =>
               val cnst = constant.map { case (_, col) =>
                 col.apply(i)
@@ -341,7 +316,7 @@ trait ModelLibModule[M[+_]] {
           //error prone; ideally determine common keys earlier
           val commonKeys = interceptCols.keySet & featuresCols.keySet
 
-          val joined0 = commonKeys map { case field => 
+          val joined0 = commonKeys map { case field =>
             (field, List(interceptCols(field), featuresCols(field)))
           } toMap
 

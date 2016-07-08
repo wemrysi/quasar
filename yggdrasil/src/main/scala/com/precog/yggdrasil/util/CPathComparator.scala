@@ -31,7 +31,6 @@ import com.precog.yggdrasil.table._
  * returning results.
  */
 sealed abstract class MaybeOrdering(val toInt: Int) {
-  val toScalazOrdering: scalaz.Ordering = scalaz.Ordering.fromInt(toInt)
   def complement: MaybeOrdering
 }
 

@@ -1,19 +1,19 @@
 /*
- *  ____    ____    _____    ____    ___     ____ 
+ *  ____    ____    _____    ____    ___     ____
  * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
  * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
  * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
  * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
  *
- * This program is free software: you can redistribute it and/or modify it under the terms of the 
- * GNU Affero General Public License as published by the Free Software Foundation, either version 
+ * This program is free software: you can redistribute it and/or modify it under the terms of the
+ * GNU Affero General Public License as published by the Free Software Foundation, either version
  * 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See 
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License along with this 
+ * You should have received a copy of the GNU Affero General Public License along with this
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
@@ -31,8 +31,6 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
   trait InfixLib extends ColumnarTableLib {
     import StdLib.{BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined, StrAndDateT, dateToStrCol}
 
-    def PrimitiveEqualsF2 = yggdrasil.table.cf.std.Eq
-    
     object Infix {
       val InfixNamespace = Vector("std", "infix")
 
@@ -87,7 +85,7 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
       val Div = new Op2F2(InfixNamespace, "divide") {
         def doublef(x: Double, y: Double) = x / y
 
-        val context = java.math.MathContext.DECIMAL128  
+        val context = java.math.MathContext.DECIMAL128
         def numf(x: BigDecimal, y: BigDecimal) = x(context) / y(context)
 
         val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
@@ -252,7 +250,7 @@ trait InfixLibModule[M[+_]] extends ColumnarTableLibModule[M] {
 
       val And = new BoolOp2("and", _ && _)
       val Or = new BoolOp2("or", _ || _)
-      
+
       val concatString = new Op2F2(InfixNamespace, "concatString") {
         //@deprecated, see the DEPRECATED comment in StringLib
         val tpe = BinaryOperationType(StrAndDateT, StrAndDateT, JTextT)

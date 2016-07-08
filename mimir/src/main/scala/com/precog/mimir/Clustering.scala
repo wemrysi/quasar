@@ -494,11 +494,6 @@ trait KMediansCoreSetClustering {
   }
 
   case class GridPoint(point: Array[Double]) {
-    def hashDouble(x: Double): Int = {
-      val l = java.lang.Double.doubleToLongBits(x)
-      l.toInt * 23 + (l >>> 32).toInt
-    }
-
     override def hashCode: Int = {
       var hash: Int = point.length * 17
       var i = 0

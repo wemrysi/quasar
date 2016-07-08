@@ -47,9 +47,6 @@ trait TableLibModule[M[+_]] extends TableModule[M] with TransSpecModule {
 
   object TableLib {
     private val defaultMorphism1Opcode = new java.util.concurrent.atomic.AtomicInteger(0)
-    private val defaultMorphism2Opcode = new java.util.concurrent.atomic.AtomicInteger(0)
-    private val defaultUnaryOpcode = new java.util.concurrent.atomic.AtomicInteger(0)
-    private val defaultBinaryOpcode = new java.util.concurrent.atomic.AtomicInteger(0)
     private val defaultReductionOpcode = new java.util.concurrent.atomic.AtomicInteger(0)
   }
 

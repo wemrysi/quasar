@@ -423,16 +423,6 @@ trait Slice { source =>
     }
   }
 
-  def nest(selectorPrefix: CPath) = new Slice {
-    val arraylessPrefix = CPath(selectorPrefix.nodes map {
-      case CPathArray => CPathIndex(0)
-      case n => n
-    }: _*)
-
-    val size = source.size
-    val columns = source.columns map { case (ColumnRef(selector, ctype), v) => ColumnRef(arraylessPrefix \ selector, ctype) -> v }
-  }
-
   def arraySwap(index: Int) = new Slice {
     val size = source.size
     val columns = source.columns.collect {

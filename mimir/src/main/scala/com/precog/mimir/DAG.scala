@@ -53,7 +53,6 @@ trait DAG extends Instructions {
   def decorate(stream: Vector[Instruction]): Either[StackError, DepGraph] = {
     import dag._
 
-    val adjustMemotable = mutable.Map[(Int, DepGraph), DepGraph]()
     implicit val M: Traverse[({ type λ[α] = Either[StackError, α] })#λ] with Monad[({ type λ[α] = Either[StackError, α] })#λ] = eitherMonad[StackError]
 
     def loop(loc: Line, roots: List[Either[BucketSpec, DepGraph]], splits: List[OpenSplit], stream: Vector[Instruction]): Trampoline[Either[StackError, DepGraph]] = {

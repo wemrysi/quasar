@@ -84,11 +84,6 @@ trait SecureVFSModule[M[+_], Block] extends VFSModule[M, Block] {
       verifyResourceAccess(apiKey, path, readMode)
     }
 
-    final def readQuery(apiKey: APIKey, path: Path, version: Version, readMode: ReadMode): EitherT[M, ResourceError, String] = {
-      readResource(apiKey, path, version, readMode) >>=
-      Resource.asQuery(path, version)
-    }
-
     final def readProjection(apiKey: APIKey, path: Path, version: Version, readMode: ReadMode): EitherT[M, ResourceError, Projection] = {
       readResource(apiKey, path, version, readMode) >>=
       Resource.asProjection(path, version)

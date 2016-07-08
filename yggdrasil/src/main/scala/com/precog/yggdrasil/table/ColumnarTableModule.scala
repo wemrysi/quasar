@@ -163,7 +163,6 @@ object ColumnarTableModule extends Logging {
       def size = n
       def getPaths: Array[String] = a
       def columnForPath(path: String) = m(path)
-      def pathForColumn(col: Int) = a(col)
       def combine(that: Indices): Indices = {
         val buf = new mutable.ArrayBuffer[String](a.length)
         buf ++= a
@@ -958,8 +957,6 @@ trait ColumnarTableModule[M[+_]]
         case class Cogroup(lr: LR, rr: RR, br: BR, left: SlicePosition[LK], right: SlicePosition[RK], rightStart: Option[SlicePosition[RK]], rightEnd: Option[SlicePosition[RK]]) extends CogroupState
         case class EndRight(rr: RR, rhead: Slice, rtail: StreamT[M, Slice]) extends CogroupState
         case object CogroupDone extends CogroupState
-
-        val Reset = -1
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
         def step(state: CogroupState): M[Option[(Slice, CogroupState)]] = {
