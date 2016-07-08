@@ -27,15 +27,8 @@ import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
 import org.joda.time._
 import org.joda.time.format._
 
-import yggdrasil._
 import yggdrasil.table._
-
-// import com.precog.util.DateTimeUtil.{ parseDateTime, parseDateTimeFlexibly, isDateTimeFlexibly }
-// import com.precog.util.{ BitSet, BitSetUtil }
-
-import TransSpecModule._
-
-// import scala.collection.mutable.ArrayBuffer
+import yggdrasil.TransSpecModule._
 
 trait TimeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait TimeLib extends ColumnarTableLib {

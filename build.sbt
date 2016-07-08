@@ -1,10 +1,10 @@
 import precog.PlatformBuild._
 
-lazy val platform = project.root.noArtifacts aggregate (blueeyes, common, yggdrasil, mimir)
+lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, yggdrasil, mimir)
 
 /** This used to be the evaluator project.
  */
-lazy val mimir = project.setup dependsOn yggdrasil.inBothScopes
+lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil.inBothScopes
 
 lazy val yggdrasil = project.setup dependsOn common.inBothScopes deps (
   "org.objectweb.howl"   % "howl"               % "1.0.1-1",
@@ -20,7 +20,6 @@ lazy val common = project.setup dependsOn blueeyes deps (
   "org.scalacheck"           %% "scalacheck"       % "1.10.1"  % Test,
   "com.google.code.findbugs"  % "jsr305"           % "3.0.1",
   "joda-time"                 % "joda-time"        % "1.6.2",
-  "javolution"                % "javolution"       % "5.5.1",
   "com.google.guava"          % "guava"            % "12.0.1",
   "commons-io"                % "commons-io"       %  "2.5",
   "com.rubiconproject.oss"    % "jchronic"         % "0.2.6"

@@ -11,15 +11,9 @@
  */
 package com.precog.util;
 
-import javolution.util.*;
-import javolution.util.FastCollection.Record;
-
-import java.lang.UnsupportedOperationException;
+import java.util.Collection;
 import java.util.Set;
 import javax.realtime.MemoryArea;
-import javolution.context.ObjectFactory;
-import javolution.lang.MathLib;
-import javolution.lang.Reusable;
 
 /**
  * <p> This class represents either a table of bits or a set of non-negative
@@ -33,17 +27,7 @@ import javolution.lang.Reusable;
  * @author  <a href="mailto:jean-marie@dautelle.com">Jean-Marie Dautelle</a>
  * @version 5.3, February 24, 2008
  */
-public class BitSet extends FastCollection <Index>  implements Set <Index> , Reusable {
-
-    /**
-     * Holds the set factory.
-     */
-    private static final ObjectFactory FACTORY = new ObjectFactory() {
-
-        public Object create() {
-            return new BitSet();
-        }
-    };
+public class BitSet {
     /**
      * Holds the bits (64 bits per long).
      */
@@ -64,6 +48,8 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      * to be zero).
      */
     private int _length;
+
+    public int length() { return _length; }
 
     public int getBitsLength() {
         return _length;
@@ -101,28 +87,6 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     }
 
     /**
-     * Returns a new, preallocated or {@link #recycle recycled} set instance
-     * (on the stack when executing in a {@link javolution.context.StackContext
-     * StackContext}).
-     *
-     * @return a new, preallocated or recycled set instance.
-     */
-    public static BitSet newInstance() {
-        BitSet bitSet = (BitSet) FACTORY.object();
-        bitSet._length = 0;
-        return bitSet;
-    }
-
-    /**
-     * Recycles a set {@link #newInstance() instance} immediately
-     * (on the stack when executing in a {@link javolution.context.StackContext
-     * StackContext}).
-     */
-    public static void recycle(BitSet instance) {
-        FACTORY.recycle(instance);
-    }
-
-    /**
      * Adds the specified index to this set. This method is equivalent
      * to <code>set(index.intValue())</code>.
      *
@@ -145,7 +109,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
      * @param that the second bit set.
      */
     public void and(BitSet that) {
-        final int n = MathLib.min(this._length, that._length);
+        final int n = java.lang.Math.min(this._length, that._length);
         for (int i = 0; i < n; ++i) {
             this.bits[i] &= that.bits[i];
         }
@@ -176,7 +140,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
     public int cardinality() {
         int sum = 0;
         for (int i = 0; i < _length; i++) {
-            sum += MathLib.bitCount(bits[i]);
+            sum += java.lang.Long.bitCount(bits[i]);
         }
         return sum;
     }
@@ -297,68 +261,6 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
         if (bitIndex < 0) return false;
         int i = bitIndex >> 6;
         return (i >= _length) ? false : (bits[i] & (1L << bitIndex)) != 0;
-    }
-
-    /**
-     * Returns a new bit set composed of a range of bits from this one.
-     *
-     * @param fromIndex the low index (inclusive).
-     * @param toIndex the high index (exclusive).
-     * @return a context allocated bit set instance.
-     * @throws IndexOutOfBoundsException if
-     *          {@code (fromIndex < 0) | (toIndex < fromIndex)}
-     */
-    public BitSet get(int fromIndex, int toIndex) {
-        if (fromIndex < 0 || fromIndex > toIndex)
-            throw new IndexOutOfBoundsException();
-        BitSet bitSet = BitSet.newInstance();
-        int length = MathLib.min(_length, (toIndex >>> 6) + 1);
-        bitSet.setLength(length);
-        System.arraycopy(bits, 0, bitSet.bits, 0, length);
-        bitSet.clear(0, fromIndex);
-        bitSet.clear(toIndex, length << 6);
-        return bitSet;
-    }
-
-    /**
-     * Returns {@code true} if this bit set shares at least one
-     * common bit with the specified bit set.
-     *
-     * @param that the bit set to check for intersection
-     * @return {@code true} if the sets intersect; {@code false} otherwise.
-     */
-    public boolean intersects(BitSet that) {
-        int i = MathLib.min(this._length, that._length);
-        while (--i >= 0) {
-            if ((bits[i] & that.bits[i]) != 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // provided by super class
-    //public boolean isEmpty() {
-    //    return nextSetBit(0) == -1;
-    //}
-
-    /**
-     * Returns the logical number of bits actually used by this bit
-     * set.  It returns the index of the highest set bit plus one.
-     *
-     * <p> Note: This method does not return the number of set bits
-     *           which is returned by {@link #size} </p>
-     *
-     * @return the index of the highest set bit plus one.
-     */
-    public int length() {
-        for (int i = _length; --i >= 0;) {
-            long l = bits[i];
-            if (l != 0) {
-                return i << 6 + 64 - MathLib.numberOfTrailingZeros(l);
-            }
-        }
-        return 0;
     }
 
     /**
@@ -554,7 +456,7 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
         if (!(obj instanceof BitSet))
             return super.equals(obj);
         BitSet that = (BitSet) obj;
-        int n = MathLib.min(this._length, that._length);
+        int n = java.lang.Math.min(this._length, that._length);
         for (int i = 0; i < n; ++i) {
             if (bits[i] != that.bits[i])
                 return false;
@@ -577,50 +479,6 @@ public class BitSet extends FastCollection <Index>  implements Set <Index> , Reu
             h += i;
         }
         return h;
-    }
-
-    // Implements Reusable.
-    public void reset() {
-        _length = 0;
-    }
-
-    // Implements abstract methods.
-
-    // Records holds the ordering position of the bit sets.
-    // (e.g. first bit set has a position of zero).
-
-    public Record head() {
-        return Index.valueOf(-1);
-    }
-
-    public Record tail() {
-        return Index.valueOf(cardinality());
-    }
-
-    public  Index  valueOf(Record record) {
-        int i = ((Index)record).intValue();
-        int count= 0;
-        for (int j = 0; j < _length;) {
-            long l = bits[j++];
-            count += MathLib.bitCount(l);
-            if (count > i) { // Found word for record.
-                int bitIndex = j << 6;
-                while (count != i) {
-                    int shiftRight = MathLib.numberOfLeadingZeros(l) + 1;
-                    l <<= shiftRight;
-                    bitIndex -= shiftRight;
-                    count--;
-                }
-                return Index.valueOf(bitIndex);
-            }
-        }
-        return null;
-    }
-
-    public void delete(Record record) {
-        Index bitIndex = (Index) valueOf(record);
-        if (bitIndex != null)
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     /**
