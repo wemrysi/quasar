@@ -22,7 +22,6 @@ package yggdrasil
 
 import com.precog.common._
 import blueeyes.json._
-import org.objectweb.howl.log._
 
 import java.io.FileOutputStream
 import java.util.Arrays
@@ -47,14 +46,14 @@ object PersistentJValue {
   object Update  extends Message(1: Byte)
   object Written extends Message(2: Byte)
 
-  private def open(baseDir: File, fileName: String): Logger = {
-    val config = new Configuration()
+  private def open(baseDir: File, fileName: String): HLogger = {
+    val config = new HConfiguration()
     config.setLogFileDir(baseDir.getCanonicalPath)
     config.setLogFileName(fileName)
     config.setLogFileExt("log")
     config.setLogFileMode("rwd")
     config.setChecksumEnabled(true)
-    val log = new Logger(config)
+    val log = new HLogger(config)
     log.open()
     log
   }
@@ -93,14 +92,14 @@ final case class PersistentJValue(baseDir: File, fileName: String) extends org.s
     var pending: Option[Array[Byte]]    = None
     var lastUpdate: Option[Array[Byte]] = None
 
-    hlog.replay(new ReplayListener {
-      def getLogRecord: LogRecord         = new LogRecord(1024 * 64)
-      def onError(ex: LogException): Unit = throw ex
-      def onRecord(rec: LogRecord): Unit = rec.`type` match {
-        case LogRecordType.END_OF_LOG =>
+    hlog.replay(new HReplayListener {
+      def getLogRecord: HLogRecord         = new HLogRecord(1024 * 64)
+      def onError(ex: HLogException): Unit = throw ex
+      def onRecord(rec: HLogRecord): Unit = rec.`type` match {
+        case HLogEnd =>
           log.debug("Versions TX log replay complete in " + baseDir.getCanonicalPath)
 
-        case LogRecordType.USER =>
+        case HLogUser =>
           val bytes = rec.getFields()(0)
           bytes match {
             case Update(rawJson) =>

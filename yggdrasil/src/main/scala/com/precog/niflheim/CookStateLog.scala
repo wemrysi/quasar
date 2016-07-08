@@ -20,13 +20,11 @@
 package com.precog.niflheim
 
 import com.precog.common._
+import com.precog.yggdrasil._
 import com.precog.util.FileLock
-import org.objectweb.howl.log._
 
-import java.io.{ File, RandomAccessFile }
-import java.nio.ByteBuffer
+import java.io.RandomAccessFile
 import java.util.concurrent.ScheduledExecutorService
-
 import scala.collection.immutable.SortedMap
 
 object CookStateLog {
@@ -39,14 +37,14 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends o
 
   private[this] val workLock = FileLock(baseDir, lockName)
 
-  private[this] val txLogConfig = new Configuration()
+  private[this] val txLogConfig = new HConfiguration()
   txLogConfig.setLogFileDir(baseDir.getCanonicalPath)
   txLogConfig.setLogFileName(logName)
   txLogConfig.setLogFileMode("rwd") // Force file sync to underlying hardware
   txLogConfig.setChecksumEnabled(true)
   // txLogConfig.setScheduler(scheduler)
 
-  private[this] val txLog = new Logger(txLogConfig)
+  private[this] val txLog = new HLogger(txLogConfig)
   txLog.open()
   txLog.setAutoMark(false) // We only mark when we're ready to write to a new raw log
 
@@ -68,22 +66,22 @@ class CookStateLog(baseDir: File, scheduler: ScheduledExecutorService) extends o
   def currentBlockId: Long = currentBlockId0
 
   // Run from the last mark to reconstruct state
-  txLog.replay(new ReplayListener {
+  txLog.replay(new HReplayListener {
     // We need to provide the record that will be filled in on each callback
     // Currently all actions are 10 bytes of data
-    val record = new LogRecord(10)
+    val record = new HLogRecord(10)
 
     def getLogRecord = record
-    def onError(e: LogException) = {
+    def onError(e: HLogException) = {
       log.error("Error reading TX log", e)
       throw e
     }
-    def onRecord(r: LogRecord) = {
+    def onRecord(r: HLogRecord) = {
       r.`type` match {
-        case LogRecordType.END_OF_LOG =>
+        case HLogEnd =>
           log.debug("TXLog Replay complete in " + baseDir.getCanonicalPath)
 
-        case LogRecordType.USER =>
+        case HLogUser =>
           TXLogEntry(r) match {
             case StartCook(blockId) =>
               pendingCookIds0 += (blockId -> r.key)
@@ -136,7 +134,7 @@ case class StartCook(blockId: Long)    extends TXLogEntry
 case class CompleteCook(blockId: Long) extends TXLogEntry
 
 object TXLogEntry extends org.slf4s.Logging {
-  def apply(record: LogRecord) = {
+  def apply(record: HLogRecord) = {
     val buffer = ByteBufferWrap(record.getFields()(0))
 
     buffer.getShort match {

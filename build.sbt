@@ -12,15 +12,15 @@ lazy val yggdrasil = project.setup dependsOn common.inBothScopes deps (
   "org.spire-math"     % "spire_2.9.2" %  "0.3.0"
 )
 lazy val common = project.setup dependsOn blueeyes deps (
-  "com.chuusai"              %% "shapeless"        % "1.2.3",
-  "org.slf4s"                %% "slf4s-api"        % "1.7.13",
-  "org.scalaz"               %% "scalaz-core"      % "7.0.9",
-  "org.scalacheck"           %% "scalacheck"       % "1.10.1"  % Test,
-  "com.google.code.findbugs"  % "jsr305"           % "3.0.1",
-  "joda-time"                 % "joda-time"        % "1.6.2",
-  "com.google.guava"          % "guava"            % "12.0.1",
-  "commons-io"                % "commons-io"       %  "2.5",
-  "com.rubiconproject.oss"    % "jchronic"         % "0.2.6"
+
+  "com.chuusai"              %% "shapeless"   % "1.2.3",
+  "org.slf4s"                %% "slf4s-api"   % "1.7.13",
+  "org.scalaz"               %% "scalaz-core" % "7.0.9",
+  "org.scalacheck"           %% "scalacheck"  % "1.10.1"  % Test,
+  "com.google.code.findbugs"  % "jsr305"      % "3.0.1",
+  "joda-time"                 % "joda-time"   % "1.6.2",
+  "com.google.guava"          % "guava"       % "12.0.1",
+  "com.rubiconproject.oss"    % "jchronic"    %  "0.2.6"
 )
 lazy val blueeyes = project.setup deps blueeyesModule("core") deps (
   // Neeed explicit versions to avoid version ranges burbling up

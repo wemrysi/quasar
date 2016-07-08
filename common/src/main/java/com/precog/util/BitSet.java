@@ -13,7 +13,6 @@ package com.precog.util;
 
 import java.util.Collection;
 import java.util.Set;
-import javax.realtime.MemoryArea;
 
 /**
  * <p> This class represents either a table of bits or a set of non-negative
@@ -488,18 +487,13 @@ public class BitSet {
      */
     private final void setLength(final int newLength) {
         if (bits.length < newLength) { // Resizes array.
-            MemoryArea.getMemoryArea(this).executeInArea(new Runnable() {
-
-                public void run() {
-                    int arrayLength = bits.length;
-                    while (arrayLength < newLength) {
-                        arrayLength <<= 1;
-                    }
-                    long[] tmp = new long[arrayLength];
-                    System.arraycopy(bits, 0, tmp, 0, _length);
-                    bits = tmp;
-                }
-            });
+            int arrayLength = bits.length;
+            while (arrayLength < newLength) {
+                arrayLength <<= 1;
+            }
+            long[] tmp = new long[arrayLength];
+            System.arraycopy(bits, 0, tmp, 0, _length);
+            bits = tmp;
         }
         for (int i = _length; i < newLength; i++) {
             bits[i] = 0;

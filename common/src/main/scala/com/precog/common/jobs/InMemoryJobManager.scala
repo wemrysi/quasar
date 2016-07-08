@@ -30,8 +30,6 @@ import java.util.UUID
 
 import scala.collection.mutable
 
-import org.streum.configrity.Configuration
-
 import scalaz._
 
 private[jobs] case class JobData(job: Job, channels: Map[String, List[Message]], status: Option[Status])

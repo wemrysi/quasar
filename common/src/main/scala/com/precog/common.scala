@@ -69,6 +69,9 @@ package object common {
   val Iso  = shapeless.Iso
   val HNil = shapeless.HNil
 
+  // configrity
+  type Configuration = org.streum.configrity.Configuration
+
   // Can't overload in package objects in scala 2.9!
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)
   def ByteBufferWrap2(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)

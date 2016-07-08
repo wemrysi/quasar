@@ -28,15 +28,26 @@ import ResourceError._
 
 import org.slf4s.Logging
 
-import java.io.{ File, FileFilter }
-
-import org.apache.commons.io.filefilter.FileFilterUtils
+import java.io.FileFilter
+import java.io.File.separator
 
 import scalaz._
 import scalaz.effect.IO
 import scalaz.std.list._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.traverse._
+
+object FileFilters {
+  final case class Not(in: FileFilter) extends FileFilter {
+    def accept(f: File): Boolean = !(in accept f)
+  }
+  final case class And(lhs: FileFilter, rhs: FileFilter) extends FileFilter {
+    def accept(f: File): Boolean = (lhs accept f) && (rhs accept f)
+  }
+  final case class Named(name: String) extends FileFilter {
+    def accept(f: File): Boolean = f.getName == name
+  }
+}
 
 object VFSPathUtils extends Logging {
   // Methods for dealing with path escapes, lookup, enumeration
@@ -51,8 +62,8 @@ object VFSPathUtils extends Logging {
   private[yggdrasil] final val escapeSuffix = "_byUser"
 
   private final val pathFileFilter: FileFilter = {
-    import FileFilterUtils.{ notFileFilter => not, _ }
-    and(not(nameFileFilter(versionsSubdir)), not(nameFileFilter(perAuthProjectionsDir)))
+    import FileFilters._
+    And(Not(Named(versionsSubdir)), Not(Named(perAuthProjectionsDir)))
   }
 
   def escapePath(path: Path, toEscape: Set[String]) =
@@ -76,7 +87,7 @@ object VFSPathUtils extends Logging {
   def pathDir(baseDir: File, path: Path): File = {
     // The path component maps directly to the FS
     val prefix = escapePath(path, Set(versionsSubdir)).elements.filterNot(disallowedPathComponents)
-    new File(baseDir, prefix.mkString(File.separator))
+    new File(baseDir, prefix.mkString(separator))
   }
 
   def versionsSubdir(pathDir: File): File = new File(pathDir, versionsSubdir)

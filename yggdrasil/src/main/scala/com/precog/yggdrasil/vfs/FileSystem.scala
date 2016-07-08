@@ -21,39 +21,20 @@ package com.precog
 package yggdrasil
 package vfs
 
-import blueeyes.bkka.FutureMonad
 import blueeyes.core.http._
 import blueeyes.json._
 import blueeyes.json.serialization._
 import DefaultSerialization._
 
-import com.google.common.cache.RemovalCause
-
-import com.precog.common.Path
-import com.precog.common.accounts.AccountId
+import com.precog.common._
 import com.precog.common.ingest.FileContent
-import com.precog.common.jobs._
-import com.precog.common.security._
 import com.precog.niflheim.NIHDB
-import com.precog.yggdrasil.nihdb._
-import com.precog.util.PrecogUnit
-import com.precog.util.cache.Cache
 
-import java.util.UUID
-
-import scalaz.{ NonEmptyList => NEL, _ }
+import scalaz._
 import scalaz.Validation._
-import scalaz.effect.IO
-import scalaz.std.list._
-import scalaz.std.stream._
 import scalaz.std.option._
-import scalaz.std.tuple._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.list._
 import scalaz.syntax.std.option._
 import scalaz.syntax.apply._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.traverse._
 
 sealed class PathData(val typeName: PathData.DataType)
 object PathData {

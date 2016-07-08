@@ -37,8 +37,6 @@ import blueeyes.json.serialization.DefaultSerialization._
 
 import blueeyes.util.Clock
 
-import org.streum.configrity.Configuration
-
 import org.slf4s.Logging
 
 import scalaz.{ NonEmptyList => NEL, _ }

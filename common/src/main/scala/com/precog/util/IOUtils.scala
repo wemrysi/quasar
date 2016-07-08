@@ -21,22 +21,21 @@ package com.precog.util
 
 import java.io._
 import java.util.Properties
-
-import com.google.common.io.Files
 import org.slf4s.Logging
-import org.apache.commons.io.FileUtils
 import scala.collection.JavaConverters._
 import scalaz.effect.IO
+import scalaz.syntax.semigroup._
+import java.nio.file.Files
 
 object IOUtils extends Logging {
-  final val UTF8 = "UTF-8"
+  final val Utf8Charset = java.nio.charset.Charset forName "UTF-8"
 
   val dotDirs = "." :: ".." :: Nil
 
   def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)
 
   def readFileToString(f: File): IO[String] = IO {
-    FileUtils.readFileToString(f, UTF8)
+    new String(Files.readAllBytes(f.toPath), Utf8Charset)
   }
 
   def readPropertiesFile(s: String): IO[Properties] = readPropertiesFile { new File(s) }
@@ -49,13 +48,13 @@ object IOUtils extends Logging {
 
   def overwriteFile(s: String, f: File): IO[PrecogUnit] = writeToFile(s, f, append = false)
   def writeToFile(s: String, f: File, append: Boolean): IO[PrecogUnit] = IO {
-    FileUtils.writeStringToFile(f, s, UTF8, append)
+    Files.write(f.toPath, s.getBytes);
     PrecogUnit
   }
 
-  def writeSeqToFile[A](s0: Seq[A], f: File): IO[Unit] = IO {
-    val s = s0.asJava
-    FileUtils.writeLines(f, s)
+  def writeSeqToFile[A](s0: Seq[A], f: File): IO[PrecogUnit] = IO {
+    Files.write(f.toPath, s0.map("" + _: CharSequence).asJava, Utf8Charset)
+    PrecogUnit
   }
 
   /** Performs a safe write to the file. Returns true
@@ -74,9 +73,29 @@ object IOUtils extends Logging {
     else throw new IOException("Failed to create directory " + dir)
   }
 
-  def recursiveDelete(dir: File): IO[PrecogUnit] = IO {
-    FileUtils.deleteDirectory(dir)
-    PrecogUnit
+  def recursiveDelete(files: Seq[File]): IO[PrecogUnit] = {
+    files.toList match {
+      case Nil      => IO(PrecogUnit)
+      case hd :: tl => recursiveDelete(hd) flatMap (_ => recursiveDelete(tl))
+    }
+  }
+
+  def listFiles(f: File): IO[Array[File]] = IO {
+    f.listFiles match {
+      case null => Array()
+      case xs   => xs
+    }
+  }
+
+  /** Deletes `file`, recursively if it is a directory. */
+  def recursiveDelete(file: File): IO[PrecogUnit] = {
+    def del(): PrecogUnit = { file.delete() ; PrecogUnit }
+
+    if (!file.isDirectory) IO(del())
+    else listFiles(file) flatMap {
+      case Array() => IO(del())
+      case xs      => recursiveDelete(xs) map (_ => del())
+    }
   }
 
   /** Recursively deletes empty directories, stopping at the first
@@ -101,21 +120,11 @@ object IOUtils extends Logging {
   }
 
   def createTmpDir(prefix: String): IO[File] = IO {
-    val tmpDir = Files.createTempDir()
-    Option(tmpDir.getParentFile).map { parent =>
-      val newTmpDir = new File(parent, prefix + tmpDir.getName)
-      if (!tmpDir.renameTo(newTmpDir)) {
-        sys.error("Error on tmpdir creation: rename to prefixed failed")
-      }
-      newTmpDir
-    }.getOrElse { sys.error("Error on tmpdir creation: no parent dir found") }
+    Files.createTempDirectory(prefix).toFile
   }
 
   def copyFile(src: File, dest: File): IO[PrecogUnit] = IO {
-    FileUtils.copyFile(src, dest)
+    Files.copy(src.toPath, dest.toPath)
     PrecogUnit
   }
-
 }
-
-// vim: set ts=4 sw=4 et:

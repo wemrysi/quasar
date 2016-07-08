@@ -4,9 +4,21 @@ import sbt._, Keys._
 // import org.scalafmt.sbt.ScalaFmtPlugin.autoImport._
 
 object PlatformBuild {
-  def blueeyesModule(name: String): ModuleID = "com.reportgrid" %% s"blueeyes-$name" % "1.0.0-M9.5"
-  def optimizeOpts                           = if (sys.props contains "precog.optimize") Seq("-optimize") else Seq()
-  def debugOpts                              = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
+  def excludeBlacklist(m: ModuleID): ModuleID = ( m
+    exclude("commons-codec", "commons-codec")
+    exclude("javolution", "javolution")
+    exclude("io.netty", "netty")
+    exclude("com.googlecode.concurrentlinkedhashmap", "concurrentlinkedhashmap-lru")
+    exclude("junit", "junit")
+    exclude("org.scalatest", "scalatest_2.9.2")
+    // exclude("org.streum", "configrity-core_2.9.2")
+  )
+
+  def blueeyesModule(name: String): ModuleID =
+    excludeBlacklist("com.reportgrid" %% s"blueeyes-$name" % "1.0.0-M9.5")
+
+  def optimizeOpts = if (sys.props contains "precog.optimize") Seq("-optimize") else Seq()
+  def debugOpts    = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
 
   implicit class ProjectOps(val p: sbt.Project) {
     def noArtifacts: Project = also(

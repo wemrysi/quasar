@@ -30,7 +30,8 @@ import DefaultSerialization._
 import Versioned._
 import Extractor._
 
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
+// import org.apache.commons.codec.binary.Base64
 
 import scalaz._
 import scalaz.syntax.apply._
@@ -69,8 +70,8 @@ object RawUTF8Encoding extends ContentEncoding {
 
 object Base64Encoding extends ContentEncoding {
   val id = "base64"
-  def encode(raw: Array[Byte])   = Base64.encodeBase64String(raw)
-  def decode(compressed: String) = Base64.decodeBase64(compressed)
+  def encode(raw: Array[Byte])   = new String(Base64.getEncoder.encode(raw), "UTF-8")
+  def decode(compressed: String) = Base64.getDecoder.decode(compressed)
 }
 
 case class FileContent(data: Array[Byte], mimeType: MimeType, encoding: ContentEncoding)

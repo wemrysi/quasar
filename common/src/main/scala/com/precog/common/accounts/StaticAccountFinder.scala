@@ -22,8 +22,6 @@ package accounts
 
 import org.slf4s.Logging
 
-import org.streum.configrity.Configuration
-
 import scalaz.Monad
 import scalaz.syntax.monad._
 

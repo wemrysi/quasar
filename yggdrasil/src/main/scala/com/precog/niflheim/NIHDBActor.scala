@@ -20,8 +20,6 @@
 package com.precog.niflheim
 
 import com.precog.common._
-import com.precog.common.accounts.AccountId
-import com.precog.common.ingest.EventId
 import com.precog.common.security.Authorities
 import com.precog.util._
 
@@ -36,20 +34,14 @@ import blueeyes.json.serialization.Extractor._
 
 import org.slf4s.Logging
 
-import org.objectweb.howl.log._
-
 import scalaz._
 import scalaz.Validation._
 import scalaz.effect.IO
 import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
 
-import java.io.{ File, FileNotFoundException, IOException }
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic._
-
 import scala.collection.immutable.SortedMap
-import scala.collection.JavaConverters._
 
 case class Insert(batch: Seq[NIHDB.Batch], responseRequested: Boolean)
 
