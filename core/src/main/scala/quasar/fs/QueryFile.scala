@@ -41,7 +41,7 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix]
+  val qscript = new Transform[Fix, QScriptInternal[Fix, ?]]
   val optimize = new Optimize[Fix]
   val elide = scala.Predef.implicitly[ElideBuckets.Aux[Fix, QScriptInternal[Fix, ?]]]
 

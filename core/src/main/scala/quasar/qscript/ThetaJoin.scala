@@ -84,19 +84,18 @@ object ThetaJoin {
         right: FreeMap[IT],
         p1: ThetaJoin[IT, Unit],
         p2: ThetaJoin[IT, Unit]) =
-        if (p1 == p2)
-          OptionT(state(Some(AbsMerge[IT, ThetaJoin[IT, Unit], FreeMap](p1, UnitF, UnitF))))
-        else
-          OptionT(state(None))
+        OptionT(state(
+          if (p1 == p2)
+            AbsMerge[ThetaJoin[IT, Unit], FreeMap[IT]](p1, UnitF, UnitF).some
+          else
+            None))
     }
 
-  implicit def bucketable[T[_[_]]: Corecursive]:
-      Bucketable.Aux[T, ThetaJoin[T, ?]] =
+  implicit def bucketable[T[_[_]]]: Bucketable.Aux[T, ThetaJoin[T, ?]] =
     new Bucketable[ThetaJoin[T, ?]] {
       type IT[G[_]] = T[G]
 
-      def digForBucket: ThetaJoin[T, Inner] => StateT[QScriptBucket[IT, Inner] \/ ?, Int, Inner] =
-        sp => IndexedStateT.stateT(sp.src)
+      def digForBucket[G[_]](tj: ThetaJoin[T, IT[G]]) = IndexedStateT.stateT(tj)
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:

@@ -55,18 +55,12 @@ package object qscript {
   type QScript[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptCommon[T, ?], A]
 
 
-  /** A variant with a simpler join type. A backend can choose to operate on this
-    * structure by applying the `equiJoinsOnly` transformation. Backends
+  /** A variant with a simpler join type. A backend can choose to operate on
+    * this structure by applying the `equiJoinsOnly` transformation. Backends
     * without true join support will likely find it easier to work with this
     * than to handle full ThetaJoins.
     */
   type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
-
-  def DeadEndInternal[T[_[_]]] = implicitly[Const[DeadEnd, ?] :<: QScriptInternal[T, ?]]
-  def SourcedPathableInternal[T[_[_]]] = implicitly[SourcedPathable[T, ?] :<: QScriptInternal[T, ?]]
-  def QScriptCoreInternal[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QScriptInternal[T, ?]]
-  def ThetaJoinInternal[T[_[_]]] = implicitly[ThetaJoin[T, ?] :<: QScriptInternal[T, ?]]
-  def QScriptBucketInternal[T[_[_]]] = implicitly[QScriptBucket[T, ?] :<: QScriptInternal[T, ?]]
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
@@ -89,13 +83,10 @@ package object qscript {
 
   def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
 
-  final case class AbsMerge[T[_[_]], A, Q[_[_[_]]]](
-    src: A,
-    left: Q[T],
-    right: Q[T])
+  final case class AbsMerge[A, B](src: A, left: B, right: B)
 
-  type Merge[T[_[_]], A] = AbsMerge[T, A, FreeMap]
-  type MergeJoin[T[_[_]], A] = AbsMerge[T, A, FreeQS]
+  type Merge[T[_[_]], A] = AbsMerge[A, FreeMap[T]]
+  type MergeJoin[F[_], A] = AbsMerge[A, Free[F, Unit]]
 
   // replace Unit in `in` with `field`
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
@@ -105,9 +96,6 @@ package object qscript {
     new Bucketable[Const[DeadEnd, ?]] {
       type IT[F[_]] = T[F]
 
-      def digForBucket: Const[DeadEnd, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
-        const => StateT { s =>
-          (s, DeadEndInternal[T].inj(const).embed).right[QScriptBucket[T, Inner]]
-        }
+      def digForBucket[G[_]](de: Const[DeadEnd, IT[G]]) = StateT.stateT(de)
     }
 }
