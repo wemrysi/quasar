@@ -39,6 +39,7 @@ object Dependencies {
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion              % "compile, test",
     "com.slamdata"      %% "matryoshka-core"           % "0.11.0"                % "compile",
     "com.slamdata"      %% "pathy-core"                % pathyVersion            % "compile",
+    "com.slamdata"      %% "pathy-argonaut"            % pathyVersion            % "compile",
     "com.github.mpilquist" %% "simulacrum"             % "0.7.0"                 % "compile, test",
     "org.http4s"        %% "http4s-core"               % http4sVersion           % "compile",
     "com.github.tototoshi" %% "scala-csv"              % "1.3.1"                 % "compile",

@@ -20,13 +20,14 @@ import quasar.Predef._
 import quasar.api._, ToApiError.ops._
 import quasar.effect.KeyValueStore
 import quasar.fp._
-import quasar.fs.{AbsPath, AFile, APath, PathyCodecJson, sandboxAbs}, PathyCodecJson._
+import quasar.fs.{AbsPath, AFile, APath, sandboxAbs}
 import quasar.fs.mount._
 
 import argonaut._, Argonaut._
 import org.http4s._, Method.MOVE
 import org.http4s.dsl._
 import pathy.Path, Path._
+import pathy.argonaut.PosixCodecJson._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 

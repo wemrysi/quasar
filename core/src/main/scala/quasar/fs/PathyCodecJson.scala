@@ -21,10 +21,7 @@ import quasar.Predef._
 import argonaut._, Argonaut._
 import pathy.Path, Path._
 
-// TODO: These belong in argonaut sub-module in scala-pathy
 object PathyCodecJson {
-  implicit def pathEncodeJson[B,T]: EncodeJson[Path[B,T,Sandboxed]] =
-    EncodeJson.of[String].contramap(posixCodec.printPath(_))
 
   implicit val aPathDecodeJson: DecodeJson[APath] =
     DecodeJson.of[String] flatMap (s => DecodeJson(hc =>
@@ -32,8 +29,4 @@ object PathyCodecJson {
         .map(sandboxAbs)
         .fold(DecodeResult.fail[APath]("[T]AbsPath[T]", hc.history))(DecodeResult.ok)))
 
-  implicit val relFileDecodeJson: DecodeJson[RelFile[Unsandboxed]] =
-    DecodeJson.of[String] flatMap (s => DecodeJson[RelFile[Unsandboxed]](hc =>
-      posixCodec.parseRelFile(s)
-        .fold(DecodeResult.fail[RelFile[Unsandboxed]](s"not a relative file path: $s", hc.history))(DecodeResult.ok)))
 }
