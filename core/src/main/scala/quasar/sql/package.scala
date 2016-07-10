@@ -149,6 +149,8 @@ package object sql {
     (r match {
       case IdentRelationAST(name, alias) =>
         _qq("`", name) :: alias.map("as " + _).toList
+      case VariRelationAST(vari, alias) =>
+        (":" + vari.symbol) :: alias.map("as " + _).toList
       case TableRelationAST(path, alias) =>
         _qq("`", prettyPrint(path)) :: alias.map("as " + _).toList
       case ExprRelationAST(expr, aliasName) =>
@@ -263,6 +265,8 @@ package object sql {
     r match {
       case IdentRelationAST(name, alias) =>
         G.point(IdentRelationAST(name, alias))
+      case VariRelationAST(vari, alias) =>
+        G.point(VariRelationAST(Vari(vari.symbol), alias))
       case TableRelationAST(name, alias) =>
         G.point(TableRelationAST(name, alias))
       case ExprRelationAST(expr, aliasName) =>
@@ -281,6 +285,9 @@ package object sql {
           case IdentRelationAST(name, alias) =>
             val aliasString = alias.cata(" as " + _, "")
             Terminal("IdentRelation" :: astType, Some(name + aliasString))
+          case VariRelationAST(vari, alias) =>
+            val aliasString = alias.cata(" as " + _, "")
+            Terminal("VariRelation" :: astType, Some(":" + vari.symbol + aliasString))
           case ExprRelationAST(select, alias) =>
             NonTerminal("ExprRelation" :: astType, Some("Expr as " + alias), ra.render(select) :: Nil)
           case TableRelationAST(name, alias) =>

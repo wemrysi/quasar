@@ -188,8 +188,8 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       case expr ~ ident => Proj(expr, ident)
     }
 
-  def variable: Parser[T[Sql]] =
-    elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => vari[T[Sql]](token.chars).embed)
+  def variable: Parser[Vari[T[Sql]]] =
+    elem("variable", _.isInstanceOf[lexical.Variable]) ^^ (token => Vari[T[Sql]](token.chars))
 
   def defined_expr: Parser[T[Sql]] =
     range_expr * (op("??") ^^^ (IfUndefined(_: T[Sql], _: T[Sql]).embed))
@@ -353,7 +353,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       case op ~ expr => op(expr).embed
     } |
     function_expr |
-    variable |
+    variable.map(_.embed) |
     literal |
     wildcard |
     array_literal |
@@ -415,6 +415,10 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       case ident ~ alias =>
         IdentRelationAST[T[Sql]](ident, alias)
     } |
+    variable ~ opt(keyword("as") ~> ident) ^^ {
+      case vari ~ alias =>
+        VariRelationAST[T[Sql]](vari, alias)
+    } |
     op("(") ~> (
       (expr ~ op(")") ~ keyword("as") ~ ident ^^ {
         case expr ~ _ ~ _ ~ alias => ExprRelationAST(expr, alias)
@@ -459,7 +463,4 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
 
   val parse: Query => ParsingError \/ T[Sql] =
     parse0(_).map(_.transAna(repeatedly(normalizeƒ)).makeTables(Nil))
-
-  def parseInContext(sql: Query, basePath: ADir): ParsingError \/ T[Sql] =
-    parse(sql).map(_.mkPathsAbsolute(basePath))
 }
