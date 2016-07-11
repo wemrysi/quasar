@@ -21,7 +21,7 @@ import quasar.Errors.convertError
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
 import quasar.fp._
-import quasar.fs._, PathyCodecJson._
+import quasar.fs._
 
 import java.io.File
 
@@ -33,6 +33,7 @@ import org.http4s.server._
 import org.http4s.server.staticcontent._
 import org.http4s.util._
 import pathy.Path, Path._
+import pathy.argonaut.PosixCodecJson._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 

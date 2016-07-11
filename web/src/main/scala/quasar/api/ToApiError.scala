@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.{Data, DataCodec, EnvironmentError, Planner, SemanticError}
 import quasar.RenderTree.ops._
 import quasar.fp._
-import quasar.fs._, PathyCodecJson._
+import quasar.fs._
 import quasar.fs.mount.{Mounting, MountingError}
 import quasar.sql._
 
@@ -29,6 +29,7 @@ import argonaut.ArgonautScalaz._
 import com.mongodb.MongoException
 import org.http4s._, Status._
 import pathy.Path._
+import pathy.argonaut.PosixCodecJson._
 import scalaz.NonEmptyList
 
 abstract class ToApiError[A] {
