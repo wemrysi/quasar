@@ -1,5 +1,7 @@
 import precog.PlatformBuild._
 
+lazy val blueeyes = ProjectRef(file("blueeyes").toURI, "core")
+
 lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, yggdrasil, mimir)
 
 /** This used to be the evaluator project.
@@ -20,11 +22,7 @@ lazy val common = project.setup dependsOn blueeyes deps (
   "com.google.code.findbugs"  % "jsr305"      % "3.0.1",
   "joda-time"                 % "joda-time"   % "1.6.2",
   "com.google.guava"          % "guava"       % "12.0.1",
-  "com.rubiconproject.oss"    % "jchronic"    %  "0.2.6"
-)
-lazy val blueeyes = project.setup deps blueeyesModule("core") deps (
-  // Neeed explicit versions to avoid version ranges burbling up
-  // and choking coursier.
-  "org.xsocket"   % "xSocket"   % "2.8.15",
-  "org.xlightweb" % "xlightweb" % "2.13.2"
+  "com.rubiconproject.oss"    % "jchronic"    % "0.2.6",
+  // Neeed explicit versions to avoid version ranges burbling up and choking coursier.
+  "org.xsocket"       % "xSocket"               % "2.8.15"
 )
