@@ -3,6 +3,8 @@ package precog
 import sbt._, Keys._
 
 object PlatformBuild {
+  val BothScopes = "compile->compile;test->test"
+
   def excludeBlacklist(m: ModuleID): ModuleID = ( m
     exclude("commons-codec", "commons-codec")
     exclude("javolution", "javolution")
@@ -24,7 +26,7 @@ object PlatformBuild {
       packagedArtifacts := Map()
     )
     def root: Project                                 = p in file(".")
-    def inBothScopes: ClasspathDependency             = p % "compile->compile;test->test"
+    def inBothScopes: ClasspathDependency             = p % BothScopes
     def inTestScope: ClasspathDependency              = p % "test->test"
     def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
     def also(s: Setting[_], ss: Setting[_]*): Project = also(s +: ss.toSeq)
@@ -37,7 +39,8 @@ object PlatformBuild {
                    javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
                    scalaVersion :=  "2.9.3",
       parallelExecution in Test :=  false,
-            logBuffered in Test :=  false
+            logBuffered in Test :=  false,
+                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
 
     )
   }
