@@ -43,12 +43,13 @@ object QueryFile {
 
   val qscript = new Transform[Fix, QScriptInternal[Fix, ?]]
   val optimize = new Optimize[Fix]
-  val elide = scala.Predef.implicitly[ElideBuckets.Aux[Fix, QScriptInternal[Fix, ?]]]
+  val elide = scala.Predef.implicitly[ElideBuckets.Aux[Fix, QScriptInternal[Fix, ?], QScriptProject[Fix, ?]]]
+
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptPure[Fix, ?]] =
+  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptProject[Fix, ?]] =
     _.transCataM(qscript.lpToQScript).evalZero.map(
       _.transCata(elide.purify ⋙ optimize.applyAll))
 

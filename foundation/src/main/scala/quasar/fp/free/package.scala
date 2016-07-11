@@ -52,13 +52,19 @@ package object free {
   def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] =
     liftFT[S] compose injectNT[F, S]
 
-  /** Given `F[_]` and `G[_]` such that `F :<: G`, lifts a natural transformation
-    * `F ~> F` to `G ~> G`.
+  /** Given `F[_]` and `G[_]` such that both `:<: H`, lifts a natural
+    * transformation `F ~> G` to `H ~> H`.
     */
-  def injectedNT[F[_], G[_]](f: F ~> F)(implicit G: F :<: G): G ~> G =
-    new (G ~> G) {
-      def apply[A](ga: G[A]) = G.prj(ga).fold(ga)(fa => G.inj(f(fa)))
+  object injectedNT {
+    def apply[H[_]] = new Aux[H]
+
+    final class Aux[H[_]] {
+      def apply[F[_], G[_]](f: F ~> G)(implicit F: F :<: H, G: G :<: H): H ~> H =
+        new (H ~> H) {
+          def apply[A](ga: H[A]) = F.prj(ga).fold(ga)(fa => G.inj(f(fa)))
+        }
     }
+  }
 
   /** `Free#liftF` as a natural transformation */
   def liftFT[S[_]]: S ~> Free[S, ?] =

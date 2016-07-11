@@ -17,6 +17,8 @@
 package quasar
 
 import quasar.Predef._
+import quasar.Planner._
+import quasar.namegen._
 
 import scala.Predef.implicitly
 
@@ -40,8 +42,11 @@ package object qscript {
     * structure, and it contains no Read or EquiJoin.
     */
   type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
+  type QScriptProject[T[_[_]], A] = Coproduct[ProjectBucket[T, ?], QScriptPure[T, ?], A]
 
-  type QScriptInternal[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], QScriptPure[T, ?], A]
+  type Bucketing[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], ProjectBucket[T, ?], A]
+
+  type QScriptInternal[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], QScriptProject[T, ?], A]
 
   /** These nodes exist in all QScript structures that a backend sees.
     */
@@ -79,6 +84,8 @@ package object qscript {
   type FreeQS[T[_[_]]] = FreeUnit[QScriptInternal[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
+
+  type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
 
   def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
 

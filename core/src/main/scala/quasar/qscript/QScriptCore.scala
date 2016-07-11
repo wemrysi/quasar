@@ -18,6 +18,8 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.namegen._
+import quasar.qscript.MapFuncs._
 
 import matryoshka._
 import monocle.macros.Lenses
@@ -27,6 +29,11 @@ import shapeless.{Fin, Nat, Sized, Succ}
 sealed abstract class QScriptCore[T[_[_]], A] {
   def src: A
 }
+
+/** A data-level transformation.
+  */
+@Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
+    extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
@@ -73,6 +80,7 @@ object QScriptCore {
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
+          case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
             b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
@@ -90,6 +98,7 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
+          case Map(a, func)       => f(a) ∘ (Map[T, B](_, func))
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
@@ -102,6 +111,9 @@ object QScriptCore {
     new Delay[Show, QScriptCore[T, ?]] {
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.show {
+          case Map(src, mf) => Cord("Map(") ++
+            s.show(src) ++ Cord(",") ++
+            mf.show ++ Cord(")")
           case Reduce(a, b, red, rep) => Cord("Reduce(") ++
             s.show(a) ++ Cord(",") ++
             b.show ++ Cord(",") ++
@@ -125,7 +137,7 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: EqualT]:
+  implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
       Mergeable.Aux[T, QScriptCore[T, Unit]] =
     new Mergeable[QScriptCore[T, Unit]] {
       type IT[F[_]] = T[F]
@@ -135,29 +147,41 @@ object QScriptCore {
         right: FreeMap[IT],
         p1: QScriptCore[IT, Unit],
         p2: QScriptCore[IT, Unit]) =
-        OptionT(state((p1, p2) match {
+        OptionT((p1, p2) match {
+          case (Map(_, m1), Map(_, m2)) => for {
+            lname <- freshName("leftMap")
+            rname <- freshName("rightMap")
+          } yield {
+            val lf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(lname)))
+            val rf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(rname)))
+
+            SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](Map((), Free.roll[MapFunc[IT, ?], Unit](
+              ConcatMaps(
+                Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(lname), rebase(m1, left))),
+                Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(rname), rebase(m2, right)))))),
+              lf, rf).some
+          }
           case (t1, t2) if t1 ≟ t2 =>
-            SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some
+            state(SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some)
           case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
             val mapL = rebase(bucket1, left)
             val mapR = rebase(bucket2, right)
 
-            if (mapL ≟ mapR)
+            state((mapL ≟ mapR).option(
               SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](
                 Reduce((), mapL, func1 // ++ func2 // TODO: append Sizeds
                   , rep1),
                 UnitF,
-                UnitF).some
-            else
-              None
+                UnitF)))
           }
-          case (_, _) => None
-        }))
+          case (_, _) =>
+            state((p1 ≟ p2).option(SrcMerge(p1, left, right)))
+        })
     }
 
-  implicit def bucketable[T[_[_]]: Corecursive]:
-      Bucketable.Aux[T, QScriptCore[T, ?]] =
-    new Bucketable[QScriptCore[T, ?]] {
+  implicit def diggable[T[_[_]]: Corecursive]:
+      Diggable.Aux[T, QScriptCore[T, ?]] =
+    new Diggable[QScriptCore[T, ?]] {
       type IT[G[_]] = T[G]
 
       def digForBucket[G[_]](fg: QScriptCore[T, IT[G]]) =
@@ -174,6 +198,7 @@ object QScriptCore {
     new Normalizable[QScriptCore[T, ?]] {
       def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
         def apply[A](qc: QScriptCore[T, A]) = qc match {
+          case Map(src, f) => Map(src, normalizeMapFunc(f))
           case Reduce(src, bucket, reducers, repair) =>
             Reduce(src, normalizeMapFunc(bucket), reducers.map(_.map(normalizeMapFunc(_))), normalizeMapFunc(repair))
           case Sort(src, bucket, order) =>

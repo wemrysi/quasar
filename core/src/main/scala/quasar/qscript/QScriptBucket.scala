@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
+import quasar.ejson, ejson.EJson
 
 import matryoshka._, Recursive.ops._
 import monocle.macros.Lenses
@@ -31,18 +32,6 @@ sealed abstract class QScriptBucket[T[_[_]], A] {
   src: A,
   values: FreeMap[T],
   bucket: FreeMap[T])
-    extends QScriptBucket[T, A]
-
-@Lenses final case class BucketField[T[_[_]], A](
-  src: A,
-  value: FreeMap[T],
-  name: FreeMap[T])
-    extends QScriptBucket[T, A]
-
-@Lenses final case class BucketIndex[T[_[_]], A](
-  src: A,
-  value: FreeMap[T],
-  index: FreeMap[T])
     extends QScriptBucket[T, A]
 
 @Lenses final case class LeftShiftBucket[T[_[_]], A](
@@ -63,10 +52,6 @@ object QScriptBucket {
         Equal.equal {
           case (GroupBy(a1, v1, b1), GroupBy(a2, v2, b2)) =>
             eq.equal(a1, a2) && v1 ≟ v2 && b1 ≟ b2
-          case (BucketField(a1, v1, n1), BucketField(a2, v2, n2)) =>
-            eq.equal(a1, a2) && v1 ≟ v2 && n1 ≟ n2
-          case (BucketIndex(a1, v1, i1), BucketIndex(a2, v2, i2)) =>
-            eq.equal(a1, a2) && v1 ≟ v2 && i1 ≟ i2
           case (LeftShiftBucket(a1, s1, r1, b1), LeftShiftBucket(a2, s2, r2, b2)) =>
             eq.equal(a1, a2) && s1 ≟ s2 && r1 ≟ r2 && b1 ≟ b2
           case (SquashBucket(a1), SquashBucket(a2)) =>
@@ -84,10 +69,6 @@ object QScriptBucket {
           G[QScriptBucket[T, B]] = fa match {
         case GroupBy(src, values, bucket) =>
           f(src) ∘ (GroupBy(_, values, bucket))
-        case BucketField(src, values, name) =>
-          f(src) ∘ (BucketField(_, values, name))
-        case BucketIndex(src, values, index) =>
-          f(src) ∘ (BucketIndex(_, values, index))
         case LeftShiftBucket(src, struct, repair, bucket) =>
           f(src) ∘ (LeftShiftBucket(_, struct, repair, bucket))
         case SquashBucket(src) =>
@@ -103,14 +84,6 @@ object QScriptBucket {
             sh.show(a) ++ Cord(",") ++
             v.show ++ Cord(",") ++
             b.show ++ Cord(")")
-          case BucketField(a, v, n) => Cord("BucketField(") ++
-            sh.show(a) ++ Cord(",") ++
-            v.show ++ Cord(",") ++
-            n.show ++ Cord(")")
-          case BucketIndex(a, v, i) => Cord("BucketIndex(") ++
-            sh.show(a) ++ Cord(",") ++
-            v.show ++ Cord(",") ++
-            i.show ++ Cord(")")
           case LeftShiftBucket(a, s, r, b) => Cord("LeftShiftBucket(") ++
             sh.show(a) ++ Cord(",") ++
             s.show ++ Cord(",") ++
@@ -121,7 +94,7 @@ object QScriptBucket {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Corecursive : EqualT]:
+  implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
       Mergeable.Aux[T, QScriptBucket[T, Unit]] =
     new Mergeable[QScriptBucket[T, Unit]] {
       type IT[F[_]] = T[F]
@@ -131,24 +104,21 @@ object QScriptBucket {
         right: FreeMap[IT],
         p1: QScriptBucket[IT, Unit],
         p2: QScriptBucket[IT, Unit]) =
-        OptionT(state {
-          if (p1 ≟ p2)
-            Some(SrcMerge[QScriptBucket[IT, Unit], FreeMap[T]](p1, left, right))
-          else
-            None
-        })
+        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
     }
 
-  implicit def bucketable[T[_[_]]: Corecursive]:
-      Bucketable.Aux[T, QScriptBucket[T, ?]] =
-    new Bucketable[QScriptBucket[T, ?]] {
+  implicit def diggable[T[_[_]]: Corecursive]:
+      Diggable.Aux[T, QScriptBucket[T, ?]] =
+    new Diggable[QScriptBucket[T, ?]] {
+      implicit val QB =
+        scala.Predef.implicitly[QScriptBucket[T, ?] :<: Bucketing[T, ?]]
+
       type IT[G[_]] = T[G]
 
-      // Int is number of buckets to skip
       def digForBucket[G[_]](fg: QScriptBucket[T, IT[G]]) =
         StateT(s =>
           if (s ≟ 0)
-            (fg match {
+            QB.inj(fg match {
               case LeftShiftBucket(src, struct, repair, bucket) =>
                 LeftShiftBucket(src, rebase(struct, bucket), repair, bucket)
               case x => x
@@ -157,18 +127,49 @@ object QScriptBucket {
             (s - 1, fg).right)
     }
 
-  def Z[T[_[_]]] = scala.Predef.implicitly[SourcedPathable[T, ?] :<: QScriptPure[T, ?]]
-
-  implicit def elideBuckets[T[_[_]]: Recursive]:
-      ElideBuckets.Aux[T, QScriptBucket[T, ?]] =
-    new ElideBuckets[QScriptBucket[T, ?]] {
+  implicit def bucketable[T[_[_]]: Corecursive]:
+      Bucketable.Aux[T, QScriptBucket[T, ?]] =
+    new Bucketable[QScriptBucket[T, ?]] {
       type IT[G[_]] = T[G]
 
-      def purify: QScriptBucket[T, InnerPure] => QScriptPure[IT, InnerPure] = {
-        case GroupBy(src, values, _) => Z[T].inj(Map(src, values))
-        case BucketField(src, value, name) => Z[T].inj(Map(src, Free.roll(MapFuncs.ProjectField(name, value))))
-        case BucketIndex(src, value, index) => Z[T].inj(Map(src, Free.roll(MapFuncs.ProjectIndex(index, value))))
-        case LeftShiftBucket(src, struct, repair, _) => Z[T].inj(LeftShift(src, struct, repair))
+      def applyBucket[G[_]: Functor](
+        ft: QScriptBucket[IT, IT[G]], inner: IT[G])(
+        f: (IT[G],
+            IT[G],
+            SrcMerge[ThetaJoin[IT, IT[G]], FreeMap[IT]] =>
+                (IT[G], FreeMap[IT], FreeMap[IT])) =>
+              QSState[(IT[G], FreeMap[IT], FreeMap[IT])])(
+        implicit TJ: ThetaJoin[IT, ?] :<: G) =
+        ft match {
+          case GroupBy(src, _, bucket) =>
+            f(
+              src,
+              inner,
+              { case SrcMerge(src, mfl, mfr) =>
+                (TJ.inj(src).embed, rebase(bucket, mfl), mfr)
+              })
+          case LeftShiftBucket(src, struct, _, bucket) =>
+            f(
+              src,
+              inner,
+              { case SrcMerge(src, mfl, mfr) =>
+                (TJ.inj(src).embed, rebase(rebase(struct, bucket), mfl), mfr)
+              })
+          case SquashBucket(src) =>
+            StateT.stateT((inner, Free.roll(Nullary(CommonEJson.inj(ejson.Null[T[EJson]]()).embed)), UnitF)) // singleton provenance - one big bucket
+        }
+    }
+
+  implicit def elideBuckets[T[_[_]]: Recursive, F[_]: Functor](
+    implicit QC: QScriptCore[T, ?] :<: F, SP: SourcedPathable[T, ?] :<: F):
+      ElideBuckets.Aux[T, QScriptBucket[T, ?], F] =
+    new ElideBuckets[QScriptBucket[T, ?]] {
+      type H[A] = F[A]
+      type IT[G[_]] = T[G]
+
+      def purify: QScriptBucket[T, T[H]] => H[IT[H]] = {
+        case GroupBy(src, values, _) => QC.inj(Map(src, values))
+        case LeftShiftBucket(src, struct, repair, _) => SP.inj(LeftShift(src, struct, repair))
         case SquashBucket(src) => src.project
       }
     }
