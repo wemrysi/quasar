@@ -1,7 +1,7 @@
 package blueeyes.core.service
 
 import org.specs2.mutable.Specification
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
 import blueeyes.parsers.W3ExtendedLogAST._
 
 class HttpRequestLoggerW3CFormatterSpec extends Specification {
@@ -17,6 +17,6 @@ class HttpRequestLoggerW3CFormatterSpec extends Specification {
     }
   }
 
-  private def decodeBase64(data: String) = new String(Base64.decodeBase64(data.substring(1, data.length - 1)), "UTF-8")
+  private def decodeBase64(data: String) = new String(Base64.getDecoder.decode(data.substring(1, data.length - 1)), "UTF-8")
 
 }

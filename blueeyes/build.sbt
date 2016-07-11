@@ -5,9 +5,7 @@ lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, bkka, 
 lazy val core = project.setup dependsOn (json, bkka, common % BothScopes) deps (
 
   "com.googlecode.concurrentlinkedhashmap" % "concurrentlinkedhashmap-lru" %      "1.1",
-  "commons-codec"                          % "commons-codec"               %      "1.5",
   "javolution"                             % "javolution"                  %     "5.5.1",
-  "joda-time"                              % "joda-time"                   %     "1.6.2",
   "io.netty"                               % "netty"                       %  "3.6.3.Final",
   "org.streum"                             % "configrity-core_2.9.2"       %     "1.0.0",
   "org.xlightweb"                          % "xlightweb"                   %     "2.13.2",

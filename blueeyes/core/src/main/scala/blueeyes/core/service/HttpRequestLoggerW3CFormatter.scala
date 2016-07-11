@@ -1,6 +1,6 @@
 package blueeyes.core.service
 
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
 import blueeyes.parsers.W3ExtendedLogAST.{ FieldsDirective, FieldIdentifier }
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -22,7 +22,7 @@ class HttpRequestLoggerW3CFormatter extends HttpRequestLoggerFormatter {
       .append(fieldsDirective.toString)
       .toString()
 
-  private def encodeBase64(value: Array[Byte]) = "\"" + new String(Base64.encodeBase64(value), "UTF-8") + "\""
+  private def encodeBase64(value: Array[Byte]) = "\"" + new String(Base64.getEncoder.encode(value), "UTF-8") + "\""
 }
 
 class HttpRequestLoggerW3CSFormatter extends HttpRequestLoggerFormatter {

@@ -17,4 +17,3 @@ ingest.*.log
 target/
 tools/lib/*
 yggdrasil/data
-/blueeyes

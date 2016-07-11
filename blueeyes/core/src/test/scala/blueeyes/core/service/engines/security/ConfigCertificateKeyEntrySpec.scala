@@ -3,7 +3,7 @@ package blueeyes.core.service.engines.security
 import org.specs2.mutable.Specification
 import org.streum.configrity.Configuration
 import org.streum.configrity.io.BlockFormat
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
 
 class ConfigCertificateKeyEntrySpec extends Specification with CertificateData {
   override def is = args(sequential = true) ^ super.is
@@ -35,5 +35,5 @@ server {
     entry must be(None)
   }
 
-  private def encode(content: Array[Byte]) = Base64.encodeBase64String(content).replaceAll("\r\n", "\n").trim
+  private def encode(content: Array[Byte]) = Base64.getEncoder.encodeToString(content).replaceAll("\r\n", "\n").trim
 }

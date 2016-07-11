@@ -9,7 +9,7 @@ import org.joda.time.format.DateTimeFormat
 import java.net.InetAddress
 import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.core.data.DefaultBijections._
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
 
 import blueeyes.bkka.AkkaDefaults
 import blueeyes.akka_testing.FutureMatchers

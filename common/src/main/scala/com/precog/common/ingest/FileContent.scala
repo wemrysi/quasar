@@ -31,7 +31,6 @@ import Versioned._
 import Extractor._
 
 import slamdata.java.util.Base64
-// import org.apache.commons.codec.binary.Base64
 
 import scalaz._
 import scalaz.syntax.apply._

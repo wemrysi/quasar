@@ -1,6 +1,6 @@
 package blueeyes.core.service.engines.security
 
-import org.apache.commons.codec.binary.Base64
+import slamdata.java.util.Base64
 import org.specs2.mutable.Specification
 import EncoderUtil._
 
@@ -13,7 +13,7 @@ class CertificateDecoderSpec extends Specification with CertificateData {
     encode(entry._2.getEncoded) mustEqual (encodedCertificate)
   }
 
-  private def encode(content: Array[Byte]) = unify(Base64.encodeBase64String(content))
+  private def encode(content: Array[Byte]) = unify(Base64.getEncoder.encodeToString(content))
 }
 
 class CertificateEncoderSpec extends Specification with CertificateData {
