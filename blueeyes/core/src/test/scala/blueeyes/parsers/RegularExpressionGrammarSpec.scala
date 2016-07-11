@@ -1,4 +1,5 @@
-package blueeyes.parsers
+package blueeyes
+package parsers
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck

@@ -1,4 +1,5 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.NANOSECONDS

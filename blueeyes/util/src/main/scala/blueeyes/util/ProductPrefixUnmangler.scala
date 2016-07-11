@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 trait ProductPrefixUnmangler {
   def productPrefix: String

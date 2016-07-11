@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.core.http.HttpHeaders._

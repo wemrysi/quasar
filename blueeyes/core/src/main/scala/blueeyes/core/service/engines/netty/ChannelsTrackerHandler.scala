@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.netty
+package blueeyes
+package core.service.engines.netty
 
 import org.jboss.netty.channel.group.ChannelGroup
 import org.jboss.netty.channel.{ ChannelStateEvent, ChannelHandlerContext, SimpleChannelUpstreamHandler }

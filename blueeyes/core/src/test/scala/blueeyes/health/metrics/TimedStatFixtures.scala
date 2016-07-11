@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import org.joda.time.DateTime
 import org.joda.time.Instant

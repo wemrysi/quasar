@@ -1,8 +1,8 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import blueeyes.json.JPath
 import blueeyes.util.ClockSystem
-import akka.dispatch.Future
 
 private[health] trait FunctionsMonitor {
   def time[T](path: JPath)(f: => T): T = {

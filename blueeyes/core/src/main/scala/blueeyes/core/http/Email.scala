@@ -1,7 +1,8 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
-import util.parsing.combinator._
-import util.parsing.input.CharSequenceReader
+import scala.util.parsing.combinator._
+import scala.util.parsing.input.CharSequenceReader
 
 case class Email(email: String)
 

@@ -1,4 +1,5 @@
-package blueeyes.health.metrics.histogram
+package blueeyes
+package health.metrics.histogram
 
 import blueeyes.health.metrics.Timer
 

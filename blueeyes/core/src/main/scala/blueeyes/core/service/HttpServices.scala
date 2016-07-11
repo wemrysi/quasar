@@ -1,8 +1,5 @@
-package blueeyes.core.service
-
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
+package blueeyes
+package core.service
 
 import blueeyes.bkka._
 import blueeyes.core.data._

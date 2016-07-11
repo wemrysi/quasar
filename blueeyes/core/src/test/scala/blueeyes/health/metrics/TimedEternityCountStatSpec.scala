@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import blueeyes.json._
 import org.specs2.mutable.Specification

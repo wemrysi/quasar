@@ -1,4 +1,5 @@
-package blueeyes.json
+package blueeyes
+package json
 
 // context used by JParser, taken from jawn under MIT license.
 // (https://github.com/non/jawn)

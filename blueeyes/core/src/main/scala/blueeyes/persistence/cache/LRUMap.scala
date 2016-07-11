@@ -1,6 +1,6 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
-import scala.collection.mutable.Map
 import java.util.{ Map => JavaMap, LinkedHashMap }
 import java.util.concurrent.{ ConcurrentMap => JavaConcurrentMap }
 
@@ -10,12 +10,7 @@ private[cache] class LRUMap[K, V](evicter: (K, V) => Unit, maximumWeightedCapaci
   private var totalWeight: Int = 0
 
   private def evict(key: K, value: V) = {
-    try {
-      evicter(key, value)
-    } catch {
-      case e => e.printStackTrace
-    }
-
+    evicter(key, value)
     decrementTotalWeight(value)
   }
 

@@ -1,13 +1,10 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import blueeyes.json.JPath
 import blueeyes.json._
 import blueeyes.json.MergeMonoid
 import metrics.IntervalConfig
-
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-import akka.util.Timeout
 
 import scalaz._
 import scalaz.std.list._

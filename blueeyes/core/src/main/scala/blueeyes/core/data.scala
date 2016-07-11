@@ -1,17 +1,12 @@
-package blueeyes.core
+package blueeyes
+package core
 
 import blueeyes.util.metrics.DataSize
-
 import blueeyes.bkka._
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
-
 import java.util.Arrays
 import java.nio.ByteBuffer
 
 import scalaz._
-
 import scala.math.max
 import scala.collection.mutable.ListBuffer
 

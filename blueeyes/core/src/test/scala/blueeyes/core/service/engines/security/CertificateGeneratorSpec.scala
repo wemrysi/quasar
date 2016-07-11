@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.security
+package blueeyes
+package core.service.engines.security
 
 import org.specs2.mutable.Specification
 

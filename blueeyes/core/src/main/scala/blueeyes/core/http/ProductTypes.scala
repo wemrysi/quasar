@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import scalaz.syntax.std.boolean._
 

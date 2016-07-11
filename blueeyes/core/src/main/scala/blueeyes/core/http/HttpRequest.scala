@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import blueeyes.core.http.HttpVersions._
 import blueeyes.json._

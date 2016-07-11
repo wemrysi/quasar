@@ -1,8 +1,8 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.bkka._
 
-import akka.dispatch.Future
 import akka.dispatch.Future._
 
 import org.specs2.mock._

@@ -1,9 +1,9 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import org.specs2.mutable.Specification
 import blueeyes.util.printer.HtmlPrinter
 import blueeyes.core.http.{ HttpResponse, HttpRequest }
-import akka.dispatch.Future
 
 import org.streum.configrity.Configuration
 import org.streum.configrity.io.BlockFormat

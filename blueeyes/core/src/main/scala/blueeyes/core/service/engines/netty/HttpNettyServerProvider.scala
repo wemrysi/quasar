@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 package engines.netty
 
 import blueeyes.core.data._

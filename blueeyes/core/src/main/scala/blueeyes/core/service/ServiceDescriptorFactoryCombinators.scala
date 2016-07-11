@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.bkka._
 import blueeyes.core.data._
@@ -28,7 +29,7 @@ import org.slf4s.Logging
 
 import java.util.Calendar
 import printer.HtmlPrinter
-import util.matching.Regex
+import scala.util.matching.Regex
 import IntervalLength._
 
 import scalaz._

@@ -1,6 +1,6 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
-import akka.dispatch.Future
 import akka.dispatch.Await
 import akka.util._
 

@@ -1,4 +1,5 @@
-package blueeyes.json.serialization
+package blueeyes
+package json.serialization
 
 import blueeyes.json._
 import java.util.{ Date => JDate }

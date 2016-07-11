@@ -1,4 +1,5 @@
-package blueeyes.core
+package blueeyes
+package core
 
 package object http
     extends HttpHeadersImplicits

@@ -1,7 +1,7 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 package engines.netty
 
-import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.dispatch.Await
 

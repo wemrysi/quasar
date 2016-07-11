@@ -1,4 +1,5 @@
-package blueeyes.util.metrics
+package blueeyes
+package util.metrics
 
 case class DataSize(size: Double, unit: DataSizeUnit) {
   def bytes         = convert(Bytes)

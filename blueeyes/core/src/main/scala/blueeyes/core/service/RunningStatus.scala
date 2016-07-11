@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 /**
   * The status of a service, which can be starting, started, stopping, stopped,

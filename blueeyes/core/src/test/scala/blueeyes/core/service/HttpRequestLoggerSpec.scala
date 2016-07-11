@@ -1,9 +1,9 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import org.specs2.mutable.Specification
 import blueeyes.parsers.W3ExtendedLogAST._
 import blueeyes.core.http._
-import akka.dispatch.Future
 import blueeyes.util.ClockMock
 import org.joda.time.format.DateTimeFormat
 import java.net.InetAddress

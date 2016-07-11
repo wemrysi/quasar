@@ -1,12 +1,10 @@
-package blueeyes.akka_testing
+package blueeyes
+package akka_testing
 
-import akka.dispatch.Future
-import akka.dispatch.Await
-import akka.util.Duration
+import akka.dispatch._, akka.util.Duration, akka.util.Duration._
 import akka.util.DurationLong
-import akka.util.duration._
-
 import blueeyes.util.RichThrowableImplicits._
+import akka.util.duration._
 
 import org.specs2.matcher._
 import org.specs2.execute.FailureException
@@ -15,8 +13,11 @@ import scala.annotation.tailrec
 import java.util.concurrent.{ TimeoutException, CountDownLatch }
 
 trait AkkaConversions {
-  implicit def specsDuration2Akka(duration: org.specs2.time.Duration): akka.util.Duration = new DurationLong(duration.inMillis).millis
-  implicit def specsDuration2Rich(duration: org.specs2.time.Duration)                     = new RichSpecsDuration(duration)
+  implicit def specsDuration2Akka(duration: org.specs2.time.Duration): Duration =
+    new DurationLong(duration.inMillis).millis
+
+  implicit def specsDuration2Rich(duration: org.specs2.time.Duration): RichSpecsDuration =
+    new RichSpecsDuration(duration)
 
   class RichSpecsDuration(duration: org.specs2.time.Duration) {
     def toAkka = specsDuration2Akka(duration)

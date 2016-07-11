@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.netty
+package blueeyes
+package core.service.engines.netty
 
 import blueeyes.core.service.engines.InetInterfaceLookup
 

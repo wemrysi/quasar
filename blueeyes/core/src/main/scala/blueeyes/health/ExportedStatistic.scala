@@ -1,4 +1,5 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import blueeyes.json.JValue
 import metrics.{ SyncStatistic }

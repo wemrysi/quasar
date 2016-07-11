@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.servlet
+package blueeyes
+package core.service.engines.servlet
 
 import javax.servlet.Servlet
 import org.eclipse.jetty.server.Server

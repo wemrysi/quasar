@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 import blueeyes.util.ProductPrefixUnmangler
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._

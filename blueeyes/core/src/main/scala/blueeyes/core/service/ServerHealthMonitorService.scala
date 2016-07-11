@@ -1,7 +1,6 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
-import akka.dispatch.ExecutionContext
-import akka.dispatch.Future
 import akka.util.Timeout
 
 import blueeyes.bkka._

@@ -19,9 +19,7 @@
  */
 package com.precog.util
 
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
-import org.scalacheck._
+import org.specs2._, mutable.Specification
 
 object RingDequeSpecs extends Specification with ScalaCheck {
   implicit val params = set(

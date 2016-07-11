@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 class HttpStatus private (val code: HttpStatusCode, unsafeReason: String) {
   val reason = unsafeReason.replaceAll("[\\r\\n]", " ")

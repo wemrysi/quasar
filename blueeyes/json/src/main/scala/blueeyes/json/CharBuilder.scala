@@ -1,4 +1,5 @@
-package blueeyes.json
+package blueeyes
+package json
 
 // efficient char-by-char string builder, taken from jawn under MIT license.
 // (https://github.com/non/jawn)

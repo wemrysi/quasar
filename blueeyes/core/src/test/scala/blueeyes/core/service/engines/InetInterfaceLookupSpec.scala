@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines
+package blueeyes
+package core.service.engines
 
 import org.specs2.mutable.Specification
 import org.streum.configrity.Configuration

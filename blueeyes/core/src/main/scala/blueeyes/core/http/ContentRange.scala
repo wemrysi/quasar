@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
@@ -6,7 +7,7 @@ import scala.util.parsing.input._
 
 sealed trait ContentByteRange {
 
-  def unit: String // Usually "bytes 
+  def unit: String // Usually "bytes
 
   def bytePair: ByteRanges.BytePair // From the ByteRange class
 

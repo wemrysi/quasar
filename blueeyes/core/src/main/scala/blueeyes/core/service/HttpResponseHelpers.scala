@@ -1,12 +1,10 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.util.RichThrowableImplicits._
 import blueeyes.core.http._
 import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.core.http.HttpVersions._
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
 
 trait HttpResponseHelpers {
 

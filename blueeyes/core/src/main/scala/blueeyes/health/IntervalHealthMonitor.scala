@@ -1,10 +1,7 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import metrics._
-
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
-import akka.util.Timeout
 
 import blueeyes.json.{ JPathIndex, JPathNode, JPathField, JPath }
 import blueeyes.json._

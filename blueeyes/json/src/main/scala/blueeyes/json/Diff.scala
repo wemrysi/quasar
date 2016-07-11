@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package blueeyes.json
+package blueeyes
+package json
 
 /** A difference between two JSONs (j1 diff j2).
   */

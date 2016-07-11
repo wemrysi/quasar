@@ -1,4 +1,5 @@
-package blueeyes.util.printer
+package blueeyes
+package util.printer
 
 import blueeyes._
 import scala.collection.mutable.StringBuilder

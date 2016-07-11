@@ -1,9 +1,8 @@
-package blueeyes.core.http.combinators
+package blueeyes
+package core.http.combinators
 
 import blueeyes.core.http.{ HttpRequest, HttpResponse, HttpException, HttpStatus }
 import blueeyes.core.http.HttpStatusCodes._
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
 
 /**
   *

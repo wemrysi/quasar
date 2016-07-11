@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import org.specs2.mutable.Specification
 
@@ -6,7 +7,6 @@ import blueeyes.core.http._
 import blueeyes.util.printer._
 import blueeyes.core.http.HttpMethods._
 import RestPathPatternParsers._
-import akka.dispatch.Future
 import blueeyes.bkka.AkkaDefaults
 
 class MetadataSpec extends Specification with HttpRequestHandlerCombinators with AkkaDefaults {

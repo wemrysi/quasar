@@ -1,8 +1,8 @@
-package blueeyes.core.service.engines.security
+package blueeyes
+package core.service.engines.security
 
 import blueeyes.bkka.AkkaDefaults
 import org.slf4s.Logging
-import akka.dispatch.Future
 import java.lang.ProcessBuilder
 import java.io.{ InputStream, ByteArrayOutputStream }
 

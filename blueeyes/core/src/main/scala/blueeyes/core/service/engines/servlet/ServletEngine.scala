@@ -1,13 +1,10 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 package engines.servlet
 
 import blueeyes.bkka._
 import blueeyes.core.data._
 import blueeyes.core.http.HttpResponse
-
-import akka.dispatch.{ Promise, Future, ExecutionContext, Await }
-import akka.util.Timeout
-import akka.util.FiniteDuration
 
 import java.io.OutputStream
 import java.nio.ByteBuffer

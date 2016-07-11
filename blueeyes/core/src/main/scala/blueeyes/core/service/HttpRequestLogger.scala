@@ -1,13 +1,11 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.bkka._
 import blueeyes.core.data._
 import blueeyes.core.http.{ HttpRequest, HttpResponse, HttpHeaders }
 import blueeyes.parsers.W3ExtendedLogAST.FieldIdentifier
 import blueeyes.util.Clock
-
-import akka.dispatch.Future
-import akka.dispatch.Promise
 
 import java.net.InetAddress
 import org.joda.time.format.DateTimeFormat

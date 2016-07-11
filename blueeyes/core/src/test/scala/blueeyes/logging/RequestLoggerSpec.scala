@@ -1,4 +1,5 @@
-package blueeyes.logging
+package blueeyes
+package logging
 
 import org.specs2.mutable.Specification
 import blueeyes.parsers.W3ExtendedLogAST._

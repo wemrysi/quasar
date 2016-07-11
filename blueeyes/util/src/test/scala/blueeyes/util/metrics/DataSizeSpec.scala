@@ -1,4 +1,5 @@
-package blueeyes.util.metrics
+package blueeyes
+package util.metrics
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck

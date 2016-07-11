@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._

@@ -1,4 +1,5 @@
-package blueeyes.bkka
+package blueeyes
+package bkka
 
 import org.specs2.mutable.Specification
 import akka.actor.Actor

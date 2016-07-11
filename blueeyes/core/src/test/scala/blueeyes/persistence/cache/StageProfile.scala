@@ -1,11 +1,11 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import java.util.concurrent.TimeUnit.{ MILLISECONDS }
 import java.util.concurrent.CountDownLatch
 import scala.util.Random
 import scalaz.Semigroup
 
-import akka.dispatch.Future
 import akka.dispatch.Future._
 import akka.actor.Actor
 import akka.actor.Props

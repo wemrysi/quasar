@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import org.specs2.mutable.Specification
 
@@ -9,7 +10,6 @@ import blueeyes.core.data._
 import HttpStatusCodes._
 import DefaultBijections._
 
-import akka.dispatch.Future
 
 import java.net.InetAddress
 import java.nio.ByteBuffer

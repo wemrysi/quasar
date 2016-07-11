@@ -1,10 +1,8 @@
-package blueeyes.core
+package blueeyes
+package core
 
 import blueeyes.core.http._
 import blueeyes.core.data._
-
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
 
 import scalaz._
 import scalaz.syntax.traverse._

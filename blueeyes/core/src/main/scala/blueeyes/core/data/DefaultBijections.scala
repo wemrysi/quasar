@@ -1,11 +1,9 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
 import blueeyes.bkka._
 import blueeyes.json._
 import blueeyes.json.JParser
-
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
 
 import java.nio.ByteBuffer
 

@@ -1,4 +1,5 @@
-package blueeyes.util.metrics
+package blueeyes
+package util.metrics
 
 sealed trait DataSizeUnit {
   def abbreviation: String

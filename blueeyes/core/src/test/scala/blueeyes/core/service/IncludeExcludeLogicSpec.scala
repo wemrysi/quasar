@@ -1,7 +1,8 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import org.specs2.mutable.Specification
-import util.matching.Regex
+import scala.util.matching.Regex
 
 class IncludeExcludeLogicSpec extends Specification {
   "IncludeExcludeLogic" should {

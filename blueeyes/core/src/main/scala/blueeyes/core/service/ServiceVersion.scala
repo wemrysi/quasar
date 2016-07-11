@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 case class ServiceVersion(majorVersion: Int, minorVersion: Int, version: String) {
   def vname = "v" + majorVersion

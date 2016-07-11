@@ -1,4 +1,5 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
 import blueeyes.json.JValue
 import scala.xml.NodeSeq

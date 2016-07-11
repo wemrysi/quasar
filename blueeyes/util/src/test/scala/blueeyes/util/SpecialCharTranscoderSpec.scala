@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 import org.specs2.mutable.Specification
 

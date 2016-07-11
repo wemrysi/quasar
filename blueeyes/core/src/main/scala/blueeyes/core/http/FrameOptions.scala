@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import blueeyes.util.ProductPrefixUnmangler
 /* For use in the X-Frame-Options Header */

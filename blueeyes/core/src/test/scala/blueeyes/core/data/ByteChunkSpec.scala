@@ -1,6 +1,6 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
-import akka.dispatch.Future
 import blueeyes.bkka._
 
 import java.nio.ByteBuffer

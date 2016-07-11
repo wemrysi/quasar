@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 import QueryParser._
 import java.net.URI

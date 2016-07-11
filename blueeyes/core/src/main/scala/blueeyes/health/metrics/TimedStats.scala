@@ -1,9 +1,9 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import blueeyes.json._
 import blueeyes.util.Clock
 import akka.actor.Actor
-import akka.dispatch.Future
 import akka.util.Timeout
 
 private[metrics] trait TimedAverageStatReport extends AsyncStatistic[Long, Map[Long, Double]] {

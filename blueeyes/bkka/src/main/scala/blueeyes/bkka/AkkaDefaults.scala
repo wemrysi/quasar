@@ -1,7 +1,6 @@
-package blueeyes.bkka
+package blueeyes
+package bkka
 
-import akka.actor.ActorSystem
-import akka.dispatch.Future
 import akka.dispatch.MessageDispatcher
 
 import scalaz._

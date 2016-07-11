@@ -1,7 +1,7 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import akka.actor.Actor
-import akka.dispatch.Future
 import akka.util.Timeout
 
 import java.util.concurrent.atomic.AtomicLong

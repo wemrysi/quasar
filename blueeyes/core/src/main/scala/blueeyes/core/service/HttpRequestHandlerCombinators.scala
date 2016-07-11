@@ -1,4 +1,5 @@
-package blueeyes.core
+package blueeyes
+package core
 package service
 
 import http._
@@ -6,8 +7,6 @@ import http.HttpHeaders._
 import http.HttpStatusCodes._
 import data._
 
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
 import blueeyes.json._
 import blueeyes.util.metrics.DataSize
 

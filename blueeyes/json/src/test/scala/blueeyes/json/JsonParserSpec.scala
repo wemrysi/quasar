@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package blueeyes.json
+package blueeyes
+package json
 
 import _root_.org.scalacheck.Prop._
 import org.specs2.mutable.Specification

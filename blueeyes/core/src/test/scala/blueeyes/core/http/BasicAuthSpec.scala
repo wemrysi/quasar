@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import slamdata.java.util.Base64
 import org.specs2.mutable.Specification

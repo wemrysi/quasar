@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 package engines.netty
 
 import org.jboss.netty.handler.codec.http.{ HttpResponse => NettyHttpResponse, DefaultHttpResponse => NettyDefaultHttpResponse, HttpResponseStatus => NettyHttpResponseStatus, HttpVersion => NettyHttpVersion }
@@ -41,30 +42,6 @@ class HttpServiceUpstreamHandlerSpec extends Specification with Mockito with Log
     HttpResponse[ByteChunk](HttpStatus(HttpStatusCodes.OK), Map("retry-after" -> "1"), Some(ByteChunk("12".getBytes("UTF-8"))), HttpVersions.`HTTP/1.1`)
 
   override def is = args(sequential = true) ^ super.is
-
-  /* FIXME
-  "write OK response service when path is match" in {
-    val nettyHandler  = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)
-
-    val event        = mock[MessageEvent]
-    val future       = Promise.successful(response)
-    val nettyMessage = toNettyResponse(response, true)
-    val nettyContent = new StreamChunkedInput(StreamT.empty[Future, ByteBuffer], channel)
-
-    when(event.getMessage()).thenReturn(request, request)
-    when(handler.service).thenReturn(service)
-    when(service.apply(request)).thenReturn(Success(future))
-    when(event.getChannel()).thenReturn(channel)
-    when(event.getChannel().isConnected).thenReturn(true)
-    when(channel.write(Matchers.argThat(new RequestMatcher(nettyMessage)))).thenReturn(channelFuture)
-    when(channel.write(Matchers.argThat(new ContentMatcher(nettyContent)))).thenReturn(channelFuture)
-
-    nettyHandler.messageReceived(context, event)
-    Thread.sleep(2000)
-
-    there was one(channelFuture).addListener(ChannelFutureListener.CLOSE)
-  }
-   */
 
   "cancel Future when connection closed" in {
     val nettyHandler = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)

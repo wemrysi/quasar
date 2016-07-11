@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.parsers.W3ExtendedLogAST.{ FieldsDirective, FieldIdentifier }
 

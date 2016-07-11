@@ -1,11 +1,11 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
 import blueeyes.bkka._
 import blueeyes.json._
 import blueeyes.akka_testing.FutureMatchers
 
 import akka.dispatch.Await
-import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 import akka.util.Duration
 

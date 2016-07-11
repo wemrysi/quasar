@@ -1,10 +1,8 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import blueeyes.bkka.AkkaDefaults
 import blueeyes.json.JValue
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.util.Timeout
 
 sealed trait Statistic[-T] {
   def +=(element: T): this.type

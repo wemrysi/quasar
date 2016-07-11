@@ -1,4 +1,5 @@
-package blueeyes.parsers
+package blueeyes
+package parsers
 
 import org.scalacheck._
 import Gen._

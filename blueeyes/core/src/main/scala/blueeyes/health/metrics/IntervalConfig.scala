@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._

@@ -1,4 +1,5 @@
-package blueeyes.parsers
+package blueeyes
+package parsers
 
 import scala.util.parsing.combinator._
 import W3ExtendedLogAST._

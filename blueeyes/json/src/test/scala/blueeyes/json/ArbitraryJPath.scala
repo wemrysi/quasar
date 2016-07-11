@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package blueeyes.json
+package blueeyes
+package json
 
 import org.scalacheck.{ Gen, Arbitrary }
 import Arbitrary.arbitrary

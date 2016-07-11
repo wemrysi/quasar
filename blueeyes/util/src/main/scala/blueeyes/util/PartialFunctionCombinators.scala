@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 trait PartialFunctionCombinators {
   implicit def partialFunctionRequestHandlerCombinatorSugar[A, B](p1: PartialFunction[A, B]) = new PartialFunctionRequestHandlerCombinatorSugar(p1)

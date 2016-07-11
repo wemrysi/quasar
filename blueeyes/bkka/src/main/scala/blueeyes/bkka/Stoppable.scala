@@ -1,4 +1,5 @@
-package blueeyes.bkka
+package blueeyes
+package bkka
 
 import akka.actor.Actor
 import akka.actor.ActorRef

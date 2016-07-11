@@ -1,6 +1,6 @@
-package blueeyes.bkka
+package blueeyes
+package bkka
 
-import akka.dispatch.Future
 import scalaz.Monad
 
 trait TestAkkaDefaults extends AkkaDefaults {

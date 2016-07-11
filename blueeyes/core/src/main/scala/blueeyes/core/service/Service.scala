@@ -1,12 +1,12 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
-import akka.dispatch.Future
 import blueeyes.bkka.Stoppable
 import scalaz.std.option._
 import scalaz.syntax.semigroup._
 
 /**
-  * An http service, which responds to http requests with http responses. 
+  * An http service, which responds to http requests with http responses.
   * Services are typed in whatever type is required by the server engine.
   * For example, some server engines might only deal with strings.
   */

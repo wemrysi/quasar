@@ -1,4 +1,5 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import scala.collection.mutable.ConcurrentMap
 
@@ -6,8 +7,8 @@ import java.util.Set
 import java.util.concurrent.{ ConcurrentHashMap => JConcurrentHashMap, ConcurrentMap => JConcurrentMap, ScheduledExecutorService, TimeUnit }
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
-/** A ExpirableMap is a key/value store backed by a Java map, where entries 
-  * expire both when the cache reaches a user-defined maximum size, and after 
+/** A ExpirableMap is a key/value store backed by a Java map, where entries
+  * expire both when the cache reaches a user-defined maximum size, and after
   * user-defined time to idle, time to live. The ExpirableMap class extends
   * Scala's mutable concurrent map trait.
   */

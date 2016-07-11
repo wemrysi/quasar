@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 /** Transcodes special characters using an escape character.
   */

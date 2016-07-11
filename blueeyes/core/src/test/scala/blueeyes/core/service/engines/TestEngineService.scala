@@ -1,10 +1,10 @@
-package blueeyes.core.service.engines
+package blueeyes
+package core.service.engines
 
 import blueeyes.bkka._
 import blueeyes.core.service._
 import security._
 
-import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.dispatch.ExecutionContext
 

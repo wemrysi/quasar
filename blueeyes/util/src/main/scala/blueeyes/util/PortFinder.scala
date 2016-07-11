@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 import java.net.{ InetSocketAddress, ServerSocket }
 

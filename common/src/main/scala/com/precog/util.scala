@@ -21,8 +21,8 @@ package com.precog
 
 import scalaz.Monoid
 
+import blueeyes._
 import org.joda.time.Instant
-import akka.dispatch.Future
 import java.util.Comparator
 import java.nio.ByteBuffer
 import scala.collection.mutable

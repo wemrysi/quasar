@@ -1,6 +1,7 @@
-package blueeyes.parsers
+package blueeyes
+package parsers
 
-import util.parsing.input.CharSequenceReader
+import scala.util.parsing.input.CharSequenceReader
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAllNoShrink
 import W3ExtendedLogAST._

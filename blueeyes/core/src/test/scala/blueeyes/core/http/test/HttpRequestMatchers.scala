@@ -1,10 +1,10 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 package test
 
 import blueeyes.akka_testing.FutureMatchers
 import org.specs2.mutable.Specification
 import org.specs2.matcher._
-import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 import akka.util.Duration
 

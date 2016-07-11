@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 sealed trait HttpMethod extends Product {
   def value = productPrefix

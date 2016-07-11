@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.security
+package blueeyes
+package core.service.engines.security
 
 import java.io.{ File, FileInputStream }
 import java.security.KeyStore

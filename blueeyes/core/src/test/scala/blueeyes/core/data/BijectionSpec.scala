@@ -1,4 +1,5 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
 import DefaultBijections._
 import org.specs2.mutable.Specification

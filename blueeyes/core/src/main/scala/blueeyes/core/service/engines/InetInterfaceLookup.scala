@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines
+package blueeyes
+package core.service.engines
 
 import org.streum.configrity.Configuration
 import java.net.{ InetAddress, InetSocketAddress }

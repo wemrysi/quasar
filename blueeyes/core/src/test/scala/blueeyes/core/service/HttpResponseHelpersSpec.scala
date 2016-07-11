@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.bkka._
 
@@ -7,7 +8,6 @@ import blueeyes.core.http._
 import blueeyes.akka_testing.FutureMatchers
 import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.util.RichThrowableImplicits._
-import akka.dispatch.Future
 import akka.dispatch.Promise
 
 class HttpResponseHelpersSpec extends Specification with HttpResponseHelpers with FutureMatchers with TestAkkaDefaults {

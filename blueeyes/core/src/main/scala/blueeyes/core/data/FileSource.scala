@@ -1,11 +1,7 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
-import blueeyes.bkka._
-
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
-
+import bkka._
 import java.nio.ByteBuffer
 import java.nio.channels._
 import java.io.{ OutputStream, FileOutputStream, RandomAccessFile, File }

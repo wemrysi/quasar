@@ -1,4 +1,5 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import org.specs2.mutable.Specification
 import blueeyes.json.JNum

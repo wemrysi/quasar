@@ -1,4 +1,5 @@
-package blueeyes.core.service.engines.security
+package blueeyes
+package core.service.engines.security
 
 trait CertificateData {
   val encodedCertificate = """MIIC1TCCApOgAwIBAgIETPAdVDALBgcqhkjOOAQDBQAwTjELMAkGA1UEBhMCQVUxETAPBgNVBAgT

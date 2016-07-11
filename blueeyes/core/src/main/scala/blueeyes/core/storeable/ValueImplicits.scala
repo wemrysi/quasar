@@ -1,4 +1,5 @@
-package blueeyes.core.storeable
+package blueeyes
+package core.storeable
 
 import blueeyes.json.JValue
 import org.joda.time.DateTime

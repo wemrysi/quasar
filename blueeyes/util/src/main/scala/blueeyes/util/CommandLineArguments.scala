@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 case class CommandLineArguments private (parameters: Map[String, String], values: List[String]) {
   def +(that: CommandLineArguments): CommandLineArguments = new CommandLineArguments(this.parameters ++ that.parameters, this.values ++ that.values)

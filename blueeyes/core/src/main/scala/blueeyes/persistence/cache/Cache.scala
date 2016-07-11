@@ -1,4 +1,5 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import scala.collection.mutable.{ Map, ConcurrentMap }
 

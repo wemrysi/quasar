@@ -1,7 +1,5 @@
-package blueeyes.core.service
-
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
+package blueeyes
+package core.service
 
 import blueeyes.core.data._
 import blueeyes.core.http.{ HttpResponse, HttpRequest }

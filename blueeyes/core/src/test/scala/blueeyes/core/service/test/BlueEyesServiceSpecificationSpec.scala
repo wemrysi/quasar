@@ -1,6 +1,6 @@
-package blueeyes.core.service.test
+package blueeyes
+package core.service.test
 
-import akka.dispatch.Future
 import akka.dispatch.Promise
 
 import blueeyes.BlueEyesServiceBuilder

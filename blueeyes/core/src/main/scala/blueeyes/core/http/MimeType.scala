@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import scala.util.matching.Regex
 import blueeyes.util.ProductPrefixUnmangler

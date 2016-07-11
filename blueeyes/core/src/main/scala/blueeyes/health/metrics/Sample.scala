@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import histogram.{ DynamicLengthBucketsStrategy, StaticHistogram }
 import java.util.concurrent.atomic.AtomicLong

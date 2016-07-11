@@ -1,14 +1,11 @@
-package blueeyes.core.service.engines.servlet
+package blueeyes
+package core.service.engines.servlet
 
 import blueeyes.bkka._
 import blueeyes.core.data.ByteChunk
 import blueeyes.core.http._
 import blueeyes.core.http.HttpHeaders._
 import blueeyes.core.http.HttpVersions._
-
-import akka.util.Timeout
-import akka.dispatch.Future
-import akka.dispatch.ExecutionContext
 
 import java.io.{ ByteArrayOutputStream, InputStream }
 import java.nio.ByteBuffer

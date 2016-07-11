@@ -1,9 +1,7 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import blueeyes.util.metrics.Duration
-import Duration._
+import blueeyes.util.metrics.Duration, Duration._
 import org.specs2.mutable.Specification
 import java.util.concurrent.TimeUnit
 

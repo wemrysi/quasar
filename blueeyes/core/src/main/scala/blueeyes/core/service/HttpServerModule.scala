@@ -1,10 +1,8 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import blueeyes.bkka.Stoppable
 import akka.actor.ActorSystem
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
 import akka.util.Timeout
 
 import blueeyes.core.data._
@@ -191,7 +189,7 @@ trait HttpServerMain extends HttpServerModule {
     */
   def run(rootConfiguration: Configuration) = {
     val actorSystem: ActorSystem           = ActorSystem(rootConfiguration[String]("blueeyes.actor_system", "blueeyes-actors"))
-    val executionContext: ExecutionContext = ExecutionContext.defaultExecutionContext(actorSystem)
+    val executionContext: ExecutionContext = akka.dispatch.ExecutionContext.defaultExecutionContext(actorSystem)
 
     /** Retrieves the logger for the server, which is configured directly from
       * the server's "log" configuration block.

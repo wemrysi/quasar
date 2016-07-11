@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 import org.specs2.mutable.Specification
 import Encodings._

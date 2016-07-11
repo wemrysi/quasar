@@ -1,9 +1,9 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import metrics.{ IntervalLength, eternity, interval }
 import org.specs2.mutable.Specification
 import blueeyes.json.JPathImplicits._
-import akka.dispatch.Future
 import akka.dispatch.Promise
 import blueeyes.akka_testing.FutureMatchers
 import blueeyes.json._

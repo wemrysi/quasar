@@ -1,4 +1,5 @@
-package blueeyes.health.metrics.histogram
+package blueeyes
+package health.metrics.histogram
 
 import blueeyes.persistence.cache.functional.TemporalCache
 import blueeyes.util.Clock

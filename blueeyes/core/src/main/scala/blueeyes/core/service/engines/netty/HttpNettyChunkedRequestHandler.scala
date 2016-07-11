@@ -1,13 +1,10 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 package engines.netty
 
 import blueeyes.bkka._
 import blueeyes.core.data._
 import blueeyes.core.http.{ HttpStatusCodes, HttpException, HttpRequest }
-
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
 
 import org.jboss.netty.buffer.{ ChannelBuffer, ChannelBuffers }
 import org.jboss.netty.channel.ChannelHandlerContext

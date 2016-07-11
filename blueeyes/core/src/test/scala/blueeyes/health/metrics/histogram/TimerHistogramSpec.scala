@@ -1,8 +1,9 @@
-package blueeyes.health.metrics.histogram
+package blueeyes
+package health.metrics.histogram
 
 import blueeyes.util.metrics.Duration._
-import org.specs2.mutable.Specification
 
+import org.specs2.mutable.Specification
 import ValueStrategy._
 import blueeyes.health.metrics.Timer
 

@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import blueeyes.bkka.Stop
 import blueeyes.bkka.ActorRefStop
@@ -9,9 +10,6 @@ import akka.actor.ActorSystem
 import akka.actor.ActorKilledException
 import akka.actor.Props
 import akka.actor.PoisonPill
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.util.Timeout
 
 import histogram.{ DynamicHistogram, ValueStrategy }
 

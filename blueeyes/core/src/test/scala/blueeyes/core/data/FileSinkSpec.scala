@@ -1,6 +1,6 @@
-package blueeyes.core.data
+package blueeyes
+package core.data
 
-import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.dispatch.Await
 import akka.util.Duration

@@ -1,4 +1,5 @@
-package blueeyes.json
+package blueeyes
+package json
 
 import scala.annotation.{ switch, tailrec }
 import java.lang.Integer.parseInt

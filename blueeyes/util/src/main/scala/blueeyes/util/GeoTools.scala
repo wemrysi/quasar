@@ -1,4 +1,5 @@
-package blueeyes.util
+package blueeyes
+package util
 
 trait GeoTools {
   val earthRadiusInMiles = 3958.75

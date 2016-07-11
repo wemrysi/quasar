@@ -1,8 +1,8 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 
 import org.specs2.mutable.Specification
 import blueeyes.json._
-import akka.dispatch.Future
 import blueeyes.util.Clock
 import java.util.concurrent.TimeUnit
 import blueeyes.akka_testing.FutureMatchers

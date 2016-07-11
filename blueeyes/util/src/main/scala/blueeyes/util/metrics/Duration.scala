@@ -1,4 +1,5 @@
-package blueeyes.util.metrics
+package blueeyes
+package util.metrics
 
 import java.util.concurrent.TimeUnit
 

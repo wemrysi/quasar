@@ -3,9 +3,6 @@ package blueeyes
 import core.data.ByteChunk
 import core.service._
 import core.service.engines.servlet.ServletEngine
-
-import akka.dispatch.ExecutionContext
-
 import org.streum.configrity.Configuration
 import org.slf4s.Logging
 

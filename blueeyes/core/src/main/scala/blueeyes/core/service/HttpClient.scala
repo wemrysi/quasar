@@ -1,6 +1,6 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
-import akka.dispatch.Future
 import blueeyes.core.http._
 import blueeyes.core.data._
 import java.net.InetAddress

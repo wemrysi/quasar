@@ -1,4 +1,5 @@
-package blueeyes.core.http
+package blueeyes
+package core.http
 
 /* A method to ensure that numbers are dealt with as we would hope in Http
  * Headers -- i.e., paser should return an Option[Long] and not die on mangled

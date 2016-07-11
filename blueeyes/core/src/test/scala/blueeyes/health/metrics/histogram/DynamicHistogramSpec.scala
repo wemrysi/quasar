@@ -1,4 +1,5 @@
-package blueeyes.health.metrics
+package blueeyes
+package health.metrics
 package histogram
 
 import org.specs2.mutable.Specification

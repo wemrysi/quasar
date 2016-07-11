@@ -1,12 +1,10 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import blueeyes.bkka.Stop
 import blueeyes.bkka.ActorRefStop
 import akka.actor.{ Actor, ActorRef, Props, Scheduler, PoisonPill, ActorKilledException, ActorSystem }
 import akka.pattern.ask
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.util.Timeout
 import akka.util.Duration
 
 import blueeyes.health.HealthMonitor
@@ -14,7 +12,6 @@ import blueeyes.util.ClockSystem._
 
 import scala.collection.JavaConversions._
 import scalaz.Semigroup
-
 import org.slf4s.Logging
 
 abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {

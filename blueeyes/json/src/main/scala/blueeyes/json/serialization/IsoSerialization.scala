@@ -1,4 +1,5 @@
-package blueeyes.json
+package blueeyes
+package json
 package serialization
 
 import Extractor._

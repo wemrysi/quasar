@@ -1,7 +1,5 @@
-package blueeyes.logging
-
-import akka.dispatch.Future
-import akka.util.Timeout
+package blueeyes
+package logging
 
 import blueeyes.health.HealthMonitor
 import blueeyes.persistence.cache.{ ExpirationPolicy, Stage }

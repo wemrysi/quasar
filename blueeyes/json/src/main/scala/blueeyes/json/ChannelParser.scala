@@ -1,4 +1,5 @@
-package blueeyes.json
+package blueeyes
+package json
 
 import java.io.{ File, FileInputStream }
 import java.nio.ByteBuffer

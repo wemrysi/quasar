@@ -1,6 +1,7 @@
-package blueeyes.json
+package blueeyes
+package json
 
-import util.matching.Regex
+import scala.util.matching.Regex
 
 import serialization._
 import serialization.DefaultSerialization._

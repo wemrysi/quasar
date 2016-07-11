@@ -1,4 +1,5 @@
-package blueeyes.core.service
+package blueeyes
+package core.service
 
 import slamdata.java.util.Base64
 import blueeyes.parsers.W3ExtendedLogAST.{ FieldsDirective, FieldIdentifier }

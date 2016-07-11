@@ -1,4 +1,5 @@
-package blueeyes.health
+package blueeyes
+package health
 
 import collection.mutable.ConcurrentMap
 

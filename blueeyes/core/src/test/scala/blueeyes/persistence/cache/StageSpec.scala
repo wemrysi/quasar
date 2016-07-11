@@ -1,4 +1,5 @@
-package blueeyes.persistence.cache
+package blueeyes
+package persistence.cache
 
 import org.specs2.mutable.Specification
 import org.specs2.time.TimeConversions._
@@ -8,7 +9,6 @@ import scala.util.Random
 import scalaz._
 
 import blueeyes.bkka.AkkaDefaults
-import akka.dispatch.Future
 import akka.dispatch.Future._
 import akka.actor.Actor
 import akka.actor.Props

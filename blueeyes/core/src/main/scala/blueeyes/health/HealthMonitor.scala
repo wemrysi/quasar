@@ -1,7 +1,6 @@
-package blueeyes.health
+package blueeyes
+package health
 
-import akka.dispatch.Future
-import akka.util.Timeout
 import blueeyes.bkka.AkkaDefaults
 import blueeyes.json.JPath
 import blueeyes.json.{ JValue, JUndefined }
