@@ -24,7 +24,5 @@ lazy val common = project.setup dependsOn blueeyes deps (
   "com.rubiconproject.oss"    % "jchronic"        %  "0.2.6",
   "org.scalacheck"           %% "scalacheck"      %  "1.10.1"  % Test,
   "org.specs2"               %% "specs2"          % "1.12.4.1" % Test,
-  "ch.qos.logback"            % "logback-classic" %  "1.0.0"   % Test,
-  "org.xsocket"               % "xSocket"         %  "2.8.15"
-  // Neeed explicit xsocket version to avoid version ranges burbling up and choking coursier.
+  "ch.qos.logback"            % "logback-classic" %  "1.0.0"   % Test
 )

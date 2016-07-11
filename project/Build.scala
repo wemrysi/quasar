@@ -1,7 +1,6 @@
 package precog
 
 import sbt._, Keys._
-// import org.scalafmt.sbt.ScalaFmtPlugin.autoImport._
 
 object PlatformBuild {
   def excludeBlacklist(m: ModuleID): ModuleID = ( m
@@ -32,16 +31,14 @@ object PlatformBuild {
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
 
     def setup: Project = also(
-                   // resolvers ++= Seq(Opts.resolver.sonatypeReleases, JCenterRepository),
-              // scalafmtConfig :=  Some((baseDirectory in ThisBuild).value / ".scalafmt"),
                    organization :=  "com.precog",
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:none") ++ optimizeOpts ++ debugOpts,
                    javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
                    scalaVersion :=  "2.9.3",
       parallelExecution in Test :=  false,
-            logBuffered in Test :=  false,
-                      resolvers +=  "Akka Repo" at "http://repo.akka.io/repository"
+            logBuffered in Test :=  false
+
     )
   }
 }
