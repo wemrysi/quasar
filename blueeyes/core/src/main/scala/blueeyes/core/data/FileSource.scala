@@ -8,7 +8,7 @@ import akka.dispatch.ExecutionContext
 
 import java.nio.ByteBuffer
 import java.nio.channels._
-import java.io.{OutputStream, FileOutputStream, RandomAccessFile, File}
+import java.io.{ OutputStream, FileOutputStream, RandomAccessFile, File }
 
 import scalaz._
 
@@ -38,7 +38,7 @@ class FileSource(file: File, offset: Long, length: Int, chunkSize: Int = 8192) {
 
       def readUntil(arr: Array[Byte], size: Int): Int = {
         var offset = 0
-        var left = size
+        var left   = size
         while (true) {
           val n = raf.read(arr, offset, left)
           if (n == -1) return size - left
@@ -51,7 +51,7 @@ class FileSource(file: File, offset: Long, length: Int, chunkSize: Int = 8192) {
 
       def makeArray(size: Int): Array[Byte] = {
         val arr = new Array[Byte](size)
-        val n = readUntil(arr, size)
+        val n   = readUntil(arr, size)
         if (n == length) {
           arr
         } else if (n > 0) {
@@ -65,7 +65,7 @@ class FileSource(file: File, offset: Long, length: Int, chunkSize: Int = 8192) {
 
       def makeStreamT(left: Int): StreamT[Future, Array[Byte]] = {
         val size = min(chunkSize, left)
-        val arr = makeArray(size)
+        val arr  = makeArray(size)
         if (arr.length < size || size == left) {
           arr :: StreamT.empty[Future, Array[Byte]]
         } else {

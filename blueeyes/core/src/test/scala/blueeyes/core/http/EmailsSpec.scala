@@ -2,8 +2,8 @@ package blueeyes.core.http
 
 import org.specs2.mutable.Specification
 
-class EmailsSpec extends Specification{
-  "Emails" should{
+class EmailsSpec extends Specification {
+  "Emails" should {
     "return the correct email name with a well-formed email" in {
       Emails("johnsmith@socialmedia.com ") must beSome(Email("johnsmith@socialmedia.com"))
     }

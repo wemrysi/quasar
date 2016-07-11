@@ -2,28 +2,30 @@ package blueeyes.core.http
 
 sealed trait HttpMethod extends Product {
   def value = productPrefix
-  
+
   override def toString = value
 }
 
 object HttpMethods {
-  
+
   /* Perhaps needs some regex */
   def parseHttpMethods(inString: String): List[HttpMethod] = {
-    inString.trim.toLowerCase.split(",").toList.map(_.trim match {
-      case "get"      => GET     
-      case "put"      => PUT
-      case "post"     => POST
-      case "patch"    => PATCH
-      case "delete"   => DELETE
-      case "options"  => OPTIONS
-      case "head"     => HEAD
-      case "connect"  => CONNECT
-      case "trace"    => TRACE
-      case x          => CUSTOM(x)    // Perhaps shouldn't return custom?
-    })
+    inString.trim.toLowerCase
+      .split(",")
+      .toList
+      .map(_.trim match {
+        case "get"     => GET
+        case "put"     => PUT
+        case "post"    => POST
+        case "patch"   => PATCH
+        case "delete"  => DELETE
+        case "options" => OPTIONS
+        case "head"    => HEAD
+        case "connect" => CONNECT
+        case "trace"   => TRACE
+        case x         => CUSTOM(x) // Perhaps shouldn't return custom?
+      })
   }
-  
 
   case object GET extends HttpMethod
 
@@ -46,6 +48,6 @@ object HttpMethods {
   case class CUSTOM(method: String) extends HttpMethod {
     override def toString = method
   }
-  
+
   val PredefinedHttpMethods = GET :: PUT :: POST :: DELETE :: PATCH :: OPTIONS :: HEAD :: CONNECT :: TRACE :: Nil
 }

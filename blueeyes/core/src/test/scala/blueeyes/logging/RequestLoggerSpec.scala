@@ -9,7 +9,7 @@ import blueeyes.core.service.HttpRequestLoggerW3CFormatter
 import org.specs2.specification.AfterExample
 import akka.util.Timeout
 
-class RequestLoggerSpec extends Specification with AfterExample{
+class RequestLoggerSpec extends Specification with AfterExample {
   private val directives = FieldsDirective(List(DateIdentifier, TimeIdentifier))
   private val formatter  = new HttpRequestLoggerW3CFormatter()
 
@@ -29,19 +29,19 @@ class RequestLoggerSpec extends Specification with AfterExample{
 
       val content = getContents(new File(w3Logger.fileName.get))
 
-      content.indexOf("#Version: 1.0")      must_!= (-1)
-      content.indexOf("#Date: ")            must_!= (-1)
-      content.indexOf(directives.toString)  must_!= (-1)
+      content.indexOf("#Version: 1.0") must_!= (-1)
+      content.indexOf("#Date: ") must_!= (-1)
+      content.indexOf(directives.toString) must_!= (-1)
     }
 
-    "flush entries while closing" in{
+    "flush entries while closing" in {
       w3Logger = RequestLogger.get(System.getProperty("java.io.tmpdir") + File.separator + "w3_2.log", Never, header _, 1)
 
       w3Logger("foo")
       w3Logger("bar")
 
       val future = w3Logger.close(Timeout(5000))
-      future.value must eventually (beSome[Either[Throwable,Unit]])
+      future.value must eventually(beSome[Either[Throwable, Unit]])
 
       val content = getContents(new File(w3Logger.fileName.get))
 
@@ -58,14 +58,14 @@ class RequestLoggerSpec extends Specification with AfterExample{
 
       val file = new File(w3Logger.fileName.get)
 
-      getContents(file).indexOf("foo") must eventually(not (be_== (-1)))
-      getContents(file).indexOf("bar") must eventually(not (be_== (-1)))
+      getContents(file).indexOf("foo") must eventually(not(be_==(-1)))
+      getContents(file).indexOf("bar") must eventually(not(be_==(-1)))
     }
   }
 
-  def cleanUp(){
+  def cleanUp() {
     val future = w3Logger.close(Timeout(5000))
-    future.value must eventually (beSome[Either[Throwable,Unit]])
+    future.value must eventually(beSome[Either[Throwable, Unit]])
 
     new File(w3Logger.fileName.get).delete
   }

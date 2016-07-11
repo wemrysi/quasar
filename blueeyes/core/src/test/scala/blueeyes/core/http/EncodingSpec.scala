@@ -3,7 +3,7 @@ package blueeyes.core.http
 import org.specs2.mutable.Specification
 import Encodings._
 
-class EncodingSpec extends Specification{
+class EncodingSpec extends Specification {
 
   "Encodings:  Should produce a encoding" in {
     Encodings.parseEncodings("compress") mustEqual List(compress)
@@ -17,4 +17,3 @@ class EncodingSpec extends Specification{
     Encodings.parseEncodings("customa, customb") mustEqual List(CustomEncoding("customa"), CustomEncoding("customb"))
   }
 }
-

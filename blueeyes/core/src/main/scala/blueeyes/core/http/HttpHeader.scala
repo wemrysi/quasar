@@ -48,7 +48,6 @@ object HttpHeaderField {
     `User-Agent`,
     Via,
     Warning,
-
     // Responses
     Age,
     Allow,
@@ -91,15 +90,16 @@ object HttpHeaderField {
     val fields = inString.toLowerCase.split("""\s*,\s*""").toList.flatMap(HttpHeaderField.ByName.get)
 
     if (parseType == "trailer") fields.filterNot {
-      case Trailer => true
+      case Trailer             => true
       case `Transfer-Encoding` => true
-      case `Content-Length` => true
-      case NullHeader => true
-      case _ => false
-    } else fields.filterNot {
-      case NullHeader => true
-      case _ => false
-    }
+      case `Content-Length`    => true
+      case NullHeader          => true
+      case _                   => false
+    } else
+      fields.filterNot {
+        case NullHeader => true
+        case _          => false
+      }
   }
 }
 
@@ -111,7 +111,7 @@ sealed trait HttpHeader extends ProductPrefixUnmangler {
 
   def canEqual(any: Any) = any match {
     case header: HttpHeader => true
-    case _ => false
+    case _                  => false
   }
 
   override def productPrefix = this.getClass.getSimpleName
@@ -122,7 +122,7 @@ sealed trait HttpHeader extends ProductPrefixUnmangler {
 
   override def equals(any: Any) = any match {
     case that: HttpHeader => name.equalsIgnoreCase(that.name) && value.equalsIgnoreCase(that.value)
-    case _ => false
+    case _                => false
   }
 }
 
@@ -137,16 +137,16 @@ object HttpHeader extends HttpHeaderImplicits {
   def apply(t: (String, String)): HttpHeader = All.get(t._1.toLowerCase).flatMap(_.parse(t)).getOrElse(HttpHeaders.CustomHeader(t._1, t._2))
 }
 
-sealed trait HttpHeaderRequest extends HttpHeader
+sealed trait HttpHeaderRequest  extends HttpHeader
 sealed trait HttpHeaderResponse extends HttpHeader
 
 case class HttpHeaders private (val raw: Map[String, String]) {
-  def + (kv: (String, String)): HttpHeaders = this + HttpHeader(kv)
-  def + (header: HttpHeader): HttpHeaders = new HttpHeaders(raw + header.tuple)
-  def ++ (that: HttpHeaders) = new HttpHeaders(raw ++ that.raw)
-  def ++ (that: Iterable[(HttpHeader)]) = new HttpHeaders(raw ++ that.map(_.tuple))
+  def +(kv: (String, String)): HttpHeaders = this + HttpHeader(kv)
+  def +(header: HttpHeader): HttpHeaders   = new HttpHeaders(raw + header.tuple)
+  def ++(that: HttpHeaders)                = new HttpHeaders(raw ++ that.raw)
+  def ++(that: Iterable[(HttpHeader)])     = new HttpHeaders(raw ++ that.map(_.tuple))
 
-  def - (key: String): HttpHeaders = new HttpHeaders(raw - key)
+  def -(key: String): HttpHeaders = new HttpHeaders(raw - key)
 
   def get(key: String): Option[String] = raw.get(key)
 
@@ -157,17 +157,17 @@ case class HttpHeaders private (val raw: Map[String, String]) {
 
 trait HttpHeadersImplicits extends HttpHeaderImplicits {
   implicit def iterableOfTuple2ToHttpHeaders(i: Iterable[(String, String)]): HttpHeaders = HttpHeaders(i)
-  implicit def iterableToHttpHeaders[A <: HttpHeader](i: Iterable[A]): HttpHeaders = HttpHeaders(i)
+  implicit def iterableToHttpHeaders[A <: HttpHeader](i: Iterable[A]): HttpHeaders       = HttpHeaders(i)
 }
 
 object HttpHeaders {
-  def apply(headers: HttpHeader*): HttpHeaders = 
+  def apply(headers: HttpHeader*): HttpHeaders =
     apply(headers.map(_.tuple))
-    
-  def apply(i: Iterable[(String, String)]): HttpHeaders = 
+
+  def apply(i: Iterable[(String, String)]): HttpHeaders =
     apply(i.map(HttpHeader(_)))
 
-  def apply[A](i: Iterable[A])(implicit ev: A <:< HttpHeader): HttpHeaders = 
+  def apply[A](i: Iterable[A])(implicit ev: A <:< HttpHeader): HttpHeaders =
     new HttpHeaders(i.map(ev(_).tuple)(collection.breakOut))
 
   val Empty: HttpHeaders = new HttpHeaders(Map.empty[String, String])
@@ -178,7 +178,7 @@ object HttpHeaders {
     def value = mimeTypes.map(_.value).mkString(", ")
   }
   implicit case object Accept extends HttpHeaderField[Accept] {
-    override def parse(s: String) = Some(apply(MimeTypes.parseMimeTypes(s): _*))
+    override def parse(s: String)    = Some(apply(MimeTypes.parseMimeTypes(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.mimeTypes)
   }
 
@@ -186,15 +186,15 @@ object HttpHeaders {
     def value = charSets.map(_.value).mkString(", ")
   }
   implicit case object `Accept-Charset` extends HttpHeaderField[`Accept-Charset`] {
-    override def parse(s: String) = Some(apply(CharSets.parseCharSets(s): _*))
+    override def parse(s: String)    = Some(apply(CharSets.parseCharSets(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.charSets)
   }
 
-  case class `Accept-Encoding`(encodings: Encoding*) extends HttpHeaderRequest  {
+  case class `Accept-Encoding`(encodings: Encoding*) extends HttpHeaderRequest {
     def value = encodings.map(_.value).mkString(", ")
   }
   implicit case object `Accept-Encoding` extends HttpHeaderField[`Accept-Encoding`] {
-    override def parse(s: String) = Some(apply(Encodings.parseEncodings(s): _*))
+    override def parse(s: String)    = Some(apply(Encodings.parseEncodings(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.encodings)
   }
 
@@ -202,7 +202,7 @@ object HttpHeaders {
     def value = languageRanges.map(_.value).mkString(", ");
   }
   implicit case object `Accept-Language` extends HttpHeaderField[`Accept-Language`] {
-    override def parse(s: String) = Some(apply(LanguageRanges.parseLanguageRanges(s): _*))
+    override def parse(s: String)    = Some(apply(LanguageRanges.parseLanguageRanges(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.languageRanges)
   }
 
@@ -210,7 +210,7 @@ object HttpHeaders {
     def value = rangeUnit.toString
   }
   implicit case object `Accept-Ranges` extends HttpHeaderField[`Accept-Ranges`] {
-    override def parse(s: String) = RangeUnits.parseRangeUnits(s).map(apply)
+    override def parse(s: String)    = RangeUnits.parseRangeUnits(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.rangeUnit)
   }
 
@@ -221,7 +221,7 @@ object HttpHeaders {
   }
 
   implicit case object Authorization extends HttpHeaderField[Authorization] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.credentials)
   }
 
@@ -229,7 +229,7 @@ object HttpHeaders {
     def value = connectionToken.toString
   }
   implicit case object Connection extends HttpHeaderField[Connection] {
-    override def parse(s: String) = ConnectionTokens.parseConnectionTokens(s).map(apply)
+    override def parse(s: String)    = ConnectionTokens.parseConnectionTokens(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.connectionToken)
   }
 
@@ -237,7 +237,7 @@ object HttpHeaders {
     def value = cookies.mkString(";")
   }
   implicit case object Cookie extends HttpHeaderField[Cookie] {
-    override def parse(s: String) = Some(apply(CookiesPattern(s)))
+    override def parse(s: String)    = Some(apply(CookiesPattern(s)))
     def unapply(t: (String, String)) = parse(t).map(_.cookies)
   }
 
@@ -249,7 +249,7 @@ object HttpHeaders {
     def value = length.toString
   }
   implicit case object `Content-Length` extends HttpHeaderField[`Content-Length`] {
-    override def parse(s: String) = s.parseLong.toOption.map(apply)
+    override def parse(s: String)    = s.parseLong.toOption.map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.length)
   }
 
@@ -257,7 +257,7 @@ object HttpHeaders {
     def value = mimeTypes.map(_.value).mkString(", ")
   }
   implicit case object `Content-Type` extends HttpHeaderField[`Content-Type`] {
-    override def parse(s: String) = Some(apply(MimeTypes.parseMimeTypes(s): _*))
+    override def parse(s: String)    = Some(apply(MimeTypes.parseMimeTypes(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.mimeTypes)
   }
 
@@ -265,7 +265,7 @@ object HttpHeaders {
     def value = httpDate.toString
   }
   implicit case object Date extends HttpHeaderField[Date] {
-    override def parse(s: String) = HttpDateTimes.parseHttpDateTimes(s).map(apply)
+    override def parse(s: String)    = HttpDateTimes.parseHttpDateTimes(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.httpDate)
   }
 
@@ -273,7 +273,7 @@ object HttpHeaders {
     def value = expectation.toString
   }
   implicit case object Expect extends HttpHeaderField[Expect] {
-    override def parse(s: String) = Expectations.parseExpectations(s).map(apply)
+    override def parse(s: String)    = Expectations.parseExpectations(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.expectation)
   }
 
@@ -281,7 +281,7 @@ object HttpHeaders {
     def value = email.toString
   }
   implicit case object From extends HttpHeaderField[From] {
-    override def parse(s: String) = Emails(s).map(apply)
+    override def parse(s: String)    = Emails(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.email)
   }
 
@@ -289,7 +289,7 @@ object HttpHeaders {
     def value = List(domain.host, domain.port.map(":" + _)).map(_.getOrElse("")).mkString("")
   }
   implicit case object Host extends HttpHeaderField[Host] {
-    override def parse(s: String) = URI.opt("http://" + s).map(apply)
+    override def parse(s: String)    = URI.opt("http://" + s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.domain)
   }
 
@@ -298,7 +298,7 @@ object HttpHeaders {
     def value = tags.toString
   }
   implicit case object `If-Match` extends HttpHeaderField[`If-Match`] { // going to need a new type here
-    override def parse(s: String) = EntityTags.parseEntityTags(s).map(apply)
+    override def parse(s: String)    = EntityTags.parseEntityTags(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.tags)
   }
 
@@ -306,7 +306,7 @@ object HttpHeaders {
     def value = httpDate.toString
   }
   implicit case object `If-Modified-Since` extends HttpHeaderField[`If-Modified-Since`] {
-    override def parse(s: String) = HttpDateTimes.parseHttpDateTimes(s).map(apply)
+    override def parse(s: String)    = HttpDateTimes.parseHttpDateTimes(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.httpDate)
   }
 
@@ -315,7 +315,7 @@ object HttpHeaders {
     def value = tags.toString
   }
   implicit case object `If-None-Match` extends HttpHeaderField[`If-None-Match`] {
-    override def parse(s: String) = EntityTags.parseEntityTags(s).map(apply)
+    override def parse(s: String)    = EntityTags.parseEntityTags(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.tags)
   }
 
@@ -324,7 +324,7 @@ object HttpHeaders {
     def value = tag.toString
   }
   implicit case object `If-Range` extends HttpHeaderField[`If-Range`] {
-    override def parse(s: String) = IfRanges.parseIfRanges(s).map(apply)
+    override def parse(s: String)    = IfRanges.parseIfRanges(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.tag)
   }
 
@@ -332,7 +332,7 @@ object HttpHeaders {
     def value = httpDate.toString
   }
   implicit case object `If-Unmodified-Since` extends HttpHeaderField[`If-Unmodified-Since`] {
-    override def parse(s: String) = HttpDateTimes.parseHttpDateTimes(s).map(apply)
+    override def parse(s: String)    = HttpDateTimes.parseHttpDateTimes(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.httpDate)
   }
 
@@ -340,7 +340,7 @@ object HttpHeaders {
     def value = maxf.toString
   }
   implicit case object `Max-Forwards` extends HttpHeaderField[`Max-Forwards`] {
-    override def parse(s: String) = HttpNumbers.parseHttpNumbers(s).map(apply)
+    override def parse(s: String)    = HttpNumbers.parseHttpNumbers(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.maxf)
   }
 
@@ -348,7 +348,7 @@ object HttpHeaders {
     def value = primeDirective.toString
   }
   implicit case object Pragma extends HttpHeaderField[Pragma] {
-    override def parse(s: String) = PragmaDirectives.parsePragmaDirectives(s).map(apply)
+    override def parse(s: String)    = PragmaDirectives.parsePragmaDirectives(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.primeDirective)
   }
 
@@ -356,7 +356,7 @@ object HttpHeaders {
     def value = auth
   }
   implicit case object `Proxy-Authorization` extends HttpHeaderField[`Proxy-Authorization`] {
-    override def parse(s: String) = Some(s).map(apply)
+    override def parse(s: String)    = Some(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.auth)
   }
 
@@ -364,7 +364,7 @@ object HttpHeaders {
     def value = byteRange.toString
   }
   implicit case object Range extends HttpHeaderField[Range] {
-    override def parse(s: String) = ByteRanges.parseByteRanges(s).map(apply)
+    override def parse(s: String)    = ByteRanges.parseByteRanges(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.byteRange)
   }
 
@@ -372,7 +372,7 @@ object HttpHeaders {
     def value = domain.toString
   }
   implicit case object Referer extends HttpHeaderField[Referer] {
-    override def parse(s: String) = URI.opt(s).map(apply)
+    override def parse(s: String)    = URI.opt(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.domain)
   }
 
@@ -380,7 +380,7 @@ object HttpHeaders {
     def value = tcodings.map(_.toString).mkString(", ")
   }
   implicit case object TE extends HttpHeaderField[TE] {
-    override def parse(s: String) = Some(apply(TCodings.parseTCodings(s): _*))
+    override def parse(s: String)    = Some(apply(TCodings.parseTCodings(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.tcodings)
   }
 
@@ -388,7 +388,7 @@ object HttpHeaders {
     def value = products.map(_.toString).mkString(", ")
   }
   implicit case object Upgrade extends HttpHeaderField[Upgrade] {
-    override def parse(s: String) = ProductTypes.parseProductTypes(s).map(apply(_: _*))
+    override def parse(s: String)    = ProductTypes.parseProductTypes(s).map(apply(_: _*))
     def unapply(t: (String, String)) = parse(t).map(_.products)
   }
 
@@ -396,7 +396,7 @@ object HttpHeaders {
     def value = product
   }
   implicit case object `User-Agent` extends HttpHeaderField[`User-Agent`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.product)
   }
 
@@ -404,7 +404,7 @@ object HttpHeaders {
     def value = info.map(_.toString).mkString(", ")
   }
   implicit case object Via extends HttpHeaderField[Via] {
-    override def parse(s: String) = Some(apply(ViaInfos.parseViaInfos(s): _*))
+    override def parse(s: String)    = Some(apply(ViaInfos.parseViaInfos(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.info)
   }
 
@@ -412,7 +412,7 @@ object HttpHeaders {
     def value = warnings.map(_.toString).mkString(", ")
   }
   implicit case object Warning extends HttpHeaderField[Warning] {
-    override def parse(s: String) = Some(apply(WarningInfos.parseWarnings(s): _*))
+    override def parse(s: String)    = Some(apply(WarningInfos.parseWarnings(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.warnings)
   }
 
@@ -422,7 +422,7 @@ object HttpHeaders {
     def value = age.toString
   }
   implicit case object Age extends HttpHeaderField[Age] {
-    override def parse(s: String) = s.parseDouble.toOption.map(apply)
+    override def parse(s: String)    = s.parseDouble.toOption.map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.age)
   }
 
@@ -430,7 +430,7 @@ object HttpHeaders {
     def value = methods.map(_.value).mkString(",")
   }
   implicit case object Allow extends HttpHeaderField[Allow] {
-    override def parse(s: String) = Some(apply(HttpMethods.parseHttpMethods(s): _*))
+    override def parse(s: String)    = Some(apply(HttpMethods.parseHttpMethods(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.methods)
   }
 
@@ -438,7 +438,7 @@ object HttpHeaders {
     def value = directives.map(_.toString).mkString(", ")
   }
   implicit case object `Cache-Control` extends HttpHeaderField[`Cache-Control`] {
-    override def parse(s: String) = Some(apply(CacheDirectives.parseCacheDirectives(s): _*))
+    override def parse(s: String)    = Some(apply(CacheDirectives.parseCacheDirectives(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.directives)
   }
 
@@ -446,7 +446,7 @@ object HttpHeaders {
     def value = encodings.map(_.toString).mkString(", ")
   }
   implicit case object `Content-Encoding` extends HttpHeaderField[`Content-Encoding`] {
-    override def parse(s: String) = Some(apply(Encodings.parseEncodings(s): _*))
+    override def parse(s: String)    = Some(apply(Encodings.parseEncodings(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.encodings)
   }
 
@@ -454,17 +454,16 @@ object HttpHeaders {
     def value = languageRanges.map(_.toString).mkString(", ")
   }
   implicit case object `Content-Language` extends HttpHeaderField[`Content-Language`] {
-    override def parse(s: String) = Some(apply(LanguageRanges.parseLanguageRanges(s): _*))
+    override def parse(s: String)    = Some(apply(LanguageRanges.parseLanguageRanges(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.languageRanges)
   }
 
   /* Content-Location: An alternate location for the returned data -- maybe use a URI/URL parser?
    * .. I Think this is referring to the path of the URL
    */
-  case class `Content-Location`(value: String) extends HttpHeaderResponse {
-  }
+  case class `Content-Location`(value: String) extends HttpHeaderResponse {}
   implicit case object `Content-Location` extends HttpHeaderField[`Content-Location`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.value)
   }
 
@@ -472,13 +471,13 @@ object HttpHeaders {
     def value = disposition.toString
   }
   implicit case object `Content-Disposition` extends HttpHeaderField[`Content-Disposition`] {
-    override def parse(s: String) = Some(apply(DispositionTypes.parseDispositionTypes(s)))
+    override def parse(s: String)    = Some(apply(DispositionTypes.parseDispositionTypes(s)))
     def unapply(t: (String, String)) = parse(t).map(_.disposition)
   }
 
   case class `Content-MD5`(value: String) extends HttpHeaderRequest with HttpHeaderResponse
   implicit case object `Content-MD5` extends HttpHeaderField[`Content-MD5`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.value)
   }
 
@@ -486,7 +485,7 @@ object HttpHeaders {
     def value = byteRange.toString
   }
   implicit case object `Content-Range` extends HttpHeaderField[`Content-Range`] {
-    override def parse(s: String) = ContentByteRanges.parseContentByteRanges(s).map(apply)
+    override def parse(s: String)    = ContentByteRanges.parseContentByteRanges(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.byteRange)
   }
 
@@ -494,7 +493,7 @@ object HttpHeaders {
     def value = tag.toString
   }
   implicit case object ETag extends HttpHeaderField[ETag] {
-    override def parse(s: String) = EntityTags.parseEntityTags(s).map(apply)
+    override def parse(s: String)    = EntityTags.parseEntityTags(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.tag)
   }
 
@@ -502,7 +501,7 @@ object HttpHeaders {
     def value = date.toString
   }
   implicit case object Expires extends HttpHeaderField[Expires] {
-    override def parse(s: String) = HttpDateTimes.parseHttpDateTimes(s).map(apply)
+    override def parse(s: String)    = HttpDateTimes.parseHttpDateTimes(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.date)
   }
 
@@ -510,7 +509,7 @@ object HttpHeaders {
     def value = date.toString
   }
   implicit case object `Last-Modified` extends HttpHeaderField[`Last-Modified`] {
-    override def parse(s: String) = HttpDateTimes.parseHttpDateTimes(s).map(apply)
+    override def parse(s: String)    = HttpDateTimes.parseHttpDateTimes(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.date)
   }
 
@@ -518,7 +517,7 @@ object HttpHeaders {
     def value = domain.toString
   }
   implicit case object Location extends HttpHeaderField[Location] {
-    override def parse(s: String) = URI.opt(s).map(apply)
+    override def parse(s: String)    = URI.opt(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.domain)
   }
 
@@ -526,7 +525,7 @@ object HttpHeaders {
     def value = challenge
   }
   implicit case object `Proxy-Authenticate` extends HttpHeaderField[`Proxy-Authenticate`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.challenge)
   }
 
@@ -535,7 +534,7 @@ object HttpHeaders {
     def value = time.toString
   }
   implicit case object Refresh extends HttpHeaderField[Refresh] {
-    override def parse(s: String) = HttpNumbers.parseHttpNumbers(s).map(apply)
+    override def parse(s: String)    = HttpNumbers.parseHttpNumbers(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.time)
   }
 
@@ -544,7 +543,7 @@ object HttpHeaders {
     def value = num.toString
   }
   implicit case object `Retry-After` extends HttpHeaderField[`Retry-After`] {
-    override def parse(s: String) = HttpNumbers.parseHttpNumbers(s).map(apply)
+    override def parse(s: String)    = HttpNumbers.parseHttpNumbers(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.num)
   }
 
@@ -553,7 +552,7 @@ object HttpHeaders {
     def value = comment
   }
   implicit case object Server extends HttpHeaderField[Server] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.comment)
   }
 
@@ -561,7 +560,7 @@ object HttpHeaders {
     def value = cookies.mkString(";")
   }
   implicit case object `Set-Cookie` extends HttpHeaderField[`Set-Cookie`] {
-    override def parse(s: String) = Some(apply(CookiesPattern(s)))
+    override def parse(s: String)    = Some(apply(CookiesPattern(s)))
     def unapply(t: (String, String)) = parse(t).map(_.cookies)
   }
 
@@ -570,7 +569,7 @@ object HttpHeaders {
     def value = fields.map(_.toString).mkString(", ")
   }
   implicit case object Trailer extends HttpHeaderField[Trailer] {
-    override def parse(s: String) = Some(apply(HttpHeaderField.parseAll(s, "trailer"): _*))
+    override def parse(s: String)    = Some(apply(HttpHeaderField.parseAll(s, "trailer"): _*))
     def unapply(t: (String, String)) = parse(t).map(_.fields)
   }
 
@@ -578,14 +577,14 @@ object HttpHeaders {
     def value = encodings.map(_.toString).mkString(", ")
   }
   implicit case object `Transfer-Encoding` extends HttpHeaderField[`Transfer-Encoding`] {
-    override def parse(s: String) = Some(apply(Encodings.parseEncodings(s): _*))
+    override def parse(s: String)    = Some(apply(Encodings.parseEncodings(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.encodings)
   }
 
   /* There are problems with using Vary in IE.  */
   case class Vary(value: String) extends HttpHeaderResponse
   implicit case object Vary extends HttpHeaderField[Vary] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.value)
   }
 
@@ -593,7 +592,7 @@ object HttpHeaders {
     def value = challenge
   }
   implicit case object `WWW-Authenticate` extends HttpHeaderField[`WWW-Authenticate`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.challenge)
   }
 
@@ -601,7 +600,7 @@ object HttpHeaders {
     def value = option.toString
   }
   implicit case object `X-Frame-Options` extends HttpHeaderField[`X-Frame-Options`] {
-    override def parse(s: String) = FrameOptions.parseFrameOptions(s).map(apply)
+    override def parse(s: String)    = FrameOptions.parseFrameOptions(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.option)
   }
 
@@ -610,7 +609,7 @@ object HttpHeaders {
     def value = xss;
   }
   implicit case object `X-XSS-Protection` extends HttpHeaderField[`X-XSS-Protection`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.xss)
   }
 
@@ -618,7 +617,7 @@ object HttpHeaders {
     def value = option.toString
   }
   implicit case object `X-Content-Type-Options` extends HttpHeaderField[`X-Content-Type-Options`] {
-    override def parse(s: String) = ContentTypeOptions.parseContentTypeOptions(s).map(apply)
+    override def parse(s: String)    = ContentTypeOptions.parseContentTypeOptions(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.option)
   }
 
@@ -626,7 +625,7 @@ object HttpHeaders {
     def value = requested.toString
   }
   implicit case object `X-Requested-With` extends HttpHeaderField[`X-Requested-With`] {
-    override def parse(s: String) = RequestedWiths.parseRequestedWiths(s).map(apply)
+    override def parse(s: String)    = RequestedWiths.parseRequestedWiths(s).map(apply)
     def unapply(t: (String, String)) = parse(t).map(_.requested)
   }
 
@@ -634,7 +633,7 @@ object HttpHeaders {
     def value = ips.map(_.toString).mkString(", ")
   }
   implicit case object `X-Forwarded-For` extends HttpHeaderField[`X-Forwarded-For`] {
-    override def parse(s: String) = Some(apply(HttpIps.parseHttpIps(s): _*))
+    override def parse(s: String)    = Some(apply(HttpIps.parseHttpIps(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.ips)
   }
 
@@ -642,7 +641,7 @@ object HttpHeaders {
     def value = ips.map(_.toString).mkString(", ")
   }
   implicit case object `X-Cluster-Client-Ip` extends HttpHeaderField[`X-Cluster-Client-Ip`] {
-    override def parse(s: String) = Some(apply(HttpIps.parseHttpIps(s): _*))
+    override def parse(s: String)    = Some(apply(HttpIps.parseHttpIps(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.ips)
   }
 
@@ -650,7 +649,7 @@ object HttpHeaders {
     def value = proto
   }
   implicit case object `X-Forwarded-Proto` extends HttpHeaderField[`X-Forwarded-Proto`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.proto)
   }
 
@@ -658,7 +657,7 @@ object HttpHeaders {
     def value = products.map(_.toString).mkString(",")
   }
   implicit case object `X-Powered-By` extends HttpHeaderField[`X-Powered-By`] {
-    override def parse(s: String) = ProductTypes.parseProductTypes(s).map(apply(_: _*))
+    override def parse(s: String)    = ProductTypes.parseProductTypes(s).map(apply(_: _*))
     def unapply(t: (String, String)) = parse(t).map(_.products)
   }
 
@@ -667,7 +666,7 @@ object HttpHeaders {
     def value = origin
   }
   implicit case object `Access-Control-Allow-Origin` extends HttpHeaderField[`Access-Control-Allow-Origin`] {
-    override def parse(s: String) = Some(apply(s))
+    override def parse(s: String)    = Some(apply(s))
     def unapply(t: (String, String)) = parse(t).map(_.origin)
   }
 
@@ -675,7 +674,7 @@ object HttpHeaders {
     def value = methods.map(_.toString).mkString(",")
   }
   implicit case object `Access-Control-Request-Method` extends HttpHeaderField[`Access-Control-Request-Method`] {
-    override def parse(s: String) = Some(apply(HttpMethods.parseHttpMethods(s): _*))
+    override def parse(s: String)    = Some(apply(HttpMethods.parseHttpMethods(s): _*))
     def unapply(t: (String, String)) = parse(t).map(_.methods)
   }
 
@@ -683,7 +682,7 @@ object HttpHeaders {
     def value = fields.map(_.toString).mkString(",")
   }
   implicit case object `Access-Control-Request-Headers` extends HttpHeaderField[`Access-Control-Request-Headers`] {
-    override def parse(s: String) = Some(apply(HttpHeaderField.parseAll(s, "accessControl"): _*))
+    override def parse(s: String)    = Some(apply(HttpHeaderField.parseAll(s, "accessControl"): _*))
     def unapply(t: (String, String)) = parse(t).map(_.fields)
   }
 

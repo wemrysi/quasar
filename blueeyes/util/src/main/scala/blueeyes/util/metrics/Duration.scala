@@ -2,63 +2,63 @@ package blueeyes.util.metrics
 
 import java.util.concurrent.TimeUnit
 
-case class Duration(time: Double, unit: TimeUnit){
+case class Duration(time: Double, unit: TimeUnit) {
   val length = time.toLong
 
   /**
-   * Returns the value in nanoseconds.
-   */
+    * Returns the value in nanoseconds.
+    */
   def nanoseconds = convert(TimeUnit.NANOSECONDS)
-  def ns = nanoseconds
+  def ns          = nanoseconds
 
   /**
-   * Returns the value in microseconds.
-   */
+    * Returns the value in microseconds.
+    */
   def microseconds = convert(TimeUnit.MICROSECONDS)
-  def us = microseconds
+  def us           = microseconds
 
   /**
-   * Returns the value in milliseconds.
-   */
+    * Returns the value in milliseconds.
+    */
   def milliseconds = convert(TimeUnit.MILLISECONDS)
-  def ms = milliseconds
+  def ms           = milliseconds
 
   /**
-   * Returns the value in seconds.
-   */
+    * Returns the value in seconds.
+    */
   def seconds = convert(TimeUnit.SECONDS)
-  def s = seconds
+  def s       = seconds
 
   /**
-   * Returns the value in minutes.
-   */
+    * Returns the value in minutes.
+    */
   def minutes = convert(TimeUnit.MINUTES)
-  def m = minutes
+  def m       = minutes
 
   /**
-   * Returns the value in hours.
-   */
+    * Returns the value in hours.
+    */
   def hours = convert(TimeUnit.HOURS)
-  def h = hours
+  def h     = hours
 
   /**
-   * Returns the value in days.
-   */
+    * Returns the value in days.
+    */
   def days = convert(TimeUnit.DAYS)
-  def d = days
+  def d    = days
 
   /**
-   * Returns the SI abbreviate for the given unit.
-   */
+    * Returns the SI abbreviate for the given unit.
+    */
   private def abbreviate(u: TimeUnit) = {
     u match {
-      case TimeUnit.NANOSECONDS => "ns"
+      case TimeUnit.NANOSECONDS  => "ns"
       case TimeUnit.MICROSECONDS => "us"
       case TimeUnit.MILLISECONDS => "ms"
-      case TimeUnit.SECONDS => "s"
-      case TimeUnit.MINUTES => "min"
-      case TimeUnit.HOURS => "h"
-      case TimeUnit.DAYS => "d"
+      case TimeUnit.SECONDS      => "s"
+      case TimeUnit.MINUTES      => "min"
+      case TimeUnit.HOURS        => "h"
+      case TimeUnit.DAYS         => "d"
     }
   }
 
@@ -72,8 +72,8 @@ case class Duration(time: Double, unit: TimeUnit){
   }
 
   /**
-   * Convert to an arbitrary time unit.
-   */
+    * Convert to an arbitrary time unit.
+    */
   def convert(u: TimeUnit) = Duration((time / ratio(unit, u)), u)
 
   override def toString = "%2.2f%s".format(time, abbreviate(unit))

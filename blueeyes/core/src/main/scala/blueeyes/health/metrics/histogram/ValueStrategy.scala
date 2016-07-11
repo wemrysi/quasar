@@ -10,16 +10,15 @@ trait ValueStrategy[V] {
   def count(value: V): Long
 }
 
-
-object ValueStrategy{
+object ValueStrategy {
   implicit val DoubleValueStrategy = new DoubleValueStrategy
 
-  implicit val LongValueStrategy   = new LongValueStrategy
+  implicit val LongValueStrategy = new LongValueStrategy
 
-  implicit val TimerValueStrategy  = new TimerValueStrategy
+  implicit val TimerValueStrategy = new TimerValueStrategy
 }
 
-class DoubleValueStrategy extends ValueStrategy[Double]{
+class DoubleValueStrategy extends ValueStrategy[Double] {
   def plus(value: Double, stat: Long) = value + stat
 
   def zero = 0.0
@@ -27,7 +26,7 @@ class DoubleValueStrategy extends ValueStrategy[Double]{
   def count(value: Double) = value.toLong
 }
 
-class LongValueStrategy extends ValueStrategy[Long]{
+class LongValueStrategy extends ValueStrategy[Long] {
   def plus(value: Long, stat: Long) = value + stat
 
   def zero = 0l
@@ -35,7 +34,7 @@ class LongValueStrategy extends ValueStrategy[Long]{
   def count(value: Long) = value
 }
 
-class TimerValueStrategy  extends ValueStrategy[Timer]{
+class TimerValueStrategy extends ValueStrategy[Timer] {
   def plus(value: Timer, ns: Long) = value.+=(ns)
 
   def zero = new Timer()

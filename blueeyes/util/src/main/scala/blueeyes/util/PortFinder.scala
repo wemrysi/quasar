@@ -1,17 +1,18 @@
 package blueeyes.util
 
-import java.net.{InetSocketAddress, ServerSocket}
+import java.net.{ InetSocketAddress, ServerSocket }
 
 import scala.util.Random
 
 import scalaz.syntax.std.boolean._
 
 trait PortFinder {
+
   /** The minimum random port number that can be used by the underlying mongo instance */
   def portRangeStart = 50000
 
   /** The size of the random port range to be used by the underlying mongo instance */
-  def portRangeSize  = 10000
+  def portRangeSize = 10000
 
   // Shamlessly borrowed from Camel:
   // http://svn.apache.org/viewvc/camel/trunk/components/camel-test/src/main/java/org/apache/camel/test/AvailablePortFinder.java?view=markup#l130
@@ -22,8 +23,9 @@ trait PortFinder {
       ss.setReuseAddress(true);
       ss.bind(new InetSocketAddress(port))
       true
-    } catch { case t: Exception =>
-      false
+    } catch {
+      case t: Exception =>
+        false
     } finally {
       if (ss != null) {
         try {

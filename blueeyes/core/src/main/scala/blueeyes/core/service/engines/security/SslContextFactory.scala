@@ -1,7 +1,7 @@
 package blueeyes.core.service.engines.security
 
 import java.security.KeyStore
-import javax.net.ssl.{TrustManager, KeyManagerFactory, SSLContext};
+import javax.net.ssl.{ TrustManager, KeyManagerFactory, SSLContext };
 
 object SslContextFactory {
   def apply(keyStore: KeyStore, password: String, trustManagers: Option[Array[TrustManager]] = None) = {

@@ -2,7 +2,7 @@ package blueeyes.core.service
 
 import org.specs2.mutable.Specification
 import blueeyes.util.printer.HtmlPrinter
-import blueeyes.core.http.{HttpResponse, HttpRequest}
+import blueeyes.core.http.{ HttpResponse, HttpRequest }
 import akka.dispatch.Future
 
 import org.streum.configrity.Configuration
@@ -11,8 +11,8 @@ import org.streum.configrity.io.BlockFormat
 class ServiceDocumenterSpec extends Specification with HttpRequestHandlerCombinators with blueeyes.bkka.AkkaDefaults {
   import Metadata._
 
-  "ServiceDocumente" should{
-    "create service docuementation" in{
+  "ServiceDocumente" should {
+    "create service docuementation" in {
       val expected = """<html>
 
   <head>
@@ -100,23 +100,37 @@ class ServiceDocumenterSpec extends Specification with HttpRequestHandlerCombina
 </html>"""
 
       implicit val printer = HtmlPrinter
-      val handler : HttpService[Int, Future[HttpResponse[Int]]] = {
+      val handler: HttpService[Int, Future[HttpResponse[Int]]] = {
         path("/details") {
           path("/bar") {
-            describe("Personal john details"){
+            describe("Personal john details") {
               path("/john") {
-                get{ (request: HttpRequest[Int]) => Future(HttpResponse[Int](content = Some(1))) }
+                get { (request: HttpRequest[Int]) =>
+                  Future(HttpResponse[Int](content = Some(1)))
+                }
               }
             }
-          }~
-          describe("Personal kate details"){
-            path("/kate") {
-              get{ (request: HttpRequest[Int]) => Future(HttpResponse[Int](content = Some(0))) }
+          } ~
+            describe("Personal kate details") {
+              path("/kate") {
+                get { (request: HttpRequest[Int]) =>
+                  Future(HttpResponse[Int](content = Some(0)))
+                }
+              }
             }
-          }
         }
       }
-      ServiceDocumenter.printFormatted(ServiceContext(Configuration.parse("", BlockFormat), Configuration.parse("", BlockFormat), "Foo", ServiceVersion(1, 0, "0"), Some("Sample service"), "localhost", 8080, 8081), handler) mustEqual (expected)
+      ServiceDocumenter.printFormatted(
+        ServiceContext(
+          Configuration.parse("", BlockFormat),
+          Configuration.parse("", BlockFormat),
+          "Foo",
+          ServiceVersion(1, 0, "0"),
+          Some("Sample service"),
+          "localhost",
+          8080,
+          8081),
+        handler) mustEqual (expected)
     }
   }
 }

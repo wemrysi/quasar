@@ -9,9 +9,9 @@ import org.specs2.mock._
 import org.specs2.mutable.Specification
 
 class HttpServiceBuilderSpec extends Specification with Mockito with TestAkkaDefaults {
-  "ServiceBuilder startup: creates StartupDescriptor with specified startup function" in{
+  "ServiceBuilder startup: creates StartupDescriptor with specified startup function" in {
     var executed = false
-    val builder  = new ServiceBuilder[Unit]{
+    val builder = new ServiceBuilder[Unit] {
       val descriptor = startup(Future(executed = true))
     }
 
@@ -20,9 +20,9 @@ class HttpServiceBuilderSpec extends Specification with Mockito with TestAkkaDef
     executed must be_==(true)
   }
 
-  "ServiceBuilder startup: creates StartupDescriptor with specified request function" in{
+  "ServiceBuilder startup: creates StartupDescriptor with specified request function" in {
     val function = mock[Function[Unit, AsyncHttpService[Unit, Unit]]]
-    val builder  = new ServiceBuilder[Unit]{
+    val builder = new ServiceBuilder[Unit] {
       val descriptor = request(function)
     }
 
@@ -34,7 +34,7 @@ class HttpServiceBuilderSpec extends Specification with Mockito with TestAkkaDef
     var shutdownCalled = false
 
     // We need "real" behavior here to allow the Stoppable hooks to run properly
-    val builder  = new ServiceBuilder[Unit]{
+    val builder = new ServiceBuilder[Unit] {
       val descriptor = shutdown {
         Future(shutdownCalled = true)
       }

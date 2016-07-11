@@ -1,7 +1,7 @@
 package blueeyes.core.service
 package engines.servlet
 
-import engines.{HttpClientXLightWeb, TestEngineService}
+import engines.{ HttpClientXLightWeb, TestEngineService }
 
 import blueeyes._
 import blueeyes.bkka._
@@ -12,21 +12,21 @@ import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.core.http.MimeTypes._
 import DefaultBijections._
 
-import akka.dispatch.{Await, Promise}
+import akka.dispatch.{ Await, Promise }
 import akka.util.Duration
 
 import java.util.concurrent.TimeUnit
 
-import org.specs2.specification.{Step, Fragments}
+import org.specs2.specification.{ Step, Fragments }
 import org.specs2.mutable.Specification
 import org.specs2.time.TimeConversions._
 
 class HttpServerServletSpec extends Specification with TestAkkaDefaults with HttpRequestMatchers {
-  val duration = Duration(1000, "millis")
-  val retries = 50
+  val duration                                = Duration(1000, "millis")
+  val retries                                 = 50
   implicit val futureTimeouts: FutureTimeouts = FutureTimeouts(10, Duration(1000l, TimeUnit.MILLISECONDS))
 
-  private var port= 8585
+  private var port                        = 8585
   private var server: Option[JettyServer] = None
 
   /*
@@ -46,7 +46,7 @@ class HttpServerServletSpec extends Specification with TestAkkaDefaults with Htt
 
     startStep ^ fs ^ stopStep
   } 
-  */
+   */
 
   "HttpServer" should {
     "return empty response" in todo /*{
@@ -131,4 +131,4 @@ class HttpServerServletSpec extends Specification with TestAkkaDefaults with Htt
   private def client = new HttpClientXLightWeb().protocol("http").host("localhost").port(port)
 }
 
-class ServletTestEngineService extends ServletServer with TestEngineService 
+class ServletTestEngineService extends ServletServer with TestEngineService

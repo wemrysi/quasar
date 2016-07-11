@@ -8,19 +8,19 @@ import blueeyes.akka_testing.FutureMatchers
 class TimedAverageStatSpec extends Specification with TimedStatFixtures with FutureMatchers {
   implicit val healthMonitorTimeout = akka.util.Timeout(10000)
 
-  "TimedAverageStat" should{
+  "TimedAverageStat" should {
     "creates JValue" in {
-      val config = interval(IntervalLength(3, TimeUnit.SECONDS), 3)
+      val config      = interval(IntervalLength(3, TimeUnit.SECONDS), 3)
       val timedSample = TimedAverageStat(config)
       fill(timedSample)
 
       val histogram      = timedSample.toJValue
       val histogramValue = JArray(List(JNum(1.3333333333333333), JNum(1.0), JNum(0.0)))
-      histogram must whenDelivered (be_==(JObject(JField("perSecond", JObject(JField(config.toString, histogramValue) :: Nil)) :: Nil)))
+      histogram must whenDelivered(be_==(JObject(JField("perSecond", JObject(JField(config.toString, histogramValue) :: Nil)) :: Nil)))
     }
   }
 
-  private def fill(timedSample: Statistic[Long]){
+  private def fill(timedSample: Statistic[Long]) {
     set(timedSample, 103000)
     set(timedSample, 104000)
     set(timedSample, 104020)

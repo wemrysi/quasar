@@ -6,19 +6,19 @@ import org.specs2.mutable.Specification
 import blueeyes.akka_testing.FutureMatchers
 
 class TimedEternityAverageStatSpec extends Specification with TimedStatFixtures with FutureMatchers {
-  "TimedEternityAverageStat" should{
-    "creates JValue" in{
+  "TimedEternityAverageStat" should {
+    "creates JValue" in {
       val timedSample = TimedAverageStat(eternity)
       fill(timedSample)
 
       val histogramValue = parse("[4.0]")
-      val future = timedSample.toJValue.map(_.renderCanonical)
-      val expected = (JObject(JField("perSecond", JObject(JField(eternity.toString, histogramValue) :: Nil)) :: Nil)).renderCanonical
-      future must whenDelivered (be_==(expected))
+      val future         = timedSample.toJValue.map(_.renderCanonical)
+      val expected       = (JObject(JField("perSecond", JObject(JField(eternity.toString, histogramValue) :: Nil)) :: Nil)).renderCanonical
+      future must whenDelivered(be_==(expected))
     }
   }
 
-  private def fill(timedSample: Statistic[Long]){
+  private def fill(timedSample: Statistic[Long]) {
     set(timedSample, 1001)
     set(timedSample, 1001)
     set(timedSample, 1002)

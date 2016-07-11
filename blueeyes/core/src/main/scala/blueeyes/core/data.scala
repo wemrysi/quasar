@@ -16,14 +16,14 @@ import scala.math.max
 import scala.collection.mutable.ListBuffer
 
 package object data {
-  type Chunk[A] = Either[A, StreamT[Future, A]]
+  type Chunk[A]  = Either[A, StreamT[Future, A]]
   type ByteChunk = Chunk[Array[Byte]]
 
   object Chunk {
     implicit def tc(implicit M: Monad[Future]): Applicative[Chunk] = new Applicative[Chunk] {
       def point[A](a: => A) = Left(a)
       override def map[A, B](c: Chunk[A])(f: A => B): Chunk[B] = c match {
-        case Left(a) => Left(f(a))
+        case Left(a)       => Left(f(a))
         case Right(stream) => Right(stream.map(f))
       }
 
@@ -31,12 +31,12 @@ package object data {
         c match {
           case Left(a) =>
             f match {
-              case Left(f0) => Left(f0(a))
-              case Right(fx) => Right(fx.map(_(a)))
+              case Left(f0)  => Left(f0(a))
+              case Right(fx) => Right(fx.map(_ (a)))
             }
           case Right(stream) =>
             f match {
-              case Left(f0) => Right(stream map f0)
+              case Left(f0)  => Right(stream map f0)
               case Right(fx) => Right(for (a <- stream; f0 <- fx) yield f0(a))
             }
         }
@@ -106,7 +106,7 @@ package object data {
         }
       s match {
         case Right(stream) => loop(stream, ListBuffer.empty[Array[Byte]])
-        case Left(bytes) => Promise.successful(Array(bytes))
+        case Left(bytes)   => Promise.successful(Array(bytes))
       }
     }
 
@@ -131,7 +131,7 @@ package object data {
     def chunkToStreamT(s: ByteChunk)(implicit executor: ExecutionContext): StreamT[Future, Array[Byte]] = {
       implicit val M: Monad[Future] = new FutureMonad(executor)
       s match {
-        case Left(bytes) => bytes :: StreamT.empty[Future, Array[Byte]]
+        case Left(bytes)   => bytes :: StreamT.empty[Future, Array[Byte]]
         case Right(stream) => stream
       }
     }
@@ -146,17 +146,18 @@ package object data {
 
         def append(c0: ByteChunk, c1: => ByteChunk): ByteChunk =
           c0 match {
-            case Left(bytes0) => c1 match {
-              case Left(bytes1) =>
-                val len0 = bytes0.length
-                val len1 = bytes1.length
-                val bytes = new Array[Byte](len0 + len1)
-                System.arraycopy(bytes0, 0, bytes, 0, len0)
-                System.arraycopy(bytes1, 0, bytes, len0, len1)
-                Left(bytes)
-              case Right(stream1) =>
-                Right(bytes0 :: stream1)
-            }
+            case Left(bytes0) =>
+              c1 match {
+                case Left(bytes1) =>
+                  val len0  = bytes0.length
+                  val len1  = bytes1.length
+                  val bytes = new Array[Byte](len0 + len1)
+                  System.arraycopy(bytes0, 0, bytes, 0, len0)
+                  System.arraycopy(bytes1, 0, bytes, len0, len1)
+                  Left(bytes)
+                case Right(stream1) =>
+                  Right(bytes0 :: stream1)
+              }
 
             case Right(stream0) =>
               Right(stream0 ++ chunkToStreamT(c1))

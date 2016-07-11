@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package blueeyes.json
 
-import org.scalacheck.{Gen, Arbitrary}
+import org.scalacheck.{ Gen, Arbitrary }
 import Arbitrary.arbitrary
 
 trait ArbitraryJPath {
@@ -38,7 +38,7 @@ trait ArbitraryJPath {
     val genIndexOrField = Gen.oneOf(genIndex, genField)
 
     for {
-      length      <- choose(1, 10)
+      length <- choose(1, 10)
       listOfNodes <- listOfN(length, genIndexOrField)
     } yield JPath(listOfNodes)
   }

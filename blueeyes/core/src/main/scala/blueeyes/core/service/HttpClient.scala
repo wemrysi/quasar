@@ -30,18 +30,18 @@ trait HttpClient[A] extends PartialFunction[HttpRequest[A], Future[HttpResponse[
 
   def custom[B](custom: HttpMethod, path: String)(implicit transcoder: AsyncHttpTranscoder[B, A]) = method[B](custom, path)
 
-  def protocol(protocol: String) = buildClient { request => 
-    request.withUriChanges(scheme = Some(protocol)) 
+  def protocol(protocol: String) = buildClient { request =>
+    request.withUriChanges(scheme = Some(protocol))
   }
 
   def secure = protocol("https")
 
-  def host(host: String) = buildClient { request => 
-    request.withUriChanges(host = Some(host)) 
+  def host(host: String) = buildClient { request =>
+    request.withUriChanges(host = Some(host))
   }
 
-  def port(port: Int) = buildClient { request => 
-    request.withUriChanges(port = Some(port)) 
+  def port(port: Int) = buildClient { request =>
+    request.withUriChanges(port = Some(port))
   }
 
   // This is extremely dodgy. Basically, the existing semantics have been that the path combinator
@@ -49,7 +49,9 @@ trait HttpClient[A] extends PartialFunction[HttpRequest[A], Future[HttpResponse[
   // sane than what was here before.
   def path(path: String) = buildClient { request =>
     def sep(o1: Option[String], o2: Option[String], s: String) = {
-      o1 |+| Apply[Option].apply2(o1, o2) { (_, _) => s } |+| o2
+      o1 |+| Apply[Option].apply2(o1, o2) { (_, _) =>
+        s
+      } |+| o2
     }
 
     val parsed = URI(path)
@@ -65,11 +67,11 @@ trait HttpClient[A] extends PartialFunction[HttpRequest[A], Future[HttpResponse[
     request.copy(uri = uri0, subpath = uri0.path.getOrElse(""))
   }
 
-  def parameters(parameters: (Symbol, String)*) = buildClient { request => 
+  def parameters(parameters: (Symbol, String)*) = buildClient { request =>
     request.copy(parameters = Map[Symbol, String](parameters: _*))
   }
 
-  def content[B](content: B)(implicit projection: B => A) = buildClient { request => 
+  def content[B](content: B)(implicit projection: B => A) = buildClient { request =>
     request.copy(content = Some(projection(content)))
   }
 
@@ -80,42 +82,44 @@ trait HttpClient[A] extends PartialFunction[HttpRequest[A], Future[HttpResponse[
     request.copy(headers = request.headers + Tuple2("Cookie", cookieEncoder.encode()))
   }
 
-  def remoteHost(host: InetAddress) = buildClient { request => 
+  def remoteHost(host: InetAddress) = buildClient { request =>
     request.copy(
-      headers = request.headers + Tuple2("X-Forwarded-For", host.getHostAddress) + Tuple2("X-Cluster-Client-Ip", host.getHostAddress), 
+      headers = request.headers + Tuple2("X-Forwarded-For", host.getHostAddress) + Tuple2("X-Cluster-Client-Ip", host.getHostAddress),
       remoteHost = Some(host)
     )
   }
 
   def header(name: String, value: String): HttpClient[A] = header((name, value))
 
-  def header(h: HttpHeader): HttpClient[A] = buildClient { request => 
+  def header(h: HttpHeader): HttpClient[A] = buildClient { request =>
     request.copy(headers = request.headers + h)
   }
 
-  def headers(h: Iterable[HttpHeader]): HttpClient[A] = buildClient { request => 
-    request.copy(headers = request.headers ++ h) 
+  def headers(h: Iterable[HttpHeader]): HttpClient[A] = buildClient { request =>
+    request.copy(headers = request.headers ++ h)
   }
 
-  def version(version: HttpVersion) = buildClient { request => 
+  def version(version: HttpVersion) = buildClient { request =>
     request.copy(version = version)
   }
 
   def query(name: String, value: String): HttpClient[A] = queries((name, value))
 
-  def queries(qs: (String, String)*): HttpClient[A] = buildClient { request => addQueries(request)(qs) }
+  def queries(qs: (String, String)*): HttpClient[A] = buildClient { request =>
+    addQueries(request)(qs)
+  }
 
   def contentType[B](mimeType: MimeType)(implicit transcoder: AsyncHttpTranscoder[B, A]) = new HttpClient[B] {
     private def contentHeader = ("Content-Type", mimeType.value)
-    def isDefinedAt(request: HttpRequest[B]): Boolean = 
+    def isDefinedAt(request: HttpRequest[B]): Boolean =
       self.isDefinedAt(transcoder(request).copy(headers = request.headers + contentHeader))
 
-    def apply(request: HttpRequest[B]): Future[HttpResponse[B]] = 
+    def apply(request: HttpRequest[B]): Future[HttpResponse[B]] =
       transcoder.unapply(self.apply(transcoder(request).copy(headers = request.headers + contentHeader)))
   }
 
   def translate[B](implicit transcoder: AsyncHttpTranscoder[B, A]) = new HttpClient[B] {
-    def isDefinedAt(request: HttpRequest[B]): Boolean = self.isDefinedAt(transcoder(request))
+    def isDefinedAt(request: HttpRequest[B]): Boolean           = self.isDefinedAt(transcoder(request))
     def apply(request: HttpRequest[B]): Future[HttpResponse[B]] = transcoder.unapply(self.apply(transcoder(request)))
   }
 
@@ -128,16 +132,15 @@ trait HttpClient[A] extends PartialFunction[HttpRequest[A], Future[HttpResponse[
     val index = url.indexOf('?')
 
     val newUrl = (if (index >= 0) {
-      if (index == url.length - 1) url + qs
-      else url + "&" + qs
-    }
-    else url + "?" + qs)
+                    if (index == url.length - 1) url + qs
+                    else url + "&" + qs
+                  } else url + "?" + qs)
 
     HttpRequest(request.method, URI(newUrl), request.parameters, request.headers, request.content, request.remoteHost, request.version)
   }
 
-  private def method[B](method: HttpMethod, path: String, content: Option[A] = None)(implicit transcoder: AsyncHttpTranscoder[B, A]): Future[HttpResponse[B]] = 
-    transcoder.unapply(self.apply(HttpRequest(method, path,  Map(),  Map(), content)))
+  private def method[B](method: HttpMethod, path: String, content: Option[A] = None)(implicit transcoder: AsyncHttpTranscoder[B, A]): Future[HttpResponse[B]] =
+    transcoder.unapply(self.apply(HttpRequest(method, path, Map(), Map(), content)))
 
   private def buildClient(copy: (HttpRequest[A]) => HttpRequest[A]) = new HttpClient[A] {
     def isDefinedAt(request: HttpRequest[A]): Boolean = self.isDefinedAt(request)

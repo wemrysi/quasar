@@ -10,13 +10,14 @@ import org.streum.configrity.Configuration
 trait NettyEngine extends AbstractNettyEngine { self =>
   type HttpServer <: NettyHttpServer
 
-  abstract class NettyHttpServer(rootConfig: Configuration, services: List[Service[ByteChunk, _]], executor: ExecutionContext) extends AbstractNettyHttpServer(rootConfig, services, executor) { self =>
+  abstract class NettyHttpServer(rootConfig: Configuration, services: List[Service[ByteChunk, _]], executor: ExecutionContext)
+      extends AbstractNettyHttpServer(rootConfig, services, executor) { self =>
     protected def nettyServers(service: AsyncHttpService[ByteChunk, ByteChunk]) = {
       val httpProvider = new HttpNettyServerProvider(self.config, service, executor)
-      val httpServer = new NettyServer(httpProvider)
+      val httpServer   = new NettyServer(httpProvider)
       if (self.config.sslEnable) {
         val httpsProvider = new HttpsNettyServerProvider(self.config, service, executor)
-        val httpsServer = new NettyServer(httpsProvider)
+        val httpsServer   = new NettyServer(httpsProvider)
 
         httpServer :: httpsServer :: Nil
       } else {

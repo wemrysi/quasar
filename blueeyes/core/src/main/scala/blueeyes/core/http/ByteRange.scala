@@ -8,27 +8,31 @@ import blueeyes.core.http.HttpNumbers.LongNumber
 
 sealed trait ByteRange {
 
-  def unit: String 
+  def unit: String
   def bytePairs: List[ByteRanges.BytePair]
-  def value: String = unit + "=" + bytePairs.map(_.toString).mkString(", ")
+  def value: String     = unit + "=" + bytePairs.map(_.toString).mkString(", ")
   override def toString = value
 
 }
 
-object ByteRanges extends RegexParsers with HttpNumberImplicits{
+object ByteRanges extends RegexParsers with HttpNumberImplicits {
 
   private def digitalParser = regex("""[\d]+""".r)
 
   private def bytePairParser = opt(
-    digitalParser ~ ("-" ~> digitalParser) ^^ {case first ~ last => BytePair(Some(LongNumber(first.toLong)), LongNumber(last.toLong))} |
-    "-" ~> digitalParser ^^ {case last => BytePair(None, LongNumber(last.toLong))}
+    digitalParser ~ ("-" ~> digitalParser) ^^ { case first ~ last => BytePair(Some(LongNumber(first.toLong)), LongNumber(last.toLong)) } |
+      "-" ~> digitalParser                 ^^ { case last         => BytePair(None, LongNumber(last.toLong)) }
   )
   private def bytePairsParser = repsep(bytePairParser, regex("""[ ]*,[ ]*""".r)) ^^ { _.flatten }
 
-  private def parser = opt(regex("""[a-zA-Z]+""".r) <~ "=") ~ bytePairsParser ^^ {case unit ~ pairs => unit.flatMap(unitValue => pairs match {
-    case x :: xs => Some(ByteRangeList(pairs, unitValue))
-    case Nil => None
-  })}
+  private def parser = opt(regex("""[a-zA-Z]+""".r) <~ "=") ~ bytePairsParser ^^ {
+    case unit ~ pairs =>
+      unit.flatMap(unitValue =>
+          pairs match {
+          case x :: xs => Some(ByteRangeList(pairs, unitValue))
+          case Nil     => None
+      })
+  }
 
   def parseByteRanges(inString: String) = parser(new CharSequenceReader(inString)) match {
     case Success(result, _) => result
@@ -42,10 +46,10 @@ object ByteRanges extends RegexParsers with HttpNumberImplicits{
 
   sealed class ByteRangeBuilder(unit: String) {
     var pairs: List[BytePair] = List()
-    var name: String = unit
+    var name: String          = unit
 
     def addBytePair(first: HttpNumber, last: HttpNumber) = BytePair(Some(first), last) :: pairs
-    def addBytePair(last: HttpNumber) = BytePair(None, last) :: pairs
+    def addBytePair(last: HttpNumber)                    = BytePair(None, last) :: pairs
 
     def constructByteRange: ByteRange = ByteRangeList(pairs, name)
 
@@ -56,11 +60,10 @@ object ByteRanges extends RegexParsers with HttpNumberImplicits{
   }
   object BytePair {
     def apply(first: HttpNumber, last: HttpNumber): BytePair = new BytePair(Some(first), last)
-    def apply(last: HttpNumber): BytePair = new BytePair(None, last)
+    def apply(last: HttpNumber): BytePair                    = new BytePair(None, last)
   }
 
   case class NullByteRange(bytePairs: List[BytePair], unit: String) extends ByteRange {
     override def value = ""
   }
 }
-

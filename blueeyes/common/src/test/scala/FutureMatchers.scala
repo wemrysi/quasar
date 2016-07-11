@@ -12,11 +12,11 @@ import org.specs2.matcher._
 import org.specs2.execute.FailureException
 
 import scala.annotation.tailrec
-import java.util.concurrent.{TimeoutException,  CountDownLatch}
+import java.util.concurrent.{ TimeoutException, CountDownLatch }
 
 trait AkkaConversions {
   implicit def specsDuration2Akka(duration: org.specs2.time.Duration): akka.util.Duration = new DurationLong(duration.inMillis).millis
-  implicit def specsDuration2Rich(duration: org.specs2.time.Duration) = new RichSpecsDuration(duration)
+  implicit def specsDuration2Rich(duration: org.specs2.time.Duration)                     = new RichSpecsDuration(duration)
 
   class RichSpecsDuration(duration: org.specs2.time.Duration) {
     def toAkka = specsDuration2Akka(duration)
@@ -28,11 +28,13 @@ trait FutureMatchers extends AkkaConversions {
 
   private sealed trait Outcome[A]
   private case class Done[A](matchResult: MatchResult[A]) extends Outcome[A]
-  private case class Retry[A](failureMessage: String) extends Outcome[A]
+  private case class Retry[A](failureMessage: String)     extends Outcome[A]
 
   implicit val defaultFutureTimeouts: FutureTimeouts = FutureTimeouts(10, 100L millis)
 
-  def awaited[A](duration: Duration)(matcher: Matcher[A]) = matcher ^^ { (future: Future[A]) => Await.result(future, duration) }
+  def awaited[A](duration: Duration)(matcher: Matcher[A]) = matcher ^^ { (future: Future[A]) =>
+    Await.result(future, duration)
+  }
 
   case class whenDelivered[A](matcher: Matcher[A])(implicit timeouts: FutureTimeouts) extends Matcher[Future[A]] with Expectations {
     def apply[B <: Future[A]](expectable: Expectable[B]): MatchResult[B] = {
@@ -45,17 +47,19 @@ trait FutureMatchers extends AkkaConversions {
       val start = System.currentTimeMillis
 
       val outcome: Outcome[A] = try {
-        val result = Await.result(future, timeouts.duration)
+        val result      = Await.result(future, timeouts.duration)
         val protoResult = matcher(result aka "The value returned from the Future")
 
         if (protoResult.isSuccess || retries <= 0) Done(protoResult)
-        else protoResult match{
-          case f @ MatchFailure(ok, ko, _, _) => Retry(ko())
-          case f @ MatchSkip(m, _)            => Retry(m)
-          case _ => Retry(protoResult.message)
-        }
+        else
+          protoResult match {
+            case f @ MatchFailure(ok, ko, _, _) => Retry(ko())
+            case f @ MatchSkip(m, _)            => Retry(m)
+            case _                              => Retry(protoResult.message)
+          }
       } catch {
-        case timeout: TimeoutException => Retry("Retried " + (totalRetries - retries) + " times with interval of " + timeouts.duration + " but did not observe a result.")
+        case timeout: TimeoutException =>
+          Retry("Retried " + (totalRetries - retries) + " times with interval of " + timeouts.duration + " but did not observe a result.")
         case failure: FailureException => Retry("Assertion failed on retry " + (totalRetries - retries) + ": " + failure.f.message)
         case ex: Throwable             => Retry("Delivery of future was canceled on retry " + (timeouts.retries - retries) + ": " + ex.fullStackTrace)
       }

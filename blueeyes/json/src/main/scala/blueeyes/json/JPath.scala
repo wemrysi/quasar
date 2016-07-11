@@ -25,13 +25,13 @@ sealed trait JPath { self =>
     ancestors0(this, Nil).reverse
   }
 
-  def \ (that: JPath):  JPath = JPath(self.nodes ++ that.nodes)
-  def \ (that: String): JPath = JPath(self.nodes :+ JPathField(that))
-  def \ (that: Int):    JPath = JPath(self.nodes :+ JPathIndex(that))
+  def \(that: JPath): JPath  = JPath(self.nodes ++ that.nodes)
+  def \(that: String): JPath = JPath(self.nodes :+ JPathField(that))
+  def \(that: Int): JPath    = JPath(self.nodes :+ JPathIndex(that))
 
-  def \: (that: JPath):  JPath = JPath(that.nodes ++ self.nodes)
-  def \: (that: String): JPath = JPath(JPathField(that) +: self.nodes)
-  def \: (that: Int):    JPath = JPath(JPathIndex(that) +: self.nodes)
+  def \:(that: JPath): JPath  = JPath(that.nodes ++ self.nodes)
+  def \:(that: String): JPath = JPath(JPathField(that) +: self.nodes)
+  def \:(that: Int): JPath    = JPath(JPathIndex(that) +: self.nodes)
 
   def hasPrefix(p: JPath): Boolean = nodes.startsWith(p.nodes)
 
@@ -41,12 +41,12 @@ sealed trait JPath { self =>
         case x :: xs =>
           toDrop match {
             case `x` :: ys => remainder(xs, ys)
-            case Nil => Some(JPath(nodes))
-            case _ => None
+            case Nil       => Some(JPath(nodes))
+            case _         => None
           }
 
-        case Nil => 
-          if (toDrop.isEmpty) Some(JPath(nodes)) 
+        case Nil =>
+          if (toDrop.isEmpty) Some(JPath(nodes))
           else None
       }
     }
@@ -60,10 +60,11 @@ sealed trait JPath { self =>
     def extract0(path: List[JPathNode], d: JValue): JValue = path match {
       case Nil => d
 
-      case head :: tail => head match {
-        case JPathField(name)  => extract0(tail, d \ name)
-        case JPathIndex(index) => extract0(tail, d(index))
-      }
+      case head :: tail =>
+        head match {
+          case JPathField(name)  => extract0(tail, d \ name)
+          case JPathIndex(index) => extract0(tail, d(index))
+        }
     }
 
     extract0(nodes, jvalue)
@@ -77,11 +78,12 @@ sealed trait JPath { self =>
     def expand0(current: List[JPathNode], right: List[JPathNode], d: JValue): List[JPath] = right match {
       case Nil => JPath(current) :: Nil
 
-      case head :: tail => head match {
-        case x @ JPathIndex(index) => expand0(current :+ x, tail, jvalue(index))
+      case head :: tail =>
+        head match {
+          case x @ JPathIndex(index) => expand0(current :+ x, tail, jvalue(index))
 
-        case x @ JPathField(name) => expand0(current :+ x, tail, jvalue \ name)
-      }
+          case x @ JPathField(name) => expand0(current :+ x, tail, jvalue \ name)
+        }
     }
 
     expand0(Nil, nodes, jvalue)
@@ -97,21 +99,21 @@ sealed trait JPath { self =>
 }
 
 sealed trait JPathNode {
-  def \(that: JPath) = JPath(this :: that.nodes)
+  def \(that: JPath)     = JPath(this :: that.nodes)
   def \(that: JPathNode) = JPath(this :: that :: Nil)
   def render: String
 }
 
 object JPathNode {
   implicit def s2PathNode(name: String): JPathNode = JPathField(name)
-  implicit def i2PathNode(index: Int): JPathNode = JPathIndex(index)
+  implicit def i2PathNode(index: Int): JPathNode   = JPathIndex(index)
 
   implicit object JPathNodeOrder extends Order[JPathNode] {
     def order(n1: JPathNode, n2: JPathNode): Ordering = (n1, n2) match {
       case (JPathField(s1), JPathField(s2)) => Ordering.fromInt(s1.compare(s2))
-      case (JPathField(_) , _             ) => GT
+      case (JPathField(_), _)               => GT
       case (JPathIndex(i1), JPathIndex(i2)) => Ordering.fromInt(i1.compare(i2))
-      case (JPathIndex(_) , _             ) => LT
+      case (JPathIndex(_), _)               => LT
     }
   }
 
@@ -119,28 +121,28 @@ object JPathNode {
 }
 
 sealed case class JPathField(name: String) extends JPathNode {
-  def render = "." + name
+  def render            = "." + name
   override def toString = render //FIXME
 }
 
 sealed case class JPathIndex(index: Int) extends JPathNode {
-  def render = "[" + index + "]"
+  def render            = "[" + index + "]"
   override def toString = "[" + index + "]"
 }
 
 trait JPathSerialization {
-  implicit val JPathDecomposer : Decomposer[JPath] = new Decomposer[JPath] {
-    def decompose(jpath: JPath) : JValue = JString(jpath.toString)
+  implicit val JPathDecomposer: Decomposer[JPath] = new Decomposer[JPath] {
+    def decompose(jpath: JPath): JValue = JString(jpath.toString)
   }
 
-  implicit val JPathExtractor : Extractor[JPath] = new Extractor[JPath] {
-    def validated(obj : JValue) : scalaz.Validation[Extractor.Error,JPath] =
+  implicit val JPathExtractor: Extractor[JPath] = new Extractor[JPath] {
+    def validated(obj: JValue): scalaz.Validation[Extractor.Error, JPath] =
       obj.validated[String].map(JPath(_))
   }
 }
 
 object JPath extends JPathSerialization {
-  private[this] case class CompositeJPath(nodes: List[JPathNode]) extends JPath 
+  private[this] case class CompositeJPath(nodes: List[JPathNode]) extends JPath
 
   private val PathPattern  = """\.|(?=\[\d+\])""".r
   private val IndexPattern = """^\[(\d+)\]$""".r
@@ -161,13 +163,12 @@ object JPath extends JPathSerialization {
 
       case head :: tail =>
         if (head.trim.length == 0) parse0(tail, acc)
-        else parse0(tail,
-          (head match {
+        else
+          parse0(tail, (head match {
             case IndexPattern(index) => JPathIndex(index.toInt)
 
             case name => JPathField(name)
-          }) :: acc
-        )
+          }) :: acc)
     }
 
     val properPath = if (path.startsWith(".")) path else "." + path
@@ -180,12 +181,12 @@ object JPath extends JPathSerialization {
   implicit object JPathOrder extends Order[JPath] {
     def order(v1: JPath, v2: JPath): Ordering = {
       def compare0(n1: List[JPathNode], n2: List[JPathNode]): Ordering = (n1, n2) match {
-        case (Nil    , Nil)     => EQ
-        case (Nil    , _  )     => LT
-        case (_      , Nil)     => GT
-        case (n1::ns1, n2::ns2) =>
+        case (Nil, Nil) => EQ
+        case (Nil, _)   => LT
+        case (_, Nil)   => GT
+        case (n1 :: ns1, n2 :: ns2) =>
           val ncomp = Order[JPathNode].order(n1, n2)
-          if(ncomp != EQ) ncomp else compare0(ns1, ns2)
+          if (ncomp != EQ) ncomp else compare0(ns1, ns2)
       }
 
       compare0(v1.nodes, v2.nodes)

@@ -10,11 +10,11 @@ import org.slf4s.Logging
 import org.slf4s.Logger
 import org.streum.configrity.Configuration
 
-
 trait AbstractNettyEngine extends HttpServerModule { self =>
   type HttpServer <: AbstractNettyHttpServer
 
-  abstract class AbstractNettyHttpServer(rootConfig: Configuration, services: List[Service[ByteChunk, _]], executor0: ExecutionContext) extends HttpServerLike(rootConfig, services, executor0) {
+  abstract class AbstractNettyHttpServer(rootConfig: Configuration, services: List[Service[ByteChunk, _]], executor0: ExecutionContext)
+      extends HttpServerLike(rootConfig, services, executor0) {
 
     override def start = {
       implicit val stop: Stop[List[NettyServer]] = new Stop[List[NettyServer]] {

@@ -2,8 +2,8 @@ package blueeyes.core.service.engines.security
 
 import org.specs2.mutable.Specification
 
-class KeyStoreFactorySpec extends Specification with CertificateData{
-  "KeyStoreFactory creates KeyStore" in{
+class KeyStoreFactorySpec extends Specification with CertificateData {
+  "KeyStoreFactory creates KeyStore" in {
     val data     = CertificateDecoder(encodedPrivateKey, encodedCertificate)
     val keyStore = KeyStoreFactory(data._1, data._2, "foo", "password")
 

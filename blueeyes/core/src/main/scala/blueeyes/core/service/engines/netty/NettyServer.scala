@@ -2,8 +2,8 @@ package blueeyes.core.service.engines.netty
 
 import blueeyes.core.service.engines.InetInterfaceLookup
 
-import org.jboss.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
-import org.jboss.netty.bootstrap.{ServerBootstrap, Bootstrap}
+import org.jboss.netty.channel.group.{ ChannelGroup, DefaultChannelGroup }
+import org.jboss.netty.bootstrap.{ ServerBootstrap, Bootstrap }
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory
 import org.jboss.netty.channel._
 
@@ -14,12 +14,11 @@ import org.slf4s.Logging
 
 import org.streum.configrity.Configuration
 
-
 class NettyServer(provider: NettyServerProvider) extends Logging {
   private val startStopLock = new java.util.concurrent.locks.ReentrantReadWriteLock
-  private val channelGroup = new DefaultChannelGroup()
+  private val channelGroup  = new DefaultChannelGroup()
 
-  private var server: Option[Bootstrap]  = None
+  private var server: Option[Bootstrap] = None
 
   def start {
     startStopLock.writeLock.lock()
@@ -36,7 +35,7 @@ class NettyServer(provider: NettyServerProvider) extends Logging {
         stop
         throw e
       }
-    } finally{
+    } finally {
       startStopLock.writeLock.unlock()
     }
   }
@@ -47,8 +46,7 @@ class NettyServer(provider: NettyServerProvider) extends Logging {
     try {
       server.foreach(_.releaseExternalResources())
       server = None
-    }
-    finally{
+    } finally {
       startStopLock.writeLock.unlock()
     }
 

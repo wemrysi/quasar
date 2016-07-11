@@ -4,19 +4,27 @@ import blueeyes.bkka.AkkaDefaults
 import org.slf4s.Logging
 import akka.dispatch.Future
 import java.lang.ProcessBuilder
-import java.io.{InputStream, ByteArrayOutputStream}
+import java.io.{ InputStream, ByteArrayOutputStream }
 
 object JavaKeyTool extends Logging with AkkaDefaults {
   def apply(keystore: String, keyalg: String, alias: String, dname: String, validity: Int, password: String) = {
-    val command = Array("keytool",
-                        "-keystore",  keystore,
-                        "-keyalg",    keyalg,
-                        "-genkeypair",
-                        "-alias",     alias,
-                        "-dname",     dname,
-                        "-validity",  validity.toString,
-                        "-keypass",   password,
-                        "-storepass", password)
+    val command = Array(
+      "keytool",
+      "-keystore",
+      keystore,
+      "-keyalg",
+      keyalg,
+      "-genkeypair",
+      "-alias",
+      alias,
+      "-dname",
+      dname,
+      "-validity",
+      validity.toString,
+      "-keypass",
+      password,
+      "-storepass",
+      password)
 
     val processBuilder = new ProcessBuilder(command: _*)
 
@@ -44,8 +52,7 @@ object JavaKeyTool extends Logging with AkkaDefaults {
 
       if (b >= 0) {
         out.write(b)
-      }
-      else looping = false
+      } else looping = false
     }
 
     out.toString("UTF-8")

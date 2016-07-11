@@ -4,7 +4,9 @@ import blueeyes.persistence.cache.functional.TemporalCache
 import blueeyes.util.Clock
 import java.util.concurrent.TimeUnit
 
-case class DynamicHistogram[V] private (private val cache: TemporalCache[Long, V], length: Int, capacity: Int, unit: TimeUnit)(implicit valueStrategy: ValueStrategy[V], clock: Clock) {
+case class DynamicHistogram[V] private (private val cache: TemporalCache[Long, V], length: Int, capacity: Int, unit: TimeUnit)(
+    implicit valueStrategy: ValueStrategy[V],
+    clock: Clock) {
   def +=(timeMs: Long, stat: Long) = {
     val bucket   = bucketNumber(timeMs)
     val value    = cache.get(bucket).getOrElse(valueStrategy.zero)
@@ -16,12 +18,16 @@ case class DynamicHistogram[V] private (private val cache: TemporalCache[Long, V
   def histogram: Map[Long, V] = {
     val lastBucket = bucketNumber(clock.now().getMillis)
     val newCache   = expire(lastBucket, cache)
-    val value      = newCache.keys.foldLeft(Map[Long, V]()){(value, key) => value + Tuple2(key, cache.get(key).get)}
+    val value = newCache.keys.foldLeft(Map[Long, V]()) { (value, key) =>
+      value + Tuple2(key, cache.get(key).get)
+    }
 
     fillMissing(lastBucket, value)
   }
 
-  def count = histogram.values.foldLeft(0l){(result, value) => result + valueStrategy.count(value)}
+  def count = histogram.values.foldLeft(0l) { (result, value) =>
+    result + valueStrategy.count(value)
+  }
 
   private def bucketNumber(ms: Long) = {
     val time = unit.convert(ms, TimeUnit.MILLISECONDS)
@@ -32,7 +38,9 @@ case class DynamicHistogram[V] private (private val cache: TemporalCache[Long, V
     val nextBucket = lastBucket + length
     val allKeys    = List.range(nextBucket - capacity * length, nextBucket, length)
 
-    allKeys.foldLeft(histogram){(value, key) => histogram.get(key).map(v => value).getOrElse(value + Tuple2(key, valueStrategy.zero))}
+    allKeys.foldLeft(histogram) { (value, key) =>
+      histogram.get(key).map(v => value).getOrElse(value + Tuple2(key, valueStrategy.zero))
+    }
   }
 
   private def expire(lastBucket: Long, cache: TemporalCache[Long, V]) = {
@@ -42,5 +50,6 @@ case class DynamicHistogram[V] private (private val cache: TemporalCache[Long, V
 }
 
 object DynamicHistogram {
-  def empty[V](length: Int, capacity: Int, unit: TimeUnit)(implicit valueStrategy: ValueStrategy[V], clock: Clock): DynamicHistogram[V] = DynamicHistogram[V](TemporalCache.empty[Long, V], length, capacity, unit)
+  def empty[V](length: Int, capacity: Int, unit: TimeUnit)(implicit valueStrategy: ValueStrategy[V], clock: Clock): DynamicHistogram[V] =
+    DynamicHistogram[V](TemporalCache.empty[Long, V], length, capacity, unit)
 }

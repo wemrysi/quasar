@@ -7,16 +7,16 @@ import blueeyes.akka_testing.FutureMatchers
 class TimedEternityCountStatSpec extends Specification with TimedStatFixtures with FutureMatchers {
   implicit val healthMonitorTimeout = akka.util.Timeout(10000)
 
-  "EternityTimedCountStat" should{
-    "creates JValue" in{
+  "EternityTimedCountStat" should {
+    "creates JValue" in {
       val timedSample = TimedCountStat(eternity)
       fill(timedSample)
 
-      timedSample.toJValue must whenDelivered (be_==(JObject(JField(eternity.toString, JArray(List(JNum(4)))) :: Nil)))
+      timedSample.toJValue must whenDelivered(be_==(JObject(JField(eternity.toString, JArray(List(JNum(4)))) :: Nil)))
     }
   }
 
-  private def fill(timedSample: Statistic[Long]){
+  private def fill(timedSample: Statistic[Long]) {
     set(timedSample, 1001)
     set(timedSample, 1001)
     set(timedSample, 1002)

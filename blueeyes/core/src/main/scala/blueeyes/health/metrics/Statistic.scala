@@ -6,10 +6,10 @@ import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.util.Timeout
 
-sealed trait Statistic[-T]{
+sealed trait Statistic[-T] {
   def +=(element: T): this.type
 
-  def ++=(xs : scala.collection.TraversableOnce[T]): this.type = {
+  def ++=(xs: scala.collection.TraversableOnce[T]): this.type = {
     xs foreach +=
     this
   }
@@ -39,7 +39,7 @@ abstract class WrapAsyncStatistic[-A, B](sync: SyncStatistic[A, B]) extends Asyn
     this
   }
 
-  def count: Future[Long] = Promise.successful(sync.count)
-  def details: Future[B] = Promise.successful(sync.details)
+  def count: Future[Long]                                    = Promise.successful(sync.count)
+  def details: Future[B]                                     = Promise.successful(sync.details)
   def shutdown(timeout: Timeout = Timeout.zero): Future[Any] = Promise.successful(())
 }

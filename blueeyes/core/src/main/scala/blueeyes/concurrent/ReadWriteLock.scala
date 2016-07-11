@@ -1,6 +1,5 @@
 package blueeyes.concurrent
 
-
 class ReadWriteLock {
   private val lock = new java.util.concurrent.locks.ReentrantReadWriteLock
 

@@ -6,18 +6,18 @@ import java.util.Date
 import java.text.SimpleDateFormat
 import java.text.ParseException
 
-class NameFormatSpec extends Specification with NameFormat{
+class NameFormatSpec extends Specification with NameFormat {
   private val baseName = "w3.log"
-  "NameFormat: formats name with Never policy" in{
+  "NameFormat: formats name with Never policy" in {
     checkName(Never, new SimpleDateFormat("yyyy"))
   }
-  "NameFormat: formats name with Hourly policy" in{
+  "NameFormat: formats name with Hourly policy" in {
     checkName(Hourly, new SimpleDateFormat("yyyyMMdd-HH"))
   }
-  "NameFormat: formats name with Daily policy" in{
+  "NameFormat: formats name with Daily policy" in {
     checkName(Daily, new SimpleDateFormat("yyyyMMdd"))
   }
-  "NameFormat: formats name with Weekly policy" in{
+  "NameFormat: formats name with Weekly policy" in {
     checkName(Weekly(3), new SimpleDateFormat("yyyyMMdd"))
   }
 

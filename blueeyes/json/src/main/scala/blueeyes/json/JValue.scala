@@ -30,17 +30,17 @@ import scalaz.syntax.bifunctor._
 import scalaz.syntax.order._
 import scalaz.syntax.semigroup._
 
-import scala.annotation.{switch, tailrec}
+import scala.annotation.{ switch, tailrec }
 import scala.collection.mutable
 import scala.util.Sorting.quickSort
 
 import java.lang.Double.isInfinite
 import java.lang.Character.codePointAt
-import JValue.{RenderMode, Compact, Pretty, Canonical}
+import JValue.{ RenderMode, Compact, Pretty, Canonical }
 
 /**
- * Data type for Json AST.
- */
+  * Data type for Json AST.
+  */
 sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with Ordered[JValue] { self =>
   def toOption = if (self == JUndefined) None else Some(self)
 
@@ -65,29 +65,29 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** XPath-like expression to query JSON fields by name. Matches only fields on
-   * next level.
-   */
-  def \ (nameToFind: String): JValue = self match {
+    * next level.
+    */
+  def \(nameToFind: String): JValue = self match {
     case j @ JObject(fields) => j.get(nameToFind)
-    case _ => JUndefined
+    case _                   => JUndefined
   }
 
-  def \? (nameToFind: String): Option[JValue] = (self \ nameToFind).toOption
+  def \?(nameToFind: String): Option[JValue] = (self \ nameToFind).toOption
 
   /**
-   * Returns the element as a JValue of the specified class.
-   */
-  def --> [A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(sys.error("Expected class " + clazz + ", but found: " + self.getClass))
+    * Returns the element as a JValue of the specified class.
+    */
+  def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(sys.error("Expected class " + clazz + ", but found: " + self.getClass))
 
   /**
-   * Returns the element as an option of a JValue of the specified class.
-   */
-  def -->? [A <: JValue](clazz: Class[A]): Option[A] = if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
+    * Returns the element as an option of a JValue of the specified class.
+    */
+  def -->?[A <: JValue](clazz: Class[A]): Option[A] = if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
 
   /** 
-   * Does a breadth-first traversal of all descendant JValues, beginning
-   * with this one.
-   */
+    * Does a breadth-first traversal of all descendant JValues, beginning
+    * with this one.
+    */
   def breadthFirst: List[JValue] = {
     import scala.collection.immutable.Queue
 
@@ -96,17 +96,15 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       else {
         val (head, nextQueue) = queue.dequeue
 
-        breadthFirst0(head :: cur, 
-          head match {
-            case JObject(fields) =>
-              nextQueue.enqueue(fields.values.toList)
+        breadthFirst0(head :: cur, head match {
+          case JObject(fields) =>
+            nextQueue.enqueue(fields.values.toList)
 
-            case JArray(elements) =>
-              nextQueue.enqueue(elements)
+          case JArray(elements) =>
+            nextQueue.enqueue(elements)
 
-            case jvalue => nextQueue
-          }
-        )
+          case jvalue => nextQueue
+        })
       }
     }
 
@@ -114,28 +112,29 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** XPath-like expression to query JSON fields by name. Returns all matching fields.
-   */
+    */
   def \\(nameToFind: String): JValue = {
     def find(json: JValue): List[JValue] = json match {
-      case JObject(l) => l.foldLeft(List.empty[JValue]) {
-        case (acc, field) => 
-          val newAcc = if (field._1 == nameToFind) field._2 :: acc else acc
+      case JObject(l) =>
+        l.foldLeft(List.empty[JValue]) {
+          case (acc, field) =>
+            val newAcc = if (field._1 == nameToFind) field._2 :: acc else acc
 
-          newAcc ::: find(field._2)
-      }
+            newAcc ::: find(field._2)
+        }
 
       case JArray(l) => l.flatMap(find)
-      
+
       case _ => Nil
     }
     find(self) match {
       case x :: Nil => x
-      case x => JArray(x)
+      case x        => JArray(x)
     }
   }
 
   /** Gets the specified value located at the terminal of the specified path.
-   */
+    */
   def apply(path: JPath): JValue = get(path)
 
   def get(path: JPath): JValue = path.extract(self)
@@ -143,13 +142,13 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = {
     value match {
       case JUndefined => success[Throwable, JValue](this)
-      case value => Validation fromTryCatch { unsafeInsert(path, value) }
+      case value      => Validation fromTryCatch { unsafeInsert(path, value) }
     }
   }
 
   /**
-   * A safe merge function that ensures that values are not overwritten.
-   */
+    * A safe merge function that ensures that values are not overwritten.
+    */
   def insertAll(other: JValue): ValidationNel[Throwable, JValue] = {
     other.flattenWithPath.foldLeft[ValidationNel[Throwable, JValue]](success(self)) {
       case (acc, (path, value)) => acc flatMap { (_: JValue).insert(path, value).toValidationNel }
@@ -160,96 +159,109 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
     JValue.unsafeInsert(self, rootPath, rootValue)
   }
 
-  def set(path: JPath, value: JValue): JValue = if (path == JPath.Identity) value else {
-    def arraySet(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
-      def update(l: List[JValue], j: Int): List[JValue] = l match {
-        case x :: xs => (if (j == i) x.set(rem, v) else x) :: update(xs, j + 1)
-        case Nil => Nil
+  def set(path: JPath, value: JValue): JValue =
+    if (path == JPath.Identity) value
+    else {
+      def arraySet(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
+        def update(l: List[JValue], j: Int): List[JValue] = l match {
+          case x :: xs => (if (j == i) x.set(rem, v) else x) :: update(xs, j + 1)
+          case Nil     => Nil
+        }
+
+        update(l.padTo(i + 1, JUndefined), 0)
       }
 
-      update(l.padTo(i + 1, JUndefined), 0)
+      self match {
+        case obj @ JObject(fields) =>
+          path.nodes match {
+            case JPathField(name) :: nodes =>
+              val (child, rest) = obj.partitionField(name)
+              rest + JField(name, child.set(JPath(nodes), value))
+
+            case x =>
+              sys.error("Objects are not indexed: attempted to set " + path + " on " + self)
+          }
+
+        case arr @ JArray(elements) =>
+          path.nodes match {
+            case JPathIndex(index) :: nodes =>
+              JArray(arraySet(elements, index, JPath(nodes), value))
+            case x =>
+              sys.error("Arrays have no fields: attempted to set " + path + " on " + self)
+          }
+
+        case _ =>
+          path.nodes match {
+            case Nil                => value
+            case JPathIndex(_) :: _ => JArray(Nil).set(path, value)
+            case JPathField(_) :: _ => JObject(Nil).set(path, value)
+          }
+      }
     }
-
-    self match {
-      case obj @ JObject(fields) => path.nodes match {
-        case JPathField(name) :: nodes => 
-          val (child, rest) = obj.partitionField(name)
-          rest + JField(name, child.set(JPath(nodes), value))
-
-        case x =>
-          sys.error("Objects are not indexed: attempted to set " + path + " on " + self)
-      }
-
-      case arr @ JArray(elements) => path.nodes match {
-        case JPathIndex(index) :: nodes =>
-          JArray(arraySet(elements, index, JPath(nodes), value))
-        case x =>
-          sys.error("Arrays have no fields: attempted to set " + path + " on " + self)
-      }
-
-      case _ => path.nodes match {
-        case Nil => value
-        case JPathIndex(_) :: _ => JArray(Nil).set(path, value)
-        case JPathField(_) :: _ => JObject(Nil).set(path, value)
-      }
-    }
-  }
 
   def delete(path: JPath): Option[JValue] = {
     path.nodes match {
-      case JPathField(name) :: xs => this match {
-        case JObject(fields) => Some(
-          JObject(fields flatMap {
-            case JField(`name`, value) => value.delete(JPath(xs: _*)) map { v => JField(name, v) }
-            case unmodified => Some(unmodified)
-          })
-        )
-        case unmodified => Some(unmodified)
-      }
+      case JPathField(name) :: xs =>
+        this match {
+          case JObject(fields) =>
+            Some(
+              JObject(fields flatMap {
+                case JField(`name`, value) =>
+                  value.delete(JPath(xs: _*)) map { v =>
+                    JField(name, v)
+                  }
+                case unmodified => Some(unmodified)
+              })
+            )
+          case unmodified => Some(unmodified)
+        }
 
-      case JPathIndex(idx) :: xs => this match {
-        case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
-        case unmodified => Some(unmodified)
-      }
+      case JPathIndex(idx) :: xs =>
+        this match {
+          case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
+          case unmodified       => Some(unmodified)
+        }
 
       case Nil => None
     }
   }
 
   /** Return nth element from JSON.
-   * Meaningful only to JArray, JObject and JField. Returns JUndefined for other types.
-   */
+    * Meaningful only to JArray, JObject and JField. Returns JUndefined for other types.
+    */
   def apply(i: Int): JValue = JUndefined
 
   /** Return direct child elements.
-   */
+    */
   def children: Iterable[JValue] = self match {
     case JObject(fields) => fields.values
-    case JArray(l) => l
-    case _ => List.empty
+    case JArray(l)       => l
+    case _               => List.empty
   }
 
   /** Return a combined value by folding over JSON by applying a function <code>f</code>
-   * for each element. The initial value is <code>z</code>.
-   */
-  def foldDown[A](z: A)(f: (A, JValue) => A): A = foldDownWithPath(z) { (acc, p, v) => f(acc, v) }
+    * for each element. The initial value is <code>z</code>.
+    */
+  def foldDown[A](z: A)(f: (A, JValue) => A): A = foldDownWithPath(z) { (acc, p, v) =>
+    f(acc, v)
+  }
 
   /** Return a combined value by folding over JSON by applying a function `f`
-   * for each element, passing along the path to the elements. The initial
-   * value is `z`.
-   */
+    * for each element, passing along the path to the elements. The initial
+    * value is `z`.
+    */
   def foldDownWithPath[A](z: A)(f: (A, JPath, JValue) => A): A = {
     def rec(acc: A, p: JPath, v: JValue): A = {
       val newAcc = f(acc, p, v)
 
       v match {
-        case JObject(l)   =>
-          l.foldLeft(newAcc) { 
-            case(acc, field) =>
-              rec(acc, p \ field._1, field._2) 
+        case JObject(l) =>
+          l.foldLeft(newAcc) {
+            case (acc, field) =>
+              rec(acc, p \ field._1, field._2)
           }
 
-        case JArray(l) =>
+        case JArray(l)                                         =>
           l.zipWithIndex.foldLeft(newAcc) { case (a, (e, idx)) => rec(a, p \ idx, e) }
 
         case _ => newAcc
@@ -260,25 +272,28 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Return a combined value by folding over JSON by applying a function <code>f</code>
-   * for each element. The initial value is <code>z</code>.
-   */
-  def foldUp[A](z: A)(f: (A, JValue) => A): A = foldUpWithPath(z) { (acc, p, v) => f(acc, v) }
+    * for each element. The initial value is <code>z</code>.
+    */
+  def foldUp[A](z: A)(f: (A, JValue) => A): A = foldUpWithPath(z) { (acc, p, v) =>
+    f(acc, v)
+  }
 
   /** Return a combined value by folding over JSON by applying a function `f`
-   * for each element, passing along the path to the elements. The initial
-   * value is `z`.
-   */
+    * for each element, passing along the path to the elements. The initial
+    * value is `z`.
+    */
   def foldUpWithPath[A](z: A)(f: (A, JPath, JValue) => A): A = {
     def rec(acc: A, p: JPath, v: JValue): A = {
       f(v match {
         case JObject(l) =>
-          l.foldLeft(acc) { 
-            (acc, field) => 
-              rec(acc, p \ field._1, field._2)
+          l.foldLeft(acc) { (acc, field) =>
+            rec(acc, p \ field._1, field._2)
           }
 
         case JArray(l) =>
-          l.zipWithIndex.foldLeft(acc) { (a, t) => val (e, idx) = t; rec(a, p \ idx, e) }
+          l.zipWithIndex.foldLeft(acc) { (a, t) =>
+            val (e, idx) = t; rec(a, p \ idx, e)
+          }
 
         case _ => acc
       }, p, v)
@@ -288,27 +303,31 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
-   * to each element, moving from the bottom-up.
-   */
+    * to each element, moving from the bottom-up.
+    */
   def mapUp(f: JValue => JValue): JValue = mapUpWithPath((p, j) => f(j))
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
-   * to each element and its path, moving from the bottom-up.
-   */
+    * to each element and its path, moving from the bottom-up.
+    */
   def mapUpWithPath(f: (JPath, JValue) => JValue): JValue = {
     def rec(p: JPath, v: JValue): JValue = v match {
-      case JObject(l) => 
-        f(p, JObject(l.flatMap { f => 
+      case JObject(l) =>
+        f(p, JObject(l.flatMap { f =>
           val v2 = rec(p \ f._1, f._2)
 
           if (v2 == JUndefined) Nil else JField(f._1, v2) :: Nil
-          
+
         }))
 
-      case JArray(l) => f(p, JArray(l.zipWithIndex.flatMap(t => rec(p \ t._2, t._1) match {
-        case JUndefined => Nil
-        case x => x :: Nil
-      })))
+      case JArray(l) =>
+        f(
+          p,
+          JArray(l.zipWithIndex.flatMap(t =>
+                rec(p \ t._2, t._1) match {
+              case JUndefined => Nil
+              case x          => x :: Nil
+          })))
 
       case x => f(p, x)
     }
@@ -316,29 +335,29 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
-   * to each element, moving from the top-down.
-   */
+    * to each element, moving from the top-down.
+    */
   def mapDown(f: JValue => JValue): JValue = mapDownWithPath((p, j) => f(j))
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
-   * to each element and its path, moving from the top-down.
-   */
+    * to each element and its path, moving from the top-down.
+    */
   def mapDownWithPath(f: (JPath, JValue) => JValue): JValue = {
     def rec(p: JPath, v: JValue): JValue = {
       f(p, v) match {
         case JObject(l) =>
-          JObject(l.flatMap { 
-            case (k, v) => 
-            val v2 = rec(p \ k, v)
-            if (v2 == JUndefined) Nil else JField(k, v2) :: Nil
+          JObject(l.flatMap {
+            case (k, v) =>
+              val v2 = rec(p \ k, v)
+              if (v2 == JUndefined) Nil else JField(k, v2) :: Nil
           })
 
         case JArray(l) =>
-          JArray(l.zipWithIndex flatMap { 
+          JArray(l.zipWithIndex flatMap {
             case (e, idx) =>
               rec(p \ idx, e) match {
                 case JUndefined => Nil
-                case x => x :: Nil
+                case x          => x :: Nil
               }
           })
 
@@ -350,45 +369,49 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Return a new JValue resulting from applying the given partial function <code>f</code>
-   * to each element in JSON.
-   */
+    * to each element in JSON.
+    */
   def transform(f: PartialFunction[JValue, JValue]): JValue = mapUp { x =>
     if (f.isDefinedAt(x)) f(x) else x
   }
 
   /** Replaces the matched path values with the result of calling the
-   * replacer function on the matches. If the path has no values, the
-   * method has no effect -- i.e. it is not an error to specify paths
-   * which do not exist.
-   */
+    * replacer function on the matches. If the path has no values, the
+    * method has no effect -- i.e. it is not an error to specify paths
+    * which do not exist.
+    */
   def replace(target: JPath, replacer: JValue => JValue): JValue = {
     def replace0(target: JPath, j: JValue): JValue = target.nodes match {
       case Nil => replacer(j)
 
-      case head :: tail => head match {
-        case JPathField(name1) => j match {
-          case JObject(fields) => JObject(fields.map {
-            case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
+      case head :: tail =>
+        head match {
+          case JPathField(name1) =>
+            j match {
+              case JObject(fields) =>
+                JObject(fields.map {
+                  case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
 
-            case field => field
-          })
+                  case field => field
+                })
 
-          case jvalue => jvalue
+              case jvalue => jvalue
+            }
+
+          case JPathIndex(index) =>
+            j match {
+              case JArray(elements) =>
+                val split = elements.splitAt(index)
+
+                val prefix = split._1
+                val middle = replace0(JPath(tail: _*), split._2.head)
+                val suffix = split._2.drop(1)
+
+                JArray(prefix ++ (middle :: suffix))
+
+              case jvalue => jvalue
+            }
         }
-
-        case JPathIndex(index) => j match {
-          case JArray(elements) =>
-            val split = elements.splitAt(index)
-
-            val prefix = split._1
-            val middle = replace0(JPath(tail: _*), split._2.head)
-            val suffix = split._2.drop(1)
-
-            JArray(prefix ++ (middle :: suffix))
-
-          case jvalue => jvalue
-        }
-      }
     }
 
     target.expand(self).foldLeft(self) { (jvalue, expansion) =>
@@ -397,12 +420,12 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** A shorthand for the other replacement in the case that the replacement
-   * does not depend on the value being replaced.
-   */
+    * does not depend on the value being replaced.
+    */
   def replace(target: JPath, replacement: JValue): JValue = replace(target, r => replacement)
 
   /** Return the first element from JSON which matches the given predicate.
-   */
+    */
   def find(p: JValue => Boolean): Option[JValue] = {
     def find(json: JValue): Option[JValue] = {
       if (p(json)) Some(json)
@@ -410,7 +433,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
         json match {
           case JObject(l) => l.flatMap({ case (_, v) => find(v) }).headOption
           case JArray(l)  => l.flatMap(find).headOption
-          case _ => None
+          case _          => None
         }
       }
     }
@@ -419,7 +442,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Return a List of all elements which matches the given predicate.
-   */
+    */
   def filter(p: JValue => Boolean): List[JValue] =
     foldDown(List.empty[JValue])((acc, e) => if (p(e)) e :: acc else acc).reverse
 
@@ -427,16 +450,16 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
     foldDown(List.empty[JValue])((acc, e) => e :: acc).reverse
 
   /** Flattens the JValue down to a list of path to simple JValue primitive.
-   */
+    */
   def flattenWithPath: List[(JPath, JValue)] = {
     def flatten0(path: JPath)(value: JValue): List[(JPath, JValue)] = value match {
       case JObject.empty | JArray.empty =>
         List(path -> value)
 
-      case JObject(fields) => 
+      case JObject(fields)           =>
         fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
 
-      case JArray(elements) => 
+      case JArray(elements)                                   =>
         elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })
 
       case JUndefined => Nil
@@ -448,54 +471,58 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   /** Concatenate with another JSON.
-   * This is a concatenation monoid: (JValue, ++, JUndefined)
-   */
-  def ++ (other: JValue): JValue = {
+    * This is a concatenation monoid: (JValue, ++, JUndefined)
+    */
+  def ++(other: JValue): JValue = {
     def append(value1: JValue, value2: JValue): JValue = (value1, value2) match {
-      case (JUndefined, x) => x
-      case (x, JUndefined) => x
+      case (JUndefined, x)          => x
+      case (x, JUndefined)          => x
       case (JArray(xs), JArray(ys)) => JArray(xs ::: ys)
-      case (JArray(xs), v: JValue) => JArray(xs ::: List(v))
-      case (v: JValue, JArray(xs)) => JArray(v :: xs)
-      case (x, y) => JArray(x :: y :: Nil)
+      case (JArray(xs), v: JValue)  => JArray(xs ::: List(v))
+      case (v: JValue, JArray(xs))  => JArray(v :: xs)
+      case (x, y)                   => JArray(x :: y :: Nil)
     }
     append(self, other)
   }
 
   /** Return a JSON where all elements matching the given predicate are removed.
-   */
+    */
   def remove(p: JValue => Boolean): JValue = self mapUp {
     case x if p(x) => JUndefined
-    case x => x
+    case x         => x
   }
 
   /**
-   * Remove instances of Nothing from the data structure.
-   */
+    * Remove instances of Nothing from the data structure.
+    */
   def minimize: Option[JValue] = {
     this match {
       case JObject(fields)  => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
       case JArray(elements) => Some(JArray(elements.flatMap(_.minimize)))
-      case JUndefined => None
-      case value => Some(value)
+      case JUndefined       => None
+      case value            => Some(value)
     }
   }
 }
 
 object JValue {
   sealed trait RenderMode
-  case object Pretty extends RenderMode
-  case object Compact extends RenderMode
+  case object Pretty    extends RenderMode
+  case object Compact   extends RenderMode
   case object Canonical extends RenderMode
 
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
 
   private def unflattenArray(elements: Seq[(JPath, JValue)]): JArray = {
-    elements.foldLeft(JArray(Nil)) { (arr, t) => arr.set(t._1, t._2) --> classOf[JArray] }
+    elements.foldLeft(JArray(Nil)) { (arr, t) =>
+      arr.set(t._1, t._2) --> classOf[JArray]
+    }
   }
 
   private def unflattenObject(elements: Seq[(JPath, JValue)]): JObject = {
-    elements.foldLeft(JObject(Nil)) { (obj, t) => obj.set(t._1, t._2) --> classOf[JObject] }
+    elements.foldLeft(JObject(Nil)) { (obj, t) =>
+      obj.set(t._1, t._2) --> classOf[JObject]
+    }
   }
 
   def unflatten(elements: Seq[(JPath, JValue)]): JValue = {
@@ -508,27 +535,27 @@ object JValue {
       if (xp == JPath.Identity && sorted.size == 1) xv
       else if (xp.path.startsWith("[")) unflattenArray(sorted)
       else unflattenObject(sorted)
-    }      
-  }    
+    }
+  }
 
   case class paired(jv1: JValue, jv2: JValue) {
     assert(jv1 != null && jv2 != null)
-    final def fold[A](default: => A)(
-      obj:    Map[String, JValue] => Map[String, JValue] => A,
-      arr:    List[JValue] => List[JValue] => A,
-      str:    String => String => A,
-      num:    BigDecimal => BigDecimal => A,
-      bool:   Boolean => Boolean => A,
-      nul:    => A, nothing: => A) = {
+    final def fold[A](default: => A)(obj: Map[String, JValue] => Map[String, JValue] => A,
+                                     arr: List[JValue] => List[JValue] => A,
+                                     str: String => String => A,
+                                     num: BigDecimal => BigDecimal => A,
+                                     bool: Boolean => Boolean => A,
+                                     nul: => A,
+                                     nothing: => A) = {
       (jv1, jv2) match {
-        case (JObject(o1),  JObject(o2)) => obj(o1)(o2)
-        case (JArray(a1) ,  JArray(a2))  => arr(a1)(a2)
-        case (JString(s1),  JString(s2)) => str(s1)(s2)
-        case (JBool(b1),    JBool(b2)) => bool(b1)(b2)
-        case (JNum(d1),     JNum(d2)) => num(d1)(d2)
-        case (JNull,        JNull) => nul
-        case (JUndefined,   JUndefined) => nul
-        case _ => default
+        case (JObject(o1), JObject(o2)) => obj(o1)(o2)
+        case (JArray(a1), JArray(a2))   => arr(a1)(a2)
+        case (JString(s1), JString(s2)) => str(s1)(s2)
+        case (JBool(b1), JBool(b2))     => bool(b1)(b2)
+        case (JNum(d1), JNum(d2))       => num(d1)(d2)
+        case (JNull, JNull)             => nul
+        case (JUndefined, JUndefined)   => nul
+        case _                          => default
       }
     }
   }
@@ -545,43 +572,53 @@ object JValue {
 
   def unsafeInsert(rootTarget: JValue, rootPath: JPath, rootValue: JValue): JValue = {
     def rec(target: JValue, path: JPath, value: JValue): JValue = {
-      if ((target == JNull || target == JUndefined) && path == JPath.Identity) value else {
+      if ((target == JNull || target == JUndefined) && path == JPath.Identity) value
+      else {
         def arrayInsert(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
           def update(l: List[JValue], j: Int): List[JValue] = l match {
             case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
-            case Nil => Nil
+            case Nil     => Nil
           }
 
           update(l.padTo(i + 1, JUndefined), 0)
         }
 
         target match {
-          case obj @ JObject(fields) => path.nodes match {
-            case JPathField(name) :: nodes => 
-              val (child, rest) = obj.partitionField(name)
+          case obj @ JObject(fields) =>
+            path.nodes match {
+              case JPathField(name) :: nodes =>
+                val (child, rest) = obj.partitionField(name)
 
-              rest + JField(name, rec(child, JPath(nodes), value))
+                rest + JField(name, rec(child, JPath(nodes), value))
 
-            case JPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-            case Nil => sys.error("JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path + 
-                                " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
-          }
+              case JPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case Nil =>
+                sys.error(
+                  "JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
+                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+            }
 
-          case arr @ JArray(elements) => path.nodes match {
-            case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
-            case JPathField(_) :: _ => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-            case Nil => sys.error("JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path + 
-                                  " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
-          }
+          case arr @ JArray(elements) =>
+            path.nodes match {
+              case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
+              case JPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case Nil =>
+                sys.error(
+                  "JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
+                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+            }
 
-          case JNull | JUndefined => path.nodes match {
-            case Nil => value
-            case JPathIndex(_) :: _ => rec(JArray(Nil), path, value)
-            case JPathField(_) :: _ => rec(JObject(Nil), path, value)
-          }
+          case JNull | JUndefined =>
+            path.nodes match {
+              case Nil                => value
+              case JPathIndex(_) :: _ => rec(JArray(Nil), path, value)
+              case JPathField(_) :: _ => rec(JObject(Nil), path, value)
+            }
 
-          case x => sys.error("JValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path + 
-                              " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+          case x =>
+            sys.error(
+              "JValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
+                " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
         }
       }
     }
@@ -593,50 +630,50 @@ object JValue {
 case class UndefinedNormalizeError(msg: String) extends Exception(msg)
 
 case object JUndefined extends JValue {
-  final def normalize = throw UndefinedNormalizeError("Can't normalize JUndefined")
-  final def sort: JValue = this
-  final def renderCompact: String = "null"
+  final def normalize                 = throw UndefinedNormalizeError("Can't normalize JUndefined")
+  final def sort: JValue              = this
+  final def renderCompact: String     = "null"
   protected[json] final def typeIndex = -1
-  final def compare(that: JValue) = typeIndex compare that.typeIndex
+  final def compare(that: JValue)     = typeIndex compare that.typeIndex
 }
 
 case object JNull extends JValue {
-  final def normalize: JNull.type = JNull
-  final def sort: JValue = this
-  final def renderCompact: String = "null"
+  final def normalize: JNull.type     = JNull
+  final def sort: JValue              = this
+  final def renderCompact: String     = "null"
   protected[json] final def typeIndex = 0
-  final def compare(that: JValue) = typeIndex compare that.typeIndex
+  final def compare(that: JValue)     = typeIndex compare that.typeIndex
 }
 
 sealed trait JBool extends JValue {
-  final def normalize: JBool = this
-  final def sort: JBool = this
+  final def normalize: JBool          = this
+  final def sort: JBool               = this
   protected[json] final def typeIndex = 1
   def value: Boolean
 }
 
 case object JTrue extends JBool {
-  final def value = true
+  final def value                 = true
   final def renderCompact: String = "true"
   final def compare(that: JValue) = that match {
-    case JTrue => 0
+    case JTrue  => 0
     case JFalse => 1
-    case _ => typeIndex compare that.typeIndex
+    case _      => typeIndex compare that.typeIndex
   }
 }
 
 case object JFalse extends JBool {
-  final def value = false
+  final def value                 = false
   final def renderCompact: String = "false"
   final def compare(that: JValue) = that match {
-    case JTrue => -1
+    case JTrue  => -1
     case JFalse => 0
-    case _ => typeIndex compare that.typeIndex
+    case _      => typeIndex compare that.typeIndex
   }
 }
 
 object JBool {
-  def apply(value: Boolean): JBool = if (value) JTrue else JFalse
+  def apply(value: Boolean): JBool           = if (value) JTrue else JFalse
   def unapply(value: JBool): Option[Boolean] = Some(value.value)
 }
 
@@ -660,7 +697,7 @@ sealed trait JNum extends JValue {
 
   final def compare(that: JValue): Int = that match {
     case num: JNum => numCompare(num)
-    case _ => typeIndex compare that.typeIndex
+    case _         => typeIndex compare that.typeIndex
   }
 
   protected[json] def numCompare(other: JNum): Int
@@ -670,14 +707,14 @@ case class JNumStr private[json] (value: String) extends JNum {
   private lazy val dec: BigDecimal = BigDecimal(value)
 
   final def toBigDecimal: BigDecimal = dec
-  final def toLong: Long = value.toDouble.toLong
-  final def toDouble: Double = value.toDouble
-  final def toRawString: String = value
+  final def toLong: Long             = value.toDouble.toLong
+  final def toDouble: Double         = value.toDouble
+  final def toRawString: String      = value
 
   override def equals(other: Any) = other match {
     case JNumLong(n) => value == n.toString
-    case num: JNum => toBigDecimal == num.toBigDecimal
-    case _ => false
+    case num: JNum   => toBigDecimal == num.toBigDecimal
+    case _           => false
   }
 
   protected[json] def numCompare(other: JNum) = toBigDecimal compare other.toBigDecimal
@@ -685,66 +722,66 @@ case class JNumStr private[json] (value: String) extends JNum {
 
 case class JNumLong(value: Long) extends JNum {
   final def toBigDecimal: BigDecimal = BigDecimal(value)
-  final def toLong: Long = value
-  final def toDouble: Double = value.toDouble
-  final def toRawString: String = value.toString
+  final def toLong: Long             = value
+  final def toDouble: Double         = value.toDouble
+  final def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
-    case JNumLong(n) => value == n
+    case JNumLong(n)   => value == n
     case JNumDouble(n) => value == n
     case JNumBigDec(n) => value == n
-    case JNumStr(s) => value.toString == s
-    case _ => false
+    case JNumStr(s)    => value.toString == s
+    case _             => false
   }
 
   protected[json] def numCompare(other: JNum) = other match {
-    case JNumLong(n) => value compare n
+    case JNumLong(n)   => value compare n
     case JNumDouble(n) => value.toDouble compare n
     case JNumBigDec(n) => BigDecimal(value) compare n
-    case _ => toBigDecimal compare other.toBigDecimal
+    case _             => toBigDecimal compare other.toBigDecimal
   }
 }
 
 case class JNumDouble private[json] (value: Double) extends JNum {
   final def toBigDecimal: BigDecimal = BigDecimal(value)
-  final def toLong: Long = value.toLong
-  final def toDouble: Double = value
-  final def toRawString: String = value.toString
+  final def toLong: Long             = value.toLong
+  final def toDouble: Double         = value
+  final def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
-    case JNumLong(n) => value == n
+    case JNumLong(n)   => value == n
     case JNumDouble(n) => value == n
-    case num: JNum => toBigDecimal == num.toBigDecimal
-    case _ => false
+    case num: JNum     => toBigDecimal == num.toBigDecimal
+    case _             => false
   }
 
   protected[json] def numCompare(other: JNum) = other match {
-    case JNumLong(n) => value compare n.toDouble
+    case JNumLong(n)   => value compare n.toDouble
     case JNumDouble(n) => value compare n
     case JNumBigDec(n) => BigDecimal(value) compare n
-    case _ => toBigDecimal compare other.toBigDecimal
+    case _             => toBigDecimal compare other.toBigDecimal
   }
 }
 
 case class JNumBigDec(value: BigDecimal) extends JNum {
   final def toBigDecimal: BigDecimal = value
-  final def toLong: Long = value.toLong
-  final def toDouble: Double = value.toDouble
-  final def toRawString: String = value.toString
+  final def toLong: Long             = value.toLong
+  final def toDouble: Double         = value.toDouble
+  final def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
-    case JNumLong(n) => value == n
+    case JNumLong(n)   => value == n
     case JNumDouble(n) => value == n
     case JNumBigDec(n) => value == n
-    case num: JNum => value == num.toBigDecimal
-    case _ => false
+    case num: JNum     => value == num.toBigDecimal
+    case _             => false
   }
 
   protected[json] def numCompare(other: JNum) = other match {
-    case JNumLong(n) => value compare n
+    case JNumLong(n)   => value compare n
     case JNumDouble(n) => value compare n
     case JNumBigDec(n) => value compare n
-    case _ => value compare other.toBigDecimal
+    case _             => value compare other.toBigDecimal
   }
 }
 
@@ -761,8 +798,7 @@ case object JNum {
   def compare(v1: JNum, v2: JNum) = v1.numCompare(v2)
 
   def unapply(value: JNum): Option[BigDecimal] = {
-    try { Some(value.toBigDecimal) }
-    catch { case _ : NumberFormatException => None }
+    try { Some(value.toBigDecimal) } catch { case _: NumberFormatException => None }
   }
 }
 
@@ -771,7 +807,7 @@ case class JString(value: String) extends JValue {
 
   final def sort: JString = this
 
-  final def renderCompact: String = JString.escape(value)
+  final def renderCompact: String         = JString.escape(value)
   final override def renderPretty: String = JString.escape(value)
   final override def internalRender(sb: StringBuilder, mode: RenderMode, indent: String) {
     JString.internalEscape(sb, value)
@@ -781,7 +817,7 @@ case class JString(value: String) extends JValue {
 
   final def compare(that: JValue): Int = that match {
     case JString(s) => value compare s
-    case _ => typeIndex compare that.typeIndex
+    case _          => typeIndex compare that.typeIndex
   }
 }
 
@@ -794,7 +830,7 @@ object JString {
     val len = s.length
     while (i < len) {
       (s.charAt(i): @switch) match {
-        case '"' => sb.append("\\\"")
+        case '"'  => sb.append("\\\"")
         case '\\' => sb.append("\\\\")
         case '\b' => sb.append("\\b")
         case '\f' => sb.append("\\f")
@@ -824,22 +860,24 @@ case object JField extends ((String, JValue) => JField) {
 
   implicit final val ordering = order.toScalaOrdering
 
-  def liftFilter(f: JField => Boolean): JValue => JValue = (value: JValue) => value match {
-    case JObject(fields) => JObject(fields.filter(f))
-    case _ => value
-  }
+  def liftFilter(f: JField => Boolean): JValue => JValue =
+    (value: JValue) =>
+      value match {
+        case JObject(fields) => JObject(fields.filter(f))
+        case _               => value
+    }
 
   def liftFind(f: JField => Boolean): JValue => Boolean = (jvalue: JValue) => {
     jvalue match {
       case JObject(fields) => !fields.filter(f).isEmpty
-      case _ => false
+      case _               => false
     }
   }
 
   def liftMap(f: JField => JField): JValue => JValue = (jvalue: JValue) => {
     jvalue match {
       case JObject(fields) => JObject(fields.map(f))
-      case _ => jvalue
+      case _               => jvalue
     }
   }
 
@@ -849,7 +887,7 @@ case object JField extends ((String, JValue) => JField) {
     def apply(value: JValue): JValue = applyOpt(value).get
 
     def applyOpt(value: JValue): Option[JValue] = value match {
-      case JObject(fields) => 
+      case JObject(fields) =>
         val newFields = fields.collect(f)
 
         if (newFields.isEmpty) None else Some(JObject(newFields))
@@ -867,27 +905,28 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
   def get(name: String): JValue = fields.get(name).getOrElse(JUndefined)
 
-  def hasDefinedChild: Boolean = fields.values.exists(_ != JUndefined) 
+  def hasDefinedChild: Boolean = fields.values.exists(_ != JUndefined)
 
   def normalize: JObject = JObject(
     fields flatMap {
-      case (k, v) => v match {
-        case JUndefined => None
-        case jv => Some((k, jv.normalize))
-      }
+      case (k, v) =>
+        v match {
+          case JUndefined => None
+          case jv         => Some((k, jv.normalize))
+        }
     }
   )
 
-  def + (field: JField): JObject = copy(fields = fields + field)
+  def +(field: JField): JObject = copy(fields = fields + field)
 
-  def - (name: String): JObject = copy(fields = fields - name)
+  def -(name: String): JObject = copy(fields = fields - name)
 
   def merge(other: JObject): JObject = JObject(Merge.mergeFields(this.fields, other.fields))
 
   def partitionField(field: String): (JValue, JObject) = {
     (get(field), JObject(fields - field))
   }
-  
+
   def partition(f: JField => Boolean): (JObject, JObject) = {
     fields.partition(f).bimap(JObject(_), JObject(_))
   }
@@ -897,9 +936,9 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
   def mapFields(f: JField => JField) = JObject(fields.map(f))
 
   def isNested: Boolean = fields.values.exists {
-    case _: JArray => true
+    case _: JArray  => true
     case _: JObject => true
-    case _ => false
+    case _          => false
   }
 
   protected[json] final def typeIndex = 7
@@ -908,8 +947,8 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
     @tailrec def rec(fields: Array[String], i: Int): Int = {
       if (i < fields.length) {
         val key = fields(i)
-        val v1 = m1.getOrElse(key, JUndefined)
-        val v2 = m2.getOrElse(key, JUndefined)
+        val v1  = m1.getOrElse(key, JUndefined)
+        val v2  = m2.getOrElse(key, JUndefined)
 
         if (v1 == JUndefined && v2 == JUndefined) rec(fields, i + 1)
         else if (v1 == JUndefined) 1
@@ -930,7 +969,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
   override def compare(that: JValue): Int = that match {
     case o: JObject => fieldsCmp(fields, o.fields)
-    case _ => typeIndex compare that.typeIndex
+    case _          => typeIndex compare that.typeIndex
   }
 
   private def fieldsEq(m1: Map[String, JValue], m2: Map[String, JValue]): Boolean = {
@@ -943,7 +982,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
   override def equals(other: Any) = other match {
     case o: JObject => fieldsEq(fields, o.fields)
-    case _ => false
+    case _          => false
   }
 
   final override def renderCompact: String = buildString(internalRender(_, Compact, ""))
@@ -967,9 +1006,9 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
         }
         sb.append("}")
 
-      case _ => 
-        val indent2 = indent + "  "
-        val oneLine = fields.size < 4 && !isNested
+      case _ =>
+        val indent2   = indent + "  "
+        val oneLine   = fields.size < 4 && !isNested
         val delimiter = if (oneLine) ", " else ",\n"
 
         sb.append("{")
@@ -999,7 +1038,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 }
 
 case object JObject extends (Map[String, JValue] => JObject) {
-  final val empty = JObject(Nil)
+  final val empty                          = JObject(Nil)
   final implicit val order: Order[JObject] = Order[List[JField]].contramap((_: JObject).fields.toList.sorted.filter(_._2 ne JUndefined).sortBy(_._2))
 
   def apply(fields: Traversable[JField]): JObject = JObject(fields.toMap)
@@ -1008,7 +1047,7 @@ case object JObject extends (Map[String, JValue] => JObject) {
 
   def unapplySeq(value: JValue): Option[Seq[JField]] = value match {
     case JObject(fields) => Some(fields.toSeq)
-    case _ => None
+    case _               => None
   }
 }
 
@@ -1023,7 +1062,7 @@ case class JArray(elements: List[JValue]) extends JValue {
     elements flatMap {
       _ match {
         case JUndefined => None
-        case v => Some(v.normalize)
+        case v          => Some(v.normalize)
       }
     }
   )
@@ -1035,9 +1074,9 @@ case class JArray(elements: List[JValue]) extends JValue {
   def merge(other: JArray): JArray = JArray(Merge.mergeVals(this.elements, other.elements))
 
   def isNested: Boolean = elements.exists {
-    case _: JArray => true
+    case _: JArray  => true
     case _: JObject => true
-    case _ => false
+    case _          => false
   }
 
   protected[json] final def typeIndex = 6
@@ -1045,42 +1084,46 @@ case class JArray(elements: List[JValue]) extends JValue {
   @tailrec
   private def elementsEq(js1: List[JValue], js2: List[JValue]): Boolean = {
     js1 match {
-      case Nil => js2 match {
-        case Nil => true
-        case _ => false
-      }
-      case h1 :: t1 => js2 match {
-        case Nil => false
-        case h2 :: t2 => if (h1 equals h2) elementsEq(t1, t2) else false
-      }
+      case Nil =>
+        js2 match {
+          case Nil => true
+          case _   => false
+        }
+      case h1 :: t1 =>
+        js2 match {
+          case Nil      => false
+          case h2 :: t2 => if (h1 equals h2) elementsEq(t1, t2) else false
+        }
     }
   }
 
   override def equals(other: Any) = other match {
     case o: JArray => elementsEq(elements, o.elements)
-    case _ => false
+    case _         => false
   }
 
   @tailrec
   private def elementsCmp(js1: List[JValue], js2: List[JValue]): Int = {
     js1 match {
-      case Nil => js2 match {
-        case Nil => 0
-        case _ => -1
-      }
+      case Nil =>
+        js2 match {
+          case Nil => 0
+          case _   => -1
+        }
 
-      case h1 :: t1 => js2 match {
-        case Nil => 1
-        case h2 :: t2 =>
-          val i = (h1 compare h2)
-          if (i == 0) elementsCmp(t1, t2) else i
-      }
+      case h1 :: t1 =>
+        js2 match {
+          case Nil => 1
+          case h2 :: t2 =>
+            val i = (h1 compare h2)
+            if (i == 0) elementsCmp(t1, t2) else i
+        }
     }
   }
 
   override def compare(other: JValue): Int = other match {
     case o: JArray => elementsCmp(elements, o.elements)
-    case o => JValue.typeIndex(this) compare JValue.typeIndex(o)
+    case o         => JValue.typeIndex(this) compare JValue.typeIndex(o)
   }
 
   final override def renderCompact: String = buildString(internalRender(_, Compact, ""))
@@ -1102,13 +1145,13 @@ case class JArray(elements: List[JValue]) extends JValue {
         sb.append("]")
 
       case _ =>
-        val indent2 = indent + "  "
-        val oneLine = !isNested
+        val indent2   = indent + "  "
+        val oneLine   = !isNested
         val delimiter = if (oneLine) ", " else ",\n"
 
         sb.append("[")
         if (!oneLine) sb.append("\n")
-        
+
         var seen = false
         elements.foreach { v =>
           if (seen) sb.append(delimiter) else seen = true

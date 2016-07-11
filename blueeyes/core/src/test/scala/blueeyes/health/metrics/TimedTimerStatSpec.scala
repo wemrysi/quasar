@@ -6,27 +6,41 @@ import java.util.concurrent.TimeUnit
 import blueeyes.akka_testing.FutureMatchers
 
 class TimedTimerStatSpec extends Specification with TimedStatFixtures with FutureMatchers {
-  "TimedTimerStat" should{
-    "creates JValue" in{
-      val config = interval(IntervalLength(3, TimeUnit.SECONDS), 3)
+  "TimedTimerStat" should {
+    "creates JValue" in {
+      val config      = interval(IntervalLength(3, TimeUnit.SECONDS), 3)
       val timedSample = TimedTimerStat(config)
       fill(timedSample)
 
-      val values = ("minimumTime", List(JNum(1.0E-6), JNum(1.0E-6), JNum(0.0))) :: ("maximumTime", List(JNum(1.0E-6), JNum(1.0E-6), JNum(0.0))) :: ("averageTime", List(JNum(1.0E-6), JNum(1.0E-6), JNum(0.0))) :: ("standardDeviation", List(JNum(0.0), JNum(0.0), JNum(0.0))) :: Nil
+      val values = ("minimumTime", List(JNum(1.0E-6), JNum(1.0E-6), JNum(0.0))) :: ("maximumTime", List(JNum(1.0E-6), JNum(1.0E-6), JNum(0.0))) :: ("averageTime",
+                                                                                                                                                    List(
+                                                                                                                                                      JNum(
+                                                                                                                                                        1.0E-6),
+                                                                                                                                                      JNum(
+                                                                                                                                                        1.0E-6),
+                                                                                                                                                      JNum(
+                                                                                                                                                        0.0))) :: ("standardDeviation",
+                                                                                                                                                                   List(
+                                                                                                                                                                     JNum(
+                                                                                                                                                                       0.0),
+                                                                                                                                                                     JNum(
+                                                                                                                                                                       0.0),
+                                                                                                                                                                     JNum(
+                                                                                                                                                                       0.0))) :: Nil
       val jValue = timedSample.toJValue
-      jValue must whenDelivered (be_==(JObject(values.map(kv => JField(kv._1, JObject(JField(config.toString, JArray(kv._2)) :: Nil))))))
+      jValue must whenDelivered(be_==(JObject(values.map(kv => JField(kv._1, JObject(JField(config.toString, JArray(kv._2)) :: Nil))))))
     }
 
-    "creates TimedSample if the configuration is interval" in{
-      TimedTimerStat(interval(IntervalLength(3, TimeUnit.SECONDS), 7)) must beAnInstanceOf[TimedSample[_]] 
+    "creates TimedSample if the configuration is interval" in {
+      TimedTimerStat(interval(IntervalLength(3, TimeUnit.SECONDS), 7)) must beAnInstanceOf[TimedSample[_]]
     }
 
-    "creates EternityTimedSample if the configuration is eternity" in{
-      TimedTimerStat(eternity) must beAnInstanceOf[EternityTimedTimersSample] 
+    "creates EternityTimedSample if the configuration is eternity" in {
+      TimedTimerStat(eternity) must beAnInstanceOf[EternityTimedTimersSample]
     }
   }
 
-  private def fill(timedSample: Statistic[Long]){
+  private def fill(timedSample: Statistic[Long]) {
     set(timedSample, 100000)
     set(timedSample, 101000)
     set(timedSample, 102000)

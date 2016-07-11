@@ -23,21 +23,21 @@ class HttpClientByteChunkSpec extends Specification with TestAkkaDefaults with H
   def stream = Array[Byte]('1', '2') :: Array[Byte]('3', '4') :: StreamT.empty[Future, Array[Byte]]
 
   "HttpClientByteChunk" should {
-    "aggregate full content when size is not specified" in{
+    "aggregate full content when size is not specified" in {
       val future = client(Right(stream)).aggregate(8192.bytes).get[String]("foo")
 
-      future must succeedWithContent { 
+      future must succeedWithContent {
         be_==("1234")
       }
     }
 
     "aggregate full content up to the specified size" in {
-      val firstBuffer = client(Right(stream)).aggregate(2.bytes).get[ByteChunk]("foo").flatMap { 
-        _.content match { case Some(Right(stream)) => stream.head }  
+      val firstBuffer = client(Right(stream)).aggregate(2.bytes).get[ByteChunk]("foo").flatMap {
+        _.content match { case Some(Right(stream)) => stream.head }
       }
 
       Await.result(firstBuffer, Duration(2L, "seconds")) must beLike {
-        case bytes => bytes.toList must_== List[Byte]('1','2')
+        case bytes => bytes.toList must_== List[Byte]('1', '2')
       }
     }
   }
@@ -47,6 +47,6 @@ class HttpClientByteChunkSpec extends Specification with TestAkkaDefaults with H
   case class HttpClientImpl(content: ByteChunk) extends HttpClientByteChunk {
     val executor = test.defaultFutureDispatch
     def isDefinedAt(request: HttpRequest[ByteChunk]) = true
-    def apply(request: HttpRequest[ByteChunk]) = Future(HttpResponse[ByteChunk](content = Some(content)))
+    def apply(request: HttpRequest[ByteChunk])       = Future(HttpResponse[ByteChunk](content = Some(content)))
   }
 }

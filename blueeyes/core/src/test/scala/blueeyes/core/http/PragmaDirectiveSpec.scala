@@ -2,9 +2,9 @@ package blueeyes.core.http
 
 import org.specs2.mutable.Specification
 
-class PragmaDirectiveSpec extends Specification{
+class PragmaDirectiveSpec extends Specification {
 
-  "Pragma: Parsing should return 'no-cache'"  in {
+  "Pragma: Parsing should return 'no-cache'" in {
     HttpHeaders.Pragma(PragmaDirectives.parsePragmaDirectives(" No-Cache ").get).value mustEqual ("no-cache")
   }
 

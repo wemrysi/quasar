@@ -24,7 +24,7 @@ val emailService = {
 
   }
 }
-*/
+  */
 trait ServiceBuilder[T] {
   protected def startup[S](startup: => Future[S]): StartupDescriptor[T, S] = {
     val thunk = () => startup
@@ -38,9 +38,9 @@ trait ServiceBuilder[T] {
 
   def service[S](sname: String, sversion: ServiceVersion, sdesc: Option[String] = None)(slifecycle: ServiceContext => ServiceLifecycle[T, S]): Service[T, S] = {
     new Service[T, S] {
-      val name = sname
+      val name    = sname
       val version = sversion
-      val desc = sdesc
+      val desc    = sdesc
 
       def lifecycle(context: ServiceContext) = {
         import HttpRequestHandlerCombinators._
@@ -51,7 +51,7 @@ trait ServiceBuilder[T] {
           startup,
           (s: S) => {
             val (service, stoppable) = runningState(s)
-            val service0 = path("/%s".format(sname)) { path("/%s".format(sversion.vname)) { service } }
+            val service0             = path("/%s".format(sname)) { path("/%s".format(sversion.vname)) { service } }
             (service0, stoppable)
           }
         )
@@ -71,14 +71,15 @@ trait ServiceBuilder[T] {
   def stop(stop: Stoppable): ShutdownDescriptor[Any] =
     ShutdownDescriptor(_ => Some(stop))
 
-  protected implicit def statelessRequestDescriptorToServiceLifecycle(rd: RequestDescriptor[T, Unit])(implicit ctx: ExecutionContext): ServiceLifecycle[T, Unit] =
+  protected implicit def statelessRequestDescriptorToServiceLifecycle(rd: RequestDescriptor[T, Unit])(
+      implicit ctx: ExecutionContext): ServiceLifecycle[T, Unit] =
     ServiceLifecycle[T, Unit](() => Promise.successful(()), (_: Unit) => (rd.serviceBuilder(()), None))
 }
 
 case class StartupDescriptor[T, S](startup: () => Future[S]) {
-  def -> (request: RequestDescriptor[T, S]) = new StartupAndShutdownDescriptor(request)
-  class StartupAndShutdownDescriptor(request: RequestDescriptor[T, S]){
-    def -> (shutdown: ShutdownDescriptor[S]) = ServiceLifecycle[T, S](startup, s => (request.serviceBuilder(s), shutdown.shutdownBuilder(s)))
+  def ->(request: RequestDescriptor[T, S]) = new StartupAndShutdownDescriptor(request)
+  class StartupAndShutdownDescriptor(request: RequestDescriptor[T, S]) {
+    def ->(shutdown: ShutdownDescriptor[S]) = ServiceLifecycle[T, S](startup, s => (request.serviceBuilder(s), shutdown.shutdownBuilder(s)))
   }
 }
 

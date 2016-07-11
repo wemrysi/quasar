@@ -17,7 +17,7 @@ import blueeyes.core.service._
 import blueeyes.util.RichThrowableImplicits._
 import blueeyes.util.CommandLineArguments
 
-import java.lang.reflect.{Method}
+import java.lang.reflect.{ Method }
 import java.util.concurrent.CountDownLatch
 import java.util.zip.Deflater
 import java.net.InetAddress
@@ -28,7 +28,6 @@ import org.streum.configrity.io.BlockFormat
 
 import org.slf4s.Logging
 import org.slf4s.Logger
-
 
 import scalaz._
 import scalaz.Validation._
@@ -46,51 +45,50 @@ class HttpServerConfig(val config: Configuration) {
   import HttpServerConfig._
 
   /** Retrieves the port the server should be running at, which defaults to
-   * 8888.
-   */
+    * 8888.
+    */
   def port: Int = config[Int]("port", 8888)
 
   /** Retrieves the ssl port the server should be running at, which defaults to
-   * 8889.
-   */
+    * 8889.
+    */
   def sslPort: Int = config[Int]("sslPort", 8889)
 
   /** Retrieves the host the server should be running at.
-   */
+    */
   def host = config.get[String]("address").getOrElse(InetAddress.getLocalHost().getHostName())
 
   /** Retrieves the chunk size.
-   */
+    */
   def chunkSize = config[Int]("chunkSize", 1048576)
 
   /** Retrieves if the ssl should be running, which defaults to
-   * true.
-   */
+    * true.
+    */
   def sslEnable: Boolean = config[Boolean]("sslEnable", true)
 
   /**
-   * Set compressionEnable to false to specifically disable compression.
-   */
+    * Set compressionEnable to false to specifically disable compression.
+    */
   def enableCompression: Boolean = config[Boolean]("compressionEnable", true)
 
   /**
-   * A compression level for deflate encoding, which must be a value between 1 and 9.
-   * GZip encoding does not require a specific level to be set, but the value must be specified.
-   */
-  def compressionLevel: Option[CompressionLevel] = config.get[CompressionLevel]("compressionLevel")
-                                                   .orElse(enableCompression.option(Deflater.BEST_SPEED))
-                                                   .filter(l => l >= 1 && l <= 9)
+    * A compression level for deflate encoding, which must be a value between 1 and 9.
+    * GZip encoding does not require a specific level to be set, but the value must be specified.
+    */
+  def compressionLevel: Option[CompressionLevel] =
+    config.get[CompressionLevel]("compressionLevel").orElse(enableCompression.option(Deflater.BEST_SPEED)).filter(l => l >= 1 && l <= 9)
 
   /**
-   * The default timeout to be used when stopping dependent services is forever. Override this value
-   * to provide a different timeout.
-   */
+    * The default timeout to be used when stopping dependent services is forever. Override this value
+    * to provide a different timeout.
+    */
   def stopTimeout = Timeout(config[Long]("shutdownTimeout", Long.MaxValue))
 }
 
 /** An http server acts as a container for services. A server can be stopped
- * and started, and has a main function so it can be mixed into objects.
- */
+  * and started, and has a main function so it can be mixed into objects.
+  */
 trait HttpServerModule extends Logging {
   type HttpServer <: HttpServerLike
 
@@ -111,64 +109,66 @@ trait HttpServerModule extends Logging {
       def append[S](lifecycle: ServiceLifecycle[ByteChunk, S], tail: List[Service[ByteChunk, _]]): ServiceLifecycle[ByteChunk, _] = {
         tail match {
           case x :: xs => append(lifecycle ~ x.lifecycle(context(x)), xs)
-          case Nil => lifecycle
+          case Nil     => lifecycle
         }
       }
 
       val lifecycle = services match {
         case x :: xs => Some(append(x.lifecycle(context(x)), xs))
-        case Nil => None
+        case Nil     => None
       }
 
       lifecycle map { _.run map { (trapErrors _).first } }
     }
 
-    def trapErrors(delegate: AsyncHttpService[ByteChunk, ByteChunk]): AsyncHttpService[ByteChunk, ByteChunk] = new CustomHttpService[ByteChunk, Future[HttpResponse[ByteChunk]]] {
-      private def convertErrorToResponse(request: HttpRequest[ByteChunk], th: Throwable): HttpResponse[ByteChunk] = {
-        import DefaultBijections._
-        log.error("Error handling request " + request.shows, th)
-        HttpResponse.error[ByteChunk](th)
-      }
-
-      val service = (request: HttpRequest[ByteChunk]) => {
-        // The raw future may die due to error:
-        val rawValidation = try {
-           delegate.service(request)
-        } catch {
-          // An error during invocation of the request handler, convert to
-          // proper response:
-          case error: Throwable => success(Promise.successful(convertErrorToResponse(request, error)))
+    def trapErrors(delegate: AsyncHttpService[ByteChunk, ByteChunk]): AsyncHttpService[ByteChunk, ByteChunk] =
+      new CustomHttpService[ByteChunk, Future[HttpResponse[ByteChunk]]] {
+        private def convertErrorToResponse(request: HttpRequest[ByteChunk], th: Throwable): HttpResponse[ByteChunk] = {
+          import DefaultBijections._
+          log.error("Error handling request " + request.shows, th)
+          HttpResponse.error[ByteChunk](th)
         }
 
-        // Convert the raw future into one that cannot die:
-        rawValidation match {
-          case Success(rawFuture) => success((rawFuture recover { case error => convertErrorToResponse(request, error) }))
+        val service = (request: HttpRequest[ByteChunk]) => {
+          // The raw future may die due to error:
+          val rawValidation = try {
+            delegate.service(request)
+          } catch {
+            // An error during invocation of the request handler, convert to
+            // proper response:
+            case error: Throwable => success(Promise.successful(convertErrorToResponse(request, error)))
+          }
 
-          case Failure(DispatchError(failure, message, detail)) =>
-            success(Promise.successful(HttpResponse[ByteChunk](HttpStatus(failure, message))))
+          // Convert the raw future into one that cannot die:
+          rawValidation match {
+            case Success(rawFuture) => success((rawFuture recover { case error => convertErrorToResponse(request, error) }))
 
-          case Failure(Inapplicable(services @ _*)) =>
-            val message = "No handler could be found for your request: " + request.shows
-            success(
-              Promise.successful(
-                HttpResponse[ByteChunk](NotFound,
-                                        headers = HttpHeaders(`Content-Type`(text/plain)),
-                                        content = Some(DefaultBijections.stringToChunk(message)))
+            case Failure(DispatchError(failure, message, detail)) =>
+              success(Promise.successful(HttpResponse[ByteChunk](HttpStatus(failure, message))))
+
+            case Failure(Inapplicable(services @ _ *)) =>
+              val message = "No handler could be found for your request: " + request.shows
+              success(
+                Promise.successful(
+                  HttpResponse[ByteChunk](
+                    NotFound,
+                    headers = HttpHeaders(`Content-Type`(text / plain)),
+                    content = Some(DefaultBijections.stringToChunk(message)))
+                )
               )
-            )
+          }
         }
-      }
 
-      val metadata = delegate.metadata
-    }
+        val metadata = delegate.metadata
+      }
   }
 }
 
-
 trait HttpServerMain extends HttpServerModule {
+
   /** A default main function, which accepts the configuration file from the
-   * command line, with flag "--configFile".
-   */
+    * command line, with flag "--configFile".
+    */
   def main(args: Array[String]) {
     val arguments = CommandLineArguments(args: _*)
 
@@ -186,11 +186,11 @@ trait HttpServerMain extends HttpServerModule {
   }
 
   /**
-   * The entry point to run HTTP server with the given root configuration.
-   * It can be useful to replace the default configuration from the {@link HttpServerMain#main} method.
-   */
+    * The entry point to run HTTP server with the given root configuration.
+    * It can be useful to replace the default configuration from the {@link HttpServerMain#main} method.
+    */
   def run(rootConfiguration: Configuration) = {
-    val actorSystem: ActorSystem = ActorSystem(rootConfiguration[String]("blueeyes.actor_system", "blueeyes-actors"))
+    val actorSystem: ActorSystem           = ActorSystem(rootConfiguration[String]("blueeyes.actor_system", "blueeyes-actors"))
     val executionContext: ExecutionContext = ExecutionContext.defaultExecutionContext(actorSystem)
 
     /** Retrieves the logger for the server, which is configured directly from
@@ -198,23 +198,26 @@ trait HttpServerMain extends HttpServerModule {
       */
     val log: Logger = org.slf4s.LoggerFactory.getLogger("blueeyes.server")
     server(rootConfiguration, executionContext).start map {
-      _ onSuccess { case (runningState, stoppable) =>
-        log.info("Services started.")
-        Runtime.getRuntime.addShutdownHook { new Thread {
-          override def start() {
-            val doneSignal = new CountDownLatch(1)
+      _ onSuccess {
+        case (runningState, stoppable) =>
+          log.info("Services started.")
+          Runtime.getRuntime.addShutdownHook {
+            new Thread {
+              override def start() {
+                val doneSignal = new CountDownLatch(1)
 
-            stoppable map { stop =>
-              Stoppable.stop(stop)(executionContext)
-              doneSignal.countDown()
-            } getOrElse {
-              doneSignal.countDown()
+                stoppable map { stop =>
+                  Stoppable.stop(stop)(executionContext)
+                  doneSignal.countDown()
+                } getOrElse {
+                  doneSignal.countDown()
+                }
+
+                doneSignal.await()
+                actorSystem.shutdown()
+              }
             }
-
-            doneSignal.await()
-            actorSystem.shutdown()
           }
-        }}
       } onFailure {
         case ex =>
           System.err.println("Startup of BlueEyes failed due to an unhandled exception.")
@@ -226,8 +229,8 @@ trait HttpServerMain extends HttpServerModule {
 }
 
 /**
- * Reflectively discovers service handlers from the fields of the class into which it is mixed.
- */
+  * Reflectively discovers service handlers from the fields of the class into which it is mixed.
+  */
 trait ReflectiveServiceList[T] { self =>
   def services: List[Service[T, _]] = {
     val c = self.getClass
@@ -243,4 +246,3 @@ trait ReflectiveServiceList[T] { self =>
     }
   }
 }
-

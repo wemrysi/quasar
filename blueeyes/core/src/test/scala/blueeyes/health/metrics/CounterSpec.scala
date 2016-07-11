@@ -9,29 +9,29 @@ class CounterSpec extends Specification {
 
     "incremented by one" in {
       val counter = makeCounter
-      counter  += 1
+      counter += 1
 
-      counter.count mustEqual(1)
+      counter.count mustEqual (1)
     }
 
     "incremented by two" in {
       val counter = makeCounter
       counter += 2
 
-      counter.count mustEqual(2)
+      counter.count mustEqual (2)
     }
 
-    "composes Counter" in{
+    "composes Counter" in {
       val counter = new Counter(0)
       counter += 2
 
-      counter.toJValue mustEqual(JNum(2))
+      counter.toJValue mustEqual (JNum(2))
     }
   }
 
   "a counter without an explicit initial value" should {
     "equals one" in {
-      new Counter().count mustEqual(0)
+      new Counter().count mustEqual (0)
     }
   }
 }

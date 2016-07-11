@@ -18,7 +18,7 @@ object ContentTypeOptions {
   def parseContentTypeOptions(inString: String): Option[ContentTypeOption] = {
     inString.trim.toLowerCase match {
       case "nosniff" => Some(nosniff)
-      case default => None
+      case default   => None
     }
   }
 

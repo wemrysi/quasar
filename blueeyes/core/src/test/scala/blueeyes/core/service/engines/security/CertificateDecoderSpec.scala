@@ -4,7 +4,7 @@ import org.apache.commons.codec.binary.Base64
 import org.specs2.mutable.Specification
 import EncoderUtil._
 
-class CertificateDecoderSpec extends Specification with CertificateData{
+class CertificateDecoderSpec extends Specification with CertificateData {
 
   "CertificateKeyEntry must create key and certificate" in {
     val entry = CertificateDecoder(encodedPrivateKey, encodedCertificate)
@@ -16,7 +16,7 @@ class CertificateDecoderSpec extends Specification with CertificateData{
   private def encode(content: Array[Byte]) = unify(Base64.encodeBase64String(content))
 }
 
-class CertificateEncoderSpec extends Specification with CertificateData{
+class CertificateEncoderSpec extends Specification with CertificateData {
 
   "CertificateKeyEntry must create key and certificate" in {
     val entry   = CertificateDecoder(encodedPrivateKey, encodedCertificate)
@@ -27,6 +27,6 @@ class CertificateEncoderSpec extends Specification with CertificateData{
   }
 }
 
-object EncoderUtil{
+object EncoderUtil {
   def unify(value: String) = value.replaceAll("\r\n", "\n").trim
 }

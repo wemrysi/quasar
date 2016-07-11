@@ -30,8 +30,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   "Functor composition" in {
-    val compositionProp = (json: JValue, fa: JValue => JValue, fb: JValue => JValue) =>
-      json.mapUp(fb).mapUp(fa) == json.mapUp(fa compose fb)
+    val compositionProp = (json: JValue, fa: JValue => JValue, fb: JValue => JValue) => json.mapUp(fb).mapUp(fa) == json.mapUp(fa compose fb)
 
     check(compositionProp)
   }
@@ -59,7 +58,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   "Diff identity" in {
     val identityProp = (json: JValue) =>
       (json diff JUndefined) == Diff(JUndefined, JUndefined, json) &&
-      (JUndefined diff json) == Diff(JUndefined, json, JUndefined)
+        (JUndefined diff json) == Diff(JUndefined, json, JUndefined)
 
     check(identityProp)
   }
@@ -87,18 +86,24 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   "Remove all" in {
-    val removeAllProp = (x: JValue) => (x remove { _ => true }) == JUndefined
+    val removeAllProp = (x: JValue) =>
+      (x remove { _ =>
+            true
+          }) == JUndefined
     check(removeAllProp)
   }
 
   "Remove nothing" in {
-    val removeNothingProp = (x: JValue) => (x remove { _ => false }) == x
+    val removeNothingProp = (x: JValue) =>
+      (x remove { _ =>
+            false
+          }) == x
     check(removeNothingProp)
   }
 
   "Remove removes only matching elements (in case of a field, the field is removed)" in {
     val removeProp = (json: JValue, x: Class[_ <: JValue]) => {
-      val removed = json remove typePredicate(x)
+      val removed       = json remove typePredicate(x)
       val Diff(c, a, d) = json diff removed
 
       removed.flatten.forall(_.getClass != x)
@@ -113,7 +118,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
 
     test.flattenWithPath must_== expected
   }
-  
+
   "flattenWithPath includes empty array values" in {
     val test = JObject(JField("a", JArray(Nil)) :: Nil)
 
@@ -147,7 +152,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
     }""")
 
     val expected = List(
-      JPath(".c") -> JNum("2"),
+      JPath(".c")        -> JNum("2"),
       JPath(".fn[0].fr") -> JNum("-2")
     )
 
@@ -155,7 +160,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   "unflatten is the inverse of flattenWithPath" in {
-    val inverse = (value: JValue) => JValue.unflatten( value.flattenWithPath ) == value 
+    val inverse = (value: JValue) => JValue.unflatten(value.flattenWithPath) == value
 
     check(inverse)
   }
@@ -167,23 +172,23 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   "sort arrays" in {
     import scalaz.Order
     import scalaz.Ordering._
- 
+
     val v1 = JParser.parseUnsafe("""[1, 1, 1]""")
     val v2 = JParser.parseUnsafe("""[1, 1, 1]""")
- 
+
     Order[JValue].order(v1, v2) must_== EQ
   }
 
   "sort objects by key" in {
     val v1 = JObject(
       JField("a", JNum(1)) ::
-      JField("b", JNum(2)) ::
-      JField("c", JNum(3)) :: Nil
+        JField("b", JNum(2)) ::
+          JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
       JField("b", JNum(2)) ::
-      JField("c", JNum(3)) :: Nil
+        JField("c", JNum(3)) :: Nil
     )
 
     JValue.order(v1, v2) must_== LT
@@ -192,30 +197,30 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   "sort objects by key then value" in {
     val v1 = JObject(
       JField("a", JNum(1)) ::
-      JField("b", JNum(2)) ::
-      JField("c", JNum(3)) :: Nil
+        JField("b", JNum(2)) ::
+          JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
       JField("a", JNum(2)) ::
-      JField("b", JNum(3)) :: 
-      JField("c", JNum(4)) :: Nil
+        JField("b", JNum(3)) ::
+          JField("c", JNum(4)) :: Nil
     )
-    
+
     JValue.order(v1, v2) must_== LT
   }
 
   "sort objects with undefined members" in {
     val v1 = JObject(
       JField("a", JUndefined) ::
-      JField("b", JNum(2)) ::
-      JField("c", JNum(3)) :: Nil
+        JField("b", JNum(2)) ::
+          JField("c", JNum(3)) :: Nil
     )
 
     val v2 = JObject(
       JField("a", JNum(2)) ::
-      JField("b", JNum(3)) :: 
-      JField("c", JNum(4)) :: Nil
+        JField("b", JNum(3)) ::
+          JField("c", JNum(4)) :: Nil
     )
 
     JValue.order(v1, v2) must_== GT
@@ -244,30 +249,33 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       val genIndexOrField = Gen.frequency((1, genIndex), (9, genField))
 
       for {
-        length      <- choose(0, 10)
+        length <- choose(0, 10)
         listOfNodes <- listOfN(length, genIndexOrField)
       } yield JPath(listOfNodes)
     }
 
     def badPath(jv: JValue, p: JPath): Boolean = {
       p.nodes match {
-        case JPathIndex(index) :: xs => jv match {
-          case JArray(nodes) => index > nodes.length || 
-                                (index < nodes.length && badPath(nodes(index), JPath(xs))) ||
-                                badPath(JArray(Nil), JPath(xs)) 
+        case JPathIndex(index) :: xs =>
+          jv match {
+            case JArray(nodes) =>
+              index > nodes.length ||
+                (index < nodes.length && badPath(nodes(index), JPath(xs))) ||
+                badPath(JArray(Nil), JPath(xs))
 
-          case JObject(_) => true
-          case _ => index != 0 || badPath(JArray(Nil), JPath(xs))
-        }
+            case JObject(_) => true
+            case _          => index != 0 || badPath(JArray(Nil), JPath(xs))
+          }
 
-        case JPathField(name) :: xs => jv match {
-          case JArray(_) => true
-          case _ => badPath(jv \ name, JPath(xs))
-        }
+        case JPathField(name) :: xs =>
+          jv match {
+            case JArray(_) => true
+            case _         => badPath(jv \ name, JPath(xs))
+          }
 
         case Nil => false
       }
-    } 
+    }
 
     val setProp = (jv: JValue, p: JPath, toSet: JValue) => {
       (!badPath(jv, p)) ==> {
@@ -279,11 +287,11 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
     val insertProp = (jv: JValue, p: JPath, toSet: JValue) => {
       (!badPath(jv, p) && (jv(p) == JUndefined)) ==> {
         (jv, p.nodes) match {
-          case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) | (JNull | JUndefined, _) => 
+          case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) | (JNull | JUndefined, _) =>
             ((p == JPath.Identity) && (jv.unsafeInsert(p, toSet) == toSet)) ||
-            (jv.unsafeInsert(p, toSet).get(p) == toSet)
+              (jv.unsafeInsert(p, toSet).get(p) == toSet)
 
-          case _ => 
+          case _ =>
             jv.unsafeInsert(p, toSet) must throwA[RuntimeException]
         }
       }
@@ -294,11 +302,11 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
 
   private def reorderFields(json: JValue) = json mapUp {
     case JObject(xs) => JObject(scala.collection.immutable.TreeMap(xs.toSeq: _*))
-    case x => x
+    case x           => x
   }
 
   private def typePredicate(clazz: Class[_])(json: JValue) = json match {
     case x if x.getClass == clazz => true
-    case _ => false
+    case _                        => false
   }
 }

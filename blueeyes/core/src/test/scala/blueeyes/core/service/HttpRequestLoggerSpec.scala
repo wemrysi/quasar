@@ -19,12 +19,22 @@ class HttpRequestLoggerSpec extends Specification with ClockMock with FutureMatc
   private val DateFormatter = DateTimeFormat.forPattern("yyyy-MM-dd")
   private val TimeFormatter = DateTimeFormat.forPattern("HH:mm:ss.S")
 
-  private val request        = HttpRequest[String](content = Some("request content"), method = HttpMethods.GET, uri = "/foo/bar?param=value", remoteHost = Some(InetAddress.getLocalHost), headers = Map[String, String]("content-language" -> "en"))
-  private val response       = HttpResponse[String](content = Some("response content"), status = HttpStatus(Created), headers = Map[String, String]("content-length" -> "1000", "age" -> "3"))
+  private val request = HttpRequest[String](
+    content = Some("request content"),
+    method = HttpMethods.GET,
+    uri = "/foo/bar?param=value",
+    remoteHost = Some(InetAddress.getLocalHost),
+    headers = Map[String, String]("content-language" -> "en"))
+  private val response = HttpResponse[String](
+    content = Some("response content"),
+    status = HttpStatus(Created),
+    headers = Map[String, String]("content-length" -> "1000", "age" -> "3"))
   private val responseFuture = Future(response)
 
   "HttpRequestLogger: logs multiple values" in {
-    log(DateIdentifier, TimeIdentifier) must whenDelivered { be_==((DateIdentifier, Left(DateFormatter.print(clockMock.now()))) :: (TimeIdentifier, Left(TimeFormatter.print(clockMock.now()))) :: Nil) }
+    log(DateIdentifier, TimeIdentifier) must whenDelivered {
+      be_==((DateIdentifier, Left(DateFormatter.print(clockMock.now()))) :: (TimeIdentifier, Left(TimeFormatter.print(clockMock.now()))) :: Nil)
+    }
   }
   "HttpRequestLogger: logs date" in {
     log(DateIdentifier) must whenDelivered { be_==((DateIdentifier, Left(DateFormatter.print(clockMock.now()))) :: Nil) }
@@ -42,13 +52,17 @@ class HttpRequestLoggerSpec extends Specification with ClockMock with FutureMatc
     log(CachedIdentifier) must whenDelivered { be_==((CachedIdentifier, Left("1")) :: Nil) }
   }
   "HttpRequestLogger: logs client ip" in {
-    log(IpIdentifier(ClientPrefix)).map(Some(_)) must whenDelivered { be_==(request.remoteHost.map(v => (IpIdentifier(ClientPrefix), Left(v.getHostAddress)) :: Nil)) }
+    log(IpIdentifier(ClientPrefix)).map(Some(_)) must whenDelivered {
+      be_==(request.remoteHost.map(v => (IpIdentifier(ClientPrefix), Left(v.getHostAddress)) :: Nil))
+    }
   }
   "HttpRequestLogger: logs server ip" in {
     log(IpIdentifier(ServerPrefix)) must whenDelivered { be_==((IpIdentifier(ServerPrefix), Left(InetAddress.getLocalHost.getHostAddress)) :: Nil) }
   }
   "HttpRequestLogger: logs client dns" in {
-    log(DnsNameIdentifier(ClientPrefix)).map(Some(_)) must whenDelivered { be_==(request.remoteHost.map(v => (DnsNameIdentifier(ClientPrefix), Left(v.getHostName)) :: Nil)) }
+    log(DnsNameIdentifier(ClientPrefix)).map(Some(_)) must whenDelivered {
+      be_==(request.remoteHost.map(v => (DnsNameIdentifier(ClientPrefix), Left(v.getHostName)) :: Nil))
+    }
   }
   "HttpRequestLogger: logs server dns" in {
     log(DnsNameIdentifier(ServerPrefix)) must whenDelivered { be_==((DnsNameIdentifier(ServerPrefix), Left(InetAddress.getLocalHost.getHostName)) :: Nil) }
@@ -66,31 +80,40 @@ class HttpRequestLoggerSpec extends Specification with ClockMock with FutureMatc
     log(UriIdentifier(ClientToServerPrefix)) must whenDelivered { be_==((UriIdentifier(ClientToServerPrefix), Left(request.uri.toString)) :: Nil) }
   }
   "HttpRequestLogger: logs uri-stem" in {
-    log(UriStemIdentifier(ClientToServerPrefix)).map(Some(_)) must whenDelivered { be_==(request.uri.path.map(v => (UriStemIdentifier(ClientToServerPrefix), Left(v)) :: Nil)) }
+    log(UriStemIdentifier(ClientToServerPrefix)).map(Some(_)) must whenDelivered {
+      be_==(request.uri.path.map(v => (UriStemIdentifier(ClientToServerPrefix), Left(v)) :: Nil))
+    }
   }
   "HttpRequestLogger: logs uri-query" in {
-    log(UriQueryIdentifier(ClientToServerPrefix)).map(Some(_)) must whenDelivered { be_==(request.uri.query.map(v => (UriQueryIdentifier(ClientToServerPrefix), Left(v)) :: Nil)) }
+    log(UriQueryIdentifier(ClientToServerPrefix)).map(Some(_)) must whenDelivered {
+      be_==(request.uri.query.map(v => (UriQueryIdentifier(ClientToServerPrefix), Left(v)) :: Nil))
+    }
   }
   "HttpRequestLogger: logs request header" in {
-    log(HeaderIdentifier(ClientToServerPrefix, "content-language")) must whenDelivered { be_==((HeaderIdentifier(ClientToServerPrefix, "content-language"), Left("en")) :: Nil) }
+    log(HeaderIdentifier(ClientToServerPrefix, "content-language")) must whenDelivered {
+      be_==((HeaderIdentifier(ClientToServerPrefix, "content-language"), Left("en")) :: Nil)
+    }
   }
   "HttpRequestLogger: logs response header" in {
     log(HeaderIdentifier(ServerToClientPrefix, "age")) must whenDelivered { be_==((HeaderIdentifier(ServerToClientPrefix, "age"), Left("3.0")) :: Nil) }
   }
   "HttpRequestLogger: logs request content" in {
-    log(ContentIdentifier(ClientToServerPrefix)).map(_.map(toStringValues)) must whenDelivered (beEqualTo(List((ContentIdentifier(ClientToServerPrefix), Right(request.content.get)))))
+    log(ContentIdentifier(ClientToServerPrefix)).map(_.map(toStringValues)) must whenDelivered(
+      beEqualTo(List((ContentIdentifier(ClientToServerPrefix), Right(request.content.get)))))
   }
   "HttpRequestLogger: logs response content" in {
-    log(ContentIdentifier(ServerToClientPrefix)).map(_.map(toStringValues)) must whenDelivered (beEqualTo(List((ContentIdentifier(ServerToClientPrefix), Right(response.content.get)))))
+    log(ContentIdentifier(ServerToClientPrefix)).map(_.map(toStringValues)) must whenDelivered(
+      beEqualTo(List((ContentIdentifier(ServerToClientPrefix), Right(response.content.get)))))
   }
 
   private def toStringValues(v: (FieldIdentifier, Either[String, Array[Byte]])): Tuple2[FieldIdentifier, Either[String, String]] = {
-    val value = v._2 match{
+    val value = v._2 match {
       case Right(value) => Right[String, String](new String(value, "UTF-8"))
-      case Left(value) => Left[String, String](value)
+      case Left(value)  => Left[String, String](value)
     }
     Tuple2[FieldIdentifier, Either[String, String]](v._1, value)
   }
 
-  private def log(fieldIdentifiers: FieldIdentifier*): Future[List[(FieldIdentifier, Either[String, Array[Byte]])]] = HttpRequestLogger[String, String](FieldsDirective(List(fieldIdentifiers: _*))).apply(request, responseFuture)
+  private def log(fieldIdentifiers: FieldIdentifier*): Future[List[(FieldIdentifier, Either[String, Array[Byte]])]] =
+    HttpRequestLogger[String, String](FieldsDirective(List(fieldIdentifiers: _*))).apply(request, responseFuture)
 }

@@ -12,7 +12,7 @@ import java.io.File
 import java.nio.ByteBuffer
 
 import org.specs2.mutable.Specification
-import org.specs2.specification.{AfterExample, BeforeAfterExample}
+import org.specs2.specification.{ AfterExample, BeforeAfterExample }
 
 import scalaz._
 import scalaz.syntax.monad._
@@ -30,41 +30,41 @@ class FileSinkSpec extends Specification with BeforeAfterExample with FutureMatc
   "FileSink" should {
     "write data" in {
       val (_, result) = FileSink.write(dataFile, chunk)
-      result must whenDelivered {
-        (_: Unit) => {
-          (dataFile.exists must_==(true)) and 
-          (dataFile.length mustEqual(data.flatten.length))
+      result must whenDelivered { (_: Unit) =>
+        {
+          (dataFile.exists must_== (true)) and
+            (dataFile.length mustEqual (data.flatten.length))
         }
       }
     }
 
     "cancel result when write failed" in {
-      val error  = new RuntimeException
+      val error       = new RuntimeException
       val (_, result) = FileSink.write(dataFile, Right(data.head.toArray :: Future[Array[Byte]](throw error).liftM[StreamT]))
 
-      result.failed must whenDelivered {
-        (err: Throwable) => (err must_== error) and (dataFile.exists must_== true) and (dataFile.length must_== data.head.toArray.length)
+      result.failed must whenDelivered { (err: Throwable) =>
+        (err must_== error) and (dataFile.exists must_== true) and (dataFile.length must_== data.head.toArray.length)
       }
     }
 
     "cancel result when write getting next chunk failed" in {
-      val error  = new RuntimeException
+      val error       = new RuntimeException
       val (_, result) = FileSink.write(dataFile, Right(data.head.toArray :: (Promise.failed(error): Future[Array[Byte]]).liftM[StreamT]))
 
-      result.failed must whenDelivered {
-        (err: Throwable) => (err must_== error) and (dataFile.exists must_== true) and (dataFile.length must_== data.head.toArray.length)
+      result.failed must whenDelivered { (err: Throwable) =>
+        (err must_== error) and (dataFile.exists must_== true) and (dataFile.length must_== data.head.toArray.length)
       }
     }
 
     "cancel writing when kill switch is thrown" in {
-      val promise = Promise[Array[Byte]]()
+      val promise                    = Promise[Array[Byte]]()
       val (Some(killSwitch), result) = FileSink.write(dataFile, Right(data.head.toArray :: (promise: Future[Array[Byte]]).liftM[StreamT]))
 
       val killed = new RuntimeException("killed")
       defaultActorSystem.scheduler.scheduleOnce(1000 millis) {
         killSwitch.kill(killed)
       }
-      
+
       defaultActorSystem.scheduler.scheduleOnce(2000 millis) {
         promise.success(data.head.toArray)
       }
@@ -82,9 +82,9 @@ class FileSinkSpec extends Specification with BeforeAfterExample with FutureMatc
 
 class FileSourceSpec extends Specification with Data with AfterExample with AkkaDefaults with FutureMatchers {
   "FileSource" should {
-    "read all data" in{
+    "read all data" in {
       val (_, writeResult) = FileSink.write(dataFile, chunk)
-      writeResult must whenDelivered (be_==(()))
+      writeResult must whenDelivered(be_==(()))
 
       val readResult = FileSource(dataFile).read
       ByteChunk.forceByteArray(readResult) must whenDelivered {

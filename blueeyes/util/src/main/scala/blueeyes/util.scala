@@ -1,6 +1,6 @@
 package blueeyes
 
-import org.joda.time.{DateTime, Instant, ReadableDuration}
+import org.joda.time.{ DateTime, Instant, ReadableDuration }
 import scala.math.Ordering
 import scalaz._
 
@@ -28,8 +28,4 @@ package object util {
     lazy val a = a0
   }
 }
-
-
-
-
 // vim: set ts=4 sw=4 et:

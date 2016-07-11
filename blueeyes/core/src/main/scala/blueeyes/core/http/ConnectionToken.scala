@@ -5,16 +5,17 @@ import scala.util.parsing.input._
 import blueeyes.util.ProductPrefixUnmangler
 
 sealed trait ConnectionToken extends ProductPrefixUnmangler {
-  def value = unmangledName 
+  def value             = unmangledName
   override def toString = value
 }
 
 object ConnectionTokens extends RegexParsers {
 
-  private def parser = (
-    "close" ^^^ close |
-     regex("""([a-zA-Z-])+"""r) ^^ {case value => CustomConnectionToken(value)}
-  )?
+  private def parser =
+    (
+      "close" ^^^ close |
+        regex("""([a-zA-Z-])+""" r) ^^ { case value => CustomConnectionToken(value) }
+    ) ?
 
   def parseConnectionTokens(inString: String) = parser(new CharSequenceReader(inString)) match {
     case Success(result, _) => result

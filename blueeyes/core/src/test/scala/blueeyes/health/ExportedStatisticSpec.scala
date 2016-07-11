@@ -4,7 +4,7 @@ import org.specs2.mutable.Specification
 import blueeyes.json.JNum
 
 class ExportedStatisticSpec extends Specification {
-  "ExportedStatistic: gets lazy value" in{
+  "ExportedStatistic: gets lazy value" in {
     var value: Int = 0
     def lazyF: JNum = JNum(value)
 
@@ -14,7 +14,7 @@ class ExportedStatisticSpec extends Specification {
 
     statistic.details mustEqual (JNum(2))
   }
-  "ExportedStatistic: creates JValue" in{
+  "ExportedStatistic: creates JValue" in {
     var value: Int = 0
     def lazyF: JNum = JNum(value)
 

@@ -6,12 +6,13 @@ import blueeyes.util.printer._
 import org.specs2.mutable.Specification
 import blueeyes.core.service.RestPathPatternParsers.LiteralPathPattern
 
-class MetadataFormatterSpec extends Specification{
+class MetadataFormatterSpec extends Specification {
 
   "pretty-printing service metadata" should {
     "pretty-print a simple set of metadata" in {
 
-      val expected = """  Parameter Type           Parameter                Description
+      val expected =
+        """  Parameter Type           Parameter                Description
   ------------------------------------------------------------
   HTTP method              GET
   Request Parameter        'callback                A callback method identifier is required when using JsonP with a "GET" request. (required)
@@ -23,22 +24,24 @@ class MetadataFormatterSpec extends Specification{
 
   HTTP method              DELETE"""
 
-      SimpleStringPrinter.printFormatted(OrMetadata(
-        AndMetadata(
-          HttpMethodMetadata(HttpMethods.GET),
-          EncodingMetadata(Encodings.gzip, Encodings.deflate),
-          DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
-          ParameterMetadata('callback, None)
-        ),
-        HttpMethodMetadata(HttpMethods.POST),
-        HttpMethodMetadata(HttpMethods.PUT),
-        HttpMethodMetadata(HttpMethods.DELETE)
-      )) must_== expected
+      SimpleStringPrinter.printFormatted(
+        OrMetadata(
+          AndMetadata(
+            HttpMethodMetadata(HttpMethods.GET),
+            EncodingMetadata(Encodings.gzip, Encodings.deflate),
+            DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
+            ParameterMetadata('callback, None)
+          ),
+          HttpMethodMetadata(HttpMethods.POST),
+          HttpMethodMetadata(HttpMethods.PUT),
+          HttpMethodMetadata(HttpMethods.DELETE)
+        )) must_== expected
     }
   }
   "html service metadata" should {
     "print a simple set of metadata in html format" in {
-      val expected = """<html>
+      val expected =
+        """<html>
 
   <head>
       <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
@@ -213,35 +216,39 @@ class MetadataFormatterSpec extends Specification{
      </div>
   </body>
 </html>"""
-      HtmlPrinter.printFormatted(AndMetadata(
-        DescriptionMetadata("Timelines are collections of Tweets, ordered with the most recent first."),
-        OrMetadata(
+      HtmlPrinter.printFormatted(
         AndMetadata(
-          HttpMethodMetadata(HttpMethods.GET),
-          DescriptionMetadata("Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
-          PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
-          EncodingMetadata(Encodings.gzip, Encodings.deflate),
-          DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
-          ParameterMetadata('callback, None)
-        ),
-          AndMetadata(
-            HttpMethodMetadata(HttpMethods.GET),
-            DescriptionMetadata("Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
-            PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
-            EncodingMetadata(Encodings.gzip, Encodings.deflate),
-            DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
-            ParameterMetadata('callback, None)
-          ),
-          AndMetadata(
-            HttpMethodMetadata(HttpMethods.GET),
-            DescriptionMetadata("Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
-            PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
-            EncodingMetadata(Encodings.gzip, Encodings.deflate),
-            DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
-            ParameterMetadata('callback, None)
-          ),
-        HttpMethodMetadata(HttpMethods.DELETE)
-      ))) must_== expected
+          DescriptionMetadata("Timelines are collections of Tweets, ordered with the most recent first."),
+          OrMetadata(
+            AndMetadata(
+              HttpMethodMetadata(HttpMethods.GET),
+              DescriptionMetadata(
+                "Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
+              PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
+              EncodingMetadata(Encodings.gzip, Encodings.deflate),
+              DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
+              ParameterMetadata('callback, None)
+            ),
+            AndMetadata(
+              HttpMethodMetadata(HttpMethods.GET),
+              DescriptionMetadata(
+                "Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
+              PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
+              EncodingMetadata(Encodings.gzip, Encodings.deflate),
+              DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
+              ParameterMetadata('callback, None)
+            ),
+            AndMetadata(
+              HttpMethodMetadata(HttpMethods.GET),
+              DescriptionMetadata(
+                "Returns the 20 most recent statuses, including retweets if they exist, posted by the authenticating user and the user's they follow. This is the same timeline seen by a user when they login to twitter.com. This method is identical to statuses/friends_timeline, except that this method always..."),
+              PathPatternMetadata(LiteralPathPattern("/statuses/home_timeline.format")),
+              EncodingMetadata(Encodings.gzip, Encodings.deflate),
+              DescriptionMetadata("A callback method identifier is required when using JsonP with a \"GET\" request."),
+              ParameterMetadata('callback, None)
+            ),
+            HttpMethodMetadata(HttpMethods.DELETE)
+          ))) must_== expected
     }
   }
 }

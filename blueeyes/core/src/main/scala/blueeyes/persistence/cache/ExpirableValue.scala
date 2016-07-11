@@ -20,8 +20,8 @@ case class ExpirableValue[V] private (_value: V, creationTimeNanos: Long)(implic
   def withValue(newValue: V): ExpirableValue[V] = copy(_value = newValue)
 
   /** Retrieves the value and updates the access time. Use _value to retrieve the value
-   * without updating the access time.
-   */
+    * without updating the access time.
+    */
   def value = {
     _accessTimeNanos = clock.nanoTime()
 
@@ -30,6 +30,7 @@ case class ExpirableValue[V] private (_value: V, creationTimeNanos: Long)(implic
 }
 
 object ExpirableValue {
+
   /** Creates a new expirable entry given the specified creatione time and time unit. */
   def apply[V](value: V, creationTime: Long, unit: TimeUnit)(implicit clock: Clock): ExpirableValue[V] = {
     new ExpirableValue[V](value, unit.toNanos(creationTime))

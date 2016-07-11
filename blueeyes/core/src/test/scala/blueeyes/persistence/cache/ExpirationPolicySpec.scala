@@ -1,7 +1,7 @@
 package blueeyes.persistence.cache
 
 import org.specs2.mutable.Specification
-import java.util.concurrent.TimeUnit.{NANOSECONDS, MILLISECONDS}
+import java.util.concurrent.TimeUnit.{ NANOSECONDS, MILLISECONDS }
 
 import blueeyes.util.ClockMock
 
@@ -9,7 +9,7 @@ class ExpirationPolicySpec extends Specification {
   val TimeToIdlePolicy = ExpirationPolicy(timeToIdle = Some(1), timeToLive = None, timeUnit = NANOSECONDS)
   val TimeToLivePolicy = ExpirationPolicy(timeToLive = Some(1), timeToIdle = None, timeUnit = NANOSECONDS)
   val TimeToAllPolicy  = ExpirationPolicy(timeToLive = Some(1), timeToIdle = Some(1), timeUnit = NANOSECONDS)
-  val TimeToNonePolicy = ExpirationPolicy(timeToLive = None, timeToIdle = None, timeUnit = NANOSECONDS)  
+  val TimeToNonePolicy = ExpirationPolicy(timeToLive = None, timeToIdle = None, timeUnit = NANOSECONDS)
 
   "eternal" should {
     "be true when timeToIdleNanos and timeToLiveNanos are not defined" in {
@@ -34,25 +34,25 @@ class ExpirationPolicySpec extends Specification {
       ExpirationPolicy(None, Some(1), MILLISECONDS).timeToLive(NANOSECONDS) must beSome(1000000)
     }
   }
-  
+
   "isExpired" should {
     "identify an expired value (creationTime/timeToLive)" in {
       implicit val clockMock = ClockMock.newMockClock
-      val value = ExpirableValue("foo", 2, NANOSECONDS)
+      val value              = ExpirableValue("foo", 2, NANOSECONDS)
 
       TimeToLivePolicy.isExpired(value, 4) must_== true
     }
 
     "identify an unexpired value (creationTime/timeToLive)" in {
       implicit val clockMock = ClockMock.newMockClock
-      val value = ExpirableValue("foo", 2, NANOSECONDS)
+      val value              = ExpirableValue("foo", 2, NANOSECONDS)
 
       TimeToLivePolicy.isExpired(value, 2) must_== false
     }
 
     "identify an expired value (accessTime/timeToIdle)" in {
       implicit val clockMock = ClockMock.newMockClock
-      val value = ExpirableValue("foo", 0, NANOSECONDS)
+      val value              = ExpirableValue("foo", 0, NANOSECONDS)
 
       clockMock.setNanoTime(2L)
 
@@ -60,10 +60,10 @@ class ExpirationPolicySpec extends Specification {
 
       TimeToIdlePolicy.isExpired(value, 4) must_== true
     }
-    
+
     "identify an unexpired value (accessTime/timeToIdle)" in {
       implicit val clockMock = ClockMock.newMockClock
-      val value = ExpirableValue("foo", 0, NANOSECONDS)
+      val value              = ExpirableValue("foo", 0, NANOSECONDS)
 
       value.value
 

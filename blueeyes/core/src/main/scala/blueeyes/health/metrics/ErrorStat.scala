@@ -8,9 +8,9 @@ import blueeyes.health.ConcurrentMaps
 import ConcurrentMaps._
 import blueeyes.json._
 
-class ErrorStat extends SyncStatistic[Throwable, Map[Class[_], Long]]{
-  private val _count = new AtomicLong(0)
-  private val _distribution : ConcurrentMap[Class[_], AtomicLong] = new ConcurrentHashMap[Class[_], AtomicLong]
+class ErrorStat extends SyncStatistic[Throwable, Map[Class[_], Long]] {
+  private val _count                                             = new AtomicLong(0)
+  private val _distribution: ConcurrentMap[Class[_], AtomicLong] = new ConcurrentHashMap[Class[_], AtomicLong]
 
   def +=(t: Throwable): this.type = {
     _count.getAndAdd(1)

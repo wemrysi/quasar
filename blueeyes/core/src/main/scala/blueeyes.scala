@@ -28,6 +28,4 @@ package blueeyes.util {
     def str(f: String => String) = s.map(f).getOrElse("")
   }
 }
-
-
 // vim: set ts=4 sw=4 et:

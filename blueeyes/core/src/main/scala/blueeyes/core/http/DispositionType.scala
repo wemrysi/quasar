@@ -4,7 +4,7 @@ import blueeyes.util.ProductPrefixUnmangler
 
 /* For use in the Content-Disposition HTTP Header */
 
-sealed trait DispositionType extends ProductPrefixUnmangler{
+sealed trait DispositionType extends ProductPrefixUnmangler {
 
   def dispType = unmangledName
 
@@ -12,12 +12,12 @@ sealed trait DispositionType extends ProductPrefixUnmangler{
   def creationDate: Option[HttpDateTime]
   def size: Option[Int]
 
-  def value = 
+  def value =
     (
-      List(dispType) ++ 
-      fileName.map("filename=" + _).toList ++ 
-      creationDate.map("creation-date=" + _.toString).toList ++ 
-      size.map("size=" + _.toString).toList
+      List(dispType) ++
+        fileName.map("filename=" + _).toList ++
+        creationDate.map("creation-date=" + _.toString).toList ++
+        size.map("size=" + _.toString).toList
     ).mkString(";")
 
   override def toString = value
@@ -33,26 +33,27 @@ object DispositionTypes {
     disBuild.buildType
   }
 
-  case class inline (fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType
+  case class inline(fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType
   object inline {
-    def apply(): DispositionType = new inline(None, None, None)
-    def apply(fileName: Option[String]) = new inline(fileName, None, None)
+    def apply(): DispositionType                           = new inline(None, None, None)
+    def apply(fileName: Option[String])                    = new inline(fileName, None, None)
     def apply(fileName: Option[String], size: Option[Int]) = new inline(fileName, None, size)
   }
 
-  case class attachment (fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType
+  case class attachment(fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType
   object attachment {
-    def apply(): DispositionType = new attachment(None, None, None)
-    def apply(fileName: Option[String]) = new attachment(fileName, None, None)
+    def apply(): DispositionType                           = new attachment(None, None, None)
+    def apply(fileName: Option[String])                    = new attachment(fileName, None, None)
     def apply(fileName: Option[String], size: Option[Int]) = new attachment(fileName, None, size)
   }
 
   case class NullDispositionType(inDispType: String, fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType {
     override def dispType = inDispType
-    override def value = ""
+    override def value    = ""
   }
 
-  case class CustomDispositionType (inDispType: String, fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int]) extends DispositionType {
+  case class CustomDispositionType(inDispType: String, fileName: Option[String], creationDate: Option[HttpDateTime], size: Option[Int])
+      extends DispositionType {
     override def dispType = inDispType
   }
 
@@ -60,9 +61,9 @@ object DispositionTypes {
 
     def dispType = inDispType;
 
-    var defFileName: Option[String] = None
+    var defFileName: Option[String]           = None
     var defCreationDate: Option[HttpDateTime] = None
-    var defSize: Option[Int] = None
+    var defSize: Option[Int]                  = None
 
     def filename: Option[String] = defFileName
     def filename_=(inName: Option[String]) { defFileName = inName }
@@ -71,13 +72,13 @@ object DispositionTypes {
     def creationDate_=(inDate: Option[HttpDateTime]) { defCreationDate = inDate }
 
     def size: Option[Int] = defSize
-    def size_=(inSize: Option[Int]) {defSize = inSize }
+    def size_=(inSize: Option[Int]) { defSize = inSize }
 
     def buildType(): DispositionType = {
       dispType match {
-        case "inline" => inline(filename, creationDate, size)
+        case "inline"     => inline(filename, creationDate, size)
         case "attachment" => attachment(filename, creationDate, size)
-        case default => NullDispositionType(dispType, None, None, None)
+        case default      => NullDispositionType(dispType, None, None, None)
       }
     }
   }

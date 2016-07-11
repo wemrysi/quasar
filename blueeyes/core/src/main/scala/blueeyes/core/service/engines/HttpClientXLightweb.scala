@@ -16,25 +16,8 @@ import akka.dispatch.ExecutionContext
 
 import org.slf4s.Logging
 
-import org.xlightweb.client.{HttpClient => XLHttpClient}
-import org.xlightweb.{
-  BodyDataSink,
-  HttpRequestHeader,
-  IHttpRequest,
-  IHttpRequestHeader,
-  IHeader,
-  IHttpResponse,
-  IHttpResponseHandler,
-  DeleteRequest,
-  GetRequest,
-  HeadRequest,
-  OptionsRequest,
-  PostRequest,
-  PutRequest,
-  NonBlockingBodyDataSource,
-  IBodyDataHandler,
-  HttpRequest => XLHttpRequest
-}
+import org.xlightweb.client.{ HttpClient => XLHttpClient }
+import org.xlightweb.{ BodyDataSink, HttpRequestHeader, IHttpRequest, IHttpRequestHeader, IHeader, IHttpResponse, IHttpResponseHandler, DeleteRequest, GetRequest, HeadRequest, OptionsRequest, PostRequest, PutRequest, NonBlockingBodyDataSource, IBodyDataHandler, HttpRequest => XLHttpRequest }
 
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -53,7 +36,7 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
   private var _httpClient: Option[XLHttpClient] = None
   private val lock = new ReentrantReadWriteLock
 
-  private def httpClient( fn: () => XLHttpClient): XLHttpClient = _httpClient match {
+  private def httpClient(fn: () => XLHttpClient): XLHttpClient = _httpClient match {
     case None =>
       lock.writeLock.lock()
       try {
@@ -64,8 +47,7 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
           }
           case Some(client) => client
         }
-      }
-      finally lock.writeLock.unlock()
+      } finally lock.writeLock.unlock()
 
     case Some(client) => client
   }
@@ -78,9 +60,9 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
 
   private def httpClientInstance(scheme: Option[String]) = {
     httpClient(() => {
-      scheme match{
+      scheme match {
         case Some("https") => new XLHttpClient(createSSLContext)
-        case _ => new XLHttpClient()
+        case _             => new XLHttpClient()
       }
     })
   }
@@ -91,8 +73,8 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
 
     val handler = new IHttpResponseHandler() {
       def onResponse(response: IHttpResponse) {
-        val headers = response.getHeaderNameSet.asScala.foldLeft(Map[String, String]()) {
-          (acc, name) => acc + (name -> response.getHeader(name))
+        val headers = response.getHeaderNameSet.asScala.foldLeft(Map[String, String]()) { (acc, name) =>
+          acc + (name -> response.getHeader(name))
         }
 
         val isChunked = headers.exists {
@@ -164,14 +146,14 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
         override def onData(source: NonBlockingBodyDataSource) = {
           val available = source.available()
           if (available > 0) {
-            val bytes = new Array[Byte](available)
+            val bytes  = new Array[Byte](available)
             val buffer = ByteBuffer.wrap(bytes)
             source.read(buffer)
 
             val current = chain
             chain = Chain.incomplete
             current.promise.success(Some((bytes, chain)))
-          } else if (available == -1){
+          } else if (available == -1) {
             chain.promise.success(None)
           }
 
@@ -183,32 +165,31 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
     Some(Right(StreamT.unfoldM[Future, Array[Byte], Chain](head) { _.promise }))
   }
 
-  private def createXLRequest(request: HttpRequest[ByteChunk]): IHeader =  {
+  private def createXLRequest(request: HttpRequest[ByteChunk]): IHeader = {
     import blueeyes.util.QueryParser
     import java.net.URI
 
     log.debug("HttpClientXLightWeb creating XLRequest for HttpRequest: \n%s".format(request.shows))
 
     // Merge request.parameters and original query params (in uri)
-    val origURI = new URI(request.uri.toString)
+    val origURI        = new URI(request.uri.toString)
     val newQueryParams = QueryParser.unparseQuery(request.parameters ++ QueryParser.parseQuery(Option(origURI.getRawQuery).getOrElse("")), false)
     // URI expects nulls for undefined params, hence the conditional for the uri param
-    val uri = new URI(origURI.getScheme, origURI.getAuthority, origURI.getPath,
-                      if(newQueryParams.length == 0) null else newQueryParams,
-                      origURI.getFragment).toString
+    val uri =
+      new URI(origURI.getScheme, origURI.getAuthority, origURI.getPath, if (newQueryParams.length == 0) null else newQueryParams, origURI.getFragment).toString
 
-    val newHeaders  = request.headers ++ requestContentLength(request)
-    val xlRequest   = request.method match {
-      case HttpMethods.DELETE     => new DeleteRequest(uri)
-      case HttpMethods.GET        => new GetRequest(uri)
-      case HttpMethods.HEAD       => new HeadRequest(uri)
-      case HttpMethods.OPTIONS    => new OptionsRequest(uri)
-      case HttpMethods.POST       => postRequest(request, uri)
-      case HttpMethods.PUT        => putRequest(request, uri)
-      case HttpMethods.CONNECT    => sys.error("CONNECT is not implemented.")
-      case HttpMethods.TRACE      => sys.error("TRACE is not implemented.")
-      case HttpMethods.PATCH      => sys.error("PATCH is not implemented.")
-      case HttpMethods.CUSTOM(x)  => sys.error("CUSTOM is not implemented.")
+    val newHeaders = request.headers ++ requestContentLength(request)
+    val xlRequest = request.method match {
+      case HttpMethods.DELETE    => new DeleteRequest(uri)
+      case HttpMethods.GET       => new GetRequest(uri)
+      case HttpMethods.HEAD      => new HeadRequest(uri)
+      case HttpMethods.OPTIONS   => new OptionsRequest(uri)
+      case HttpMethods.POST      => postRequest(request, uri)
+      case HttpMethods.PUT       => putRequest(request, uri)
+      case HttpMethods.CONNECT   => sys.error("CONNECT is not implemented.")
+      case HttpMethods.TRACE     => sys.error("TRACE is not implemented.")
+      case HttpMethods.PATCH     => sys.error("PATCH is not implemented.")
+      case HttpMethods.CUSTOM(x) => sys.error("CUSTOM is not implemented.")
     }
 
     for ((key, value) <- newHeaders.raw) xlRequest.addHeader(key, value)
@@ -220,27 +201,27 @@ class HttpClientXLightWeb(implicit val executor: ExecutionContext) extends HttpC
     import HttpMethods._
     request.method match {
       case DELETE | GET | HEAD | OPTIONS | POST | PUT => true
-      case _ => false
+      case _                                          => false
     }
   }
 
   private def postRequest(request: HttpRequest[ByteChunk], url: String): IHeader = {
     request.content match {
-      case None => new PostRequest(url)
+      case None                => new PostRequest(url)
       case Some(Left(data))    => new PostRequest(url, requestContentType(request).value, Array(ByteBuffer.wrap(data)))
       case Some(Right(stream)) => new HttpRequestHeader("POST", url, requestContentType(request).value)
     }
   }
 
   private def putRequest(request: HttpRequest[ByteChunk], url: String): IHeader = {
-    request.content match{
-      case None => new PutRequest(url)
+    request.content match {
+      case None                => new PutRequest(url)
       case Some(Left(data))    => new PutRequest(url, requestContentType(request).value, Array(ByteBuffer.wrap(data)))
       case Some(Right(stream)) => new HttpRequestHeader("PUT", url, requestContentType(request).value)
     }
   }
 
-  private def requestContentType(request: HttpRequest[ByteChunk]) = `Content-Type`(request.mimeTypes : _*)
+  private def requestContentType(request: HttpRequest[ByteChunk]) = `Content-Type`(request.mimeTypes: _*)
 
   private def requestContentLength(request: HttpRequest[ByteChunk]): Option[HttpHeader] = {
     for (content <- request.content; v <- content.left.toOption) yield {

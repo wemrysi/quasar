@@ -13,9 +13,9 @@ trait HttpRequestMatchers extends Specification with FutureMatchers {
     def apply[B <: Future[HttpResponse[A]]](expectable: Expectable[B]): MatchResult[B] = {
       val nested = awaited[HttpResponse[A]](await) {
         beLike {
-          case HttpResponse(status, _, Some(content), _) => 
+          case HttpResponse(status, _, Some(content), _) =>
             (status.code must_== HttpStatusCodes.OK) and
-            (matcher(content aka "The content of the response"))
+              (matcher(content aka "The content of the response"))
         }
       }
 
@@ -24,10 +24,13 @@ trait HttpRequestMatchers extends Specification with FutureMatchers {
   }
 
   def succeedWithFutureContent[A](matcher: Matcher[A])(implicit executor: ExecutionContext): Matcher[Future[HttpResponse[Future[A]]]] = {
-    succeedWithContent(matcher) ^^ { 
+    succeedWithContent(matcher) ^^ {
       (_: Future[HttpResponse[Future[A]]]).flatMap { response =>
         response.content match {
-          case Some(content) => content map { c => response.copy(content = Some(c)) }
+          case Some(content) =>
+            content map { c =>
+              response.copy(content = Some(c))
+            }
           case None => Future(response.copy(content = None))
         }
       }

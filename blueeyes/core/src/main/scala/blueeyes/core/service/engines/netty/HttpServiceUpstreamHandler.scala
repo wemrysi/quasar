@@ -8,7 +8,7 @@ import akka.dispatch.ExecutionContext
 import blueeyes.bkka._
 import blueeyes.concurrent.ReadWriteLock
 import blueeyes.core.http._
-import blueeyes.core.http.HttpStatusCodes.{InternalServerError, NotFound}
+import blueeyes.core.http.HttpStatusCodes.{ InternalServerError, NotFound }
 import blueeyes.core.data._
 import blueeyes.core.data.DefaultBijections._
 import blueeyes.util._
@@ -19,29 +19,8 @@ import org.slf4s.Logging
 import java.io.IOException
 
 import org.jboss.netty.buffer.ChannelBuffers
-import org.jboss.netty.channel.{
-  SimpleChannelUpstreamHandler,
-  MessageEvent,
-  Channel,
-  ChannelFutureListener,
-  ChannelHandler,
-  ChannelHandlerContext,
-  ChannelStateEvent,
-  ExceptionEvent
-}
-import org.jboss.netty.handler.codec.http.{
-  QueryStringDecoder,
-  DefaultHttpChunk,
-  DefaultHttpChunkTrailer,
-  DefaultHttpResponse,
-  HttpChunk,
-  HttpMethod => NettyHttpMethod,
-  HttpVersion => NettyHttpVersion,
-  HttpHeaders => NettyHttpHeaders,
-  HttpRequest => NettyHttpRequest,
-  HttpResponse => NettyHttpResponse,
-  HttpResponseStatus
-}
+import org.jboss.netty.channel.{ SimpleChannelUpstreamHandler, MessageEvent, Channel, ChannelFutureListener, ChannelHandler, ChannelHandlerContext, ChannelStateEvent, ExceptionEvent }
+import org.jboss.netty.handler.codec.http.{ QueryStringDecoder, DefaultHttpChunk, DefaultHttpChunkTrailer, DefaultHttpResponse, HttpChunk, HttpMethod => NettyHttpMethod, HttpVersion => NettyHttpVersion, HttpHeaders => NettyHttpHeaders, HttpRequest => NettyHttpRequest, HttpResponse => NettyHttpResponse, HttpResponseStatus }
 import org.jboss.netty.handler.codec.http.HttpHeaders._
 import org.jboss.netty.handler.stream.ChunkedInput
 import org.jboss.netty.handler.stream.ChunkedWriteHandler
@@ -54,15 +33,17 @@ import scalaz._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
 import scala.collection.JavaConverters._
-import scala.collection.mutable.{HashSet, SynchronizedSet}
+import scala.collection.mutable.{ HashSet, SynchronizedSet }
 
 /** This handler is not thread safe, it's assumed a new one will be created
- * for each client connection.
- *
- * TODO: Pass health monitor to the request handler to report on Netty errors.
- */
-private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[ByteChunk, ByteChunk], executionContext: ExecutionContext) extends SimpleChannelUpstreamHandler with Logging {
-  private val pendingResponses = new HashSet[Future[HttpResponse[ByteChunk]]] with SynchronizedSet[Future[HttpResponse[ByteChunk]]]
+  * for each client connection.
+  *
+  * TODO: Pass health monitor to the request handler to report on Netty errors.
+  */
+private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[ByteChunk, ByteChunk], executionContext: ExecutionContext)
+    extends SimpleChannelUpstreamHandler
+    with Logging {
+  private val pendingResponses          = new HashSet[Future[HttpResponse[ByteChunk]]] with SynchronizedSet[Future[HttpResponse[ByteChunk]]]
   private implicit val M: Monad[Future] = new FutureMonad(executionContext)
 
   override def messageReceived(ctx: ChannelHandlerContext, event: MessageEvent) {
@@ -81,7 +62,9 @@ private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[Byte
         writeResponse(request, ctx.getChannel, HttpResponse(HttpStatus(httpFailure, message), content = detail.map(stringToChunk)))
 
       case Failure(Inapplicable(_)) =>
-        writeResponse(request, ctx.getChannel,
+        writeResponse(
+          request,
+          ctx.getChannel,
           HttpResponse(status = NotFound, content = Some("No service was found to be able to handle your request: " + request.shows)))
     }
   }
@@ -152,7 +135,7 @@ private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[Byte
     }
   }
 
-  private def isKeepAlive(message: HttpRequest[ByteChunk] ): Boolean = {
+  private def isKeepAlive(message: HttpRequest[ByteChunk]): Boolean = {
     val connection = message.headers.get(Names.CONNECTION).getOrElse("")
     if (connection.equalsIgnoreCase(Values.CLOSE)) false
     else {
@@ -167,7 +150,7 @@ private[engines] class HttpServiceUpstreamHandler(service: AsyncHttpService[Byte
     // Kill all pending responses to this channel:
     pendingResponses.foreach {
       case (pr: Promise[_]) => pr.tryComplete(Left(why))
-      case notPromise => log.error("Pending response was not a promise, but a %s. This should never happen.".format(Option(notPromise).toString))
+      case notPromise       => log.error("Pending response was not a promise, but a %s. This should never happen.".format(Option(notPromise).toString))
     }
     pendingResponses.clear()
   }
@@ -182,7 +165,7 @@ private[engines] class StreamChunkedInput(queue: BlockingQueue[Option[HttpChunk]
   override def nextChunk() = {
     queue.poll() match {
       case None | null => null
-      case Some(data) => data
+      case Some(data)  => data
     }
   }
 
@@ -202,12 +185,11 @@ object StreamChunkedInput extends Logging {
           channel.getPipeline.get(classOf[ChunkedWriteHandler]).resumeTransfer()
           advance(queue, tail)
 
-        case None =>
-          {
-            queue.put(Some(new DefaultHttpChunkTrailer))
-            queue.put(None)
-            channel.getPipeline.get(classOf[ChunkedWriteHandler]).resumeTransfer()
-          }.point[Future]
+        case None => {
+          queue.put(Some(new DefaultHttpChunkTrailer))
+          queue.put(None)
+          channel.getPipeline.get(classOf[ChunkedWriteHandler]).resumeTransfer()
+        }.point[Future]
       } recover {
         case ex =>
           log.error("An error was encountered retrieving the next chunk of data: " + ex.getMessage, ex)

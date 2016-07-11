@@ -5,9 +5,9 @@ import blueeyes.util.ClockSystem
 import akka.dispatch.Future
 
 private[health] trait FunctionsMonitor {
-  def time[T](path: JPath)(f: => T): T      = {
+  def time[T](path: JPath)(f: => T): T = {
     val startTime = ClockSystem.realtimeClock.nanoTime()
-    val t = f
+    val t         = f
     trackTime(path)(ClockSystem.realtimeClock.nanoTime - startTime)
     t
   }
@@ -27,8 +27,9 @@ private[health] trait FunctionsMonitor {
     try {
       f
     } catch {
-      case t: Throwable => error(path)(t)
-      throw t
+      case t: Throwable =>
+        error(path)(t)
+        throw t
     }
   }
 

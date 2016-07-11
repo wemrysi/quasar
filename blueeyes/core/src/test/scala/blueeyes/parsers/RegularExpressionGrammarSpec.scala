@@ -9,7 +9,7 @@ import scala.util.parsing.input._
 import RegularExpressionAST.RegexAtom
 import RegexpGen._
 
-class RegularExpressionGrammarSpec extends Specification with ScalaCheck{
+class RegularExpressionGrammarSpec extends Specification with ScalaCheck {
 
   implicit def stringToInput(s: String) = new CharSequenceReader(s)
 
@@ -18,83 +18,83 @@ class RegularExpressionGrammarSpec extends Specification with ScalaCheck{
       passTest(regexAtom)
     }
 
-    "parse single fixed chars" in{
+    "parse single fixed chars" in {
       passTest(singleFixedChar)
     }
 
-    "parse digit number" in{
+    "parse digit number" in {
       passTest(digit)
     }
 
-    "parse small num hex" in{
+    "parse small num hex" in {
       passTestCaseInsensitive(smallHexNumber)
     }
 
-    "parse unicode char" in{
+    "parse unicode char" in {
       passTestCaseInsensitive(unicodeChar)
     }
 
-    "parse octal char" in{
+    "parse octal char" in {
       passTest(octalNumber)
     }
 
-    "parse other char" in{
+    "parse other char" in {
       passTest(otherChar)
     }
 
-    "parse boundary match" in{
+    "parse boundary match" in {
       passTest(boundaryMatch)
     }
 
-    "parse Shorthand Character Class" in{
+    "parse Shorthand Character Class" in {
       passTest(shorthandCharacterClass)
     }
 
-    "parse Posix Character Class" in{
+    "parse Posix Character Class" in {
       passTest(posixCharacterClass)
     }
 
-    "parse Escape Sequence" in{
+    "parse Escape Sequence" in {
       passTest(escapeSequence)
     }
 
-    "parse Flag Group" in{
+    "parse Flag Group" in {
       passTest(flags)
       passTest(flagGroup)
     }
 
-    "parse Quotation" in{
+    "parse Quotation" in {
       passTest(quotation)
     }
-    "parse Back Reference" in{
+    "parse Back Reference" in {
       passTest(backReference)
     }
 
-    "parse Single Char " in{
+    "parse Single Char " in {
       passTest(singleChar)
     }
 
-    "parse Character Class" in{
+    "parse Character Class" in {
       passTest(characterClass)
     }
 
-    "parse Non Capturing Group" in{
+    "parse Non Capturing Group" in {
       passTest(nonCapturingGroup)
     }
 
-    "parse Atomic Group" in{
+    "parse Atomic Group" in {
       passTest(atomicGroup)
     }
 
-    "parse Named Capture Group" in{
+    "parse Named Capture Group" in {
       passTest(namedCaptureGroup)
     }
 
-    "parse Look Around" in{
+    "parse Look Around" in {
       passTest(lookAround)
     }
 
-    "parse Group" in{
+    "parse Group" in {
       passTest(group)
     }
 
@@ -105,8 +105,8 @@ class RegularExpressionGrammarSpec extends Specification with ScalaCheck{
 
   override def defaultValues = super.defaultValues + (minTestsOk -> 1000)
 
-  private def passTest(gen: Gen[String]) = forAllNoShrink(gen)(n => >>(RegularExpressionPatten(n)) mustEqual  n)
+  private def passTest(gen: Gen[String])                = forAllNoShrink(gen)(n => >>(RegularExpressionPatten(n)) mustEqual n)
   private def passTestCaseInsensitive(gen: Gen[String]) = forAllNoShrink(gen)(n => >>(RegularExpressionPatten(n)).toLowerCase mustEqual n.toLowerCase)
 
-  def >> (regexp : List[RegexAtom]): String = regexp.map(_.toString).mkString("")
+  def >>(regexp: List[RegexAtom]): String = regexp.map(_.toString).mkString("")
 }

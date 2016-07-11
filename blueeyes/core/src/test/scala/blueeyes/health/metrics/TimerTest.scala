@@ -13,7 +13,7 @@ class TimerTest extends Specification with blueeyes.bkka.AkkaDefaults {
   "timing an event" should {
     "returns the event's value" in {
       val timer = new Timer
-      timer.time { 1 + 1 } mustEqual(2)
+      timer.time { 1 + 1 } mustEqual (2)
     }
 
     "records the duration of the event" in {
@@ -23,7 +23,7 @@ class TimerTest extends Specification with blueeyes.bkka.AkkaDefaults {
     }
 
     "records the duration of the event specified by future" in {
-      val timer  = new Timer
+      val timer   = new Timer
       val promise = Promise[Unit]()
 
       timer.time(promise)
@@ -31,14 +31,14 @@ class TimerTest extends Specification with blueeyes.bkka.AkkaDefaults {
       Thread.sleep(100)
       promise.success(())
 
-      timer.mean.ms.time must not (beCloseTo(0.0, precision))
+      timer.mean.ms.time must not(beCloseTo(0.0, precision))
     }
 
     "records the existence of the event" in {
       val timer = new Timer
       timer.time { Thread.sleep(10) }
 
-      timer.count mustEqual(1)
+      timer.count mustEqual (1)
     }
   }
 

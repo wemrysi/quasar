@@ -7,8 +7,8 @@ import shapeless._
 import scalaz._
 
 object IsoSerialization {
-  def extractor[T] = new MkExtractor[T]
-  def decomposer[T] = new MkDecomposer[T]
+  def extractor[T]     = new MkExtractor[T]
+  def decomposer[T]    = new MkDecomposer[T]
   def serialization[T] = new MkSerialization[T]
 
   implicit def stringToRichField(name: String) = RichField(List(name))
@@ -34,17 +34,17 @@ object IsoSerialization {
   case object Inline
 
   case object Omit {
-    def |||[T](default: T) = orElse(default)
-    def orElse[T](default: T) = OmitWithDefault(default) 
+    def |||[T](default: T)    = orElse(default)
+    def orElse[T](default: T) = OmitWithDefault(default)
   }
 
   case class OmitWithDefault[T](default: T)
 
   case class RichField(alts: List[String]) {
-    def |(alt: String) = alias(alt)
+    def |(alt: String)     = alias(alt)
     def alias(alt: String) = copy(alts = alts :+ alt)
 
-    def |||[T](default: T) = orElse(default)
+    def |||[T](default: T)    = orElse(default)
     def orElse[T](default: T) = RichFieldWithDefault(alts, default)
   }
 
@@ -58,31 +58,31 @@ object IsoSerialization {
     implicit def hnilDecomposer = new DecomposerAux[HNil, HNil] {
       def decompose(fields: HNil, values: HNil) = JObject.empty
     }
-    
+
     implicit def hlistDecomposer1[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[String :: FT, H :: T] {
-        def decompose(fields: String :: FT, values: H :: T) = 
+        def decompose(fields: String :: FT, values: H :: T) =
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           dt.decompose(fields.tail, values.tail).insert(fields.head, dh.decompose(values.head)).fold(throw _, identity)
       }
-    
+
     implicit def hlistDecomposer2[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[RichField :: FT, H :: T] {
-        def decompose(fields: RichField :: FT, values: H :: T) = 
+        def decompose(fields: RichField :: FT, values: H :: T) =
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           dt.decompose(fields.tail, values.tail).insert(fields.head.alts.head, dh.decompose(values.head)).fold(throw _, identity)
       }
-    
+
     implicit def hlistDecomposer3[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[RichFieldWithDefault[H] :: FT, H :: T] {
-        def decompose(fields: RichFieldWithDefault[H] :: FT, values: H :: T) = 
+        def decompose(fields: RichFieldWithDefault[H] :: FT, values: H :: T) =
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           dt.decompose(fields.tail, values.tail).insert(fields.head.alts.head, dh.decompose(values.head)).fold(throw _, identity)
       }
-    
+
     implicit def hlistDecomposer4[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[String :: FT, Option[H] :: T] {
-        def decompose(fields: String :: FT, values: Option[H] :: T) = { 
+        def decompose(fields: String :: FT, values: Option[H] :: T) = {
           val tail = dt.decompose(fields.tail, values.tail)
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           values.head.map(h => tail.insert(fields.head, dh.decompose(h)).fold(throw _, identity)).getOrElse(tail)
@@ -91,7 +91,7 @@ object IsoSerialization {
 
     implicit def hlistDecomposer5[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[RichField :: FT, Option[H] :: T] {
-        def decompose(fields: RichField :: FT, values: Option[H] :: T) = { 
+        def decompose(fields: RichField :: FT, values: Option[H] :: T) = {
           val tail = dt.decompose(fields.tail, values.tail)
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           values.head.map(h => tail.insert(fields.head.alts.head, dh.decompose(h)).fold(throw _, identity)).getOrElse(tail)
@@ -100,7 +100,7 @@ object IsoSerialization {
 
     implicit def hlistDecomposer6[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[RichFieldWithDefault[H] :: FT, Option[H] :: T] {
-        def decompose(fields: RichFieldWithDefault[H] :: FT, values: Option[H] :: T) = { 
+        def decompose(fields: RichFieldWithDefault[H] :: FT, values: Option[H] :: T) = {
           val tail = dt.decompose(fields.tail, values.tail)
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
           values.head.map(h => tail.insert(fields.head.alts.head, dh.decompose(h)).fold(throw _, identity)).getOrElse(tail)
@@ -112,18 +112,18 @@ object IsoSerialization {
         def decompose(fields: Omit.type :: FT, values: H :: T) =
           dt.decompose(fields.tail, values.tail)
       }
-    
+
     implicit def hlistDecomposer8[FT <: HList, H, T <: HList](implicit dt: DecomposerAux[FT, T]) =
       new DecomposerAux[OmitWithDefault[H] :: FT, H :: T] {
         def decompose(fields: OmitWithDefault[H] :: FT, values: H :: T) =
           dt.decompose(fields.tail, values.tail)
       }
-    
+
     implicit def hlistDecomposer9[FT <: HList, H, T <: HList](implicit dh: Decomposer[H], dt: DecomposerAux[FT, T]) =
       new DecomposerAux[Inline.type :: FT, H :: T] {
-        def decompose(fields: Inline.type :: FT, values: H :: T) = 
+        def decompose(fields: Inline.type :: FT, values: H :: T) =
           // No point propagating decompose validation to the top level, we'd need to throw there anyway
-          dh.decompose(values.head).insertAll(dt.decompose(fields.tail, values.tail)).fold(l => throw l.head, identity) 
+          dh.decompose(values.head).insertAll(dt.decompose(fields.tail, values.tail)).fold(l => throw l.head, identity)
       }
   }
 
@@ -135,7 +135,7 @@ object IsoSerialization {
     implicit val hnilExtractor = new ExtractorAux[HNil, HNil] {
       def extract(source: JValue, fields: HNil) = Success(HNil)
     }
-    
+
     implicit def hlistExtractor1[FT <: HList, H, T <: HList](implicit eh: Extractor[H], et: ExtractorAux[FT, T]) =
       new ExtractorAux[String :: FT, H :: T] {
         def extract(source: JValue, fields: String :: FT) =
@@ -151,9 +151,9 @@ object IsoSerialization {
           for {
             h <- fields.head.alts.find { alt =>
                   (source \? alt).isDefined
-                 }.map { alt => 
-                   eh.validated(source, alt)
-                 }.getOrElse(Failure(Invalid("Missing field")))
+                }.map { alt =>
+                  eh.validated(source, alt)
+                }.getOrElse(Failure(Invalid("Missing field")))
             t <- et.extract(source, fields.tail)
           } yield h :: t
       }
@@ -164,9 +164,9 @@ object IsoSerialization {
           for {
             h <- fields.head.alts.find { alt =>
                   (source \? alt).isDefined
-                 }.map { alt => 
-                   eh.validated(source, alt)
-                 }.getOrElse(Success(fields.head.default))
+                }.map { alt =>
+                  eh.validated(source, alt)
+                }.getOrElse(Success(fields.head.default))
             t <- et.extract(source, fields.tail)
           } yield h :: t
       }
@@ -178,7 +178,7 @@ object IsoSerialization {
             t <- et.extract(source, fields.tail)
           } yield m.zero :: t
       }
-    
+
     implicit def hlistExtractor5[FT <: HList, H, T <: HList](implicit et: ExtractorAux[FT, T]) =
       new ExtractorAux[OmitWithDefault[H] :: FT, H :: T] {
         def extract(source: JValue, fields: OmitWithDefault[H] :: FT) =
@@ -197,36 +197,31 @@ object IsoSerialization {
       }
   }
 
-  class IsoDecomposer[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], decomposer: DecomposerAux[F, L])
-    extends Decomposer[T] {
-      def decompose(t: T) = decomposer.decompose(fields, iso.to(t)) 
-    }
+  class IsoDecomposer[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], decomposer: DecomposerAux[F, L]) extends Decomposer[T] {
+    def decompose(t: T) = decomposer.decompose(fields, iso.to(t))
+  }
 
-  class IsoExtractor[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], extractor: ExtractorAux[F, L])
-    extends Extractor[T] {
-      def validated(source: JValue) =
-        for {
-          l <- extractor.extract(source, fields)
-        } yield iso.from(l)
-    }
+  class IsoExtractor[T, F <: HList, L <: HList](fields: F, iso: Iso[T, L], extractor: ExtractorAux[F, L]) extends Extractor[T] {
+    def validated(source: JValue) =
+      for {
+        l <- extractor.extract(source, fields)
+      } yield iso.from(l)
+  }
 
   class MkDecomposer[T] {
     def apply[F <: HList, L <: HList](fields: F)(implicit iso: Iso[T, L], decomposer: DecomposerAux[F, L]): Decomposer[T] =
-      new IsoDecomposer(fields, iso, decomposer) 
+      new IsoDecomposer(fields, iso, decomposer)
   }
 
   class MkExtractor[T] {
-    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Iso[T, L], extractor: ExtractorAux[F, L]): Extractor[T] = 
-      new IsoExtractor(fields, iso, extractor) 
+    def apply[F <: HList, L <: HList](fields: F)(implicit iso: Iso[T, L], extractor: ExtractorAux[F, L]): Extractor[T] =
+      new IsoExtractor(fields, iso, extractor)
   }
 
   class MkSerialization[T] {
-    def apply[F <: HList, L <: HList](fields: F)
-      (implicit iso: Iso[T, L], decomposer: DecomposerAux[F, L], extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
-        (new IsoDecomposer(fields, iso, decomposer), new IsoExtractor(fields, iso, extractor))
+    def apply[F <: HList, L <: HList](
+        fields: F)(implicit iso: Iso[T, L], decomposer: DecomposerAux[F, L], extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
+      (new IsoDecomposer(fields, iso, decomposer), new IsoExtractor(fields, iso, extractor))
   }
 }
-
-
-
 // vim: set ts=4 sw=4 et:

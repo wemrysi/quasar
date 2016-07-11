@@ -1,6 +1,6 @@
 package blueeyes.core.service.engines.security
 
-trait CertificateData{
+trait CertificateData {
   val encodedCertificate = """MIIC1TCCApOgAwIBAgIETPAdVDALBgcqhkjOOAQDBQAwTjELMAkGA1UEBhMCQVUxETAPBgNVBAgT
 CFZpY3RvcmlhMRIwEAYDVQQHEwlNZWxib3VybmUxGDAWBgNVBAMTD2Zvby5leGFtcGxlLmNvbTAe
 Fw0xMDExMjYyMDQ5MjRaFw0xMTAyMjQyMDQ5MjRaME4xCzAJBgNVBAYTAkFVMREwDwYDVQQIEwhW

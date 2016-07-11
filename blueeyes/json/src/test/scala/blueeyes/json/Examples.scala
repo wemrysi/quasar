@@ -22,13 +22,13 @@ object Examples extends Specification {
   import JParser._
 
   "Lotto example" in {
-    val json = parseUnsafe(lotto)
+    val json          = parseUnsafe(lotto)
     val renderedLotto = json.renderCompact
     json mustEqual parseUnsafe(renderedLotto)
   }
 
   "Person example" in {
-    val json = parseUnsafe(person)
+    val json           = parseUnsafe(person)
     val renderedPerson = json.renderPretty
     json mustEqual parseUnsafe(renderedPerson)
     //render(json) mustEqual render(personDSL)
@@ -38,7 +38,7 @@ object Examples extends Specification {
 
   "Transformation example" in {
     val uppercased = parseUnsafe(person).transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
-    val rendered = uppercased.renderCompact
+    val rendered   = uppercased.renderCompact
     rendered.contains(""""NAME":"Joe"""") mustEqual true
     rendered.contains(""""AGE":35.0""") mustEqual true
     //rendered mustEqual
@@ -74,33 +74,38 @@ object Examples extends Specification {
   }
 
   "JSON building example" in {
-    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++ 
-               JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
+    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++
+        JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
 
     json.renderCompact mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
   }
 
   "Example which collects all integers and forms a new JSON" in {
     val json = parseUnsafe(person)
-    val ints = json.foldDown(JUndefined: JValue) { (a, v) => v match {
-      case x: JNum => a ++ x
-      case _ => a
-    }}
+    val ints = json.foldDown(JUndefined: JValue) { (a, v) =>
+      v match {
+        case x: JNum => a ++ x
+        case _       => a
+      }
+    }
     val out = ints.renderCompact
     out == "[33.0,35.0]" || out == "[35.0,33.0]" mustEqual true
   }
-  
+
   "Example which folds up to form a flattened list" in {
     val json = parseUnsafe(person)
-  
+
     def form(list: JPath*): List[(JPath, JValue)] = list.toList.map { path =>
       (path, json(path))
     }
-  
-    val folded = (json.foldUpWithPath[List[(JPath, JValue)]](Nil) { (list, path, json) =>
-      (path, json) :: list
-    }).sorted.collect { case (p, j) => (p, j) }
-  
+
+    val folded = (json
+      .foldUpWithPath[List[(JPath, JValue)]](Nil) { (list, path, json) =>
+        (path, json) :: list
+      })
+      .sorted
+      .collect { case (p, j) => (p, j) }
+
     val formed = form(
       JPath.Identity,
       JPath("person"),
@@ -111,7 +116,7 @@ object Examples extends Specification {
       JPath("person.spouse.person.age"),
       JPath("person.spouse.person.name")
     )
-  
+
     folded mustEqual formed
   }
 
@@ -156,26 +161,25 @@ object Examples extends Specification {
 
   def personDSL =
     JObject(
-      JField("person",
+      JField(
+        "person",
         JObject(
           JField("name", JString("Joe")) ::
-          JField("age", JNum(35)) ::
-          JField("spouse",
-            JObject(
-              JField("person", 
+            JField("age", JNum(35)) ::
+              JField(
+                "spouse",
                 JObject(
-                  JField("name", JString("Marilyn")) ::
-                  JField("age", JNum(33)) :: Nil
-                )
-              ) :: Nil
-            )
-          ) :: Nil
-        )
-      ) :: Nil
+                  JField(
+                    "person",
+                    JObject(
+                      JField("name", JString("Marilyn")) ::
+                        JField("age", JNum(33)) :: Nil
+                    )) :: Nil
+                )) :: Nil
+        )) :: Nil
     )
 
-  val objArray =
-"""
+  val objArray = """
 { "name": "joe",
   "address": {
     "street": "Bulevard",
@@ -194,6 +198,6 @@ object Examples extends Specification {
 }
 """
 
-  val quoted = """["foo \" \n \t \r bar"]"""
+  val quoted  = """["foo \" \n \t \r bar"]"""
   val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
 }

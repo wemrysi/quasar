@@ -3,40 +3,40 @@ package blueeyes.health.metrics
 import org.specs2.mutable.Specification
 import blueeyes.json._
 
-class SampleSpec extends Specification{
+class SampleSpec extends Specification {
   private val sample = new Sample(10)
-  "stores raw data" in{
+  "stores raw data" in {
     sample += 1.1
     sample += 2.2
     sample += 2.2
 
-    sample.count                mustEqual (3)
-    sample.rawData.size         mustEqual (2)
+    sample.count mustEqual (3)
+    sample.rawData.size mustEqual (2)
     sample.rawData.get(1.1).get mustEqual (1)
     sample.rawData.get(2.2).get mustEqual (2)
   }
-  "does not add new data when size is exceeded" in{
+  "does not add new data when size is exceeded" in {
     val sample = new Sample(1)
     sample += 1.1
     sample += 2.2
 
-    sample.count                mustEqual (1)
+    sample.count mustEqual (1)
   }
-  "does not add create Histogram when data is not full" in{
+  "does not add create Histogram when data is not full" in {
     val sample = new Sample(2)
     sample += 1.1
 
-    sample.details              mustEqual (None)
+    sample.details mustEqual (None)
   }
-  "creates Histogram when data is full" in{
+  "creates Histogram when data is full" in {
     val sample = new Sample(2)
     sample += 1.1
     sample += 2.2
 
-    sample.details              mustNotEqual (None)
+    sample.details mustNotEqual (None)
   }
 
-  "composes Sample" in{
+  "composes Sample" in {
     val sample = new Sample(1)
     sample += 1.1
 

@@ -1,8 +1,3 @@
 package blueeyes.core.service.engines.security
 
-
-import java.security.{Key, KeyStore, KeyFactory}
-
-
-
-
+import java.security.{ Key, KeyStore, KeyFactory }

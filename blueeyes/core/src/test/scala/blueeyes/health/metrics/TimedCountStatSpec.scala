@@ -6,18 +6,18 @@ import java.util.concurrent.TimeUnit
 import blueeyes.akka_testing.FutureMatchers
 
 class TimedCountStatSpec extends Specification with TimedStatFixtures with FutureMatchers {
-  "TimedCountStat" should{
-    "creates JValue" in{
+  "TimedCountStat" should {
+    "creates JValue" in {
       val config      = interval(IntervalLength(3, TimeUnit.SECONDS), 3)
       val timedSample = TimedCountStat(config)
       fill(timedSample)
 
       val jValue = timedSample.toJValue
-      jValue must whenDelivered (be_==(JObject(JField(config.toString, (JArray(List(JNum(4), JNum(3), JNum(0))))) :: Nil)))
+      jValue must whenDelivered(be_==(JObject(JField(config.toString, (JArray(List(JNum(4), JNum(3), JNum(0))))) :: Nil)))
     }
   }
 
-  private def fill(timedSample: Statistic[Long]){
+  private def fill(timedSample: Statistic[Long]) {
     set(timedSample, 100000)
     set(timedSample, 101000)
     set(timedSample, 102000)

@@ -19,31 +19,31 @@ import scalaz.Semigroup
 import org.slf4s.Logging
 
 /**
- * A base trait for typeclass instances that describe how to stop a given type of service.
- * TODO: make polymorphic in the type of the Future, perhaps using an ADT such as StopResult { StopSuccess / StopFailure }
- *
- * In order for implementations of this trait to work properly in a graph where the same service is a dependant of multiple other services,
- * it should be safe for stop to be called multiple times with the same target.
- */
+  * A base trait for typeclass instances that describe how to stop a given type of service.
+  * TODO: make polymorphic in the type of the Future, perhaps using an ADT such as StopResult { StopSuccess / StopFailure }
+  *
+  * In order for implementations of this trait to work properly in a graph where the same service is a dependant of multiple other services,
+  * it should be safe for stop to be called multiple times with the same target.
+  */
 trait Stop[-A] {
   def stop(a: A): Future[Any]
 }
 
 /**
- * A DAG of things that can be stopped. Dependents are traversed in breadth-first order.
- */
+  * A DAG of things that can be stopped. Dependents are traversed in breadth-first order.
+  */
 sealed trait Stoppable { self =>
   protected def stop: Future[Any]
   def dependents: List[Stoppable]
 
   final def append(other: Stoppable) = new Stoppable {
     protected def stop = self.stop zip other.stop
-    def dependents = self.dependents ++ other.dependents
+    def dependents     = self.dependents ++ other.dependents
   }
 
   final def parent(other: Stoppable) = new Stoppable {
     protected def stop = self.stop
-    def dependents = other :: self.dependents
+    def dependents     = other :: self.dependents
   }
 }
 
@@ -53,8 +53,9 @@ object Stoppable extends Logging {
       Future(log.info("About to stop " + a)) flatMap { _ =>
         stopa.stop(a).onSuccess {
           case v => log.info("Stopped " + a + " with result " + v)
-        } recover { case ex =>
-          log.error("Stop failed", ex)
+        } recover {
+          case ex =>
+            log.error("Stop failed", ex)
         }
       }
     }
@@ -64,12 +65,12 @@ object Stoppable extends Logging {
 
   def fromFuture(future: => Future[Any]) = new Stoppable {
     protected lazy val stop = future
-    val dependents = Nil
+    val dependents          = Nil
   }
 
   def Noop(implicit executor: ExecutionContext): Stoppable = new Stoppable {
     protected lazy val stop = Promise.successful(())
-    val dependents = Nil
+    val dependents          = Nil
   }
 
   implicit object semigroup extends Semigroup[Stoppable] {
@@ -77,15 +78,15 @@ object Stoppable extends Logging {
   }
 
   /**
-   * Stops the specified stoppable, returning a future containing a list of the results
-   * of the stoppable graph in breadth-first order. When this future is completed,
-   * everything will be stopped.
-   *
-   * TODO: Make it possible to specify whether failure to stop any given service
-   * should prevent the stopping of its dependants. At present, any exception encountered
-   * in stopping will stop the stopping process, leaving the system in a potentially
-   * indeterminate state.
-   */
+    * Stops the specified stoppable, returning a future containing a list of the results
+    * of the stoppable graph in breadth-first order. When this future is completed,
+    * everything will be stopped.
+    *
+    * TODO: Make it possible to specify whether failure to stop any given service
+    * should prevent the stopping of its dependants. At present, any exception encountered
+    * in stopping will stop the stopping process, leaving the system in a potentially
+    * indeterminate state.
+    */
   implicit def stoppableStop(timeout: Timeout)(implicit ctx: ExecutionContext): Stop[Stoppable] = new Stop[Stoppable] {
     def stop(stoppable: Stoppable) = {
       def _stop(q: Queue[List[Stoppable]]): Future[List[Any]] = {
@@ -100,7 +101,7 @@ object Stoppable extends Logging {
     }
   }
 
-  implicit def stoppableStop(implicit ctx: ExecutionContext): Stop[Stoppable]  = stoppableStop(Timeout.never)
+  implicit def stoppableStop(implicit ctx: ExecutionContext): Stop[Stoppable] = stoppableStop(Timeout.never)
 
   def stop(stoppable: Stoppable, duration: Duration = Duration.Inf)(implicit ctx: ExecutionContext) =
     stoppableStop(duration).stop(stoppable)
@@ -125,12 +126,10 @@ case class ActorRefStop(actorSystem: ActorSystem, timeout: Timeout) extends Stop
   }
 
   override def stop(target: ActorRef): Future[Unit] = {
-    val exitFuture = Promise[Unit]()(actorSystem.dispatcher)
+    val exitFuture  = Promise[Unit]()(actorSystem.dispatcher)
     val stopMonitor = actorSystem.actorOf(Props(new StopMonitor(target, exitFuture, timeout)))
     target ! PoisonPill
     exitFuture
   }
 }
-
-
 // vim: set ts=4 sw=4 et:

@@ -11,15 +11,15 @@ import akka.dispatch.Future
 import akka.dispatch.Promise
 
 class HttpResponseHelpersSpec extends Specification with HttpResponseHelpers with FutureMatchers with TestAkkaDefaults {
-  
+
   "HttpResponseHelpers respond: creates Future with the specified parameters" in {
-    val statusCode  = InternalServerError
-    val headers = Map("foo" -> "bar")
-    val content = "zoo"
+    val statusCode = InternalServerError
+    val headers    = Map("foo" -> "bar")
+    val content    = "zoo"
 
     respond(HttpStatus(statusCode), headers, Some(content)) must whenDelivered {
       beLike {
-        case HttpResponse(HttpStatus(code, _), HttpHeaders(h), c, _) => 
+        case HttpResponse(HttpStatus(code, _), HttpHeaders(h), c, _) =>
           (code must_== statusCode) and (h must_== headers) and (c must beSome(content))
       }
     }
@@ -30,8 +30,8 @@ class HttpResponseHelpersSpec extends Specification with HttpResponseHelpers wit
     val content = "zoo"
 
     respondLater[String](Future(content), headers) must whenDelivered {
-      beLike { 
-        case HttpResponse(HttpStatus(code, _), HttpHeaders(h), c, _) => 
+      beLike {
+        case HttpResponse(HttpStatus(code, _), HttpHeaders(h), c, _) =>
           (code must_== OK) and (h must_== headers) and (c must beSome(content))
       }
     }
@@ -42,7 +42,7 @@ class HttpResponseHelpersSpec extends Specification with HttpResponseHelpers wit
     val promise = Promise.failed[String](error)
     respondLater[String](promise) must whenDelivered {
       beLike {
-        case HttpResponse(HttpStatus(code, _), _, c, _) =>  code must_== InternalServerError
+        case HttpResponse(HttpStatus(code, _), _, c, _) => code must_== InternalServerError
       }
     }
   }
@@ -54,7 +54,7 @@ class HttpResponseHelpersSpec extends Specification with HttpResponseHelpers wit
 
     respondLater[String](promise) must whenDelivered {
       beLike {
-        case HttpResponse(HttpStatus(code, _), _, c, _) =>  code must_== InternalServerError
+        case HttpResponse(HttpStatus(code, _), _, c, _) => code must_== InternalServerError
       }
     }
   }

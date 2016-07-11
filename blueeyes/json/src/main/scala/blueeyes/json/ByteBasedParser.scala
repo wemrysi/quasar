@@ -1,20 +1,20 @@
 package blueeyes.json
 
-import scala.annotation.{switch, tailrec}
+import scala.annotation.{ switch, tailrec }
 
 /**
- * Trait used when the data to be parsed is in UTF-8.
- */
+  * Trait used when the data to be parsed is in UTF-8.
+  */
 private[json] trait ByteBasedParser extends Parser {
   protected[this] def byte(i: Int): Byte
 
   /**
-   * See if the string has any escape sequences. If not, return the end of the
-   * string. If so, bail out and return -1.
-   *
-   * This method expects the data to be in UTF-8 and accesses it as bytes. Thus
-   * we can just ignore any bytes with the highest bit set.
-   */
+    * See if the string has any escape sequences. If not, return the end of the
+    * string. If so, bail out and return -1.
+    *
+    * This method expects the data to be in UTF-8 and accesses it as bytes. Thus
+    * we can just ignore any bytes with the highest bit set.
+    */
   protected[this] final def parseStringSimple(i: Int, ctxt: Context): Int = {
     var j = i
     var c = byte(j)
@@ -27,10 +27,10 @@ private[json] trait ByteBasedParser extends Parser {
   }
 
   /**
-   * Parse the string according to JSON rules, and add to the given context.
-   *
-   * This method expects the data to be in UTF-8 and accesses it as bytes.
-   */
+    * Parse the string according to JSON rules, and add to the given context.
+    *
+    * This method expects the data to be in UTF-8 and accesses it as bytes.
+    */
   protected[this] final def parseString(i: Int, ctxt: Context): Int = {
     val k = parseStringSimple(i + 1, ctxt)
     if (k != -1) {
@@ -40,12 +40,12 @@ private[json] trait ByteBasedParser extends Parser {
 
     var j = i + 1
     val sb = new CharBuilder
-      
+
     var c = byte(j)
     while (c != 34) { // "
       if (c == 92) { // \
         (byte(j + 1): @switch) match {
-          case 98 => { sb.append('\b'); j += 2 }
+          case 98  => { sb.append('\b'); j += 2 }
           case 102 => { sb.append('\f'); j += 2 }
           case 110 => { sb.append('\n'); j += 2 }
           case 114 => { sb.append('\r'); j += 2 }

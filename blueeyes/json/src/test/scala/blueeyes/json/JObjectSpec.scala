@@ -2,9 +2,9 @@ package blueeyes.json
 
 import org.specs2.mutable.Specification
 
-class JObjectSpec extends Specification{
+class JObjectSpec extends Specification {
   "JObjects equal even fields order is different" in {
-    JParser.parseUnsafe(j1) mustEqual(JParser.parseUnsafe(j2))
+    JParser.parseUnsafe(j1) mustEqual (JParser.parseUnsafe(j2))
   }
 
   val j1 = """{
@@ -41,7 +41,7 @@ class JObjectSpec extends Specification{
   "cKfCsaquqbvkrfkykrpby510244":false
 }"""
 
-val j2 = """{
+  val j2 = """{
   "IfnufnjhtztlieemsDegZwlmhwM132924":[["ioucxudplkylHantqbvmpwlClhzbtj",[],{
     "lpnclThlxzRoyzsXiiwyIyEurpEhc476273":4.2965233947521606E307,
     "n148475":{

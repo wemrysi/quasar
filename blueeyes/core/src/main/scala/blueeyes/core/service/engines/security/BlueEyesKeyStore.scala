@@ -5,7 +5,7 @@ import org.streum.configrity.Configuration
 import java.security.KeyStore
 import blueeyes.core.service.engines.InetInterfaceLookup
 
-object CertificateConfig{
+object CertificateConfig {
   val SslKey              = "ssl"
   val CertificateEntryKey = "certificateEntry"
   val CertificateKey      = "certificate"
@@ -13,9 +13,9 @@ object CertificateConfig{
 }
 
 import CertificateConfig._
-object ConfigCertificateKeyEntry{
+object ConfigCertificateKeyEntry {
   def apply(config: Configuration) = {
-    val certificateConfig   = config.detach(SslKey).detach(CertificateEntryKey)
+    val certificateConfig = config.detach(SslKey).detach(CertificateEntryKey)
 
     val privateKey  = certificateConfig.get[String](PrivateKeyKey)
     val certificate = certificateConfig.get[String](CertificateKey)
@@ -25,17 +25,17 @@ object ConfigCertificateKeyEntry{
   }
 }
 
-object BlueEyesKeyStoreFactory{
-  val alias    = "SSL-Support"
-  val password = "SSL-Support2009"
+object BlueEyesKeyStoreFactory {
+  val alias        = "SSL-Support"
+  val password     = "SSL-Support2009"
   private val lock = new java.util.concurrent.locks.ReentrantReadWriteLock
   private var keyStore: Option[KeyStore] = None
 
   def apply(config: Configuration) = {
-    writeLock{
+    writeLock {
       val value = keyStore.getOrElse({
         val newKeyStore = create(config)
-        keyStore        = Some(newKeyStore)
+        keyStore = Some(newKeyStore)
         newKeyStore
       })
       value
@@ -49,8 +49,8 @@ object BlueEyesKeyStoreFactory{
   }
 
   private def generate(config: Configuration) = {
-    val certificateConfig   = config.detach(SslKey).detach(CertificateEntryKey)
-    val cn = "CN=" + certificateConfig[String]("CN", InetInterfaceLookup.host(config))
+    val certificateConfig = config.detach(SslKey).detach(CertificateEntryKey)
+    val cn                = "CN=" + certificateConfig[String]("CN", InetInterfaceLookup.host(config))
     CertificateGenerator("RSA", alias, cn, 36500, password)
   }
 
@@ -58,8 +58,7 @@ object BlueEyesKeyStoreFactory{
     lock.writeLock.lock()
     try {
       f
-    }
-    finally {
+    } finally {
       lock.writeLock.unlock()
     }
   }

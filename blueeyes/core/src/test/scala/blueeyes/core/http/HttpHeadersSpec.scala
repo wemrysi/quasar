@@ -3,9 +3,9 @@ package blueeyes.core.http
 import org.specs2.mutable.Specification
 import HttpHeaders._
 
-class HttpHeadersSpec extends Specification{
+class HttpHeadersSpec extends Specification {
   "HttpHeaders" should {
-    "find headers by type" in{
+    "find headers by type" in {
       val headers = HttpHeaders(List("authorization" -> "foo"))
       headers.header[Authorization] must beSome(Authorization("foo"))
     }

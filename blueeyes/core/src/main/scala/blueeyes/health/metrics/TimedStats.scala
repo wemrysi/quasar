@@ -20,71 +20,78 @@ private[metrics] trait TimedAverageStatReport extends AsyncStatistic[Long, Map[L
 
 object TimedAverageStat {
   def apply(intervalConfig: IntervalConfig)(implicit clock: Clock): AsyncStatistic[Long, Map[Long, Double]] = intervalConfig match {
-    case e: interval => new TimedNumbersSample(e) with TimedAverageStatReport {
-      val intervalLengthInSeconds = config.granularity.unit.toSeconds(config.granularity.length)
-    }
+    case e: interval =>
+      new TimedNumbersSample(e) with TimedAverageStatReport {
+        val intervalLengthInSeconds = config.granularity.unit.toSeconds(config.granularity.length)
+      }
 
-    case eternity => 
+    case eternity =>
       val sample = new EternityTimedNumbersSample
       new WrapAsyncStatistic(sample) with TimedAverageStatReport {
         val startTime = clock.now().getMillis
         def intervalLengthInSeconds = (clock.now().getMillis - startTime) / 1000
-        def config: IntervalConfig = sample.config
+        def config: IntervalConfig  = sample.config
       }
   }
 }
 
-private[metrics] trait TimedCountStatReport extends AsyncStatistic[Long, Map[Long, Double]]{
-  def toJValue = details.map {details => JObject(JField(config.toString, JArray(details.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(kv => JNum(kv._2.toLong)))) :: Nil) }
+private[metrics] trait TimedCountStatReport extends AsyncStatistic[Long, Map[Long, Double]] {
+  def toJValue = details.map { details =>
+    JObject(JField(config.toString, JArray(details.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(kv => JNum(kv._2.toLong)))) :: Nil)
+  }
 
   protected def config: IntervalConfig
 }
 
 object TimedCountStat {
   def apply(intervalConfig: IntervalConfig)(implicit clock: Clock): AsyncStatistic[Long, Map[Long, Double]] = intervalConfig match {
-    case e: interval => new TimedNumbersSample(e) with TimedCountStatReport 
+    case e: interval => new TimedNumbersSample(e) with TimedCountStatReport
 
-    case eternity    => 
-      val sample = new EternityTimedNumbersSample 
+    case eternity =>
+      val sample = new EternityTimedNumbersSample
       new WrapAsyncStatistic(sample) with TimedCountStatReport {
         val startTime = clock.now().getMillis
         def intervalLengthInSeconds = (clock.now().getMillis - startTime) / 1000
-        def config: IntervalConfig = sample.config
+        def config: IntervalConfig  = sample.config
       }
   }
 }
 
-private[metrics] trait TimedErrorStatReport extends AsyncStatistic[Long, Map[Long, Double]]{
-  def toJValue = details map {details =>JObject(JField(config.toString, JArray(details.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(kv => JNum(kv._2.toLong)))) :: Nil) }
+private[metrics] trait TimedErrorStatReport extends AsyncStatistic[Long, Map[Long, Double]] {
+  def toJValue = details map { details =>
+    JObject(JField(config.toString, JArray(details.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(kv => JNum(kv._2.toLong)))) :: Nil)
+  }
 
   protected def config: IntervalConfig
 }
 
 object TimedErrorStat {
-  def apply(intervalConfig: IntervalConfig)(implicit clock: Clock): AsyncStatistic[Long, Map[Long, Double]] = intervalConfig match{
-    case e: interval => new TimedNumbersSample(e) with TimedErrorStatReport 
+  def apply(intervalConfig: IntervalConfig)(implicit clock: Clock): AsyncStatistic[Long, Map[Long, Double]] = intervalConfig match {
+    case e: interval => new TimedNumbersSample(e) with TimedErrorStatReport
 
-    case eternity    => 
-      val sample = new EternityTimedNumbersSample 
+    case eternity =>
+      val sample = new EternityTimedNumbersSample
       new WrapAsyncStatistic(sample) with TimedErrorStatReport {
         val startTime = clock.now().getMillis
         def intervalLengthInSeconds = (clock.now().getMillis - startTime) / 1000
-        def config: IntervalConfig = sample.config
+        def config: IntervalConfig  = sample.config
       }
   }
 }
 
 import histogram.ValueStrategy._
 
-private[metrics] trait TimedTimerStatReport extends AsyncStatistic[Long, Map[Long, Timer]]{
-  def toJValue = details map {value =>
-    val buildDetails  = value.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(_._2.toJValue).collect{case e: JObject => e}
-    buildDetails match{
+private[metrics] trait TimedTimerStatReport extends AsyncStatistic[Long, Map[Long, Timer]] {
+  def toJValue = details map { value =>
+    val buildDetails = value.toList.sortWith((e1, e2) => (e1._1 > e2._1)).map(_._2.toJValue).collect { case e: JObject => e }
+    buildDetails match {
       case x :: xs =>
-        val fieldsNames   = buildDetails.head.fields.map(_._1)
-        val values        = fieldsNames.map{name => (name, buildDetails.map(_ \ name))}
+        val fieldsNames = buildDetails.head.fields.map(_._1)
+        val values = fieldsNames.map { name =>
+          (name, buildDetails.map(_ \ name))
+        }
         JObject(values.map(kv => JField(kv._1, JObject(JField(config.toString, JArray(kv._2)) :: Nil))))
-      case Nil     => JObject(Nil)
+      case Nil => JObject(Nil)
     }
   }
   protected def config: IntervalConfig
@@ -92,9 +99,9 @@ private[metrics] trait TimedTimerStatReport extends AsyncStatistic[Long, Map[Lon
 
 object TimedTimerStat {
   def apply(intervalConfig: IntervalConfig)(implicit clock: Clock): AsyncStatistic[Long, Map[Long, Timer]] = intervalConfig match {
-    case e: interval => new TimedTimersSample(e) with TimedTimerStatReport 
+    case e: interval => new TimedTimersSample(e) with TimedTimerStatReport
 
-    case eternity    => new EternityTimedTimersSample with TimedTimerStatReport
+    case eternity => new EternityTimedTimersSample with TimedTimerStatReport
   }
 }
 

@@ -20,7 +20,7 @@ trait DefaultBijections {
   implicit def futureByteArrayToChunk(implicit executor: ExecutionContext): Bijection[Future[Array[Byte]], ByteChunk] = {
     new Bijection[Future[Array[Byte]], ByteChunk] {
       private implicit val M: Monad[Future] = new FutureMonad(executor)
-      def apply(f: Future[Array[Byte]]): ByteChunk = Right(f.liftM[StreamT])
+      def apply(f: Future[Array[Byte]]): ByteChunk   = Right(f.liftM[StreamT])
       def unapply(s: ByteChunk): Future[Array[Byte]] = ByteChunk.forceByteArray(s)
     }
   }
@@ -30,8 +30,8 @@ trait DefaultBijections {
   /// String Bijections ///
 
   implicit val StringToByteArray = new Bijection[String, Array[Byte]] {
-    def apply(s: String): Array[Byte] = s.getBytes("UTF-8")
-    def unapply(t: Array[Byte]): String   = new String(t, "UTF-8")
+    def apply(s: String): Array[Byte]   = s.getBytes("UTF-8")
+    def unapply(t: Array[Byte]): String = new String(t, "UTF-8")
   }
 
   implicit val ByteArrayToString = StringToByteArray.inverse
@@ -54,14 +54,14 @@ trait DefaultBijections {
 
   /// JValue Bijections ///
 
-  implicit val JValueToByteArray = new Bijection[JValue, Array[Byte]]{
+  implicit val JValueToByteArray = new Bijection[JValue, Array[Byte]] {
     def apply(jv: JValue) = {
       jv.renderCompact.getBytes("UTF-8")
     }
 
     def unapply(arr: Array[Byte]) = {
       val bb = ByteBuffer.wrap(arr)
-      val r = JParser.parseFromByteBuffer(bb)
+      val r  = JParser.parseFromByteBuffer(bb)
       r.valueOr(e => throw e)
     }
   }

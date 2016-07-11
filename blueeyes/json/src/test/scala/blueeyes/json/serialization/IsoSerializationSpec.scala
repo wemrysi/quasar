@@ -11,27 +11,27 @@ import scalaz._
 
 object IsoSerializationSpec {
   case class Foo(s: String, i: Option[Int], b: Boolean)
-  implicit val fooIso = Iso.hlist(Foo.apply _, Foo.unapply _)
-  val foo = Foo("Hello world", Some(23), true)
-  val foo2 = Foo("Hello world", None, true)
-  val foo3 = Foo("Hello default world", Some(23), true)
-  val fooSchema = "s" :: "i" :: "b" :: HNil
-  val defaultedFooSchema = ("s" ||| "Hello default world") :: "i" :: "b" :: HNil
-  val fooVariantSchema = ("s" | "z") :: "i" :: "b" :: HNil
-  val safeFooSchema = "s" :: Omit :: "b" :: HNil
+  implicit val fooIso        = Iso.hlist(Foo.apply _, Foo.unapply _)
+  val foo                    = Foo("Hello world", Some(23), true)
+  val foo2                   = Foo("Hello world", None, true)
+  val foo3                   = Foo("Hello default world", Some(23), true)
+  val fooSchema              = "s" :: "i" :: "b" :: HNil
+  val defaultedFooSchema     = ("s" ||| "Hello default world") :: "i" :: "b" :: HNil
+  val fooVariantSchema       = ("s" | "z") :: "i" :: "b" :: HNil
+  val safeFooSchema          = "s" :: Omit :: "b" :: HNil
   val safeDefaultedFooSchema = (Omit ||| "Hello default world") :: "i" :: "b" :: HNil
-  
+
   case class Bar(d: Double, f: Foo, l: List[String])
-  implicit val barIso = Iso.hlist(Bar.apply _, Bar.unapply _)
-  val bar = Bar(2.3, foo, List("foo", "bar", "baz"))
-  val bar2 = Bar(2.3, foo2, List("foo", "bar", "baz"))
-  val barSchema = "d" :: "f" :: "l" :: HNil
+  implicit val barIso  = Iso.hlist(Bar.apply _, Bar.unapply _)
+  val bar              = Bar(2.3, foo, List("foo", "bar", "baz"))
+  val bar2             = Bar(2.3, foo2, List("foo", "bar", "baz"))
+  val barSchema        = "d" :: "f" :: "l" :: HNil
   val inlinedBarSchema = "d" :: Inline :: "l" :: HNil
-  
+
   case class Baz(s: String, l: List[Foo])
   implicit val bazIso = Iso.hlist(Baz.apply _, Baz.unapply _)
-  val baz = Baz("Hello world", List(foo, foo2))
-  val bazSchema = "s" :: "l" :: HNil
+  val baz             = Baz("Hello world", List(foo, foo2))
+  val bazSchema       = "s" :: "l" :: HNil
 }
 
 class IsoSerializationSpec extends Specification {
@@ -39,84 +39,84 @@ class IsoSerializationSpec extends Specification {
   "serialization" should {
     "serialize a simple case class" in {
       val fooDecomp = decomposer[Foo](fooSchema)
-      
+
       val result = fooDecomp.decompose(foo)
-      
+
       result must_== JParser.parseUnsafe("""{ "s": "Hello world", "i": 23, "b": true }""")
     }
-    
+
     "serialize a simple case class with field aliases" in {
       val fooDecomp = decomposer[Foo](fooVariantSchema)
-      
+
       val result = fooDecomp.decompose(foo)
-      
+
       result must_== JParser.parseUnsafe("""{ "s": "Hello world", "i": 23, "b": true }""")
     }
-    
+
     "serialize a simple case class omitting absent optional fields" in {
       val fooDecomp = decomposer[Foo](fooSchema)
-      
+
       val result = fooDecomp.decompose(foo2)
-      
+
       result must_== JParser.parseUnsafe("""{ "s": "Hello world", "b": true }""")
     }
-    
+
     "serialize a simple case class with defaulted fields" in {
       val fooDecomp = decomposer[Foo](defaultedFooSchema)
-      
+
       val result = fooDecomp.decompose(foo)
-      
+
       result must_== JParser.parseUnsafe("""{ "s": "Hello world", "i": 23, "b": true }""")
     }
-    
+
     "serialize a simple case class with omitted fields" in {
       val fooDecomp = decomposer[Foo](safeFooSchema)
-      
+
       val result = fooDecomp.decompose(foo)
-      
+
       result must_== JParser.parseUnsafe("""{ "s": "Hello world", "b": true }""")
     }
-    
+
     "serialize a simple case class with defaulted omitted fields" in {
       val fooDecomp = decomposer[Foo](safeDefaultedFooSchema)
-      
+
       val result = fooDecomp.decompose(foo)
-      
+
       result must_== JParser.parseUnsafe("""{ "i": 23, "b": true }""")
     }
-    
+
     "serialize a case class with a nested case class element" in {
       implicit val fooDecomp = decomposer[Foo](fooSchema)
-      val barDecomp = decomposer[Bar](barSchema)
-      
+      val barDecomp          = decomposer[Bar](barSchema)
+
       val result = barDecomp.decompose(bar)
-      
+
       result must_== JParser.parseUnsafe("""{
         "d": 2.3,
         "f": { "s": "Hello world", "i": 23, "b": true },
         "l": ["foo", "bar", "baz"]
       }""")
     }
-    
+
     "serialize a case class with a nested case class element respecting alternative schema" in {
       implicit val fooDecomp = decomposer[Foo](safeFooSchema)
-      val barDecomp = decomposer[Bar](barSchema)
-      
+      val barDecomp          = decomposer[Bar](barSchema)
+
       val result = barDecomp.decompose(bar)
-      
+
       result must_== JParser.parseUnsafe("""{
         "d": 2.3,
         "f": { "s": "Hello world", "b": true },
         "l": ["foo", "bar", "baz"]
       }""")
     }
-    
+
     "serialize a case class with an inlined case class element" in {
       implicit val fooDecomp = decomposer[Foo](fooSchema)
-      val barDecomp = decomposer[Bar](inlinedBarSchema)
+      val barDecomp          = decomposer[Bar](inlinedBarSchema)
 
       val result = barDecomp.decompose(bar)
-      
+
       result must_== JParser.parseUnsafe("""{
         "d": 2.3, "s": "Hello world", "i": 23, "b": true, "l": ["foo", "bar", "baz"]
       }""")
@@ -124,21 +124,21 @@ class IsoSerializationSpec extends Specification {
 
     "serialize a case class with a list of nested case class elements" in {
       implicit val fooDecomp = decomposer[Foo](fooSchema)
-      val bazDecomp = decomposer[Baz](bazSchema)
+      val bazDecomp          = decomposer[Baz](bazSchema)
 
       val result = bazDecomp.decompose(baz)
-      
+
       result must_== JParser.parseUnsafe("""{
         "s": "Hello world", 
         "l": [{ "s": "Hello world", "i": 23, "b": true }, { "s": "Hello world", "b": true }]
       }""")
     }
   }
-  
+
   "deserialization" should {
     "extract to a simple case class" in {
       val fooExtract = extractor[Foo](fooSchema)
-      
+
       val result = fooExtract.extract(
         jobject(
           jfield("s", "Hello world"),
@@ -146,13 +146,13 @@ class IsoSerializationSpec extends Specification {
           jfield("b", true)
         )
       )
-      
+
       result must_== foo
     }
-    
+
     "extract to a simple case class with field aliases" in {
       val fooExtract = extractor[Foo](fooVariantSchema)
-      
+
       val result1 = fooExtract.extract(
         jobject(
           jfield("s", "Hello world"),
@@ -160,7 +160,7 @@ class IsoSerializationSpec extends Specification {
           jfield("b", true)
         )
       )
-      
+
       result1 must_== foo
 
       val result2 = fooExtract.extract(
@@ -170,106 +170,106 @@ class IsoSerializationSpec extends Specification {
           jfield("b", true)
         )
       )
-      
+
       result2 must_== foo
     }
-    
+
     "extract to a simple case class with an absent optional field" in {
       val fooExtract = extractor[Foo](fooSchema)
-      
+
       val result = fooExtract.extract(
         jobject(
           jfield("s", "Hello world"),
           jfield("b", true)
         )
       )
-      
+
       result must_== foo2
     }
-    
+
     "extract to a simple case class with an absent defaulted field" in {
       val fooExtract = extractor[Foo](defaultedFooSchema)
-      
+
       val result = fooExtract.extract(
         jobject(
           jfield("i", 23),
           jfield("b", true)
         )
       )
-      
+
       result must_== foo3
     }
-    
+
     "extract to a simple case class with omitted fields" in {
       val fooExtract = extractor[Foo](safeFooSchema)
-      
+
       val result = fooExtract.extract(
         jobject(
           jfield("s", "Hello world"),
           jfield("b", true)
         )
       )
-      
+
       result must_== foo2
     }
-    
+
     "extract to a simple case class with defaulted omitted fields" in {
       val fooExtract = extractor[Foo](safeDefaultedFooSchema)
-      
+
       val result = fooExtract.extract(
         jobject(
           jfield("i", 23),
           jfield("b", true)
         )
       )
-      
+
       result must_== foo3
     }
 
     "extract to a case class with a nested case class element" in {
       implicit val fooExtract = extractor[Foo](fooSchema)
-      val barExtract = extractor[Bar](barSchema)
-      
+      val barExtract          = extractor[Bar](barSchema)
+
       val result = barExtract.extract(
         jobject(
           jfield("d", 2.3),
-          jfield("f",
+          jfield(
+            "f",
             jobject(
               jfield("s", "Hello world"),
               jfield("i", 23),
               jfield("b", true)
             )),
-          jfield("l",
-            jarray(JString("foo"), JString("bar"), JString("baz")))
+          jfield("l", jarray(JString("foo"), JString("bar"), JString("baz")))
         )
       )
-      
+
       result must_== bar
     }
-    
+
     "extract to a case class with a nested case class element respecting alternative schema" in {
       implicit val fooExtract = extractor[Foo](fooSchema)
-      val barExtract = extractor[Bar](barSchema)
-      
+      val barExtract          = extractor[Bar](barSchema)
+
       val result = barExtract.extract(
         jobject(
           jfield("d", 2.3),
-          jfield("f",
+          jfield(
+            "f",
             jobject(
               jfield("s", "Hello world"),
               jfield("b", true)
             )),
-          jfield("l",
-            jarray(JString("foo"), JString("bar"), JString("baz")))
+          jfield("l", jarray(JString("foo"), JString("bar"), JString("baz")))
         )
       )
-      
+
       result must_== bar2
     }
-    
+
     "extract to a case class with a nested case class element from an inlined serialization" in {
       implicit val fooExtract = extractor[Foo](fooSchema)
-      val barExtract = extractor[Bar](inlinedBarSchema)
+      val barExtract          = extractor[Bar](inlinedBarSchema)
 
       val result = barExtract.extract(
         jobject(
@@ -277,22 +277,22 @@ class IsoSerializationSpec extends Specification {
           jfield("s", "Hello world"),
           jfield("i", 23),
           jfield("b", true),
-          jfield("l",
-            jarray(JString("foo"), JString("bar"), JString("baz")))
+          jfield("l", jarray(JString("foo"), JString("bar"), JString("baz")))
         )
       )
-      
+
       result must_== bar
     }
 
     "extract to a case class with a list of nested case class elements" in {
       implicit val fooExtract = extractor[Foo](fooSchema)
-      val bazExtract = extractor[Baz](bazSchema)
+      val bazExtract          = extractor[Baz](bazSchema)
 
       val result = bazExtract.extract(
         jobject(
           jfield("s", "Hello world"),
-          jfield("l",
+          jfield(
+            "l",
             jarray(
               jobject(
                 jfield("s", "Hello world"),
@@ -303,7 +303,7 @@ class IsoSerializationSpec extends Specification {
             ))
         )
       )
-      
+
       result must_== baz
     }
   }

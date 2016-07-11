@@ -7,7 +7,7 @@ import akka.dispatch.MessageDispatcher
 import scalaz._
 
 trait AkkaDefaults {
-  def defaultActorSystem = AkkaDefaults.actorSystem
+  def defaultActorSystem             = AkkaDefaults.actorSystem
   implicit def defaultFutureDispatch = AkkaDefaults.defaultFutureDispatch
 }
 

@@ -4,7 +4,7 @@ import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 
 import blueeyes.core.data._
-import blueeyes.core.http.{HttpResponse, HttpRequest}
+import blueeyes.core.http.{ HttpResponse, HttpRequest }
 import blueeyes.util.metrics.DataSize
 
 trait HttpClientByteChunk extends HttpClient[ByteChunk] { self =>

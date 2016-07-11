@@ -8,7 +8,7 @@ import scala.util.parsing.input._
 sealed trait EntityTag {
 
   def tags: List[String]
-  def value = tags.mkString(", ")
+  def value             = tags.mkString(", ")
   override def toString = value
 }
 
@@ -16,10 +16,13 @@ object EntityTags extends RegexParsers {
 
   private def parser = (
     "*" ^^^ Some(Star) |
-    repsep(regex("\"[^,]+\"".r), regex("""[ ]*,[ ]*""".r))  ^^ {case values => values match {
-      case x :: xs => Some(CustomEntityTags(values))
-      case Nil => None
-    }}
+      repsep(regex("\"[^,]+\"".r), regex("""[ ]*,[ ]*""".r)) ^^ {
+        case values =>
+          values match {
+            case x :: xs => Some(CustomEntityTags(values))
+            case Nil     => None
+          }
+      }
   )
 
   /* Should be an array of EntityTags */
@@ -32,7 +35,7 @@ object EntityTags extends RegexParsers {
   }
 
   case object Star extends EntityTag {
-    override def tags =  List("*")
+    override def tags = List("*")
   }
 
   sealed case class CustomEntityTags(tags: List[String]) extends EntityTag

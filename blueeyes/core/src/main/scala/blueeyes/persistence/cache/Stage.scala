@@ -2,7 +2,7 @@ package blueeyes.persistence.cache
 
 import blueeyes.bkka.Stop
 import blueeyes.bkka.ActorRefStop
-import akka.actor.{Actor, ActorRef, Props, Scheduler, PoisonPill, ActorKilledException, ActorSystem}
+import akka.actor.{ Actor, ActorRef, Props, Scheduler, PoisonPill, ActorKilledException, ActorSystem }
 import akka.pattern.ask
 import akka.dispatch.Future
 import akka.dispatch.Promise
@@ -20,8 +20,8 @@ import org.slf4s.Logging
 abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
   private sealed trait StageIn
   private case class PutAll(pairs: Iterable[(K, V)], semigroup: Semigroup[V]) extends StageIn
-  private object     FlushAll extends StageIn
-  private object     FlushAllBySchedule extends StageIn
+  private object FlushAll           extends StageIn
+  private object FlushAllBySchedule extends StageIn
 
   def flush(k: K, v: V): Unit
 
@@ -38,14 +38,14 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
 
     def iterator: Iterator[(K, ExpirableValue[V])] = impl.iterator
 
-    def += (kv: (K, ExpirableValue[V])): this.type = {
+    def +=(kv: (K, ExpirableValue[V])): this.type = {
       impl.remove(kv._1)
       impl.put(kv._1, kv._2)
 
       this
     }
 
-    def -= (k: K): this.type = {
+    def -=(k: K): this.type = {
       Option(impl.get(k)) foreach { v =>
         flush(k, v.value)
         impl.remove(k)
@@ -71,9 +71,10 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
     import scala.math._
     import java.util.concurrent.TimeUnit
 
-    private val cache           = new Cache
-    private var flushScheduled  = false
-    private val duration        = Duration(min(expirationPolicy.timeToIdleNanos.getOrElse(2000000000l), expirationPolicy.timeToLiveNanos.getOrElse(2000000000l)) / 2, TimeUnit.NANOSECONDS)
+    private val cache = new Cache
+    private var flushScheduled = false
+    private val duration =
+      Duration(min(expirationPolicy.timeToIdleNanos.getOrElse(2000000000l), expirationPolicy.timeToLiveNanos.getOrElse(2000000000l)) / 2, TimeUnit.NANOSECONDS)
 
     def receive = {
       case PutAll(pairs, semigroup) =>
@@ -86,7 +87,7 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
 
         val keysToRemove = cache.foldLeft[List[K]](Nil) {
           case (keysToRemove, (key, value)) =>
-            if(expirationPolicy.isExpired(value, currentTime)) key :: keysToRemove
+            if (expirationPolicy.isExpired(value, currentTime)) key :: keysToRemove
             else keysToRemove
         }
 
@@ -115,7 +116,7 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
       flushScheduled = true
     }
 
-    private def putToCache(pairs:  Iterable[(K, V)], semigroup: Semigroup[V]) {
+    private def putToCache(pairs: Iterable[(K, V)], semigroup: Semigroup[V]) {
       var putSize = 0
       for ((key, value) <- pairs) {
         putSize += 1
@@ -132,9 +133,9 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
 
   private val actor: ActorRef = actorSystem.actorOf(Props(new StageActor))
 
-  def += (k: K, v: V)(implicit sg: Semigroup[V]) = put(k, v)
+  def +=(k: K, v: V)(implicit sg: Semigroup[V]) = put(k, v)
 
-  def += (tuple: (K, V))(implicit sg: Semigroup[V]) = put(tuple._1, tuple._2)
+  def +=(tuple: (K, V))(implicit sg: Semigroup[V]) = put(tuple._1, tuple._2)
 
   def put(k: K, v: V)(implicit sg: Semigroup[V]) = actor ! PutAll((k, v) :: Nil, sg)
 
@@ -155,13 +156,14 @@ abstract class Stage[K, V](monitor: HealthMonitor = HealthMonitor.Noop) {
 object Stage {
   def apply[K, V](policy: ExpirationPolicy, capacity: Int, evict: (K, V) => Unit): Stage[K, V] = apply(policy, capacity)(evict)
 
-  def apply[K, V](policy: ExpirationPolicy, capacity: Int, monitor: HealthMonitor = HealthMonitor.Noop)(evict: (K, V) => Unit): Stage[K, V] = new Stage[K, V](monitor) {
-    def expirationPolicy = policy
+  def apply[K, V](policy: ExpirationPolicy, capacity: Int, monitor: HealthMonitor = HealthMonitor.Noop)(evict: (K, V) => Unit): Stage[K, V] =
+    new Stage[K, V](monitor) {
+      def expirationPolicy = policy
 
-    def maximumCapacity = capacity
+      def maximumCapacity = capacity
 
-    def flush(k: K, v: V): Unit = evict(k, v)
-  }
+      def flush(k: K, v: V): Unit = evict(k, v)
+    }
 
   implicit def stop[K, V](implicit timeout: Timeout): Stop[Stage[K, V]] = new Stop[Stage[K, V]] {
     def stop(s: Stage[K, V]) = s.stop(timeout)

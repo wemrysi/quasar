@@ -2,11 +2,11 @@ package blueeyes.persistence.cache
 
 import org.specs2.mutable.Specification
 
-class LRUMapSpec extends Specification{
+class LRUMapSpec extends Specification {
   "LRUMap.put: adds new value" in {
     val map = newMap()
     map.put("foo", "bar")
-    map.get("foo") mustEqual("bar")
+    map.get("foo") mustEqual ("bar")
   }
   "LRUMap.put: evict eldest entry" in {
     var evicted = false
@@ -14,9 +14,9 @@ class LRUMapSpec extends Specification{
     map.put("foo", "bar")
     map.put("baz", "foo")
 
-    evicted        must be_==(true)
-    map.get("foo") must be  (null)
-    map.get("baz") mustEqual("foo")
+    evicted must be_==(true)
+    map.get("foo") must be(null)
+    map.get("baz") mustEqual ("foo")
   }
   "LRUMap.remove: removes entry and decrement Total Weight" in {
     val map = newMap()
@@ -24,8 +24,8 @@ class LRUMapSpec extends Specification{
     map.remove("foo") mustEqual ("bar")
     map.put("baz", "foo")
 
-    map.get("foo") must be  (null)
-    map.get("baz") mustEqual("foo")
+    map.get("foo") must be(null)
+    map.get("baz") mustEqual ("foo")
   }
   "LRUMap.remove(key, value): removes entry and decrement Total Weight" in {
     val map = newMap()
@@ -33,8 +33,8 @@ class LRUMapSpec extends Specification{
     map.remove("foo", "bar") mustEqual (true)
     map.put("baz", "foo")
 
-    map.get("foo") must be  (null)
-    map.get("baz") mustEqual("foo")
+    map.get("foo") must be(null)
+    map.get("baz") mustEqual ("foo")
   }
   "LRUMap.clear: clears map and decrement Total Weight" in {
     val map = newMap()
@@ -42,36 +42,41 @@ class LRUMapSpec extends Specification{
     map.clear()
     map.put("baz", "foo")
 
-    map.get("foo") must be  (null)
-    map.get("baz") mustEqual("foo")
+    map.get("foo") must be(null)
+    map.get("baz") mustEqual ("foo")
   }
   "LRUMap.putIfAbsent: does not add existing key" in {
     val map = newMap()
     map.putIfAbsent("foo", "bar")
     map.putIfAbsent("foo", "baz")
 
-    map.get("foo") must be  ("bar")
+    map.get("foo") must be("bar")
   }
   "LRUMap.replace: replaces existing entry" in {
     val map = newMap()
     map.put("foo", "bar")
     map.replace("foo", "baz")
 
-    map.get("foo") must be  ("baz")
+    map.get("foo") must be("baz")
   }
   "LRUMap.replace(key, oldValue, value): replaces existing entry" in {
     val map = newMap()
     map.put("foo", "bar")
     map.replace("foo", "bar", "baz")
 
-    map.get("foo") must be  ("baz")
+    map.get("foo") must be("baz")
   }
   "LRUMap.replace: does not replace not existing entry" in {
     val map = newMap()
     map.put("foo", "bar")
     map.replace("baz", "foo")
 
-    map.get("baz") must be  (null)
+    map.get("baz") must be(null)
   }
-  private def newMap(evicter: (String, String) => Unit = {(key: String, value: String) => ()}) = new LRUMap[String, String](evicter, 1, {value: String => 1})
+  private def newMap(evicter: (String, String) => Unit = { (key: String, value: String) =>
+    ()
+  }) =
+    new LRUMap[String, String](evicter, 1, { value: String =>
+      1
+    })
 }

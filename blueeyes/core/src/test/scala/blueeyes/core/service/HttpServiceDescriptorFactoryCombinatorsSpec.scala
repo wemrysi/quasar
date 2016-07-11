@@ -9,9 +9,9 @@ import blueeyes.core.http._
 import blueeyes.core.http.test._
 import blueeyes.core.http.HttpStatusCodes._
 import blueeyes.core.http.MimeTypes._
-import blueeyes.core.http.{HttpRequest, HttpResponse, HttpStatus}
+import blueeyes.core.http.{ HttpRequest, HttpResponse, HttpStatus }
 import blueeyes.core.service._
-import blueeyes.health.metrics.{eternity}
+import blueeyes.health.metrics.{ eternity }
 import blueeyes.health.metrics.IntervalLength._
 import blueeyes.json._
 
@@ -21,13 +21,17 @@ import akka.util.Timeout
 import java.io.File
 import scala.util.Random
 
-import org.specs2.specification.{Step, Fragments}
+import org.specs2.specification.{ Step, Fragments }
 import org.scalacheck.Gen._
 
 import DefaultBijections._
 
-class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecification with HealthMonitorTestService with HttpRequestMatchers with TestAkkaDefaults {
-  val logFilePrefix = "w3log-" + identifier.sample.get
+class HttpServiceDescriptorFactoryCombinatorsSpec
+    extends BlueEyesServiceSpecification
+    with HealthMonitorTestService
+    with HttpRequestMatchers
+    with TestAkkaDefaults {
+  val logFilePrefix    = "w3log-" + identifier.sample.get
   val executionContext = defaultFutureDispatch
 
   override def configuration = """
@@ -61,10 +65,10 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
   val httpClient: HttpClient[ByteChunk] = new HttpClient[ByteChunk] {
     def apply(r: HttpRequest[ByteChunk]): Future[HttpResponse[ByteChunk]] = {
       val responseContent = r.uri.path match {
-        case Some("/foo/v1/email/v1/proxy")  => 
+        case Some("/foo/v1/email/v1/proxy") =>
           DefaultBijections.stringToChunk("it works!")
 
-        case _ => 
+        case _ =>
           DefaultBijections.stringToChunk("it does not work!")
       }
 
@@ -74,12 +78,14 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
     def isDefinedAt(x: HttpRequest[ByteChunk]) = true
   }
 
-  override protected def afterSpec() = Step{
+  override protected def afterSpec() = Step {
     findLogFile foreach { _.delete }
   }
 
   private def findLogFile = {
-    new File(System.getProperty("java.io.tmpdir")).listFiles find { file => file.getName.startsWith(logFilePrefix) && file.getName.endsWith(".log") } 
+    new File(System.getProperty("java.io.tmpdir")).listFiles find { file =>
+      file.getName.startsWith(logFilePrefix) && file.getName.endsWith(".log")
+    }
   }
 
   val monitorClient = client.path("/email/v1")
@@ -96,12 +102,12 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
     "support health monitor statistics" in {
       import blueeyes.json.JParser.parse
       monitorClient.get[JValue]("/health") must succeedWithContent { (content: JValue) =>
-        (content \ "requests" \ "GET" \ "count" \ "eternity" mustEqual(parse("[1]"))) and
-        (content \ "requests" \ "GET" \ "timing" mustNotEqual(JUndefined)) and
-        (content \ "requests" \ "GET" \ "timing" \ "perSecond" \ "eternity" mustNotEqual(JUndefined)) and
-        (content \ "service" \ "name"    mustEqual(JString("email"))) and
-        (content \ "service" \ "version" mustEqual(JString("1.2.3"))) and
-        (content \ "uptimeSeconds"       mustNotEqual(JUndefined)) 
+        (content \ "requests" \ "GET" \ "count" \ "eternity" mustEqual (parse("[1]"))) and
+          (content \ "requests" \ "GET" \ "timing" mustNotEqual (JUndefined)) and
+          (content \ "requests" \ "GET" \ "timing" \ "perSecond" \ "eternity" mustNotEqual (JUndefined)) and
+          (content \ "service" \ "name" mustEqual (JString("email"))) and
+          (content \ "service" \ "version" mustEqual (JString("1.2.3"))) and
+          (content \ "uptimeSeconds" mustNotEqual (JUndefined))
       }
     }
 
@@ -109,7 +115,7 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
       monitorClient.get[String]("/proxy") must succeedWithContent((_: String) must_== "it works!")
     }
 
-    "RequestLogging: Creates logRequest" in{
+    "RequestLogging: Creates logRequest" in {
       findLogFile must beSome[File]
     }
   }
@@ -118,29 +124,31 @@ class HttpServiceDescriptorFactoryCombinatorsSpec extends BlueEyesServiceSpecifi
 trait HealthMonitorTestService extends BlueEyesServiceBuilder with ServiceDescriptorFactoryCombinators with TestAkkaDefaults {
   implicit def httpClient: HttpClient[ByteChunk]
 
-  val emailService = service ("email", "1.2.3") {
+  val emailService = service("email", "1.2.3") {
     requestLogging(Timeout(60000)) {
       logging { log =>
         healthMonitor("/health", Timeout(60000), List(eternity)) { monitor =>
-          serviceLocator { locator: ServiceLocator[ByteChunk] =>
-            context => {
+          serviceLocator { locator: ServiceLocator[ByteChunk] => context =>
+            {
               request {
                 path("/foo") {
-                  get  { request: HttpRequest[ByteChunk] => Future(HttpResponse[ByteChunk]()) }
-                } ~
-                path("/proxy") {
                   get { request: HttpRequest[ByteChunk] =>
-                    val foo = locator("foo", "1.02.32")
-                    foo(request)
+                    Future(HttpResponse[ByteChunk]())
                   }
                 } ~
-                remainingPath{
-                  get{
-                    request: HttpRequest[ByteChunk] => { path: String =>
-                      Future(HttpResponse[ByteChunk]())
+                  path("/proxy") {
+                    get { request: HttpRequest[ByteChunk] =>
+                      val foo = locator("foo", "1.02.32")
+                      foo(request)
+                    }
+                  } ~
+                  remainingPath {
+                    get { request: HttpRequest[ByteChunk] =>
+                      { path: String =>
+                        Future(HttpResponse[ByteChunk]())
+                      }
                     }
                   }
-                }
               }
             }
           }

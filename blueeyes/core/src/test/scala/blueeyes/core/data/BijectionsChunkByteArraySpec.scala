@@ -19,8 +19,8 @@ class BijectionsChunkByteArraySpec extends Specification with TestAkkaDefaults w
 
   "BijectionsChunkByteArray" should {
     "Convert a stream of chunks to a single byte array" in {
-      val bytes1 = Array[Byte](0x01, 0x02, 0x03)
-      val bytes2 = Array[Byte](0x04, 0x05, 0x06)
+      val bytes1   = Array[Byte](0x01, 0x02, 0x03)
+      val bytes2   = Array[Byte](0x04, 0x05, 0x06)
       val expected = Array[Byte](0x01, 0x02, 0x03, 0x04, 0x05, 0x06)
 
       val result = bijection.unapply(Right(bytes1 :: bytes2 :: StreamT.empty[Future, Array[Byte]]))

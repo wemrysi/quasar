@@ -18,9 +18,9 @@ sealed trait HttpIp {
 
 }
 
-object HttpIps extends RegexParsers{
+object HttpIps extends RegexParsers {
 
-  private def elementParser = regex("""([\d]{1,3}\.){3}[\d]{1,3}""".r) ^^ {case v => CustomIP(InetAddress.getByName(v))}
+  private def elementParser = regex("""([\d]{1,3}\.){3}[\d]{1,3}""".r) ^^ { case v => CustomIP(InetAddress.getByName(v)) }
 
   private def parser = repsep(elementParser, regex("""[ ]*,[ ]*""".r))
 
@@ -37,4 +37,3 @@ object HttpIps extends RegexParsers{
   case class CustomIP(ip: InetAddress) extends HttpIp
 
 }
-

@@ -20,15 +20,15 @@ import org.specs2.mutable.Specification
 
 object DiffExamples extends Specification {
   import JParser._
-  import MergeExamples.{scala1, scala2, lotto1, lotto2, mergedLottoResult}
-  
+  import MergeExamples.{ scala1, scala2, lotto1, lotto2, mergedLottoResult }
+
   "Diff example" in {
     val Diff(changed, added, deleted) = scala1 diff scala2
     changed mustEqual expectedChanges
     added mustEqual expectedAdditions
     deleted mustEqual expectedDeletions
   }
-  
+
   val expectedChanges = parseUnsafe("""
     {
       "tags": ["static-typing","fp"],
@@ -36,7 +36,7 @@ object DiffExamples extends Specification {
         "key2":"newval2"
       }
     }""")
-  
+
   val expectedAdditions = parseUnsafe("""
     {
       "features": {
@@ -44,32 +44,32 @@ object DiffExamples extends Specification {
       },
       "compiled": true
     }""")
-  
+
   val expectedDeletions = parseUnsafe("""
     {
       "year":2006,
       "features":{ "key1":"val1" }
     }""")
-  
+
   "Lotto example" in {
     val Diff(changed, added, deleted) = mergedLottoResult diff lotto1
     changed mustEqual JUndefined
     added mustEqual JUndefined
     deleted mustEqual lotto2
   }
-  
+
   "Example from http://tlrobinson.net/projects/js/jsondiff/" in {
-    val json1 = read("/diff-example-json1.json")
-    val json2 = read("/diff-example-json2.json")
-    val expectedChanges = read("/diff-example-expected-changes.json")
+    val json1             = read("/diff-example-json1.json")
+    val json2             = read("/diff-example-json2.json")
+    val expectedChanges   = read("/diff-example-expected-changes.json")
     val expectedAdditions = read("/diff-example-expected-additions.json")
     val expectedDeletions = read("/diff-example-expected-deletions.json")
-  
+
     val Diff(changes, additions, deletions) = json1 diff json2
     changes.renderCanonical mustEqual expectedChanges.renderCanonical
     additions.renderCanonical mustEqual expectedAdditions.renderCanonical
     deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
   }
-  
+
   private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
 }

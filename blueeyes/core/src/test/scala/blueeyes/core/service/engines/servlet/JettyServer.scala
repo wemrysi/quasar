@@ -2,7 +2,7 @@ package blueeyes.core.service.engines.servlet
 
 import javax.servlet.Servlet
 import org.eclipse.jetty.server.Server
-import org.eclipse.jetty.servlet.{ServletHandler, ServletHolder, ServletContextHandler}
+import org.eclipse.jetty.servlet.{ ServletHandler, ServletHolder, ServletContextHandler }
 import java.io.File
 
 class JettyServer(servlet: Servlet) {
@@ -10,7 +10,7 @@ class JettyServer(servlet: Servlet) {
 
   private var server: Option[Server] = None;
 
-  def start(port: Int){
+  def start(port: Int) {
     configFile.createNewFile();
 
     val server = new Server(port);
@@ -19,7 +19,7 @@ class JettyServer(servlet: Servlet) {
     this.server = Some(server)
   }
 
-  def stop(){
+  def stop() {
     configFile.delete()
 
     server.foreach(_.stop())

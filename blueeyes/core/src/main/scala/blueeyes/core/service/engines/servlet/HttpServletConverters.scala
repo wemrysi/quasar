@@ -10,7 +10,7 @@ import akka.util.Timeout
 import akka.dispatch.Future
 import akka.dispatch.ExecutionContext
 
-import java.io.{ByteArrayOutputStream, InputStream}
+import java.io.{ ByteArrayOutputStream, InputStream }
 import java.nio.ByteBuffer
 import java.net.InetAddress
 import javax.servlet.http.HttpServletRequest
@@ -25,17 +25,21 @@ trait HttpServletConverters {
     val parameters = request.getParameterMap.asScala.map {
       case (name, values) => Symbol(name) -> values.headOption.getOrElse("")
     }
-    
-    val headers    = buildHeaders(request)
-    val content    = fromServletContent(request)
 
-    val xforwarded  = headers.header(`X-Forwarded-For`).flatMap(_.ips.toList.headOption.map(_.ip))
-    val remoteIp    = xforwarded.orElse(headers.header(`X-Cluster-Client-Ip`).flatMap(_.ips.toList.headOption.map(_.ip)))
-    val remoteHost  = remoteIp.orElse(Option(request.getRemoteHost).map(InetAddress.getByName(_)))
-    val httpRequest = HttpRequest(HttpMethods.parseHttpMethods(request.getMethod).head, 
-                                  URI(request.getRequestURL.toString), 
-                                  parameters.toMap, headers, content, remoteHost, 
-                                  fromServletVersion(request.getProtocol))
+    val headers = buildHeaders(request)
+    val content = fromServletContent(request)
+
+    val xforwarded = headers.header(`X-Forwarded-For`).flatMap(_.ips.toList.headOption.map(_.ip))
+    val remoteIp   = xforwarded.orElse(headers.header(`X-Cluster-Client-Ip`).flatMap(_.ips.toList.headOption.map(_.ip)))
+    val remoteHost = remoteIp.orElse(Option(request.getRemoteHost).map(InetAddress.getByName(_)))
+    val httpRequest = HttpRequest(
+      HttpMethods.parseHttpMethods(request.getMethod).head,
+      URI(request.getRequestURL.toString),
+      parameters.toMap,
+      headers,
+      content,
+      remoteHost,
+      fromServletVersion(request.getProtocol))
 
     httpRequest.withSubpath(request.getRequestURI.substring(request.getContextPath.length + request.getServletPath.length))
   }
@@ -44,27 +48,28 @@ trait HttpServletConverters {
     if (!isTransferEncodingChunked(request)) {
       val byteContents = new ByteArrayOutputStream()
       val buffer       = new Array[Byte](maxBufferSize)
-      val in = request.getInputStream
+      val in           = request.getInputStream
 
-      var length       = in.read(buffer)
+      var length = in.read(buffer)
       while (length != -1) {
         byteContents.write(buffer, 0, length);
-        length       = in.read(buffer)
+        length = in.read(buffer)
       }
 
       val written = byteContents.toByteArray
       if (written.length == 0) None else Some(Left(written))
     } else {
       implicit val M: Monad[Future] = new FutureMonad(ctx)
-      Some(Right(
-       StreamT.unfoldM[Future, Array[Byte], InputStream](request.getInputStream) { in =>
-         Future {
-           val bytes = new Array[Byte](maxBufferSize)
-           val length = in.read(bytes)
-           if (length < 1) None else Some((bytes, in))
-         }
-       }
-      ))
+      Some(
+        Right(
+          StreamT.unfoldM[Future, Array[Byte], InputStream](request.getInputStream) { in =>
+          Future {
+            val bytes  = new Array[Byte](maxBufferSize)
+            val length = in.read(bytes)
+            if (length < 1) None else Some((bytes, in))
+          }
+        }
+        ))
     }
   }
 

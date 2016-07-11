@@ -5,7 +5,7 @@ import org.streum.configrity.Configuration
 import org.streum.configrity.io.BlockFormat
 import org.apache.commons.codec.binary.Base64
 
-class ConfigCertificateKeyEntrySpec extends Specification with CertificateData{
+class ConfigCertificateKeyEntrySpec extends Specification with CertificateData {
   override def is = args(sequential = true) ^ super.is
 
   private val configuration = """
@@ -21,7 +21,7 @@ server {
 
   "CertificateKeyEntry must create key and certificate" in {
     val config = Configuration.parse(configuration, BlockFormat)
-    
+
     val entry = ConfigCertificateKeyEntry(config.detach("server"))
 
     encode(entry.get._1.getEncoded) mustEqual (encodedPrivateKey)

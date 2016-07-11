@@ -2,7 +2,7 @@ package blueeyes.core.http
 
 import org.specs2.mutable.Specification
 
-class ExpectationSpec extends Specification{
+class ExpectationSpec extends Specification {
 
   "Expectation:  Should return continue or failure" in {
     HttpHeaders.Expect(Expectations.parseExpectations("100").get).value mustEqual "100-continue"
@@ -12,8 +12,7 @@ class ExpectationSpec extends Specification{
     HttpHeaders.Expect(Expectations.parseExpectations("417").get).value mustEqual "417-expectationfailed"
   }
 
-  "Expectation: Should parse to none on bad input" in { 
+  "Expectation: Should parse to none on bad input" in {
     Expectations.parseExpectations("asdf4s17") mustEqual None
   }
 }
-

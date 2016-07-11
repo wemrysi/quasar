@@ -1,7 +1,7 @@
 package blueeyes.core.service.engines.security
 
 import java.security.cert.Certificate
-import java.security.{Key, KeyStore}
+import java.security.{ Key, KeyStore }
 
 object KeyStoreFactory {
   def apply(key: Key, certificate: Certificate, alias: String, password: String) = {

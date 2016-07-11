@@ -21,7 +21,7 @@ case class TemporalCache[K, V] private (private val cache: Map[K, CacheValue[V]]
     assert(maxCapacity >= baseCapacity)
 
     if (cache.size > maxCapacity) {
-      val numTruncate = cache.size - baseCapacity
+      val numTruncate     = cache.size - baseCapacity
       val (removed, kept) = cache.toArray.sortBy(_._2.accessTime).splitAt(numTruncate)
       TemporalCacheState(removed.view.map(t => (t._1, t._2.value)).toMap, TemporalCache(kept.toMap))
     } else {
@@ -41,12 +41,13 @@ case class TemporalCache[K, V] private (private val cache: Map[K, CacheValue[V]]
 
   def put(kv: (K, V), accessTime: NanoTime): TemporalCache[K, V] = {
     val (key, value) = kv
-    val oldValue = cache.get(key)
+    val oldValue     = cache.get(key)
 
     TemporalCache(
       cache + (
         key -> CacheValue(
-          value, oldValue.map(_.creationTime).getOrElse(accessTime), 
+          value,
+          oldValue.map(_.creationTime).getOrElse(accessTime),
           oldValue.cata(v => v.accessTime.max(accessTime), accessTime)
         )
       )
@@ -63,5 +64,5 @@ case class TemporalCache[K, V] private (private val cache: Map[K, CacheValue[V]]
 object TemporalCache {
   type NanoTime = Long
 
-  def empty[K, V] = TemporalCache[K,V](Map.empty)
+  def empty[K, V] = TemporalCache[K, V](Map.empty)
 }

@@ -110,4 +110,4 @@ object JSchemaSpec extends Specification with ScalaCheck with ArbitraryJPath wit
     }
   }
 }
-*/
+ */

@@ -23,7 +23,7 @@ import scalaz.syntax.monad._
 
 class BlueEyesServiceSpecificationSpec extends BlueEyesServiceSpecification with TestService with FutureMatchers with TestAkkaDefaults {
   implicit val futureTimeouts = FutureTimeouts(6, 1 second)
-  val executionContext = defaultFutureDispatch
+  val executionContext        = defaultFutureDispatch
 
   "Service Specification" should {
     "support get by valid URL" in {
@@ -31,7 +31,7 @@ class BlueEyesServiceSpecificationSpec extends BlueEyesServiceSpecification with
     }
 
     "support asynch get by valid URL" in {
-      val result = client.get[String]("/sample/v1/asynch/future") 
+      val result = client.get[String]("/sample/v1/asynch/future")
       result must whenDelivered { be_==(serviceResponse) }
     }
 
@@ -48,29 +48,29 @@ trait TestService extends BlueEyesServiceBuilder with TestAkkaDefaults {
   val sampleService = service("sample", "1.32") { context =>
     request {
       encode[ByteChunk, Future[HttpResponse[String]], Future[HttpResponse[ByteChunk]]] {
-        produce(text/html) {
+        produce(text / html) {
           path("/bar/'foo/bar.html") {
             get { request: HttpRequest[ByteChunk] =>
               Future(serviceResponse)
             }
-          }~
-          path("/asynch/future") {
-            get { request: HttpRequest[ByteChunk] =>
-              async {
-                serviceResponse
+          } ~
+            path("/asynch/future") {
+              get { request: HttpRequest[ByteChunk] =>
+                async {
+                  serviceResponse
+                }
+              }
+            } ~
+            path("/asynch/eventually") {
+              get { request: HttpRequest[ByteChunk] =>
+                if (eventuallyCondition) {
+                  Future(serviceResponse)
+                } else {
+                  eventuallyCondition = true
+                  Promise.successful(HttpResponse[String](HttpStatus(HttpStatusCodes.NotFound)))
+                }
               }
             }
-          }~
-          path("/asynch/eventually") {
-            get { request: HttpRequest[ByteChunk] =>
-              if (eventuallyCondition) {
-                Future(serviceResponse)
-              } else {
-                eventuallyCondition = true
-                Promise.successful(HttpResponse[String](HttpStatus(HttpStatusCodes.NotFound)))
-              }
-            }
-          }
         }
       }
     }
@@ -87,8 +87,8 @@ trait TestService extends BlueEyesServiceBuilder with TestAkkaDefaults {
 
     promise
   }
-} 
+}
 
-object TestService{
+object TestService {
   val serviceResponse = HttpResponse[String](HttpStatus(HttpStatusCodes.OK), Map("Content-Type" -> "text/html"), Some("context"), HttpVersions.`HTTP/1.1`)
 }

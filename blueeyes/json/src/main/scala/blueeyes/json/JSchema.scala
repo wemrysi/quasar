@@ -1,4 +1,3 @@
-
 package blueeyes.json
 
 import scalaz._
@@ -259,4 +258,4 @@ case object JEitherSchema {
     else set.reduce[JSchema]((a, b) => JEitherSchema(a, b))
   }
 }
-*/
+ */

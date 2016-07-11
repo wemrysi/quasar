@@ -2,7 +2,7 @@ package blueeyes.core.http
 
 import org.specs2.mutable.Specification
 
-class IfRangeSpec extends Specification{
+class IfRangeSpec extends Specification {
 
   "If-Range:  should return an HttpDateTime from an HttpDateTime input" in {
     HttpHeaders.`If-Range`(IfRanges.parseIfRanges("Tue, 29 Dec 2009 12:12:12 GMT").get).value mustEqual "Tue, 29 Dec 2009 12:12:12 GMT"
@@ -13,4 +13,3 @@ class IfRangeSpec extends Specification{
   }
 
 }
-

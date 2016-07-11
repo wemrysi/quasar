@@ -59,7 +59,7 @@ object MergeExamples extends Specification {
       },
       "compiled": true
     }""")
-  
+
   "Lotto example" in {
     (lotto1 merge lotto2) mustEqual mergedLottoResult
   }

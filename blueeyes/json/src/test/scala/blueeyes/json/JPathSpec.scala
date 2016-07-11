@@ -17,7 +17,7 @@
 package blueeyes.json
 
 import org.specs2.mutable.Specification
-import org.scalacheck.{Gen, Arbitrary, Prop}
+import org.scalacheck.{ Gen, Arbitrary, Prop }
 import Prop.forAll
 import Arbitrary._
 
@@ -48,7 +48,7 @@ object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with 
 
       check { (testData: (JValue, List[(JPath, JValue)])) =>
         testData match {
-          case (obj, allPathValues) => 
+          case (obj, allPathValues) =>
             val allProps = allPathValues.map {
               case (path, pathValue) => path.extract(obj) == pathValue
             }
@@ -58,9 +58,9 @@ object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with 
     }
 
     "extract a second level node" in {
-      val j = JObject(JField("address", JObject( JField("city", JString("B")) :: JField("street", JString("2")) ::  Nil)) :: Nil)
+      val j = JObject(JField("address", JObject(JField("city", JString("B")) :: JField("street", JString("2")) :: Nil)) :: Nil)
 
-      JPath("address.city").extract(j) mustEqual(JString("B"))
+      JPath("address.city").extract(j) mustEqual (JString("B"))
     }
   }
 
@@ -114,7 +114,7 @@ object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with 
         JPath("b[10].a[0].a")
       )
 
-      val expected = List(1,0,2,3,4,6,5,9,10,7,8) map test
+      val expected = List(1, 0, 2, 3, 4, 6, 5, 9, 10, 7, 8) map test
 
       test.sorted must_== expected
     }

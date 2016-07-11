@@ -13,12 +13,13 @@ import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.util.Timeout
 
-import histogram.{DynamicHistogram, ValueStrategy}
+import histogram.{ DynamicHistogram, ValueStrategy }
 
 abstract class TimedSample[V](val config: interval)(implicit valueStrategy: ValueStrategy[V], clock: Clock, m: Manifest[V])
-extends AsyncStatistic[Long, Map[Long, V]]{
+    extends AsyncStatistic[Long, Map[Long, V]] {
   val actorSystem = ActorSystem("timed-sample") //TODO: Specialize
-  private[TimedSample] val actor = actorSystem.actorOf(Props(new TimedSampleActor(DynamicHistogram.empty(config.granularity.length, config.samples + 1, config.granularity.unit))))
+  private[TimedSample] val actor =
+    actorSystem.actorOf(Props(new TimedSampleActor(DynamicHistogram.empty(config.granularity.length, config.samples + 1, config.granularity.unit))))
 
   def +=(elem: Long): this.type = {
     actor ! DataRequest(clock.now().getMillis(), elem)

@@ -10,7 +10,7 @@ import blueeyes.core.service._
 import engines.HttpClientXLightWeb
 import HttpStatusCodes._
 
-import scalaz.{Failure, Success}
+import scalaz.{ Failure, Success }
 import scalaz.Validation._
 import blueeyes.Environment
 
@@ -29,9 +29,9 @@ trait ConfigurableHttpClient {
     def isDefinedAt(r: HttpRequest[ByteChunk]) = true
     def apply(r: HttpRequest[ByteChunk]): Future[HttpResponse[ByteChunk]] = h.service(r) match {
       case Success(rawFuture) => rawFuture recover { case throwable => convertErrorToResponse(throwable) }
-      case Failure(DispatchError(failure, message, detail)) => 
+      case Failure(DispatchError(failure, message, detail)) =>
         Promise.successful(HttpResponse[ByteChunk](HttpStatus(failure, message)))
-      case Failure(Inapplicable(services @ _*)) => 
+      case Failure(Inapplicable(services @ _ *)) =>
         val message = "MockClient received NotFound for request " + r
         Promise.successful(HttpResponse[ByteChunk](HttpStatus(NotFound, message)))
     }
@@ -39,7 +39,7 @@ trait ConfigurableHttpClient {
 
   private def convertErrorToResponse(th: Throwable): HttpResponse[ByteChunk] = th match {
     case e: HttpException => HttpResponse[ByteChunk](HttpStatus(e.failure, e.reason))
-    case e => HttpResponse[ByteChunk](HttpStatus(InternalServerError, Option(e.getMessage).getOrElse("")))
+    case e                => HttpResponse[ByteChunk](HttpStatus(InternalServerError, Option(e.getMessage).getOrElse("")))
   }
 
   protected def mockServer: AsyncHttpService[ByteChunk, ByteChunk] = new CustomHttpService[ByteChunk, Future[HttpResponse[ByteChunk]]] {

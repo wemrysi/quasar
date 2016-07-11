@@ -4,17 +4,18 @@ import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 
 sealed trait Expectation {
-  def code: HttpStatusCode 
-  def value: Int = code.value
+  def code: HttpStatusCode
+  def value: Int                = code.value
   override def toString: String = value.toString + "-" + code.name.toLowerCase
 }
 
 object Expectations extends RegexParsers {
 
-  private def parser = (
-    "100" ^^^ continue |
-    "417" ^^^ failure
-  )?
+  private def parser =
+    (
+      "100" ^^^ continue |
+        "417" ^^^ failure
+    ) ?
 
   def parseExpectations(inString: String): Option[ExpectType] = parser(new CharSequenceReader(inString)) match {
     case Success(result, _) => result
@@ -28,7 +29,7 @@ object Expectations extends RegexParsers {
     override def code = inCode;
   }
 
-  case object continue extends ExpectType (HttpStatusCodes.Continue) 
-  case object failure extends ExpectType (HttpStatusCodes.ExpectationFailed) 
+  case object continue extends ExpectType(HttpStatusCodes.Continue)
+  case object failure  extends ExpectType(HttpStatusCodes.ExpectationFailed)
 
 }

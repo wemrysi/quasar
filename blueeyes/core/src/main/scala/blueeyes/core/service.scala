@@ -22,7 +22,7 @@ package object service {
       def unapply(responseFuture: Future[HttpResponse[B]]) = {
         for {
           response <- responseFuture
-          content  <- response.content.map(surjection).sequence
+          content <- response.content.map(surjection).sequence
         } yield {
           response.copy(content = content)
         }
@@ -32,7 +32,7 @@ package object service {
 
   implicit def identityHttpTranscoder[A]: AsyncHttpTranscoder[A, A] = {
     new AsyncTranscoder[HttpRequest, HttpResponse, A, A] {
-      def apply(request: HttpRequest[A]) = request
+      def apply(request: HttpRequest[A])                   = request
       def unapply(responseFuture: Future[HttpResponse[A]]) = responseFuture
     }
   }
@@ -40,7 +40,7 @@ package object service {
   implicit def unpackFutureContent[A, B](responseFuture: Future[HttpResponse[A]])(implicit M: Monad[Future], f: A => Future[B]): Future[HttpResponse[B]] = {
     for {
       response <- responseFuture
-      content  <- response.content.map(f).sequence
+      content <- response.content.map(f).sequence
     } yield {
       response.copy(content = content)
     }

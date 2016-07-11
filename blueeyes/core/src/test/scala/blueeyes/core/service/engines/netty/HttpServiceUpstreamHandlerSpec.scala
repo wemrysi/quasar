@@ -1,10 +1,7 @@
 package blueeyes.core.service
 package engines.netty
 
-import org.jboss.netty.handler.codec.http.{HttpResponse => NettyHttpResponse,
-                                           DefaultHttpResponse => NettyDefaultHttpResponse,
-                                           HttpResponseStatus => NettyHttpResponseStatus,
-                                           HttpVersion => NettyHttpVersion}
+import org.jboss.netty.handler.codec.http.{ HttpResponse => NettyHttpResponse, DefaultHttpResponse => NettyDefaultHttpResponse, HttpResponseStatus => NettyHttpResponseStatus, HttpVersion => NettyHttpVersion }
 import org.jboss.netty.handler.stream.ChunkedInput
 import org.jboss.netty.channel._
 
@@ -22,8 +19,8 @@ import DefaultBijections._
 
 import org.slf4s.Logging
 
-import org.mockito.Mockito.{times, when}
-import org.mockito.{Matchers, ArgumentMatcher}
+import org.mockito.Mockito.{ times, when }
+import org.mockito.{ Matchers, ArgumentMatcher }
 import org.specs2.mock._
 import org.specs2.mutable.Specification
 
@@ -38,8 +35,10 @@ class HttpServiceUpstreamHandlerSpec extends Specification with Mockito with Log
   private val channelFuture = mock[ChannelFuture]
   private val service       = mock[HttpRequest[ByteChunk] => Validation[NotServed, Future[HttpResponse[ByteChunk]]]]
 
-  private val request       = HttpRequest[ByteChunk](HttpMethods.GET, URI("/bar/1/adCode.html"), Map[Symbol, String](), HttpHeaders.Empty, None, None, HttpVersions.`HTTP/1.0`)
-  private val response      = HttpResponse[ByteChunk](HttpStatus(HttpStatusCodes.OK), Map("retry-after" -> "1"), Some(ByteChunk("12".getBytes("UTF-8"))), HttpVersions.`HTTP/1.1`)
+  private val request =
+    HttpRequest[ByteChunk](HttpMethods.GET, URI("/bar/1/adCode.html"), Map[Symbol, String](), HttpHeaders.Empty, None, None, HttpVersions.`HTTP/1.0`)
+  private val response =
+    HttpResponse[ByteChunk](HttpStatus(HttpStatusCodes.OK), Map("retry-after" -> "1"), Some(ByteChunk("12".getBytes("UTF-8"))), HttpVersions.`HTTP/1.1`)
 
   override def is = args(sequential = true) ^ super.is
 
@@ -65,10 +64,10 @@ class HttpServiceUpstreamHandlerSpec extends Specification with Mockito with Log
 
     there was one(channelFuture).addListener(ChannelFutureListener.CLOSE)
   }
-  */
+   */
 
   "cancel Future when connection closed" in {
-    val nettyHandler  = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)
+    val nettyHandler = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)
     val event        = mock[MessageEvent]
     val stateEvent   = mock[ChannelStateEvent]
     val promise      = Promise[HttpResponse[ByteChunk]]()
@@ -87,9 +86,9 @@ class HttpServiceUpstreamHandlerSpec extends Specification with Mockito with Log
   "return a bad request code when server on bad urls" in {
     import org.mockito.Matchers
 
-    val nettyHandler  = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)
-    val event        = mock[MessageEvent]
-    val stateEvent   = mock[ChannelStateEvent]
+    val nettyHandler   = new HttpServiceUpstreamHandler(handler, defaultFutureDispatch)
+    val event          = mock[MessageEvent]
+    val stateEvent     = mock[ChannelStateEvent]
     val exceptionEvent = new DefaultExceptionEvent(channel, HttpException(HttpStatusCodes.BadRequest, "bad mojo"))
 
     channel.isOpen() returns true
@@ -99,21 +98,21 @@ class HttpServiceUpstreamHandlerSpec extends Specification with Mockito with Log
     nettyHandler.exceptionCaught(context, exceptionEvent)
     nettyHandler.channelDisconnected(context, stateEvent)
 
-    val badSyntaxStatus = new NettyHttpResponseStatus(400, "The request contains bad syntax or cannot be fulfilled.")
-    val expectedResponse = new NettyDefaultHttpResponse(NettyHttpVersion.HTTP_1_1, badSyntaxStatus)
+    val badSyntaxStatus        = new NettyHttpResponseStatus(400, "The request contains bad syntax or cannot be fulfilled.")
+    val expectedResponse       = new NettyDefaultHttpResponse(NettyHttpVersion.HTTP_1_1, badSyntaxStatus)
     val matchBadSyntaxResponse = new RequestMatcher(expectedResponse)
     there was one(channel).write(Matchers argThat matchBadSyntaxResponse)
   }
 
   class RequestMatcher(matchingResponce: NettyHttpResponse) extends ArgumentMatcher[NettyHttpResponse] {
-     def matches(arg: Object ): Boolean = {
-       val response = arg.asInstanceOf[NettyHttpResponse]
-       response != null && matchingResponce.getStatus == response.getStatus
-     }
+    def matches(arg: Object): Boolean = {
+      val response = arg.asInstanceOf[NettyHttpResponse]
+      response != null && matchingResponce.getStatus == response.getStatus
+    }
   }
   class ContentMatcher(chunkedInput: ChunkedInput) extends ArgumentMatcher[NettyHttpResponse] {
-     def matches(arg: Object ): Boolean = {
-       arg != null
-     }
+    def matches(arg: Object): Boolean = {
+      arg != null
+    }
   }
 }

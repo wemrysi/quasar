@@ -12,7 +12,7 @@ import blueeyes.core.http.MimeTypes._
 import blueeyes.core.http.combinators.HttpRequestCombinators
 import blueeyes.core.http.HttpStatusCodes._
 import engines.security.BlueEyesKeyStoreFactory
-import engines.{TestEngineService, HttpClientXLightWeb}
+import engines.{ TestEngineService, HttpClientXLightWeb }
 import DefaultBijections._
 
 import akka.dispatch.Future
@@ -32,7 +32,7 @@ import blueeyes.akka_testing.FutureMatchers
 import org.slf4s.Logging
 
 import org.specs2.mutable.Specification
-import org.specs2.specification.{Step, Fragments}
+import org.specs2.specification.{ Step, Fragments }
 import org.specs2.time.TimeConversions._
 
 import scalaz._
@@ -45,19 +45,19 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
 
   private val (port, sslPort) = findUnusedPorts(1000, 2) match {
     case Some(p :: sp :: Nil) => (p, sp)
-    case _ => throw new Exception("Failed to find 2 unused ports for testing")
+    case _                    => throw new Exception("Failed to find 2 unused ports for testing")
   }
 
   log.info("Running HttpServerNettySpec with config " + configPattern.format(port, sslPort))
 
   private var stop: Option[Stoppable] = None
-  private var config: Configuration = null
+  private var config: Configuration   = null
 
   override def is = args(sequential = true) ^ super.is
 
   override def map(fs: => Fragments) = {
     def startStep = Step {
-      val conf = Configuration.parse(configPattern.format(port, sslPort), BlockFormat)
+      val conf         = Configuration.parse(configPattern.format(port, sslPort), BlockFormat)
       val sampleServer = (new SampleServer).server(conf, defaultFutureDispatch)
       config = conf.detach("server")
 
@@ -80,8 +80,8 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
     "return empty response" in {
       Await.result(client.post("/empty/response")(""), duration) must beLike {
         case HttpResponse(status, _, content, _) =>
-          (status.code must be (OK)) and
-          (content must beNone)
+          (status.code must be(OK)) and
+            (content must beNone)
       }
     }
 
@@ -92,9 +92,9 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
       Await.result(client.post("/file/write")("foo"), duration) must
         beLike {
           case HttpResponse(status, _, content, _) =>
-            (status.code must be (OK)) and
-            (TestEngineService.dataFile.exists must be_==(true)) and
-            (TestEngineService.dataFile.length mustEqual("foo".length))
+            (status.code must be(OK)) and
+              (TestEngineService.dataFile.exists must be_==(true)) and
+              (TestEngineService.dataFile.length mustEqual ("foo".length))
         }
       //}
     }
@@ -142,7 +142,7 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
       Await.result(client.get[ByteChunk]("/huge"), 10.seconds) must beLike {
         case HttpResponse(status, _, Some(content), _) =>
           (status.code must_== HttpStatusCodes.OK) and
-          (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
+            (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
       }
     }
 
@@ -152,7 +152,7 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
       Await.result(client.get[ByteChunk]("/huge/delayed"), 10.seconds) must beLike {
         case HttpResponse(status, _, Some(content), _) =>
           (status.code must_== HttpStatusCodes.OK) and
-          (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
+            (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
       }
     }
 
@@ -166,7 +166,7 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
       Await.result(sslClient.get[ByteChunk]("/huge"), 10.seconds) must beLike {
         case HttpResponse(status, _, Some(content), _) =>
           (status.code must_== HttpStatusCodes.OK) and
-          (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
+            (readContent(content) must haveSize(TestEngineService.hugeContent.map(v => v.length).sum))
       }
     }
   }
@@ -179,7 +179,7 @@ class HttpServerNettySpec extends Specification with TestAkkaDefaults with HttpR
     Await.result(ByteChunk.forceByteArray(chunk).map(new String(_, "UTF-8")), 10.seconds)
   }
 
-  private def client    = new LocalClient(config).protocol("http").host("localhost").port(port).path("/sample/v1")
+  private def client = new LocalClient(config).protocol("http").host("localhost").port(port).path("/sample/v1")
 
   private def sslClient = new LocalClient(config).protocol("https").host("localhost").port(sslPort).path("/sample/v1")
 }

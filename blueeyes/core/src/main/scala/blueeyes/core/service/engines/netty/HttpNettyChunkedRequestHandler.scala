@@ -3,19 +3,19 @@ package engines.netty
 
 import blueeyes.bkka._
 import blueeyes.core.data._
-import blueeyes.core.http.{HttpStatusCodes, HttpException, HttpRequest}
+import blueeyes.core.http.{ HttpStatusCodes, HttpException, HttpRequest }
 
 import akka.dispatch.Future
 import akka.dispatch.Promise
 import akka.dispatch.ExecutionContext
 
-import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
+import org.jboss.netty.buffer.{ ChannelBuffer, ChannelBuffers }
 import org.jboss.netty.channel.ChannelHandlerContext
 import org.jboss.netty.channel.ChannelStateEvent
 import org.jboss.netty.channel.Channels
 import org.jboss.netty.channel.MessageEvent
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler
-import org.jboss.netty.handler.codec.http.{HttpHeaders => NettyHeaders, HttpChunk => NettyChunk, HttpRequest => NettyRequest}
+import org.jboss.netty.handler.codec.http.{ HttpHeaders => NettyHeaders, HttpChunk => NettyChunk, HttpRequest => NettyRequest }
 import org.jboss.netty.util.CharsetUtil
 
 import org.slf4s.Logging
@@ -26,7 +26,9 @@ import java.util.concurrent.CountDownLatch
 import scalaz._
 import scala.collection.JavaConverters._
 
-private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit executionContext: ExecutionContext) extends SimpleChannelUpstreamHandler with Logging {
+private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit executionContext: ExecutionContext)
+    extends SimpleChannelUpstreamHandler
+    with Logging {
   import HttpNettyConverters._
   import HttpNettyChunkedRequestHandler._
   import NettyHeaders._
@@ -40,13 +42,13 @@ private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit e
         if (is100ContinueExpected(nettyRequest)) Channels.write(ctx, Channels.succeededFuture(ctx.getChannel), CONTINUE.duplicate())
 
         val httpRequestBuilder = fromNettyRequest(nettyRequest, event.getRemoteAddress)
-        val nettyContent = nettyRequest.getContent
+        val nettyContent       = nettyRequest.getContent
 
         val content: Option[ByteChunk] = if (nettyRequest.isChunked) {
           val head = Chain.incomplete
           if (nettyContent.readable()) {
             chain = Chain.incomplete
-            val len = nettyContent.readableBytes
+            val len   = nettyContent.readableBytes
             val bytes = new Array[Byte](len)
             nettyContent.readBytes(bytes)
             head.promise.success(Some((bytes, chain)))
@@ -57,7 +59,7 @@ private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit e
           Some(Right(StreamT.unfoldM[Future, Array[Byte], Chain](head) { _.promise }))
         } else {
           if (nettyContent.readable()) {
-            val len = nettyContent.readableBytes
+            val len   = nettyContent.readableBytes
             val bytes = new Array[Byte](len)
             nettyContent.readBytes(bytes)
             Some(Left(bytes))
@@ -72,8 +74,8 @@ private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit e
         val current = chain
         chain = if (chunk.isLast) Chain.complete else Chain.incomplete
         val content = chunk.getContent
-        val len = content.readableBytes
-        val bytes = new Array[Byte](len)
+        val len     = content.readableBytes
+        val bytes   = new Array[Byte](len)
         content.readBytes(bytes)
         current.promise.success(Some((bytes, chain)))
 
@@ -93,7 +95,7 @@ private[engines] class HttpNettyChunkedRequestHandler(chunkSize: Int)(implicit e
   }
 
   private def killPending(message: String) {
-    if (chain != null && ! chain.promise.isCompleted) {
+    if (chain != null && !chain.promise.isCompleted) {
       chain.promise.failure(new RuntimeException(message))
     }
   }

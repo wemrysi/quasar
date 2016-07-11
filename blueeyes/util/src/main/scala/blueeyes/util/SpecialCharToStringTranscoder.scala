@@ -1,7 +1,7 @@
 package blueeyes.util
 
 /** Transcodes special characters to characters.
- */
+  */
 case class SpecialCharToStringTranscoder(encoding: PartialFunction[Char, String], decoding: PartialFunction[List[Char], Option[Char]]) {
 
   private val encodingF: Char => Option[String] = encoding.lift
@@ -9,7 +9,7 @@ case class SpecialCharToStringTranscoder(encoding: PartialFunction[Char, String]
   private val decodingF: List[Char] => Option[Option[Char]] = decoding.lift
 
   /** Takes an decoded string, and encodes it.
-   */
+    */
   def encode(s: String): String = {
     val encoded = new StringBuilder
 
@@ -29,9 +29,9 @@ case class SpecialCharToStringTranscoder(encoding: PartialFunction[Char, String]
   }
 
   /** Takes an encoded string, and decodes it.
-   */
+    */
   def decode(s: String): String = {
-    val decoded     = new StringBuilder
+    val decoded = new StringBuilder
     var decodingPart: List[Char] = Nil
 
     for (i <- 0 until s.length) {

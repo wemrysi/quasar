@@ -17,9 +17,9 @@ object FrameOptions {
 
   def parseFrameOptions(inString: String): Option[FrameOption] = {
     inString.trim.toLowerCase match {
-      case "deny" => Some(DENY)
+      case "deny"       => Some(DENY)
       case "sameorigin" => Some(SAMEORIGIN)
-      case default => None
+      case default      => None
     }
   }
 

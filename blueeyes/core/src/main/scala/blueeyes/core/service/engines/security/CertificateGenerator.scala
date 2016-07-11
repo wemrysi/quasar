@@ -1,12 +1,12 @@
 package blueeyes.core.service.engines.security
 
-import java.io.{File, FileInputStream}
+import java.io.{ File, FileInputStream }
 import java.security.KeyStore
 
-object CertificateGenerator{
+object CertificateGenerator {
 
   def apply(keyalg: String, alias: String, dname: String, validity: Int, password: String) = {
-    val keyStorePath  = System.getProperty("java.io.tmpdir") + "/" + System.currentTimeMillis + ".jks"
+    val keyStorePath = System.getProperty("java.io.tmpdir") + "/" + System.currentTimeMillis + ".jks"
 
     JavaKeyTool(keyStorePath, keyalg, alias, dname, validity, password)
 
@@ -23,8 +23,7 @@ object CertificateGenerator{
       keystore.load(keystoreStream, passwordArray)
 
       Tuple2(keystore.getKey(alias, passwordArray), keystore.getCertificate(alias))
-    }
-    finally {
+    } finally {
       keystoreStream.close
       keyStorePathFile.delete
     }

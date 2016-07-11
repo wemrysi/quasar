@@ -12,6 +12,4 @@ object Chain {
   def complete(implicit executor: ExecutionContext) =
     new Chain(Promise.successful(None))
 }
-
-
 // vim: set ts=4 sw=4 et:
