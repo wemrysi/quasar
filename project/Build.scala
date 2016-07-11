@@ -3,16 +3,6 @@ import Keys._
 
 object BlueEyesBuild extends Build {
   val nexusSettings : Seq[Project.Setting[_]] = Seq(
-    resolvers ++= Seq(
-      "Sonatype Jetty"                    at "http://oss.sonatype.org/content/groups/jetty/",
-      "Typesafe Repository"               at "http://repo.typesafe.com/typesafe/releases/",
-      "Sonatype Releases"                 at "http://oss.sonatype.org/content/repositories/releases",
-      "Sonatype Snapshots"                at "http://oss.sonatype.org/content/repositories/snapshots",
-      "JBoss Releases"                    at "http://repository.jboss.org/nexus/content/groups/public/",
-      "Maven Repo 1"                      at "http://repo1.maven.org/maven2/",
-      "Guiceyfruit Googlecode"            at "http://guiceyfruit.googlecode.com/svn/repo/releases/"
-    ),
-
     publishMavenStyle := true,
     publishArtifact in Test := false,
     pomIncludeRepository := { (repo: MavenRepository) => false },
@@ -51,26 +41,18 @@ object BlueEyesBuild extends Build {
       </developers>
   )
 
-  val scalazVersion = "7.0.0"
+  val scalazVersion = "7.0.9"
 
   val commonSettings = Seq(
-    scalaVersion := "2.9.3",
-
-    crossScalaVersions := Seq("2.9.3"),
-
-    organization := "com.reportgrid",
-
-    version := "1.0.0-M9.5",
-
+           scalaVersion :=  "2.9.3",
+           organization :=  "com.reportgrid",
+                version :=  "1.0.0-M9.5",
     libraryDependencies ++= Seq(
-      "org.scalaz"         %% "scalaz-core"   % scalazVersion,
-      "org.scalaz"         %% "scalaz-effect" % scalazVersion,
-      "org.specs2"         %% "specs2"        % "1.12.4.1"       % "test",
-      "org.scalacheck"     %% "scalacheck"    % "1.10.0"         % "test",
-      "ch.qos.logback"     %  "logback-classic"    % "1.0.0" % "test"
-    ),
-
-    scalacOptions ++= Seq("-deprecation", "-unchecked")
+      "org.scalaz"     %% "scalaz-effect"   % scalazVersion,
+      "org.specs2"     %% "specs2"          %   "1.12.4.1"   % Test,
+      "org.scalacheck" %% "scalacheck"      %    "1.10.1"    % Test,
+      "ch.qos.logback"  % "logback-classic" %    "1.0.0"     % Test
+    )
   )
 
   lazy val blueeyes = Project(id = "blueeyes", base = file(".")).settings((nexusSettings ++ commonSettings): _*) aggregate(util, json, akka_testing, bkka, core, test, mongo)
@@ -88,9 +70,4 @@ object BlueEyesBuild extends Build {
   lazy val test  = Project(id = "test", base = file("test")).settings((nexusSettings ++ commonSettings): _*) dependsOn core
 
   lazy val mongo = Project(id = "mongo", base = file("mongo")).settings((nexusSettings ++ commonSettings): _*) dependsOn (core, json % "test->test")
-
-  //lazy val actor = Project(id = "actor", base = file("actor")).settings(nexusSettings : _*)
 }
-
-
-// vim: set ts=4 sw=4 et:
