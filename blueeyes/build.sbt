@@ -1,15 +1,8 @@
 import blueeyes.BlueeyesBuild._
 
-lazy val akka_testing = project.setup.noArtifacts dependsOn util
-lazy val bkka         = project.setup dependsOn util deps (
-  "org.slf4s" %% "slf4s-api" % "1.7.13"
-)
-lazy val blueeyes     = project.setup.root.noArtifacts aggregate (util, json, bkka, core, test, common)
-lazy val common       = project.setup also (name := "blueeyes-common") deps (
-  "com.typesafe.akka"  % "akka-actor" %  "2.0.5"   % Test,
-  "org.specs2"        %% "specs2"     % "1.12.4.1" % Test
-)
-lazy val core         = project.setup dependsOn (util, json, bkka, common.inBothScopes) also (name := "blueeyes-core") deps (
+lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, bkka, core, test, common)
+
+lazy val core = project.setup dependsOn (json, bkka, common % BothScopes) deps (
 
   "com.googlecode.concurrentlinkedhashmap" % "concurrentlinkedhashmap-lru" %      "1.1",
   "commons-codec"                          % "commons-codec"               %      "1.5",
@@ -23,14 +16,18 @@ lazy val core         = project.setup dependsOn (util, json, bkka, common.inBoth
   "org.eclipse.jetty"                      % "jetty-server"                % "8.1.3.v20120416" %    Test,
   "org.eclipse.jetty"                      % "jetty-servlet"               % "8.1.3.v20120416" %    Test
 )
-lazy val json = project.setup deps (
-  "org.scalaz"  %% "scalaz-core"     % "7.0.9",
-  "joda-time"    % "joda-time"       % "1.6.2"  % "optional",
-  "com.chuusai"  % "shapeless_2.9.2" % "1.2.4"  % "optional"
-)
 lazy val util = project.setup deps (
-  "org.scalaz"        %% "scalaz-effect" % "7.0.9",
-  "com.typesafe.akka"  % "akka-actor"    % "2.0.5",
-  "joda-time"          % "joda-time"     % "1.6.2"
+
+  "org.slf4s"         %% "slf4s-api"     % "1.7.13",
+  "org.scalaz"        %% "scalaz-effect" %  "7.0.9",
+  "joda-time"          % "joda-time"     %  "1.6.2",
+  "com.typesafe.akka"  % "akka-actor"    %  "2.0.5",
+  "org.specs2"        %% "specs2"        % "1.12.4.1" % Test
 )
-lazy val test = project.setup.noArtifacts dependsOn (core, common.inTestScope)
+lazy val json   = project.setup dependsOn (util % BothScopes) deps (
+  "com.chuusai" %% "shapeless" % "1.2.3"
+)
+
+lazy val bkka   = project.setup dependsOn util
+lazy val common = project.setup dependsOn (util % BothScopes)
+lazy val test   = project.setup.noArtifacts dependsOn (core, common.inTestScope)

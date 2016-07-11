@@ -26,7 +26,6 @@ object PlatformBuild {
       packagedArtifacts := Map()
     )
     def root: Project                                 = p in file(".")
-    def inBothScopes: ClasspathDependency             = p % BothScopes
     def inTestScope: ClasspathDependency              = p % "test->test"
     def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
     def also(s: Setting[_], ss: Setting[_]*): Project = also(s +: ss.toSeq)

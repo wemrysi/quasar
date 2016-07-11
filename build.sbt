@@ -6,9 +6,9 @@ lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, 
 
 /** This used to be the evaluator project.
  */
-lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil.inBothScopes
+lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil % BothScopes
 
-lazy val yggdrasil = project.setup dependsOn (common.inBothScopes, blueeyes % BothScopes) deps (
+lazy val yggdrasil = project.setup dependsOn (common % BothScopes, blueeyes % BothScopes) deps (
   "org.objectweb.howl" % "howl"        % "1.0.1-1",
   "org.slamdata"       % "jdbm"        %  "3.0.0",
   "org.spire-math"     % "spire_2.9.2" %  "0.3.0"
