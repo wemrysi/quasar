@@ -15,14 +15,16 @@ lazy val yggdrasil = project.setup dependsOn common.inBothScopes deps (
 )
 lazy val common = project.setup dependsOn blueeyes deps (
 
-  "com.chuusai"              %% "shapeless"   % "1.2.3",
-  "org.slf4s"                %% "slf4s-api"   % "1.7.13",
-  "org.scalaz"               %% "scalaz-core" % "7.0.9",
-  "org.scalacheck"           %% "scalacheck"  % "1.10.1"  % Test,
-  "com.google.code.findbugs"  % "jsr305"      % "3.0.1",
-  "joda-time"                 % "joda-time"   % "1.6.2",
-  "com.google.guava"          % "guava"       % "12.0.1",
-  "com.rubiconproject.oss"    % "jchronic"    % "0.2.6",
-  // Neeed explicit versions to avoid version ranges burbling up and choking coursier.
-  "org.xsocket"       % "xSocket"               % "2.8.15"
+  "com.chuusai"              %% "shapeless"       %  "1.2.3",
+  "org.slf4s"                %% "slf4s-api"       % "1.7.13",
+  "org.scalaz"               %% "scalaz-core"     %  "7.0.9",
+  "com.google.code.findbugs"  % "jsr305"          %  "3.0.1",
+  "joda-time"                 % "joda-time"       %  "1.6.2",
+  "com.google.guava"          % "guava"           % "12.0.1",
+  "com.rubiconproject.oss"    % "jchronic"        %  "0.2.6",
+  "org.scalacheck"           %% "scalacheck"      %  "1.10.1"  % Test,
+  "org.specs2"               %% "specs2"          % "1.12.4.1" % Test,
+  "ch.qos.logback"            % "logback-classic" %  "1.0.0"   % Test,
+  "org.xsocket"               % "xSocket"         %  "2.8.15"
+  // Neeed explicit xsocket version to avoid version ranges burbling up and choking coursier.
 )

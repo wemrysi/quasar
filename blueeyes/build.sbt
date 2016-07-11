@@ -1,4 +1,4 @@
-import blueeyes.Blueeyes._
+import blueeyes.BlueeyesBuild._
 
 lazy val akka_testing = project.setup dependsOn util
 lazy val bkka         = project.setup dependsOn util

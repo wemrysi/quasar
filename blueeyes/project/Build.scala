@@ -3,7 +3,7 @@ package blueeyes
 import sbt._
 import Keys._
 
-object Blueeyes {
+object BlueeyesBuild {
   implicit class ProjectOps(val p: sbt.Project) {
     def noArtifacts: Project = also(
                 publish := (()),
@@ -25,10 +25,10 @@ object Blueeyes {
                   version :=  "1.0.0-M9.5",
       logBuffered in Test :=  false,
       libraryDependencies ++= Seq(
-        "org.scalaz"        %% "scalaz-effect"   %  "7.0.9",
-        "org.specs2"        %% "specs2"          % "1.12.4.1" % Test,
-        "org.scalacheck"    %% "scalacheck"      %  "1.10.1"  % Test,
-        "ch.qos.logback"     % "logback-classic" %  "1.0.0"   % Test
+        "org.scalaz"     %% "scalaz-effect"   %  "7.0.9",
+        "org.specs2"     %% "specs2"          % "1.12.4.1" % Test,
+        "org.scalacheck" %% "scalacheck"      %  "1.10.1"  % Test,
+        "ch.qos.logback"  % "logback-classic" %  "1.0.0"   % Test
       )
     )
   }
