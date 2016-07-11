@@ -10,9 +10,10 @@ libraryDependencies ++= Seq(
   "org.streum"                              % "configrity-core_2.9.2"       %     "1.0.0",
   "org.xlightweb"                           % "xlightweb"                   %     "2.13.2",
   "javax.servlet"                           % "javax.servlet-api"           %      "3.0.1"      % "provided",
-  "org.mockito"                             % "mockito-all"                 %      "1.9.0"      %   "test",
-  "org.eclipse.jetty"                       % "jetty-server"                % "8.1.3.v20120416" %   "test",
-  "org.eclipse.jetty"                       % "jetty-servlet"               % "8.1.3.v20120416" %   "test"
+  "org.mockito"                             % "mockito-all"                 %      "1.9.0"      %    Test,
+  "org.eclipse.jetty"                       % "jetty-server"                % "8.1.3.v20120416" %    Test,
+  "org.eclipse.jetty"                       % "jetty-servlet"               % "8.1.3.v20120416" %    Test,
+  "org.specs2"                             %% "specs2"                      %    "1.12.4.1"     %    Test
 )
 
 ivyXML :=
