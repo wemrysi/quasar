@@ -126,7 +126,7 @@ object SourcedPathable {
             //scala.Predef.println(s"lf>>>> ${lf.show}")
             //scala.Predef.println(s"rf>>>> ${rf.show}")
 
-            AbsMerge[IT, SourcedPathable[IT, Unit], FreeMap](Map((), Free.roll[MapFunc[IT, ?], Unit](
+            AbsMerge[SourcedPathable[IT, Unit], FreeMap[IT]](Map((), Free.roll[MapFunc[IT, ?], Unit](
               ConcatMaps(
                 Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(lname), rebase(m1, left))),
                 Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(rname), rebase(m2, right)))))),
@@ -141,8 +141,8 @@ object SourcedPathable {
     new Bucketable[SourcedPathable[T, ?]] {
       type IT[G[_]] = T[G]
 
-      def digForBucket: SourcedPathable[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
-        sp => IndexedStateT.stateT(sp.src)
+      def digForBucket[G[_]](fg: SourcedPathable[T, IT[G]]) =
+        IndexedStateT.stateT(fg)
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:

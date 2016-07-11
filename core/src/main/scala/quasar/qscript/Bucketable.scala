@@ -18,29 +18,28 @@ package quasar.qscript
 
 import quasar.Predef._
 
+import scalaz._, Scalaz._
 import simulacrum.typeclass
-import scalaz._
 
 @typeclass trait Bucketable[F[_]] {
   type IT[G[_]]
 
-  type Inner = IT[QScriptInternal[IT, ?]]
-
-  // TODO use matryoshka.instances.fixedpoint.Nat
-  def digForBucket: F[Inner] => StateT[QScriptBucket[IT, Inner] \/ ?, Int, Inner]
+  def digForBucket[G[_]](fg: F[IT[G]]):
+      // TODO: use matryoshka.instances.fixedpoint.Nat
+      StateT[QScriptBucket[IT, IT[G]] \/ ?, Int, F[IT[G]]]
 }
 
 object Bucketable {
   type Aux[T[_[_]], F[_]] = Bucketable[F] { type IT[G[_]] = T[G] }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit F: Bucketable.Aux[T, F], G: Bucketable.Aux[T, G]):
+    implicit FB: Bucketable.Aux[T, F], GB: Bucketable.Aux[T, G]):
       Bucketable.Aux[T, Coproduct[F, G, ?]] =
     new Bucketable[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
-      def digForBucket:
-          Coproduct[F, G, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] =
-        _.run.fold(F.digForBucket, G.digForBucket)
+      def digForBucket[H[_]](fg: Coproduct[F, G, IT[H]]) =
+        fg.run.bitraverse(FB.digForBucket[H](_), GB.digForBucket[H](_)) ∘
+          (Coproduct(_))
     }
 }

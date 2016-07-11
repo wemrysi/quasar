@@ -139,35 +139,16 @@ object QScriptBucket {
       type IT[G[_]] = T[G]
 
       // Int is number of buckets to skip
-      def digForBucket: QScriptBucket[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = {
-        case LeftShiftBucket(src, struct, repair, bucket) => StateT { s =>
-          if (s == 0)
-            LeftShiftBucket(src, rebase(struct, bucket), repair, bucket).left[(Int, Inner)]
+      def digForBucket[G[_]](fg: QScriptBucket[T, IT[G]]) =
+        StateT(s =>
+          if (s ≟ 0)
+            (fg match {
+              case LeftShiftBucket(src, struct, repair, bucket) =>
+                LeftShiftBucket(src, rebase(struct, bucket), repair, bucket)
+              case x => x
+            }).left
           else
-            ((s - 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case gb @ GroupBy(src, _, _) => StateT { s =>
-          if (s == 0)
-            gb.left[(Int, Inner)]
-          else
-            ((s - 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case bf @ BucketField(src, _, _) => StateT { s =>
-          if (s == 0)
-            bf.left[(Int, Inner)]
-          else
-            ((s - 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case bi @ BucketIndex(src, _, _) => StateT { s =>
-          if (s == 0)
-            bi.left[(Int, Inner)]
-          else
-            ((s - 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case sq @ SquashBucket(_) => StateT { _ =>
-          sq.left[(Int, Inner)]
-        }
-      }
+            (s - 1, fg).right)
     }
 
   def Z[T[_[_]]] = scala.Predef.implicitly[SourcedPathable[T, ?] :<: QScriptPure[T, ?]]

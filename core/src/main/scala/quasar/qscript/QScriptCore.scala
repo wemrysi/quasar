@@ -137,13 +137,13 @@ object QScriptCore {
         p2: QScriptCore[IT, Unit]) =
         OptionT(state((p1, p2) match {
           case (t1, t2) if t1 == t2 =>
-            AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](t1, UnitF, UnitF).some
+            AbsMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some
           case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
             val mapL = rebase(bucket1, left)
             val mapR = rebase(bucket2, right)
 
             if (mapL == mapR)
-              AbsMerge[IT, QScriptCore[IT, Unit], FreeMap](
+              AbsMerge[QScriptCore[IT, Unit], FreeMap[IT]](
                 Reduce((), mapL, func1 // ++ func2 // TODO: append Sizeds
                   , rep1),
                 UnitF,
@@ -160,14 +160,12 @@ object QScriptCore {
     new Bucketable[QScriptCore[T, ?]] {
       type IT[G[_]] = T[G]
 
-      def digForBucket: QScriptCore[T, Inner] => StateT[QScriptBucket[T, Inner] \/ ?, Int, Inner] = {
-        case Reduce(src, _, _, _) => StateT { s =>
-          ((s + 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case Sort(src, _, _) => StateT { s =>
-          ((s + 1, src)).right[QScriptBucket[T, Inner]]
-        }
-        case qs => IndexedStateT.stateT(qs.src)
+      def digForBucket[G[_]](fg: QScriptCore[T, IT[G]]) =
+        fg match {
+          case Reduce(_, _, _, _)
+             | Sort(_, _, _) =>
+            StateT(s => (s + 1, fg).right)
+          case _ => IndexedStateT.stateT(fg)
       }
     }
 
