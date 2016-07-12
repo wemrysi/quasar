@@ -22,9 +22,6 @@ package com.precog.niflheim
 import com.precog.util._
 import blueeyes._
 import com.precog.common._
-
-import scala.{ specialized => sepc }
-
 import scalaz._
 
 trait Reduction[A] {

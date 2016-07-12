@@ -26,7 +26,6 @@ package object blueeyes {
   type ActorRef         = akka.actor.ActorRef
   type ActorSystem      = akka.actor.ActorSystem
   type Duration         = akka.util.Duration
-  type DurationLong     = akka.util.DurationLong
   type ExecutionContext = akka.dispatch.ExecutionContext
   type Future[+A]       = akka.dispatch.Future[A]
   type Promise[A]       = akka.dispatch.Promise[A]

@@ -19,13 +19,9 @@
  */
 package com.precog.niflheim
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.util._
-
-import scala.{ specialized => spec }
-
-import blueeyes.json._
 
 case class SegmentId(blockid: Long, cpath: CPath, ctype: CType)
 

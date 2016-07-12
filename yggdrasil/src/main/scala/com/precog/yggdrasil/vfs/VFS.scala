@@ -30,7 +30,6 @@ import com.precog.common.ingest._
 import com.precog.common.security._
 import com.precog.common.jobs._
 import com.precog.niflheim._
-import com.precog.yggdrasil.actor.IngestData
 import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.util._
 
