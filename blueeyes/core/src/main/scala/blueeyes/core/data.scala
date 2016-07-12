@@ -1,14 +1,9 @@
 package blueeyes
 package core
 
-import blueeyes.util.metrics.DataSize
-import blueeyes.bkka._
+import blueeyes._, bkka._
 import java.util.Arrays
-import java.nio.ByteBuffer
-
 import scalaz._
-import scala.math.max
-import scala.collection.mutable.ListBuffer
 
 package object data {
   type Chunk[A]  = Either[A, StreamT[Future, A]]

@@ -20,24 +20,15 @@
 package com.precog.yggdrasil
 package vfs
 
-import actor._
 import execution._
 import metadata._
-import com.precog.util._
 import SValue._
 import ResourceError._
-import blueeyes._
 import com.precog.common._, accounts._, ingest._, security._, com.precog.common.util._
-
 import com.precog.util._
 import akka.util.duration._
-
-import blueeyes.json._
-
-import scalaz._
-import scalaz.effect._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.option._
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
 class StubVFSMetadata[M[+_]](projectionMetadata: Map[Path, Map[ColumnRef, Long]])(implicit M: Monad[M]) extends VFSMetadata[M]{
   def findDirectChildren(apiKey: APIKey, path: Path): EitherT[M, ResourceError, Set[PathMetadata]] = EitherT.right {

@@ -6,6 +6,7 @@ package object blueeyes {
   type ArrayBuffer[A] = scala.collection.mutable.ArrayBuffer[A]
   type ListBuffer[A]  = scala.collection.mutable.ListBuffer[A]
   val ArrayBuffer     = scala.collection.mutable.ArrayBuffer
+  val ListBuffer      = scala.collection.mutable.ListBuffer
 
   // java stdlib
   type BufferedOutputStream = java.io.BufferedOutputStream
