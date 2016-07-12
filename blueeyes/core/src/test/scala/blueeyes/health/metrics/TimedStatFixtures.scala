@@ -1,9 +1,6 @@
 package blueeyes
 package health.metrics
 
-import org.joda.time.DateTime
-import org.joda.time.Instant
-
 trait TimedStatFixtures {
   protected implicit val clock = new TestClock
 
@@ -19,5 +16,3 @@ trait TimedStatFixtures {
     }
   }
 }
-
-// vim: set ts=4 sw=4 et:

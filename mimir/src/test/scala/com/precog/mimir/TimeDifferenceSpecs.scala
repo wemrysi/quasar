@@ -19,25 +19,15 @@
  */
 package com.precog.mimir
 
-import org.specs2.mutable._
-
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
-import com.precog.common.Path
 import scalaz._
-import scalaz.std.list._
 
-import com.precog.util.IdGen
-
-import org.joda.time._
-import org.joda.time.format._
-
-trait TimeDifferenceSpecs[M[+_]] extends EvaluatorSpecification[M]
-    with LongIdMemoryDatasetConsumer[M] { self =>
+trait TimeDifferenceSpecs[M[+_]] extends EvaluatorSpecification[M] with LongIdMemoryDatasetConsumer[M] {
+  self =>
 
   import Function._
-
   import dag._
   import instructions._
   import library._

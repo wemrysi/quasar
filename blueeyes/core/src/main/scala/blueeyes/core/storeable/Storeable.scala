@@ -2,8 +2,7 @@ package blueeyes
 package core.storeable
 
 import blueeyes.json.JValue
-import org.joda.time.DateTime
-import scalaz.{ Validation, Success, Failure }
+import scalaz._
 
 sealed trait Storeable
 

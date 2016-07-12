@@ -22,8 +22,6 @@ package mimir
 
 import scala.collection.mutable
 
-import com.precog.util.IdGen
-
 trait DAGTransform extends DAG {
   import dag._
   import instructions.{ DerefObject, Eq, JoinObject, Line, PushString, WrapObject }

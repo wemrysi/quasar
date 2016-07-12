@@ -22,10 +22,8 @@ package com.precog.niflheim
 import blueeyes._
 import com.precog.common._
 import com.precog.util._
-
 import java.nio.channels._
 import scalaz._
-import org.joda.time.Period
 
 object V1SegmentFormat extends SegmentFormat {
   private val checksum = true

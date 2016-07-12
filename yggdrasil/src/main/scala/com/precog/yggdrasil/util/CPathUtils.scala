@@ -23,8 +23,6 @@ package util
 import blueeyes._
 import com.precog.common._
 import blueeyes.json._
-
-import scala.collection.mutable
 import scalaz._
 
 object CPathUtils {

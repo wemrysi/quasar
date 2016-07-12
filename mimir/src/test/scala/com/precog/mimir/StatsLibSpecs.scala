@@ -19,19 +19,10 @@
  */
 package com.precog.mimir
 
-import org.specs2.mutable._
-
-import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
-
-import blueeyes.json._
-
-import scalaz._
-import scalaz.std.list._
-
-import com.precog.util.IdGen
-import com.precog.util.IOUtils
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
 case class Precision(p: Double)
 class AlmostEqual(d: Double) {

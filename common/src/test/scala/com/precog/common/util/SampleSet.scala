@@ -19,8 +19,9 @@
  */
 package com.precog.common.util
 
-import org.joda.time._, format._
-import blueeyes.json._
+import blueeyes._, json._
+import org.joda.time.DateTimeZone
+import org.joda.time.format._
 import org.scalacheck._, Gen._, Arbitrary._
 import scalaz.syntax.std.boolean._
 

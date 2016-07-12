@@ -23,7 +23,6 @@ package table
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.util._
-
 import scala.collection.mutable
 
 /**

@@ -23,10 +23,7 @@ package table
 import blueeyes._
 import com.precog.common._
 import scala.collection.mutable
-import scala.util.Random
-import scalaz._
-import scalaz.std.list._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   import TableModule._
@@ -43,7 +40,7 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
 
   import trans._
 
-  def rng: Random = scala.util.Random
+  def rng: scala.util.Random = scala.util.Random
 
   type Table <: ColumnarTable with SamplableTable
 

@@ -42,11 +42,7 @@ import org.joda.time.{ Duration => JodaDuration }
 
 import scala.collection.mutable.PriorityQueue
 
-import scalaz.{ Ordering => _, idInstance => _, _ }
-import scalaz.std.option._
-import scalaz.syntax.id._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.option._
+import scalaz.{ Ordering => _, _ }, Scalaz._
 
 sealed trait SchedulingMessage
 

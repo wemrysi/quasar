@@ -19,7 +19,7 @@
  */
 package com.precog.util
 
-import org.joda.time.DateTime
+import blueeyes._
 
 object NumericComparisons {
 

@@ -27,13 +27,7 @@ import com.precog.common._
 import org.joda.time.{ DateTime => _, _ }
 
 import yggdrasil.table._
-
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.std.option._
-import scalaz.std.set._
-import scalaz.std.tuple._
-import scalaz.syntax.foldable._
+import scalaz._, Scalaz._
 
 class LongAdder {
   var t = 0L

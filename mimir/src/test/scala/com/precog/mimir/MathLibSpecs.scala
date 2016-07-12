@@ -28,8 +28,6 @@ import com.precog.common._
 import scalaz._
 import scalaz.std.list._
 
-import com.precog.util.IdGen
-
 trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
 

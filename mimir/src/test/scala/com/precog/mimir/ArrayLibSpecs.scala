@@ -27,8 +27,6 @@ import com.precog.yggdrasil._
 import scalaz._
 import scalaz.std.list._
 
-import com.precog.util.IdGen
-
 trait ArrayLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
 

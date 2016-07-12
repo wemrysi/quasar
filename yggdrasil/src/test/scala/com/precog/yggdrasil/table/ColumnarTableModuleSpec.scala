@@ -20,35 +20,18 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
-import com.precog.common._
-import com.precog.common.security._
+import com.precog.common._, security._
 import com.precog.bytecode.JType
-import com.precog.yggdrasil.util._
+import com.precog.yggdrasil.util.IdSourceConfig
+import org.slf4j.LoggerFactory
 
-import blueeyes.json._
-import org.slf4j.{LoggerFactory, MDC}
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
-import scala.annotation.tailrec
-import scala.collection.mutable.LinkedHashSet
-import scala.util.Random
-
-import scalaz._
-import scalaz.effect.IO
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
-import scalaz.std.anyVal._
-import scalaz.std.stream._
-
-import org.specs2._
-import org.specs2.mutable.SpecificationLike
 import org.specs2.execute.{ AsResult, Skipped }
 import org.specs2.specification.{ Outside, Context }
 import org.specs2.matcher.MatchResult
 import org.scalacheck._, Gen._, Arbitrary._
-
-import java.nio.CharBuffer
-
 import TableModule._
 import SampleData._
 

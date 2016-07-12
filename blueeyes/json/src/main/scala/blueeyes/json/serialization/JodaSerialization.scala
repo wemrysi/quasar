@@ -4,7 +4,7 @@ package serialization
 
 import DefaultSerialization._
 import Extractor._
-import org.joda.time.{ Instant, DateTime, DateTimeZone, Duration }
+import org.joda.time._
 
 trait JodaSerializationImplicits {
   implicit val InstantExtractor = LongExtractor map { l =>

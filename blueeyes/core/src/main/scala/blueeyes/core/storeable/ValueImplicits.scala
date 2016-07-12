@@ -2,7 +2,6 @@ package blueeyes
 package core.storeable
 
 import blueeyes.json.JValue
-import org.joda.time.DateTime
 
 trait ValueImplicits {
   implicit def intToValue(value: Int)               = ValueInt(value)

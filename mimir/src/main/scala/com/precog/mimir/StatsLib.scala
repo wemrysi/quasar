@@ -20,35 +20,13 @@
 package com.precog
 package mimir
 
-import scala.annotation.tailrec
-
-import bytecode._
-import bytecode.Library
-
-import yggdrasil._
-import yggdrasil.table._
-
 import blueeyes._
+import bytecode._
+import yggdrasil._, table._
 import com.precog.common._
-
-import com.precog.util.IdGen
 import com.precog.util._
-
-import com.precog.util.{ BitSet, BitSetUtil }
-
-import blueeyes.json._
-
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.std.option._
-import scalaz.std.set._
-import scalaz.std.tuple._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.option._
-import scalaz.syntax.std.boolean._
-
-import TableModule._
+import scalaz._, Scalaz._
+import TableModule.SortAscending
 
 trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
   //import library._

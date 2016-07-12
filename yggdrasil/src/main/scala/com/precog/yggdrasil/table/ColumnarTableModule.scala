@@ -20,51 +20,24 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
+import blueeyes._, json._, bkka._
+import blueeyes.core.http.{ MimeType, MimeTypes }
+
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.bytecode._
 import com.precog.yggdrasil.jdbm3._
 import com.precog.yggdrasil.util._
 import com.precog.util._
-
 import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
-
-import blueeyes.bkka._
-import blueeyes.json._
-import blueeyes.core.http.{ MimeType, MimeTypes }
-
-import com.google.common.io.Files
-
 import org.slf4j.Logger
 import org.slf4s.Logging
-
-import org.apache.jdbm.DBMaker
-
 import com.precog.util.{ BitSet, BitSetUtil, IOUtils, Loop }
 
 import scala.collection.mutable
-
-import scalaz._
-import scalaz.Ordering._
-import scalaz.std.function._
-import scalaz.std.list._
-import scalaz.std.tuple._
-import scalaz.std.option._
-import scalaz.std.map._
-import scalaz.std.set._
-import scalaz.std.stream._
-import scalaz.std.vector._
-import scalaz.syntax.arrow._
-import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
-import scalaz.syntax.show._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.applicative._
-
+import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 
 trait ColumnarTableTypes[M[+ _]] {

@@ -31,8 +31,6 @@ import scala.Function._
 import scalaz._
 import scalaz.std.list._
 
-import com.precog.util.IdGen
-
 trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
 

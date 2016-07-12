@@ -32,7 +32,6 @@ import metadata._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
 
-import java.io.File
 import java.util.SortedMap
 import java.util.Comparator
 
@@ -40,20 +39,8 @@ import org.apache.jdbm.DBMaker
 import org.apache.jdbm.DB
 
 import org.slf4j.LoggerFactory
-
-import scalaz._
-import scalaz.Ordering._
-import scalaz.std.set._
-import scalaz.std.list._
-import scalaz.std.stream._
-import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.stream._
-import scala.annotation.tailrec
+import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
-
 import TableModule._
 
 trait BlockStoreColumnarTableModuleConfig {

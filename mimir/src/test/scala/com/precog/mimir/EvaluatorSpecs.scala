@@ -33,7 +33,7 @@ import com.precog.yggdrasil.vfs._
 import com.precog.yggdrasil.util._
 
 import com.precog.common.security._
-import com.precog.util.{IOUtils, IdGen, Identifier}
+import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
 
 import akka.util.duration._

@@ -20,6 +20,7 @@ package object blueeyes {
   type OutputStream         = java.io.OutputStream
   type OutputStreamWriter   = java.io.OutputStreamWriter
   type PrintStream          = java.io.PrintStream
+  type CharBuffer           = java.nio.CharBuffer
 
   // akka in 2.9
   type ActorRef         = akka.actor.ActorRef

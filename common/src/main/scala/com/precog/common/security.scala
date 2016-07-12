@@ -23,8 +23,6 @@ import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.Extractor._
 
-import org.joda.time.format.ISODateTimeFormat
-
 import scalaz._
 import scalaz.syntax.bifunctor._
 
@@ -32,7 +30,7 @@ package object security {
   type APIKey  = String
   type GrantId = String
 
-  private val isoFormat = ISODateTimeFormat.dateTime
+  private val isoFormat = org.joda.time.format.ISODateTimeFormat.dateTime
 
   implicit val TZDateTimeDecomposer: Decomposer[DateTime] = new Decomposer[DateTime] {
     override def decompose(d: DateTime): JValue = JString(isoFormat.print(d))

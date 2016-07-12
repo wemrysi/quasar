@@ -1,11 +1,9 @@
 package blueeyes
 package json.serialization
 
-import blueeyes.json._
+import blueeyes._, json._
 import java.util.{ Date => JDate }
 import java.math.MathContext
-import scala.math.BigDecimal
-import org.joda.time.{ DateTime, DateTimeZone }
 
 /** Decomposers for all basic types.
   */
