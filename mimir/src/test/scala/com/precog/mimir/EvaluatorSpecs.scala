@@ -60,7 +60,6 @@ trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupp
 }
 
 trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
-    with EchoHttpClientModule[M]
     with BaseBlockStoreTestModule[M]
     with IdSourceScannerModule { outer =>
 
