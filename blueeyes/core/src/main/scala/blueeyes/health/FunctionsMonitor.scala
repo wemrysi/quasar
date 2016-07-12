@@ -3,6 +3,7 @@ package health
 
 import blueeyes.json.JPath
 import blueeyes.util.ClockSystem
+import scala.concurrent.ExecutionContext.Implicits.global
 
 private[health] trait FunctionsMonitor {
   def time[T](path: JPath)(f: => T): T = {
@@ -14,13 +15,15 @@ private[health] trait FunctionsMonitor {
 
   def timeFuture[T](path: JPath)(f: Future[T]): Future[T] = {
     val startTime = ClockSystem.realtimeClock.nanoTime()
-    f onSuccess {
-      case v => trackTime(path)(ClockSystem.realtimeClock.nanoTime - startTime)
-    }
+    // f onSuccess {
+    //   case v => trackTime(path)(ClockSystem.realtimeClock.nanoTime - startTime)
+    // }
+    f map (v => doto(v)(_ => trackTime(path)(ClockSystem.realtimeClock.nanoTime - startTime)))
   }
 
   def trapFuture[T](path: JPath)(f: Future[T]): Future[T] = {
-    f onFailure { case ex => error(path)(ex) }
+    f recover { case ex: Throwable => error(path)(ex) ; throw ex }
+    // f onFailure { case ex => error(path)(ex) }
   }
 
   def trap[T](path: JPath)(f: => T): T = {

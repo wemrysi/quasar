@@ -22,7 +22,7 @@ object BlueeyesBuild {
 
     def setup: Project = also(
                             name := s"blueeyes-${p.id}",
-                    scalaVersion := "2.9.3",
+                    scalaVersion := "2.10.6",
                     organization := "com.reportgrid",
                          version := "1.0.0-M9.5",
              logBuffered in Test := false,

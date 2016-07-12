@@ -1,5 +1,6 @@
 package object blueeyes {
   // scala stdlib
+  type CTag[A]        = scala.reflect.ClassTag[A]
   type spec           = scala.specialized
   type tailrec        = scala.annotation.tailrec
   type switch         = scala.annotation.switch
@@ -24,16 +25,16 @@ package object blueeyes {
   type CharBuffer           = java.nio.CharBuffer
 
   // akka in 2.9
-  type Duration         = akka.util.Duration
-  type ExecutionContext = akka.dispatch.ExecutionContext
-  type Future[+A]       = akka.dispatch.Future[A]
-  type Promise[A]       = akka.dispatch.Promise[A]
+  type Duration         = scala.concurrent.duration.Duration
+  type ExecutionContext = scala.concurrent.ExecutionContext
+  type Future[+A]       = scala.concurrent.Future[A]
+  type Promise[A]       = scala.concurrent.Promise[A]
 
-  val Await            = akka.dispatch.Await
-  val ExecutionContext = akka.dispatch.ExecutionContext
-  val Future           = akka.dispatch.Future
-  val Promise          = akka.dispatch.Promise
-  val Duration         = akka.util.Duration
+  val Await            = scala.concurrent.Await
+  val ExecutionContext = scala.concurrent.ExecutionContext
+  val Future           = scala.concurrent.Future
+  val Promise          = scala.concurrent.Promise
+  val Duration         = scala.concurrent.duration.Duration
 
   // precog
   type ProducerId = Int
@@ -65,6 +66,7 @@ package object blueeyes {
   def decimal(d: String): BigDecimal                                      = BigDecimal(d, java.math.MathContext.UNLIMITED)
   def lp[T](label: String): T => Unit                                     = (t: T) => println(label + ": " + t)
   def lpf[T](label: String)(f: T => Any): T => Unit                       = (t: T) => println(label + ": " + f(t))
+  def doto[A](value: A)(f: A => Unit): A                                  = { f(value) ; value }
 
   implicit def K[A](a: A): util.K[A]                          = new util.K(a)
   implicit def OptStr(s: Option[String]): util.OptStr         = new util.OptStr(s)

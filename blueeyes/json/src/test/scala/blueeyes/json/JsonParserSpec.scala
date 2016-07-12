@@ -103,7 +103,7 @@ object AsyncParserSpec extends Specification {
 
   private def chunk(data: Array[Byte], i: Int, j: Int) = {
     val len = min(j, data.length) - i
-    if (len > 0) More(ByteBufferWrap(data, i, len)) else Done
+    if (len > 0) More(ByteBufferWrap2(data, i, len)) else Done
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {

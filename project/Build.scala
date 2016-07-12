@@ -36,7 +36,7 @@ object PlatformBuild {
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:none") ++ optimizeOpts ++ debugOpts,
                    javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
-                   scalaVersion :=  "2.9.3",
+                   scalaVersion :=  "2.10.6",
       parallelExecution in Test :=  false,
             logBuffered in Test :=  false,
                        ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))

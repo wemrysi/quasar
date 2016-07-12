@@ -18,15 +18,7 @@ object Unapply {
 }
 
 trait Bijection[A, B] extends Function1[A, B] with Unapply[A, B] { self =>
-  def isDefinedAt(t: A): Boolean = {
-    try {
-      apply(t)
-      true
-    } catch {
-      case ex => false
-    }
-  }
-
+  def isDefinedAt(t: A): Boolean = scala.util.Try(apply(t)).isSuccess
   def apply(t: A): B
 
   def inverse: Bijection[B, A] = new Bijection[B, A] {

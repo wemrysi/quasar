@@ -22,7 +22,7 @@ import Arbitrary.arbitrary
 
 trait ArbitraryJPath {
   def trace[A](a: => A): A = try { a } catch {
-    case ex => { ex.printStackTrace; throw ex }
+    case ex: Throwable => { ex.printStackTrace; throw ex }
   }
 
   val genJPath = {

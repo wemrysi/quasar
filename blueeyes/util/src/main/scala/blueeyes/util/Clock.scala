@@ -2,6 +2,7 @@ package blueeyes
 package util
 
 import org.joda.time.{ DateTime, DateTimeZone, Period, Instant }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait Clock {
 

@@ -56,9 +56,9 @@ package object data {
         stream.uncons.flatMap {
           case None =>
             if (offset > 0)
-              Promise.successful(Arrays.copyOf(buf, offset) :: StreamT.empty[Future, Array[Byte]])
+              Promise.successful(Arrays.copyOf(buf, offset) :: StreamT.empty[Future, Array[Byte]]).future
             else
-              Promise.successful(StreamT.empty[Future, Array[Byte]])
+              Promise.successful(StreamT.empty[Future, Array[Byte]]).future
           case Some((bytes, tail)) =>
             val limit = buf.length - offset
             if (bytes.length <= limit) {
@@ -89,14 +89,14 @@ package object data {
       def loop(stream: StreamT[Future, Array[Byte]], buf: ListBuffer[Array[Byte]])(implicit M: Monad[Future]): Future[Array[Array[Byte]]] =
         stream.uncons.flatMap {
           case None =>
-            Promise.successful(buf.toArray)
+            Promise.successful(buf.toArray).future
           case Some((bytes, tail)) =>
             buf.append(bytes)
             loop(tail, buf)
         }
       s match {
         case Right(stream) => loop(stream, ListBuffer.empty[Array[Byte]])
-        case Left(bytes)   => Promise.successful(Array(bytes))
+        case Left(bytes)   => Promise.successful(Array(bytes)).future
       }
     }
 

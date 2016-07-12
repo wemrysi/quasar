@@ -22,7 +22,7 @@ class FileSource(file: File, offset: Long, length: Int, chunkSize: Int = 8192) {
   //def this(file: File) = if (this(file, 0, file.length())
 
   def read(implicit executor: ExecutionContext): ByteChunk = {
-    implicit val M = new FutureMonad(executor)
+    implicit val M: Monad[Future] = new FutureMonad(executor)
 
     val raf = new RandomAccessFile(file, "r")
     try {
@@ -79,7 +79,7 @@ class FileSink(file: File) {
   import FileSink.KillSwitch
 
   def write(chunk: ByteChunk)(implicit executor: ExecutionContext): (Option[KillSwitch], Future[Unit]) = {
-    implicit val M = new FutureMonad(executor)
+    implicit val M: Monad[Future] = new FutureMonad(executor)
 
     val killed = new java.util.concurrent.atomic.AtomicReference[Option[Throwable]](None)
 
