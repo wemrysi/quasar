@@ -20,10 +20,11 @@
 package com.precog
 package mimir
 
+import blueeyes._
 import bytecode._
 import com.precog.util._
-import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
-import org.joda.time._
+import com.precog.common._
+import org.joda.time.{ DateTime => _, _ }
 
 import yggdrasil.table._
 

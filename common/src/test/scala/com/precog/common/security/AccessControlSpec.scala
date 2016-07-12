@@ -20,11 +20,8 @@
 package com.precog.common
 package security
 
-import org.specs2.mutable._
-
-
-import scala.collection.mutable
-
+import blueeyes._
+import org.specs2.mutable.Specification
 import scalaz._
 import scalaz.Id._
 

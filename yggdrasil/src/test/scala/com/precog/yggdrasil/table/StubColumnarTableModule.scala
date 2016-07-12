@@ -24,7 +24,7 @@ import vfs.ResourceError
 import com.precog.bytecode.JType
 import com.precog.common._, security._
 
-import blueeyes.json._
+import blueeyes._, json._
 import scalaz._
 import scalaz.Validation._
 import scalaz.std.stream._

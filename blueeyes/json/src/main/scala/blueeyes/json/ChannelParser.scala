@@ -14,7 +14,7 @@ object ChannelParser {
   * Basic file parser.
   *
   * Given a file name this parser opens it, chunks the data 1M at a time, and
-  * parses it. 
+  * parses it.
   */
 private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncParser with ByteBasedParser {
 
@@ -27,8 +27,8 @@ private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncPar
   var next = new Array[Byte](bufsize)
 
   // these are the bytebuffers used to load the data
-  var bcurr = ByteBuffer.wrap(curr)
-  var bnext = ByteBuffer.wrap(next)
+  var bcurr = ByteBufferWrap(curr)
+  var bnext = ByteBufferWrap(next)
 
   // these are the bytecounts for each array
   var ncurr = ch.read(bcurr)

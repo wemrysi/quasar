@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package actor
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security.PermissionsFinder
 import com.precog.common.ingest._

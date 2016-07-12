@@ -23,6 +23,7 @@ package mimir
 import bytecode.{ BinaryOperationType, UnaryOperationType, JNumberT }
 import bytecode.Library
 
+import blueeyes._
 import com.precog.common._
 import yggdrasil._
 import yggdrasil.table._

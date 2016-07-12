@@ -26,6 +26,7 @@ import blueeyes.json._
 import blueeyes.json.serialization._
 import DefaultSerialization._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.niflheim.NIHDB

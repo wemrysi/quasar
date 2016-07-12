@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes.json._
 
+import blueeyes._
 import com.precog.common._
 import scalaz._
 import scalaz.std.list._

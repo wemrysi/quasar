@@ -22,7 +22,7 @@ package accounts
 
 import security._
 
-import blueeyes.json._
+import blueeyes._, json._
 
 import scalaz._
 import scalaz.syntax.monad._

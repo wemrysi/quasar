@@ -8,9 +8,6 @@ import akka.util.Duration
 import blueeyes.bkka._
 import blueeyes.akka_testing.FutureMatchers
 
-import java.io.File
-import java.nio.ByteBuffer
-
 import org.specs2.mutable.Specification
 import org.specs2.specification.{ AfterExample, BeforeAfterExample }
 
@@ -19,7 +16,7 @@ import scalaz.syntax.monad._
 import scala.collection.mutable.ArrayBuilder.ofByte
 
 trait Data extends TestAkkaDefaults {
-  val dataFile = new File(System.getProperty("java.io.tmpdir") + File.separator + System.currentTimeMillis)
+  val dataFile = new File(System.getProperty("java.io.tmpdir") + java.io.File.separator + System.currentTimeMillis)
   val data     = List.fill(5)(List.fill[Byte](10)('0'))
   val chunk    = Right(StreamT.fromStream[Future, Array[Byte]](Future(data.map(_.toArray).toStream)))
 }

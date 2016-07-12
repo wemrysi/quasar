@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 package jdbm3
 
 import table._
+import blueeyes._
 import com.precog.common._
 import com.precog.util._
 

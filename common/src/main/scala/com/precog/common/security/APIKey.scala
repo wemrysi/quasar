@@ -20,8 +20,7 @@
 package com.precog.common
 package security
 
-import blueeyes.json.JValue
-import blueeyes.json.serialization.{ Decomposer, Extractor }
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.Versioned._

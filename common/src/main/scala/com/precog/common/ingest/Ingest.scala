@@ -24,8 +24,7 @@ import accounts.AccountId
 import security._
 import jobs.JobId
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._

@@ -24,6 +24,7 @@ import metadata.ColumnMetadata
 import metadata.ColumnMetadata._
 import vfs.UpdateSuccess
 import com.precog.util._
+import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.vfs._
 

@@ -27,9 +27,9 @@ import com.precog.niflheim._
 import com.precog.yggdrasil.table._
 import com.precog.util.IOUtils
 
+import blueeyes._, json._
 import blueeyes.akka_testing.FutureMatchers
 import blueeyes.bkka.FutureMonad
-import blueeyes.json._
 
 import org.specs2.mutable.{After, Specification}
 import org.specs2.specification.{Fragments, Step}
@@ -40,7 +40,6 @@ import scalaz.syntax.traverse._
 import scalaz.syntax.monad._
 import scalaz.effect.IO
 
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ScheduledThreadPoolExecutor
 

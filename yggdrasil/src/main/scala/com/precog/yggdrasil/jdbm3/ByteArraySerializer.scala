@@ -19,6 +19,7 @@
  */
 package com.precog.yggdrasil.jdbm3
 
+import blueeyes._
 import com.precog.common._
 import java.io.{ DataInput, DataOutput }
 import org.apache.jdbm.Serializer

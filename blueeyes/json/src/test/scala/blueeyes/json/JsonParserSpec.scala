@@ -73,7 +73,7 @@ object ParserBugs extends Specification {
 
 object ParsingByteBufferSpec extends Specification {
   "Respects current ByteBuffer's position" in {
-    val bb = ByteBuffer.wrap(Array(54, 55, 56, 57))
+    val bb = ByteBufferWrap(Array(54, 55, 56, 57))
     bb.remaining must_== 4
     bb.get must_== 54
     bb.remaining must_== 3
@@ -82,7 +82,7 @@ object ParsingByteBufferSpec extends Specification {
   }
 
   "Respects current ByteBuffer's limit" in {
-    val bb = ByteBuffer.wrap(Array(54, 55, 56, 57))
+    val bb = ByteBufferWrap(Array(54, 55, 56, 57))
     bb.limit(3)
     JParser.parseFromByteBuffer(bb) must_== Success(JNum(678))
     bb.remaining must_== 0
@@ -103,7 +103,7 @@ object AsyncParserSpec extends Specification {
 
   private def chunk(data: Array[Byte], i: Int, j: Int) = {
     val len = min(j, data.length) - i
-    if (len > 0) More(ByteBuffer.wrap(data, i, len)) else Done
+    if (len > 0) More(ByteBufferWrap(data, i, len)) else Done
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
@@ -220,7 +220,7 @@ object AsyncParserSpec extends Specification {
     println("parsing %d bytes with %d-byte chunks" format (data.length, step))
 
     def chunks = (0 until data.length by step).map(i => chunk(data, i, i + step))
-    def bb     = ByteBuffer.wrap(data)
+    def bb     = ByteBufferWrap(data)
 
     // warmup
     run1(chunks, n); run2(bb, n)
@@ -297,7 +297,7 @@ object ArrayUnwrappingSpec extends Specification {
 
   val utf8 = java.nio.charset.Charset.forName("UTF-8")
 
-  def bb(s: String)        = More(ByteBuffer.wrap(s.getBytes("UTF-8")))
+  def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))
   def j(s: String, n: Int) = JObject(Map(s -> JNum(n)))
 
   "Unwrapping array parser catches errors" in {
@@ -360,7 +360,7 @@ object ArrayUnwrappingSpec extends Specification {
       }
       sb.append("]")
       val data = sb.toString.getBytes("UTF-8")
-      val bb   = ByteBuffer.wrap(data)
+      val bb   = ByteBufferWrap(data)
       val t0   = System.currentTimeMillis
       JParser.parseFromByteBuffer(bb)
       val ms = System.currentTimeMillis() - t0
@@ -374,7 +374,7 @@ object ArrayUnwrappingSpec extends Specification {
         sb.append("\n")
       }
       val data        = sb.toString.getBytes("UTF-8")
-      val bb          = ByteBuffer.wrap(data)
+      val bb          = ByteBufferWrap(data)
       val t0          = System.currentTimeMillis
       val Success(js) = JParser.parseManyFromByteBuffer(bb)
       val ms          = System.currentTimeMillis() - t0
@@ -414,7 +414,7 @@ object ArrayUnwrappingSpec extends Specification {
               lastChunk
 
           bytes += data.length
-          p.apply(More(ByteBuffer.wrap(data)))
+          p.apply(More(ByteBufferWrap(data)))
         } else {
           done = true
           p.apply(Done)

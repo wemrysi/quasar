@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package scheduling
 
+import blueeyes._
 import com.precog.common._, jobs._, security._
 import com.precog.util.PrecogUnit
 import com.precog.yggdrasil.execution._

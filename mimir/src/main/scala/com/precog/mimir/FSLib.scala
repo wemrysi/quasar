@@ -19,6 +19,7 @@
  */
 package com.precog.mimir
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.bytecode._

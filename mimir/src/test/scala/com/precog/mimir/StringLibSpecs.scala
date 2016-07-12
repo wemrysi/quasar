@@ -23,6 +23,7 @@ import org.specs2.mutable._
 
 import blueeyes.json._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
 import com.precog.common.Path

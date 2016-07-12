@@ -19,6 +19,7 @@
  */
 package com.precog.common
 
+import blueeyes._
 import com.precog.util._
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }

@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package execution
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.yggdrasil.vfs._

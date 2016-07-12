@@ -23,10 +23,11 @@ package vfs
 import actor._
 import execution._
 import metadata._
-import util._
+import com.precog.util._
 import SValue._
 import ResourceError._
-import com.precog.common._, accounts._, ingest._, security._, util._
+import blueeyes._
+import com.precog.common._, accounts._, ingest._, security._, com.precog.common.util._
 
 import com.precog.util._
 import akka.util.duration._

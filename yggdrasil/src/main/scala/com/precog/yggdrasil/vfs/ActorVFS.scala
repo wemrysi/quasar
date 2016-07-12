@@ -25,6 +25,7 @@ import table.Slice
 import metadata.PathMetadata
 import metadata.PathStructure
 
+import blueeyes._
 import com.precog.common._, ingest._, security._, jobs._
 import com.precog.common.accounts.AccountId
 import com.precog.niflheim._

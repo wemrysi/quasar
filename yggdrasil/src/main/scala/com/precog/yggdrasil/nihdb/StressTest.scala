@@ -22,6 +22,7 @@ package nihdb
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 
+import blueeyes._
 import com.precog.common._, accounts._, ingest._, security._
 import com.precog.niflheim._
 import com.precog.util.IOUtils

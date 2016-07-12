@@ -19,6 +19,7 @@
  */
 package com.precog.common
 
+import blueeyes._
 import blueeyes.json.serialization.DefaultSerialization._
 
 import scalaz._

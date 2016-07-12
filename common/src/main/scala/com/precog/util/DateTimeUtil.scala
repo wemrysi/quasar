@@ -19,10 +19,11 @@
  */
 package com.precog.util
 
+import blueeyes.{ DateTime => _, Period => _, _ }
+import java.util.regex.Pattern
 import org.joda.time._
 import org.joda.time.format._
-
-import java.util.regex.Pattern
+import com.mdimension.jchronic._
 
 object DateTimeUtil {
   private val fullParser  = ISODateTimeFormat.dateTimeParser
@@ -46,8 +47,6 @@ object DateTimeUtil {
     p.parseDateTime(value)
   }
 
-  import com.mdimension.jchronic._
-
   //val defaultOptions = new Options()
   val defaultOptions  = new Options(0)
   val defaultTimeZone = java.util.TimeZone.getDefault()
@@ -55,7 +54,6 @@ object DateTimeUtil {
   def parseDateTimeFlexibly(s: String): DateTime = {
     val span  = Chronic.parse(s, defaultOptions)
     val msecs = span.getBegin * 1000
-
     // jchronic doesn't really handle time zones.
     //
     // all times are parsed as if they are local time, but the DateTime
@@ -63,38 +61,11 @@ object DateTimeUtil {
     new DateTime(msecs + defaultTimeZone.getOffset(msecs))
   }
 
-  def isDateTimeFlexibly(s: String): Boolean =
-    try {
-      Chronic.parse(s, defaultOptions) != null
-    } catch {
-      case e: Exception => false
-    }
+  private def Try[A](body: => A): Option[A] = try Some(body) catch { case x: Exception => None }
 
-  def isValidISO(str: String): Boolean =
-    try {
-      parseDateTime(str, true); true
-    } catch {
-      case e: IllegalArgumentException => { false }
-    }
-
-  def isValidTimeZone(str: String): Boolean =
-    try {
-      DateTimeZone.forID(str); true
-    } catch {
-      case e: IllegalArgumentException => { false }
-    }
-
-  def isValidFormat(time: String, fmt: String): Boolean =
-    try {
-      DateTimeFormat.forPattern(fmt).withOffsetParsed().parseDateTime(time); true
-    } catch {
-      case e: IllegalArgumentException => { false }
-    }
-
-  def isValidPeriod(period: String): Boolean =
-    try {
-      new Period(period); true
-    } catch {
-      case e: IllegalArgumentException => { false }
-    }
+  def isDateTimeFlexibly(s: String): Boolean            = Try(Chronic.parse(s, defaultOptions) != null) exists (x => x)
+  def isValidISO(str: String): Boolean                  = Try(parseDateTime(str, true)).isDefined
+  def isValidTimeZone(str: String): Boolean             = Try(DateTimeZone.forID(str)).isDefined
+  def isValidFormat(time: String, fmt: String): Boolean = Try(DateTimeFormat.forPattern(fmt).withOffsetParsed().parseDateTime(time)).isDefined
+  def isValidPeriod(period: String): Boolean            = Try(new Period(period)).isDefined
 }

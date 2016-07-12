@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package vfs
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security.Authorities
 

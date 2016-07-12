@@ -22,8 +22,7 @@ package accounts
 
 import com.precog.common.security.APIKey
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Versioned._
 

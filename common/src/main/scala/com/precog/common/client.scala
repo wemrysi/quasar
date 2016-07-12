@@ -19,6 +19,7 @@
  */
 package com.precog.common
 
+import blueeyes._
 import scalaz._
 
 package object client {

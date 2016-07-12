@@ -19,8 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz.Ordering._
 import scalaz.syntax.std.boolean._

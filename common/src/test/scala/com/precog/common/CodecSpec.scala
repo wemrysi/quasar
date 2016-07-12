@@ -19,8 +19,8 @@
  */
 package com.precog.common
 
+import blueeyes._
 import com.precog.util.{ ByteBufferPool, RawBitSet }
-
 
 import com.precog.util.BitSet
 import com.precog.util.BitSetUtil

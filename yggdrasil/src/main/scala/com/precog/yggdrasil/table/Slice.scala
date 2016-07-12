@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 package table
 
 import util.CPathUtils
+import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
 import com.precog.util._

@@ -19,10 +19,11 @@
  */
 package com.precog.niflheim
 
-import com.precog.common.{ IOException => _, File => _, _ }
+import blueeyes._
+import com.precog.common._
 import com.precog.util._
 
-import java.io._
+import java.io.FileOutputStream
 import java.nio.channels.WritableByteChannel
 
 import akka.actor._

@@ -23,10 +23,8 @@ package security
 import ingest._
 import service.v1
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
-
 import org.specs2.mutable.Specification
 import scalaz._
 

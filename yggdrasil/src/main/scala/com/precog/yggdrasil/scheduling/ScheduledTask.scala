@@ -25,6 +25,7 @@ import blueeyes.json.serialization._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.DefaultSerialization._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest.JavaSerialization._
 import com.precog.common.security.{ APIKey, Authorities }

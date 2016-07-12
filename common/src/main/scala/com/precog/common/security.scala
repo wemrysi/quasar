@@ -19,8 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes.json._
-import blueeyes.json.serialization.{ Extractor, Decomposer }
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.Extractor._
 

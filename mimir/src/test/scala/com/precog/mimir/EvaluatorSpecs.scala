@@ -20,6 +20,7 @@
 package com.precog
 package mimir
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.util._

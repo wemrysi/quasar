@@ -19,6 +19,7 @@
  */
 package com.precog.niflheim
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security.Authorities
 import com.precog.util._

@@ -25,6 +25,7 @@ import blueeyes.json.serialization._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.common.accounts._

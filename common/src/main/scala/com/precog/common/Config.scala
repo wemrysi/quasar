@@ -19,6 +19,8 @@
  */
 package com.precog.common
 
+import blueeyes._
+
 trait Config {
   def config: Configuration
 }

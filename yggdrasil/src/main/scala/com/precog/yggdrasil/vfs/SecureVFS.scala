@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package vfs
 
+import blueeyes._
 import com.precog.common._, accounts._, ingest._, security._, jobs._
 import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.metadata._

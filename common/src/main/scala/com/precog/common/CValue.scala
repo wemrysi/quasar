@@ -21,7 +21,7 @@ package com.precog.common
 
 import com.precog.util._
 
-import blueeyes.json._
+import blueeyes._, json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 

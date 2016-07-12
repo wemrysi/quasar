@@ -23,6 +23,7 @@ package security
 import com.precog.common.accounts._
 import com.precog.common.security.service._
 
+import blueeyes._
 import blueeyes.util.Clock
 
 import org.specs2.mutable.Specification

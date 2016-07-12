@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package table
 
+import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
 import com.precog.util.{ BitSet, BitSetUtil }

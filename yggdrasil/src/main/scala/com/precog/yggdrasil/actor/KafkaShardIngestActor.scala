@@ -22,7 +22,7 @@ package actor
 
 import metadata.ColumnMetadata
 import com.precog.util._
-import com.precog.common.{ File => _, _ }
+import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.common.ingest._
 import com.precog.common.security._
@@ -33,10 +33,11 @@ import akka.util.duration._
 
 import org.slf4s._
 
-import java.io._
+import java.io.{ PrintWriter, BufferedReader, FileWriter, FileReader }
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicInteger
 
+import blueeyes._
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Extractor._

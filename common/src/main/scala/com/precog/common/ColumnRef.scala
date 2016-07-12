@@ -19,6 +19,7 @@
  */
 package com.precog.common
 
+import blueeyes._
 import scalaz.syntax.semigroup._
 import scalaz.syntax.order._
 

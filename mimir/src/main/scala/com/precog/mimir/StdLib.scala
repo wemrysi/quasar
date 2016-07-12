@@ -28,6 +28,7 @@ import bytecode.Op1Like
 import bytecode.Op2Like
 import bytecode.ReductionLike
 
+import blueeyes._
 import com.precog.common._
 import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext

@@ -20,10 +20,11 @@
 package com.precog
 package mimir
 
+import blueeyes.{ DateTime => _, Period => _, _ }
+import com.precog.common._
 import com.precog.util._, DateTimeUtil._
 import bytecode._
 
-import com.precog.common.{ Period => _, DateTime => _, Instant => _, _ }
 import org.joda.time._
 import org.joda.time.format._
 

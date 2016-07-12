@@ -19,13 +19,9 @@
  */
 package com.precog.niflheim
 
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
-import scala.collection.mutable
 import org.joda.time.format.DateTimeFormat
-import java.io.{ File => _, _ }
-
-// import com.precog.common._
 import com.precog.util._
 
 private[niflheim] object RawLoader {
@@ -66,8 +62,8 @@ private[niflheim] object RawLoader {
     * expects to see zero-or-more of the following groups:
     */
   def load1(id: Long, f: File, reader: BufferedReader): (Seq[JValue], Seq[Long], Boolean) = {
-    val rows   = mutable.ArrayBuffer.empty[JValue]
-    val events = mutable.ArrayBuffer.empty[(Long, Int)]
+    val rows   = ArrayBuffer.empty[JValue]
+    val events = ArrayBuffer.empty[(Long, Int)]
     var line = reader.readLine()
     var ok   = true
     while (ok && line != null) {
@@ -104,7 +100,7 @@ private[niflheim] object RawLoader {
   /**
     * Recovery
     */
-  def recover1(id: Long, f: File, rows: mutable.ArrayBuffer[JValue], events: mutable.ArrayBuffer[(Long, Int)]) {
+  def recover1(id: Long, f: File, rows: ArrayBuffer[JValue], events: ArrayBuffer[(Long, Int)]) {
 
     // open a tempfile to write a "corrected" rawlog to, and write the header
     val tmp = java.io.File.createTempFile("nilfheim", "recovery")
@@ -113,7 +109,7 @@ private[niflheim] object RawLoader {
 
     // for each event, write its rows to the rawlog
     var row = 0
-    val values = mutable.ArrayBuffer.empty[JValue]
+    val values = ArrayBuffer.empty[JValue]
     events.foreach {
       case (eventid, count) =>
         var i = 0
@@ -140,8 +136,8 @@ private[niflheim] object RawLoader {
       case _: Exception => false
     }
 
-  def loadEvents1(reader: BufferedReader, eventid: Long, rows: mutable.ArrayBuffer[JValue]): Int = {
-    val sofar = mutable.ArrayBuffer.empty[JValue]
+  def loadEvents1(reader: BufferedReader, eventid: Long, rows: ArrayBuffer[JValue]): Int = {
+    val sofar = ArrayBuffer.empty[JValue]
 
     var line  = reader.readLine()
     var going = true

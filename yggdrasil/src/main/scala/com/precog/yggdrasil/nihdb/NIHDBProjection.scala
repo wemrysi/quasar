@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package nihdb
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.security.Authorities
 import com.precog.niflheim._

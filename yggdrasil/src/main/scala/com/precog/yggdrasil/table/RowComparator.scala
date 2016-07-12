@@ -21,6 +21,7 @@ package com.precog
 package yggdrasil
 package table
 
+import blueeyes._
 import common._
 import scalaz.Ordering._
 

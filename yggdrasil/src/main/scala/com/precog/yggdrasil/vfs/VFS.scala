@@ -24,6 +24,7 @@ import table.Slice
 import metadata.PathMetadata
 import metadata.PathStructure
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._
@@ -76,7 +77,7 @@ object VFSModule {
           val result = encoder.encode(cbuf, buf, false)
           if (result == CoderResult.OVERFLOW) {
             val arr2 = new Array[Byte](bufferSize)
-            StreamT.Yield(arr, loop(cbuf :: tail, ByteBuffer.wrap(arr2), arr2))
+            StreamT.Yield(arr, loop(cbuf :: tail, ByteBufferWrap(arr2), arr2))
           } else {
             StreamT.Skip(loop(tail, buf, arr))
           }
@@ -85,7 +86,7 @@ object VFSModule {
           val result = encoder.encode(CharBuffer.wrap(""), buf, true)
           if (result == CoderResult.OVERFLOW) {
             val arr2 = new Array[Byte](bufferSize)
-            StreamT.Yield(arr, loop(stream, ByteBuffer.wrap(arr2), arr2))
+            StreamT.Yield(arr, loop(stream, ByteBufferWrap(arr2), arr2))
           } else {
             StreamT.Yield(Arrays.copyOf(arr, buf.position), StreamT.empty)
           }
@@ -93,7 +94,7 @@ object VFSModule {
     }
 
     val arr = new Array[Byte](bufferSize)
-    loop(stream0, ByteBuffer.wrap(arr), arr)
+    loop(stream0, ByteBufferWrap(arr), arr)
   }
 }
 

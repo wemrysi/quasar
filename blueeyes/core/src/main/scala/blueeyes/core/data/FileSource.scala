@@ -2,12 +2,10 @@ package blueeyes
 package core.data
 
 import bkka._
-import java.nio.ByteBuffer
 import java.nio.channels._
-import java.io.{ OutputStream, FileOutputStream, RandomAccessFile, File }
+import java.io.RandomAccessFile
 
 import scalaz._
-
 import scala.math.min
 
 object FileSource {
@@ -96,7 +94,7 @@ class FileSink(file: File) {
               throw error
 
             case None =>
-              out.write(ByteBuffer.wrap(head))
+              out.write(ByteBufferWrap(head))
               writeStream(tail, out)
           }
 
@@ -112,7 +110,7 @@ class FileSink(file: File) {
         None -> Future {
           val out = new FileOutputStream(file)
           try {
-            out.getChannel.write(ByteBuffer.wrap(bytes))
+            out.getChannel.write(ByteBufferWrap(bytes))
           } finally {
             out.close()
           }

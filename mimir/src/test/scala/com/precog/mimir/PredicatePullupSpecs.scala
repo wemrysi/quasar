@@ -20,6 +20,7 @@
 package com.precog
 package mimir
 
+import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
 import org.specs2.execute.Result

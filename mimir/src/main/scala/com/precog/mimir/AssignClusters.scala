@@ -27,6 +27,7 @@ import table._
 
 import bytecode._
 
+import blueeyes._
 import com.precog.common._
 
 import scalaz._

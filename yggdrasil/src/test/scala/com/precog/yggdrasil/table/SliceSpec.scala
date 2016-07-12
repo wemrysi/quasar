@@ -23,6 +23,7 @@ package table
 
 import scala.util.Random
 
+import blueeyes._
 import com.precog.common._, security._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck

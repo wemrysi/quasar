@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package table
 
+import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.util.IdSourceConfig
 

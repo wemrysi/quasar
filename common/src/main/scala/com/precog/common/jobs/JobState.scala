@@ -22,7 +22,7 @@ package jobs
 
 import com.precog.common.security._
 
-import blueeyes.json._
+import blueeyes._, json._
 import blueeyes.json.serialization.{ Decomposer, Extractor }
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
 

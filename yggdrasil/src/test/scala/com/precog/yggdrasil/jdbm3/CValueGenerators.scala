@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package jdbm3
 
+import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
 

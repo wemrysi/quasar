@@ -20,6 +20,7 @@
 package com.precog.common
 package security
 
+import blueeyes._
 import com.precog.common.accounts.AccountId
 import com.precog.util.cache.Cache
 

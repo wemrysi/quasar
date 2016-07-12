@@ -25,6 +25,7 @@ import table.Slice
 import metadata._
 import PathMetadata._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._

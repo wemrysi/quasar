@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 package execution
 
 import com.precog.yggdrasil.vfs._
+import blueeyes._
 import com.precog.common._
 
 import blueeyes.core.http.MimeType

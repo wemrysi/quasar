@@ -23,6 +23,7 @@ import scalaz.Monoid
 
 import scala.collection.mutable
 
+import blueeyes._
 import com.precog.common._
 import com.precog.util._
 import com.precog.yggdrasil._

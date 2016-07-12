@@ -20,14 +20,14 @@
 package com.precog.common
 package ingest
 
+import blueeyes._
 import accounts.AccountId
 import security._
-import com.precog.common.serialization._
+import com.precog.common.serializationImplicits._
 import jobs.JobId
 
 import blueeyes.core.http.MimeType
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._

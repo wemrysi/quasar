@@ -24,8 +24,7 @@ import com.precog.common.Path
 import com.precog.common.security.{ APIKey, Permission, ReadPermission, WritePermission, DeletePermission }
 import Permission._
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Versioned._

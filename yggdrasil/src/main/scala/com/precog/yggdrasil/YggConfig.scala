@@ -20,6 +20,7 @@
 package com.precog
 package yggdrasil
 
+import blueeyes._
 import org.streum.configrity._
 import common._
 

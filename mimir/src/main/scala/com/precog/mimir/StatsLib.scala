@@ -28,6 +28,7 @@ import bytecode.Library
 import yggdrasil._
 import yggdrasil.table._
 
+import blueeyes._
 import com.precog.common._
 
 import com.precog.util.IdGen

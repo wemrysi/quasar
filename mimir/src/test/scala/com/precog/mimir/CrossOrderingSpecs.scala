@@ -20,6 +20,7 @@
 package com.precog
 package mimir
 
+import blueeyes._
 import com.precog.common._
 import bytecode._
 import org.specs2.mutable._

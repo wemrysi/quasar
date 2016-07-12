@@ -20,69 +20,11 @@
 package com.precog
 
 package object common {
-  type ProducerId = Int
-  type SequenceId = Int
+  implicit def stringExtensions(s: String): StringExtensions = new StringExtensions(s)
+}
 
-  // akka encapsulation
-  type ActorRef         = akka.actor.ActorRef
-  type ActorSystem      = akka.actor.ActorSystem
-  type Duration         = akka.util.Duration
-  type ExecutionContext = akka.dispatch.ExecutionContext
-  type Future[+A]       = akka.dispatch.Future[A]
-  type Promise[A]       = akka.dispatch.Promise[A]
-  type Timeout          = akka.util.Timeout
-  val ActorSystem      = akka.actor.ActorSystem
-  val AkkaProps        = akka.actor.Props
-  val Await            = akka.dispatch.Await
-  val Duration         = akka.util.Duration
-  val ExecutionContext = akka.dispatch.ExecutionContext
-  val Future           = akka.dispatch.Future
-  val Promise          = akka.dispatch.Promise
-  val Timeout          = akka.util.Timeout
-
-  // scalaz encapsulation
-  type ScalazOrder[A] = scalaz.Order[A]
-  type ScalazOrdering = scalaz.Ordering
-  val ScalazOrder    = scalaz.Order
-  val ScalazOrdering = scalaz.Ordering
-  type ScalaMathOrdering[A] = scala.math.Ordering[A]
-
-  // scala stdlib encapsulation
-  type spec           = scala.specialized
-  type tailrec        = scala.annotation.tailrec
-  type switch         = scala.annotation.switch
-  type ArrayBuffer[A] = scala.collection.mutable.ArrayBuffer[A]
-  type ListBuffer[A]  = scala.collection.mutable.ListBuffer[A]
-  val ArrayBuffer     = scala.collection.mutable.ArrayBuffer
-
-  // java stdlib encapsulation
-  type File        = java.io.File
-  type IOException = java.io.IOException
-  type ByteBuffer  = java.nio.ByteBuffer
-
-  // joda encapsulation
-  type DateTime = org.joda.time.DateTime
-  type Instant  = org.joda.time.Instant
-  type Period   = org.joda.time.Period
-
-  // shapeless
-  val Iso  = shapeless.Iso
-  val HNil = shapeless.HNil
-
-  // configrity
-  type Configuration = org.streum.configrity.Configuration
-
-  // Can't overload in package objects in scala 2.9!
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)
-  def ByteBufferWrap2(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
-
-  def abort(msg: String): Nothing = throw new RuntimeException(msg)
-
-  def decimal(d: String) = BigDecimal(d, java.math.MathContext.UNLIMITED)
-
+package common {
   final class StringExtensions(s: String) {
     def cpath = CPath(s)
   }
-
-  implicit def stringExtensions(s: String) = new StringExtensions(s)
 }

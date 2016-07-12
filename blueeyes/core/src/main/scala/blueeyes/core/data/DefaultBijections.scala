@@ -58,7 +58,7 @@ trait DefaultBijections {
     }
 
     def unapply(arr: Array[Byte]) = {
-      val bb = ByteBuffer.wrap(arr)
+      val bb = ByteBufferWrap(arr)
       val r  = JParser.parseFromByteBuffer(bb)
       r.valueOr(e => throw e)
     }
@@ -79,7 +79,7 @@ trait DefaultBijections {
       // TODO: we could use the async parser here to avoid forcing
       def unapply(s: ByteChunk) =
         ByteChunk.forceByteArray(s) map { bytes =>
-          JParser.parseFromByteBuffer(ByteBuffer.wrap(bytes)) | JUndefined
+          JParser.parseFromByteBuffer(ByteBufferWrap(bytes)) | JUndefined
         }
     }
   }

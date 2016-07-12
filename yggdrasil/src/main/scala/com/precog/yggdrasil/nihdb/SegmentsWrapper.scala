@@ -22,6 +22,7 @@ package nihdb
 
 import org.slf4j.LoggerFactory
 
+import blueeyes._
 import com.precog.common._
 import com.precog.util._
 import com.precog.yggdrasil.table._

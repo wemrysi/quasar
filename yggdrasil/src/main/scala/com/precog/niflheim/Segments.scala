@@ -21,6 +21,7 @@ package com.precog.niflheim
 
 import blueeyes.json._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.util._
 

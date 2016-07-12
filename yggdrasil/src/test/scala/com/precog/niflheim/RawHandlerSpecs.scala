@@ -19,13 +19,12 @@
  */
 package com.precog.niflheim
 
-import java.io._
-import blueeyes.json._
-import com.precog.common.{ File => _, _ }
+import blueeyes._, json._
+import com.precog.common._
 
 import com.precog.util.BitSet
 
-import org.specs2.mutable._
+import org.specs2.mutable._ //Specification
 import org.specs2.ScalaCheck
 import org.scalacheck._
 

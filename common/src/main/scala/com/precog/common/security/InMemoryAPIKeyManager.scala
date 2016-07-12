@@ -22,6 +22,7 @@ package security
 
 import accounts.AccountId
 
+import blueeyes._
 import blueeyes.util.Clock
 
 import scala.collection.mutable

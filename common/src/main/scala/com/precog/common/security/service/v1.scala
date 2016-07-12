@@ -23,8 +23,7 @@ package service
 
 import com.precog.common.accounts._
 
-import blueeyes.json._
-import blueeyes.json.serialization.{ Extractor, Decomposer, IsoSerialization }
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.JodaSerializationImplicits.InstantDecomposer

@@ -21,6 +21,7 @@ package com.precog.mimir
 
 import scala.util.Random._
 
+import blueeyes._
 import com.precog.common._
 import com.precog.util.IOUtils
 import com.precog.yggdrasil._

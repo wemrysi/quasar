@@ -20,7 +20,7 @@
 package com.precog.common
 package ingest
 
-import com.precog.common.serialization._
+import com.precog.common.serializationImplicits._
 
 import blueeyes.json._
 import blueeyes.json.serialization._

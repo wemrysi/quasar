@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes.json._
+import blueeyes._
 import com.precog.common._
 import com.precog.util.{ BitSet, BitSetUtil }
 import scalaz.Semigroup

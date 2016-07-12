@@ -25,7 +25,7 @@ import java.util.UUID
 import com.precog.common.util.ArbitraryJValue
 
 import security._
-import blueeyes.json._
+import blueeyes._, json._
 import org.scalacheck._, Gen._, Arbitrary._
 
 trait ArbitraryEventMessage extends ArbitraryJValue {

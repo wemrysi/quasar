@@ -28,7 +28,7 @@ import java.util.UUID
 
 import scalaz.{ Failure, Success }
 
-package object serialization {
+object serializationImplicits {
   implicit val uuidDecomposer: Decomposer[UUID] = new Decomposer[UUID] {
     def decompose(u: UUID) = JString(u.toString)
   }

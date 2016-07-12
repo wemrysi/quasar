@@ -21,6 +21,7 @@ package com.precog
 package mimir
 
 import org.specs2.mutable._
+import blueeyes._
 import com.precog.common._
 import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext

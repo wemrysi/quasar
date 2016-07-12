@@ -5,7 +5,7 @@ import blueeyes.health.HealthMonitor
 import blueeyes.persistence.cache.{ ExpirationPolicy, Stage }
 import blueeyes.util.RichThrowableImplicits
 
-import java.io.{ FileOutputStream, OutputStreamWriter, File, Writer }
+import java.io.Writer
 import java.text.SimpleDateFormat
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.{ GregorianCalendar, Calendar, Date }

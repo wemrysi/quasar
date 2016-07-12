@@ -22,6 +22,7 @@ package table
 
 import blueeyes.json._
 
+import blueeyes._
 import com.precog.common._
 
 import scalaz.StreamT

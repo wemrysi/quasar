@@ -23,6 +23,7 @@ import table._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
 
+import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
 

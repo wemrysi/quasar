@@ -27,7 +27,7 @@ import yggdrasil.table._
 import common._
 import com.precog.util._
 
-import blueeyes.json._
+import blueeyes._, json._
 
 import spire.implicits._
 import spire.math.Eq

@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package table
 
+import blueeyes._
 import com.precog.common._, security._
 import com.precog.yggdrasil.util._
 import com.precog.bytecode.JType

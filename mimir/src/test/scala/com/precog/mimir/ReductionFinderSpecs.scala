@@ -21,6 +21,7 @@ package com.precog
 package mimir
 
 import scalaz._
+import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
 import bytecode._
