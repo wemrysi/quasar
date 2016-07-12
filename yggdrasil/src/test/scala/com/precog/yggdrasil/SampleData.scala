@@ -19,11 +19,8 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
 import com.precog.common._
-
-import blueeyes.json._
-import blueeyes.akka_testing.FutureMatchers
+import blueeyes._, json._
 
 import scalaz.{Ordering => _, NonEmptyList => NEL, _}
 import scalaz.std.tuple._

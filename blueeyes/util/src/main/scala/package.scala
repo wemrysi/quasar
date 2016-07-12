@@ -24,21 +24,15 @@ package object blueeyes {
   type CharBuffer           = java.nio.CharBuffer
 
   // akka in 2.9
-  type ActorRef         = akka.actor.ActorRef
-  type ActorSystem      = akka.actor.ActorSystem
   type Duration         = akka.util.Duration
   type ExecutionContext = akka.dispatch.ExecutionContext
   type Future[+A]       = akka.dispatch.Future[A]
   type Promise[A]       = akka.dispatch.Promise[A]
-  type Timeout          = akka.util.Timeout
 
-  val ActorSystem      = akka.actor.ActorSystem
-  val AkkaProps        = akka.actor.Props
   val Await            = akka.dispatch.Await
   val ExecutionContext = akka.dispatch.ExecutionContext
   val Future           = akka.dispatch.Future
   val Promise          = akka.dispatch.Promise
-  val Timeout          = akka.util.Timeout
   val Duration         = akka.util.Duration
 
   // precog

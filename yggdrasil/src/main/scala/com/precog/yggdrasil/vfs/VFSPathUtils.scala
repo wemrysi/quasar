@@ -23,12 +23,10 @@ package vfs
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security.{ APIKey, PermissionsFinder }
-import com.precog.niflheim.NIHDBActor
 import com.precog.yggdrasil.metadata._
 import ResourceError._
 
 import org.slf4s.Logging
-
 import java.io.FileFilter
 import java.io.File.separator
 

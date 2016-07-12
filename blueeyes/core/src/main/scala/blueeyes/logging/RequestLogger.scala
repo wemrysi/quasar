@@ -1,10 +1,7 @@
 package blueeyes
 package logging
 
-import blueeyes.health.HealthMonitor
-import blueeyes.persistence.cache.{ ExpirationPolicy, Stage }
 import blueeyes.util.RichThrowableImplicits
-
 import java.io.Writer
 import java.text.SimpleDateFormat
 import java.util.concurrent.TimeUnit.SECONDS
@@ -21,37 +18,6 @@ object RollPolicies {
 }
 
 import RollPolicies._
-object RequestLogger {
-  private val loggersCache = new scala.collection.mutable.HashMap[String, RequestLogger]
-
-  def get(fileName: String, policy: Policy, fileHeader: () => String, writeDelaySeconds: Int): RequestLogger = {
-    loggersCache.get(fileName) match {
-      case Some(logger) =>
-        logger
-      case None =>
-        val logger = new RequestLogger(fileName, policy, fileHeader, writeDelaySeconds)
-        loggersCache.put(fileName, logger)
-        logger
-    }
-  }
-}
-
-class RequestLogger(baseFileName: String, policy: Policy, fileHeader: () => String, writeDelaySeconds: Int, healthMonitor: HealthMonitor = HealthMonitor.Noop) {
-  private val fileHandler = new FileHandler(baseFileName, policy, fileHeader)
-  private val logStage = Stage[String, StringBuilder](ExpirationPolicy(None, Some(writeDelaySeconds), SECONDS), 2000) { (_: String, record: StringBuilder) =>
-    fileHandler.publish(record)
-  }
-
-  implicit val LogLineSemigroup = new Semigroup[StringBuilder] {
-    def append(l1: StringBuilder, l2: => StringBuilder): StringBuilder = l1.append(l2)
-  }
-
-  def apply(logEntry: String) { logStage += ("log", new StringBuilder(logEntry).append("\n")) }
-
-  def close(timeout: Timeout): Future[Unit] = logStage.flushAll(timeout).map(_ => fileHandler.close())
-
-  def fileName: Option[String] = fileHandler.fileName
-}
 
 class FileHandler(baseFileName: String, policy: Policy, fileHeader: () => String) extends RichThrowableImplicits with NameFormat with Roll {
 

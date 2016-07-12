@@ -1,7 +1,7 @@
 package blueeyes
 package core
 
-import blueeyes._, bkka._
+import blueeyes._
 import java.util.Arrays
 import scalaz._
 

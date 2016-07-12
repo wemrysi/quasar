@@ -20,7 +20,7 @@
 package com.precog.util
 package cache
 
-import akka.util.Duration
+import blueeyes._
 import com.google.common.cache.{ Cache => GCache, _ }
 import scalaz.Validation
 import scala.collection.JavaConverters._

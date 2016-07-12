@@ -24,22 +24,17 @@ import com.precog.bytecode.JType
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
-import com.precog.yggdrasil.nihdb.NIHDBProjection
 import com.precog.yggdrasil.vfs._
-import akka.pattern.AskSupport
 
 import org.slf4s.Logging
-
-import java.io.File
 
 import scalaz._
 import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
-
 import TableModule._
 
-trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with SecureVFSModule[Future, Slice] with AskSupport with Logging {
+trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with SecureVFSModule[Future, Slice] with Logging {
   def vfs: SecureVFS
 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {

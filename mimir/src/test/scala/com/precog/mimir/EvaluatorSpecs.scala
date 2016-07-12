@@ -24,6 +24,7 @@ import blueeyes._
 import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.util._
+import blueeyes.util.metrics.Duration._
 
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
@@ -35,11 +36,6 @@ import com.precog.yggdrasil.util._
 import com.precog.common.security._
 import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
-
-import akka.util.duration._
-
-import java.util.concurrent.Executors
-
 
 import scalaz._
 import scalaz.Validation._
@@ -142,14 +138,14 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
   private val indexLock = new AnyRef                                  // if we were doing this for real: DIE IN A FIRE!!!
 
   class YggConfig extends IdSourceConfig with ColumnarTableModuleConfig with BlockStoreColumnarTableModuleConfig {
-    val sortBufferSize = 1000
-    val sortWorkDir: File = IOUtils.createTmpDir("idsoSpec").unsafePerformIO
-    val clock = blueeyes.util.Clock.System
-    val memoizationBufferSize = 1000
+    val sortBufferSize           = 1000
+    val sortWorkDir: File        = IOUtils.createTmpDir("idsoSpec").unsafePerformIO
+    val clock                    = blueeyes.util.Clock.System
+    val memoizationBufferSize    = 1000
     val memoizationWorkDir: File = null //no filesystem storage in test!
-    val flatMapTimeout = intToDurationInt(30).seconds
-    val maxSliceSize = 10
-    val smallSliceSize = 3
+    val flatMapTimeout           = 30.seconds
+    val maxSliceSize             = 10
+    val smallSliceSize           = 3
 
     val idSource = new FreshAtomicIdSource
   }

@@ -20,14 +20,9 @@
 package com.precog.yggdrasil
 package vfs
 
-import execution._
+import ResourceError.NotFound
 import metadata._
-import SValue._
-import ResourceError._
-import com.precog.common._, accounts._, ingest._, security._, com.precog.common.util._
-import com.precog.util._
-import akka.util.duration._
-import blueeyes._, json._
+import com.precog.common._, security._, ingest._
 import scalaz._, Scalaz._
 
 class StubVFSMetadata[M[+_]](projectionMetadata: Map[Path, Map[ColumnRef, Long]])(implicit M: Monad[M]) extends VFSMetadata[M]{

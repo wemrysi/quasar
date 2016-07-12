@@ -20,7 +20,7 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._, json._, bkka._
+import blueeyes._, json._
 import blueeyes.core.http.{ MimeType, MimeTypes }
 
 import com.precog.common._

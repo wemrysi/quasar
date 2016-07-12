@@ -1,8 +1,8 @@
 import blueeyes.BlueeyesBuild._
 
-lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, bkka, core, test)
+lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, core, test)
 
-lazy val core = project.setup dependsOn (json, bkka, util % BothScopes) deps (
+lazy val core = project.setup dependsOn (json, util % BothScopes) deps (
 
   "com.googlecode.concurrentlinkedhashmap" % "concurrentlinkedhashmap-lru" %      "1.1",
   "javolution"                             % "javolution"                  %     "5.5.1",
@@ -25,5 +25,4 @@ lazy val util = project.setup deps (
 )
 
 lazy val json = project.setup dependsOn (util % BothScopes)
-lazy val bkka = project.setup dependsOn (util % BothScopes)
 lazy val test = project.setup.noArtifacts dependsOn (core, util % BothScopes)

@@ -1,12 +1,7 @@
 package blueeyes
 package core.data
 
-import blueeyes.bkka._
-import blueeyes.json._
-import blueeyes.json.JParser
-
-import java.nio.ByteBuffer
-
+import blueeyes._, json._
 import scalaz._
 import scalaz.syntax.monad._
 import scala.xml.NodeSeq

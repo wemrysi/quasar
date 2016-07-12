@@ -19,25 +19,13 @@
  */
 package com.precog.mimir
 
-import com.precog.common.Path
-import com.precog.common.security._
-
+import com.precog.common._, security._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.table._
 
-import akka.dispatch.Await
-import akka.util.Duration
-
-import scalaz._
-import scalaz.Validation
-import scalaz.effect.IO
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
-import scalaz.std.set._
-import Validation._
-
-import blueeyes.json._
+import scalaz._, Scalaz._
+import blueeyes._, json._
 
 trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
   type IdType

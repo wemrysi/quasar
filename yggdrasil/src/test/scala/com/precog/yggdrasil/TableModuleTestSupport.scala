@@ -20,11 +20,8 @@
 package com.precog.yggdrasil
 
 import table._
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-
-import blueeyes.json._
-import blueeyes.akka_testing.FutureMatchers
 
 import scalaz.{Ordering => _, NonEmptyList => NEL, _}
 import scalaz.syntax.comonad._

@@ -1,13 +1,6 @@
 package blueeyes
-package bkka
 
 import scalaz._
-
-import akka.dispatch.Future
-import akka.dispatch.Promise
-import akka.dispatch.ExecutionContext
-import akka.dispatch.Await
-import akka.util.Duration
 
 class FutureMonad(context: ExecutionContext) extends Applicative[Future] with Monad[Future] {
   def point[A](a: => A): Future[A]                                          = Future(a)(context)

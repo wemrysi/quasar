@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package scheduling
 
-import akka.pattern.ask
 import blueeyes._
 import com.precog.common._, security._
 import com.precog.util.PrecogUnit
@@ -29,6 +28,16 @@ import com.precog.yggdrasil.execution.EvaluationContext
 import java.util.UUID
 
 import scalaz._
+
+case class DeleteTask(id: UUID)
+case class StatusForTask(id: UUID, limit: Option[Int])
+case class AddTask(repeat: Option[CronExpression],
+                    apiKey: APIKey,
+                    authorities: Authorities,
+                    context: EvaluationContext,
+                    source: Path,
+                    sink: Path,
+                    timeoutMillis: Option[Long])
 
 trait Scheduler[M[+ _]] {
   def enabled: Boolean
@@ -44,29 +53,6 @@ trait Scheduler[M[+ _]] {
   def deleteTask(id: UUID): EitherT[M, String, PrecogUnit]
 
   def statusForTask(id: UUID, limit: Option[Int]): EitherT[M, String, Option[(ScheduledTask, Seq[ScheduledRunReport])]]
-}
-
-class ActorScheduler(scheduler: ActorRef, timeout: Timeout) extends Scheduler[Future] {
-  implicit val requestTimeout = timeout
-  val enabled                 = true
-
-  def addTask(repeat: Option[CronExpression],
-              apiKey: APIKey,
-              authorities: Authorities,
-              context: EvaluationContext,
-              source: Path,
-              sink: Path,
-              timeoutMillis: Option[Long]): EitherT[Future, String, UUID] = EitherT {
-    (scheduler ? AddTask(repeat, apiKey, authorities, context, source, sink, timeoutMillis)).mapTo[String \/ UUID]
-  }
-
-  def deleteTask(id: UUID) = EitherT {
-    (scheduler ? DeleteTask(id)).mapTo[String \/ PrecogUnit]
-  }
-
-  def statusForTask(id: UUID, limit: Option[Int]) = EitherT {
-    (scheduler ? StatusForTask(id, limit)).mapTo[String \/ Option[(ScheduledTask, Seq[ScheduledRunReport])]]
-  }
 }
 
 object NoopScheduler {
