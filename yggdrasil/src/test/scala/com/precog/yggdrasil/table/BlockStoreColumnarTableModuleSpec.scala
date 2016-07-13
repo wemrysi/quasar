@@ -27,13 +27,8 @@ import scalaz.Need
 import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
 
-trait BlockStoreColumnarTableModuleSpec[M[+_]] extends TableModuleSpec[M]
-    with BlockLoadSpec[M]
-    with BlockSortSpec[M]
-    with BlockAlignSpec[M]
-    { self =>
-
-
+trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec[Need] with BlockSortSpec with BlockAlignSpec[Need] {
+  implicit def M = Need.need
   type MemoId = Int
 
   "a block store columnar table" should {
@@ -65,8 +60,7 @@ trait BlockStoreColumnarTableModuleSpec[M[+_]] extends TableModuleSpec[M]
   }
 }
 
-object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSpec[Need] {
-  implicit def M = Need.need
+object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSpec {
 
   type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
 
@@ -77,5 +71,3 @@ object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSp
     val idSource = new FreshAtomicIdSource
   }
 }
-
-// vim: set ts=4 sw=4 et:

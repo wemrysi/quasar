@@ -32,7 +32,7 @@ import scalaz.syntax.comonad._
 import org.specs2._
 import org.scalacheck._, Gen._, Arbitrary._
 
-trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with Specification with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._

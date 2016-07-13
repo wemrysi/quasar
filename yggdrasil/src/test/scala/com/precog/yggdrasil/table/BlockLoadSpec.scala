@@ -35,7 +35,7 @@ import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 import CValueGenerators._
 
-trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification with ScalaCheck { self =>
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[M] {
 
     val M = self.M

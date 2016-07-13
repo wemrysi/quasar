@@ -26,20 +26,17 @@ import com.precog.yggdrasil.util._
 
 import blueeyes.json._
 
-import scalaz._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
-
+import scalaz._, Scalaz._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 
-trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification with ScalaCheck { self =>
   def testAlign(sample: SampleData) = {
     val module = emptyTestModule
 
-    import module._
+    import module.{ M => _, _ }
     import module.trans._
     import module.trans.constants._
 
@@ -294,7 +291,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationL
   def testAlignSymmetry(i: Int) = {
     val module = emptyTestModule
 
-    import module._
+    import module.{ M => _, _ }
     import module.trans._
     import module.trans.constants._
 

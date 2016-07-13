@@ -26,7 +26,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
 
-trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with Specification with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._

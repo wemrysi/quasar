@@ -27,15 +27,11 @@ import scala.util.Random
 
 import blueeyes.json._
 
-import scalaz.StreamT
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
-import scalaz.std.string._
-
+import scalaz._, Scalaz._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
-trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specification with ScalaCheck {
   import SampleData._
   import trans._
 

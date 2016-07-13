@@ -27,7 +27,7 @@ import scalaz.{Ordering => _, NonEmptyList => NEL, _}
 import scalaz.syntax.comonad._
 
 import org.specs2._
-import org.specs2.mutable.SpecificationLike
+import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._, Arbitrary._
 import CValueGenerators.JSchema
 
@@ -46,7 +46,7 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
 }
 
-trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
+trait TableModuleSpec[M[+_]] extends Specification with ScalaCheck {
   import SampleData._
   override val defaultPrettyParams = Pretty.Params(2)
 

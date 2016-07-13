@@ -25,13 +25,7 @@ import com.precog.bytecode.JType
 import com.precog.common._, security._
 
 import blueeyes._, json._
-import scalaz._
-import scalaz.Validation._
-import scalaz.std.stream._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.boolean._
+import scalaz._, Scalaz._, Validation._
 import TableModule._
 
 trait StubColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {

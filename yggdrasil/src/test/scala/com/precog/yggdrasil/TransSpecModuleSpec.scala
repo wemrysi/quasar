@@ -22,9 +22,9 @@ package com.precog.yggdrasil
 import table._
 import blueeyes._
 import com.precog.common._
-import org.specs2.mutable.SpecificationLike
+import org.specs2.mutable.Specification
 
-trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike {
+trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specification {
   import trans._
   import CPath._
 

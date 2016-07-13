@@ -64,20 +64,15 @@ object SampleData extends CValueGenerators {
       jschema <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
     } yield {
-      try {
-
-      SampleData(
-        data.sorted.toStream flatMap {
-          // Sometimes the assembly process will generate overlapping values which will
-          // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
-          // out here than prevent it from happening in the first place.
-          case (ids, jv) => try { Some(toRecord(ids, assemble(jv))) } catch { case _ : RuntimeException => None }
-        },
-        Some((idCount, jschema))
-      )
-      } catch {
-        case ex => println("depth: "+depth) ; throw ex
-      }
+        SampleData(
+          data.sorted.toStream flatMap {
+            // Sometimes the assembly process will generate overlapping values which will
+            // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
+            // out here than prevent it from happening in the first place.
+            case (ids, jv) => try { Some(toRecord(ids, assemble(jv))) } catch { case _ : RuntimeException => None }
+          },
+          Some((idCount, jschema))
+        )
     }
   )
 

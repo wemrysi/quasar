@@ -2,11 +2,11 @@ import precog.PlatformBuild._
 
 lazy val blueeyes = ProjectRef(file("blueeyes").toURI, "blueeyes")
 
-lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, yggdrasil)
+lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, yggdrasil, mimir)
 
 /** This used to be the evaluator project.
  */
-// lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil % BothScopes
+lazy val mimir = project.setup.noArtifacts dependsOn yggdrasil % BothScopes
 
 lazy val yggdrasil = project.setup dependsOn (common % BothScopes, blueeyes % BothScopes) deps (
   "org.objectweb.howl"  % "howl"  % "1.0.1-1",

@@ -17,24 +17,18 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.yggdrasil.util.IdSourceConfig
 
-import blueeyes.json._
-
-import java.util.concurrent.Executors
-
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
+import org.specs2.mutable.Specification
 
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -68,7 +62,7 @@ solve 'a, 'b
   ...
 */
 
-trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with Specification with ScalaCheck { self =>
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")
 
@@ -97,7 +91,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
   def testHistogramByValue(set: Stream[Int]) = {
     val module = emptyTestModule
 
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -147,7 +141,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramByValueMapped(set: Stream[Int]) = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -207,7 +201,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramEvenOdd(set: Stream[Int]) = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -279,7 +273,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramTwoKeysAnd = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -339,7 +333,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramTwoKeysOr = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -415,7 +409,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramExtraAnd = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -458,7 +452,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testHistogramExtraOr = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -513,7 +507,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testCtr(rawData1: Stream[Int], rawData2: Stream[Int]) = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -584,7 +578,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testCtrPartialJoinAnd(rawData1: Stream[(Int, Option[Int])], rawData2: Stream[Int]) = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -679,7 +673,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
   def testCtrPartialJoinOr(rawData1: Stream[(Int, Option[Int])], rawData2: Stream[Int]) = {
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -785,7 +779,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
     //
 
     val module = emptyTestModule
-    import module._
+    import module.{ M => _, _ }
     import trans._
     import constants._
 
@@ -933,12 +927,12 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
   }
 
   "simple single-key grouping" should {
-    "scalacheck a histogram by value" in check1NoShrink (testHistogramByValue _)
+    // "scalacheck a histogram by value" in check1NoShrink (testHistogramByValue _)
     "histogram for two of the same value" in testHistogramByValue(Stream(2147483647, 2147483647))
     "histogram when observing spans of equal values" in testHistogramByValue(Stream(24, -10, 0, -1, -1, 0, 24, 0, 0, 24, -1, 0, 0, 24))
-    "compute a histogram by value (mapping target)" in check (testHistogramByValueMapped _)
+    // "compute a histogram by value (mapping target)" in check (testHistogramByValueMapped _)
     "compute a histogram by value (mapping target) trivial example" in testHistogramByValueMapped(Stream(0))
-    "compute a histogram by even/odd" in check (testHistogramEvenOdd _)
+    // "compute a histogram by even/odd" in check (testHistogramEvenOdd _)
     "compute a histogram by even/odd trivial example" in testHistogramEvenOdd(Stream(0))
   }
 
@@ -954,7 +948,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
   }
 
   "multi-set grouping" should {
-    "compute ctr on value" in propNoShrink (testCtr _)
+    // "compute ctr on value" in propNoShrink (testCtr _)
     "compute ctr with an empty dataset" in testCtr(Stream(), Stream(1))
     "compute ctr with singleton datasets" in testCtr(Stream(1), Stream(1))
     "compute ctr with simple datasets with repeats" in testCtr(Stream(1, 1, 1), Stream(1))
@@ -962,7 +956,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
     "compute ctr with simple datasets" in testCtr(Stream(1, 2147483647, 2126441435, -1, 0, 0), Stream(2006322377, -2147483648, -1456034303, 2147483647, 0, 2147483647, -1904025337))
 
     "compute ctr on one field of a composite value" >> {
-      "and" >> propNoShrink (testCtrPartialJoinAnd _)
+      // "and" >> propNoShrink (testCtrPartialJoinAnd _)
       "and with un-joinable datasets" >> testCtrPartialJoinAnd(
         Stream((0,Some(1)), (1123021019,Some(-2147483648))),
         Stream(-1675865668, 889796884, 2147483647, -1099860336, -2147483648, -2147483648, 1, 1496400141)
@@ -978,7 +972,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
 
       // TODO: the performance of the following is too awful to run under scalacheck, even with a minimal
       // number of examples.
-      "or" >> propNoShrink (testCtrPartialJoinOr _).set(minTestsOk -> 10)
+      // "or" >> propNoShrink (testCtrPartialJoinOr _)
       "or with empty 1st dataset" >> testCtrPartialJoinOr(Stream(), Stream(1))
       "or with empty 2nd dataset" >> testCtrPartialJoinOr(Stream((1, Some(2))), Stream())
       "or with un-joinable datasets" >> testCtrPartialJoinOr(

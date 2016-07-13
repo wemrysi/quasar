@@ -24,15 +24,11 @@ import blueeyes._
 import com.precog.common._
 import blueeyes.json._
 
-import scalaz._
-import scalaz.std.list._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 import org.specs2.ScalaCheck
-import org.specs2.mutable._
+import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._, Arbitrary._
-
 import SampleData._
 import TableModule._
 
@@ -41,9 +37,14 @@ import TableModule._
  */
 import PrecogJValueOrder._
 
-trait BlockSortSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait BlockSortSpec extends BlockStoreTestSupport[Need] with Specification with ScalaCheck {
+
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
-    val module = BlockStoreTestModule.empty[M]
+    val module = BlockStoreTestModule.empty[Need]
+
+    // import module.{ M => _, _ }
+    // import module.trans._
+
 
     val jvalueOrdering     = ScalazOrder[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
