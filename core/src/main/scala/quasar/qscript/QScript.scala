@@ -419,11 +419,29 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
           Free.roll(MakeMap(StrLit("right"), Free.point(RightSide))))))
     }
 
-  def pathToProj(path: pathy.Path[_, _, _]): FreeMap[T] =
-    pathy.Path.peel(path).fold[FreeMap[T]](
-      Free.point(())) {
+  case class Ann(provenance: List[FreeMap[T]], values: FreeMap[T])
+  val EmptyAnn: Ann = Ann(Nil, UnitF[T])
+
+  def DeadEndTarget(deadEnd: DeadEnd): TargetRec =
+    EnvT[Ann, F, T[Target]]((EmptyAnn, DE.inj(Const[DeadEnd, T[Target]](deadEnd))))
+
+  type Target[A] = EnvT[Ann, F, A]
+  type TargetRec = Target[T[Target]]
+
+  val RootTarget: TargetRec = DeadEndTarget(Root)
+  val EmptyTarget: TargetRec = DeadEndTarget(Empty)
+
+
+  def pathToProj(path: pathy.Path[_, _, _]): TargetRec =
+    pathy.Path.peel(path).fold[TargetRec](
+      RootTarget) {
       case (p, n) =>
-        Free.roll(ProjectField(pathToProj(p), StrLit(n.fold(_.value, _.value))))
+        val str = StrLit(n.fold(_.value, _.value))
+        val prefix = pathToProj(p)
+        val Ann(provenance, values) = prefix.ask
+        EnvT[Ann, F, T[Target]]((
+          Ann(Free.roll(ConcatArrays(Free.roll(MakeArray(UnitF[T])), Free.roll(MakeArray(str)))) :: provenance, values),
+          PB.inj(BucketField(prefix.embed, str))))
     }
 
   // TODO error handling
@@ -435,23 +453,23 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       Data.toEJson[EJson].apply(_).right)
   }
 
-  def lpToQScript: LogicalPlan[Inner] => QSState[F[Inner]] = {
+  def lpToQScript: LogicalPlan[T[Target]] => QSState[TargetRec] = {
     case LogicalPlan.ReadF(path) =>
-      stateT(QC.inj(Map(
-        CorecursiveOps[T, F](DE.inj(Const[DeadEnd, Inner](Root))).embed,
-        pathToProj(path))))
+      stateT(pathToProj(path))
 
     case LogicalPlan.ConstantF(data) =>
-      stateT(QC.inj(Map(
-        DE.inj(Const[DeadEnd, Inner](Root)).embed,
+      val res = QC.inj(Map(
+        RootTarget.embed,
         Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](fromData(data).fold(
           error => CommonEJson.inj(ejson.Str[T[EJson]](error)).embed,
-          ι))))))
+          ι)))))
+      stateT(EnvT((EmptyAnn, res)))
 
     case LogicalPlan.FreeF(name) =>
-      stateT(QC.inj(Map(
-        DE.inj(Const[DeadEnd, Inner](Empty)).embed,
-        Free.roll(ProjectField(StrLit(name.toString), UnitF[T])))))
+      val res = QC.inj(Map(
+        EmptyTarget.embed,
+        Free.roll(ProjectField(StrLit(name.toString), UnitF[T]))))
+      stateT(EnvT((EmptyAnn, res))) // TODO bucketing or not?
 
     case LogicalPlan.LetF(name, form, body) =>
       for {
