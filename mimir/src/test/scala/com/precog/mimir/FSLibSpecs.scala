@@ -19,7 +19,6 @@
  */
 package com.precog.mimir
 
-import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
 import com.precog.common.Path
@@ -35,13 +34,12 @@ import com.precog.yggdrasil.vfs._
 
 import org.specs2.mutable.Specification
 
-import blueeyes.json._
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
+trait FSLibSpecs extends Specification with FSLibModule[Need] with TestColumnarTableModule[Need] {
+  implicit def M = Need.need
 
-trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColumnarTableModule[M] { self =>
   import trans._
   import constants._
 
@@ -63,7 +61,7 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
     Path("/foo2/bar1/baz/quux1" ) -> Map(ColumnRef(CPath.Identity, CString) -> 40L)
   )
 
-  val vfs = new StubVFSMetadata[M](projectionMetadata)
+  val vfs = new StubVFSMetadata[Need](projectionMetadata)
 
   def pathTable(path: String) = {
     Table.constString(Set(path)).transform(WrapObject(Leaf(Source), TransSpecModule.paths.Value.name))
@@ -74,10 +72,10 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
     new DateTime, "testAPIKey", Path.Root, AccountPlan.Free)
   val defaultEvaluationContext = EvaluationContext(testAPIKey, testAccount, Path.Root, Path.Root, new DateTime)
   val defaultMorphContext = MorphContext(defaultEvaluationContext, new MorphLogger {
-    def info(msg: String): M[Unit] = M.point(())
-    def warn(msg: String): M[Unit] = M.point(())
-    def error(msg: String): M[Unit] = M.point(())
-    def die(): M[Unit] = M.point(sys.error("MorphContext#die()"))
+    def info(msg: String): Need[Unit]  = M.point(())
+    def warn(msg: String): Need[Unit]  = M.point(())
+    def error(msg: String): Need[Unit] = M.point(())
+    def die(): Need[Unit]              = M.point(sys.error("MorphContext#die()"))
   })
 
   def runExpansion(table: Table): List[JValue] = {
@@ -123,6 +121,4 @@ trait FSLibSpecs[M[+_]] extends Specification with FSLibModule[M] with TestColum
   }
 }
 
-object FSLibSpecs extends FSLibSpecs[Need] {
-  def M = Need.need
-}
+object FSLibSpecs extends FSLibSpecs
