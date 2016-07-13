@@ -21,6 +21,7 @@ package com.precog.common
 
 import blueeyes._
 import scalaz._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 package object client {
 

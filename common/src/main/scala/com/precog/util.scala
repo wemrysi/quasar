@@ -111,7 +111,7 @@ package object util {
   implicit def lazyValueMapper[A, B](m: Map[A, B]) = new LazyMapValues[A, B] { val source = m }
   implicit val InstantOrdering: Ordering[Instant] = Ordering.Long.on[Instant](_.getMillis)
 
-  implicit val FutureBind: Bind[Future] = new Bind[Future] {
+  implicit def FutureBind(implicit ctx: ExecutionContext): Bind[Future] = new Bind[Future] {
     def map[A, B](fut: Future[A])(f: A => B)          = fut.map(f)
     def bind[A, B](fut: Future[A])(f: A => Future[B]) = fut.flatMap(f)
   }

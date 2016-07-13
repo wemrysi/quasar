@@ -1,6 +1,6 @@
 import precog.PlatformBuild._
 
-lazy val blueeyes = ProjectRef(file("blueeyes").toURI, "core")
+lazy val blueeyes = ProjectRef(file("blueeyes").toURI, "blueeyes")
 
 lazy val platform = project.setup.root.noArtifacts aggregate (blueeyes, common, yggdrasil)
 
@@ -14,15 +14,10 @@ lazy val yggdrasil = project.setup dependsOn (common % BothScopes, blueeyes % Bo
   "org.spire-math"     %% "spire" %  "0.3.0"
 )
 
-lazy val common = project.setup dependsOn blueeyes deps (
+lazy val common = project.setup dependsOn (blueeyes % BothScopes) deps (
 
-  "com.google.code.findbugs"  % "jsr305"          % "3.0.1",
-  "com.google.guava"          % "guava"           % "12.0.1",
-  "com.rubiconproject.oss"    % "jchronic"        % "0.2.6",
-  "org.scalacheck"           %% "scalacheck"      % "1.10.1"  % Test,
-  "org.specs2"               %% "specs2"          % "1.12.3"  % Test,
-  "ch.qos.logback"            % "logback-classic" %  "1.0.0"  % Test
-)
-//  also (
-//   scalacOptions in Compile += "-Xlog-implicits"
-// )
+  "com.google.code.findbugs" % "jsr305"          % "3.0.1",
+  "com.google.guava"         % "guava"           % "12.0.1",
+  "com.rubiconproject.oss"   % "jchronic"        % "0.2.6",
+  "ch.qos.logback"           % "logback-classic" %  "1.0.0"  % Test
+) // also ( scalacOptions in Compile += "-Xlog-implicits" )

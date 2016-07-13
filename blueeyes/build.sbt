@@ -1,6 +1,6 @@
 import blueeyes.BlueeyesBuild._
 
-lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, core, test)
+lazy val blueeyes = project.setup.root.noArtifacts aggregate (util, json, core, test) dependsOn (core % BothScopes)
 
 lazy val core = project.setup dependsOn (json, util % BothScopes) deps (
 
@@ -15,12 +15,13 @@ lazy val core = project.setup dependsOn (json, util % BothScopes) deps (
 )
 lazy val util = project.setup deps (
 
-  "org.streum"  %% "configrity-core" % "1.0.0",
-  "com.chuusai" %% "shapeless"       % "1.2.4",
-  "org.slf4s"   %% "slf4s-api"       % "1.7.13",
-  "org.scalaz"  %% "scalaz-effect"   % "7.0.9",
-  "joda-time"    % "joda-time"       % "1.6.2",
-  "org.specs2"  %% "specs2"          % "1.12.3"  % Test
+  "org.streum"     %% "configrity-core" % "1.0.0",
+  "com.chuusai"    %% "shapeless"       % "1.2.4",
+  "org.slf4s"      %% "slf4s-api"       % "1.7.13",
+  "org.scalaz"     %% "scalaz-effect"   % "7.0.9",
+  "joda-time"       % "joda-time"       % "1.6.2",
+  "org.specs2"     %% "specs2"          % "1.12.3"  % Test,
+  "org.scalacheck" %% "scalacheck"      % "1.10.1"  % Test
 )
 lazy val json = project.setup dependsOn (util % BothScopes)
 lazy val test = project.setup.noArtifacts dependsOn (core, util % BothScopes)

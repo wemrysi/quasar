@@ -27,12 +27,7 @@ import com.precog.common.accounts.{ Account, AccountId }
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
 
-import scalaz.{ NonEmptyList => NEL, _ }
-import scalaz.std.option._
-import scalaz.std.list._
-import scalaz.syntax.id._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._
 
 object APIKeyManager {
   def newUUID() = java.util.UUID.randomUUID.toString

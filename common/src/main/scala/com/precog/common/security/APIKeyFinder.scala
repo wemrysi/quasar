@@ -26,11 +26,7 @@ import accounts.AccountId
 import accounts.AccountFinder
 import org.slf4s.Logging
 
-import scalaz._
-import scalaz.std.option.optionInstance
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._
 
 trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
   def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]): M[Option[v1.APIKeyDetails]]

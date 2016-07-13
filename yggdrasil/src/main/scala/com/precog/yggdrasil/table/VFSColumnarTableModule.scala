@@ -33,6 +33,7 @@ import scalaz.std.list._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 import TableModule._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with SecureVFSModule[Future, Slice] with Logging {
   def vfs: SecureVFS
