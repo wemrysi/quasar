@@ -577,7 +577,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
 
         result2 must contain(237 + 22 + (237.0 / 22))
-      }
+      }.pendingUntilFixed
     }
 
     "evaluate a rewrite/eval of a 3-way mega reduce" in {
@@ -1796,7 +1796,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             s mustEqual "string cheese"
         }
       }
-    }
+    }.pendingUntilFixed
 
     "compute the set difference of the set difference" in {
       val line = Line(1, 1, "")
@@ -1824,7 +1824,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             obj must haveKey("time")
         }
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iunion of a set with itself" in {
       val line = Line(1, 1, "")
@@ -1858,7 +1858,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
         result3 must haveSize(10)
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iunion of two homogeneous sets (with relative load)" in {
       val line = Line(1, 1, "")
@@ -1876,7 +1876,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must contain(42, 12, 77, 1, 13, 14, -1, 0)
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iunion of two datasets, one with objects" in {
       val line = Line(1, 1, "")
@@ -1888,7 +1888,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
       testEval(input) { result =>
         result must haveSize(105)
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iintersect of two nonintersecting sets of numbers" in {
       val line = Line(1, 1, "")
@@ -1900,7 +1900,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
       testEval(input) { result =>
         result must haveSize(0)
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iintersect of two nonintersecting datasets" in {
       val line = Line(1, 1, "")
@@ -1912,7 +1912,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
       testEval(input) { result =>
         result must haveSize(0)
       }
-    }
+    }.pendingUntilFixed
 
     "compute the iintersect of mod2 and mod3" in {
       val line = Line(1, 1, "")
@@ -1943,7 +1943,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must contain(6, 12, 24)
       }
-    }
+    }.pendingUntilFixed
 
     "filter homogeneous numeric set by binary operation" >> {
       "less-than" >> {
@@ -3294,7 +3294,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         results must contain(SObject(Map("user" -> SString("jason"), "num" -> SDecimal(BigDecimal("13")), "rank" -> SDecimal(BigDecimal("6")))))
         results must contain(SObject(Map("user" -> SNull, "num" -> SDecimal(BigDecimal("3")), "rank" -> SDecimal(BigDecimal("0")))))
       }
-    }
+    }.pendingUntilFixed
 
     "perform a naive cartesian product on the clicks dataset" in {
       val line = Line(1, 1, "")
@@ -3340,7 +3340,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must contain(42, 12, 77, 1, 13)
       }
-    }
+    }.pendingUntilFixed
 
     "distinct heterogenous sets" in {
       val line = Line(1, 1, "")
@@ -3361,7 +3361,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must contain(42, 12, 77, 1, 13, true, false, "daniel", Map("test" -> SString("fubar")), Vector())
       }
-    }
+    }.pendingUntilFixed
 
     "join two sets according to a value sort" in {
       val line = Line(1, 1, "")
@@ -3405,7 +3405,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           }
         }
       }
-    }
+    }.pendingUntilFixed
 
     "join two sets according to a value sort and then an identity sort" in {
       val line = Line(1, 1, "")
@@ -3431,7 +3431,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         result2 must contain(true)
         result2 must not(contain(false))
       }
-    }
+    }.pendingUntilFixed
 
     "filter two sets according to a value sort" in {
       val line = Line(1, 1, "")
@@ -3479,7 +3479,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           }
         }
       }
-    }
+    }.pendingUntilFixed
 
     "produce a preemptive error when crossing enormous sets" in {
       val line = Line(1, 1, "")

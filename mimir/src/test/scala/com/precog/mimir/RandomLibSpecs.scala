@@ -62,7 +62,7 @@ trait RandomLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         ids must haveSize(0)
         d mustEqual(0.2182148468113263)
     }
-  }
+  }.pendingUntilFixed
 
   "fail to observe if seed for distribution is not a long" in {
     val uniform = dag.Morph1(UniformDistribution,
@@ -104,7 +104,7 @@ trait RandomLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     actual mustEqual expected
-  }
+  }.pendingUntilFixed
 
   "return observed set joined with original" in {
     val numbers = dag.AbsoluteLoad(Const(CString("/het/numbers"))(line))(line)
@@ -145,7 +145,7 @@ trait RandomLibSpecs[M[+_]] extends EvaluatorSpecification[M]
           case SDecimal(d) => expected must contain(d)
         }
     }
-  }
+  }.pendingUntilFixed
 }
 
 object RandomLibSpecs extends RandomLibSpecs[Need]

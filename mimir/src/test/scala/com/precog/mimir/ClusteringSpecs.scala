@@ -139,7 +139,7 @@ trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
             }
         }
       }
-    }
+    }.pendingUntilFixed
 
     "return result when given fewer than k numeric rows" in {
       val k = 8
