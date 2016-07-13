@@ -237,7 +237,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
         Free.roll(ProjectField(UnitF[T], StrLit(rightName))))
     }
 
-  // NB: More compilicated LeftShifts are generated as an optimization:
+  // NB: More complicated LeftShifts are generated as an optimization:
   // before: ThetaJoin(cs, Map((), mf), LeftShift((), struct, repair), comb)
   // after: LeftShift(cs, struct, comb.flatMap(LeftSide => mf.map(_ => LeftSide), RS => repair))
   def invokeExpansion1(func: UnaryFunc, values: Func.Input[Inner, nat._1]):
