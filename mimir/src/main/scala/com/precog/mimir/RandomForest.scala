@@ -26,6 +26,7 @@ package mimir
 import yggdrasil._
 import yggdrasil.table._
 
+import blueeyes._
 import common._
 import bytecode._
 import com.precog.util._
@@ -33,13 +34,7 @@ import com.precog.util._
 import spire.implicits.{ semigroupOps => _, _ }
 import spire.{ ArrayOps, SeqOps }
 
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.monoid._
-import scalaz.syntax.traverse._
-import scalaz.std.list._
-
-import scala.annotation.tailrec
+import scalaz._, Scalaz._
 import scala.util.Random.nextInt
 import scala.collection.JavaConverters._
 
@@ -236,7 +231,7 @@ trait TreeMaker[ /*@specialized(Double) */ A] {
 
     val orders = (0 until opts.features).map { i =>
       val order = (0 until dependent.length).toArray
-      order.qsortBy(independent(_)(i))
+      (new ArrayOps(order)).qsortBy(independent(_)(i))
       order
     }.toArray
     growTree(orders)
@@ -362,7 +357,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
   }
 
-  private def collapse[@specialized(Double) A: Manifest](chunks0: List[Array[A]]): Array[A] = {
+  private def collapse[@specialized(Double) A: CTag](chunks0: List[Array[A]]): Array[A] = {
     val len   = chunks0.foldLeft(0)(_ + _.length)
     val array = new Array[A](len)
     def mkArray(init: Int, chunks: List[Array[A]]): Unit = chunks match {
@@ -505,7 +500,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
 
       def findError(actual: Array[Double], predicted: Array[Double]): Double = {
-        val actualMean = actual.qmean
+        val actualMean = new SeqOps(actual) qmean
 
         val diffs = actual - predicted
         val num   = diffs dot diffs

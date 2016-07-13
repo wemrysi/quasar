@@ -36,10 +36,10 @@ import yggdrasil.table._
 
 import blueeyes.json._
 
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.apply._
-import scala.annotation.tailrec
+import scalaz._, Scalaz._
+// import scalaz.syntax.monad._
+// import scalaz.syntax.apply._
+// import scala.annotation.tailrec
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib

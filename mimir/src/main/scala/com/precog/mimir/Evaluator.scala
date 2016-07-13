@@ -33,12 +33,7 @@ import com.precog.util._
 import org.slf4j.LoggerFactory
 import scala.collection.immutable.Queue
 
-import scalaz._
-import scalaz.StateT.{ StateMonadTrans, stateTMonadState }
-import scalaz.std.list._
-import scalaz.std.set._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._, StateT._
 
 trait EvaluatorConfig extends IdSourceConfig {
   def maxSliceSize: Int
