@@ -34,10 +34,12 @@ import scalaz._, Scalaz._
 class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   val transform = new Transform[Fix, QScriptInternal[Fix, ?]]
 
-  val DeadEndPure = implicitly[Const[DeadEnd, ?] :<: QScriptPure[Fix, ?]]
-  val SourcedPathablePure = implicitly[SourcedPathable[Fix, ?] :<: QScriptPure[Fix, ?]]
+  // TODO: Narrow this to QScriptPure
+  type QS[A] = QScriptProject[Fix, A]
+  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
+  val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
 
-  def RootR = CorecursiveOps[Fix, QScriptPure[Fix, ?]](DeadEndPure.inj(Const[DeadEnd, transform.InnerPure](Root))).embed
+  def RootR = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
 
   def ProjectFieldR[A](src: FreeMap[Fix], field: FreeMap[Fix]): FreeMap[Fix] =
     Free.roll(ProjectField(src, field))
@@ -52,13 +54,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       QueryFile.convertToQScript(lpRead("/foo")).toOption must
       equal(
         // Map(Root, ProjectField(Unit, "foo"))
-        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
     }
 
     "convert a simple read" in {
       QueryFile.convertToQScript(lpRead("/some/foo/bar")).toOption must
       equal(
-        SourcedPathablePure.inj(
+        QC.inj(
           Map(RootR,
             ProjectFieldR(
               ProjectFieldR(
@@ -74,7 +76,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "convert a basic invoke" in pending {  // TODO normalization
       QueryFile.convertToQScript(math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
       equal(
-        SourcedPathablePure.inj(
+        QC.inj(
           Map(RootR,
             Free.roll(Add(
               ProjectFieldR(UnitF, StrLit("foo")),
@@ -101,7 +103,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
       QueryFile.convertToQScript(lp).toOption must equal(
-        SourcedPathablePure.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
     }
   }
 }

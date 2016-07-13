@@ -84,15 +84,11 @@ object ThetaJoin {
         right: FreeMap[IT],
         p1: ThetaJoin[IT, Unit],
         p2: ThetaJoin[IT, Unit]) =
-        OptionT(state(
-          if (p1 ≟ p2)
-            SrcMerge[ThetaJoin[IT, Unit], FreeMap[IT]](p1, left, right).some
-          else
-            None))
+        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
     }
 
-  implicit def bucketable[T[_[_]]]: Bucketable.Aux[T, ThetaJoin[T, ?]] =
-    new Bucketable[ThetaJoin[T, ?]] {
+  implicit def diggable[T[_[_]]]: Diggable.Aux[T, ThetaJoin[T, ?]] =
+    new Diggable[ThetaJoin[T, ?]] {
       type IT[G[_]] = T[G]
 
       def digForBucket[G[_]](tj: ThetaJoin[T, IT[G]]) = IndexedStateT.stateT(tj)

@@ -16,38 +16,40 @@
 
 package quasar.qscript
 
-import quasar.Predef._
+import scalaz._
 
-import scalaz._, Scalaz._
-import simulacrum.typeclass
-
-@typeclass trait Bucketable[F[_]] {
+// TODO: make this a @typeclass (currently errors when we do)
+trait Bucketable[F[_]] {
   type IT[G[_]]
 
-  def digForBucket[G[_]](fg: F[IT[G]]):
-      // TODO: use matryoshka.instances.fixedpoint.Nat
-      StateT[QScriptBucket[IT, IT[G]] \/ ?, Int, F[IT[G]]]
+  def applyBucket[G[_]: Functor](
+    ft: F[IT[G]], inner: IT[G])(
+    f: (IT[G],
+        IT[G],
+        SrcMerge[ThetaJoin[IT, IT[G]], FreeMap[IT]] =>
+            (IT[G], FreeMap[IT], FreeMap[IT])) =>
+          QSState[(IT[G], FreeMap[IT], FreeMap[IT])])(
+    implicit TJ: ThetaJoin[IT, ?] :<: G):
+      QSState[(IT[G], FreeMap[IT], FreeMap[IT])]
 }
 
 object Bucketable {
   type Aux[T[_[_]], F[_]] = Bucketable[F] { type IT[G[_]] = T[G] }
 
-  implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit FB: Bucketable.Aux[T, F], GB: Bucketable.Aux[T, G]):
-      Bucketable.Aux[T, Coproduct[F, G, ?]] =
-    new Bucketable[Coproduct[F, G, ?]] {
+  implicit def coproduct[T[_[_]], F[_], H[_]](
+    implicit FB: Bucketable.Aux[T, F], HB: Bucketable.Aux[T, H]):
+      Bucketable.Aux[T, Coproduct[F, H, ?]] =
+    new Bucketable[Coproduct[F, H, ?]] {
       type IT[F[_]] = T[F]
 
-      def digForBucket[H[_]](fg: Coproduct[F, G, IT[H]]) =
-        fg.run.bitraverse(FB.digForBucket[H](_), GB.digForBucket[H](_)) ∘
-          (Coproduct(_))
-    }
-
-  implicit def const[T[_[_]], A]:
-      Bucketable.Aux[T, Const[A, ?]] =
-    new Bucketable[Const[A, ?]] {
-      type IT[F[_]] = T[F]
-
-      def digForBucket[G[_]](de: Const[A, IT[G]]) = StateT.stateT(de)
+      def applyBucket[G[_]: Functor](
+        ft: Coproduct[F, H, IT[G]], inner: IT[G])(
+        f: (IT[G],
+          IT[G],
+          SrcMerge[ThetaJoin[IT, IT[G]], FreeMap[IT]] =>
+          (IT[G], FreeMap[IT], FreeMap[IT])) =>
+        QSState[(IT[G], FreeMap[IT], FreeMap[IT])])(
+        implicit TJ: ThetaJoin[IT, ?] :<: G) =
+        ft.run.fold(FB.applyBucket(_, inner)(f), HB.applyBucket(_, inner)(f))
     }
 }

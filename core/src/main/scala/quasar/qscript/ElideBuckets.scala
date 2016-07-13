@@ -22,37 +22,40 @@ import scalaz._
 import simulacrum.typeclass
 
 @typeclass trait ElideBuckets[F[_]] {
+  type H[_]
+
   type IT[G[_]]
 
-  type InnerPure = IT[QScriptPure[IT, ?]]
-
-  def purify: F[InnerPure] => QScriptPure[IT, InnerPure]
-  // #1: F[_]](implicit QSC :<: F, )
-  // #2: transformations work across Free
+  def purify: F[IT[H]] => H[IT[H]]
 }
 
 object ElideBuckets extends ElideBucketsInstances {
-  type Aux[T[_[_]], F[_]] = ElideBuckets[F] { type IT[G[_]] = T[G] }
+  type Aux[T[_[_]], F[_], G[_]] = ElideBuckets[F] {
+    type H[A] = G[A]
+    type IT[G[_]] = T[G]
+  }
 }
 
 trait ElideBucketsInstances0 {
-  implicit def inject[T[_[_]], F[_]](implicit F: F :<: QScriptPure[T, ?]):
-      ElideBuckets.Aux[T, F] =
+  implicit def inject[T[_[_]], F[_], G[_]](implicit F: F :<: G):
+      ElideBuckets.Aux[T, F, G] =
     new ElideBuckets[F] {
+      type H[A] = G[A]
       type IT[K[_]] = T[K]
 
-      def purify: F[InnerPure] => QScriptPure[IT, InnerPure] = F.inj
+      val purify = F.inj(_: F[IT[H]])
     }
 }
 
 trait ElideBucketsInstances extends ElideBucketsInstances0 {
-  implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit F: ElideBuckets.Aux[T, F], G: ElideBuckets.Aux[T, G]):
-      ElideBuckets.Aux[T, Coproduct[F, G, ?]] =
+  implicit def coproduct[T[_[_]], F[_], G[_], I[_]](
+    implicit F: ElideBuckets.Aux[T, F, I], G: ElideBuckets.Aux[T, G, I]):
+      ElideBuckets.Aux[T, Coproduct[F, G, ?], I] =
     new ElideBuckets[Coproduct[F, G, ?]] {
+      type H[A] = I[A]
       type IT[K[_]] = T[K]
-  
-      def purify: Coproduct[F, G, InnerPure] => QScriptPure[IT, InnerPure] =
+
+      def purify: Coproduct[F, G, T[I]] => I[T[I]] =
         _.run.fold(F.purify, G.purify)
     }
 }
