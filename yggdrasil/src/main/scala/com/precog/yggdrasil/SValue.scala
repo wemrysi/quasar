@@ -28,12 +28,12 @@ import blueeyes.json.serialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.Ordering._
-import scalaz.syntax.order._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.equal._
-import scalaz.std.AllInstances._
+// import scalaz.syntax.order._
+// import scalaz.syntax.semigroup._
+// import scalaz.syntax.equal._
+// import scalaz.std.AllInstances._
 
 sealed trait SValue {
   def isA(valueType: SType): Boolean

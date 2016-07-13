@@ -42,15 +42,15 @@ import org.slf4s.Logging
 
 import java.util.UUID
 
-import scalaz._
-import scalaz.EitherT._
-import scalaz.std.stream._
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.list._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
+// import scalaz.EitherT._
+// import scalaz.std.stream._
+// import scalaz.syntax.monad._
+// import scalaz.syntax.show._
+// import scalaz.syntax.traverse._
+// import scalaz.syntax.std.boolean._
+// import scalaz.syntax.std.list._
+// import scalaz.syntax.std.option._
 import scalaz.effect.IO
 
 trait InMemoryVFSModule[M[+ _]] extends VFSModule[M, Slice] { moduleSelf =>

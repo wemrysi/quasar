@@ -51,7 +51,7 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
 }
 
 trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
-    with SliceColumnarTableModule[M]
+    // with SliceColumnarTableModule[M]
     with StubProjectionModule[M, Slice] {
 
   import trans._
