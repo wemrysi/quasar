@@ -199,7 +199,7 @@ object MapFunc {
         case (Nullary(v1), Nullary(v2)) => v1.equals(v2)
 
         // unary
-        case (Date(a1), Date(b1)) => in.equal(a1, b1) 
+        case (Date(a1), Date(b1)) => in.equal(a1, b1)
         case (Time(a1), Time(b1)) => in.equal(a1, b1)
         case (Timestamp(a1), Timestamp(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
@@ -485,3 +485,4 @@ object MapFuncs {
     }, _ => None)
   }
 }
+

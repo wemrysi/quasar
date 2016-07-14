@@ -44,10 +44,6 @@ package object qscript {
   type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
   type QScriptProject[T[_[_]], A] = Coproduct[ProjectBucket[T, ?], QScriptPure[T, ?], A]
 
-  type Bucketing[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], ProjectBucket[T, ?], A]
-
-  type QScriptInternal[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], QScriptProject[T, ?], A]
-
   /** These nodes exist in all QScript structures that a backend sees.
     */
   type QScriptCommon[T[_[_]], A] = Coproduct[Read, QScriptPrim[T, ?], A]
@@ -81,11 +77,14 @@ package object qscript {
   type FreeUnit[F[_]] = Free[F, Unit]
 
   type FreeMap[T[_[_]]] = FreeUnit[MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeUnit[QScriptInternal[T, ?]]
+  type FreeQS[T[_[_]]] = FreeUnit[QScriptProject[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
   type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
+
+  case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, UnitF[T])
 
   def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
 

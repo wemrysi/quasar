@@ -75,23 +75,16 @@ object ThetaJoin {
       }
     }
 
-  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, Unit]] =
-    new Mergeable[ThetaJoin[T, Unit]] {
+  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, ?]] =
+    new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: ThetaJoin[IT, Unit],
-        p2: ThetaJoin[IT, Unit]) =
+        p1: EnvT[Ann, ThetaJoin[IT, ?], Unit],
+        p2: EnvT[Ann, ThetaJoin[IT, ?], Unit]) =
         OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
-    }
-
-  implicit def diggable[T[_[_]]]: Diggable.Aux[T, ThetaJoin[T, ?]] =
-    new Diggable[ThetaJoin[T, ?]] {
-      type IT[G[_]] = T[G]
-
-      def digForBucket[G[_]](tj: ThetaJoin[T, IT[G]]) = IndexedStateT.stateT(tj)
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
@@ -101,11 +94,12 @@ object ThetaJoin {
         def apply[A](tj: ThetaJoin[T, A]) =
           ThetaJoin(
             tj.src,
-            tj.lBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
-            tj.rBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+            tj.lBranch.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
+            tj.rBranch.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
             normalizeMapFunc(tj.on),
             tj.f,
             normalizeMapFunc(tj.combine))
       }
     }
 }
+

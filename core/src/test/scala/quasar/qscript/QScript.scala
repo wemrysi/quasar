@@ -32,7 +32,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptSpec extends CompilerHelpers with ScalazMatchers {
-  val transform = new Transform[Fix, QScriptInternal[Fix, ?]]
+  val transform = new Transform[Fix, QScriptProject[Fix, ?]]
 
   // TODO: Narrow this to QScriptPure
   type QS[A] = QScriptProject[Fix, A]

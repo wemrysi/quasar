@@ -60,3 +60,4 @@ trait NormalizableInstances extends NormalizableInstances0 {
 }
 
 object Normalizable extends NormalizableInstances
+
