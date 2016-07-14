@@ -127,6 +127,26 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       ZipperAcc(Nil, sides, tails).left.point[State[NameGen, ?]]
   }
 
+  /** This unifies a pair of sources into a single one, with additional
+    * expressions to access the combined bucketing info, as well as the left and
+    * right values.
+    */
+  def autojoin(left: T[Target], right: T[Target]):
+      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) =
+    ???
+
+  /** A convenience for a pair of autojoins, does the same thing, but returns
+    * access to all three values.
+    */
+  def autojoin3(left: T[Target], center: T[Target], right: T[Target]):
+      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T], FreeMap[T]) = {
+    val (lsrc, lbuckets, lval, cval) = autojoin(left, center)
+    val (fullSrc, fullBuckets, bval, rval) =
+      autojoin(EnvT((Ann(lbuckets, UnitF), lsrc)).embed, right)
+
+    (fullSrc, fullBuckets, bval >> lval, bval >> cval, rval)
+  }
+
   def merge(left: Inner, right: Inner): State[NameGen, SrcMerge[Inner, Free[F, Unit]]] = {
     val lLin: Fs[Unit] = left.cata(linearize).reverse
     val rLin: Fs[Unit] = right.cata(linearize).reverse
@@ -160,16 +180,36 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
         makeBasicTheta(merged, left, right).map(out)
     }
 
+  def concatBuckets(buckets: List[FreeMap[T]]): (FreeMap[T], List[FreeMap[T]]) =
+    (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b))): _*),
+      buckets.zipWithIndex.map(p =>
+        Free.roll(ProjectIndex[T, FreeMap[T]](
+          UnitF[T],
+          IntLit[T, Unit](p._2)))))
+
+  def concat(l: FreeMap[T], r: FreeMap[T]):
+      State[NameGen, (FreeMap[T], FreeMap[T], FreeMap[T])] =
+    (freshName("lc") ⊛ freshName("rc"))((lname, rname) =>
+      (Free.roll(ConcatMaps[T, FreeMap[T]](
+        Free.roll(MakeMap[T, FreeMap[T]](StrLit[T, Unit](lname), l)),
+        Free.roll(MakeMap[T, FreeMap[T]](StrLit[T, Unit](rname), r)))),
+        Free.roll(ProjectField[T, FreeMap[T]](UnitF[T], StrLit[T, Unit](lname))),
+        Free.roll(ProjectField[T, FreeMap[T]](UnitF[T], StrLit[T, Unit](rname)))))
+
   def merge2Map(
-    values: Func.Input[Inner, nat._2])(
+    values: Func.Input[T[Target], nat._2])(
     func: (FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
-      QSState[QScriptCore[T, Inner]] =
-    mergeTheta[QScriptCore[T, Inner]](
-      values(0),
-      values(1),
-      { case SrcMerge(src, mfl, mfr) =>
-        Map(TJ.inj(src).embed, Free.roll(func(mfl, mfr)))
-      })
+      State[NameGen, Target[T[Target]]] = {
+    val (src, buckets, lval, rval) = autojoin(values(0), values(1))
+    val (bucks, newBucks) = concatBuckets(buckets)
+    concat(bucks, func(lval, rval).embed) ∘ {
+      case (merged, b, v) =>
+        EnvT((
+          Ann(newBucks.map(b >> _), v),
+          // NB: Does it matter what annotation we add to `src` here?
+          QC.inj(Map(EnvT((Ann(Nil, UnitF), src)).embed, merged))))
+    }
+  }
 
   def merge2Expansion(
     values: Func.Input[Inner, nat._2])(
@@ -329,22 +369,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       case set.Range => merge2Expansion(values)(Range(_, _))
     }
 
-  def invokeMapping1(func: UnaryFunc, values: Func.Input[Inner, nat._1]):
-      QScriptCore[T, Inner] =
-    Map(values(0), Free.roll(MapFunc.translateUnaryMapping(func)(UnitF)))
-
-  def invokeMapping2(
-    func: BinaryFunc,
-    values: Func.Input[Inner, nat._2]):
-      QSState[QScriptCore[T, Inner]] =
-    merge2Map(values)(MapFunc.translateBinaryMapping(func))
-
-  def invokeMapping3(
-    func: TernaryFunc,
-    values: Func.Input[Inner, nat._3]):
-      QSState[QScriptCore[T, Inner]] =
-    merge3Map(values)(MapFunc.translateTernaryMapping(func))
-
   val bucketable = implicitly[Bucketable.Aux[T, Bucketing[T, ?]]]
 
   def findBucket(inner: Inner):
@@ -431,17 +455,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
   val RootTarget: TargetRec = DeadEndTarget(Root)
   val EmptyTarget: TargetRec = DeadEndTarget(Empty)
 
+  def ProjectTarget(prefix: Target[T[Target]], field: FreeMap[T]) = {
+    val Ann(provenance, values) = prefix.ask
+    EnvT[Ann, F, T[Target]]((
+      Ann(Free.roll(ConcatArrays[T, FreeMap[T]](Free.roll(MakeArray[T, FreeMap[T]](UnitF[T])), Free.roll(MakeArray[T, FreeMap[T]](field)))) :: provenance, values),
+      PB.inj(BucketField(prefix.embed, field))))
+  }
 
   def pathToProj(path: pathy.Path[_, _, _]): TargetRec =
     pathy.Path.peel(path).fold[TargetRec](
       RootTarget) {
       case (p, n) =>
-        val str = StrLit(n.fold(_.value, _.value))
-        val prefix = pathToProj(p)
-        val Ann(provenance, values) = prefix.ask
-        EnvT[Ann, F, T[Target]]((
-          Ann(Free.roll(ConcatArrays(Free.roll(MakeArray(UnitF[T])), Free.roll(MakeArray(str)))) :: provenance, values),
-          PB.inj(BucketField(prefix.embed, str))))
+        ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
 
   // TODO error handling
@@ -492,7 +517,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
         .map(QC.inj)
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
-      stateT(QC.inj(invokeMapping1(func, Func.Input1(a1))))
+      stateT(QC.inj(
+        Map(a1, Free.roll(MapFunc.translateUnaryMapping(func)(UnitF)))))
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       mergeTheta[F[Inner]](a1, a2, {
@@ -508,11 +534,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
         if func.effect ≟ Mapping =>
-      invokeMapping2(func, Func.Input2(a1, a2)).map(QC.inj)
+      merge2Map(Func.Input2(a1, a2))(MapFunc.translateBinaryMapping(func))
+        .map(QC.inj)
 
     case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
-      invokeMapping3(func, Func.Input3(a1, a2, a3)).map(QC.inj)
+      merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(func))
+        .map(QC.inj)
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>

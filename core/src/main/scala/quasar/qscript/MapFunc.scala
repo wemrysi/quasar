@@ -459,6 +459,19 @@ object MapFuncs {
   final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]
 
+  object IntLit {
+    def apply[T[_[_]]: Corecursive, A](i: BigInt): Free[MapFunc[T, ?], A] =
+      Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](ExtEJson.inj(ejson.Int[T[EJson]](i)).embed))
+
+    def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Option[BigInt] = mf.resume.fold ({
+      case Nullary(ej) => ExtEJson.prj(ej.project).flatMap {
+        case ejson.Int(i) => i.some
+        case _ => None
+      }
+      case _ => None
+    }, _ => None)
+  }
+
   object StrLit {
     def apply[T[_[_]]: Corecursive, A](str: String): Free[MapFunc[T, ?], A] =
       Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Str[T[EJson]](str)).embed))
