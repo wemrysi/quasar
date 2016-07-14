@@ -23,6 +23,7 @@ import quasar.fp._
 import quasar.qscript._
 
 import matryoshka._, TraverseT.ops._
+import matryoshka.patterns._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.iteratee._
@@ -49,7 +50,7 @@ object QueryFile {
     */
   val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptProject[Fix, ?]] =
     _.transCataM(qscript.lpToQScript).evalZero.map(
-      _.transCata(optimize.applyAll))
+      _.transCata(((_: EnvT[Ann[Fix], QScriptProject[Fix, ?], Fix[QScriptProject[Fix, ?]]]).lower) ⋙ optimize.applyAll))
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.

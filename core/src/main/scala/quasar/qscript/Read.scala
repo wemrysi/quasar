@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.fp._
 
+import matryoshka._
 import monocle.macros.Lenses
 import pathy.Path._
 import scalaz._, Scalaz._

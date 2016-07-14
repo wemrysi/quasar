@@ -103,8 +103,8 @@ object SourcedPathable {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann, SourcedPathable[IT, ?], Unit],
-        p2: EnvT[Ann, SourcedPathable[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Unit],
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Unit]) =
         OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
     }
 

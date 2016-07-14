@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -82,8 +83,8 @@ object ThetaJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann, ThetaJoin[IT, ?], Unit],
-        p2: EnvT[Ann, ThetaJoin[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Unit],
+        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Unit]) =
         OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
     }
 

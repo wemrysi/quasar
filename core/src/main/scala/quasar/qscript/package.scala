@@ -18,10 +18,13 @@ package quasar
 
 import quasar.Predef._
 import quasar.Planner._
+import quasar.fp._
 import quasar.namegen._
 
 import scala.Predef.implicitly
 
+import matryoshka._
+import matryoshka.patterns._
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -31,7 +34,7 @@ import scalaz._, Scalaz._
   * here, and autojoin_d has been replaced with a lower-level join operation
   * that doesn’t include the cross portion.
   */
-package object qscript {
+package object qscript extends LowPriorityImplicits {
   type Pathable[T[_[_]], A] = Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
   /** These are the operations included in all forms of QScript.
@@ -84,6 +87,12 @@ package object qscript {
   type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
 
   case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+
+  object Ann {
+    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
+      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+  }
+
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, UnitF[T])
 
   def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
@@ -91,4 +100,29 @@ package object qscript {
   final case class SrcMerge[A, B](src: A, left: B, right: B)
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+
+  // TODO: move to matryoshka
+
+  implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
+    CoEnv.bifunctor[F].rightFunctor
+
+  implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
+      Delay[Equal, EnvT[E, F, ?]] =
+    new Delay[Equal, EnvT[E, F, ?]] {
+      def apply[A](eq: Equal[A]) =
+        Equal.equal {
+          case (env1, env2) =>
+            env1.ask ≟ env2.ask && F(eq).equal(env1.lower, env2.lower)
+        }
+    }
+
+  def envtHmap[F[_], G[_], E, A](env: EnvT[E, F, A])(f: F ~> G): EnvT[E, G, A] =
+    EnvT((env.ask, f(env.lower)))
+}
+
+abstract class LowPriorityImplicits {
+  // TODO: move to matryoshka
+
+  implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
+    CoEnv.bitraverse[F, Unit].rightTraverse
 }

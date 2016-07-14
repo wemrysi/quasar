@@ -18,10 +18,11 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.namegen._
-import quasar.qscript.MapFuncs._
+// import quasar.namegen._
+// import quasar.qscript.MapFuncs._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
@@ -145,8 +146,8 @@ object QScriptCore {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann, QScriptCore[IT, ?], Unit],
-        p2: EnvT[Ann, QScriptCore[IT, ?], Unit]) = ???
+        p1: EnvT[Ann[T], QScriptCore[IT, ?], Unit],
+        p2: EnvT[Ann[T], QScriptCore[IT, ?], Unit]) = ???
         // OptionT((p1, p2) match {
         //   case (Map(_, m1), Map(_, m2)) => for {
         //     lname <- freshName("leftMap")

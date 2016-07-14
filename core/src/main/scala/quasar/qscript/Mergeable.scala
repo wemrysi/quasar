@@ -17,11 +17,13 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.fp._
 import quasar.namegen._
 
+import matryoshka._
 import matryoshka.patterns._
 import simulacrum.typeclass
-import scalaz._
+import scalaz._, Scalaz._
 
 @typeclass trait Mergeable[F[_]] {
   type IT[F[_]]
@@ -33,7 +35,7 @@ import scalaz._
 object Mergeable {
   type Aux[T[_[_]], F[_]] = Mergeable[F] { type IT[F[_]] = T[F] }
 
-  implicit def const[T[_[_]]]: Mergeable.Aux[T, Const[DeadEnd, ?]] =
+  implicit def const[T[_[_]]: EqualT]: Mergeable.Aux[T, Const[DeadEnd, ?]] =
     new Mergeable[Const[DeadEnd, ?]] {
       type IT[F[_]] = T[F]
 

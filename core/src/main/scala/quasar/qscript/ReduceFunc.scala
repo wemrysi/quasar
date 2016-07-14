@@ -17,9 +17,9 @@
 package quasar.qscript
 
 import quasar._
-import quasar.fp._
 import quasar.std.StdLib._
 
+import matryoshka._
 import scalaz._, Scalaz._
 
 sealed trait ReduceFunc[A]

@@ -35,7 +35,7 @@ object Dependencies {
     "io.argonaut"       %% "argonaut-scalaz"           % argonautVersion         % "compile, test",
     "org.jboss.aesh"    %  "aesh"                      % "0.66.8"                % "compile, test",
     "org.typelevel"     %% "shapeless-scalaz"          % slcVersion              % "compile, test",
-    "com.slamdata"      %% "matryoshka-core"           % "0.11.0"                % "compile",
+    "com.slamdata"      %% "matryoshka-core"           % "0.11.1"                % "compile",
     "com.slamdata"      %% "pathy-core"                % pathyVersion            % "compile",
     "com.slamdata"      %% "pathy-argonaut"            % pathyVersion            % "compile",
     "com.github.mpilquist" %% "simulacrum"             % "0.7.0"                 % "compile, test",
