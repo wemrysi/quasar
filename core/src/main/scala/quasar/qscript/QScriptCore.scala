@@ -138,51 +138,59 @@ object QScriptCore {
         }
     }
 
-  implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
+  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
+        left: FreeMap[T],
+        right: FreeMap[T],
         p1: EnvT[Ann[T], QScriptCore[IT, ?], Unit],
-        p2: EnvT[Ann[T], QScriptCore[IT, ?], Unit]) = ???
-        // OptionT((p1, p2) match {
-        //   case (Map(_, m1), Map(_, m2)) => for {
-        //     lname <- freshName("leftMap")
-        //     rname <- freshName("rightMap")
-        //   } yield {
-        //     val lf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(lname)))
-        //     val rf = Free.roll[MapFunc[IT, ?], Unit](ProjectField(UnitF[IT], StrLit(rname)))
+        p2: EnvT[Ann[T], QScriptCore[IT, ?], Unit]) =
+        (p1, p2) match {
+          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](p1, left, right).some
+          case (EnvT((Ann(b1, v1), Map(_, m1))),
+                EnvT((Ann(_,  v2), Map(_, m2)))) =>
+            // TODO: optimize cases where one side is a subset of the other
+            val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
+            val (buck, newBuckets) = concatBuckets(b1.map(_ >> m1))
+            val (full, buckAccess, valAccess) = concat(buck, mf)
+            SrcMerge(
+              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map((), full): QScriptCore[T, Unit])),
+              lv,
+              rv).some
 
-        //     SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](Map((), Free.roll[MapFunc[IT, ?], Unit](
-        //       ConcatMaps(
-        //         Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(lname), rebase(m1, left))),
-        //         Free.roll[MapFunc[IT, ?], Unit](MakeMap(StrLit(rname), rebase(m2, right)))))),
-        //       lf, rf).some
-        //   }
-        //   case (t1, t2) if t1 ≟ t2 =>
-        //     state(SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](t1, UnitF, UnitF).some)
-        //   case (Reduce(_, bucket1, func1, rep1), Reduce(_, bucket2, func2, rep2)) => {
-        //     val mapL = rebase(bucket1, left)
-        //     val mapR = rebase(bucket2, right)
+          case (EnvT((Ann(b1, v1), Reduce(_, bucket1, func1, rep1))),
+                EnvT((Ann(b2, v2), Reduce(_, bucket2, func2, rep2)))) =>
+            val funcL = func1.map(_.map(_ >> left))
+            val funcR = func1.map(_.map(_ >> right))
+            // val (newRep, lrep, rrep) = concat(rep1, rep2.map(_ + func1.length))
+            val mapL = bucket1 >> left
+            val mapR = bucket2 >> right
 
-        //     state((mapL ≟ mapR).option(
-        //       SrcMerge[QScriptCore[IT, Unit], FreeMap[IT]](
-        //         Reduce((), mapL, func1 // ++ func2 // TODO: append Sizeds
-        //           , rep1),
-        //         UnitF,
-        //         UnitF)))
-        //   }
-        //   case (_, _) =>
-        //     state((p1 ≟ p2).option(SrcMerge(p1, left, right)))
-        // })
+            (mapL ≟ mapR).option(
+              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](
+                EnvT((Ann(b1, UnitF),
+                  Reduce((),
+                    mapL,
+                    // FIXME: Concat these things!
+                    func1, // for { f1 <- funcL; f2 <- funcR } yield f1 ++ f2,
+                    rep1 // newRep
+                  ): QScriptCore[T, Unit])),
+                UnitF, // lrep,
+                UnitF // rrep
+              ))
+
+          case (_, _) => None
+        }
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Normalizable[QScriptCore[T, ?]] =
     new Normalizable[QScriptCore[T, ?]] {
+      val opt = new Optimize[T]
+
       def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
         def apply[A](qc: QScriptCore[T, A]) = qc match {
           case Map(src, f) => Map(src, normalizeMapFunc(f))
@@ -194,13 +202,13 @@ object QScriptCore {
           case Take(src, from, count) =>
             Take(
               src,
-              from.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
-              count.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize))
+              from.mapSuspension(opt.applyToFreeQS),
+              count.mapSuspension(opt.applyToFreeQS))
           case Drop(src, from, count) =>
             Drop(
               src,
-              from.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
-              count.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize))
+              from.mapSuspension(opt.applyToFreeQS),
+              count.mapSuspension(opt.applyToFreeQS))
         }
       }
     }

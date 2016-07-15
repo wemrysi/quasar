@@ -36,18 +36,14 @@ import simulacrum.typeclass
       .cata(CoEnv.freeIso[A, MapFunc[T, ?]].get)
 }
 
-trait NormalizableInstances0 {
-  /** This case matches _everything_. I.e., if something _isn’t_ normalizable,
-    * then normalization is identity.
-    */
-  implicit def default[F[_]]: Normalizable[F] = new Normalizable[F] {
-    def normalize = new (F ~> F) {
-      def apply[A](sp: F[A]) = sp
+trait NormalizableInstances {
+  implicit def const[A]: Normalizable[Const[A, ?]] =
+    new Normalizable[Const[A, ?]] {
+      def normalize = new (Const[A, ?] ~> Const[A, ?]) {
+        def apply[B](const: Const[A, B]) = const
+      }
     }
-  }
-}
 
-trait NormalizableInstances extends NormalizableInstances0 {
   implicit def coproduct[F[_], G[_]](
     implicit F: Normalizable[F], G: Normalizable[G]):
       Normalizable[Coproduct[F, G, ?]] =

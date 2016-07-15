@@ -17,14 +17,13 @@
 package quasar
 
 import quasar.Predef._
-import quasar.Planner._
 import quasar.fp._
-import quasar.namegen._
 
 import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.patterns._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -84,9 +83,7 @@ package object qscript extends LowPriorityImplicits {
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
-  type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
-
-  case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
+  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
 
   object Ann {
     implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
@@ -100,6 +97,24 @@ package object qscript extends LowPriorityImplicits {
   final case class SrcMerge[A, B](src: A, left: B, right: B)
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+
+  import MapFunc._
+  import MapFuncs._
+
+  def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
+      (FreeMap[T], List[FreeMap[T]]) =
+    (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
+      buckets.zipWithIndex.map(p =>
+        Free.roll(ProjectIndex[T, FreeMap[T]](
+          UnitF[T],
+          IntLit[T, Unit](p._2)))))
+
+  def concat[T[_[_]]: Corecursive, A](
+    l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
+      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0))),
+      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1))))
 
   // TODO: move to matryoshka
 
@@ -116,8 +131,14 @@ package object qscript extends LowPriorityImplicits {
         }
     }
 
-  def envtHmap[F[_], G[_], E, A](env: EnvT[E, F, A])(f: F ~> G): EnvT[E, G, A] =
-    EnvT((env.ask, f(env.lower)))
+  def envtHmap[F[_], G[_], E, A](f: F ~> G): EnvT[E, F, ?] ~> EnvT[E, G, ?] =
+    new (EnvT[E, F, ?] ~> EnvT[E, G, ?]) {
+      def apply[A](env: EnvT[E, F, A]) = EnvT((env.ask, f(env.lower)))
+    }
+
+  def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
+    def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
+  }
 }
 
 abstract class LowPriorityImplicits {

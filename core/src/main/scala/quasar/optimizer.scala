@@ -61,6 +61,15 @@ object Optimizer {
     case _ => None
   }
 
+  /** Like `simplifyƒ`, but eliminates _all_ `Let` (and any bound `Free`) nodes.
+    */
+  def elideLets[T[_[_]]: Recursive: FunctorT]:
+      LogicalPlan[T[LogicalPlan]] => Option[LogicalPlan[T[LogicalPlan]]] = {
+    case LetF(ident, form, in) =>
+      in.transPara(inlineƒ(ident, form.project)).project.some
+    case _ => None
+  }
+
   def simplify(t: Fix[LogicalPlan]): Fix[LogicalPlan] = t.transCata(repeatedly(simplifyƒ))
 
   val namesƒ: Algebra[LogicalPlan, Set[Symbol]] = {

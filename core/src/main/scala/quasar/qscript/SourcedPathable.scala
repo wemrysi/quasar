@@ -105,16 +105,24 @@ object SourcedPathable {
         right: FreeMap[IT],
         p1: EnvT[Ann[T], SourcedPathable[IT, ?], Unit],
         p2: EnvT[Ann[T], SourcedPathable[IT, ?], Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
+        // TODO: Merge two LeftShifts with different repair functions
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Normalizable[SourcedPathable[T, ?]] =
     new Normalizable[SourcedPathable[T, ?]] {
+      val opt = new Optimize[T]
+
       def normalize = new (SourcedPathable[T, ?] ~> SourcedPathable[T, ?]) {
         def apply[A](sp: SourcedPathable[T, A]) = sp match {
-          case LeftShift(src, s, r) => LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
-          case Union(src, l, r) => Union(src, l.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize), r.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize))
+          case LeftShift(src, s, r) =>
+            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
+          case Union(src, l, r) =>
+            Union(
+              src,
+              l.mapSuspension(opt.applyToFreeQS),
+              r.mapSuspension(opt.applyToFreeQS))
         }
       }
     }

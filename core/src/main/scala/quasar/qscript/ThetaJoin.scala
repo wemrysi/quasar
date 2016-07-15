@@ -85,18 +85,21 @@ object ThetaJoin {
         right: FreeMap[IT],
         p1: EnvT[Ann[T], ThetaJoin[IT, ?], Unit],
         p2: EnvT[Ann[T], ThetaJoin[IT, ?], Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
+        // TODO: merge two joins with different combine funcs
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Normalizable[ThetaJoin[T, ?]] =
     new Normalizable[ThetaJoin[T, ?]] {
+      val opt = new Optimize[T]
+
       def normalize = new (ThetaJoin[T, ?] ~> ThetaJoin[T, ?]) {
         def apply[A](tj: ThetaJoin[T, A]) =
           ThetaJoin(
             tj.src,
-            tj.lBranch.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
-            tj.rBranch.mapSuspension(Normalizable[QScriptProject[T, ?]].normalize),
+            tj.lBranch.mapSuspension(opt.applyToFreeQS),
+            tj.rBranch.mapSuspension(opt.applyToFreeQS),
             normalizeMapFunc(tj.on),
             tj.f,
             normalizeMapFunc(tj.combine))

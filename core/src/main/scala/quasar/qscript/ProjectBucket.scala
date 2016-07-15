@@ -98,6 +98,19 @@ object ProjectBucket {
         right: FreeMap[IT],
         p1: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit],
         p2: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+    }
+
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+      Normalizable[ProjectBucket[T, ?]] =
+    new Normalizable[ProjectBucket[T, ?]] {
+      def normalize = new (ProjectBucket[T, ?] ~> ProjectBucket[T, ?]) {
+        def apply[A](pb: ProjectBucket[T, A]) = pb match {
+          case BucketField(a, v, f) =>
+            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(f))
+          case BucketIndex(a, v, i) =>
+            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(i))
+        }
+      }
     }
 }
