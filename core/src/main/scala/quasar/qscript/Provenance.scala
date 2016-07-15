@@ -25,35 +25,33 @@ import scalaz._, Scalaz._
 
 // NB: Should we use char lits instead?
 class Provenance[T[_[_]]: Corecursive] {
-  private def tagIdentity[A](tag: String, mf: Free[MapFunc[T, ?], A]) =
+  private def tagIdentity[A](tag: String, mf: Free[MapFunc[T, ?], A]):
+      Free[MapFunc[T, ?], A] =
     Free.roll(MakeMap[T, Free[MapFunc[T, ?], A]](StrLit(tag), mf))
 
   // provenances:
   // projectfield: f
   // projectindex: i
-  // join:         j []
+  // join:         j [] // should be commutative, but currently isn’t
   // nest:         n []
   // shiftmap:     m
   // shiftarray:   a
-  // unionleft:    l
-  // unionright:   r
   def projectField[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("f", mf)
   def projectIndex[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("i", mf)
   def shiftMap[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("m", mf)
   def shiftArray[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("a", mf)
-  def unionLeft[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("l", mf)
-  def unionRight[A](mf: Free[MapFunc[T, ?], A]) = tagIdentity("r", mf)
+
   def join[A](left: Free[MapFunc[T, ?], A], right: Free[MapFunc[T, ?], A]) =
     tagIdentity("j",
       Free.roll(ConcatArrays(
         Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](left)),
         Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](right)))))
+
   def nest[A](car: Free[MapFunc[T, ?], A], cadr: Free[MapFunc[T, ?], A]) =
     tagIdentity("n",
       Free.roll(ConcatArrays(
         Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](car)),
         Free.roll(MakeArray[T, Free[MapFunc[T, ?], A]](cadr)))))
-
 
   def joinProvenances(leftBuckets: List[FreeMap[T]], rightBuckets: List[FreeMap[T]]):
       List[JoinFunc[T]] =
@@ -69,8 +67,7 @@ class Provenance[T[_[_]]: Corecursive] {
       case \&/.Both(l, r) => (l, r)
       case \&/.This(l)    => (l, NullLit[T, Unit]())
       case \&/.That(r)    => (NullLit[T, Unit](), r)
-    }.map(_.bimap(unionLeft[Unit], unionRight[Unit])).unzip
-
+    }.unzip
 
   def nestProvenances(buckets: List[FreeMap[T]]): List[FreeMap[T]] =
     buckets match {
