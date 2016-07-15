@@ -60,7 +60,7 @@ object readfile {
     client: MongoClient
   )(implicit
     S0: Task :<: S,
-    S1: MongoErr :<: S
+    S1: PhysErr :<: S
   ): Task[MongoRead ~> Free[S, ?]] =
     TaskRef[ReadState]((0, Map.empty)) map { ref =>
       new (MongoRead ~> Free[S, ?]) {

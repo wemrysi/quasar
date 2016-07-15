@@ -19,6 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.SKI._
 import quasar.{EnvironmentError, EnvErrT}
+import quasar.fs._
 import quasar.physical.mongodb.execution._
 import quasar.physical.mongodb.workflowtask._
 import quasar.physical.mongodb.mongoiterable._
@@ -121,20 +122,17 @@ private[mongodb] object MongoDbIOWorkflowExecutor {
   val liftEnvErr: MongoDbIO ~> EnvErrT[MongoDbIO, ?] =
     new (MongoDbIO ~> EnvErrT[MongoDbIO, ?]) {
       def apply[A](m: MongoDbIO[A]) = EitherT(m.attemptMongo.run flatMap {
-        case -\/(ex: MongoSocketOpenException) =>
-          connectionFailed(ex.getMessage).left.point[MongoDbIO]
-
-        case -\/(ex: MongoSocketException) =>
-          connectionFailed(ex.getMessage).left.point[MongoDbIO]
-
-        case -\/(ex) if ex.getMessage contains "Command failed with error 18: 'auth failed'" =>
-          invalidCredentials(ex.getMessage).left.point[MongoDbIO]
-
-        case -\/(ex) =>
-          MongoDbIO.fail(ex)
-
-        case \/-(a) =>
-          a.right.point[MongoDbIO]
+        case -\/(UnhandledFSError(ex)) => ex match {
+          case _: MongoSocketOpenException =>
+            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+          case _: MongoSocketException =>
+            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+          case _ =>
+            if (ex.getMessage contains "Command failed with error 18: 'auth failed'")
+              invalidCredentials(ex.getMessage).left.point[MongoDbIO]
+            else MongoDbIO.fail(ex)
+        }
+        case \/-(a) => a.right.point[MongoDbIO]
       })
     }
 }

@@ -152,30 +152,27 @@ lazy val oneJarSettings =
         commitReleaseVersion,
         pushChanges))
 
-//      foundation
-//     / / | | \ \
-//
-//        ejson
-//          |
-//        core
-//        /   \
-// mongodb    «other backends»
-//        \   /
-//        main
-//        /  \
-//    repl    web
-//        \  /
-//         it
-//          |
-//        root
-
-// common components
-
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(noPublishSettings)
-  .aggregate(foundation, ejson, core, mongodb, main, repl, web, it)
+  .aggregate(
+        foundation,
+//     / / | | \ \
+//
+          ejson,
+//          |
+          core,
+//        /   \
+   mongodb,    skeleton,
+//        \   /
+          main,
+//        /  \
+      repl,   web,
+//        \  /
+           it)
   .enablePlugins(AutomateHeaderPlugin)
+
+// common components
 
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
@@ -208,7 +205,9 @@ lazy val core = project
 
 lazy val main = project
   .settings(name := "quasar-main-internal")
-  .dependsOn(mongodb % "test->test;compile->compile")
+  .dependsOn(
+    mongodb  % "test->test;compile->compile",
+    skeleton % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
@@ -220,6 +219,15 @@ lazy val mongodb = project
   .dependsOn(core % "test->test;compile->compile")
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
+  .settings(libraryDependencies +=
+    "org.mongodb" % "mongodb-driver-async" % "3.2.2")
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val skeleton = project
+  .settings(name := "quasar-skeleton-internal")
+  .dependsOn(core % "test->test;compile->compile")
+  .settings(oneJarSettings: _*)
+  // .settings(publishSettings: _*) // NB: uncomment this line when you copy it
   .enablePlugins(AutomateHeaderPlugin)
 
 // frontends

@@ -18,11 +18,10 @@ package quasar
 
 import quasar.api._
 import quasar.fp._, free._
-import quasar.fs.FileSystemError
+import quasar.fs.{FileSystemError, PhysicalError}
 import quasar.fs.mount.MountConfigs
 import quasar.main._
 
-import com.mongodb.MongoException
 import org.http4s.Response
 import scalaz.{~>, EitherT, Monad}
 import scalaz.concurrent.Task
@@ -31,8 +30,8 @@ package object server {
   def toResponseIOT[F[_]: Monad](
     eval: MountConfigs ~> F
   ): CfgsErrs ~> ResponseIOT[F, ?] = {
-    failureResponseIOT[F, FileSystemError]                       :+:
-    failureResponseIOT[F, MongoException]                        :+:
+    failureResponseIOT[F, FileSystemError] :+:
+    failureResponseIOT[F, PhysicalError]   :+:
     (liftMT[F, EitherT[?[_], Task[Response], ?]] compose eval)
   }
 

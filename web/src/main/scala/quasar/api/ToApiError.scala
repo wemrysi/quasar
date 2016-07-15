@@ -26,11 +26,10 @@ import quasar.sql._
 
 import argonaut._, Argonaut._
 import argonaut.ArgonautScalaz._
-import com.mongodb.MongoException
 import org.http4s._, Status._
 import pathy.Path._
 import pathy.argonaut.PosixCodecJson._
-import scalaz.NonEmptyList
+import scalaz.{NonEmptyList, Scalaz}, Scalaz._
 
 abstract class ToApiError[A] {
   def toApiError(a: A): ApiError
@@ -92,7 +91,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           reason,
           det.toList : _*)            :+
         ("logicalPlan" :=  lp.render) :?+
-        ("cause"       :?= cause.map(_.getMessage))
+        ("cause"       :?= cause.map(_.shows))
       case PathErr(e) =>
         e.toApiError
       case PlanningFailed(lp, e) =>
@@ -122,6 +121,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         ) :?+ ("data" :?= encodeData(data))
     }
   }
+
+  implicit def physicalErrorToApiError: ToApiError[PhysicalError] =
+    error(err => fromMsg_(
+      InternalServerError withReason "Physical filesystem error.",
+      err.shows))
 
   implicit def mountingErrorToApiError: ToApiError[MountingError] = {
     import MountingError._, PathError.InvalidPath
@@ -355,11 +359,6 @@ sealed abstract class ToApiErrorInstances0 {
           "requestedMediaType"  := messageType.renderString,
           "supportedMediaTypes" := expectedMediaTypes.map(_.renderString))
     }
-
-  implicit def mongoExceptionToApiError: ToApiError[MongoException] =
-    error(merr => fromMsg_(
-      InternalServerError withReason "MongoDB error.",
-      merr.getMessage))
 
   implicit def nonEmptyListToApiError[A: ToApiError]: ToApiError[NonEmptyList[A]] =
     error { nel =>

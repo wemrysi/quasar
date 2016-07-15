@@ -17,12 +17,11 @@
 package quasar.physical
 
 import quasar.Predef.Vector
-import quasar.effect.Failure
 import quasar.javascript.Js
+import quasar.fs.PhysicalError
 import quasar.namegen._
 import quasar.qscript._
 
-import com.mongodb.MongoException
 import com.mongodb.async.AsyncBatchCursor
 import org.bson.BsonDocument
 import scalaz._
@@ -30,8 +29,7 @@ import scalaz._
 package object mongodb {
   type BsonCursor         = AsyncBatchCursor[BsonDocument]
 
-  type MongoErr[A]        = Failure[MongoException, A]
-  type MongoErrT[F[_], A] = EitherT[F, MongoException, A]
+  type MongoErrT[F[_], A] = EitherT[F, PhysicalError, A]
 
   type WorkflowExecErrT[F[_], A] = EitherT[F, WorkflowExecutionError, A]
 

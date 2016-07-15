@@ -25,7 +25,7 @@ import argonaut._
 import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
-package object fs {
+package object fs extends PhysicalErrorPrisms {
   type FileSystem0[A] = Coproduct[WriteFile, ManageFile, A]
   type FileSystem1[A] = Coproduct[ReadFile, FileSystem0, A]
   type FileSystem[A]  = Coproduct[QueryFile, FileSystem1, A]
@@ -59,6 +59,8 @@ package object fs {
 
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
+
+  type PhysErr[A] = Failure[PhysicalError, A]
 
   def interpretFileSystem[M[_]](
     q: QueryFile ~> M,
