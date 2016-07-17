@@ -254,6 +254,8 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
     type SortingKey    = Array[Byte]
     type SortBlockData = BlockProjectionData[SortingKey, Slice]
 
+    lazy val sortMergeEngine = new MergeEngine[SortingKey, SortBlockData] {}
+
     sealed trait SliceSorter {
       def name: String
       // def keyComparator: Comparator[SortingKey]
@@ -311,8 +313,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
     }
 
     case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[(SliceTransform1[_], String)])
-
-    private[BlockStoreColumnarTableModule] object sortMergeEngine extends MergeEngine[SortingKey, SortBlockData]
 
     object addGlobalIdScanner extends CScanner {
       type A = Long
