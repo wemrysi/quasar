@@ -20,10 +20,10 @@ package json
 import org.scalacheck._
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
-import scalaz.Ordering._
+import scalaz._, Scalaz._, Ordering._
 
 object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
-  // override val defaultPrettyParams = Pretty.Params(2)
+  override val defaultPrettyParams = Pretty.Params(2)
 
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
@@ -157,7 +157,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       JPath(".fn[0].fr") -> JNum("-2")
     )
 
-    test.flattenWithPath must_== expected
+    test.flattenWithPath.sorted must_== expected
   }
 
   "unflatten is the inverse of flattenWithPath" in {
@@ -166,9 +166,9 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
     check(inverse)
   }
 
-  // "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
-  //   runArbitraryPathSpec
-  // }
+  "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
+    runArbitraryPathSpec
+  }
 
   "sort arrays" in {
     import scalaz.Order

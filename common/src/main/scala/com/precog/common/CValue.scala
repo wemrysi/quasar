@@ -552,7 +552,7 @@ case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
 case object CNum extends CNumericType[BigDecimal] {
   val manifest: Manifest[BigDecimal] = implicitly[Manifest[BigDecimal]]
   def readResolve()                         = CNum
-  def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalInstance.order(v1, v2)
+  def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def jValueFor(v: BigDecimal)              = JNum(v)
   def bigDecimalFor(v: BigDecimal)          = v
 }

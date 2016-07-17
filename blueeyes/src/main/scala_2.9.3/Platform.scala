@@ -14,6 +14,11 @@ package blueeyesstubs {
     val Promise           = akka.dispatch.Promise
     val Duration          = akka.util.Duration
 
+    type BigDecimal = scala.math.BigDecimal
+    val BigDecimal  = scala.math.BigDecimal
+
+    implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] = Scalaz.bigDecimalInstance
+
     def futureMonad(ec: ExecutionContext): Monad[Future] = new blueeyes.FutureMonad(ec)
   }
 }

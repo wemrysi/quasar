@@ -27,11 +27,9 @@ import com.precog.yggdrasil._
 
 import scalaz._
 
-trait RandomLibSpecs[M[+_]] extends EvaluatorSpecification[M]
-    with LongIdMemoryDatasetConsumer[M] { self =>
+trait RandomLibSpecs[M[+_]] extends EvaluatorSpecification[M] with LongIdMemoryDatasetConsumer[M] { self =>
 
   import Function._
-
   import dag._
   import instructions._
   import library._

@@ -65,6 +65,11 @@ object HetOrder extends HetOrderLow {
   * Extra SpireOrders that fill out the rest of our value types.
   */
 object ExtraOrders {
+  implicit object BigDecimalOrder extends SpireOrder[BigDecimal] {
+    def eqv(a: BigDecimal, b: BigDecimal)     = a == b
+    def compare(a: BigDecimal, b: BigDecimal) = bigDecimalOrder.order(a, b).toInt
+  }
+
   implicit object BooleanOrder extends SpireOrder[Boolean] {
     def eqv(a: Boolean, b: Boolean)     = a == b
     def compare(a: Boolean, b: Boolean) = if (a == b) 0 else if (a) 1 else -1

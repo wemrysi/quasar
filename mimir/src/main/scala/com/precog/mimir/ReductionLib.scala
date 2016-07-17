@@ -52,7 +52,7 @@ class LongAdder {
       t = x
     }
   }
-  def total(): BigDecimal = ts.sum + t
+  def total(): BigDecimal = ts.foldLeft(BigDecimal(0))(_ + _) + t
 }
 
 trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {

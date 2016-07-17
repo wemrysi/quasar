@@ -27,11 +27,9 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._, Arbitrary._
 import scalaz._
+import PrecogScalacheck._
 
 trait SegmentFormatSupport {
-  // import Gen._
-  // import Arbitrary.arbitrary
-
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_)))
 
@@ -50,17 +48,14 @@ trait SegmentFormatSupport {
   }
 
   def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {
-    case CPeriod => arbitrary[Long].map(new Period(_))
-    case CBoolean => arbitrary[Boolean]
-    case CString => arbitrary[String]
-    case CLong => arbitrary[Long]
-    case CDouble => arbitrary[Double]
-    case CNum => arbitrary[BigDecimal]
-    case CDate => arbitrary[Long] map (new DateTime(_))
-    case CArrayType(elemType: CValueType[a]) =>
-      val list: Gen[List[a]] = listOf(genForCType(elemType))
-      val array: Gen[Array[a]] = list map (_.toArray(elemType.manifest))
-      array
+    case CPeriod          => arbitrary[Long].map(new Period(_))
+    case CBoolean         => arbitrary[Boolean]
+    case CString          => arbitrary[String]
+    case CLong            => arbitrary[Long]
+    case CDouble          => arbitrary[Double]
+    case CNum             => arbitrary[BigDecimal]
+    case CDate            => arbitrary[Long] map (new DateTime(_))
+    case CArrayType(elem) => arrayOf(genForCType(elem))(elem.manifest)
   }
 
   def genCValueType(maxDepth: Int = 2): Gen[CValueType[_]] = {

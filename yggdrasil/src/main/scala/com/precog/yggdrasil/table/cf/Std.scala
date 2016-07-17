@@ -21,6 +21,7 @@ package com.precog.yggdrasil
 package table
 package cf
 
+import blueeyes._
 import com.precog.util.NumericComparisons
 
 object std {

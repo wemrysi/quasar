@@ -23,6 +23,7 @@ package mimir
 import yggdrasil._
 import yggdrasil.table._
 
+import blueeyes._
 import bytecode._
 import common._
 import com.precog.util._

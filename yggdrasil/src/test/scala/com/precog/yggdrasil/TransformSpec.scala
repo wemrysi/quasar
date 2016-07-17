@@ -223,7 +223,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val expected = data flatMap { jv =>
       (jv \ "value") match {
         case JNum(x) if x % 2 == 0 => Some(jv)
-        case _ => None
+        case _                     => None
       }
     }
 

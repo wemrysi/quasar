@@ -1,7 +1,7 @@
 package blueeyes
 package json.serialization
 
-import blueeyes._, json._
+import json._
 import java.util.{ Date => JDate }
 import java.math.MathContext
 

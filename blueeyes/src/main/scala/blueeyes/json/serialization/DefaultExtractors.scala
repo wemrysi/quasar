@@ -5,7 +5,6 @@ import blueeyes.json._
 import Extractor._
 
 import java.util.{ Date => JDate }
-import scala.math.BigDecimal
 import org.joda.time.{ DateTime, DateTimeZone }
 
 import scalaz._

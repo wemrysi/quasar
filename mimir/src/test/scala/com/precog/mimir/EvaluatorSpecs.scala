@@ -574,7 +574,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(237 + 22 + (237.0 / 22))
+        result2 must contain(237 + 22 + (BigDecimal(237.0) / 22))
       }
     }
 

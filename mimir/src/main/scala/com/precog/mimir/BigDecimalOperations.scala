@@ -19,6 +19,8 @@
  */
 package com.precog.mimir
 
+import blueeyes._
+
 object BigDecimalOperations {
 
   /**

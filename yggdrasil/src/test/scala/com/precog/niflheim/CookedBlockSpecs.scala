@@ -60,7 +60,7 @@ trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentF
       ))
     }
 
-    "roundtrip arbitrary blocks" in skipped /*{
+    "roundtrip arbitrary blocks" in false.pendingUntilFixed /*{
       check { files: List[(SegmentId, File)] =>
         surviveRoundTrip(format)(CookedBlockMetadata(999L, files.length, files.toArray))
       }.set(maxDiscarded -> 2000)

@@ -20,10 +20,11 @@ package json
 import org.scalacheck._
 import Gen._
 import Arbitrary.arbitrary
+import PrecogScalacheck._
 
 trait ArbitraryJValue {
   def genJValue: Gen[JValue]   = frequency((5, genSimple), (1, wrap(genArray)), (1, wrap(genObject)))
-  def genJNum: Gen[JNum]       = arbitrary[BigDecimal].map(JNum(_))
+  def genJNum: Gen[JNum]       = genBigDecimal map (JNum(_))
   def genJBool: Gen[JBool]     = arbitrary[Boolean].map(JBool(_))
   def genJString: Gen[JString] = alphaStr.map(JString(_))
   def genSimple: Gen[JValue]   = oneOf(value(JNull), genJNum, genJBool, genJString)
