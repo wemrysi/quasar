@@ -150,6 +150,10 @@ object Codec {
 
   private val byteBufferPool = new ByteBufferPool()
 
+  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]) = new IndexedSeqCodec(elemCodec)
+
+  implicit def arrayCodec[@spec(Boolean, Long, Double) A: Codec: Manifest]: Codec[Array[A]] = ArrayCodec(Codec[A])
+
   /**
     * A utility method for getting the encoded version of `a` as an array of
     * bytes.
@@ -529,11 +533,6 @@ object Codec {
       }
     }
   }
-
-  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]) = new IndexedSeqCodec(elemCodec)
-
-  implicit def arrayCodec[@spec(Boolean, Long, Double) A: Codec: Manifest]: Codec[Array[A]] = ArrayCodec(Codec[A])
-
   case class ArrayCodec[@spec(Boolean, Long, Double) A: Manifest](elemCodec: Codec[A]) extends Codec[Array[A]] {
     type S = Either[Array[A], (elemCodec.S, Array[A], Int)]
 

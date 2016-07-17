@@ -26,10 +26,7 @@ import blueeyes.json._
 import blueeyes.json.serialization._
 
 import org.specs2.mutable.Specification
-
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
+import scalaz._, Scalaz._
 
 class JobQueryLoggerSpec extends Specification {
   import JobManager._
@@ -37,7 +34,7 @@ class JobQueryLoggerSpec extends Specification {
 
   def withReport[A](f: JobQueryLogger[Need, Unit] => A): A = {
     f(new JobQueryLogger[Need, Unit] with TimingQueryLogger[Need, Unit] {
-      val M = Need.need
+      implicit val M: Monad[Need] with Comonad[Need] = Need.need
       val clock = Clock.System
       val jobManager = new InMemoryJobManager[Need]
       val jobId = jobManager.createJob("password", "error-report-spec", "hard", None, Some(clock.now())).copoint.id

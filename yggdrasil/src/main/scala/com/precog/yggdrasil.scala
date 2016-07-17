@@ -25,9 +25,6 @@ package object yggdrasil {
   val HLogEnd  = org.objectweb.howl.log.LogRecordType.END_OF_LOG
   val HLogUser = org.objectweb.howl.log.LogRecordType.USER
 
-  // spire vs. scalaz order
-  type SpireOrder[A] = spire.math.Order[A]
-
   type Identity   = Long
   type Identities = Array[Identity]
   object Identities {

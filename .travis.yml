@@ -1,6 +1,8 @@
 sudo: false
 language: scala
-scala: 2.9.3
+scala:
+ - 2.9.3
+ - 2.10.6
 jdk: oraclejdk7
 script: ./bin/tests
 

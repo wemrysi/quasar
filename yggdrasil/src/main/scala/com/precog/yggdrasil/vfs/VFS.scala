@@ -47,14 +47,7 @@ import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
 
-import scalaz._
-import scalaz.EitherT._
-import scalaz.std.stream._
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.option._
-import scalaz.syntax.std.list._
+import scalaz._, Scalaz._, EitherT._
 import scalaz.effect.IO
 
 sealed trait Version

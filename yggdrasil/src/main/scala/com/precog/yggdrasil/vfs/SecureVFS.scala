@@ -35,16 +35,7 @@ import blueeyes.util.Clock
 import java.util.UUID
 import org.slf4s.Logging
 
-import scalaz._
-import scalaz.NonEmptyList.nels
-import scalaz.std.string._
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.show._
-import scalaz.syntax.traverse._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.std.list._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
 import scalaz.effect.IO
 import scala.math.Ordered._
 

@@ -21,17 +21,11 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.bytecode._
-import blueeyes._
 import com.precog.common._
 import scala.util.Random
 
-import blueeyes.json._
-
-import scalaz.StreamT
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
-import scalaz.std.string._
-
+import blueeyes._, json._
+import scalaz._, Scalaz._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 

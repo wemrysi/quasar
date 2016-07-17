@@ -20,18 +20,16 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
 import com.precog.common._
 import com.precog.common.security.APIKey
 import com.precog.yggdrasil.util._
 
-import blueeyes.json._
-
-import scalaz._
-import scalaz.syntax.comonad._
-import scalaz.std.list._
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
 trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
+  implicit def M: Monad[M] with Comonad[M]
+
   type GroupId = String
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = "groupId(" + groupId.getAndIncrement + ")"
@@ -138,10 +136,4 @@ object BlockStoreTestModule {
     val M = M0
     val projections = Map.empty[Path, Projection]
   }
-}
-
-trait BlockStoreTestSupport[M[+_]] { self =>
-  implicit def M: Monad[M] with Comonad[M]
-
-  def emptyTestModule = BlockStoreTestModule.empty[M]
 }

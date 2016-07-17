@@ -28,9 +28,7 @@ import blueeyes.util.Clock
 
 import org.specs2.mutable.Specification
 
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.comonad._
+import scalaz._, Scalaz._
 
 trait APIKeyFinderSpec[M[+_]] extends Specification {
   import Permission._

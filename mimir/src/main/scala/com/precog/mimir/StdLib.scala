@@ -21,25 +21,12 @@ package com.precog
 package mimir
 
 import bytecode._
-import bytecode.Library
-import bytecode.Morphism1Like
-import bytecode.Morphism2Like
-import bytecode.Op1Like
-import bytecode.Op2Like
-import bytecode.ReductionLike
-
-import blueeyes._
 import com.precog.common._
 import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import yggdrasil.table._
-
-import blueeyes.json._
-
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.apply._
-import scala.annotation.tailrec
+import blueeyes._, json._
+import scalaz._, Scalaz._
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib

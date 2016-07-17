@@ -35,10 +35,9 @@ import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 import CValueGenerators._
 
-trait BlockLoadSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
-  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[M] {
-
-    val M = self.M
+trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
+  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[Need] {
+    val M = Need.need
     val Some((idCount, schema)) = sampleData.schema
     val actualSchema = inferSchema(sampleData.data map { _ \ "value" })
 

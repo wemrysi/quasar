@@ -27,13 +27,9 @@ import com.precog.util.cache.Cache
 import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
 
-import scalaz._
-import scalaz.effect._
-import scalaz.std.option._
-import scalaz.std.list._
+import scalaz._, Scalaz._
+import scalaz.effect.IO
 import scalaz.syntax.effect.id._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
 
 case class CachingAPIKeyManagerSettings(
     apiKeyCacheSettings: Seq[Cache.CacheOption[APIKey, APIKeyRecord]],

@@ -20,7 +20,6 @@
 package com.precog
 package mimir
 
-import blueeyes._
 import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.util._
@@ -37,20 +36,10 @@ import com.precog.common.security._
 import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
 
-import scalaz._
-import scalaz.Validation._
-import scalaz.effect._
-import scalaz.syntax.comonad._
-import scalaz.syntax.traverse._
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.stream._
-import scala.Function._
-
+import scalaz._, Scalaz._, Validation._
 import org.specs2.execute.Result
-import org.specs2.mutable._
-
-import blueeyes.json._
+import org.specs2.mutable.Specification
+import blueeyes._, json._
 
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]

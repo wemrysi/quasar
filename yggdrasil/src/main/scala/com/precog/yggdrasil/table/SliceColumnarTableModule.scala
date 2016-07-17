@@ -23,11 +23,7 @@ package table
 import blueeyes._
 import com.precog.common._, security._
 import com.precog.bytecode._
-
-import scalaz._
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
 trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] with ProjectionModule[M, Slice] {

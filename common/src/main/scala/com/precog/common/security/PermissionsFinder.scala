@@ -25,14 +25,7 @@ import service.v1
 import accounts.AccountId
 import accounts.AccountFinder
 
-import scalaz._
-import scalaz.\/._
-import scalaz.std.option.optionInstance
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
-import scalaz.syntax.bitraverse._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
 
 object PermissionsFinder {
   import Permission._

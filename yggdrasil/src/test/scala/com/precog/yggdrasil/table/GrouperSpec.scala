@@ -31,10 +31,7 @@ import java.util.concurrent.Executors
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -68,14 +65,17 @@ solve 'a, 'b
   ...
 */
 
-trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
+  implicit def M = Need.need
+  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")
 
   def tic_aj = JPathField("tic_a")
   def tic_bj = JPathField("tic_b")
 
-  implicit val fid = NaturalTransformation.refl[M]
+  implicit val fid = NaturalTransformation.refl[Need]
 
   val eq12F1 = CF1P("testing::eq12F1") {
     case c: DoubleColumn => new Map1Column(c) with BoolColumn {
@@ -109,7 +109,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
       SourceKey.Single, Some(TransSpec1.Id), groupId,
       GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => M[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson
@@ -170,7 +170,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
       SourceKey.Single, Some(valueTrans), groupId,
       GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => M[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson
@@ -226,7 +226,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
       SourceKey.Single, Some(TransSpec1.Id), groupId,
       GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => M[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson
@@ -1021,8 +1021,7 @@ trait GrouperSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike
   "handle non-trivial group alignment with composite key" in testNonTrivial
 }
 
-object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec[Need] {
-  def M = Need.need
+object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec {
   type YggConfig = IdSourceConfig
   val yggConfig = new IdSourceConfig {
     val idSource = new FreshAtomicIdSource

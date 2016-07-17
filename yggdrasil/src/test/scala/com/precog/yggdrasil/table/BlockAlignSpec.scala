@@ -20,22 +20,21 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.util._
 
-import blueeyes.json._
+import blueeyes._, json._
 
-import scalaz._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
-
+import scalaz._, Scalaz._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 
-trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationLike with ScalaCheck { self =>
+trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
+  implicit def M = Need.need
+  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+
   def testAlign(sample: SampleData) = {
     val module = emptyTestModule
 
@@ -437,8 +436,7 @@ trait BlockAlignSpec[M[+_]] extends BlockStoreTestSupport[M] with SpecificationL
   }
 }
 
-object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec[Need] {
-  def M = Need.need
+object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec {
   type YggConfig = IdSourceConfig
   val yggConfig = new IdSourceConfig {
     val idSource = new FreshAtomicIdSource

@@ -29,10 +29,7 @@ import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.vfs._
 
 import java.util.regex._
-import scalaz.StreamT
-import scalaz.std.stream._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
+import scalaz._, Scalaz._
 
 trait FSLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   def vfs: VFSMetadata[M]

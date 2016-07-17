@@ -23,11 +23,9 @@ import table._
 import blueeyes._, json._
 import com.precog.common._
 
-import scalaz.{Ordering => _, NonEmptyList => NEL, _}
-import scalaz.syntax.comonad._
-
-import org.specs2._
-import org.specs2.mutable.SpecificationLike
+import scalaz._, Scalaz._
+import org.specs2.ScalaCheck
+import org.specs2.mutable._
 import org.scalacheck._, Gen._, Arbitrary._
 import CValueGenerators.JSchema
 

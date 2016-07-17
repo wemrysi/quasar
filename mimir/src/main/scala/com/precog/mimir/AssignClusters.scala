@@ -30,16 +30,7 @@ import bytecode._
 import blueeyes._
 import com.precog.common._
 
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.map._
-import scalaz.std.set._
-import scalaz.syntax.foldable._
-import scalaz.syntax.monad._
-import scalaz.syntax.std.boolean._
-import scalaz.syntax.traverse._
-
+import scalaz._, Scalaz._
 import spire.implicits._
 
 trait AssignClusterModule[M[+ _]] extends ColumnarTableLibModule[M] with ModelLibModule[M] {
@@ -277,7 +268,7 @@ trait AssignClusterModule[M[+ _]] extends ColumnarTableLibModule[M] with ModelLi
           val tables0 = (0 until scanners.size) map { i =>
             forcedTable.map(_.transform(DerefArrayStatic(TransSpec1.Id, CPathIndex(i))))
           }
-          val tables: M[Seq[Table]] = (tables0.toList).sequence
+          val tables: M[Seq[Table]] = (tables0.toList).sequence[M, Table]
 
           tables.map(_.reduceOption { _ concat _ } getOrElse Table.empty)
         }

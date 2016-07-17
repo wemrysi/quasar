@@ -30,7 +30,7 @@ import java.util.UUID
 import scalaz.EitherT
 
 class InMemoryScheduleStorage(implicit executor: ExecutionContext) extends ScheduleStorage[Future] {
-  private implicit val M = new FutureMonad(executor)
+  private implicit val M = futureMonad(executor)
   private[this] var tasks   = Map.empty[UUID, ScheduledTask]
   private[this] var history = Map.empty[UUID, Seq[ScheduledRunReport]]
 

@@ -27,12 +27,7 @@ import common._
 import bytecode._
 import util._
 
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.std.map._
-import scalaz.std.stream._
-import scalaz.syntax.traverse._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {
   trait SummaryLib extends ReductionLib {
