@@ -38,7 +38,7 @@ package object security {
 
   implicit val TZDateTimeExtractor: Extractor[DateTime] = new Extractor[DateTime] {
     override def validated(obj: JValue): Validation[Error, DateTime] = obj match {
-      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatch(isoFormat.parseDateTime(dt))
+      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(isoFormat.parseDateTime(dt))
       case _           => Failure(Invalid("Date time must be represented as JSON string"))
     }
   }

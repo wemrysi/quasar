@@ -22,12 +22,10 @@ package com.precog.common
 import blueeyes._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import scalaz._
-import scalaz.syntax.semigroup._
-
-import org.specs2.mutable.Specification
+import scalaz._, Scalaz._
 import org.specs2._
-import org.scalacheck._, Gen._, Arbitrary.arbitrary
+import org.specs2.mutable.Specification
+import org.scalacheck._, Gen.{ choose, frequency, listOfN }, Arbitrary.arbitrary
 import PrecogScalacheck._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
@@ -36,13 +34,13 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   val sampleSize = 100
 
   "simple metadata" should {
-    "surivive round trip serialization" in check { in: Metadata =>
+    "surivive round trip serialization" in prop { in: Metadata =>
       in.serialize.validated[Metadata] must beLike {
         case Success(out) => in mustEqual out
       }
     }
 
-    "merge with like metadata" in check { (sample1: List[Metadata], sample2: List[Metadata]) =>
+    "merge with like metadata" in prop { (sample1: List[Metadata], sample2: List[Metadata]) =>
       val prepared = sample1 zip sample2 map {
         case (e1, e2) => (e1, e2, e1 merge e2)
       }
@@ -78,13 +76,13 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   }
 
   "metadata maps" should {
-    "survive round trip serialization" in check { in: Map[MetadataType, Metadata] =>
+    "survive round trip serialization" in prop { in: Map[MetadataType, Metadata] =>
       in.map(_._2).toList.serialize.validated[List[Metadata]] must beLike {
         case Success(out) => in must_== Map[MetadataType, Metadata](out.map{ m => (m.metadataType, m) }: _*)
       }
     }
 
-    "merge as expected" in check { (sample1: List[Map[MetadataType, Metadata]], sample2: List[Map[MetadataType, Metadata]]) =>
+    "merge as expected" in prop { (sample1: List[Map[MetadataType, Metadata]], sample2: List[Map[MetadataType, Metadata]]) =>
       val prepared = sample1 zip sample2 map {
         case (s1, s2) => (s1, s2, s1 |+| s2)
       }

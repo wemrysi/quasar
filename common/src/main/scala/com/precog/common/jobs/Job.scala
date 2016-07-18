@@ -35,7 +35,7 @@ import scalaz.syntax.std.boolean._
 
 case class Job(id: JobId, apiKey: APIKey, name: String, jobType: String, data: Option[JValue], state: JobState)
 object Job {
-  implicit val iso                           = Iso.hlist(Job.apply _, Job.unapply _)
+  // implicit val iso                           = Iso.hlist(Job.apply _, Job.unapply _)
   val schemaV1                               = "id" :: "apiKey" :: "name" :: "type" :: "data" :: "state" :: HNil
   implicit val decomposerV1: Decomposer[Job] = decomposerV[Job](schemaV1, Some("1.0".v))
   implicit val extractorV1: Extractor[Job]   = extractorV[Job](schemaV1, Some("1.0".v))
@@ -48,7 +48,7 @@ object Message {
     val Warnings = "warnings"
   }
 
-  implicit val iso                               = Iso.hlist(Message.apply _, Message.unapply _)
+  // implicit val iso                               = Iso.hlist(Message.apply _, Message.unapply _)
   val schemaV1                                   = "jobId" :: "id" :: "channel" :: "value" :: HNil
   implicit val decomposerV1: Decomposer[Message] = decomposerV[Message](schemaV1, Some("1.0".v))
   implicit val extractorV1: Extractor[Message]   = extractorV[Message](schemaV1, Some("1.0".v))
@@ -59,7 +59,7 @@ object Status {
   import JobManager._
   import scalaz.syntax.apply._
 
-  implicit val iso                              = Iso.hlist(Status.apply _, Status.unapply _)
+  // implicit val iso                              = Iso.hlist(Status.apply _, Status.unapply _)
   val schemaV1                                  = "job" :: "id" :: "message" :: "progress" :: "unit" :: "info" :: HNil
   implicit val decomposerV1: Decomposer[Status] = decomposerV[Status](schemaV1, Some("1.0".v))
   implicit val extractorV1: Extractor[Status]   = extractorV[Status](schemaV1, Some("1.0".v))

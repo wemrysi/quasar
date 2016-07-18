@@ -27,13 +27,14 @@ import java.util.concurrent.atomic.AtomicLong
 
 import java.lang.ref.SoftReference
 
+import blueeyes._
 import scalaz._
 import scalaz.State
 
 /**
   * A `Monad` for working with `ByteBuffer`s.
   */
-trait ByteBufferMonad[M[+ _]] extends Monad[M] {
+trait ByteBufferMonad[M[_]] extends Monad[M] {
   def getBuffer(min: Int): M[ByteBuffer]
 }
 
@@ -93,7 +94,7 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
 
 object ByteBufferPool {
 
-  type ByteBufferPoolS[+A] = State[(ByteBufferPool, List[ByteBuffer]), A]
+  type ByteBufferPoolS[A] = State[ByteBufferPool -> List[ByteBuffer], A]
 
   implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
 

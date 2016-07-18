@@ -49,8 +49,9 @@ trait APIKeyManagerSpec[M[+_]] extends Specification {
 
       val (grantParents, rootGrantId) = grantParentage.copoint
 
-      grantParents must not be empty
-      grantParents must haveAllElementsLike({ case gid => gid must_== rootGrantId })
+      val gs = grantParents collect { case gid: GrantId => gid }
+      grantParents must haveSize(1)
+      grantParents must contain(rootGrantId)
     }
   }
 }

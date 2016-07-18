@@ -22,7 +22,7 @@ package security
 
 import accounts.AccountId
 
-import blueeyes.json._
+import blueeyes._, json._
 import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.Extractor.Error
 import blueeyes.json.serialization.Extractor.Invalid
@@ -30,12 +30,7 @@ import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => 
 import blueeyes.json.serialization.Versioned._
 
 import org.slf4s.Logging
-
-import scalaz._
-import scalaz.Validation._
-import scalaz.std.option._
-import scalaz.syntax.apply._
-import scalaz.syntax.plusEmpty._
+import scalaz._, Scalaz._, Validation._
 import Permission._
 
 sealed trait AccessMode { def name: String }
@@ -109,7 +104,7 @@ object Permission {
   case class WriteAsAll private[Permission] (accountIds: Set[AccountId]) extends WriteAs
 
   object WriteAs {
-    def all(accountIds: NonEmptyList[AccountId]): WriteAs = WriteAsAll(accountIds.list.toSet)
+    def all(accountIds: NonEmptyList[AccountId]): WriteAs = WriteAsAll(accountIds.list.toVector.toSet)
     val any: WriteAs = WriteAsAny
 
     private[Permission] def apply(accountIds: Set[AccountId]): WriteAs = if (accountIds.isEmpty) WriteAsAny else WriteAsAll(accountIds)
@@ -165,16 +160,15 @@ object Permission {
 
   val extractorV1Base: Extractor[Permission] = new Extractor[Permission] {
     private def writtenByPermission(obj: JValue, pathV: Validation[Error, Path])(f: (Path, WrittenBy) => Permission): Validation[Error, Permission] = {
-      (obj \? "ownerAccountIds") map { ids =>
-        Apply[({ type l[a] = Validation[Error, a] })#l].zip.zip(pathV, ids.validated[Set[AccountId]]) flatMap {
-          case (path, accountIds) =>
+      ((obj \? "ownerAccountIds") map { ids: JValue =>
+        pathV flatMap { path =>
+          ids.validated[Set[AccountId]] flatMap { accountIds =>
             if (accountIds.isEmpty) success(f(path, WrittenByAny))
             else if (accountIds.size == 1) success(f(path, WrittenByAccount(accountIds.head)))
             else failure(Invalid("Cannot extract read permission for more than one account ID."))
+          }
         }
-      } getOrElse {
-        pathV map { f(_: Path, WrittenByAny) }
-      }
+      }).getOrElse( pathV map { f(_: Path, WrittenByAny) })
     }
 
     override def validated(obj: JValue) = {

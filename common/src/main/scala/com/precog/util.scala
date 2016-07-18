@@ -20,11 +20,11 @@
 package com.precog
 
 import blueeyes._
-import scalaz.{ Bind, Monoid }
 import java.util.Comparator
 import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
+import scalaz._, Scalaz._
 
 package util {
   /**
@@ -75,7 +75,17 @@ package util {
 }
 
 package object util {
-  type RawBitSet = Array[Int]
+  type RawBitSet          = Array[Int]
+  type ByteBufferPoolS[A] = State[ByteBufferPool -> List[ByteBuffer], A]
+
+  /**
+    * A `Monad` for working with `ByteBuffer`s.
+    */
+  implicit object ByteBufferPoolS extends Monad[ByteBufferPoolS] {
+    def point[A](a: => A): ByteBufferPoolS[A]                                              = State.state(a)
+    def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] = State { s => val (s1, a) = fa(s) ; f(a)(s1) }
+    def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer]                                   = ByteBufferPool acquire min
+  }
 
   def flipBytes(buffer: ByteBuffer): Array[Byte] = {
     val bytes = new Array[Byte](buffer.remaining())
@@ -109,7 +119,7 @@ package object util {
   }
 
   implicit def lazyValueMapper[A, B](m: Map[A, B]) = new LazyMapValues[A, B] { val source = m }
-  implicit val InstantOrdering: Ordering[Instant] = Ordering.Long.on[Instant](_.getMillis)
+  implicit val InstantOrdering: ScalaMathOrdering[Instant] = scala.math.Ordering.Long.on[Instant](_.getMillis)
 
   implicit val FutureBind: Bind[Future] = new Bind[Future] {
     def map[A, B](fut: Future[A])(f: A => B)          = fut.map(f)

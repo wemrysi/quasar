@@ -27,7 +27,6 @@ import blueeyes._
 import blueeyes.util.Clock
 
 import org.specs2.mutable.Specification
-
 import scalaz._, Scalaz._
 
 trait APIKeyFinderSpec[M[+_]] extends Specification {
@@ -179,10 +178,12 @@ trait APIKeyFinderSpec[M[+_]] extends Specification {
 }
 
 class DirectAPIKeyFinderSpec extends Specification {
-  include(new APIKeyFinderSpec[Need] {
-    val M = Need.need
-    def withAPIKeyFinder[A](mgr: APIKeyManager[Need])(f: APIKeyFinder[Need] => A): A = {
-      f(new DirectAPIKeyFinder(mgr))
-    }
-  })
+  // include( 5 )
+
+  //   new APIKeyFinderSpec[Need] {
+  //   val M = Need.need
+  //   def withAPIKeyFinder[A](mgr: APIKeyManager[Need])(f: APIKeyFinder[Need] => A): A = {
+  //     f(new DirectAPIKeyFinder(mgr))
+  //   }
+  // })
 }

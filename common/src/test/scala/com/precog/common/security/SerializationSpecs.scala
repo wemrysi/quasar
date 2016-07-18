@@ -23,10 +23,9 @@ package security
 import ingest._
 import service.v1
 
-import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.DefaultSerialization._
+import blueeyes._, json._, serialization._, DefaultSerialization._
 import org.specs2.mutable.Specification
-import scalaz._
+import scalaz._, Scalaz._, Validation.FlatMap._
 
 class SerializationSpecs extends Specification {
   import Permission._

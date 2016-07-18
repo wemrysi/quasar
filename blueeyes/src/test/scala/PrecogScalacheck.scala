@@ -10,6 +10,7 @@ object PrecogSpecs {
   import org.specs2._, execute._, matcher._
   import mutable.SpecificationLike
 
+  type ScalaCheck         = org.specs2.ScalaCheck
   val SpecsFailure        = org.specs2.execute.Failure
   type MatchResult[+A]    = org.specs2.matcher.MatchResult[A]
   type SpecsFailure       = org.specs2.execute.Failure

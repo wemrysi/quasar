@@ -24,20 +24,12 @@ import org.scalacheck._, Gen._, Arbitrary._
 import PrecogScalacheck._
 
 trait ArbitraryJValue {
-  def genJValue:  Gen[JValue]  = frequency((10, genSimple), (1, wrap(choose(0, 5) flatMap genArray)), (1, wrap(choose(0, 5) flatMap genObject)))
-  def genJNum: Gen[JNum]       = genBigDecimal map (JNum(_))
-  def genJBool:   Gen[JBool]   = arbitrary[Boolean].map(JBool(_))
-  def genJString: Gen[JString] = alphaStr.map(JString(_))
-  def genSimple: Gen[JValue] = oneOf(
-    value(JNull),
-    genJNum,
-    genJBool,
-    genJString)
-
-  def genSimpleNotNull: Gen[JValue] = oneOf(
-    genJNum,
-    genJBool,
-    genJString)
+  def genJValue:  Gen[JValue]       = frequency((10, genSimple), (1, wrap(choose(0, 5) flatMap genArray)), (1, wrap(choose(0, 5) flatMap genObject)))
+  def genJNum: Gen[JNum]            = genBigDecimal map (JNum(_))
+  def genJBool:   Gen[JBool]        = arbitrary[Boolean].map(JBool(_))
+  def genJString: Gen[JString]      = alphaStr.map(JString(_))
+  def genSimple: Gen[JValue]        = oneOf[JValue](const(JNull), genJNum, genJBool, genJString)
+  def genSimpleNotNull: Gen[JValue] = oneOf[JValue](genJNum, genJBool, genJString)
 
   def genArray(listSize: Int): Gen[JValue] = for (l <- genList(listSize)) yield JArray(l)
   def genObject(listSize: Int): Gen[JObject] = for (l <- genFieldList(listSize)) yield JObject(l)

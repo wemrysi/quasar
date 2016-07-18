@@ -69,7 +69,7 @@ trait Codec[@spec(Boolean, Long, Double) A] { self =>
     * Writes `a` using a `ByteBufferMonad`. This is much slower than just using
     * writeInit/writeMore.
     */
-  def write[M[+ _]](a: A)(implicit M: ByteBufferMonad[M]): M[Unit] = {
+  def write[M[_]](a: A)(implicit M: ByteBufferMonad[M]): M[Unit] = {
     import scalaz.syntax.monad._
 
     val min = minSize(a)
@@ -162,7 +162,7 @@ object Codec {
     import ByteBufferPool._
 
     byteBufferPool.run(for {
-      _ <- codec.write(a)
+      _ <- codec.write[ByteBufferPoolS](a)
       bytes <- flipBytes
       _ <- release
     } yield bytes)

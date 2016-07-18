@@ -37,7 +37,7 @@ import scalaz._
 class EventSpec extends Specification with ArbitraryEventMessage with ScalaCheck {
   implicit val arbEvent = Arbitrary(genRandomIngest)
   "serialization of an event" should {
-    "read back the data that was written" in check { in: Ingest =>
+    "read back the data that was written" in prop { in: Ingest =>
       in.serialize.validated[Ingest] must beLike {
         case Success(out) => out must_== in
       }

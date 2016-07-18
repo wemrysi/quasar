@@ -28,16 +28,17 @@ import com.precog.util.BitSetUtil
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{Shrink, Arbitrary, Gen}
+import PrecogArb._, PrecogSpecs._
 
 class CodecSpec extends Specification with ScalaCheck {
-  import Arbitrary._
+  // import Arbitrary._
   import ByteBufferPool._
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_, java.math.MathContext.UNLIMITED)))
 
   //implicit def arbBitSet = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map (BitSet(_: _*)))
-  implicit def arbBitSet = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
+  implicit def arbBitSet: Arbitrary[BitSet] = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
 
   implicit def arbSparseBitSet: Arbitrary[(Codec[BitSet], BitSet)] = {
     Arbitrary(Gen.chooseNum(0, 500) flatMap { size =>
@@ -48,7 +49,7 @@ class CodecSpec extends Specification with ScalaCheck {
           (codec, BitSetUtil.create(bits))
         }
       } else {
-        Gen.value((codec, new BitSet()))
+        Gen.const((codec, new BitSet()))
       }
     })
   }
@@ -64,7 +65,7 @@ class CodecSpec extends Specification with ScalaCheck {
           (codec, bs)
         }
       } else {
-        Gen.value((codec, RawBitSet.create(0)))
+        Gen.const((codec, RawBitSet.create(0)))
       }
     })
   }
@@ -109,8 +110,8 @@ class CodecSpec extends Specification with ScalaCheck {
   }
 
   def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" in {
-    "with large buffers" in { check { (a: A) => surviveEasyRoundTrip(a)(codec) } }
-    "with small buffers" in { check { (a: A) => surviveHardRoundTrip(a)(codec) } }
+    "with large buffers" in { prop { (a: A) => surviveEasyRoundTrip(a)(codec) } }
+    "with small buffers" in { prop { (a: A) => surviveHardRoundTrip(a)(codec) } }
   }
 
   "LongCodec" should surviveRoundTrip(Codec.LongCodec)
@@ -123,12 +124,12 @@ class CodecSpec extends Specification with ScalaCheck {
   "SparseBitSet" should {
     "survive round-trip" in {
       "with large buffers" in {
-        check { (sparse: (Codec[BitSet], BitSet)) =>
+        prop { (sparse: (Codec[BitSet], BitSet)) =>
           surviveEasyRoundTrip(sparse._2)(sparse._1)
         }
       }
       "with small buffers" in {
-        check { (sparse: (Codec[BitSet], BitSet)) =>
+        prop { (sparse: (Codec[BitSet], BitSet)) =>
           surviveHardRoundTrip(sparse._2)(sparse._1)
         }
       }
@@ -137,12 +138,12 @@ class CodecSpec extends Specification with ScalaCheck {
   "SparseRawBitSet" should {
     "survive round-trip" in {
       "with large buffers" in {
-        check { (sparse: (Codec[RawBitSet], RawBitSet)) =>
+        prop { (sparse: (Codec[RawBitSet], RawBitSet)) =>
           surviveEasyRoundTrip(sparse._2)(sparse._1)
         }
       }
       "with small buffers" in {
-        check { (sparse: (Codec[RawBitSet], RawBitSet)) =>
+        prop { (sparse: (Codec[RawBitSet], RawBitSet)) =>
           surviveHardRoundTrip(sparse._2)(sparse._1)
         }
       }
@@ -151,28 +152,28 @@ class CodecSpec extends Specification with ScalaCheck {
   "IndexedSeqCodec" should {
     "survive round-trip" in {
       "with large buffers" in {
-        check { (xs: IndexedSeq[Long]) => surviveEasyRoundTrip(xs) }
-        check { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveEasyRoundTrip(xs) }
-        check { (xs: IndexedSeq[String]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: IndexedSeq[Long]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: IndexedSeq[String]) => surviveEasyRoundTrip(xs) }
       }
       "with small buffers" in {
-        check { (xs: IndexedSeq[Long]) => surviveHardRoundTrip(xs) }
-        check { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveHardRoundTrip(xs) }
-        check { (xs: IndexedSeq[String]) => surviveHardRoundTrip(xs) }
+        prop { (xs: IndexedSeq[Long]) => surviveHardRoundTrip(xs) }
+        prop { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveHardRoundTrip(xs) }
+        prop { (xs: IndexedSeq[String]) => surviveHardRoundTrip(xs) }
       }
     }
   }
   "ArrayCodec" should {
     "survive round-trip" in {
       "with large buffers" in {
-        check { (xs: Array[Long]) => surviveEasyRoundTrip(xs) }
-        check { (xs: Array[Array[Long]]) => surviveEasyRoundTrip(xs) }
-        check { (xs: Array[String]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: Array[Long]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: Array[Array[Long]]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: Array[String]) => surviveEasyRoundTrip(xs) }
       }
       "with small buffers" in {
-        check { (xs: Array[Long]) => surviveHardRoundTrip(xs) }
-        check { (xs: Array[Array[Long]]) => surviveHardRoundTrip(xs) }
-        check { (xs: Array[String]) => surviveHardRoundTrip(xs) }
+        prop { (xs: Array[Long]) => surviveHardRoundTrip(xs) }
+        prop { (xs: Array[Array[Long]]) => surviveHardRoundTrip(xs) }
+        prop { (xs: Array[String]) => surviveHardRoundTrip(xs) }
       }
     }
   }

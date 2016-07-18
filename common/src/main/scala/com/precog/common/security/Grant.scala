@@ -68,7 +68,7 @@ case class Grant(grantId: GrantId,
 }
 
 object Grant extends Logging {
-  implicit val grantIso = Iso.hlist(Grant.apply _, Grant.unapply _)
+  // implicit val grantIso = Iso.hlist(Grant.apply _, Grant.unapply _)
 
   val schemaV1 = "grantId" :: "name" :: "description" :: ("issuerKey" ||| "(undefined)") :: "parentIds" :: "permissions" :: ("createdAt" ||| new Instant(0L)) :: "expirationDate" :: HNil
 

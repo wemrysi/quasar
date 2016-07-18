@@ -66,21 +66,21 @@ object AdSamples {
   val departments = List("sales", "marketing", "operations", "engineering", "manufacturing", "research")
 
   def gaussianIndex(size: Int): Gen[Int] = {
-    Gen( p => {
+    Gen.parameterized( p => {
       def sample: Double = {
         val testIndex = (p.rng.nextGaussian * (size / 5)) + (size / 2)
         if (testIndex < 0 || testIndex >= size) sample
         else testIndex
       }
 
-      Some(sample.toInt)
+      sample.toInt
     })
   }
 
   def exponentialIndex(size: Int): Gen[Int] = {
-    Gen( p => {
+    Gen.parameterized( p => {
       import scala.math._
-      Some(round(exp(-p.rng.nextDouble * 8) * size).toInt.min(size - 1).max(0))
+      round(exp(-p.rng.nextDouble * 8) * size).toInt.min(size - 1).max(0)
     })
   }
 

@@ -27,9 +27,10 @@ import com.precog.common.util.ArbitraryJValue
 import security._
 import blueeyes._, json._
 import org.scalacheck._, Gen._, Arbitrary._
+import PrecogScalacheck._
 
 trait ArbitraryEventMessage extends ArbitraryJValue {
-  def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen.resultOf[Int, Option[UUID]](_ => Some(UUID.randomUUID)), None)
+  def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(UUID.randomUUID), Gen const None)
 
   def genContentJValue: Gen[JValue] =
     frequency(
@@ -62,8 +63,9 @@ trait ArbitraryEventMessage extends ArbitraryJValue {
       apiKey <- alphaStr
       path <- genPath
       ownerAccountId <- alphaStr
-      content <- containerOf[List, JValue](genContentJValue).map(l => Vector(l: _*)) if !content.isEmpty
-      jobId <- oneOf(identifier.map(Option.apply), None)
+      content <- vectorOf(genContentJValue)
+      if !content.isEmpty
+      jobId <- genIdentifier.optional
       streamRef <- genStreamRef
     } yield Ingest(apiKey, path, Some(Authorities(ownerAccountId)), content, jobId, new Instant(), streamRef)
 
@@ -71,7 +73,7 @@ trait ArbitraryEventMessage extends ArbitraryJValue {
     for {
       apiKey <- alphaStr
       path <- genPath
-      jobId <- oneOf(identifier.map(Option.apply), None)
+      jobId <- genIdentifier.optional
     } yield Archive(apiKey, path, jobId, new Instant())
 
   def genRandomIngestMessage: Gen[IngestMessage] =

@@ -45,7 +45,7 @@ class AutoCache[K, V](private val backing: LoadingCache[K, V]) extends mutable.M
   }
   def invalidateAll = backing.invalidateAll
 
-  def getFull(key: K): Validation[Throwable, V] = Validation.fromTryCatch {
+  def getFull(key: K): Validation[Throwable, V] = Validation.fromTryCatchNonFatal {
     backing.get(key)
   }
 }

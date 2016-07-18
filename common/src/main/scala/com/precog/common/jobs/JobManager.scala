@@ -130,8 +130,8 @@ trait JobManager[M[+ _]] { self =>
   def withM[N[+ _]](implicit t: M ~> N, u: N ~> M, M: Monad[M], N: Monad[N]) = new JobManager[N] {
     import scalaz.syntax.monad._
 
-    private val transformStreamBack    = implicitly[Hoist[StreamT]].hoist(u)
-    private val transformStreamForward = implicitly[Hoist[StreamT]].hoist(t)
+    private val transformStreamBack    = implicitly[Hoist[StreamT]].hoist[N, M](u)
+    private val transformStreamForward = implicitly[Hoist[StreamT]].hoist[M, N](t)
 
     def createJob(auth: APIKey, name: String, jobType: String, data: Option[JValue], started: Option[DateTime]): N[Job] =
       t(self.createJob(auth, name, jobType, data, started))
