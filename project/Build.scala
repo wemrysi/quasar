@@ -70,7 +70,8 @@ object PlatformBuild {
              crossScalaVersions :=  Seq("2.9.3", "2.10.6"),
       parallelExecution in Test :=  false,
             logBuffered in Test :=  false,
-                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
+                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true)),
+                      resolvers +=  "Akka Repo" at "http://repo.akka.io/repository"
     ) also inBoth(doubleCross)
 
     // .compileArgs("-Ywarn-numeric-widen")
