@@ -36,7 +36,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
   def testDistinctIdentity = {
     implicit val gen = sort(distinct(sample(schema)))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
 
       val distinctTable = table.distinct(Leaf(Source))
@@ -215,7 +215,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
   def testDistinct = {
     implicit val gen = sort(duplicateRows(sample(schema)))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
 
       val distinctTable = table.distinct(Leaf(Source))
@@ -224,6 +224,6 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
       val expected = sample.data.toSeq.distinct
 
       result must_== expected
-    }.set(minTestsOk -> 2000)
+    }.set(minTestsOk = 2000)
   }
 }

@@ -180,7 +180,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
       val dataset = fromJson(sample.toStream)
       val results = dataset.toJson
-      results.copoint must containAllOf(sample).only
+      results.copoint.toList must_== sample
     }
 
     "verify bijection from JSON" in checkMappings(this)
@@ -188,9 +188,9 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     "verify renderJson round tripping" in {
       implicit val gen = sample(schema)
 
-      check { data: SampleData =>
+      prop { data: SampleData =>
         testRenderJson(data.data)
-      }.set(minTestsOk -> 20000, workers -> Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 
     "handle special cases of renderJson" >> {
@@ -239,14 +239,14 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
           JNum(42) :: Nil)
       }
 
-      "check utf-8 encoding" in check { str: String =>
+      "check utf-8 encoding" in prop { str: String =>
         val s = str.toList.map((c: Char) => if (c < ' ') ' ' else c).mkString
         testRenderJson(JString(s) :: Nil)
-      }.set(minTestsOk -> 20000, workers -> Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
 
-      "check long encoding" in check { ln: Long =>
+      "check long encoding" in prop { ln: Long =>
         testRenderJson(JNum(ln) :: Nil)
-      }.set(minTestsOk -> 20000, workers -> Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 
     "in cogroup" >> {
@@ -269,7 +269,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
 
       "survive scalacheck" in {
-        check { cogroupData: (SampleData, SampleData) => testCogroup(cogroupData._1, cogroupData._2) }
+        prop { cogroupData: (SampleData, SampleData) => testCogroup(cogroupData._1, cogroupData._2) }
       }
     }
 
@@ -315,7 +315,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
       "cross across slice boundaries on one side" in testCrossSingles
       "survive scalacheck" in {
-        check { cogroupData: (SampleData, SampleData) => testCross(cogroupData._1, cogroupData._2) }
+        prop { cogroupData: (SampleData, SampleData) => testCross(cogroupData._1, cogroupData._2) }
       }
     }
 
@@ -520,7 +520,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
   "track table metrics" in {
     "single traversal" >> {
       implicit val gen = sample(objectSchema(_, 3))
-      check { (sample: SampleData) =>
+      prop { (sample: SampleData) =>
         val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
 
         val table = fromSample(sample)
@@ -536,7 +536,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
     "multiple transforms" >> {
       implicit val gen = sample(objectSchema(_, 3))
-      check { (sample: SampleData) =>
+      prop { (sample: SampleData) =>
         val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
 
         val table = fromSample(sample)
@@ -552,7 +552,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
     "multiple forcing calls" >> {
       implicit val gen = sample(objectSchema(_, 3))
-      check { (sample: SampleData) =>
+      prop { (sample: SampleData) =>
         val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
 
         val table = fromSample(sample)

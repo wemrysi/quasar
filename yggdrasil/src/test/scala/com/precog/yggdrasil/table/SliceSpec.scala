@@ -136,7 +136,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     "concat arbitrary slices together" in {
       implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 23))
 
-      check { slices: List[Slice] =>
+      prop { slices: List[Slice] =>
         val slice = Slice.concat(slices)
         toCValues(slice) must_== fakeConcat(slices)
       }
@@ -145,7 +145,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     "concat small singleton together" in {
       implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 1))
 
-      check { slices: List[Slice] =>
+      prop { slices: List[Slice] =>
         val slice = Slice.concat(slices)
         toCValues(slice) must_== fakeConcat(slices)
       }
@@ -159,7 +159,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     "concat empty slices correctly" in {
       implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 23))
 
-      check { fullSlices: List[Slice] =>
+      prop { fullSlices: List[Slice] =>
         val slices = fullSlices collect {
           case slice if Random.nextBoolean => slice
           case _ => emptySlice
@@ -175,7 +175,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
 
       implicit val arbSlice = Arbitrary(Gen.oneOf(g1, g2, gs: _*))
 
-      check { slices: List[Slice] =>
+      prop { slices: List[Slice] =>
         val slice = Slice.concat(slices)
         // This is terrible, but there isn't an immediately easy way to test
         // without duplicating concat.

@@ -42,7 +42,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkTransformLeaf = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform(Leaf(Source)))
 
@@ -115,7 +115,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkMap1 = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
 
       val results = toJson(table.transform {
@@ -139,7 +139,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   /* Do we want to allow non-boolean sets to be used as filters without an explicit existence predicate?
   def checkTrivialFilter = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Filter(
@@ -155,7 +155,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkTrueFilter = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Filter(
@@ -169,8 +169,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   }
 
   def checkFilter = {
-    implicit val gen = sample(_ => Gen.value(Seq(JPath.Identity -> CLong)))
-    check { (sample: SampleData) =>
+    implicit val gen = sample(_ => Gen.const(Seq(JPath.Identity -> CLong)))
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Filter(
@@ -232,7 +232,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkMetaDeref = {
     implicit val gen = sample(objectSchema(_, 3))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         DerefMetadataStatic(Leaf(Source), CPathMeta("foo"))
@@ -244,7 +244,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkObjectDeref = {
     implicit val gen = sample(objectSchema(_, 3))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val (field, _) = sample.schema.get._2.head
       val fieldHead = field.head.get
       val table = fromSample(sample)
@@ -266,7 +266,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkArrayDeref = {
     implicit val gen = sample(arraySchema(_, 3))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val (field, _) = sample.schema.get._2.head
       val fieldHead = field.head.get
       val table = fromSample(sample)
@@ -288,7 +288,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkMap2Eq = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CDouble, JPath("value2") -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Map2(
@@ -312,7 +312,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkMap2Add = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Map2(
@@ -356,7 +356,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkEqualSelf = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Equal(Leaf(Source), Leaf(Source))
@@ -624,7 +624,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    check (testEqual _)
+    prop (testEqual _)
   }
 
   def testEqual1 = {
@@ -678,7 +678,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         EqualLiteral(
@@ -723,7 +723,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         EqualLiteral(
@@ -745,7 +745,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkWrapObject = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         WrapObject(Leaf(Source), "foo")
@@ -759,7 +759,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkObjectConcatSelf = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
         InnerObjectConcat(Leaf(Source), Leaf(Source))
@@ -996,7 +996,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkObjectConcat = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
         InnerObjectConcat(
@@ -1031,7 +1031,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkObjectConcatOverwrite = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val resultsInner = toJson(table.transform {
         InnerObjectConcat(
@@ -1079,7 +1079,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkArrayConcat = {
     implicit val gen = sample(_ => Seq(JPath("[0]") -> CLong, JPath("[1]") -> CLong))
-    check { (sample0: SampleData) =>
+    prop { (sample0: SampleData) =>
       /***
       important note:
       `sample` is excluding the cases when we have JArrays of size 1
@@ -1332,7 +1332,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       Random.shuffle(schema).headOption.map({ case (JPath(x @ JPathField(_), _ @ _*), _) => x })
     }
 
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val toDelete = sample.schema.flatMap({ case (_, schema) => randomDeletionMask(schema) })
       toDelete.isDefined ==> {
         val table = fromSample(sample)
@@ -1472,7 +1472,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val toDelete = sample.schema.flatMap(randomDeleteMask)
       toDelete.isDefined ==> {
         val table = fromSample(sample)
@@ -1764,9 +1764,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected0 = schemas map { schema => Schema.subsumes(schema, jtpe) }
     val expected = expected0 map {
-      case true => JTrue
+      case true  => JTrue
       case false => JFalse
-      case _ => sys.error("impossible result")
     }
 
     results.copoint mustEqual expected
@@ -1774,12 +1773,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkIsType = {
     implicit val gen = sample(schema)
-    check { testIsType _ }.set(minTestsOk -> 10000)
+    prop { testIsType _ }.set(minTestsOk = 10000)
   }
 
   def checkTypedTrivial = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CBoolean, JPath("value3") -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
 
       val results = toJson(table.transform {
@@ -1836,7 +1835,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkTyped = {
     implicit val gen = sample(schema)
-    check { testTyped _ }.set(minTestsOk -> 10000)
+    prop { testTyped _ }.set(minTestsOk = 10000)
   }
 
   def testTypedAtSliceBoundary = {
@@ -2135,7 +2134,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkScan = {
     implicit val gen = sample(_ => Seq(JPath.Identity -> CLong))
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
         Scan(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupScanner(Nil, "sum"))
@@ -2174,7 +2173,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
   def checkArraySwap = {
     implicit val gen = sample(arraySchema(_, 3))
-    check { (sample0: SampleData) =>
+    prop { (sample0: SampleData) =>
       /***
       important note:
       `sample` is excluding the cases when we have JArrays of sizes 1 and 2
@@ -2212,7 +2211,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JPath("value") \ "field"
     )
 
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(
         table.transform(
@@ -2234,8 +2233,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   }
 
   def checkCond = {
-    implicit val gen = sample(_ => Gen.value(Seq(JPath.Identity -> CLong)))
-    check { (sample: SampleData) =>
+    implicit val gen = sample(_ => Gen.const(Seq(JPath.Identity -> CLong)))
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table transform {
         Cond(

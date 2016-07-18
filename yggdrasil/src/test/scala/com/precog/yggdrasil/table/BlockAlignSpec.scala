@@ -65,7 +65,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
 
   def checkAlign = {
     implicit val gen = sample(objectSchema(_, 3))
-    check { (sample: SampleData) => testAlign(sample.sortBy(_ \ "key")) }
+    prop { (sample: SampleData) => testAlign(sample.sortBy(_ \ "key")) }
   }
 
   def alignSimple = {

@@ -46,17 +46,15 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
 
 trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
   import SampleData._
-  override val defaultPrettyParams = Pretty.Params(2)
+  // override val defaultPrettyParams = Pretty.Params(2)
 
   implicit def M: Monad[M] with Comonad[M]
 
   def checkMappings(testSupport: TableModuleTestSupport[M]) = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val dataset = testSupport.fromSample(sample)
-      testSupport.toJson(dataset).copoint must containAllOf(sample.data.toList).only
+      testSupport.toJson(dataset).copoint.toSet must_== sample.data.toSet
     }
   }
 }
-
-// vim: set ts=4 sw=4 et:

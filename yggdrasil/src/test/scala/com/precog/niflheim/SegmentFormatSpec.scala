@@ -46,7 +46,7 @@ class VersionedSegmentFormatSpec extends Specification with ScalaCheck with Segm
       implicit val arbSegment = Arbitrary(genSegment(100))
       val old = VersionedSegmentFormat(Map(1 -> V1SegmentFormat))
 
-      check { (segment0: Segment) =>
+      prop { (segment0: Segment) =>
         val out = new InMemoryWritableByteChannel
         old.writer.writeSegment(out, segment0) must beLike { case Success(_) =>
           val in = new InMemoryReadableByteChannel(out.toArray)
@@ -104,13 +104,13 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
     }
     "roundtrip arbitrary small segments" in {
       implicit val arbSegment = Arbitrary(genSegment(100))
-      check { (segment: Segment) =>
+      prop { (segment: Segment) =>
         surviveRoundTrip(segment)
       }
     }
     "roundtrip arbitrary large segments" in {
       implicit val arbSegment = Arbitrary(genSegment(10000))
-      check { (segment: Segment) =>
+      prop { (segment: Segment) =>
         surviveRoundTrip(segment)
       }
     }

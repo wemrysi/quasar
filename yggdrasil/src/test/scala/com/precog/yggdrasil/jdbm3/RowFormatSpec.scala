@@ -104,7 +104,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
   "IdentitiesRowFormat" should {
     "round-trip CLongs" in {
-      check { id: List[Long] =>
+      prop { id: List[Long] =>
         val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val cId: List[CValue] = id map (CLong(_))
         rowFormat.decode(rowFormat.encode(cId)) must_== cId
@@ -112,7 +112,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     }
 
     "encodeIdentities matches encode format" in {
-      check { id: List[Long] =>
+      prop { id: List[Long] =>
         val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val cId: List[CValue] = id map (CLong(_))
         rowFormat.decode(rowFormat.encodeIdentities(id.toArray)) must_== cId
@@ -120,7 +120,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     }
 
     "round-trip CLongs -> Column -> CLongs" in {
-      check { id: List[Long] =>
+      prop { id: List[Long] =>
         val columns = arrayColumnsFor(1, identityCols(id.size))
         val rowFormat = RowFormat.IdentitiesRowFormatV1(identityCols(id.size))
         val columnDecoder = rowFormat.ColumnDecoder(columns)
@@ -140,7 +140,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     checkRoundTrips(RowFormat.forSortingKey(_))
 
     "sort encoded as ValueFormat does" in {
-      check { refs: List[ColumnRef] =>
+      prop { refs: List[ColumnRef] =>
         val valueRowFormat = RowFormat.forValues(refs)
         val sortingKeyRowFormat = RowFormat.forSortingKey(refs)
         implicit val arbRows: Arbitrary[List[List[CValue]]] =
@@ -148,7 +148,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
 
 
-        check { (vals: List[List[CValue]]) =>
+        prop { (vals: List[List[CValue]]) =>
           val valueEncoded = vals map (valueRowFormat.encode(_))
           val sortEncoded = vals map (sortingKeyRowFormat.encode(_))
 
@@ -162,16 +162,16 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
           sortedA must_== sortedB
         }
       }
-    }.set(minTestsOk -> 500, maxDiscarded -> 500)
+    }.set(minTestsOk = 500, maxDiscardRatio = 5)
   }
 
   def checkRoundTrips(toRowFormat: List[ColumnRef] => RowFormat) {
     "survive round-trip from CValue -> Array[Byte] -> CValue" in {
-      check { (refs: List[ColumnRef]) =>
+      prop { (refs: List[ColumnRef]) =>
         val rowFormat = toRowFormat(refs)
         implicit val arbColumnValues: Arbitrary[List[CValue]] = Arbitrary(genCValuesForColumnRefs(refs))
 
-        check { (vals: List[CValue]) =>
+        prop { (vals: List[CValue]) =>
           assert(refs.size == vals.size)
           rowFormat.decode(rowFormat.encode(vals)) must_== vals
         }
@@ -180,12 +180,12 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     "survive rountrip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
       val size = 10
 
-      check { (refs: List[ColumnRef]) =>
+      prop { (refs: List[ColumnRef]) =>
         val rowFormat = toRowFormat(refs)
         implicit val arbRows: Arbitrary[List[List[CValue]]] =
           Arbitrary(Gen.listOfN(size, genCValuesForColumnRefs(refs)))
 
-        check { (rows: List[List[CValue]]) =>
+        prop { (rows: List[List[CValue]]) =>
           val columns = arrayColumnsFor(size, refs)
           val columnDecoder = rowFormat.ColumnDecoder(columns)
           val columnEncoder = rowFormat.ColumnEncoder(columns)

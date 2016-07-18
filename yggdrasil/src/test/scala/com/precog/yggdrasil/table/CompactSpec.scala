@@ -133,7 +133,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactIdentity = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val compactTable = table.compact(Leaf(Source))
 
@@ -145,7 +145,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactPreserve = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
 
@@ -158,7 +158,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactRows = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
 
@@ -172,7 +172,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactSlices = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
       val sampleJson = toJson(sampleTable)
 
@@ -186,7 +186,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactPreserveKey = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
 
@@ -204,7 +204,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactRowsKey = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
 
@@ -221,7 +221,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def testCompactSlicesKey = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)
       val key = chooseColumn(baseTable)
 

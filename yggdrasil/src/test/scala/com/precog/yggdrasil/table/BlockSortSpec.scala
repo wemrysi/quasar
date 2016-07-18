@@ -79,7 +79,7 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
     import TableModule.paths.Value
 
     implicit val gen = sample(objectSchema(_, 3))
-    check { (sample: SampleData) => {
+    prop { (sample: SampleData) => {
       val Some((_, schema)) = sample.schema
 
       testSortDense(sample, sortOrder, false, schema.map(_._1).head)

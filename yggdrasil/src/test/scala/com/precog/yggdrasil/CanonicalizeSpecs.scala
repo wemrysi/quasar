@@ -56,7 +56,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
 
   def checkBoundedCanonicalize = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val size = sample.data.size
       val minLength = Gen.choose(0, size / 2).sample.get
@@ -65,11 +65,10 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       val canonicalizedTable = table.canonicalize(minLength, Some(maxLength))
       val slices = canonicalizedTable.slices.toStream.copoint map (_.size)
       if (size > 0) {
-        slices.init must haveAllElementsLike { case (sliceSize: Int) =>
-          sliceSize must beBetween(minLength, maxLength)
-        }
+        slices.init must contain(like[Int]({ case size: Int => size must beBetween(minLength, maxLength) })).forall
         slices.last must be_<=(maxLength)
-      } else {
+      }
+      else {
         slices must haveSize(0)
       }
     }
@@ -77,7 +76,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
 
   def checkCanonicalize = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val size = sample.data.size
       val length = Gen.choose(1, size + 3).sample.get

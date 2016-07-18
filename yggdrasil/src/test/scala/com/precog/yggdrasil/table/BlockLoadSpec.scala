@@ -96,7 +96,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
 
   def checkLoadDense = {
     implicit val gen = sample(objectSchema(_, 3))
-    check { (sample: SampleData) => testLoadDense(sample) }
+    prop { (sample: SampleData) => testLoadDense(sample) }
   }
 
   def testLoadSample1 = {

@@ -37,7 +37,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
 
   def checkTakeRange = {
     implicit val gen = sample(schema)
-    check { (sample: SampleData) =>
+    prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val size = sample.data.size
 
