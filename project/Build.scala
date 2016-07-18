@@ -8,17 +8,6 @@ object PlatformBuild {
   def optimizeOpts = if (sys.props contains "precog.optimize") Seq("-optimize") else Seq()
   def debugOpts    = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
 
-  def versionDeps(scalaVersion: String): Seq[ModuleID] = (
-    if (scalaVersion startsWith "2.9") Seq(
-      "com.typesafe.akka"  % "akka-actor"  % "2.0.5",
-      "org.spire-math"     % "spire_2.9.2" % "0.3.0"
-      // "org.specs2"        %% "specs2"      % "1.12.3" % Test
-    ) else Seq(
-      "org.spire-math" %% "spire"  % "0.3.0"
-      // "org.specs2"     %% "specs2" %  "1.14"  % Test
-    )
-  )
-
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...
    *
@@ -72,7 +61,7 @@ object PlatformBuild {
             logBuffered in Test :=  false,
                        ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true)),
                       resolvers +=  "Akka Repo" at "http://repo.akka.io/repository"
-    ) also inBoth(doubleCross)
+    ) also inBoth(doubleCross) also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
 
     // .compileArgs("-Ywarn-numeric-widen")
     // compileArgs("-Xlog-implicits")

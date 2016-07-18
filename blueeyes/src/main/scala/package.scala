@@ -33,7 +33,7 @@ package object blueeyes extends blueeyesstubs.Platform {
   val ScalazOrder           = scalaz.Order
   val ScalazOrdering        = scalaz.Ordering
   type ScalaMathOrdering[A] = scala.math.Ordering[A]
-  type SpireOrder[A]        = spire.math.Order[A]
+  type SpireOrder[A]        = spire.algebra.Order[A]
 
   // joda
   type DateTime = org.joda.time.DateTime
@@ -41,8 +41,9 @@ package object blueeyes extends blueeyesstubs.Platform {
   type Period   = org.joda.time.Period
 
   // shapeless
-  val Iso  = shapeless.Iso
-  val HNil = shapeless.HNil
+  val Iso        = shapeless.Generic
+  type Iso[T, L] = shapeless.Generic.Aux[T, L]
+  val HNil       = shapeless.HNil
 
   type Configuration = org.streum.configrity.Configuration
 
@@ -57,6 +58,14 @@ package object blueeyes extends blueeyesstubs.Platform {
   implicit def K[A](a: A): util.K[A]                          = new util.K(a)
   implicit def OptStr(s: Option[String]): util.OptStr         = new util.OptStr(s)
   implicit def IOClose[T <: java.io.Closeable]: util.Close[T] = new util.Close[T] { def close(a: T): Unit = a.close() }
+
+  implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
+    scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
+
+  @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
+    scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
+
+  type ->[+A, +B] = (A, B)
 }
 
 package blueeyes {

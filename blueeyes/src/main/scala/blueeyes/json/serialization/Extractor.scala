@@ -45,7 +45,7 @@ object Extractor {
   def apply[A](implicit e: Extractor[A]): Extractor[A] = e
 
   def invalidv[A](message: String) = failure[Error, A](Invalid(message))
-  def tryv[A](a: => A)             = (Thrown.apply _) <-: Validation.fromTryCatch(a)
+  def tryv[A](a: => A)             = (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(a)
 
   sealed trait Error {
     def message: String
@@ -79,7 +79,7 @@ object Extractor {
   }
 
   case class Errors(errors: NonEmptyList[Error]) extends Error {
-    def message = "Multiple extraction errors occurred: " + errors.map(_.message).list.mkString(": ")
+    def message = "Multiple extraction errors occurred: " + errors.map(_.message).list.toList.mkString(": ")
   }
 
   implicit val typeclass: Plus[Extractor] with Functor[Extractor] = new Plus[Extractor] with Functor[Extractor] {

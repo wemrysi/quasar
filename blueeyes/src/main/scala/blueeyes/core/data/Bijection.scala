@@ -2,7 +2,6 @@ package blueeyes
 package core.data
 
 import blueeyes.json.JValue
-import scala.xml.NodeSeq
 
 import scalaz.{ Validation, Failure, ValidationNel }
 import scalaz.Scalaz._
@@ -18,15 +17,7 @@ object Unapply {
 }
 
 trait Bijection[A, B] extends Function1[A, B] with Unapply[A, B] { self =>
-  def isDefinedAt(t: A): Boolean = {
-    try {
-      apply(t)
-      true
-    } catch {
-      case ex => false
-    }
-  }
-
+  def isDefinedAt(t: A): Boolean = scala.util.Try(apply(t)).isSuccess
   def apply(t: A): B
 
   def inverse: Bijection[B, A] = new Bijection[B, A] {
@@ -65,7 +56,6 @@ trait IdentityBijections extends Bijections {
   implicit val JValueToJValue       = identity[JValue]
   implicit val StringToString       = identity[String]
   implicit val ArrayByteToArrayByte = identity[Array[Byte]]
-  implicit val XMLToXML             = identity[NodeSeq]
   implicit val ByteChunkToByteChunk = identity[ByteChunk]
 }
 

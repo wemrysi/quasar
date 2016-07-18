@@ -24,13 +24,14 @@ import Arbitrary._
 
 import org.specs2.ScalaCheck
 import org.scalacheck._
+import PrecogSpecs._
 
 object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
-  override val defaultPrettyParams = Pretty.Params(2)
+  // override val defaultPrettyParams = Pretty.Params(2)
 
   "Parser" should {
     "parse all valid JPath strings" in {
-      check { (jpath: JPath) =>
+      prop { (jpath: JPath) =>
         JPath(jpath.toString) == jpath
       }
     }
@@ -47,7 +48,7 @@ object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with 
         for (jv <- arbitrary[JObject]) yield (jv, jv.flattenWithPath)
       }
 
-      check { (testData: (JValue, List[(JPath, JValue)])) =>
+      prop { (testData: (JValue, List[(JPath, JValue)])) =>
         testData match {
           case (obj, allPathValues) =>
             val allProps = allPathValues.map {

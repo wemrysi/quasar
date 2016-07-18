@@ -17,22 +17,7 @@
 package blueeyes
 package json
 
-import scalaz._
-import scalaz.Ordering._
-import scalaz.Validation._
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.math.bigInt._
-import scalaz.std.string._
-import scalaz.std.tuple._
-
-import scalaz.syntax.applicative._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.order._
-import scalaz.syntax.semigroup._
-
-import scala.annotation.{ switch, tailrec }
-import scala.collection.mutable
+import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
 import scala.util.Sorting.quickSort
 
 import java.lang.Double.isInfinite
@@ -85,7 +70,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
     */
   def -->?[A <: JValue](clazz: Class[A]): Option[A] = if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
 
-  /** 
+  /**
     * Does a breadth-first traversal of all descendant JValues, beginning
     * with this one.
     */
@@ -143,7 +128,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = {
     value match {
       case JUndefined => success[Throwable, JValue](this)
-      case value      => Validation fromTryCatch { unsafeInsert(path, value) }
+      case value      => Validation fromTryCatchNonFatal { unsafeInsert(path, value) }
     }
   }
 
@@ -1025,7 +1010,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
         }
 
         if (mode == Canonical)
-          fields.toSeq.sorted.foreach(handlePair)
+          fields.toSeq.sortMe.foreach(handlePair)
         else
           fields.foreach(handlePair)
 
@@ -1040,7 +1025,14 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
 case object JObject extends (Map[String, JValue] => JObject) {
   final val empty                          = JObject(Nil)
-  final implicit val order: Order[JObject] = Order[List[JField]].contramap((_: JObject).fields.toList.sorted.filter(_._2 ne JUndefined).sortBy(_._2))
+
+  implicit val order = Order.orderBy((x: JObject) => x.fields.toVector.sortMe filterNot (_._2 eq JUndefined) sortBy (_._2))
+
+  //   case
+
+  // : Order[JObject] =
+
+  // Order[List[JField]].contramap((_: JObject).fields.toList.sorted.filter(_._2 ne JUndefined).sortBy(_._2))
 
   def apply(fields: Traversable[JField]): JObject = JObject(fields.toMap)
 

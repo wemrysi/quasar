@@ -7,12 +7,7 @@ import Extractor._
 import DefaultSerialization._
 
 import shapeless._
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.show._
-import scalaz.syntax.order._
-import scalaz.syntax.semigroup._
-import scalaz.Validation._
+import scalaz._, Scalaz._, Validation._, FlatMap._
 
 case class Version(major: Int, minor: Int, micro: Option[Int] = None, classifier: Option[String] = None) {
   def isBackwardCompatible(other: Version) = this >= other && this.major == other.major

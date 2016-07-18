@@ -4,8 +4,6 @@ package core.data
 import json._
 import scalaz._
 import scalaz.syntax.monad._
-import scala.xml.NodeSeq
-import scala.xml.XML
 
 trait DefaultBijections {
   implicit def byteArrayToChunk(a: Array[Byte]): ByteChunk = Left(a)

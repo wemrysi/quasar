@@ -21,39 +21,40 @@ import org.scalacheck._
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
 import scalaz._, Scalaz._, Ordering._
+import PrecogSpecs._
 
 object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
-  override val defaultPrettyParams = Pretty.Params(2)
+  // override val defaultPrettyParams = Pretty.Params(2)
 
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
-    check(identityProp)
+    prop(identityProp)
   }
 
   "Functor composition" in {
     val compositionProp = (json: JValue, fa: JValue => JValue, fb: JValue => JValue) => json.mapUp(fb).mapUp(fa) == json.mapUp(fa compose fb)
 
-    check(compositionProp)
+    prop(compositionProp)
   }
 
   "Monoid identity" in {
     val identityProp = (json: JValue) => (json ++ JUndefined == json) && (JUndefined ++ json == json)
-    check(identityProp)
+    prop(identityProp)
   }
 
   "Monoid associativity" in {
     val assocProp = (x: JValue, y: JValue, z: JValue) => x ++ (y ++ z) == (x ++ y) ++ z
-    check(assocProp)
+    prop(assocProp)
   }
 
   "Merge identity" in {
     val identityProp = (json: JValue) => (json merge JUndefined) == json && (JUndefined merge json) == json
-    check(identityProp)
+    prop(identityProp)
   }
 
   "Merge idempotency" in {
     val idempotencyProp = (x: JValue) => (x merge x) == x
-    check(idempotencyProp)
+    prop(idempotencyProp)
   }
 
   "Diff identity" in {
@@ -61,12 +62,12 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       (json diff JUndefined) == Diff(JUndefined, JUndefined, json) &&
         (JUndefined diff json) == Diff(JUndefined, json, JUndefined)
 
-    check(identityProp)
+    prop(identityProp)
   }
 
   "Diff with self is empty" in {
     val emptyProp = (x: JValue) => (x diff x) == Diff(JUndefined, JUndefined, JUndefined)
-    check(emptyProp)
+    prop(emptyProp)
   }
 
   "Diff is subset of originals" in {
@@ -74,12 +75,12 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       val Diff(c, a, d) = x diff y
       y == (y merge (c merge a))
     }
-    check(subsetProp)
+    prop(subsetProp)
   }
 
   "Diff result is same when fields are reordered" in {
     val reorderProp = (x: JObject) => (x diff reorderFields(x)) == Diff(JUndefined, JUndefined, JUndefined)
-    check(reorderProp)
+    prop(reorderProp)
   }
 
   "delete" in {
@@ -91,7 +92,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       (x remove { _ =>
             true
           }) == JUndefined
-    check(removeAllProp)
+    prop(removeAllProp)
   }
 
   "Remove nothing" in {
@@ -99,7 +100,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       (x remove { _ =>
             false
           }) == x
-    check(removeNothingProp)
+    prop(removeNothingProp)
   }
 
   "Remove removes only matching elements (in case of a field, the field is removed)" in {
@@ -109,7 +110,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
 
       removed.flatten.forall(_.getClass != x)
     }
-    check(removeProp)
+    prop(removeProp)
   }
 
   "flattenWithPath includes empty object values" in {
@@ -163,7 +164,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   "unflatten is the inverse of flattenWithPath" in {
     val inverse = (value: JValue) => JValue.unflatten(value.flattenWithPath) == value
 
-    check(inverse)
+    prop(inverse)
   }
 
   "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
@@ -298,7 +299,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
       }
     }
 
-    check(setProp) and check(insertProp)
+    prop(setProp) && prop(insertProp)
   }
 
   private def reorderFields(json: JValue) = json mapUp {

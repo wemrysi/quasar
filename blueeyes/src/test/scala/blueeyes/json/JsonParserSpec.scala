@@ -29,6 +29,7 @@ import scalaz._
 import scala.math.min
 import scala.util.Random.nextInt
 import scala.collection.mutable
+import PrecogSpecs._
 
 object JsonParserSpec extends Specification with ArbitraryJValue with ScalaCheck {
   import JParser._
@@ -36,7 +37,7 @@ object JsonParserSpec extends Specification with ArbitraryJValue with ScalaCheck
 
   "Any valid json can be parsed" in {
     val parsing = (json: JValue) => { parseUnsafe(json.renderPretty); true }
-    check(parsing)
+    prop(parsing)
   }
 
   "Parsing is thread safe" in {

@@ -29,7 +29,7 @@ class DataSizeSpec extends Specification with ScalaCheck {
 
   "DataSize" should {
     "convert different units" in {
-      check { (dataSize: DataSize, unit: DataSizeUnit) =>
+      prop { (dataSize: DataSize, unit: DataSizeUnit) =>
         dataSize.convert(unit) == DataSize(dataSize.size * (dataSize.unit.bytesInUnit / unit.bytesInUnit), unit)
       }
     }

@@ -25,7 +25,7 @@ import scalaz.Validation
 import scalaz.syntax.arrow._
 import scalaz.std.function._
 
-import Validation.fromTryCatch
+import Validation.fromTryCatchNonFatal
 
 import java.io.File
 import java.nio.ByteBuffer
@@ -46,37 +46,37 @@ object JParser {
   type AsyncResult = (AsyncParse, AsyncParser)
 
   def parseFromString(str: String): Result[JValue] =
-    fromTryCatch(new StringParser(str).parse())
+    fromTryCatchNonFatal(new StringParser(str).parse())
 
   def validateFromString[A: Extractor](str: String) =
     ((thrown _) <-: parseFromString(str)) flatMap { _.validated[A] }
 
   def parseFromFile(file: File): Result[JValue] =
-    fromTryCatch(ChannelParser.fromFile(file).parse())
+    fromTryCatchNonFatal(ChannelParser.fromFile(file).parse())
 
   def validateFromFile[A: Extractor](file: File) =
     ((thrown _) <-: parseFromFile(file)) flatMap { _.validated[A] }
 
   def parseFromByteBuffer(buf: ByteBuffer): Result[JValue] =
-    fromTryCatch(new ByteBufferParser(buf).parse())
+    fromTryCatchNonFatal(new ByteBufferParser(buf).parse())
 
   def validateFromByteBuffer[A: Extractor](buf: ByteBuffer) =
     ((thrown _) <-: parseFromByteBuffer(buf)) flatMap { _.validated[A] }
 
   def parseManyFromString(str: String): Result[Seq[JValue]] =
-    fromTryCatch(new StringParser(str).parseMany())
+    fromTryCatchNonFatal(new StringParser(str).parseMany())
 
   def validateManyFromString[A: Extractor](str: String) =
     ((thrown _) <-: parseManyFromString(str)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }
 
   def parseManyFromFile(file: File): Result[Seq[JValue]] =
-    fromTryCatch(ChannelParser.fromFile(file).parseMany())
+    fromTryCatchNonFatal(ChannelParser.fromFile(file).parseMany())
 
   def validateManyFromFile[A: Extractor](file: File) =
     ((thrown _) <-: parseManyFromFile(file)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }
 
   def parseManyFromByteBuffer(buf: ByteBuffer): Result[Seq[JValue]] =
-    fromTryCatch(new ByteBufferParser(buf).parseMany())
+    fromTryCatchNonFatal(new ByteBufferParser(buf).parseMany())
 
   def validateManyFromByteBuffer[A: Extractor](buf: ByteBuffer) =
     ((thrown _) <-: parseManyFromByteBuffer(buf)) flatMap { _.toStream.map(_.validated[A]).sequence[Extract, A] }

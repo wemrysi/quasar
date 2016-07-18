@@ -27,14 +27,10 @@ trait PortFinder {
     } catch {
       case t: Exception =>
         false
-    } finally {
-      if (ss != null) {
-        try {
-          ss.close();
-        } catch {
-          case t => t.printStackTrace
-        }
-      }
+    }
+    finally {
+      if (ss != null)
+        scala.util.Try(ss.close())
     }
   }
 

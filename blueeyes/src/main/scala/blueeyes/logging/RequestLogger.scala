@@ -35,10 +35,7 @@ class FileHandler(baseFileName: String, policy: Policy, fileHeader: () => String
 
   def close() {
     flush()
-    try {
-      _stream.foreach(_.close())
-      _stream = None
-    } catch { case _ => () }
+    scala.util.Try({ _stream.foreach(_.close()) ; _stream = None })
   }
 
   def publish(record: StringBuilder) {
@@ -48,11 +45,9 @@ class FileHandler(baseFileName: String, policy: Policy, fileHeader: () => String
 
   private def writeRecord(record: StringBuilder) {
     _stream foreach { streamValue =>
-      try {
+      scala.util.Try {
         streamValue.write(record.toArray)
         streamValue.flush()
-      } catch {
-        case e => System.err.println(e.fullStackTrace)
       }
     }
   }

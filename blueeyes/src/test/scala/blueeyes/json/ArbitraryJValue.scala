@@ -23,11 +23,11 @@ import Arbitrary.arbitrary
 import PrecogScalacheck._
 
 trait ArbitraryJValue {
-  def genJValue: Gen[JValue]   = frequency((5, genSimple), (1, wrap(genArray)), (1, wrap(genObject)))
+  def genJValue: Gen[JValue]   = frequency((5, genSimple), (1, delay(genArray)), (1, delay(genObject)))
   def genJNum: Gen[JNum]       = genBigDecimal map (JNum(_))
   def genJBool: Gen[JBool]     = arbitrary[Boolean].map(JBool(_))
   def genJString: Gen[JString] = alphaStr.map(JString(_))
-  def genSimple: Gen[JValue]   = oneOf(value(JNull), genJNum, genJBool, genJString)
+  def genSimple: Gen[JValue]   = oneOf[JValue](const(JNull), genJNum, genJBool, genJString)
 
   def genArray: Gen[JValue]   = for (l <- genList) yield JArray(l)
   def genObject: Gen[JObject] = for (l <- genFieldList) yield JObject(l)
