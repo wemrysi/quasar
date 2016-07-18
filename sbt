@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 
-sbtVersion="0.13.11"
+sbtVersion="0.13.12"
 # -Dprecog.optimize
 # -Dprecog.dev
 
