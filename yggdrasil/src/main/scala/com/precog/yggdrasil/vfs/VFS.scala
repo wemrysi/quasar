@@ -57,13 +57,13 @@ object Version {
 }
 
 object VFSModule {
-  def bufferOutput[M[+ _]: Monad](stream0: StreamT[M, CharBuffer],
+  def bufferOutput[M[+_]: Monad](stream0: StreamT[M, CharBuffer],
                                   charset: Charset = Charset.forName("UTF-8"),
                                   bufferSize: Int = 64 * 1024): StreamT[M, Array[Byte]] = {
     val encoder = charset.newEncoder()
 
     def loop(stream: StreamT[M, CharBuffer], buf: ByteBuffer, arr: Array[Byte]): StreamT[M, Array[Byte]] = {
-      StreamT(stream.uncons map {
+      StreamT[M, Array[Byte]](stream.uncons map {
         case Some((cbuf, tail)) =>
           val result = encoder.encode(cbuf, buf, false)
           if (result == CoderResult.OVERFLOW) {
@@ -79,7 +79,7 @@ object VFSModule {
             val arr2 = new Array[Byte](bufferSize)
             StreamT.Yield(arr, loop(stream, ByteBufferWrap(arr2), arr2))
           } else {
-            StreamT.Yield(Arrays.copyOf(arr, buf.position), StreamT.empty)
+            StreamT.Yield(Arrays.copyOf(arr, buf.position), StreamT.empty[M, Array[Byte]])
           }
       })
     }

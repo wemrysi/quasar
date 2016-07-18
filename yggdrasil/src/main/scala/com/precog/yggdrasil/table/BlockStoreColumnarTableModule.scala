@@ -901,9 +901,10 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
       Table(StreamT(M.point(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
 
+    /** XXX
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                                         rightKeySpec: TransSpec1,
-                                                                                        joinSpec: TransSpec2): M[(JoinOrder, Table)] = {
+                                                                                        joinSpec: TransSpec2): M[JoinOrder -> Table] = {
 
       def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
@@ -990,6 +991,8 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
       }
     }
 
+    ***/
+
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table]
   }
 
@@ -1017,7 +1020,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] = {
-      EitherT(slices.toStream map { slices1 =>
+      EitherT[M, ExternalTable, InternalTable](slices.toStream map { slices1 =>
         \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))
       })
     }
@@ -1062,7 +1065,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
     import TableModule._
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
-      EitherT(M.point(\/-(this)))
+      EitherT[M, ExternalTable, InternalTable](M point \/-(this))
 
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)

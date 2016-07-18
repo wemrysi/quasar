@@ -46,7 +46,6 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
 
 trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
   import SampleData._
-  // override val defaultPrettyParams = Pretty.Params(2)
 
   implicit def M: Monad[M] with Comonad[M]
 

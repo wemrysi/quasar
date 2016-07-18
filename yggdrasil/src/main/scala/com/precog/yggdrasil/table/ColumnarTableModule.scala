@@ -287,14 +287,14 @@ object ColumnarTableModule extends Logging {
       (indices, CharBuffer.wrap(sb))
     }
 
-    StreamT.unfoldM((slices, none[Indices])) {
+    StreamT.unfoldM(slices -> none[Indices]) {
       case (stream, pastIndices) =>
         stream.uncons.map {
           case Some((slice, tail)) =>
             val (indices, cb) = renderSlice(pastIndices, slice)
-            Some((cb, (tail, Some(indices))))
+            some(cb -> (tail -> some(indices)))
           case None =>
-            None
+            none
         }
     }
   }
@@ -778,7 +778,7 @@ trait ColumnarTableModule[M[+ _]]
     }
 
     def toArray[A](implicit tpe: CValueType[A]): Table = {
-      val slices2 = slices map { _.toArray[A] }
+      val slices2: StreamT[M, Slice] = slices map { _.toArray[A] }
       Table(slices2, size)
     }
 

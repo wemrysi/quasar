@@ -24,6 +24,8 @@ import com.precog.common._
 import blueeyes.json._
 import java.math.MathContext
 import org.scalacheck._, Gen._, Arbitrary._
+import scalaz._, Scalaz._
+import PrecogScalacheck._
 
 object CValueGenerators {
   type JSchema = Seq[(JPath, CType)]
@@ -113,7 +115,7 @@ trait CValueGenerators extends ArbitraryBigDecimal {
   }
 
   def jvalue(schema: Seq[(JPath, CType)]): Gen[JValue] = {
-    schema.foldLeft(Gen.value[JValue](JUndefined)) {
+    schema.foldLeft(Gen.const[JValue](JUndefined)) {
       case (gen, (jpath, ctype)) =>
         for {
           acc <- gen
@@ -124,25 +126,24 @@ trait CValueGenerators extends ArbitraryBigDecimal {
     }
   }
 
-  def genEventColumns(jschema: JSchema): Gen[(Int, Stream[(Identities, Seq[(JPath, JValue)])])] =
+  def genEventColumns(jschema: JSchema): Gen[Int -> Stream[Identities -> Seq[JPath -> JValue]]] =
     for {
       idCount  <- choose(1, 3)
       dataSize <- choose(0, 20)
-      ids      <- containerOfN[Set, List[Long]](dataSize, containerOfN[List, Long](idCount, posNum[Long]))
-      values   <- containerOfN[List, Seq[(JPath, JValue)]](dataSize, Gen.sequence[List, (JPath, JValue)](jschema map { case (jpath, ctype) => jvalue(ctype).map(jpath ->) }))
-
+      ids      <- setOfN[List[Long]](dataSize, listOfN[Long](idCount, genPosLong))
+      values   <- listOfN[Seq[JPath -> JValue]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
       falseDepth  <- choose(1, 3)
       falseSchema <- schema(falseDepth)
       falseSize   <- choose(0, 5)
-      falseIds    <- containerOfN[Set, List[Long]](falseSize, containerOfN[List, Long](idCount, posNum[Long]))
-      falseValues <- containerOfN[List, Seq[(JPath, JValue)]](falseSize, Gen.sequence[List, (JPath, JValue)](falseSchema map { case (jpath, ctype) => jvalue(ctype).map(jpath ->) }))
+      falseIds    <- setOfN[List[Long]](falseSize, listOfN(idCount, genPosLong))
+      falseValues <- listOfN[Seq[JPath -> JValue]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
 
       falseIds2 = falseIds -- ids     // distinct ids
     } yield {
       (idCount, (ids.map(_.toArray) zip values).toStream ++ (falseIds2.map(_.toArray) zip falseValues).toStream)
     }
 
-  def assemble(parts: Seq[(JPath, JValue)]): JValue = {
+  def assemble(parts: Seq[JPath -> JValue]): JValue = {
     val result = parts.foldLeft[JValue](JUndefined) {
       case (acc, (selector, jv)) => acc.unsafeInsert(selector, jv)
     }
@@ -179,13 +180,13 @@ trait SValueGenerators extends ArbitraryBigDecimal {
   }
 
 
-  def sleaf: Gen[SValue] = oneOf(
+  def sleaf: Gen[SValue] = oneOf[SValue](
     alphaStr map (SString(_: String)),
     arbitrary[Boolean] map (SBoolean(_: Boolean)),
     arbitrary[Long]    map (l => SDecimal(BigDecimal(l))),
     arbitrary[Double]  map (d => SDecimal(BigDecimal(d))),
     arbitrary[BigDecimal] map { bd => SDecimal(bd) }, //scalacheck's BigDecimal gen will overflow at random
-    value(SNull)
+    const(SNull)
   )
 
   def sevent(idCount: Int, vdepth: Int): Gen[SEvent] = {

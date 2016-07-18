@@ -21,12 +21,9 @@ package com.precog.niflheim
 
 import blueeyes._
 import com.precog.common._
-
-import org.specs2.mutable.Specification
-import org.specs2._
 import org.scalacheck._
-
-import scalaz._
+import scalaz._, Scalaz._
+import PrecogSpecs._, PrecogScalacheck._
 
 class V1CookedBlockFormatSpecs extends CookedBlockFormatSpecs {
   val format = V1CookedBlockFormat
@@ -38,8 +35,6 @@ case class VersionedCookedBlockFormatSpecs() extends CookedBlockFormatSpecs {
 
 trait CookedBlockFormatSpecs extends Specification with ScalaCheck with SegmentFormatSupport {
   def format: CookedBlockFormat
-
-  override val defaultPrettyParams = Pretty.Params(2)
 
   implicit val arbFile = Arbitrary(for {
     parts <- Gen.listOfN(3, Gen.identifier map { part =>

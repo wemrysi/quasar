@@ -28,12 +28,11 @@ import org.slf4j.LoggerFactory
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-import org.specs2.execute.AsResult
-import org.specs2.specification.{ Outside, Context }
-import org.specs2.matcher.MatchResult
+import org.specs2.specification.Context
 import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
 import SampleData._
+import PrecogSpecs._
 
 trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int
@@ -74,21 +73,12 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     with ToArraySpec[M]
     with ConcatSpec[M]
     with SampleSpec[M]
-    //with UnionAllSpec[M]
-    //with CrossAllSpec[M]
-    //with GroupingGraphSpec[M]
     with DistinctSpec[M]
     with SchemasSpec[M]
     { spec =>
 
   import trans._
   import constants._
-
-  // For reasons unknown it won't compile under 2.9.3 without these overrides.
-  override implicit def contextAsResult[T, M[_] <: MatchResult[_]](implicit context: Context): AsResult[M[T]] = super.contextAsResult[T, M]
-  override implicit def outsideFunctionToResult[T : Outside, R : AsResult]: AsResult[T => R]                  = super.outsideFunctionToResult[T, R]
-
-  override val defaultPrettyParams = Pretty.Params(2)
 
   lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
 
@@ -641,15 +631,8 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
   }
 }
 
-object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Free.Trampoline] {
-  implicit def M = new Monad[Free.Trampoline] with Comonad[Free.Trampoline] with Cobind.FromCojoin[Free.Trampoline] {
-    import scalaz.Free._
-    import scalaz.std.function._
-    override def point[A](a: => A) = freeMonad[Function0].point(a)
-    override def bind[A, B](m: Free.Trampoline[A])(f: A => Free.Trampoline[B]) = freeMonad[Function0].bind(m)(f)
-    override def copoint[A](m: Free.Trampoline[A]) = m go { f => f() }
-    override def cojoin[A](m: Free.Trampoline[A]) = point(m)
-  }
+object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Need] {
+  implicit def M = Need.need
 
   type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
   val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {

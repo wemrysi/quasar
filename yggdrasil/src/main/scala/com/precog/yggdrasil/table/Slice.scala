@@ -21,18 +21,14 @@ package com.precog.yggdrasil
 package table
 
 import util.CPathUtils
-import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
 import com.precog.util._
 
 import TransSpecModule._
-import blueeyes.json._
+import blueeyes._, json._
 
-
-import scalaz._
-import scalaz.Ordering._
-import scalaz.syntax.id._
+import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 
 trait Slice { source =>
@@ -723,15 +719,15 @@ trait Slice { source =>
               0
             }
 
-            def eqv(i: Int, j: Int): Boolean = {
-              var k = 0
-              while (k < cols.length) {
-                if (!cols(k).eqv(i, j))
-                  return false
-                k += 1
-              }
-              true
-            }
+            // def eqv(i: Int, j: Int): Boolean = {
+            //   var k = 0
+            //   while (k < cols.length) {
+            //     if (!cols(k).eqv(i, j))
+            //       return false
+            //     k += 1
+            //   }
+            //   true
+            // }
           }
 
         case Right(cols) =>
@@ -927,7 +923,7 @@ trait Slice { source =>
 
   def renderJson[M[+ _]](delimiter: String)(implicit M: Monad[M]): (StreamT[M, CharBuffer], Boolean) = {
     if (columns.isEmpty) {
-      (StreamT.empty, false)
+      (StreamT.empty[M, CharBuffer], false)
     } else {
       val BufferSize = 1024 * 10 // 10 KB
 
@@ -1565,9 +1561,8 @@ trait Slice { source =>
         }
 
         (stream, rendered)
-      } else {
-        (StreamT.empty, false)
       }
+      else StreamT.empty[M, CharBuffer] -> false
     }
   }
 

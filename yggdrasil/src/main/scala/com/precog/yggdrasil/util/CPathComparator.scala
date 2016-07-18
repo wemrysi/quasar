@@ -23,6 +23,7 @@ package util
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
+import scalaz._, Scalaz._
 
 /**
   * Represents the result of an ordering, but with the possibility that no

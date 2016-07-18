@@ -26,11 +26,8 @@ import com.precog.yggdrasil.table._
 
 import com.precog.util._
 
-import org.specs2._
-import org.specs2.mutable.Specification
-import org.scalacheck.{ Shrink, Arbitrary, Gen, Pretty }
-
-
+import org.scalacheck.{ Shrink, Arbitrary, Gen }
+import PrecogSpecs._, PrecogScalacheck._
 
 class CPathTraversalSpec extends Specification {
   import CPathTraversal.{ Done, Sequence, Select, Loop }
@@ -152,7 +149,7 @@ class CPathTraversalSpec extends Specification {
     // [0, "b"]
     // ["abc", "c"]
     val nonIntersectingHet: Map[CPath, Set[Column]] = Map(
-      CPath("[*]") -> Set(col(0)(Array(0L, 01L, 02L))),
+      CPath("[*]") -> Set(col(0)(Array[Long](0L, 1L, 2L))),
       CPath("[0]") -> Set(col(1)(0L), col(2)("abc")),
       CPath("[1]") -> Set(col(1, 2)("b", "c"))
     )

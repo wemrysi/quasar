@@ -82,7 +82,7 @@ object ResourceError {
 
   case class ResourceErrors private[ResourceError] (errors: NonEmptyList[ResourceError]) extends ResourceError with FatalError with UserError { self =>
     override def fold[A](fatalError: FatalError => A, userError: UserError => A) = {
-      val hasFatal = errors.list.exists(_.fold(_ => true, _ => false))
+      val hasFatal = errors.list.toList.exists(_.fold(_ => true, _ => false))
       if (hasFatal) fatalError(self) else userError(self)
     }
 

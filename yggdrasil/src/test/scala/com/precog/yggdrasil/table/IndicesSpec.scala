@@ -20,22 +20,17 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
 import com.precog.common._, security._
 import com.precog.yggdrasil.util._
 import com.precog.bytecode.JType
 
-import blueeyes.json._
-import scalaz._
-import scalaz.syntax.comonad._
-import scalaz.std.stream._
+import blueeyes._, json._
+import scalaz._, Scalaz._
+import PrecogSpecs._
 
 // TODO: mix in a trait rather than defining Table directly
 
-trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M]
-    with TableModuleSpec[M]
-    with IndicesModule[M] { spec =>
-
+trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableModuleSpec[M] with IndicesModule[M] {
   type GroupId = Int
 
   import TableModule._
@@ -94,16 +89,14 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M]
 {"a": 1, "c": [666]}
 """
 
-    val table = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
-
-    val keySpecs = Array(groupkey("a"), groupkey("b"))
-    val valSpec = valuekey("c")
-
+    val table             = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
+    val keySpecs          = Array(groupkey("a"), groupkey("b"))
+    val valSpec           = valuekey("c")
     val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
     "determine unique groupkey values" in {
-      index.getUniqueKeys(0) must_== Set(CLong(1), CLong(2), CLong(3), CString("foo"))
-      index.getUniqueKeys(1) must_== Set(CLong(2), CLong(999), CString("bar"), CString(""))
+      index.getUniqueKeys(0) must_== Set[RValue](CLong(1), CLong(2), CLong(3), CString("foo"))
+      index.getUniqueKeys(1) must_== Set[RValue](CLong(2), CLong(999), CString("bar"), CString(""))
     }
 
     "determine unique groupkey sets" in {

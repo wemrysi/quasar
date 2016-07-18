@@ -32,7 +32,8 @@ trait HetOrder[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boole
 }
 
 trait HetOrderLow {
-  implicit def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](implicit ho: HetOrder[A, B]) =
+  // implicit
+  def reverse[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](ho: HetOrder[A, B]) =
     new HetOrder[B, A] {
       def compare(b: B, a: A) = {
         val cmp = ho.compare(a, b)
@@ -46,6 +47,14 @@ trait HetOrderLow {
 }
 
 object HetOrder extends HetOrderLow {
+  implicit def fromScalazOrder[A](implicit z: ScalazOrder[A]) = new HetOrder[A, A] {
+    def compare(a: A, b: A): Int = z.order(a, b).toInt
+  }
+
+  implicit def DoubleLongOrder       = reverse(LongDoubleOrder)
+  implicit def BigDecimalLongOrder   = reverse(LongBigDecimalOrder)
+  implicit def BigDecimalDoubleOrder = reverse(DoubleBigDecimalOrder)
+
   implicit object LongDoubleOrder extends HetOrder[Long, Double] {
     def compare(a: Long, b: Double): Int = NumericComparisons.compare(a, b)
   }
@@ -66,22 +75,22 @@ object HetOrder extends HetOrderLow {
   */
 object ExtraOrders {
   implicit object BigDecimalOrder extends SpireOrder[BigDecimal] {
-    def eqv(a: BigDecimal, b: BigDecimal)     = a == b
+    // def eqv(a: BigDecimal, b: BigDecimal)     = a == b
     def compare(a: BigDecimal, b: BigDecimal) = bigDecimalOrder.order(a, b).toInt
   }
 
   implicit object BooleanOrder extends SpireOrder[Boolean] {
-    def eqv(a: Boolean, b: Boolean)     = a == b
+    // def eqv(a: Boolean, b: Boolean)     = a == b
     def compare(a: Boolean, b: Boolean) = if (a == b) 0 else if (a) 1 else -1
   }
 
   implicit object StringOrder extends SpireOrder[String] {
-    def eqv(a: String, b: String)     = a == b
+    // def eqv(a: String, b: String)     = a == b
     def compare(a: String, b: String) = a compareTo b
   }
 
   implicit object DateTimeOrder extends SpireOrder[DateTime] {
-    def eqv(a: DateTime, b: DateTime)     = compare(a, b) == 0
+    // def eqv(a: DateTime, b: DateTime)     = compare(a, b) == 0
     def compare(a: DateTime, b: DateTime) = a compareTo b
   }
 }

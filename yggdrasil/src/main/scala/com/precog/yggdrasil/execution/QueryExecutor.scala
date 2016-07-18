@@ -66,13 +66,3 @@ case class CacheControl(maxAge: Option[Long], recacheAfter: Option[Long], cachea
 object CacheControl {
   val NoCache = CacheControl(None, None, false, false)
 }
-
-trait QueryExecutor[M[+ _], +A] { self =>
-  def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, A]
-
-  def map[B](f: A => B)(implicit M: Functor[M]): QueryExecutor[M, B] = new QueryExecutor[M, B] {
-    def execute(query: String, context: EvaluationContext, opts: QueryOptions): EitherT[M, EvaluationError, B] = {
-      self.execute(query, context, opts) map f
-    }
-  }
-}

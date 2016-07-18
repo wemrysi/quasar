@@ -33,7 +33,6 @@ import TransSpecModule._
 
 import scalaz._
 import scalaz.syntax.monad._
-import scala.collection.{ Set => GenSet }
 import scala.collection.mutable
 import org.slf4s.Logging
 
@@ -75,22 +74,16 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     /**
       * Return the set of values we've seen for this group key.
       */
-    def getUniqueKeys(keyId: Int): GenSet[RValue] = {
+    def getUniqueKeys(keyId: Int): Set[RValue] =
       // Union the sets we get from our slice indices.
-      val set = mutable.Set.empty[RValue]
-      indices.foreach(set ++= _.getUniqueKeys(keyId))
-      set
-    }
+      indices flatMap (_ getUniqueKeys keyId) toSet
 
     /**
       * Return the set of values we've seen for this group key.
       */
-    def getUniqueKeys(): GenSet[Seq[RValue]] = {
+    def getUniqueKeys(): Set[Seq[RValue]] =
       // Union the sets we get from our slice indices.
-      val set = mutable.Set.empty[Seq[RValue]]
-      indices.foreach(set ++= _.getUniqueKeys())
-      set
-    }
+      indices flatMap (_.getUniqueKeys()) toSet
 
     /**
       * Return the subtable where each group key in keyIds is set to
@@ -225,12 +218,12 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     /**
       * Return the set of values we've seen for this group key.
       */
-    def getUniqueKeys(keyId: Int): GenSet[RValue] = vals(keyId)
+    def getUniqueKeys(keyId: Int): Set[RValue] = vals(keyId).toSet
 
     /**
       * Return the set of value combinations we've seen.
       */
-    def getUniqueKeys(): GenSet[Seq[RValue]] = keyset
+    def getUniqueKeys(): Set[Seq[RValue]] = keyset.toSet
 
     /**
       * Return the subtable where each group key in keyIds is set to

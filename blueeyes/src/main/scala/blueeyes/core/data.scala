@@ -100,8 +100,6 @@ package object data {
     }
 
     def forceByteArray(s: ByteChunk)(implicit executor: ExecutionContext): Future[Array[Byte]] = {
-      implicit val M: Monad[Future] = futureMonad(executor)
-
       ByteChunk.force(s) map { arrays =>
         val len = arrays.foldLeft(0)(_ + _.length)
         val arr = new Array[Byte](len)

@@ -153,7 +153,7 @@ class VersionLog(logFiles: VersionLog.LogFiles, initVersion: Option[VersionEntry
 
   def addVersion(entry: VersionEntry): IO[PrecogUnit] =
     allVersions.find(_ == entry) map { _ =>
-      IO(PrecogUnit)
+      IO[PrecogUnit](PrecogUnit)
     } getOrElse {
       log.debug("Adding version entry: " + entry)
       IOUtils.writeToFile(entry.serialize.renderCompact + "\n", logFile, append = true) map { _ =>

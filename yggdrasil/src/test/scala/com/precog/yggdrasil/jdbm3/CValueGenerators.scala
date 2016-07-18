@@ -23,6 +23,7 @@ package jdbm3
 import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
+import PrecogScalacheck._
 
 trait CValueGenerators {
   def maxArraySize = 16
@@ -30,9 +31,8 @@ trait CValueGenerators {
 
   def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
 
-  private def containerOfAtMostN[C[_],T](maxSize: Int, g: Gen[T])
-      (implicit b: org.scalacheck.util.Buildable[T,C]): Gen[C[T]] =
-    Gen.sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C,T](n,g)) yield c)
+  // private def containerOfAtMostN[C[_],T](maxSize: Int, g: Gen[T])(implicit b: Buildable[T,C]): Gen[C[T]] =
+  //   Gen.sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C,T](n,g)) yield c)
 
   private def indexedSeqOf[A](gen: Gen[A]): Gen[IndexedSeq[A]] =
     containerOfAtMostN[List, A](maxArraySize, gen) map (_.toIndexedSeq)
@@ -69,10 +69,10 @@ trait CValueGenerators {
 
   def genCValue(tpe: CType): Gen[CValue] = tpe match {
     case tpe: CValueType[_] => genValueForCValueType(tpe)
-    case CNull    => Gen.value(CNull)
-    case CEmptyObject => Gen.value(CEmptyObject)
-    case CEmptyArray  => Gen.value(CEmptyArray)
-    case invalid      => sys.error("No values for type " + invalid)
+    case CNull              => Gen.const(CNull)
+    case CEmptyObject       => Gen.const(CEmptyObject)
+    case CEmptyArray        => Gen.const(CEmptyArray)
+    case invalid            => sys.error("No values for type " + invalid)
   }
 }
 

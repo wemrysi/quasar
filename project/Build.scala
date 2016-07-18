@@ -50,7 +50,8 @@ object PlatformBuild {
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
     def compileArgs(args: String*): Project           = also(scalacOptions in Compile ++= args.toList)
 
-    def setup: Project = also(
+    def setup: Project = (
+      also(
                    organization :=  "com.precog",
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
@@ -61,9 +62,11 @@ object PlatformBuild {
             logBuffered in Test :=  false,
                        ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true)),
                       resolvers +=  "Akka Repo" at "http://repo.akka.io/repository"
-    ) also inBoth(doubleCross) also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
-
-    // .compileArgs("-Ywarn-numeric-widen")
-    // compileArgs("-Xlog-implicits")
+      )
+      also inBoth(doubleCross)
+      also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
+      compileArgs("-Ywarn-unused", "-Ywarn-unused-import")
+    )
+    // "-Ywarn-numeric-widen", "-Xlog-implicits"
   }
 }

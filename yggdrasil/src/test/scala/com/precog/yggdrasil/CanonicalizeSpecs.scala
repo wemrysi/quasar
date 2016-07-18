@@ -20,7 +20,7 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes.json._
+import blueeyes._, json._
 
 import scalaz.StreamT
 import scalaz.syntax.comonad._
@@ -28,6 +28,7 @@ import scalaz.syntax.comonad._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
+import PrecogSpecs._
 
 trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
@@ -94,7 +95,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
 
       resultSizes mustEqual expected
     }
-  }.set(minTestsOk -> 1000)
+  }.set(minTestsOk =  1000)
 
   def testCanonicalize = {
     val result = table.canonicalize(3)

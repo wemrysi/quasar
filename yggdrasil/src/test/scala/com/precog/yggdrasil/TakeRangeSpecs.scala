@@ -53,7 +53,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
 
       result must_== expected
     }
-  }.set(minTestsOk -> 1000)
+  }.set(minTestsOk =  1000)
 
   def testTakeRange = {
     val data: Stream[JValue] =

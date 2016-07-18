@@ -27,8 +27,6 @@ import org.scalacheck._
 import PrecogSpecs._
 
 object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
-  // override val defaultPrettyParams = Pretty.Params(2)
-
   "Parser" should {
     "parse all valid JPath strings" in {
       prop { (jpath: JPath) =>

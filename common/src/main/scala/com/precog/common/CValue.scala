@@ -161,13 +161,14 @@ sealed trait CNullValue extends CValue { self: CNullType =>
   def cType: CNullType = self
 }
 
-sealed trait CWrappedValue[@spec(Boolean, Long, Double) A] extends CValue {
+sealed trait CWrappedValue[A] extends CValue {
   def cType: CValueType[A]
   def value: A
   def toJValue = cType.jValueFor(value)
 }
 
-sealed trait CNumericValue[@spec(Long, Double) A] extends CWrappedValue[A] {
+sealed trait CNumericValue[A] extends CWrappedValue[A] {
+  final override def hashCode = 12
   def cType: CNumericType[A]
   def toCNum: CNum = CNum(cType.bigDecimalFor(value))
 }
@@ -233,7 +234,7 @@ sealed trait CType extends Serializable {
 
 sealed trait CNullType extends CType with CNullValue
 
-sealed trait CValueType[@spec(Boolean, Long, Double) A] extends CType { self =>
+sealed trait CValueType[A] extends CType { self =>
   def manifest: Manifest[A]
 
   def readResolve(): CValueType[A]
@@ -242,7 +243,7 @@ sealed trait CValueType[@spec(Boolean, Long, Double) A] extends CType { self =>
   def jValueFor(a: A): JValue
 }
 
-sealed trait CNumericType[@spec(Long, Double) A] extends CValueType[A] {
+sealed trait CNumericType[A] extends CValueType[A] {
   override def isNumeric: Boolean = true
   def bigDecimalFor(a: A): BigDecimal
 }
@@ -396,26 +397,26 @@ object CType {
 }
 
 object CValueType {
-  def apply[@spec(Boolean, Long, Double) A](implicit A: CValueType[A]): CValueType[A]          = A
-  def apply[@spec(Boolean, Long, Double) A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
+  def apply[A](implicit A: CValueType[A]): CValueType[A]          = A
+  def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
 
   // These let us do, def const[A: CValueType](a: A): CValue = CValueType[A](a)
 
-  implicit def string: CValueType[String]                                              = CString
-  implicit def boolean: CValueType[Boolean]                                            = CBoolean
-  implicit def long: CValueType[Long]                                                  = CLong
-  implicit def double: CValueType[Double]                                              = CDouble
-  implicit def bigDecimal: CValueType[BigDecimal]                                      = CNum
-  implicit def dateTime: CValueType[DateTime]                                          = CDate
-  implicit def period: CValueType[Period]                                              = CPeriod
-  implicit def array[@spec(Boolean, Long, Double) A](implicit elemType: CValueType[A]) = CArrayType(elemType)
+  implicit def string: CValueType[String]                 = CString
+  implicit def boolean: CValueType[Boolean]               = CBoolean
+  implicit def long: CValueType[Long]                     = CLong
+  implicit def double: CValueType[Double]                 = CDouble
+  implicit def bigDecimal: CValueType[BigDecimal]         = CNum
+  implicit def dateTime: CValueType[DateTime]             = CDate
+  implicit def period: CValueType[Period]                 = CPeriod
+  implicit def array[A](implicit elemType: CValueType[A]) = CArrayType(elemType)
 }
 
 //
 // Homogeneous arrays
 //
-case class CArray[@spec(Boolean, Long, Double) A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
-  private final def leafEquiv[@spec(Boolean, Long, Double) A](as: Array[A], bs: Array[A]): Boolean = {
+case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
+  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = {
     var i      = 0
     var result = as.length == bs.length
     while (result && i < as.length) {
@@ -461,11 +462,11 @@ case class CArray[@spec(Boolean, Long, Double) A](value: Array[A], cType: CArray
 }
 
 case object CArray {
-  def apply[@spec(Boolean, Long, Double) A](as: Array[A])(implicit elemType: CValueType[A]): CArray[A] =
+  def apply[A](as: Array[A])(implicit elemType: CValueType[A]): CArray[A] =
     CArray(as, CArrayType(elemType))
 }
 
-case class CArrayType[@spec(Boolean, Long, Double) A](elemType: CValueType[A]) extends CValueType[Array[A]] {
+case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
   // Spec. bug: Leave lazy here.
   lazy val manifest: Manifest[Array[A]] = elemType.manifest.arrayManifest
 

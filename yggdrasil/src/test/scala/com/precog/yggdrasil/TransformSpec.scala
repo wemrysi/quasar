@@ -19,19 +19,14 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
 import com.precog.common._
-
-import blueeyes.json._
-
+import blueeyes._, json._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
-
 import scala.util.Random
 import org.scalacheck._, Gen._, Arbitrary._
-
 import com.precog.bytecode._
-import scalaz.syntax.comonad._
+import scalaz._, Scalaz._
 
 trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import CValueGenerators._
@@ -190,7 +185,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
 
       results.copoint must_== expected
-    }.set(minTestsOk -> 200)
+    }.set(minTestsOk =  200)
   }
 
   def testMod2Filter = {
@@ -2253,7 +2248,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
 
       results.copoint must_== expected
-    }.set(minTestsOk -> 200)
+    }.set(minTestsOk =  200)
   }
 
   def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]], subsumes: Boolean): Stream[JValue] = {

@@ -24,8 +24,6 @@ import scalaz._, Scalaz._, Ordering._
 import PrecogSpecs._
 
 object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
-  // override val defaultPrettyParams = Pretty.Params(2)
-
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)

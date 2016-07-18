@@ -24,6 +24,7 @@ import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.util._
 import scala.collection.mutable
+import scalaz._, Scalaz._
 
 /**
   * Represents a way to traverse a list of CPaths in sorted order. This takes
@@ -157,7 +158,7 @@ sealed trait CPathTraversal { self =>
         pathComp.compare(row1, row2, indices).toInt
       }
 
-      def eqv(row1: Int, row2: Int) = compare(row1, row2) == 0
+      // def eqv(row1: Int, row2: Int) = compare(row1, row2) == 0
     }
   }
 

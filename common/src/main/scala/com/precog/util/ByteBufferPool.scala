@@ -93,9 +93,6 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
 }
 
 object ByteBufferPool {
-
-  type ByteBufferPoolS[A] = State[ByteBufferPool -> List[ByteBuffer], A]
-
   implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
 
     def point[A](a: => A): ByteBufferPoolS[A] = State.state(a)

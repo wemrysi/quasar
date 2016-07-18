@@ -23,7 +23,9 @@ package jdbm3
 import table._
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
+import com.precog.util.{ flipBytes => _, _ }
+import scalaz._, Scalaz._
+import ByteBufferPool._
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]
@@ -587,21 +589,16 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
       case (_, cvals) => cvals map (_._1) find (_ != CUndefined) getOrElse CUndefined
     }
 
-    import ByteBufferPool._
-
-    import scalaz.syntax.traverse._
-    import scalaz.std.list._
-
     val writes: ByteBufferPoolS[List[Unit]] = cvals.map {
       case v: CNullValue =>
-        writeFlagFor(v.cType)
+        writeFlagFor[ByteBufferPoolS](v.cType)
 
       case v: CWrappedValue[_] =>
         for {
-          _ <- writeFlagFor(v.cType)
+          _ <- writeFlagFor[ByteBufferPoolS](v.cType)
           _ <- codecForCValueType(v.cType).write(v.value)
         } yield ()
-    }.sequence
+    }.sequence[ByteBufferPoolS, Unit]
 
     pool.run(for {
       _ <- writes
@@ -745,8 +742,8 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 }
 
 object SortingRowFormat {
-  def writeFlagFor[M[+ _]](cType: CType)(implicit M: ByteBufferMonad[M]): M[Unit] = {
-    import scalaz.syntax.monad._
+  def writeFlagFor[M[_]](cType: CType)(implicit M: ByteBufferMonad[M]): M[Unit] = {
+    // import scalaz.syntax.monad._
 
     val flag = flagForCType(cType)
     for (buf <- M.getBuffer(1)) yield {

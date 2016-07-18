@@ -81,11 +81,11 @@ package object util {
   /**
     * A `Monad` for working with `ByteBuffer`s.
     */
-  implicit object ByteBufferPoolS extends Monad[ByteBufferPoolS] {
-    def point[A](a: => A): ByteBufferPoolS[A]                                              = State.state(a)
-    def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] = State { s => val (s1, a) = fa(s) ; f(a)(s1) }
-    def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer]                                   = ByteBufferPool acquire min
-  }
+  // implicit object ByteBufferPoolS extends Monad[ByteBufferPoolS] {
+  //   def point[A](a: => A): ByteBufferPoolS[A]                                              = State.state(a)
+  //   def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] = State { s => val (s1, a) = fa(s) ; f(a)(s1) }
+  //   def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer]                                   = ByteBufferPool acquire min
+  // }
 
   def flipBytes(buffer: ByteBuffer): Array[Byte] = {
     val bytes = new Array[Byte](buffer.remaining())

@@ -21,15 +21,10 @@ package com.precog.niflheim
 
 import blueeyes._
 import com.precog.common._
-
 import com.precog.util._
-
-
-import org.specs2._
-import org.specs2.mutable.Specification
 import org.scalacheck._
-
-import scalaz._
+import scalaz._, Scalaz._
+import PrecogSpecs._, PrecogScalacheck._
 
 class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
@@ -65,8 +60,6 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
   def surviveRoundTrip(segment: Segment) = surviveRoundTripWithFormat(format)(segment)
 
   val EmptyBitSet = BitSetUtil.create()
-
-  override val defaultPrettyParams = Pretty.Params(2)
 
   "segment formats" should {
     "roundtrip trivial null segments" in {

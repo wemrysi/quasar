@@ -38,13 +38,13 @@ trait SegmentFormatSupport {
     parts <- Gen.listOfN(len, Gen.identifier)
   } yield CPath(parts mkString ".")
 
-  def genBitSet(length: Int, density: Double): Gen[BitSet] = Gen { params =>
+  def genBitSet(length: Int, density: Double): Gen[BitSet] = Gen parameterized { params =>
     val bits = new ArrayBuffer[Int]
     Loop.range(0, bits.length) { row =>
       if (params.rng.nextDouble < density)
         bits += row
     }
-    Some(BitSetUtil.create(bits.toArray))
+    BitSetUtil.create(bits.toArray)
   }
 
   def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {

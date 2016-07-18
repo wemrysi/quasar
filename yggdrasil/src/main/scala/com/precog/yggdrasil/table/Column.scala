@@ -96,7 +96,7 @@ object HomogeneousArrayColumn {
   def unapply[A](col: HomogeneousArrayColumn[A]): Option[CValueType[A]] = Some(col.tpe.elemType)
 
   @inline
-  private[table] def select(col: HomogeneousArrayColumn[_], i: Int) = col match {
+  private[table] def select[A](col: HomogeneousArrayColumn[A], i: Int) = col match {
     case col @ HomogeneousArrayColumn(CString) =>
       new StrColumn {
         def isDefinedAt(row: Int): Boolean =
@@ -359,11 +359,11 @@ object Column {
       else 0
     }
 
-    def eqv(i: Int, j: Int): Boolean = {
-      if (col.isDefinedAt(i)) {
-        if (col.isDefinedAt(j)) col.rowEq(i, j) else false
-      } else !col.isDefinedAt(j)
-    }
+    // def eqv(i: Int, j: Int): Boolean = {
+    //   if (col.isDefinedAt(i)) {
+    //     if (col.isDefinedAt(j)) col.rowEq(i, j) else false
+    //   } else !col.isDefinedAt(j)
+    // }
   }
   @inline def const(cv: CValue): Column = cv match {
     case CBoolean(v)                         => const(v)

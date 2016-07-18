@@ -23,23 +23,21 @@ package jdbm3
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
-import com.precog.util.ByteBufferPool
+import com.precog.util.{ ByteBufferPool, ByteBufferPoolS }
 import org.specs2._
 import org.specs2.mutable.Specification
-import org.scalacheck.{ Shrink, Arbitrary, Gen, Pretty }
+import org.scalacheck.{ Shrink, Arbitrary, Gen }
+import PrecogScalacheck._, PrecogSpecs._
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._
   import ByteBufferPool._
 
-  // Get ScalaCheck to print out the full stacktrace.
-  override val defaultPrettyParams = Pretty.Params(2)
-
   // This should generate some jpath ids, then generate CTypes for these.
-  def genColumnRefs: Gen[List[ColumnRef]] = Gen.listOf(Gen.alphaStr filter (_.size > 0)) flatMap { paths =>
-    Gen.sequence[List, List[ColumnRef]](paths.distinct.map { name =>
-      Gen.listOf(genCType) map { _.distinct map (ColumnRef(CPath(name), _)) }
-    }).map(_.flatten)
+  def genJpathIds: Gen[List[String]] = Gen.alphaStr filter (_.length > 0) list
+  def genColumnRefs: Gen[List[ColumnRef]] = genJpathIds >> { ids =>
+    val generators = ids.distinct map (id => listOf(genCType) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
+    Gen.sequence(generators) ^^ (_.flatten.toList)
   }
 
   def groupConsecutive[A, B](as: List[A])(f: A => B) = {
@@ -55,16 +53,17 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     build(as, Nil)
   }
 
-  def genCValuesForColumnRefs(refs: List[ColumnRef]): Gen[List[CValue]] =
-    Gen.sequence[List, List[CValue]](groupConsecutive(refs)(_.selector) map {
-      case refs =>
-        Gen.choose(0, refs.size - 1) flatMap { i =>
-          Gen.sequence[List, CValue](refs.zipWithIndex map {
-            case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValue(cType), 1 -> Gen.value(CUndefined))
-            case (_, _) => Gen.value(CUndefined)
-          })
-        }
-    }) map (_.flatten)
+  def genCValuesForColumnRefs(refs: List[ColumnRef]): Gen[List[CValue]] = {
+    val generators = groupConsecutive(refs)(_.selector) map (refs =>
+      genIndex(refs.size) >> (i =>
+        Gen.sequence(refs.zipWithIndex map {
+          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValue(cType), 1 -> Gen.const(CUndefined))
+          case _                          => Gen.const(CUndefined)
+        })
+      )
+    )
+    (Gen sequence generators) ^^ (_.flatten.toList)
+  }
 
   def arrayColumnsFor(size: Int, refs: List[ColumnRef]): List[ArrayColumn[_]] =
     refs map JDBMSlice.columnFor(CPath.Identity, size) map (_._2)
