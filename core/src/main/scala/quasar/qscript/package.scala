@@ -88,6 +88,9 @@ package object qscript extends LowPriorityImplicits {
   object Ann {
     implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
       Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+
+    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
+      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
   }
 
   def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, UnitF[T])
@@ -116,6 +119,14 @@ package object qscript extends LowPriorityImplicits {
       Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0))),
       Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1))))
 
+  def concat3[T[_[_]]: Corecursive, A](
+    l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
+      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
+      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0))),
+      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1))),
+      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](2))))
+
   // TODO: move to matryoshka
 
   implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
@@ -128,6 +139,15 @@ package object qscript extends LowPriorityImplicits {
         Equal.equal {
           case (env1, env2) =>
             env1.ask ≟ env2.ask && F(eq).equal(env1.lower, env2.lower)
+        }
+    }
+
+  implicit def envtShow[E: Show, F[_]](implicit F: Delay[Show, F]):
+      Delay[Show, EnvT[E, F, ?]] =
+    new Delay[Show, EnvT[E, F, ?]] {
+      def apply[A](sh: Show[A]) =
+        Show.show {
+          envt => Cord("EnvT(") ++ envt.ask.show ++ Cord(", ") ++ F(sh).show(envt.lower) ++ Cord(")")
         }
     }
 
@@ -147,3 +167,4 @@ abstract class LowPriorityImplicits {
   implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
     CoEnv.bitraverse[F, Unit].rightTraverse
 }
+

@@ -25,7 +25,7 @@ import quasar.Planner._
 import quasar.Predef._
 import quasar.std.StdLib._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
 import shapeless.{Fin, nat, Sized}
@@ -55,7 +55,7 @@ trait Helpers[T[_[_]]] {
 
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
-class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
+class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: Traverse: Normalizable](
   implicit DE: Const[DeadEnd, ?] :<: F,
            SP: SourcedPathable[T, ?] :<: F,
            QC: QScriptCore[T, ?] :<: F,
@@ -64,7 +64,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
            // TODO: Remove this one once we have multi-sorted AST
            FI: F :<: QScriptProject[T, ?],
            mergeable:  Mergeable.Aux[T, F],
-           eq:         Delay[Equal, F])
+           eq:         Delay[Equal, F],
+           show:       Delay[Show, F])
     extends Helpers[T] {
 
   val prov = new Provenance[T]
@@ -133,7 +134,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       ZipperAcc(Nil, sides, tails).left
   }
 
-  type MergeResult = (T[Target], Free[Target, Unit], Free[Target, Unit])
+  type MergeResult = (T[Target], FreeMap[T], FreeMap[T], Free[Target, Unit], Free[Target, Unit])
 
   def merge(left: T[Target], right: T[Target]): MergeResult = {
     val lLin: Envs = left.cata(linearizeEnv).reverse
@@ -155,11 +156,56 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     val commonSrc: T[Target] =
       common.reverse.ana[T, Target](delinearizeInner)
 
-    (commonSrc, leftF, rightF)
+    (commonSrc, lMap, rMap, leftF, rightF)
   }
 
-  def someAnn[A](v: Target[Free[Target, A]] \/ A, default: T[Target]) =
+  def useMerge(
+    res: MergeResult,
+    ap: (T[Target], Free[Target, Unit], Free[Target, Unit]) => (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
+      (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
+
+    val (src, lMap, rMap, lBranch, rBranch) = res
+
+    def rebaseBranch(br: Free[Target, Unit], fm: FreeMap[T]):
+        Free[Target, Unit] =
+      if (fm ≟ Free.point(()))
+        br
+      else
+        br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Unit](()), fm)))))
+
+    if (lBranch ≟ Free.point(()) && rBranch ≟ Free.point(())) {
+      val (buck, newBucks) = concatBuckets(src.project.ask.provenance)
+      val (mf, baccess, laccess, raccess) = concat3(buck, lMap, rMap)
+      (QC.inj(Map(src, mf)), newBucks.map(_ >> baccess), laccess, raccess)
+    } else {
+      val leftRebase = rebaseBranch(lBranch, lMap)
+      val rightRebase = rebaseBranch(rBranch, rMap)
+      ap(src, leftRebase, rightRebase)
+    }
+  }
+
+  // foo.bar
+  // foo\bar
+
+  // foo.bar + foo.baz //  MF
+
+  // foo\bar[*] + foo\baz[*] // TJ
+
+  // TJ(foo, BucketField(bar), BucketField(baz) … Add(LS, RS))
+
+
+  // /foo/bar/baz.quux + /foo/bar/baz.zub
+
+  // select sum(baz), quux.name from \foo\bar as bar join \foo\quux as quux on bar.parent = quux.name
+
+  def someAnn[A](
+    v: Target[Free[Target, A]] \/ A,
+    default: T[Target]):
+      Ann[T] =
     v.fold(_.ask, κ(default.project.ask))
+
+// CoEnv[Unit, EnvT[Ann, F, ?], ?]
+// EnvT[Ann, CoAnn[Unit, F, ?], ?]
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -167,31 +213,33 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     */
   def autojoin(left: T[Target], right: T[Target]):
       (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
-    val (src, lfree, rfree) = merge(left, right)
-    val lcomp = lfree.resume
-    val rcomp = rfree.resume
-    val (combine, lacc, racc) =
-      concat[T, JoinSide](Free.point(LeftSide), Free.point(RightSide))
+    useMerge(merge(left, right), (src, lBranch, rBranch) => {
+      val lcomp = lBranch.resume
+      val rcomp = rBranch.resume
+      val (combine, lacc, racc) =
+        concat[T, JoinSide](Free.point(LeftSide), Free.point(RightSide))
 
-    val lann = someAnn(lcomp, src)
-    val rann = someAnn(rcomp, src)
-    val commonProvLength = src.project.ask.provenance.length
-    (TJ.inj(ThetaJoin(
-      src,
-      lfree.mapSuspension(FI.compose(envtLowerNT)),
-      rfree.mapSuspension(FI.compose(envtLowerNT)),
-      // FIXME: not quite right – e.g., if there is a reduction in a branch the
-      //        condition won’t line up.
-      Free.roll(Eq(
-        concatBuckets(lann.provenance.drop(lann.provenance.length - commonProvLength))._1.map(κ(LeftSide)),
-        concatBuckets(rann.provenance.drop(rann.provenance.length - commonProvLength))._1.map(κ(RightSide)))),
-      Inner,
-      combine)),
-      prov.joinProvenances(
-        lann.provenance.map(_ >> lacc),
-        rann.provenance.map(_ >> racc)),
-      lann.values >> lacc,
-      rann.values >> racc)
+      val lann = someAnn(lcomp, src)
+      val rann = someAnn(rcomp, src)
+      val commonProvLength = src.project.ask.provenance.length
+
+      (TJ.inj(ThetaJoin(
+        src,
+        lBranch.mapSuspension(FI.compose(envtLowerNT)),
+        rBranch.mapSuspension(FI.compose(envtLowerNT)),
+        // FIXME: not quite right – e.g., if there is a reduction in a branch the
+        //        condition won’t line up.
+        Free.roll(Eq(
+          concatBuckets(lann.provenance.drop(lann.provenance.length - commonProvLength))._1.map(κ(LeftSide)),
+          concatBuckets(rann.provenance.drop(rann.provenance.length - commonProvLength))._1.map(κ(RightSide)))),
+        Inner,
+        combine)),
+        prov.joinProvenances(
+          lann.provenance.map(_ >> lacc),
+          rann.provenance.map(_ >> racc)),
+        lann.values >> lacc,
+        rann.values >> racc)
+    })
   }
 
   /** A convenience for a pair of autojoins, does the same thing, but returns
@@ -347,7 +395,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     func: UnaryFunc,
     values: Func.Input[T[Target], nat._1]):
       TargetT = {
-    val EnvT((Ann(provs, reduce), src)): TargetT = values(0).project
+    val Ann(provs, reduce) = values(0).project.ask
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     provs.tailOption.fold(values(0).project) { tail =>
@@ -358,7 +406,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
           provAccess.map(_ >> Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0)))),
           Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1)))),
         QC.inj(Reduce[T, T[Target], nat._1](
-          EnvT((EmptyAnn[T], src)).embed,
+          values(0),
           newProvs,
           Sized[List](
             ReduceFuncs.Arbitrary(newProvs),
@@ -369,31 +417,51 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
     }
   }
 
-  def invokeThetaJoin(values: Func.Input[T[Target], nat._3], tpe: JoinType):
-      TargetT = ??? // {
-  //   val (src, buckets, lBranch, rBranch, cond) = autojoin3(values(0), values(1), values(2))
-  //   val (buck, newBucks) = concatBuckets(buckets)
+  def invokeThetaJoin(
+    values: Func.Input[T[Target], nat._3],
+    tpe: JoinType):
+      PlannerError \/ TargetT = {
+    val condError: PlannerError \/ JoinFunc[T] =
+      // FIXME: This won’t work where we join a collection against itself
+      TJ.prj(values(2).transCata[F](_.lower).transCata((new Optimize[T]).applyAll[F]).project).fold(
+        (InternalError("non theta join condition found"): PlannerError).left[JoinFunc[T]])(
+        _.combine.right[PlannerError])
 
-  //   val left: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), lBranch))
-  //   val right: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), rBranch))
+    // NB: This is a magic structure. Improve LP to not imply this structure.
+    val combine: JoinFunc[T] = Free.roll(ConcatMaps(
+      Free.roll(MakeMap(StrLit[T, JoinSide]("left"), Free.point[MapFunc[T, ?], JoinSide](LeftSide))),
+      Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc[T, ?], JoinSide](RightSide)))))
 
-  //   val (concatted, buckAccess, valAccess): (FreeMap[T], FreeMap[T], FreeMap[T]) =
-  //     concat(
-  //       buck: FreeMap[T],
-  //       Free.roll(ConcatMaps(
-  //         Free.roll(MakeMap(StrLit[T, JoinSide]("left"), Free.point[MapFunc[T, ?], JoinSide](LeftSide))),
-  //         Free.roll(MakeMap(StrLit[T, JoinSide]("right"), Free.point[MapFunc[T, ?], JoinSide](RightSide))))))
+    println(s">>>>>> left: ${values(0).project.run.show}")
+    println(s">>>>>> right: ${values(1).project.run.show}")
+    println(s">>>>>> join cond: ${values(2).project.run.show}")
 
-  //   EnvT((
-  //     Ann[T](newBucks.map(_ >> buckAccess), valAccess),
-  //     TJ.inj(ThetaJoin(
-  //       EnvT((EmptyAnn[T], src)).embed,
-  //       Free.roll(left).mapSuspension(FI),
-  //       Free.roll(right).mapSuspension(FI),
-  //       cond,
-  //       tpe,
-  //       concatted))))
-  // }
+    condError.map { cond =>
+      val (commonSrc, lMap, rMap, leftSide, rightSide) = merge(values(0), values(1))
+      val Ann(leftBuckets, leftValue) = leftSide.resume.fold(_.ask, _ => EmptyAnn[T])
+      val Ann(rightBuckets, rightValue) = leftSide.resume.fold(_.ask, _ => EmptyAnn[T])
+
+      val buckets: List[FreeMap[T]] =
+        prov.joinProvenances(leftBuckets, rightBuckets)
+
+      // cond >>= {
+      //   case LeftSide => leftValue.map(κ(LeftSide))
+      //   case RightSide => rightValue.map(κ(RightSide))
+      // }
+
+      EnvT((
+        Ann[T](buckets, UnitF[T]),
+        TJ.inj(ThetaJoin(
+          commonSrc,
+          leftSide.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
+          rightSide.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          cond,
+          tpe,
+          combine))))
+     }
+   }
 
   def ProjectTarget(prefix: TargetT, field: FreeMap[T]): TargetT = {
     val Ann(provenance, values) = prefix.ask
@@ -409,12 +477,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
 
-  // TODO error handling
-  def fromData[T[_[_]]: Corecursive](data: Data): String \/ T[EJson] = {
-    data.hyloM[String \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
-      interpretM[String \/ ?, EJson, Data, T[EJson]](
-        _.toString.left[T[EJson]],
-        _.embed.right[String]),
+  def fromData[T[_[_]]: Corecursive](data: Data): PlannerError \/ T[EJson] = {
+    data.hyloM[PlannerError \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
+      interpretM[PlannerError \/ ?, EJson, Data, T[EJson]](
+        NonRepresentableData(_).left,
+        _.embed.right[PlannerError]),
       Data.toEJson[EJson].apply(_).right)
   }
 
@@ -424,12 +491,12 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       pathToProj(path).right
 
     case LogicalPlan.ConstantF(data) =>
-      val res = QC.inj(Map(
-        RootTarget.embed,
-        Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](fromData(data).fold(
-          error => CommonEJson.inj(ejson.Str[T[EJson]](error)).embed,
-          ι)))))
-        EnvT((EmptyAnn[T], res)).right
+      fromData(data).map(d =>
+        EnvT((
+          EmptyAnn[T],
+          QC.inj(Map(
+            RootTarget.embed,
+            Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](d)))))))
 
     case LogicalPlan.FreeF(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[TargetT]
@@ -547,12 +614,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
             EmptyAnn[T],
             QC.inj(Filter(EnvT((EmptyAnn[T], src)).embed, rval)))).embed,
           lval)))).right
-      //mergeTheta[F[Inner]](a1, a2, {
-      //  case SrcMerge(src, fm1, fm2) =>
-      //    QC.inj(Map(
-      //      QC.inj(Filter(TJ.inj(src).embed, fm2)).embed,
-      //      fm1))
-      //})
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Squashing =>
@@ -573,47 +634,59 @@ class Transform[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]: Traverse](
       invokeExpansion2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.GroupBy, Sized(a1, a2)) => ??? // TODO
+
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
-      val (src, lfree, rfree) = merge(a1, a2)
-      EnvT((
-        Ann(
+      val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {
+        (SP.inj(Union(src,
+          lfree.mapSuspension(FI.compose(envtLowerNT)),
+          rfree.mapSuspension(FI.compose(envtLowerNT)))),
           prov.unionProvenances(
             someAnn(lfree.resume, src).provenance,
             someAnn(rfree.resume, src).provenance),
-          UnitF), // FIXME: Not UnitF
-        SP.inj(Union(src,
-          lfree.mapSuspension(FI.compose(envtLowerNT)),
-          rfree.mapSuspension(FI.compose(envtLowerNT)))))).right
+          UnitF,
+          UnitF)
+      })
 
-    case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) => ??? // TODO
-      //merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-      //  case SrcMerge(src, jb1, jb2) =>
-      //    TJ.inj(ThetaJoin(src, jb1.mapSuspension(FI), jb2.mapSuspension(FI), equiJF, Inner, Free.point(LeftSide)))
-      //}
+      EnvT((Ann(buckets, UnitF), qs)).right
 
-    case LogicalPlan.InvokeFUnapply(set.Except, Sized(a1, a2)) => ??? // TODO
-      //merge(a1, a2).mapK(_.right[PlannerError]) ∘ {
-      //  case SrcMerge(src, jb1, jb2) =>
-      //    TJ.inj(ThetaJoin(
-      //      src,
-      //      jb1.mapSuspension(FI),
-      //      jb2.mapSuspension(FI),
-      //      Free.roll(Nullary(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
-      //      LeftOuter,
-      //      Free.point(LeftSide)))
-      //}
+    case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) =>
+      val (src, lMap, rMap, left, right) = merge(a1, a2)
+      EnvT((
+        src.project.ask,
+        TJ.inj(ThetaJoin(
+          src,
+          left.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
+          right.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          equiJF,
+          Inner,
+          Free.point(LeftSide))))).right
+
+    case LogicalPlan.InvokeFUnapply(set.Except, Sized(a1, a2)) =>
+      val (src, lMap, rMap, left, right) = merge(a1, a2)
+      EnvT((
+        src.project.ask, // TODO is this the correct provenance?
+        TJ.inj(ThetaJoin(
+          src,
+          left.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
+          right.mapSuspension(FI.compose(envtLowerNT)) >>
+            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          Free.roll(Nullary(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
+          LeftOuter,
+          Free.point(LeftSide))))).right
 
     case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
-        if func.effect ≟ Transformation=>
-      def invoke(tpe: JoinType) =
-        invokeThetaJoin(Func.Input3(a1, a2, a3), tpe).right
-
-      func match {
-        case set.InnerJoin      => invoke(Inner)
-        case set.LeftOuterJoin  => invoke(LeftOuter)
-        case set.RightOuterJoin => invoke(RightOuter)
-        case set.FullOuterJoin  => invoke(FullOuter)
-      }
+        if func.effect ≟ Transformation =>
+      invokeThetaJoin(
+        Func.Input3(a1, a2, a3),
+        func match {
+          case set.InnerJoin      => Inner
+          case set.LeftOuterJoin  => LeftOuter
+          case set.RightOuterJoin => RightOuter
+          case set.FullOuterJoin  => FullOuter
+        })
   }
 }
 
@@ -740,3 +813,4 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     quasar.fp.free.injectedNT[F](simplifyProjections).compose(
       Normalizable[F].normalize)
 }
+
