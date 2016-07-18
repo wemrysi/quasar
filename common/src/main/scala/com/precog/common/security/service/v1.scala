@@ -41,8 +41,6 @@ object v1 {
     }
   }
   object GrantDetails {
-    // implicit val grantDetailsIso = Iso.hlist(GrantDetails.apply _, GrantDetails.unapply _)
-
     val schema = "grantId" :: "name" :: "description" :: "permissions" :: ("createdAt" ||| new Instant(0L)) :: "expirationDate" :: HNil
 
     implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[GrantDetails](schema)
@@ -50,8 +48,6 @@ object v1 {
 
   case class APIKeyDetails(apiKey: APIKey, name: Option[String], description: Option[String], grants: Set[GrantDetails], issuerChain: List[APIKey])
   object APIKeyDetails {
-    // implicit val apiKeyDetailsIso = Iso.hlist(APIKeyDetails.apply _, APIKeyDetails.unapply _)
-
     val schema = "apiKey" :: "name" :: "description" :: "grants" :: "issuerChain" :: HNil
 
     implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[APIKeyDetails](schema)
@@ -71,7 +67,6 @@ object v1 {
 
   object NewGrantRequest {
     private implicit val reqPermDecomposer = Permission.decomposerV1Base
-    // implicit val newGrantRequestIso        = Iso.hlist(NewGrantRequest.apply _, NewGrantRequest.unapply _)
 
     val schemaV1 = "name" :: "description" :: ("parentIds" ||| Set.empty[GrantId]) :: "permissions" :: "expirationDate" :: HNil
 
@@ -82,8 +77,6 @@ object v1 {
   case class NewAPIKeyRequest(name: Option[String], description: Option[String], grants: Set[NewGrantRequest])
 
   object NewAPIKeyRequest {
-    // implicit val newAPIKeyRequestIso = Iso.hlist(NewAPIKeyRequest.apply _, NewAPIKeyRequest.unapply _)
-
     val schemaV1 = "name" :: "description" :: "grants" :: HNil
 
     implicit val (decomposerV1, extractorV1) = IsoSerialization.serialization[NewAPIKeyRequest](schemaV1)

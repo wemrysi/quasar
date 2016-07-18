@@ -12,7 +12,6 @@ import scalaz._
 
 object IsoSerializationSpec {
   case class Foo(s: String, i: Option[Int], b: Boolean)
-  // implicit val fooIso        = Iso.hlist(Foo.apply _, Foo.unapply _)
   val foo                    = Foo("Hello world", Some(23), true)
   val foo2                   = Foo("Hello world", None, true)
   val foo3                   = Foo("Hello default world", Some(23), true)
@@ -23,16 +22,14 @@ object IsoSerializationSpec {
   val safeDefaultedFooSchema = (Omit ||| "Hello default world") :: "i" :: "b" :: HNil
 
   case class Bar(d: Double, f: Foo, l: List[String])
-  // implicit val barIso  = Iso.hlist(Bar.apply _, Bar.unapply _)
   val bar              = Bar(2.3, foo, List("foo", "bar", "baz"))
   val bar2             = Bar(2.3, foo2, List("foo", "bar", "baz"))
   val barSchema        = "d" :: "f" :: "l" :: HNil
   val inlinedBarSchema = "d" :: Inline :: "l" :: HNil
 
   case class Baz(s: String, l: List[Foo])
-  // implicit val bazIso = Iso.hlist(Baz.apply _, Baz.unapply _)
-  val baz             = Baz("Hello world", List(foo, foo2))
-  val bazSchema       = "s" :: "l" :: HNil
+  val baz       = Baz("Hello world", List(foo, foo2))
+  val bazSchema = "s" :: "l" :: HNil
 }
 
 class IsoSerializationSpec extends Specification {

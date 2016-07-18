@@ -43,7 +43,6 @@ object AccountPlan {
   val Root = AccountPlan("Root")
   val Free = AccountPlan("Free")
 
-  // implicit val iso                     = Iso.hlist(AccountPlan.apply _, AccountPlan.unapply _)
   val schema                           = "type" :: HNil
   implicit val (decomposer, extractor) = serializationV[AccountPlan](schema, None)
 }
@@ -61,7 +60,6 @@ case class Account(accountId: AccountId,
                    profile: Option[JValue] = None)
 
 object Account {
-  // implicit val iso = Iso.hlist(Account.apply _, Account.unapply _)
   val schemaV1     = "accountId" :: "email" :: "passwordHash" :: "passwordSalt" :: "accountCreationDate" :: "apiKey" :: "rootPath" :: "plan" :: "parentId" :: "lastPasswordChangeTime" :: "profile" :: HNil
 
   val extractorPreV             = extractorV[Account](schemaV1, None)
@@ -96,8 +94,6 @@ object Account {
 case class WrappedAccountId(accountId: AccountId)
 
 object WrappedAccountId {
-  // implicit val wrappedAccountIdIso = Iso.hlist(WrappedAccountId.apply _, WrappedAccountId.unapply _)
-
   val schema = "accountId" :: HNil
 
   implicit val (wrappedAccountIdDecomposer, wrappedAccountIdExtractor) = serializationV[WrappedAccountId](schema, None)

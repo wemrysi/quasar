@@ -80,8 +80,6 @@ case class Ingest(apiKey: APIKey, path: Path, writeAs: Option[Authorities], data
 }
 
 object Ingest {
-  // implicit val eventIso = Iso.hlist(Ingest.apply _, Ingest.unapply _)
-
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: "streamRef" :: HNil
   implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
 
@@ -128,8 +126,6 @@ case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: 
 }
 
 object Archive {
-  // implicit val archiveIso = Iso.hlist(Archive.apply _, Archive.unapply _)
-
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
   val schemaV0 = "tokenId" :: "path" :: Omit :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
 
@@ -228,8 +224,6 @@ case class StoreFile(apiKey: APIKey, path: Path, writeAs: Option[Authorities], j
 
 object StoreFile {
   import JavaSerialization._
-
-  // implicit val iso = Iso.hlist(StoreFile.apply _, StoreFile.unapply _)
 
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "content" :: "timestamp" :: "streamRef" :: HNil
 

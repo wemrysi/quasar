@@ -66,8 +66,6 @@ case class ScheduledTask(id: UUID,
 object ScheduledTask {
   import CronExpressionSerialization._
 
-  implicit val iso = Iso.hlist(ScheduledTask.apply _, ScheduledTask.unapply _)
-
   val schemaV1 = "id" :: "repeat" :: "apiKey" :: "authorities" :: "prefix" :: "source" :: "sink" :: "timeout" :: HNil
 
   implicit val decomposer: Decomposer[ScheduledTask] = decomposerV(schemaV1, Some("1.0".v))

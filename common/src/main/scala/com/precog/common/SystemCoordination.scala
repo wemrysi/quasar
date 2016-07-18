@@ -71,7 +71,6 @@ case class IdSequenceBlock(producerId: Int, firstSequenceId: Int, lastSequenceId
 }
 
 object IdSequenceBlock {
-  // implicit val iso                = Iso.hlist(IdSequenceBlock.apply _, IdSequenceBlock.unapply _)
   val schemaV1                    = "producerId" :: "firstSequenceId" :: "lastSequenceId" :: HNil
   val extractorPreV               = extractorV[IdSequenceBlock](schemaV1, None)
   val (decomposerV1, extractorV1) = serializationV[IdSequenceBlock](schemaV1, Some("1.0".v))
@@ -90,7 +89,6 @@ case class EventRelayState(offset: Long, nextSequenceId: Int, idSequenceBlock: I
 }
 
 object EventRelayState {
-  // implicit val iso                = Iso.hlist(EventRelayState.apply _, EventRelayState.unapply _)
   val schemaV1                    = "offset" :: "nextSequenceId" :: "idSequenceBlock" :: HNil
   val extractorPreV               = extractorV[EventRelayState](schemaV1, None)
   val (decomposerV1, extractorV1) = serializationV[EventRelayState](schemaV1, Some("1.0".v))
@@ -117,7 +115,6 @@ object YggCheckpoint {
   case class CheckpointParseError(message: String)   extends LoadError
   case class ShardCheckpointMissing(shardId: String) extends LoadError
 
-  // implicit val iso = Iso.hlist(YggCheckpoint.apply _, YggCheckpoint.unapply _)
   val schemaV1     = "offset" :: "messageClock" :: HNil
 
   val extractorPreV               = extractorV[YggCheckpoint](schemaV1, None)

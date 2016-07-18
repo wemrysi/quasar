@@ -70,8 +70,6 @@ case class EventId(producerId: ProducerId, sequenceId: SequenceId) {
 }
 
 object EventId {
-  // implicit val iso = Iso.hlist(EventId.apply _, EventId.unapply _)
-
   val schemaV1 = "producerId" :: "sequenceId" :: HNil
 
   implicit val (decomposerV1, extractorV1) = serializationV[EventId](schemaV1, Some("1.0".v))
@@ -85,8 +83,6 @@ object EventId {
 case class IngestRecord(eventId: EventId, value: JValue)
 
 object IngestRecord {
-  // implicit val ingestRecordIso = Iso.hlist(IngestRecord.apply _, IngestRecord.unapply _)
-
   val schemaV1 = "eventId" :: "jvalue" :: HNil
 
   implicit val (decomposerV1, extractorV1) = serializationV[IngestRecord](schemaV1, Some("1.0".v))
@@ -120,8 +116,6 @@ case class IngestMessage(apiKey: APIKey,
 
 object IngestMessage {
   import EventMessage._
-
-  // implicit val ingestMessageIso = Iso.hlist(IngestMessage.apply _, IngestMessage.unapply _)
 
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "data" :: "jobId" :: "timestamp" :: ("streamRef" ||| StreamRef.Append.asInstanceOf[StreamRef]) :: HNil
   implicit def seqExtractor[A: Extractor]: Extractor[Seq[A]] = implicitly[Extractor[List[A]]].map(_.toSeq)
@@ -165,8 +159,6 @@ case class ArchiveMessage(apiKey: APIKey, path: Path, jobId: Option[JobId], even
 
 object ArchiveMessage {
   import EventMessage._
-  // implicit val archiveMessageIso = Iso.hlist(ArchiveMessage.apply _, ArchiveMessage.unapply _)
-
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
 
   val decomposerV1: Decomposer[ArchiveMessage] = decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
@@ -198,8 +190,6 @@ case class StoreFileMessage(apiKey: APIKey,
 }
 
 object StoreFileMessage {
-  // implicit val storeFileMessageIso = Iso.hlist(StoreFileMessage.apply _, StoreFileMessage.unapply _)
-
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "eventId" :: "content" :: "timestamp" :: "streamRef" :: HNil
 
   implicit val Decomposer: Decomposer[StoreFileMessage] = decomposerV[StoreFileMessage](schemaV1, Some("1.0".v))

@@ -36,8 +36,6 @@ import scalaz.syntax.std.option._
 case class BlobMetadata(mimeType: MimeType, size: Long, created: DateTime, authorities: Authorities)
 
 object BlobMetadata {
-  implicit val iso = Iso.hlist(BlobMetadata.apply _, BlobMetadata.unapply _)
-
   implicit val mimeTypeDecomposer: Decomposer[MimeType] = new Decomposer[MimeType] {
     def decompose(u: MimeType) = JString(u.toString)
   }

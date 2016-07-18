@@ -3,9 +3,8 @@ package json
 package serialization
 
 import Extractor._
-
-import shapeless._
 import scalaz._
+import shapeless._
 
 object IsoSerialization {
   def extractor[T]     = new MkExtractor[T]
