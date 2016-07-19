@@ -379,14 +379,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def invokeExpansion2(func: BinaryFunc, values: Func.Input[T[Target], nat._2]):
       TargetT =
     func match {
-      // TODO left shift `freshName + range value` values onto provenance
       case set.Range =>
         val (src, buckets, lval, rval) = autojoin(values(0), values(1))
         val (bucksArray, newBucks) = concatBuckets(buckets)
         val (merged, b, v) = concat[T, Unit](bucksArray, Free.roll(Range(lval, rval)))
 
         EnvT((
-          Ann[T](/*Concat(freshName("range"), v) ::*/ newBucks.map(b >> _), v),
+          Ann[T](NullLit[T, Unit]() :: newBucks.map(b >> _), v),
           SP.inj(LeftShift(
             EnvT((EmptyAnn[T], src)).embed,
             merged,
@@ -633,7 +632,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         if func.effect ≟ Expansion =>
       invokeExpansion2(func, Func.Input2(a1, a2)).right
 
-    case LogicalPlan.InvokeFUnapply(set.GroupBy, Sized(a1, a2)) => ??? // TODO
+    case LogicalPlan.InvokeFUnapply(set.GroupBy, Sized(a1, a2)) =>
+      val (src, buckets, lval, rval) = autojoin(a1, a2)
+      EnvT((Ann(prov.swapProvenances(rval :: buckets), lval), src)).right
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {

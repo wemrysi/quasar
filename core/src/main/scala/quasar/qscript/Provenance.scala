@@ -86,4 +86,10 @@ class Provenance[T[_[_]]: Corecursive] {
       case a :: b :: tail => squashProvenances(nest(a, b) :: tail)
       case _              => buckets
     }
+
+  def swapProvenances(buckets: List[FreeMap[T]]): List[FreeMap[T]] =
+    buckets match {
+      case a :: b :: tail => b :: a :: tail
+      case _              => buckets
+    }
 }
