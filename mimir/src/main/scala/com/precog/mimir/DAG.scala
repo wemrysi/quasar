@@ -40,28 +40,32 @@ trait DAG extends Instructions {
 
   import instructions._
   import library._
-
   import TableModule.CrossOrder // TODO: Move cross order out of yggdrasil.
+  import dag.BucketSpec
 
-  def decorate(stream: Vector[Instruction]): Either[StackError, DepGraph] = {
+//   type Either[+A, +B] = scala.util.Either[A, B]
+//   val Either          = scala.util.Either
+//   val Left            = scala.util.Left
+//   val Right           = scala.util.Right
+
+//   type StackErrorT[+A] = Either[StackError, A]
+  type SpecOrGraph     = Either[BucketSpec, DepGraph]
+  type Step            = List[SpecOrGraph] => Either[StackError, List[SpecOrGraph]]
+  type DecorateResult  = Either[StackError, DepGraph]
+  type LoopResult      = Trampoline[DecorateResult]
+
+  def left[A](x: StackError): Either[StackError, A] = scala.util.Left(x)
+  def right[A](x: A): Either[Nothing, A]         = scala.util.Right(x)
+
+  def decorate(stream: Vector[Instruction]): DecorateResult = {
     import dag._
+    implicit val M = eitherMonad[StackError]
 
-    implicit val M: Traverse[({ type λ[α] = Either[StackError, α] })#λ] with Monad[({ type λ[α] = Either[StackError, α] })#λ] = eitherMonad[StackError]
+    def loop(loc: Line, roots: List[SpecOrGraph], splits: List[OpenSplit], stream: Vector[Instruction]): LoopResult = {
+      @inline def continue(f: Step): LoopResult =
+        Trampoline.suspend(M.sequence(f(roots) map { roots2 => loop(loc, roots2, splits, stream.tail) }) map (_.joinRight))
 
-    def loop(loc: Line,
-             roots: List[Either[BucketSpec, DepGraph]],
-             splits: List[OpenSplit],
-             stream: Vector[Instruction]): Trampoline[Either[StackError, DepGraph]] = {
-      @inline
-      def continue(f: List[Either[BucketSpec, DepGraph]] => Either[StackError, List[Either[BucketSpec, DepGraph]]]): Trampoline[Either[StackError, DepGraph]] = {
-        Free.suspend(
-          M.sequence(f(roots).right map { roots2 =>
-            loop(loc, roots2, splits, stream.tail)
-          })
-            .map(_.joinRight))
-      }
-
-      def processJoinInstr(instr: JoinInstr) = {
+      def processJoinInstr(instr: JoinInstr): LoopResult = {
         val maybeOpSort = Some(instr) collect {
           case instructions.Map2Match(op) => (op, IdentitySort)
           case instructions.Map2Cross(op) => (op, Cross(None))
@@ -71,8 +75,8 @@ trait DAG extends Instructions {
           case (op, joinSort) =>
             continue {
               case Right(right) :: Right(left) :: tl => Right(Right(Join(op, joinSort, left, right)(loc)) :: tl)
-              case Left(_) :: _ | _ :: Left(_) :: _  => Left(OperationOnBucket(instr))
-              case _                                 => Left(StackUnderflow(instr))
+              case Left(_) :: _ | _ :: Left(_) :: _  => left(OperationOnBucket(instr))
+              case _                                 => left(StackUnderflow(instr))
             }
         }
 
@@ -80,29 +84,29 @@ trait DAG extends Instructions {
           case instr @ instructions.Observe =>
             continue {
               case Right(samples) :: Right(data) :: tl => Right(Right(Observe(data, samples)(loc)) :: tl)
-              case Left(_) :: _ | _ :: Left(_) :: _    => Left(OperationOnBucket(instr))
-              case _                                   => Left(StackUnderflow(instr))
+              case Left(_) :: _ | _ :: Left(_) :: _    => left(OperationOnBucket(instr))
+              case _                                   => left(StackUnderflow(instr))
             }
 
           case instr @ instructions.Assert =>
             continue {
               case Right(child) :: Right(pred) :: tl => Right(Right(Assert(pred, child)(loc)) :: tl)
-              case Left(_) :: _ | _ :: Left(_) :: _  => Left(OperationOnBucket(instr))
-              case _                                 => Left(StackUnderflow(instr))
+              case Left(_) :: _ | _ :: Left(_) :: _  => left(OperationOnBucket(instr))
+              case _                                 => left(StackUnderflow(instr))
             }
 
           case instr @ (instructions.IIntersect | instructions.IUnion) =>
             continue {
               case Right(right) :: Right(left) :: tl => Right(Right(IUI(instr == instructions.IUnion, left, right)(loc)) :: tl)
-              case Left(_) :: _ | _ :: Left(_) :: _  => Left(OperationOnBucket(instr))
-              case _                                 => Left(StackUnderflow(instr))
+              case Left(_) :: _ | _ :: Left(_) :: _  => left(OperationOnBucket(instr))
+              case _                                 => left(StackUnderflow(instr))
             }
 
           case instructions.SetDifference =>
             continue {
               case Right(right) :: Right(left) :: tl => Right(Right(Diff(left, right)(loc)) :: tl)
-              case Left(_) :: _ | _ :: Left(_) :: _  => Left(OperationOnBucket(instr))
-              case _                                 => Left(StackUnderflow(instr))
+              case Left(_) :: _ | _ :: Left(_) :: _  => left(OperationOnBucket(instr))
+              case _                                 => left(StackUnderflow(instr))
             }
         }
 
@@ -113,12 +117,12 @@ trait DAG extends Instructions {
         val (args, roots2) = roots splitAt 2
 
         if (args.lengthCompare(2) < 0) {
-          Left(StackUnderflow(instr)).point[Trampoline]
+          Trampoline delay left(StackUnderflow(instr))
         } else {
           val rightArgs = args flatMap { _.right.toOption }
 
           if (rightArgs.lengthCompare(2) < 0) {
-            Left(OperationOnBucket(instr)).point[Trampoline]
+            Trampoline delay left(OperationOnBucket(instr))
           } else {
             val (boolean :: target :: predRoots) = rightArgs
             loop(loc, Right(Filter(joinSort, target, boolean)(loc)) :: roots2, splits, stream.tail)
@@ -129,17 +133,17 @@ trait DAG extends Instructions {
       val tail: Option[Trampoline[Either[StackError, DepGraph]]] = stream.headOption map {
         case instr @ Map1(instructions.New) => {
           continue {
-            case Right(hd) :: tl => Right(Right(New(hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
+            case Right(hd) :: tl => right(Right(New(hd)(loc)) :: tl)
+            case Left(_) :: _    => left(OperationOnBucket(instr))
+            case _               => left(StackUnderflow(instr))
           }
         }
 
         case instr @ Map1(op) => {
           continue {
-            case Right(hd) :: tl => Right(Right(Operate(op, hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
+            case Right(hd) :: tl => right(Right(Operate(op, hd)(loc)) :: tl)
+            case Left(_) :: _    => left(OperationOnBucket(instr))
+            case _               => left(StackUnderflow(instr))
           }
         }
 
@@ -147,43 +151,43 @@ trait DAG extends Instructions {
 
         case instr @ instructions.Morph1(BuiltInMorphism1(m1)) => {
           continue {
-            case Right(hd) :: tl => Right(Right(Morph1(m1, hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
+            case Right(hd) :: tl => right(Right(Morph1(m1, hd)(loc)) :: tl)
+            case Left(_) :: _    => left(OperationOnBucket(instr))
+            case _               => left(StackUnderflow(instr))
           }
         }
 
         case instr @ instructions.Morph2(BuiltInMorphism2(m2)) => {
           continue {
             case Right(right) :: Right(left) :: tl => Right(Right(Morph2(m2, left, right)(loc)) :: tl)
-            case Left(_) :: _                      => Left(OperationOnBucket(instr))
-            case _ :: Left(_) :: _                 => Left(OperationOnBucket(instr))
-            case _                                 => Left(StackUnderflow(instr))
+            case Left(_) :: _                      => left(OperationOnBucket(instr))
+            case _ :: Left(_) :: _                 => left(OperationOnBucket(instr))
+            case _                                 => left(StackUnderflow(instr))
           }
         }
 
         case instr @ instructions.Reduce(BuiltInReduction(red)) => {
           continue {
             case Right(hd) :: tl => Right(Right(Reduce(red, hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
+            case Left(_) :: _    => left(OperationOnBucket(instr))
+            case _               => left(StackUnderflow(instr))
           }
         }
 
         case instructions.Distinct => {
           continue {
             case Right(hd) :: tl => Right(Right(Distinct(hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instructions.Distinct))
-            case _               => Left(StackUnderflow(instructions.Distinct))
+            case Left(_) :: _    => left(OperationOnBucket(instructions.Distinct))
+            case _               => left(StackUnderflow(instructions.Distinct))
           }
         }
 
         case instr @ instructions.Group(id) => {
           continue {
             case Right(target) :: Left(child) :: tl => Right(Left(Group(id, target, child)) :: tl)
-            case Left(_) :: _                       => Left(OperationOnBucket(instr))
-            case Right(_) :: Right(_) :: _          => Left(BucketOperationOnSets(instr))
-            case _                                  => Left(StackUnderflow(instr))
+            case Left(_) :: _                       => left(OperationOnBucket(instr))
+            case Right(_) :: Right(_) :: _          => left(BucketOperationOnSets(instr))
+            case _                                  => left(StackUnderflow(instr))
           }
         }
 
@@ -192,217 +196,172 @@ trait DAG extends Instructions {
 
           continue {
             case Left(right) :: Left(left) :: tl => Right(Left(const(left, right)) :: tl)
-            case Right(_) :: _ :: _              => Left(BucketOperationOnSets(instr))
-            case _ :: Right(_) :: _              => Left(BucketOperationOnSets(instr))
-            case _                               => Left(StackUnderflow(instr))
+            case Right(_) :: _ :: _              => left(BucketOperationOnSets(instr))
+            case _ :: Right(_) :: _              => left(BucketOperationOnSets(instr))
+            case _                               => left(StackUnderflow(instr))
           }
         }
 
-        case instr @ KeyPart(id) => {
-          continue {
-            case Right(parent) :: tl => Right(Left(UnfixedSolution(id, parent)) :: tl)
-            case Left(_) :: _        => Left(OperationOnBucket(instr))
-            case _                   => Left(StackUnderflow(instr))
-          }
-        }
+//         case instr @ KeyPart(id) => {
+//           continue {
+//             case Right(parent) :: tl => right(left(UnfixedSolution(id, parent)) :: tl)
+//             case Left(_) :: _        => left(OperationOnBucket(instr))
+//             case _                   => left(StackUnderflow(instr))
+//           }
+//         }
 
-        case instructions.Extra => {
-          continue {
-            case Right(parent) :: tl => Right(Left(Extra(parent)) :: tl)
-            case Left(_) :: _        => Left(OperationOnBucket(instructions.Extra))
-            case _                   => Left(StackUnderflow(instructions.Extra))
-          }
-        }
+//         case instructions.Extra => {
+//           continue {
+//             case Right(parent) :: tl => right(left(Extra(parent)) :: tl)
+//             case Left(_) :: _        => left(OperationOnBucket(instructions.Extra))
+//             case _                   => left(StackUnderflow(instructions.Extra))
+//           }
+//         }
 
-        case instructions.Split => {
-          roots match {
-            case Left(spec) :: tl =>
-              loop(loc, tl, OpenSplit(loc, spec, tl, new Identifier) :: splits, stream.tail)
+//         case instructions.Split => {
+//           roots match {
+//             case Left(spec) :: tl => loop(loc, tl, OpenSplit(loc, spec, tl, new Identifier) :: splits, stream.tail)
+//             case Right(_) :: _    => Trampoline delay left(OperationOnBucket(instructions.Split))
+//             case _                => Trampoline delay left(StackUnderflow(instructions.Split))
+//           }
+//         }
 
-            case Right(_) :: _ => Left(OperationOnBucket(instructions.Split)).point[Trampoline]
-            case _             => Left(StackUnderflow(instructions.Split)).point[Trampoline]
-          }
-        }
+//         case Merge => {
+//           val (eitherRoots, splits2) = splits match {
+//             case (open @ OpenSplit(loc, spec, oldTail, id)) :: splitsTail => {
+//               roots match {
+//                 case Right(child) :: tl => {
+//                   val oldTailSet = Set(oldTail: _*)
+//                   val newTailSet = Set(tl: _*)
 
-        case Merge => {
-          val (eitherRoots, splits2) = splits match {
-            case (open @ OpenSplit(loc, spec, oldTail, id)) :: splitsTail => {
-              roots match {
-                case Right(child) :: tl => {
-                  val oldTailSet = Set(oldTail: _*)
-                  val newTailSet = Set(tl: _*)
+//                   if ((oldTailSet & newTailSet).size == newTailSet.size) {
+//                     val split = Split(spec, child, id)(loc)
 
-                  if ((oldTailSet & newTailSet).size == newTailSet.size) {
-                    val split = Split(spec, child, id)(loc)
+//                     (Right(Right(split) :: tl), splitsTail)
+//                   } else {
+//                     (Left(MergeWithUnmatchedTails), splitsTail)
+//                   }
+//                 }
 
-                    (Right(Right(split) :: tl), splitsTail)
-                  } else {
-                    (Left(MergeWithUnmatchedTails), splitsTail)
-                  }
-                }
+//                 case _ => (Left(StackUnderflow(Merge)), splitsTail)
+//               }
+//             }
 
-                case _ => (Left(StackUnderflow(Merge)), splitsTail)
-              }
-            }
+//             case Nil => (Left(UnmatchedMerge), Nil)
+//           }
 
-            case Nil => (Left(UnmatchedMerge), Nil)
-          }
+//           M.sequence(eitherRoots.right map { roots2 =>
+//               loop(loc, roots2, splits2, stream.tail)
+//             })
+//             .map(_.joinRight)
+//         }
 
-          M.sequence(eitherRoots.right map { roots2 =>
-              loop(loc, roots2, splits2, stream.tail)
-            })
-            .map(_.joinRight)
-        }
+//         case instr @ FilterMatch => processFilter(instr, IdentitySort)
+//         case instr @ FilterCross => processFilter(instr, Cross(None))
 
-        case instr @ FilterMatch => processFilter(instr, IdentitySort)
-        case instr @ FilterCross => processFilter(instr, Cross(None))
+//         case Dup => {
+//           roots match {
+//             case hd :: tl => loop(loc, hd :: hd :: tl, splits, stream.tail)
+//             case _        => Trampoline delay left(StackUnderflow(Dup))
+//           }
+//         }
 
-        case Dup => {
-          roots match {
-            case hd :: tl => loop(loc, hd :: hd :: tl, splits, stream.tail)
-            case _        => Left(StackUnderflow(Dup)).point[Trampoline]
-          }
-        }
+//         case instr @ Swap(depth) => {
+//           if (depth > 0) {
+//             if (roots.lengthCompare(depth + 1) < 0) {
+//               Trampoline delay left(StackUnderflow(instr))
+//             } else {
+//               val (span, rest)         = roots splitAt (depth + 1)
+//               val (spanInit, spanTail) = span splitAt depth
+//               val roots2               = spanTail ::: spanInit.tail ::: (span.head :: rest)
+//               loop(loc, roots2, splits, stream.tail)
+//             }
+//           } else {
+//             Trampoline delay left(NonPositiveSwapDepth(instr))
+//           }
+//         }
 
-        case instr @ Swap(depth) => {
-          if (depth > 0) {
-            if (roots.lengthCompare(depth + 1) < 0) {
-              Left(StackUnderflow(instr)).point[Trampoline]
-            } else {
-              val (span, rest)         = roots splitAt (depth + 1)
-              val (spanInit, spanTail) = span splitAt depth
-              val roots2               = spanTail ::: spanInit.tail ::: (span.head :: rest)
-              loop(loc, roots2, splits, stream.tail)
-            }
-          } else {
-            Left(NonPositiveSwapDepth(instr)).point[Trampoline]
-          }
-        }
+//         case Drop => {
+//           roots match {
+//             case hd :: tl => loop(loc, tl, splits, stream.tail)
+//             case _        => Trampoline delay left(StackUnderflow(Drop))
+//           }
+//         }
 
-        case Drop => {
-          roots match {
-            case hd :: tl => loop(loc, tl, splits, stream.tail)
-            case _        => Left(StackUnderflow(Drop)).point[Trampoline]
-          }
-        }
+//         case loc: Line => loop(loc, roots, splits, stream.tail)
 
-        case loc: Line => loop(loc, roots, splits, stream.tail)
+//         case instr @ instructions.AbsoluteLoad => {
+//           continue {
+//             case Right(hd) :: tl => right(Right(AbsoluteLoad(hd)(loc)) :: tl)
+//             case Left(_) :: _    => left(OperationOnBucket(instr))
+//             case _               => left(StackUnderflow(instr))
+//           }
+//         }
 
-        case instr @ instructions.AbsoluteLoad => {
-          continue {
-            case Right(hd) :: tl => Right(Right(AbsoluteLoad(hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
-          }
-        }
+//         case instr @ instructions.RelativeLoad => {
+//           continue {
+//             case Right(hd) :: tl => right(Right(RelativeLoad(hd)(loc)) :: tl)
+//             case Left(_) :: _    => left(OperationOnBucket(instr))
+//             case _               => left(StackUnderflow(instr))
+//           }
+//         }
 
-        case instr @ instructions.RelativeLoad => {
-          continue {
-            case Right(hd) :: tl => Right(Right(RelativeLoad(hd)(loc)) :: tl)
-            case Left(_) :: _    => Left(OperationOnBucket(instr))
-            case _               => Left(StackUnderflow(instr))
-          }
-        }
+//         case PushUndefined => {
+//           loop(loc, Right(Undefined(loc)) :: roots, splits, stream.tail)
+//         }
 
-        case PushUndefined => {
-          loop(loc, Right(Undefined(loc)) :: roots, splits, stream.tail)
-        }
+//         case PushKey(id) => {
+//           val openPoss = splits find { open =>
+//             findGraphWithId(id)(open.spec).isDefined
+//           }
+//           openPoss map { open =>
+//             loop(loc, right(SplitParam(id, open.id)(loc)) :: roots, splits, stream.tail)
+//           } getOrElse (Trampoline delay left(UnableToLocateSplitDescribingId(id)))
+//         }
 
-        case PushKey(id) => {
-          val openPoss = splits find { open =>
-            findGraphWithId(id)(open.spec).isDefined
-          }
-          openPoss map { open =>
-            loop(loc, Right(SplitParam(id, open.id)(loc)) :: roots, splits, stream.tail)
-          } getOrElse Left(UnableToLocateSplitDescribingId(id)).point[Trampoline]
-        }
+//         case PushGroup(id) => {
+//           val openPoss = splits find { open =>
+//             findGraphWithId(id)(open.spec).isDefined
+//           }
+//           openPoss map { open =>
+//             val graph = findGraphWithId(id)(open.spec).get
+//             loop(loc, right(SplitGroup(id, graph.identities, open.id)(loc)) :: roots, splits, stream.tail)
+//           } getOrElse (Trampoline delay Left(UnableToLocateSplitDescribingId(id)))
+//         }
 
-        case PushGroup(id) => {
-          val openPoss = splits find { open =>
-            findGraphWithId(id)(open.spec).isDefined
-          }
-          openPoss map { open =>
-            val graph = findGraphWithId(id)(open.spec).get
-            loop(loc, Right(SplitGroup(id, graph.identities, open.id)(loc)) :: roots, splits, stream.tail)
-          } getOrElse Left(UnableToLocateSplitDescribingId(id)).point[Trampoline]
-        }
+//         case instr: RootInstr => {
+//           val rvalue = instr match {
+//             case PushString(str) => CString(str)
+//             case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+//             case PushTrue        => CBoolean(true)
+//             case PushFalse       => CBoolean(false)
+//             case PushNull        => CNull
+//             case PushObject      => RObject.empty
+//             case PushArray       => RArray.empty
+//           }
 
-        case instr: RootInstr => {
-          val rvalue = instr match {
-            case PushString(str) => CString(str)
-            case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
-            case PushTrue        => CBoolean(true)
-            case PushFalse       => CBoolean(false)
-            case PushNull        => CNull
-            case PushObject      => RObject.empty
-            case PushArray       => RArray.empty
-          }
-
-          loop(loc, Right(Const(rvalue)(loc)) :: roots, splits, stream.tail)
-        }
+//           loop(loc, right(Const(rvalue)(loc)) :: roots, splits, stream.tail)
+//         }
       }
 
-      tail getOrElse {
-        {
-          if (!splits.isEmpty) {
-            Left(UnmatchedSplit)
-          } else {
-            roots match {
-              case Right(hd) :: Nil => Right(hd)
-              case Left(_) :: Nil   => Left(BucketAtEnd)
-              case _ :: _ :: _      => Left(MultipleStackValuesAtEnd)
-              case Nil              => Left(EmptyStackAtEnd)
-            }
-          }
-        }.point[Trampoline]
+//       tail getOrElse {
+//         Trampoline delay {
+//           if (!splits.isEmpty) {
+//             Left(UnmatchedSplit)
+//           } else {
+//             roots match {
+//               case Right(hd) :: Nil => right(hd)
+//               case Left(_) :: Nil   => left(BucketAtEnd)
+//               case _ :: _ :: _      => left(MultipleStackValuesAtEnd)
+//               case Nil              => left(EmptyStackAtEnd)
+//             }
+//           }
+//         }
+        ???
       }
+
+      ???
     }
-
-    def findFirstRoot(line: Option[Line], stream: Vector[Instruction]): Either[StackError, (Root, Vector[Instruction])] = {
-      def buildConstRoot(instr: RootInstr): Either[StackError, (Root, Vector[Instruction])] = {
-        val rvalue = instr match {
-          case PushString(str) => CString(str)
-          case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
-          case PushTrue        => CBoolean(true)
-          case PushFalse       => CBoolean(false)
-          case PushNull        => CNull
-          case PushObject      => RObject.empty
-          case PushArray       => RArray.empty
-        }
-
-        line map { ln =>
-          Right((Const(rvalue)(ln), stream.tail))
-        } getOrElse Left(UnknownLine)
-      }
-
-      val back = stream.headOption collect {
-        case ln: Line => findFirstRoot(Some(ln), stream.tail)
-
-        case i: PushString => buildConstRoot(i)
-        case i: PushNum    => buildConstRoot(i)
-        case PushTrue      => buildConstRoot(PushTrue)
-        case PushFalse     => buildConstRoot(PushFalse)
-        case PushNull      => buildConstRoot(PushNull)
-        case PushObject    => buildConstRoot(PushObject)
-        case PushArray     => buildConstRoot(PushArray)
-
-        case PushUndefined =>
-          line map { ln =>
-            Right((Undefined(ln), stream.tail))
-          } getOrElse Left(UnknownLine)
-
-        case instr => Left(StackUnderflow(instr))
-      }
-
-      back getOrElse Left(EmptyStream)
-    }
-
-    if (stream.isEmpty) {
-      Left(EmptyStream)
-    } else {
-      M.sequence(findFirstRoot(None, stream).right map { case (root, tail) => loop(root.loc, Right(root) :: Nil, Nil, tail) }).map(_.joinRight).run
-    }
-  }
 
   private def findGraphWithId(id: Int)(spec: dag.BucketSpec): Option[DepGraph] = spec match {
     case dag.UnionBucketSpec(left, right)     => findGraphWithId(id)(left) orElse findGraphWithId(id)(right)
@@ -615,168 +574,168 @@ trait DAG extends Instructions {
 
       val memotable = mutable.Map.empty[DepGraph, State[SubstitutionState, DepGraph]]
 
-      def memoized(node: DepGraph): State[SubstitutionState, DepGraph] = {
+      def memoized(node: DepGraph): State[SubstitutionState, DepGraph] = { ???
 
-        def inner(graph: DepGraph): State[SubstitutionState, DepGraph] = {
+        // def inner(graph: DepGraph): State[SubstitutionState, DepGraph] = {
 
-          val inScopeM = for {
-            state <- monadState.gets(identity)
-            inScope = state.inScope || graph == scope
-            _ <- monadState.modify(_.copy(inScope = inScope))
-          } yield inScope
+        //   val inScopeM = for {
+        //     state <- monadState.gets(identity)
+        //     inScope = state.inScope || graph == scope
+        //     _ <- monadState.modify(_.copy(inScope = inScope))
+        //   } yield inScope
 
-          val rewritten = inScopeM.flatMap { inScope =>
-            editUpdate[E].edit(inScope, graph, edit, (rep: DepGraph) => for { state <- monadState.gets(identity) } yield rep, (_: DepGraph) match {
-              // not using extractors due to bug
-              case s: dag.SplitParam =>
-                for { state <- monadState.gets(identity) } yield dag.SplitParam(s.id, s.parentId)(s.loc)
+        //   val rewritten = inScopeM.flatMap { inScope =>
+        //     editUpdate[E].edit(inScope, graph, edit, (rep: DepGraph) => for { state <- monadState.gets(identity) } yield rep, (_: DepGraph) match {
+        //       // not using extractors due to bug
+        //       case s: dag.SplitParam =>
+        //         for { state <- monadState.gets(identity) } yield dag.SplitParam(s.id, s.parentId)(s.loc)
 
-              // not using extractors due to bug
-              case s: dag.SplitGroup =>
-                for { state <- monadState.gets(identity) } yield dag.SplitGroup(s.id, s.identities, s.parentId)(s.loc)
+        //       // not using extractors due to bug
+        //       case s: dag.SplitGroup =>
+        //         for { state <- monadState.gets(identity) } yield dag.SplitGroup(s.id, s.identities, s.parentId)(s.loc)
 
-              case graph @ dag.Const(_) =>
-                for { _ <- monadState.gets(identity) } yield graph
+        //       case graph @ dag.Const(_) =>
+        //         for { _ <- monadState.gets(identity) } yield graph
 
-              case graph @ dag.Undefined() =>
-                for { _ <- monadState.gets(identity) } yield graph
+        //       case graph @ dag.Undefined() =>
+        //         for { _ <- monadState.gets(identity) } yield graph
 
-              case graph @ dag.New(parent) =>
-                for { newParent <- memoized(parent) } yield dag.New(newParent)(graph.loc)
+        //       case graph @ dag.New(parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.New(newParent)(graph.loc)
 
-              case graph @ dag.Morph1(m, parent) =>
-                for { newParent <- memoized(parent) } yield dag.Morph1(m, newParent)(graph.loc)
+        //       case graph @ dag.Morph1(m, parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.Morph1(m, newParent)(graph.loc)
 
-              case graph @ dag.Morph2(m, left, right) =>
-                for {
-                  newLeft <- memoized(left)
-                  newRight <- memoized(right)
-                } yield dag.Morph2(m, newLeft, newRight)(graph.loc)
+        //       case graph @ dag.Morph2(m, left, right) =>
+        //         for {
+        //           newLeft <- memoized(left)
+        //           newRight <- memoized(right)
+        //         } yield dag.Morph2(m, newLeft, newRight)(graph.loc)
 
-              case graph @ dag.Distinct(parent) =>
-                for { newParent <- memoized(parent) } yield dag.Distinct(newParent)(graph.loc)
+        //       case graph @ dag.Distinct(parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.Distinct(newParent)(graph.loc)
 
-              case graph @ dag.AbsoluteLoad(parent, jtpe) =>
-                for { newParent <- memoized(parent) } yield dag.AbsoluteLoad(newParent, jtpe)(graph.loc)
+        //       case graph @ dag.AbsoluteLoad(parent, jtpe) =>
+        //         for { newParent <- memoized(parent) } yield dag.AbsoluteLoad(newParent, jtpe)(graph.loc)
 
-              case graph @ dag.Operate(op, parent) =>
-                for { newParent <- memoized(parent) } yield dag.Operate(op, newParent)(graph.loc)
+        //       case graph @ dag.Operate(op, parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.Operate(op, newParent)(graph.loc)
 
-              case graph @ dag.Reduce(red, parent) =>
-                for { newParent <- memoized(parent) } yield dag.Reduce(red, newParent)(graph.loc)
+        //       case graph @ dag.Reduce(red, parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.Reduce(red, newParent)(graph.loc)
 
-              case dag.MegaReduce(reds, parent) =>
-                for { newParent <- memoized(parent) } yield dag.MegaReduce(reds, newParent)
+        //       case dag.MegaReduce(reds, parent) =>
+        //         for { newParent <- memoized(parent) } yield dag.MegaReduce(reds, newParent)
 
-              case s @ dag.Split(spec, child, id) => {
-                for {
-                  newSpec <- memoizedSpec(spec)
-                  newChild <- memoized(child)
-                } yield dag.Split(newSpec, newChild, id)(s.loc)
-              }
+        //       case s @ dag.Split(spec, child, id) => {
+        //         for {
+        //           newSpec <- memoizedSpec(spec)
+        //           newChild <- memoized(child)
+        //         } yield dag.Split(newSpec, newChild, id)(s.loc)
+        //       }
 
-              case graph @ dag.Assert(pred, child) =>
-                for {
-                  newPred <- memoized(pred)
-                  newChild <- memoized(child)
-                } yield dag.Assert(newPred, newChild)(graph.loc)
+        //       case graph @ dag.Assert(pred, child) =>
+        //         for {
+        //           newPred <- memoized(pred)
+        //           newChild <- memoized(child)
+        //         } yield dag.Assert(newPred, newChild)(graph.loc)
 
-              case graph @ dag.Observe(data, samples) =>
-                for {
-                  newData <- memoized(data)
-                  newSamples <- memoized(samples)
-                } yield dag.Observe(newData, newSamples)(graph.loc)
+        //       case graph @ dag.Observe(data, samples) =>
+        //         for {
+        //           newData <- memoized(data)
+        //           newSamples <- memoized(samples)
+        //         } yield dag.Observe(newData, newSamples)(graph.loc)
 
-              case graph @ dag.IUI(union, left, right) =>
-                for {
-                  newLeft <- memoized(left)
-                  newRight <- memoized(right)
-                } yield dag.IUI(union, newLeft, newRight)(graph.loc)
+        //       case graph @ dag.IUI(union, left, right) =>
+        //         for {
+        //           newLeft <- memoized(left)
+        //           newRight <- memoized(right)
+        //         } yield dag.IUI(union, newLeft, newRight)(graph.loc)
 
-              case graph @ dag.Diff(left, right) =>
-                for {
-                  newLeft <- memoized(left)
-                  newRight <- memoized(right)
-                } yield dag.Diff(newLeft, newRight)(graph.loc)
+        //       case graph @ dag.Diff(left, right) =>
+        //         for {
+        //           newLeft <- memoized(left)
+        //           newRight <- memoized(right)
+        //         } yield dag.Diff(newLeft, newRight)(graph.loc)
 
-              case graph @ dag.Join(op, joinSort, left, right) =>
-                for {
-                  newLeft <- memoized(left)
-                  newRight <- memoized(right)
-                } yield dag.Join(op, joinSort, newLeft, newRight)(graph.loc)
+        //       case graph @ dag.Join(op, joinSort, left, right) =>
+        //         for {
+        //           newLeft <- memoized(left)
+        //           newRight <- memoized(right)
+        //         } yield dag.Join(op, joinSort, newLeft, newRight)(graph.loc)
 
-              case graph @ dag.Filter(joinSort, target, boolean) =>
-                for {
-                  newTarget <- memoized(target)
-                  newBoolean <- memoized(boolean)
-                } yield dag.Filter(joinSort, newTarget, newBoolean)(graph.loc)
+        //       case graph @ dag.Filter(joinSort, target, boolean) =>
+        //         for {
+        //           newTarget <- memoized(target)
+        //           newBoolean <- memoized(boolean)
+        //         } yield dag.Filter(joinSort, newTarget, newBoolean)(graph.loc)
 
-              case dag.AddSortKey(parent, sortField, valueField, id) =>
-                for { newParent <- memoized(parent) } yield dag.AddSortKey(newParent, sortField, valueField, id)
+        //       case dag.AddSortKey(parent, sortField, valueField, id) =>
+        //         for { newParent <- memoized(parent) } yield dag.AddSortKey(newParent, sortField, valueField, id)
 
-              case dag.Memoize(parent, priority) =>
-                for { newParent <- memoized(parent) } yield dag.Memoize(newParent, priority)
-            })
-          }
+        //       case dag.Memoize(parent, priority) =>
+        //         for { newParent <- memoized(parent) } yield dag.Memoize(newParent, priority)
+        //     })
+        //   }
 
-          if (graph != scope)
-            rewritten
-          else
-            for {
-              node <- rewritten
-              _ <- monadState.modify(_.copy(rewrittenScope = scopeUpdate[S].update(node)))
-            } yield node
-        }
+        //   if (graph != scope)
+        //     rewritten
+        //   else
+        //     for {
+        //       node <- rewritten
+        //       _ <- monadState.modify(_.copy(rewrittenScope = scopeUpdate[S].update(node)))
+        //     } yield node
+        // }
 
-        memotable.get(node) getOrElse {
-          val result = inner(node)
-          memotable += (node -> result)
-          result
-        }
+        // memotable.get(node) getOrElse {
+        //   val result = inner(node)
+        //   memotable += (node -> result)
+        //   result
+        // }
       }
 
-      def memoizedSpec(spec: dag.BucketSpec): State[SubstitutionState, dag.BucketSpec] = {
-        val inScopeM = for {
-          state <- monadState.gets(identity)
-          inScope = state.inScope || spec == scope
-          _ <- monadState.modify(_.copy(inScope = inScope))
-        } yield inScope
+      def memoizedSpec(spec: dag.BucketSpec): State[SubstitutionState, dag.BucketSpec] = { ???
+        // val inScopeM = for {
+        //   state <- monadState.gets(identity)
+        //   inScope = state.inScope || spec == scope
+        //   _ <- monadState.modify(_.copy(inScope = inScope))
+        // } yield inScope
 
-        val rewritten = inScopeM.flatMap { inScope =>
-          editUpdate[E].edit(inScope, spec, edit, (rep: dag.BucketSpec) => for { state <- monadState.gets(identity) } yield rep, (_: dag.BucketSpec) match {
-            case dag.UnionBucketSpec(left, right) =>
-              for {
-                newLeft <- memoizedSpec(left)
-                newRight <- memoizedSpec(right)
-              } yield dag.UnionBucketSpec(newLeft, newRight)
+        // val rewritten = inScopeM.flatMap { inScope =>
+        //   editUpdate[E].edit(inScope, spec, edit, (rep: dag.BucketSpec) => for { state <- monadState.gets(identity) } yield rep, (_: dag.BucketSpec) match {
+        //     case dag.UnionBucketSpec(left, right) =>
+        //       for {
+        //         newLeft <- memoizedSpec(left)
+        //         newRight <- memoizedSpec(right)
+        //       } yield dag.UnionBucketSpec(newLeft, newRight)
 
-            case dag.IntersectBucketSpec(left, right) =>
-              for {
-                newLeft <- memoizedSpec(left)
-                newRight <- memoizedSpec(right)
-              } yield dag.IntersectBucketSpec(newLeft, newRight)
+        //     case dag.IntersectBucketSpec(left, right) =>
+        //       for {
+        //         newLeft <- memoizedSpec(left)
+        //         newRight <- memoizedSpec(right)
+        //       } yield dag.IntersectBucketSpec(newLeft, newRight)
 
-            case dag.Group(id, target, child) =>
-              for {
-                newTarget <- memoized(target)
-                newChild <- memoizedSpec(child)
-              } yield dag.Group(id, newTarget, newChild)
+        //     case dag.Group(id, target, child) =>
+        //       for {
+        //         newTarget <- memoized(target)
+        //         newChild <- memoizedSpec(child)
+        //       } yield dag.Group(id, newTarget, newChild)
 
-            case dag.UnfixedSolution(id, target) =>
-              for { newTarget <- memoized(target) } yield dag.UnfixedSolution(id, newTarget)
+        //     case dag.UnfixedSolution(id, target) =>
+        //       for { newTarget <- memoized(target) } yield dag.UnfixedSolution(id, newTarget)
 
-            case dag.Extra(target) =>
-              for { newTarget <- memoized(target) } yield dag.Extra(newTarget)
-          })
-        }
+        //     case dag.Extra(target) =>
+        //       for { newTarget <- memoized(target) } yield dag.Extra(newTarget)
+        //   })
+        // }
 
-        if (spec != scope)
-          rewritten
-        else
-          for {
-            node <- rewritten
-            _ <- monadState.modify(_.copy(rewrittenScope = scopeUpdate[S].update(node)))
-          } yield node
+        // if (spec != scope)
+        //   rewritten
+        // else
+        //   for {
+        //     node <- rewritten
+        //     _ <- monadState.modify(_.copy(rewrittenScope = scopeUpdate[S].update(node)))
+        //   } yield node
       }
 
       val resultM = for {

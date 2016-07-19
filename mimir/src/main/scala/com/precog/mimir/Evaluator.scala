@@ -426,7 +426,7 @@ trait EvaluatorModule[M[+ _]]
           }
         }
 
-        type TSM[+T] = StateT[N, EvaluatorState, T]
+        type TSM[T] = StateT[N, EvaluatorState, T]
         def evalTransSpecable(to: DepGraph): StateT[N, EvaluatorState, PendingTable] = {
           mkTransSpecWithState[TSM, PendingTable](to, None, ctx, get0, set0, init0)
         }
@@ -850,7 +850,7 @@ trait EvaluatorModule[M[+ _]]
       def fullEval(graph: DepGraph, splits: Map[Identifier, Int => N[Table]], parentSplits: List[Identifier]): StateT[N, EvaluatorState, Table] = {
         import scalaz.syntax.monoid._
 
-        type EvaluatorStateT[+A] = StateT[N, EvaluatorState, A]
+        type EvaluatorStateT[A] = StateT[N, EvaluatorState, A]
 
         def stage(toEval: List[StagingPoint], graph: DepGraph): EvaluatorStateT[DepGraph] = {
           for {

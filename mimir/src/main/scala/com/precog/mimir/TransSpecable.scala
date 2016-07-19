@@ -98,7 +98,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
     def findOrderAncestor(to: DepGraph, ctx: EvaluationContext): Option[DepGraph] =
       mkTransSpecOrderWithState[Option, (TransSpec1, DepGraph)](to, None, ctx, identity, snd, some).map(_._2)
 
-    def transFold[N[+ _]: Monad, S](to: DepGraph,
+    def transFold[N[_]: Monad, S](to: DepGraph,
                                     from: Option[DepGraph],
                                     ctx: EvaluationContext,
                                     get: S => (TransSpec1, DepGraph),
@@ -224,7 +224,7 @@ trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] wi
       }
     }
 
-    def mkTransSpecWithState[N[+ _]: Monad, S](to: DepGraph,
+    def mkTransSpecWithState[N[_]: Monad, S](to: DepGraph,
                                                from: Option[DepGraph],
                                                ctx: EvaluationContext,
                                                get: S => (TransSpec1, DepGraph),
