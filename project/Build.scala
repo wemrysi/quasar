@@ -55,18 +55,15 @@ object PlatformBuild {
                    organization :=  "com.precog",
                         version :=  "2.6.1-SNAPSHOT",
                   scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
-                   javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
-                   scalaVersion :=  "2.10.6",
-             crossScalaVersions :=  Seq("2.9.3", "2.10.6"),
-      parallelExecution in Test :=  false,
+                   scalaVersion :=  "2.11.8",
+             crossScalaVersions :=  Seq("2.9.3", "2.10.6", "2.11.8"),
             logBuffered in Test :=  false,
-                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true)),
-                      resolvers +=  "Akka Repo" at "http://repo.akka.io/repository"
+                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
       )
       also inBoth(doubleCross)
       also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
-      compileArgs("-Ywarn-unused", "-Ywarn-unused-import")
+      // compileArgs("-Ywarn-unused", "-Ywarn-unused-import")
+      // "-Ywarn-numeric-widen", "-Xlog-implicits"
     )
-    // "-Ywarn-numeric-widen", "-Xlog-implicits"
   }
 }

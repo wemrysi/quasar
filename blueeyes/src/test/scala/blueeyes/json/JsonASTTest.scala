@@ -18,8 +18,6 @@ package blueeyes
 package json
 
 import org.scalacheck._
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
 import scalaz._, Scalaz._, Ordering._
 import PrecogSpecs._
 
@@ -170,13 +168,10 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   "sort arrays" in {
-    import scalaz.Order
-    import scalaz.Ordering._
-
     val v1 = JParser.parseUnsafe("""[1, 1, 1]""")
     val v2 = JParser.parseUnsafe("""[1, 1, 1]""")
 
-    Order[JValue].order(v1, v2) must_== EQ
+    Order[JValue].order(v1, v2) must_== Ordering.EQ
   }
 
   "sort objects by key" in {
@@ -233,8 +228,6 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   def runArbitraryPathSpec = {
-    import org.scalacheck.Prop._
-
     implicit val arbJPath: Arbitrary[JPath] = Arbitrary {
       import Gen._
 

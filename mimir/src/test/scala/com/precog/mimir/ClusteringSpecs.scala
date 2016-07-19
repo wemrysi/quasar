@@ -19,20 +19,14 @@
  */
 package com.precog.mimir
 
-import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
 
-import org.specs2.mutable._
-
-import spire.ArrayOps
 import spire.implicits._
-
 import scala.util.Random
-
-import blueeyes.json._
-
+import blueeyes._, json._
 import scalaz._
+import org.specs2.mutable._
 
 trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with ClusteringTestSupport
@@ -51,8 +45,6 @@ trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
   }
 
-  implicit def arrayOps[@specialized(Double) A](lhs: Array[A]) = new ArrayOps(lhs)
-
   def kMediansCost(points: Array[Array[Double]], centers: Array[Array[Double]]): Double = {
     points.foldLeft(0.0) { (cost, p) =>
       cost + centers.map({ c => (p - c).norm }).qmin
@@ -65,9 +57,7 @@ trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     val targetCost = kMediansCost(points, centers)
 
     clusterMap must haveSize(k)
-    clusterMap.keys must haveAllElementsLike {
-      case ClusterIdPattern(_) => ok
-    }
+    clusterMap.keys must contain(like[String]({ case ClusterIdPattern(_) => ok })).forall
 
     def getPoint(sval: SValue): List[Double] = sval match {
       case SArray(arr) =>
@@ -250,7 +240,7 @@ trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       val points = pointsA.zipWithIndex map {
         case (p, i) if i % 3 == 2 => p ++ Array.fill(3)(Random.nextDouble)
-        case (p, _) => p
+        case (p, _)               => p
       }
 
       writePointsToDataset(points) { dataset =>

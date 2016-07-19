@@ -37,9 +37,8 @@ import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
 
 import scalaz._, Scalaz._, Validation._
-import org.specs2.execute.Result
-import org.specs2.mutable.Specification
 import blueeyes._, json._
+import PrecogSpecs._
 
 trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupport[M] {
   def M = Need.need.asInstanceOf[scalaz.Monad[M] with scalaz.Comonad[M]]
@@ -47,7 +46,8 @@ trait EvaluatorSpecification[M[+_]] extends Specification with EvaluatorTestSupp
 
 trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
     with BaseBlockStoreTestModule[M]
-    with IdSourceScannerModule { outer =>
+    with IdSourceScannerModule
+    with SpecificationHelp { outer =>
 
   def Evaluator[N[+_]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M) =
     new Evaluator[N](N0)(mn,nm) {
@@ -84,7 +84,7 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
     override def load(table: Table, apiKey: APIKey, jtpe: JType) = EitherT {
       table.toJson map { events =>
         val eventsV = events.toStream.traverse[({ type λ[α] = Validation[ResourceError, α] })#λ, Stream[JValue]] {
-          case JString(pathStr) => success {
+          case JString(pathStr) => Validation.success {
             indexLock synchronized {      // block the WHOLE WORLD
               val path = Path(pathStr)
 
@@ -112,7 +112,7 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
           }
 
           case x =>
-            failure(ResourceError.corrupt("Attempted to load JSON as a table from something that wasn't a string: " + x))
+            Validation.failure(ResourceError.corrupt("Attempted to load JSON as a table from something that wasn't a string: " + x))
         }
 
         eventsV.disjunction.map(ss => fromJson(ss.flatten))
@@ -152,7 +152,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   val testAPIKey = "testAPIKey"
 
-  def testEval(graph: DepGraph, path: Path = Path.Root, scriptPath: Path = Path.Root, optimize: Boolean = true)(test: Set[SEvent] => Result): Result = {
+  def testEval(graph: DepGraph, path: Path = Path.Root, scriptPath: Path = Path.Root, optimize: Boolean = true)(test: Set[SEvent] => SpecsResult): SpecsResult = {
     val ctx = defaultEvaluationContext.copy(basePath = path, scriptPath = scriptPath)
     (consumeEval(graph, ctx, optimize) match {
       case Success(results) => test(results)
@@ -396,7 +396,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 2 => d.toInt
         }
 
-        result2 must contain(84,54,119,43,55,43,54,24,89,13,25,13,119,89,154,78,90,78,43,13,78,2,14,2,55,25,90,14,26,14)
+        result2.toSet must_== Set(84,54,119,43,55,43,54,24,89,13,25,13,119,89,154,78,90,78,43,13,78,2,14,2,55,25,90,14,26,14)
       }
     }
 
@@ -1081,7 +1081,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SBoolean(d)) if ids.size == 1 => d
         }
 
-        result2 must contain(true).only
+        result2 must contain(true)
       }
     }
 
@@ -2738,7 +2738,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must haveSize(23)
 
-        result2 must contain(0, -377, -780, 6006, -76, 5929, 1, 156, 169, 2, 1764,
+        result2.toSet must_== Set(0, -377, -780, 6006, -76, 5929, 1, 156, 169, 2, 1764,
           2695, 144, 1806, -360, 1176, -832, 182, 4851, -1470, -13, -41, -24)
       }
     }
@@ -3085,7 +3085,6 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       testEval(input) { result =>
         result must haveSize(100)
-
         result must haveAllElementsLike {
           case (ids, SObject(obj)) =>
             ids must haveSize(1)
@@ -3094,9 +3093,9 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             obj must haveKey("page")
             obj must haveKey("t")
 
-            obj("t") mustEqual SDecimal(42)
+            obj("t") must_== SDecimal(42)
 
-          case _ => failure("Result has wrong shape")
+          case _ => fail("Result has wrong shape")
         }
       }
     }

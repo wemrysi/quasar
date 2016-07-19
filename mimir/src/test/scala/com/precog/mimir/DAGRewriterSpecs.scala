@@ -83,11 +83,11 @@ trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
         case m@MegaReduce(_, _) => Tag(Some(m)): FirstOption[DepGraph]
       }
 
-      megaReduce must beSome
+      megaReduce.getClass must_== classOf[scala.Some[_]]
 
       val rewritten = inlineNodeValue(
         optimizedDAG,
-        megaReduce.get,
+        megaReduce.asInstanceOf[Option[DepGraph]].get,
         CNum(42))
 
       val hasMegaReduce = rewritten.foldDown(false) {

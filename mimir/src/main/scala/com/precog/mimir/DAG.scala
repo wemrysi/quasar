@@ -31,16 +31,8 @@ import com.precog.yggdrasil._
 
 import scala.collection.mutable
 
-import scalaz.{ NonEmptyList => NEL, _ }
+import scalaz._, Scalaz._
 import scalaz.Free.Trampoline
-import scalaz.std.either._
-import scalaz.std.function._
-import scalaz.std.option._
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.traverse._
-
 import java.math.MathContext
 
 trait DAG extends Instructions {
@@ -338,16 +330,12 @@ trait DAG extends Instructions {
         case instr: RootInstr => {
           val rvalue = instr match {
             case PushString(str) => CString(str)
-
-            // get the numeric coersion
-            case PushNum(num) =>
-              CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
-
-            case PushTrue   => CBoolean(true)
-            case PushFalse  => CBoolean(false)
-            case PushNull   => CNull
-            case PushObject => RObject.empty
-            case PushArray  => RArray.empty
+            case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+            case PushTrue        => CBoolean(true)
+            case PushFalse       => CBoolean(false)
+            case PushNull        => CNull
+            case PushObject      => RObject.empty
+            case PushArray       => RArray.empty
           }
 
           loop(loc, Right(Const(rvalue)(loc)) :: roots, splits, stream.tail)
@@ -374,16 +362,12 @@ trait DAG extends Instructions {
       def buildConstRoot(instr: RootInstr): Either[StackError, (Root, Vector[Instruction])] = {
         val rvalue = instr match {
           case PushString(str) => CString(str)
-
-          // get the numeric coersion
-          case PushNum(num) =>
-            CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
-
-          case PushTrue   => CBoolean(true)
-          case PushFalse  => CBoolean(false)
-          case PushNull   => CNull
-          case PushObject => RObject.empty
-          case PushArray  => RArray.empty
+          case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+          case PushTrue        => CBoolean(true)
+          case PushFalse       => CBoolean(false)
+          case PushNull        => CNull
+          case PushObject      => RObject.empty
+          case PushArray       => RArray.empty
         }
 
         line map { ln =>

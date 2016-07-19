@@ -23,20 +23,11 @@ package mimir
 import bytecode._
 import yggdrasil._
 import yggdrasil.table._
-
 import common._
 import com.precog.util._
 
 import blueeyes._, json._
-
-import spire.implicits._
-import spire.math.Eq
-import spire.ArrayOps
-
-import scalaz._
-import scalaz.{ Monad, Monoid, StreamT }
-import scalaz.std.list._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 trait KMediansCoreSetClustering {
   type CoreSet = (Array[Array[Double]], Array[Long])
@@ -65,9 +56,6 @@ trait KMediansCoreSetClustering {
 
   def epsilon: Double
 
-  // Remove once we get next RC of Spire.
-  implicit def arrayOps[@spec(Double) A](lhs: Array[A]) = new ArrayOps(lhs)
-
   case class CoreSetTree(tree: List[(Int, CoreSet)], k: Int) {
     def coreSet: CoreSet = {
       val coresets = tree map {
@@ -82,6 +70,7 @@ trait KMediansCoreSetClustering {
     }
 
     def mergeCoreSets(c1: CoreSet, c2: CoreSet, level: Int): CoreSet = {
+      import spire.syntax.all._
       val c                    = 1
       val (centers1, weights1) = c1
       val (centers2, weights2) = c2
@@ -220,6 +209,8 @@ trait KMediansCoreSetClustering {
     * @link http://valis.cs.uiuc.edu/~sariel/papers/03/kcoreset/kcoreset.pdf
     */
   private def createCenters(points: Array[Array[Double]], weights: Array[Long]): Array[Array[Double]] = {
+    import spire.implicits._
+
     if (points.length < 100) {
       points
     } else {
@@ -314,6 +305,8 @@ trait KMediansCoreSetClustering {
     */
   def approxKMedian(points: Array[Array[Double]], weights: Array[Long], k: Int): (Double, Array[Array[Double]], Array[Boolean]) = { // (cost, centers, isCenter)
 
+    import spire.implicits._
+
     val reps = new Array[Array[Double]](k)
     reps(0) = points(0)
 
@@ -402,6 +395,7 @@ trait KMediansCoreSetClustering {
     * @link http://valis.cs.uiuc.edu/~sariel/papers/03/kcoreset/kcoreset.pdf
     */
   private def makeCoreSet(points: Array[Array[Double]], weights: Array[Long], clustering: Array[Array[Double]]): CoreSet = {
+    import spire.implicits._
     val (distance, assignments) = assign(points, clustering)
 
     weightArray(distance, weights)
@@ -523,6 +517,8 @@ trait KMediansCoreSetClustering {
 }
 
 trait ClusteringLibModule[M[+ _]] extends ColumnarTableModule[M] with AssignClusterModule[M] {
+  import spire.implicits._
+
   trait ClusteringLib extends ColumnarTableLib with AssignClusterSupport {
     import trans._
     import TransSpecModule._
@@ -538,7 +534,7 @@ trait ClusteringLibModule[M[+ _]] extends ColumnarTableModule[M] with AssignClus
       type KS = List[Int]
       val epsilon = 0.1
 
-      implicit def monoidKS = new Monoid[KS] {
+      implicit def monoidKS: Monoid[KS] = new Monoid[KS] {
         def zero: KS                    = List.empty[Int]
         def append(ks1: KS, ks2: => KS) = ks1 ++ ks2
       }

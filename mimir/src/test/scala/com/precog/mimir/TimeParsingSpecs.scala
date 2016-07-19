@@ -22,7 +22,8 @@ package com.precog.mimir
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
-import scalaz._
+import scalaz._, Scalaz._
+import PrecogSpecs._
 
 trait TimeParsingSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>

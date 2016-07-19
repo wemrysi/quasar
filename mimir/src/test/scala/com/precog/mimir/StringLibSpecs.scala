@@ -246,7 +246,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites").only
+      result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites")
     }
     "determine takeRight with valid integer" in {
       val input = op2Input(takeRight, CLong(8), homStrings)
@@ -258,7 +258,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ").only
+      result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ")
     }
     "determine dropLeft with valid integer" in {
       val input = op2Input(dropLeft, CLong(8), homStrings)
@@ -270,7 +270,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ").only
+      result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ")
     }
     "determine dropRight with valid integer" in {
       val input = op2Input(dropRight, CLong(8), homStrings)
@@ -281,7 +281,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !").only
+      result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !")
     }
     "determine takeLeft with invalid integer" in {
       val input = op2Input(takeLeft, CNum(7.5), homStrings)
@@ -645,7 +645,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites").only
+      result2 must contain("", "quirky", "solstice", "Monkey: ", "(\"alpha\"", "  Whites")
     }
     "determine takeRight with valid integer" in {
       val input = Join(BuiltInFunction2Op(takeRight), Cross(None),
@@ -659,7 +659,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ").only
+      result2 must contain("", "quirky", "tice + 7", "[Brains]", "\"gamma\")", "!!1!!   ")
     }
     "determine dropLeft with valid integer" in {
       val input = Join(BuiltInFunction2Op(dropLeft), Cross(None),
@@ -673,7 +673,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ").only
+      result2 must contain("", " + 7", "[Brains]", ", \"beta\", \"gamma\")", "pace       is   awesome  !!!1!!   ")
     }
     "determine dropRight with valid integer" in {
       val input = Join(BuiltInFunction2Op(dropRight), Cross(None),
@@ -687,7 +687,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 1 => d
       }
 
-      result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !").only
+      result2 must contain("", "sols", "Monkey: ", "(\"alpha\", \"beta\", ", "  Whitespace       is   awesome  !")
     }
     "determine takeLeft with invalid integer" in {
       val input = op2Input(takeLeft, CNum(7.5), hetStrings)
@@ -831,7 +831,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         BigDecimal("0e9"),
         BigDecimal("2.23532235235235353252352343636953295923"),
         BigDecimal("1.2e3")
-      ).only
+      )
     }
   }
 
@@ -855,7 +855,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         "4",
         "3",
         "4"
-      ).only
+      )
     }
 
     "trim the trailing '.0' in round double conversion" in {

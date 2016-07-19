@@ -30,18 +30,13 @@ import blueeyes._
 import common._
 import bytecode._
 import com.precog.util._
-
-import spire.implicits.{ semigroupOps => _, _ }
-import spire.{ ArrayOps, SeqOps }
+import spire.implicits._
 
 import scalaz._, Scalaz._
 import scala.util.Random.nextInt
 import scala.collection.JavaConverters._
 
 private object MissingSpireOps {
-  implicit def arrayOps[@specialized(Double) A](lhs: Array[A]) = new ArrayOps(lhs)
-  implicit def seqOps[@specialized(Double) A](lhs: Seq[A])     = new SeqOps[A](lhs)
-
   // TODO: Use incremental mean, or switch back to Spire's when fixed.
   def meanSeq(xs: List[Double]): Double = {
     def loop(sum: Double, count: Double, acc: List[Double]): Double = acc match {
@@ -231,7 +226,7 @@ trait TreeMaker[ /*@specialized(Double) */ A] {
 
     val orders = (0 until opts.features).map { i =>
       val order = (0 until dependent.length).toArray
-      (new ArrayOps(order)).qsortBy(independent(_)(i))
+      arrayOps(order).qsortBy(independent(_)(i))
       order
     }.toArray
     growTree(orders)
@@ -500,7 +495,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
 
       def findError(actual: Array[Double], predicted: Array[Double]): Double = {
-        val actualMean = new SeqOps(actual) qmean
+        val actualMean = arrayOps(actual) qmean
 
         val diffs = actual - predicted
         val num   = diffs dot diffs

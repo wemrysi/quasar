@@ -208,7 +208,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,2,3,4,7,8).only
+      result2.toSet must_=== Set(0,2,3,4,7,8)
     }
 
     "compute rank, denseRank, indexedRank" in {
@@ -325,7 +325,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,1,2,3,4,5,6,7,8,9).only
+      result2.toSet must_== Set(0,1,2,3,4,5,6,7,8,9)
     }
 
     "compute rank within a filter" in {
@@ -347,7 +347,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(11).only
+      result2 must contain(11)
     }
 
     "compute rank resulting in a boolean set" in {
@@ -388,7 +388,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(2,4,5,6,9,10).only
+      result2 must contain(2,4,5,6,9,10)
     }
 
     "compute denseRank" in {
@@ -405,7 +405,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,1,2,3,4,5).only
+      result2 must contain(0,1,2,3,4,5)
     }
 
     "compute denseRank within a filter" in {
@@ -445,7 +445,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(2,3,4,5,6,7).only
+      result2 must contain(2,3,4,5,6,7)
     }
 
     "compute linear correlation" in {
@@ -468,7 +468,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 0.9998746737089123)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute covariance" in {
@@ -490,7 +490,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 400.08)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -616,7 +616,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,1,2,3,4,5,7,8,9,12,13,15,16,17).only
+      result2 must contain(0,1,2,3,4,5,7,8,9,12,13,15,16,17)
     }
 
     "compute indexedRank" in {
@@ -633,7 +633,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17).only
+      result2 must contain(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17)
     }
 
     "compute rank heterogenously" in {
@@ -693,7 +693,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(34).only
+      result2 must contain(34)
     }
 
     "compute rank within another equals filter" in {
@@ -714,7 +714,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-10).only
+      result2 must contain(-10)
 
     }
 
@@ -736,7 +736,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-10,0,5,11).only
+      result2 must contain(-10,0,5,11)
     }
 
     "compute rank within a join" in {
@@ -755,7 +755,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5, 10, 14, 6, 9, 2, 17, 7, 3, 18, 11, 19, 4, 15).only
+      result2 must contain(5, 10, 14, 6, 9, 2, 17, 7, 3, 18, 11, 19, 4, 15)
     }
 
     "compute denseRank" in {
@@ -772,7 +772,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,1,2,3,4,5,6,7,8,9,10,11,12,13).only
+      result2 must contain(0,1,2,3,4,5,6,7,8,9,10,11,12,13)
     }
 
     "compute denseRank within an equals filter" in {
@@ -814,7 +814,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-10,0,5,11,12).only
+      result2 must contain(-10,0,5,11,12)
     }
 
     "compute denseRank within a join" in {
@@ -833,7 +833,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5, 10, 14, 6, 9, 13, 2, 12, 7, 3, 11, 8, 4, 15).only
+      result2 must contain(5, 10, 14, 6, 9, 13, 2, 12, 7, 3, 11, 8, 4, 15)
     }
 
     "compute linear correlation" in {
@@ -855,7 +855,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 0.9998746737089123)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute covariance" in {
@@ -877,7 +877,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 400.08)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -905,7 +905,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "compute the correct coefficients in a simple log regression" in {
@@ -958,7 +958,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 0.9998746737089123)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute covariance" in {
@@ -980,7 +980,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 400.08)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -1060,7 +1060,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 1)
       }
 
-      result2 must contain(true).only //todo test this answer to a certain level of accuracy
+      result2 must contain(true) //todo test this answer to a certain level of accuracy
     }
 
     "compute covariance" in {
@@ -1082,7 +1082,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 582.96)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -1110,7 +1110,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "compute the correct coefficients in a simple log regression" in {
@@ -1217,7 +1217,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "compute the correct coefficients in a simple log regression" >> {
@@ -1437,7 +1437,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-9).only
+      result2 must contain(-9)
     }
 
     "compute rank resulting in a boolean set" in {
@@ -1478,7 +1478,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(10,14,6,21,13,17,22,7,3,18,16,23,8,4,15).only
+      result2 must contain(10,14,6,21,13,17,22,7,3,18,16,23,8,4,15)
     }
 
     "compute denseRank" in {
@@ -1495,7 +1495,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5,10,14,1,6,9,13,2,12,7,3,11,8,4,0).only
+      result2 must contain(5,10,14,1,6,9,13,2,12,7,3,11,8,4,0)
     }
 
     "compute denseRank within a filter" in {
@@ -1535,7 +1535,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5,10,14,6,9,13,17,12,7,3,16,11,8,4,15).only
+      result2 must contain(5,10,14,6,9,13,17,12,7,3,16,11,8,4,15)
     }
 
     "compute covariance" in {
@@ -1557,7 +1557,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 301.5)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute linear correlation" in {
@@ -1579,7 +1579,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 0.2832061115667535364)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -1607,7 +1607,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "compute the correct coefficients in a simple log regression" in {
@@ -1635,7 +1635,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "simple exponential smoothing" in {
@@ -1759,7 +1759,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0, 10, 20, 1, 6, 9, 13, 2, 17, 7, 3, 18, 16, 11, 8, 19, 4, 15).only
+      result2 must contain(0, 10, 20, 1, 6, 9, 13, 2, 17, 7, 3, 18, 16, 11, 8, 19, 4, 15)
     }
 
     "compute rank within an equals filter" in {
@@ -1780,7 +1780,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(12).only
+      result2 must contain(12)
     }
 
     "compute rank within another equals filter" in {
@@ -1801,7 +1801,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-3).only
+      result2 must contain(-3)
     }
 
     "compute rank within a less-than filter" in {
@@ -1822,7 +1822,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(-1,-3).only
+      result2 must contain(-1,-3)
     }
 
     "compute rank within a join" in {
@@ -1841,7 +1841,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5, 10, 14, 20, 6, 21, 9, 13, 22, 12, 7, 3, 18, 16, 11, 23, 19, 4).only
+      result2 must contain(5, 10, 14, 20, 6, 21, 9, 13, 22, 12, 7, 3, 18, 16, 11, 23, 19, 4)
     }
 
     "compute denseRank" in {
@@ -1858,7 +1858,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0, 5, 10, 14, 1, 6, 9, 13, 2, 17, 12, 7, 3, 16, 11, 8, 4, 15).only
+      result2 must contain(0, 5, 10, 14, 1, 6, 9, 13, 2, 17, 12, 7, 3, 16, 11, 8, 4, 15)
     }
 
     "compute denseRank within an equals filter" in {
@@ -1900,7 +1900,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(0,-3,-1).only
+      result2 must contain(0,-3,-1)
     }
 
     "compute denseRank within a join" in {
@@ -1919,7 +1919,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5, 10, 14, 20, 6, 9, 13, 17, 12, 7, 3, 18, 16, 11, 8, 19, 4, 15).only
+      result2 must contain(5, 10, 14, 20, 6, 9, 13, 17, 12, 7, 3, 18, 16, 11, 8, 19, 4, 15)
     }
 
     "compute covariance" in {
@@ -1941,7 +1941,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 874.2741666666666)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute correlation of 0 when datasets are uncorrelated" in {
@@ -1982,7 +1982,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 0 => (d.toDouble ~= 0.7835742008825)
       }
 
-      result2 must contain(true).only
+      result2 must contain(true)
     }
 
     "compute the correct coefficients in a simple linear regression" in {
@@ -2010,7 +2010,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "compute the correct coefficients in a simple log regression" in {
@@ -2038,7 +2038,7 @@ trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         }
       }
 
-      result2 must contain(Vector(true, true)).only
+      result2 must contain(Vector(true, true))
     }
 
     "simple exponential smoothing" in {

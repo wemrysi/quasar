@@ -101,13 +101,13 @@ trait ArrayLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       val values = result collect {
         case (ids, jv) if ids.length == 2 => jv
       }
-      values must haveAllElementsLike {
+      values must contain(like[SValue]({
         case SObject(obj) =>
           obj.keySet mustEqual Set("arr", "val")
           val SArray(elems) = obj("arr")
           elems must contain(obj("val"))
         case _ => ko
-      }
+      })).forall
     }
 
     "flatten a non-array without exploding" in {
