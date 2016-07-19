@@ -166,7 +166,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, sparkcore,
+  mongodb, skeleton, postgresql, sparkcore, marklogic,
 //      \ \ | / /
           main,
 //        /  \
@@ -237,9 +237,20 @@ lazy val skeleton = project
   // .settings(publishSettings: _*) // NB: uncomment this line when you copy it
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogic = project
+  .settings(name := "quasar-marklogic-internal")
+  .dependsOn(core % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Seq(
+    "com.marklogic"  %  "java-client-api"   % "3.0.5",
+    "org.http4s"     %% "jawn-streamz"      % "0.8.1",
+    "org.spire-math" %% "jawn-argonaut"     % "0.8.4"))
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
