@@ -19,14 +19,10 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.util.PrecogUnit
-
-import blueeyes.json.JValue
-
-import scalaz._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 trait ProjectionModule[M[+ _], Block] {
   type Projection <: ProjectionLike[M, Block]

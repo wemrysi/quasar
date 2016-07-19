@@ -21,9 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes._
 import com.precog.common._
-
-import scalaz.Monoid
-import scala.collection.mutable
+import scalaz._
 
 package object metadata {
   type MetadataMap = Map[MetadataType, Metadata]

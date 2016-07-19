@@ -20,8 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes.json._
-
 import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
@@ -31,8 +29,7 @@ import com.precog.util._
 
 import TransSpecModule._
 
-import scalaz._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 import scala.collection.mutable
 import org.slf4s.Logging
 

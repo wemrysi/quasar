@@ -20,8 +20,6 @@
 package com.precog.yggdrasil
 package jdbm3
 
-import org.apache.jdbm.Serializer
-
 import java.io.{ DataInput, DataOutput, Externalizable, ObjectInput, ObjectInputStream, ObjectOutput }
 import java.util.Comparator
 

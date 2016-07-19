@@ -21,21 +21,14 @@ package com.precog
 package yggdrasil
 package vfs
 
+import blueeyes._, json._, serialization._
 import blueeyes.core.http._
-import blueeyes.json._
-import blueeyes.json.serialization._
 import DefaultSerialization._
-
-import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.niflheim.NIHDB
 
-import scalaz._
-import scalaz.Validation._
-import scalaz.std.option._
-import scalaz.syntax.std.option._
-import scalaz.syntax.apply._
+import scalaz._, Scalaz._, Validation._
 
 sealed class PathData(val typeName: PathData.DataType)
 object PathData {

@@ -22,11 +22,7 @@ package com.precog.niflheim
 import blueeyes._
 import com.precog.common._
 import com.precog.util.PrecogUnit
-
-import java.io.{ IOException, File }
-import java.nio.ByteBuffer
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
-
 import scalaz._
 
 case class CookedBlockMetadata(blockid: Long, length: Int, segments: Array[(SegmentId, File)]) {

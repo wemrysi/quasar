@@ -22,7 +22,6 @@ package com.precog.niflheim
 import com.precog.util.PrecogUnit
 
 import blueeyes._
-import java.io.{ File, IOException }
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
 import java.nio.ByteBuffer
 import scalaz.{ Validation, Success, Failure }

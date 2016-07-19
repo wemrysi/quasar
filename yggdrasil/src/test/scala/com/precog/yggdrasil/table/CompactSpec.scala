@@ -24,15 +24,11 @@ import blueeyes._
 import com.precog.common._
 import scala.util.Random
 
-import com.precog.util.{BitSet, BitSetUtil, Loop}
+import com.precog.util.{ BitSet, BitSetUtil }
 
-import blueeyes.json._
-
-import scalaz.StreamT
-import scalaz.syntax.comonad._
-
-import org.specs2.ScalaCheck
+import scalaz._, Scalaz._
 import org.specs2.mutable._
+import PrecogSpecs._
 
 trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._

@@ -20,7 +20,6 @@
 package com.precog.niflheim
 
 import blueeyes._
-import com.precog.common._
 import com.precog.yggdrasil._
 import com.precog.util.FileLock
 

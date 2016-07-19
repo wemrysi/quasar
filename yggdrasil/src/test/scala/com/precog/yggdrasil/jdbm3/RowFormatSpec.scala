@@ -23,7 +23,6 @@ package jdbm3
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
-import com.precog.util.{ ByteBufferPool, ByteBufferPoolS }
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{ Shrink, Arbitrary, Gen }
@@ -31,7 +30,6 @@ import PrecogScalacheck._, PrecogSpecs._
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._
-  import ByteBufferPool._
 
   // This should generate some jpath ids, then generate CTypes for these.
   def genJpathIds: Gen[List[String]] = Gen.alphaStr filter (_.length > 0) list

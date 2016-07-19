@@ -19,15 +19,10 @@
  */
 package com.precog.yggdrasil
 
-import com.precog.util._
-import blueeyes._
-import com.precog.common._
-
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.DefaultSerialization._
-
+import com.precog.common._
 import scalaz._, Scalaz._, Ordering._
 
 sealed trait SValue {

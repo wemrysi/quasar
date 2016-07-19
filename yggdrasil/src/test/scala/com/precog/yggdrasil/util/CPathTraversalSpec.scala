@@ -25,12 +25,10 @@ import com.precog.common._
 import com.precog.yggdrasil.table._
 
 import com.precog.util._
-
-import org.scalacheck.{ Shrink, Arbitrary, Gen }
-import PrecogSpecs._, PrecogScalacheck._
+import PrecogSpecs._
 
 class CPathTraversalSpec extends Specification {
-  import CPathTraversal.{ Done, Sequence, Select, Loop }
+  import CPathTraversal._
 
   sealed trait ColBuilder[@spec(Boolean, Long, Double) A] {
     def apply(defined: BitSet, items: Array[A]): Column

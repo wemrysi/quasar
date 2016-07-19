@@ -1,11 +1,9 @@
 package com.precog
 
+import blueeyes._
 import common._
 import scalaz.effect.IO
-import scalaz.Ordering._
-import scalaz.std.anyVal._
-
-import blueeyes._
+import scalaz._, Scalaz._, Ordering._
 import com.precog.util.PrecogUnit
 
 package object yggdrasil {

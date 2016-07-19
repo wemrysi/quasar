@@ -19,12 +19,8 @@
  */
 package com.precog.common
 
-import blueeyes.json._
-import blueeyes.json.serialization._
-import blueeyes.json.serialization.DefaultSerialization._
-
-import scalaz._
-import scalaz.syntax.std.boolean._
+import blueeyes._, json._, serialization._, DefaultSerialization._
+import scalaz._, Scalaz._
 
 class Path private (val elements: String*) {
   def components: List[String] = elements.toList

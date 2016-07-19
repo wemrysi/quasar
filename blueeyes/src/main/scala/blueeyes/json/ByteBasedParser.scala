@@ -1,8 +1,6 @@
 package blueeyes
 package json
 
-import scala.annotation.{ switch, tailrec }
-
 /**
   * Trait used when the data to be parsed is in UTF-8.
   */

@@ -26,7 +26,6 @@ import com.precog.util.BitSet
 
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
-import org.scalacheck._
 
 abstract class cleanup(f: File) extends After {
   def after = {

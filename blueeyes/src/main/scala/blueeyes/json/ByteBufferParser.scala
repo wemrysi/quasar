@@ -1,7 +1,6 @@
 package blueeyes
 package json
 
-import scala.annotation.{ switch, tailrec }
 import java.nio.ByteBuffer
 
 /**

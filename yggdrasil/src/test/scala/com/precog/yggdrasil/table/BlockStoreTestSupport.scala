@@ -53,7 +53,6 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
     with StubProjectionModule[M, Slice] {
 
   import trans._
-  import CValueGenerators._
 
   implicit def M: Monad[M] with Comonad[M]
 

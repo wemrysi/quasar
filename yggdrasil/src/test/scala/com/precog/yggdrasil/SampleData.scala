@@ -19,26 +19,17 @@
  */
 package com.precog.yggdrasil
 
-import com.precog.common._
 import blueeyes._, json._
 
-import scalaz.{Ordering => _, NonEmptyList => NEL, _}
-import scalaz.std.tuple._
-import scalaz.std.function._
-import scalaz.syntax.arrow._
-import scalaz.syntax.bifunctor._
+import scalaz._, Scalaz._
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 
 import org.specs2._
-import org.specs2.mutable.Specification
 import org.scalacheck._
-import org.scalacheck.Gen
 import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary
 import org.scalacheck.Arbitrary._
 import CValueGenerators.JSchema
 
@@ -48,7 +39,7 @@ case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = Non
     "\nschema: " + schema
   }
 
-  def sortBy[B: Ordering](f: JValue => B) = copy(data = data.sortBy(f))
+  def sortBy[B: ScalaMathOrdering](f: JValue => B) = copy(data = data.sortBy(f))
 }
 
 object SampleData extends CValueGenerators {
@@ -56,7 +47,7 @@ object SampleData extends CValueGenerators {
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
   }
 
-  implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
+  implicit def keyOrder[A]: ScalaMathOrdering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
 
   def sample(schema: Int => Gen[JSchema]) = Arbitrary(
     for {

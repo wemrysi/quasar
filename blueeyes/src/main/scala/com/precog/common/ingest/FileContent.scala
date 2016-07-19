@@ -25,7 +25,6 @@ import com.precog.common.serializationImplicits._
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.core.http.{ MimeTypes, MimeType }
-import IsoSerialization._
 import DefaultSerialization._
 import Versioned._
 import Extractor._

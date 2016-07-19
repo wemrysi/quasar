@@ -19,8 +19,7 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes.json._
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import org.specs2.mutable.Specification
 

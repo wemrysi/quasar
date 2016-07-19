@@ -49,8 +49,6 @@ package object data {
     def aggregate(s: ByteChunk, chunkSize: Int = 8192)(implicit executor: ExecutionContext): ByteChunk = {
       implicit val M: Monad[Future] = futureMonad(executor)
 
-      import StreamT._
-
       def aggregateStream(stream: StreamT[Future, Array[Byte]], buf: Array[Byte], offset: Int): Future[StreamT[Future, Array[Byte]]] = {
         stream.uncons.flatMap {
           case None =>

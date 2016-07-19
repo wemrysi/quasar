@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package vfs
 
-import table.Slice
 import metadata.PathMetadata
 import metadata.PathStructure
 
@@ -28,16 +27,11 @@ import blueeyes._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._
-import com.precog.common.jobs._
 import com.precog.niflheim._
 import com.precog.util._
 
 import blueeyes.core.http.MimeType
 import blueeyes.json._
-import blueeyes.json.serialization._
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.Decomposer._
-import blueeyes.util.Clock
 
 import java.util.UUID
 import java.nio.ByteBuffer
@@ -47,7 +41,8 @@ import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
 
-import scalaz._, Scalaz._, EitherT._
+import scalaz._, Scalaz._
+import EitherT._
 import scalaz.effect.IO
 
 sealed trait Version

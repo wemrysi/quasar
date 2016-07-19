@@ -19,8 +19,6 @@
  */
 package com.precog.bytecode
 
-import scalaz.Scalaz._
-
 trait Instructions {
   type Lib <: Library
   val library: Lib

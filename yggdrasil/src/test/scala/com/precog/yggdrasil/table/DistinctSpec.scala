@@ -20,11 +20,8 @@
 package com.precog.yggdrasil
 package table
 
-import scala.util.Random
+import blueeyes._, json._
 
-import blueeyes.json._
-
-import scalaz.StreamT
 import scalaz.syntax.comonad._
 
 import org.specs2.ScalaCheck

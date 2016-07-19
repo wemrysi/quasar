@@ -21,7 +21,6 @@ package com.precog.common
 package ingest
 
 import blueeyes._
-import accounts.AccountId
 import security._
 import com.precog.common.serializationImplicits._
 import jobs.JobId

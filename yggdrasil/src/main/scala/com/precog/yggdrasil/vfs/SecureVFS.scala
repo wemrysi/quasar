@@ -22,22 +22,15 @@ package vfs
 
 import blueeyes._
 import com.precog.common._, accounts._, ingest._, security._, jobs._
-import com.precog.yggdrasil.execution._
 import com.precog.yggdrasil.metadata._
-import com.precog.yggdrasil.nihdb._
-import com.precog.yggdrasil.scheduling._
-import com.precog.util._
 import ResourceError._
 import Permission._
 
 import blueeyes.util.Clock
 
-import java.util.UUID
 import org.slf4s.Logging
 
 import scalaz._, Scalaz._
-import scalaz.effect.IO
-import scala.math.Ordered._
 
 trait VFSMetadata[M[+ _]] {
   def findDirectChildren(apiKey: APIKey, path: Path): EitherT[M, ResourceError, Set[PathMetadata]]

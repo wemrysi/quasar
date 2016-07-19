@@ -261,8 +261,7 @@ object CPathTraversal {
     }
 
     implicit object CPathPositionOrder extends ScalazOrder[CPathPosition] {
-      import scalaz.std.int._
-      import scalaz.Ordering.{ EQ, LT, GT }
+      import scalaz.Ordering._
 
       private val nodeOrder = implicitly[ScalazOrder[CPathNode]]
 

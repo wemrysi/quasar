@@ -20,7 +20,6 @@
 package com.precog.niflheim
 
 import blueeyes._, json._
-import com.precog.common._
 import org.joda.time.format.DateTimeFormat
 import com.precog.util._
 

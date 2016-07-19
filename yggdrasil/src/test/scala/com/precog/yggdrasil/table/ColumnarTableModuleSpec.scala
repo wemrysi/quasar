@@ -93,15 +93,12 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
 
   def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
-    val t0    = System.currentTimeMillis()
     val es    = JParser.parseManyFromString(json).valueOr(throw _)
     val table = fromJson(es.toStream, maxSliceSize)
     streamToString(table.renderCsv())
   }
 
   def testRenderJson(seq: Seq[JValue]) = {
-    def arr(es: List[JValue]) = if (es.isEmpty) None else Some(JArray(es))
-
     def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
 
     def minimize(value: JValue): Option[JValue] = {

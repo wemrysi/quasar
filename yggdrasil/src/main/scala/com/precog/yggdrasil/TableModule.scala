@@ -138,9 +138,6 @@ trait TableModule[M[+ _]] extends TransSpecModule {
 
   trait TableCompanionLike {
     import trans._
-    //import trans._
-    import trans.constants._
-
     def empty: Table
 
     def constString(v: Set[String]): Table

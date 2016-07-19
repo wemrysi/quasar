@@ -27,7 +27,6 @@ import com.precog.bytecode._
 import com.precog.yggdrasil.jdbm3._
 import com.precog.yggdrasil.util._
 import com.precog.util._
-import Schema._
 import metadata._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }

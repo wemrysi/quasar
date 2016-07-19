@@ -8,8 +8,6 @@ case class CommandLineArguments private (parameters: Map[String, String], values
 }
 object CommandLineArguments {
   def apply(args: String*): CommandLineArguments = {
-    import scala.util.matching.Regex
-
     var Key   = """-{1,2}(.+)""".r
     var Value = """([^\-].*)""".r
 

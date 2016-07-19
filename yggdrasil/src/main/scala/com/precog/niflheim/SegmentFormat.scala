@@ -19,10 +19,9 @@
  */
 package com.precog.niflheim
 
+import blueeyes._
 import com.precog.util.PrecogUnit
-
-import java.io.{ File, IOException }
-import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
+import java.nio.channels._
 import scalaz.Validation
 
 trait SegmentWriter {

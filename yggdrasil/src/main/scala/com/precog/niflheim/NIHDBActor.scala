@@ -23,8 +23,6 @@ import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.security.Authorities
 import com.precog.util.PrecogUnit
-
-import scalaz._
 import scalaz.effect.IO
 import java.util.concurrent.atomic._
 

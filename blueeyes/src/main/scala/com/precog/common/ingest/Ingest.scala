@@ -33,12 +33,7 @@ import blueeyes.json.serialization.JodaSerializationImplicits.{ InstantExtractor
 
 import java.util.UUID
 
-import scalaz._
-import scalaz.Validation._
-import scalaz.std.option._
-import scalaz.syntax.plus._
-import scalaz.syntax.applicative._
-import scalaz.syntax.validation._
+import scalaz._, Scalaz._, Validation._
 
 object JavaSerialization {
   implicit val uuidDecomposer: Decomposer[UUID] = implicitly[Decomposer[String]].contramap((_: UUID).toString)

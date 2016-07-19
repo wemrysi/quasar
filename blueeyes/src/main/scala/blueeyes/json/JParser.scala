@@ -20,19 +20,8 @@ package json
 import serialization.Extractor
 import serialization.Extractor.Error._
 import serialization.SerializationImplicits._
-
-import scalaz.Validation
-import scalaz.syntax.arrow._
-import scalaz.std.function._
-
+import scalaz._, Scalaz._
 import Validation.fromTryCatchNonFatal
-
-import java.io.File
-import java.nio.ByteBuffer
-
-import scalaz.std.stream._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.traverse._
 
 object JParser {
   // legacy parsing methods

@@ -20,7 +20,7 @@
 package com.precog.common
 package jobs
 
-import blueeyes.core.http.{ MimeType, MimeTypes }
+import blueeyes.core.http.MimeType
 
 import scalaz.StreamT
 

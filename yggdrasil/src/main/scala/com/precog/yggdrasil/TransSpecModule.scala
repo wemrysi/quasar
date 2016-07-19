@@ -19,16 +19,10 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.bytecode.JType
-
-import blueeyes.json._
-
-import collection.Set
-
-import scalaz.{ Monad, Monoid, StreamT }
-
+import scalaz._
 import java.nio.CharBuffer
 
 object TransSpecModule {

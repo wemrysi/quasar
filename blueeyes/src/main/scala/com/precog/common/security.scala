@@ -20,7 +20,6 @@
 package com.precog.common
 
 import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
 import blueeyes.json.serialization.Extractor._
 
 import scalaz._

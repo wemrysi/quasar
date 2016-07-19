@@ -17,7 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package com.precog
+package common
 
 import blueeyes._
 import scalaz.syntax.semigroup._

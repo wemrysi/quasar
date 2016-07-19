@@ -30,13 +30,12 @@ import scalaz.std.tuple._
 import scalaz.syntax.comonad._
 
 import org.specs2._
-import org.scalacheck._, Gen._, Arbitrary._
+import org.scalacheck._, Gen._
 
 trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._
-  import TableModule.paths._
 
   implicit val cogroupData = Arbitrary(
     for {
@@ -89,8 +88,6 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     val rtable = fromSample(r)
 
     val keyOrder = ScalazOrder[JValue].contramap((_: JValue) \ "key")
-
-    import scala.math.max
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
       case Left3(jv) => jv
@@ -169,7 +166,6 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
   def testUnionCogroup = {
     def recl(i: Int, j: Int) = toRecord(Array(i), JObject(List(JField("left", JNum(j)))))
     def recr(i: Int, j: Int) = toRecord(Array(i), JObject(List(JField("right", JNum(j)))))
-    def recBoth(i: Int, j: Int, k: Int) = toRecord(Array(i), JObject(List(JField("left", JNum(j)), JField("right", JNum(k)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(0, 1), recl(1, 12), recl(3, 13), recl(4, 42), recl(5, 77))))
     val rtable  = fromSample(SampleData(Stream(recr(6, -1), recr(7, 0), recr(8, 14), recr(9, 42), recr(10, 77))))
@@ -250,7 +246,6 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
   def testUnsortedInputs = {
     def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
     def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
-    def recBoth(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(0), recl(1))))
     val rtable  = fromSample(SampleData(Stream(recr(1), recr(0))))

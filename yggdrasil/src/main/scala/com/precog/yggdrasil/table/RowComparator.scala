@@ -22,7 +22,6 @@ package yggdrasil
 package table
 
 import blueeyes._
-import common._
 import scalaz.Ordering._
 
 trait RowComparator { self =>

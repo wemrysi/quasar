@@ -32,7 +32,6 @@ import scalaz.syntax.bifunctor._
 
 trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] with ObjectConcatHelpers with ArrayConcatHelpers with MapUtils {
 
-  import TableModule._
   import trans._
   import trans.constants._
 

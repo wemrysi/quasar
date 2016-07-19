@@ -4,10 +4,7 @@ package logging
 import blueeyes.util.RichThrowableImplicits
 import java.io.Writer
 import java.text.SimpleDateFormat
-import java.util.concurrent.TimeUnit.SECONDS
 import java.util.{ GregorianCalendar, Calendar, Date }
-
-import scalaz.Semigroup
 
 object RollPolicies {
   sealed abstract class Policy

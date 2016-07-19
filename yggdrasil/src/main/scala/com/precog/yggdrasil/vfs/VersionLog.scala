@@ -21,31 +21,18 @@ package com.precog
 package yggdrasil
 package vfs
 
-import blueeyes.json.{ JParser, JString, JValue }
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.JodaSerializationImplicits._
 
-import blueeyes._
-import com.precog.common._
 import com.precog.common.serializationImplicits._
 import com.precog.util.{ FileLock, IOUtils, PrecogUnit }
-
 import org.slf4s.Logging
-
-import java.io.{ File => _, _ }
 import java.util.UUID
-
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.effect.IO
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.traverse._
-import scalaz.syntax.applicative._
-import scalaz.syntax.std.boolean._
 
 object VersionLog {
   final val lockName               = "versionLog"

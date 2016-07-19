@@ -19,7 +19,7 @@
  */
 package com.precog.niflheim
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import com.precog.util._
 

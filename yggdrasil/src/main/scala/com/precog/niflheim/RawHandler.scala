@@ -23,7 +23,6 @@ import blueeyes._, json._
 import java.io.{ OutputStream, BufferedOutputStream, FileOutputStream }
 
 import com.precog.common._
-import com.precog.util._
 
 object RawHandler {
   // file doesn't exist -> create new file

@@ -17,17 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package com.precog
+package common
 
-import com.precog.util._
-
-import blueeyes._, json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.Ordering._
-import scalaz.std.AllInstances._
 import java.math.MathContext.UNLIMITED
 
 sealed trait RValue { self =>

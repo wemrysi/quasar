@@ -5,6 +5,7 @@ import sbt._, Keys._
 object PlatformBuild {
   val BothScopes = "compile->compile;test->test"
 
+  def envArgs      = sys.env.getOrElse("ARGS", "") split "\\s+" toList
   def optimizeOpts = if (sys.props contains "precog.optimize") Seq("-optimize") else Seq()
   def debugOpts    = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
 
@@ -52,16 +53,16 @@ object PlatformBuild {
 
     def setup: Project = (
       also(
-                   organization :=  "com.precog",
-                        version :=  "2.6.1-SNAPSHOT",
-                  scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
-                   scalaVersion :=  "2.11.8",
-             crossScalaVersions :=  Seq("2.9.3", "2.10.6", "2.11.8"),
-            logBuffered in Test :=  false,
-                       ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
+               organization :=  "com.precog",
+                    version :=  "2.6.1-SNAPSHOT",
+              scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
+               scalaVersion :=  "2.11.8",
+        logBuffered in Test :=  false,
+                   ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
       )
       also inBoth(doubleCross)
       also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
+      compileArgs(envArgs: _*)
       // compileArgs("-Ywarn-unused", "-Ywarn-unused-import")
       // "-Ywarn-numeric-widen", "-Xlog-implicits"
     )

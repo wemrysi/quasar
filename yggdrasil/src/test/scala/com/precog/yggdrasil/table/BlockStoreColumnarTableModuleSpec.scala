@@ -21,10 +21,8 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes._
-import com.precog.common._
 import com.precog.yggdrasil.util._
-import scalaz._, Scalaz._
-import org.scalacheck._, Gen._, Arbitrary._
+import scalaz._
 import TableModule._
 
 trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {

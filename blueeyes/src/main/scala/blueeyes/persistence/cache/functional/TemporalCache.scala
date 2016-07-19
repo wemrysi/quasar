@@ -1,8 +1,7 @@
 package blueeyes
 package persistence.cache.functional
 
-import scalaz._
-import scalaz.Scalaz._
+import scalaz._, Scalaz._
 import TemporalCache.NanoTime
 
 case class TemporalCacheState[K, V](removed: Map[K, V], retained: TemporalCache[K, V])

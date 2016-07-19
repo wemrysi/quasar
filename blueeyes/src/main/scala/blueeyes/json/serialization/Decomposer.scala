@@ -3,7 +3,6 @@ package json
 package serialization
 
 import scalaz.Validation
-import Validation._
 
 /** Decomposes the value into a JSON object.
   */
@@ -25,7 +24,7 @@ object Decomposer {
   def apply[A](implicit d: Decomposer[A]): Decomposer[A] = d
 }
 
-/** Serialization implicits allow a convenient syntax for serialization and 
+/** Serialization implicits allow a convenient syntax for serialization and
   * deserialization when implicit decomposers and extractors are in scope.
   * <p>
   * foo.serialize
@@ -51,7 +50,7 @@ trait SerializationImplicits {
 
 object SerializationImplicits extends SerializationImplicits
 
-/** Bundles default extractors, default decomposers, and serialization 
+/** Bundles default extractors, default decomposers, and serialization
   * implicits for natural serialization of core supported types.
   */
 object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits

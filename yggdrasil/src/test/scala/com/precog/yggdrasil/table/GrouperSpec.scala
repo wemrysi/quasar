@@ -23,9 +23,6 @@ package table
 import com.precog.common._
 import com.precog.yggdrasil.util.IdSourceConfig
 import blueeyes._, json._
-
-import java.util.concurrent.Executors
-
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 import org.scalacheck.Prop

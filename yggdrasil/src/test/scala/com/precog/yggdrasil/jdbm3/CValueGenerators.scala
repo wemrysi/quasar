@@ -26,19 +26,9 @@ import org.scalacheck._, Gen._, Arbitrary._
 import PrecogScalacheck._
 
 trait CValueGenerators {
-  def maxArraySize = 16
   def maxArrayDepth = 3
 
   def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
-
-  // private def containerOfAtMostN[C[_],T](maxSize: Int, g: Gen[T])(implicit b: Buildable[T,C]): Gen[C[T]] =
-  //   Gen.sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C,T](n,g)) yield c)
-
-  private def indexedSeqOf[A](gen: Gen[A]): Gen[IndexedSeq[A]] =
-    containerOfAtMostN[List, A](maxArraySize, gen) map (_.toIndexedSeq)
-
-  private def arrayOf[A: Manifest](gen: Gen[A]): Gen[Array[A]] =
-    containerOfAtMostN[List, A](maxArraySize, gen) map (_.toArray)
 
   private def genNonArrayCValueType: Gen[CValueType[_]] = Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum, CDate)
 
@@ -61,7 +51,7 @@ trait CValueGenerators {
     } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
     case CDate                => choose[Long](0, Long.MaxValue) map (new DateTime(_)) map (CDate(_))
     case CArrayType(elemType) =>
-      indexedSeqOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
+      vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.manifest), CArrayType(elemType))
       }
     case CPeriod => abort("undefined")

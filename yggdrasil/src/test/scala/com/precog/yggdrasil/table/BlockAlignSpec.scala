@@ -39,7 +39,6 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
     val module = emptyTestModule
 
     import module._
-    import module.trans._
     import module.trans.constants._
 
     val lstream = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
@@ -295,7 +294,6 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
 
     import module._
     import module.trans._
-    import module.trans.constants._
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
       val (ljsondirect, rjsondirect) = (for {

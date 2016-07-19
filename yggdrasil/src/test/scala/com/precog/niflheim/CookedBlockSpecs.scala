@@ -22,8 +22,8 @@ package com.precog.niflheim
 import blueeyes._
 import com.precog.common._
 import org.scalacheck._
-import scalaz._, Scalaz._
-import PrecogSpecs._, PrecogScalacheck._
+import scalaz._
+import PrecogSpecs._
 
 class V1CookedBlockFormatSpecs extends CookedBlockFormatSpecs {
   val format = V1CookedBlockFormat

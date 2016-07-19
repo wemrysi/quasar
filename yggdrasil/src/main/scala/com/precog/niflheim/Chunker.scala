@@ -20,7 +20,6 @@
 package com.precog.niflheim
 
 import blueeyes._
-import com.precog.common._
 import java.nio.channels._
 import java.util.zip.Adler32
 

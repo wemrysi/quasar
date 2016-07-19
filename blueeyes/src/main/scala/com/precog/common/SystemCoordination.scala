@@ -21,8 +21,7 @@ package com.precog.common
 
 import com.precog.util.VectorClock
 
-import blueeyes._, json._
-import blueeyes.json.serialization.{ Extractor, Decomposer }
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._

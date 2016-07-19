@@ -1,7 +1,6 @@
 package blueeyes
 package json
 
-import scala.annotation.{ switch, tailrec }
 import scala.collection.mutable
 
 private[json] trait SyncParser extends Parser {

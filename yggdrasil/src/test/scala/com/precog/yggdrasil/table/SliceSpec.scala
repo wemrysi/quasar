@@ -22,12 +22,12 @@ package yggdrasil
 package table
 
 import scala.util.Random
-
 import blueeyes._
-import com.precog.common._, security._
+import com.precog.common._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck._
+import PrecogSpecs._
 
 class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
 

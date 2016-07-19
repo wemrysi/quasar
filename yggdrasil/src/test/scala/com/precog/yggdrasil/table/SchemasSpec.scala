@@ -21,21 +21,14 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.bytecode._
-
-import scala.util.Random
-
 import blueeyes.json._
 
-import scalaz.StreamT
 import scalaz.syntax.comonad._
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
 
 trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
-  import SampleData._
-  import trans._
-
   def testSingleSchema = {
     val expected = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
     val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))

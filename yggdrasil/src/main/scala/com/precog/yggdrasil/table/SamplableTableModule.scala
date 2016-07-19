@@ -26,8 +26,6 @@ import scala.collection.mutable
 import scalaz._, Scalaz._
 
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {
-  import TableModule._
-
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>

@@ -20,11 +20,8 @@
 package com.precog.yggdrasil
 package table
 
-import scala.util.Random
-
 import blueeyes.json._
 
-import scalaz.StreamT
 import scalaz.syntax.comonad._
 
 import org.specs2.ScalaCheck
@@ -33,7 +30,6 @@ import org.scalacheck.Gen
 
 trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
-  import trans._
 
   def checkTakeRange = {
     implicit val gen = sample(schema)

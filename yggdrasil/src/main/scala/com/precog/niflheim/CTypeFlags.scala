@@ -21,12 +21,8 @@ package com.precog.niflheim
 
 import blueeyes._
 import com.precog.common._
-
-import com.precog.util.PrecogUnit
-
 import scala.collection.mutable
-
-import scalaz.{ Validation, Success, Failure }
+import scalaz._
 
 object CTypeFlags {
   object Flags {

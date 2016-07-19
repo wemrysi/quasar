@@ -1,8 +1,6 @@
 package blueeyes
 package json
 
-import scala.util.matching.Regex
-
 import serialization._
 import serialization.DefaultSerialization._
 import scalaz.Order

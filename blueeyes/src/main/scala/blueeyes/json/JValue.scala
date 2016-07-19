@@ -21,7 +21,6 @@ import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
 import scala.util.Sorting.quickSort
 
 import java.lang.Double.isInfinite
-import java.lang.Character.codePointAt
 import JValue.{ RenderMode, Compact, Pretty, Canonical }
 
 /**

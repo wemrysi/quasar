@@ -19,8 +19,6 @@
  */
 package com.precog.common
 
-import java.nio.charset.Charset
-
 import blueeyes._, json._
 import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.DefaultSerialization._

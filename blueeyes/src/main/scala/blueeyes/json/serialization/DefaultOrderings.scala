@@ -1,11 +1,8 @@
 package blueeyes
-package json.serialization
+package json
+package serialization
 
-import blueeyes.json._
 import java.util.{ Date => JDate }
-
-import scala.math.Ordering
-import scala.math.Ordering._
 
 trait DefaultOrderings {
   val StringOrdering: Ordering[String] = new Ordering[String] {

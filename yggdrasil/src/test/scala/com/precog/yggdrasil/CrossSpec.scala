@@ -29,7 +29,6 @@ import org.specs2.mutable._
 trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
-  import trans.constants._
 
   def testCross(l: SampleData, r: SampleData) {
     val ltable = fromSample(l)

@@ -1,20 +1,6 @@
 package blueeyes
 package json
 
-import scalaz._
-import scalaz.Ordering._
-import scalaz.Validation._
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.math.bigInt._
-import scalaz.std.string._
-import scalaz.std.tuple._
-
-import scalaz.syntax.applicative._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.order._
-import scalaz.syntax.semigroup._
-
 /*
 sealed trait JSchema { self =>
   def validate(value: JValue): Boolean
@@ -31,10 +17,10 @@ sealed trait JSchema { self =>
 
   def fuse(that: JSchema): Option[JSchema] = (self, that) match {
     case (x, y) if (x == y) => Some(x)
-    
+
     case (JFixedSchema(_: JBool), JBoolSchema) => Some(JBoolSchema)
     case (JBoolSchema, JFixedSchema(_: JBool)) => Some(JBoolSchema)
-    
+
     case (JFixedSchema(_: JNum), JNumSchema) => Some(JNumSchema)
     case (JNumSchema, JFixedSchema(_: JNum)) => Some(JNumSchema)
 
@@ -49,7 +35,7 @@ sealed trait JSchema { self =>
 
     case (JUndefinedSchema, x) => Some(x)
     case (x, JUndefinedSchema) => Some(x)
-    
+
     case (x: JObjectSchema, y: JObjectSchema) =>
       sys.error("TODO")
 
@@ -68,7 +54,7 @@ case object JSchema {
 
       if (elements.size > 1 && uniqueEls.size == 1) JSetSchema(fixed(elements.head))
       else JArraySchema(Array(elements.map(v => Need(fixed(v))): _*))
-    
+
     case JObject(fields) =>
       JObjectSchema(fields.mapValues(v => Need(fixed(v))))
 
@@ -77,13 +63,13 @@ case object JSchema {
 
   def unfixed(value: JValue): JSchema = value match {
     case JNull => JNullSchema
-    
+
     case JUndefined => JUndefinedSchema
-    
+
     case _ : JBool => JBoolSchema
-    
+
     case _ : JNum => JNumSchema
-    
+
     case _ : JString => JStringSchema
 
     case JArray(elements) =>
@@ -123,7 +109,7 @@ case class JObjectSchema(private val schema0: Map[String, Need[JSchema]]) extend
 
   def validate(value: JValue): Boolean = {
      value match {
-      case JObject(fields) => 
+      case JObject(fields) =>
         fields forall {
           case (k, v) => schema.get(k).exists(_ validate v)
         }
@@ -152,7 +138,7 @@ case class JArraySchema(private val schemas0: Array[Need[JSchema]]) extends JSch
   private lazy val schemas: Seq[JSchema] = schemas0.map(_.value)
 
   def validate(value: JValue): Boolean = value match {
-    case JArray(elements) => 
+    case JArray(elements) =>
       if (elements.length != schemas.length) false
       else (schemas zip elements) forall { case (s, e) => s validate e }
 

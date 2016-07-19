@@ -20,12 +20,9 @@
 package com.precog.yggdrasil
 package execution
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
-
-import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.common.accounts._

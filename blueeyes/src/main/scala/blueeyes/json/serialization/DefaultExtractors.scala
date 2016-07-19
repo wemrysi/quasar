@@ -7,17 +7,7 @@ import Extractor._
 import java.util.{ Date => JDate }
 import org.joda.time.{ DateTime, DateTimeZone }
 
-import scalaz._
-import scalaz.Validation._
-import scalaz.std.list._
-import scalaz.std.function._
-import scalaz.std.map._
-import scalaz.std.tuple._
-import scalaz.syntax.arrow._
-import scalaz.syntax.apply._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.traverse.ToTraverseOps
-import scalaz.syntax.id._
+import scalaz._, Scalaz._
 
 /** Extractors for all basic types.
   */

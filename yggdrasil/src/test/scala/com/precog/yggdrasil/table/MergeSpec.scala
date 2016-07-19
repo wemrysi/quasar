@@ -20,23 +20,12 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.bytecode.JType
 import com.precog.common.security._
 import com.precog.yggdrasil.util.IdSourceConfig
-
-import blueeyes.json._
-
-import java.util.concurrent.Executors
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-
-import scalaz._
-import scalaz.std.anyVal._
-import scalaz.syntax.comonad._
-import scalaz.syntax.monad._
+import scalaz._, Scalaz._
 
 trait MergeSpec[M[+_]] extends
   ColumnarTableModuleTestSupport[M] with

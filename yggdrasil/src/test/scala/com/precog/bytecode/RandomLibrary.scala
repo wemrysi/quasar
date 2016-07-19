@@ -20,7 +20,6 @@
 package com.precog.bytecode
 
 import org.scalacheck._
-import Arbitrary.arbitrary
 import Gen._
 
 trait RandomLibrary extends Library {
