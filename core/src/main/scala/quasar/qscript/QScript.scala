@@ -159,19 +159,21 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     (commonSrc, lMap, rMap, leftF, rightF)
   }
 
+  def rebaseBranch(br: Free[Target, Unit], fm: FreeMap[T]):
+      Free[Target, Unit] =
+    // TODO: Special-casing the `point` case should be unnecessary after
+    //       optimizations are applied across all branches.
+    if (fm ≟ Free.point(()))
+      br
+    else
+      br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Unit](()), fm)))))
+
   def useMerge(
     res: MergeResult,
     ap: (T[Target], Free[Target, Unit], Free[Target, Unit]) => (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
       (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
 
     val (src, lMap, rMap, lBranch, rBranch) = res
-
-    def rebaseBranch(br: Free[Target, Unit], fm: FreeMap[T]):
-        Free[Target, Unit] =
-      if (fm ≟ Free.point(()))
-        br
-      else
-        br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Unit](()), fm)))))
 
     if (lBranch ≟ Free.point(()) && rBranch ≟ Free.point(())) {
       val (buck, newBucks) = concatBuckets(src.project.ask.provenance)
@@ -453,10 +455,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, UnitF[T]),
         TJ.inj(ThetaJoin(
           commonSrc,
-          leftSide.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
-          rightSide.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          rebaseBranch(leftSide, lMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(rightSide, rMap).mapSuspension(FI.compose(envtLowerNT)),
           cond,
           tpe,
           combine))))
@@ -655,10 +655,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         src.project.ask,
         TJ.inj(ThetaJoin(
           src,
-          left.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
-          right.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
           equiJF,
           Inner,
           Free.point(LeftSide))))).right
@@ -669,10 +667,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         src.project.ask, // TODO is this the correct provenance?
         TJ.inj(ThetaJoin(
           src,
-          left.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), lMap)))),
-          right.mapSuspension(FI.compose(envtLowerNT)) >>
-            Free.roll(FI.inj(QC.inj(Map(Free.point[QScriptProject[T, ?], Unit](()), rMap)))),
+          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
           Free.roll(Nullary(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
           LeftOuter,
           Free.point(LeftSide))))).right
