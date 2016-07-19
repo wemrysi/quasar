@@ -316,13 +316,12 @@ trait TimeParsingSpecs[M[+_]] extends EvaluatorSpecification[M]
   }
 
   "\"flexible\" parsing" should {
-    def testParseFuzzy(s: String, r: String) {
+    def testParseFuzzy(s: String, r: String) = {
       val input = Operate(BuiltInFunction1Op(ParseDateTimeFuzzy), Const(CString(s))(line))(line)
       val result = testEval(input) collect {
         case (ids, SString(d)) if ids.length == 0 => d.toString
       }
-      result must haveSize(1)
-      result must contain(r)
+      (result must haveSize(1)) && (result must contain(r))
     }
 
     "correctly handle a bunch of casually formatted dates" in {

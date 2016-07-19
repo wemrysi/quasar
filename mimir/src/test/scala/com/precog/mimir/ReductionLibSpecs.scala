@@ -54,7 +54,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       case (ids, SDecimal(d)) if ids.length == 0 => d.toDouble
     }
 
-    result2 must contain(value)
+    result2.toSet must_== Set(value)
   }
 
   val line = Line(1, 1, "")
@@ -145,7 +145,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2012-12-28T22:38:19.430+06:00")
+      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
     }
 
     "minTime" >> {
@@ -160,7 +160,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2010-04-29T09:37:52.599+08:00")
+      result2.toSet must_== Set("2010-04-29T09:37:52.599+08:00")
     }
 
     "standard deviation" >> {
@@ -218,7 +218,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SBoolean(b)) if ids.length == 0 => b
       }
 
-      result2 must contain(false)
+      result2.toSet must_== Set(false)
     }
 
     "exists" >> {
@@ -235,7 +235,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SBoolean(b)) if ids.length == 0 => b
       }
 
-      result2 must contain(true)
+      result2.toSet must_== Set(true)
     }
   }
 
@@ -287,7 +287,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2012-12-28T22:38:19.430+06:00")
+      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
     }
 
     "minTime" >> {
@@ -302,7 +302,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2010-04-29T09:37:52.599+08:00")
+      result2.toSet must_== Set("2010-04-29T09:37:52.599+08:00")
     }
 
     "standard deviation" >> {
@@ -382,7 +382,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2012-12-28T22:38:19.430+06:00")
+      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
     }
 
     "minTime" >> {
@@ -397,7 +397,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2007-02-04T10:58:14.041-01:00")
+      result2.toSet must_== Set("2007-02-04T10:58:14.041-01:00")
     }
 
     "standard deviation" >> {
@@ -477,7 +477,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2012-05-05T08:58:10.171+10:00")
+      result2.toSet must_== Set("2012-05-05T08:58:10.171+10:00")
     }
 
     "minTime" >> {
@@ -492,7 +492,7 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SString(d)) if ids.length == 0 => d
       }
 
-      result2 must contain("2007-07-14T03:49:30.311-07:00")
+      result2.toSet must_== Set("2007-07-14T03:49:30.311-07:00")
     }
 
     "standard deviation" >> {

@@ -30,7 +30,7 @@ trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike 
   import SampleData._
   import trans._
 
-  def testCross(l: SampleData, r: SampleData) {
+  def testCross(l: SampleData, r: SampleData) = {
     val ltable = fromSample(l)
     val rtable = fromSample(r)
 

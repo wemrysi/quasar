@@ -156,7 +156,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d
       }
 
-      result2 must contain()
+      result2 must haveSize(0)
     }
     "determine startsWith" in {
       val input = op2Input(startsWith, CString("s"), homStrings)
@@ -234,7 +234,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d
       }
 
-      result2 must contain()
+      result2 must haveSize(0)
     }
     "determine takeLeft with valid integer" in {
       val input = op2Input(takeLeft, CLong(8), homStrings)
@@ -541,7 +541,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d
       }
 
-      result2 must contain()
+      result2 must haveSize(0)
     }
     "determine startsWith" in {
       val input = Join(BuiltInFunction2Op(startsWith), Cross(None),
@@ -631,7 +631,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d
       }
 
-      result2 must contain()
+      result2 must haveSize(0)
     }
     "determine takeLeft with valid integer" in {
       val input = Join(BuiltInFunction2Op(takeLeft), Cross(None),
@@ -822,7 +822,7 @@ trait StringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (_, SDecimal(n)) => n
       }
 
-      ns must contain(
+      ns.toSet must_== Set[BigDecimal](
         BigDecimal("42"),
         BigDecimal("42.0"),
         BigDecimal("42.123"),

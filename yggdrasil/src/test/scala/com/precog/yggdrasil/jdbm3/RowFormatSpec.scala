@@ -162,7 +162,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
     }.set(minTestsOk = 500, maxDiscardRatio = 5)
   }
 
-  def checkRoundTrips(toRowFormat: List[ColumnRef] => RowFormat) {
+  def checkRoundTrips(toRowFormat: List[ColumnRef] => RowFormat) = {
     "survive round-trip from CValue -> Array[Byte] -> CValue" in {
       prop { (refs: List[ColumnRef]) =>
         val rowFormat = toRowFormat(refs)
@@ -194,7 +194,7 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
 
           verify(rows, columns)
 
-          rows.zipWithIndex foreach { case (vals, row) =>
+          rows.zipWithIndex forall { case (vals, row) =>
             rowFormat.decode(columnEncoder.encodeFromRow(row)) must_== vals
           }
         }

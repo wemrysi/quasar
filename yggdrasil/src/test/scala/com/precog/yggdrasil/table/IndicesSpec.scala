@@ -113,7 +113,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
       index.getSubTable(ids, vs).toJson.copoint.toSet.map(RValue.fromJValue)
 
-    def test(vs: Seq[RValue], result: Set[RValue]): Unit =
+    def test(vs: Seq[RValue], result: Set[RValue]) =
       subtableSet(index, Array(0, 1), vs) must_== result
 
     "generate subtables based on groupkeys" in {
@@ -154,7 +154,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
     "efficiently combine to produce unions" in {
 
-      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) {
+      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }

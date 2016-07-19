@@ -136,57 +136,57 @@ object AsyncParserSpec extends Specification {
   "Async parser works on one 1M chunk" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 1024 * 1024)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    0 until 1000 forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 100K" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 100 * 1024)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 10K" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 10 * 1024)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 1K" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 1024)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 100B" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 100)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 10B" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 10)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of 1B" in {
     val vs = runTest("blueeyes/src/test/resources/z1k_nl.json", 1)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of sizes 10B-1K" in {
     val f  = () => nextInt(1014) + 10
     val vs = runTestRandomStep("blueeyes/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of sizes 1k-10K" in {
     val f  = () => nextInt(9 * 1024) + 1024
     val vs = runTestRandomStep("blueeyes/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
-    (0 until 1000).foreach { _.toOption must beSome }
+    (0 until 1000).forall { _.toOption must beSome }
   }
 
   def run1(chunks: Seq[Input], expected: Int) = {
@@ -237,6 +237,7 @@ object AsyncParserSpec extends Specification {
       val tt = run2(bb, n); System.gc(); t + tt
     }
     println("byteb: %.2f ms" format (t2 / 10000000.0))
+    ok
   }
 
   "Async parser can fail fast" in {
@@ -266,10 +267,9 @@ xyz
     es.length must_== 1
     js.length must_== 1
 
-    def confirm(e: ParseException, y: Int, x: Int) {
-      e.line must_== y
-      e.col must_== x
-    }
+    def confirm(e: ParseException, y: Int, x: Int) =
+      (e.line must_== y) && (e.col must_== x)
+
     confirm(es(0), 2, 24)
   }
 
@@ -446,5 +446,6 @@ object ArrayUnwrappingSpec extends Specification {
     b1 must_== b5
     println("parsed array (%d bytes):  sync=%dms  async=%dms  unpacked=%dms" format (b1, t1, t3, t5))
     println("parsed stream (%d bytes): sync=%dms  async=%dms" format (b2, t2, t4))
+    ok
   }
 }

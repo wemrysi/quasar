@@ -19,11 +19,7 @@ object PrecogSpecs {
   type ThrownExpectations = org.specs2.matcher.ThrownExpectations
 
   trait SpecificationHelp extends SpecificationLike with ThrownMessages {
-    def haveAllElementsLike[A, B](pf: PartialFunction[A, MatchResult[B]]): ContainWithResult[A] = contain(like[A](pf)).forall
-  }
-
-  implicit def unitAsResult: AsResult[Unit] = new AsResult[Unit] {
-    def asResult(r: => Unit) = ResultExecution.execute(r)(_ => Success())
+    def haveAllElementsLike[A](pf: PartialFunction[A, Boolean]): ContainWithResult[A] = contain(like[A]({ case x if pf.isDefinedAt(x) && pf(x) => ok })).forall
   }
 }
 

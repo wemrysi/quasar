@@ -127,10 +127,10 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     arrayM.copoint mustEqual minimized
   }
 
-  def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) {
-    val event = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
-    val events = event * lots
-    val csv = testRenderCsv(events, maxSliceSize)
+  def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
+    val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
+    val events   = event * lots
+    val csv      = testRenderCsv(events, maxSliceSize)
     val expected = ".x,.y,.z.xx,.z.yy\r\n" + ("123,foobar,1,2\r\n" * lots)
     csv must_== expected
   }
@@ -306,18 +306,18 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform deepmap1 using numeric coercion" in testDeepMap1CoerceToDouble
       "perform map1 using numeric coercion" in testMap1CoerceToDouble
       "fail to map1 into array and object" in testMap1ArrayObject
-      "perform a less trivial map1" in false.pendingUntilFixed // checkMap1
+      "perform a less trivial map1" in checkMap1.pendingUntilFixed
 
       //"give the identity transform for the trivial filter" in checkTrivialFilter
       "give the identity transform for the trivial 'true' filter" in checkTrueFilter
-      "give the identity transform for a nontrivial filter" in false.pendingUntilFixed // checkFilter
-      "give a transformation for a big decimal and a long" in false.pendingUntilFixed // testMod2Filter
+      "give the identity transform for a nontrivial filter" in checkFilter.pendingUntilFixed
+      "give a transformation for a big decimal and a long" in testMod2Filter.pendingUntilFixed
 
       "perform an object dereference" in checkObjectDeref
       "perform an array dereference" in checkArrayDeref
       "perform metadata dereference on data without metadata" in checkMetaDeref
 
-      "perform a trivial map2 add" in false.pendingUntilFixed // checkMap2Add
+      "perform a trivial map2 add" in checkMap2Add.pendingUntilFixed
       "perform a trivial map2 eq" in checkMap2Eq
       "perform a map2 add over but not into arrays and objects" in testMap2ArrayObject
 
@@ -415,7 +415,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform an array swap" in checkArraySwap
       "replace defined rows with a constant" in checkConst
 
-      "check cond" in false.pendingUntilFixed // checkCond
+      "check cond" in checkCond.pendingUntilFixed
     }
 
     "in compact" >> {

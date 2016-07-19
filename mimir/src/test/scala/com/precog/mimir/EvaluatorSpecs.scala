@@ -179,7 +179,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.isEmpty => d.toInt
         }
 
-        result2 must contain(42)
+        result2.toSet must_== Set(42)
       }
     }
 
@@ -195,7 +195,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SString(str)) if ids.isEmpty => str
           }
 
-          result2 must contain("daniel")
+          result2.toSet must_== Set("daniel")
         }
       }
 
@@ -209,7 +209,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.isEmpty => d.toInt
           }
 
-          result2 must contain(42)
+          result2.toSet must_== Set(42)
         }
       }
 
@@ -224,7 +224,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SBoolean(b)) if ids.isEmpty => b
           }
 
-          result2 must contain(true)
+          result2.toSet must_== Set(true)
         }
       }
 
@@ -239,7 +239,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SBoolean(b)) if ids.isEmpty => b
           }
 
-          result2 must contain(false)
+          result2.toSet must_== Set(false)
         }
       }
 
@@ -264,7 +264,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.isEmpty => obj
           }
 
-          result2 must contain(Map())
+          result2.toSet must_== Set(Map())
         }
       }
 
@@ -279,7 +279,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.isEmpty => arr
           }
 
-          result2 must contain(Vector())
+          result2.toList must_== List(Vector())
         }
       }
     }
@@ -295,7 +295,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -310,7 +310,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -325,7 +325,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -340,7 +340,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -358,7 +358,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(84, 24, 154, 2, 26)
+        result2.toSet must_== Set(84, 24, 154, 2, 26)
       }
     }
 
@@ -377,7 +377,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(84, 24, 154, 2, 26)
+        result2.toSet must_== Set(84, 24, 154, 2, 26)
       }
     }
 
@@ -413,7 +413,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(-42, -12, -77, -1, -13)
+        result2.toSet must_== Set(-42, -12, -77, -1, -13)
       }
     }
 
@@ -430,7 +430,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -446,7 +446,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SString(s)) if ids.size == 1 => s
         }
 
-        result2 must contain("foo")
+        result2.toSet must_== Set("foo")
       }
     }
 
@@ -466,7 +466,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(259)
+        result2.toSet must_== Set(259)
       }
     }
 
@@ -493,7 +493,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(259)
+        result2.toSet must_== Set(259)
       }
     }
 
@@ -519,7 +519,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SArray(arr)) if ids.size == 0 => arr
         }
 
-        result2 must contain(Vector(SArray(Vector(SDecimal(104))), SArray(Vector(SDecimal(138)))))
+        result2.toSet must_== Set(Vector(SArray(Vector(SDecimal(104))), SArray(Vector(SDecimal(138)))))
       }
     }
 
@@ -549,7 +549,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(138 + 104)
+        result2.toSet must_== Set(138 + 104)
       }
     }
 
@@ -571,10 +571,10 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         result must haveSize(1)
 
         val result2 = result collect {
-          case (ids, SDecimal(d)) if ids.size == 0 => d
+          case (Seq(), SDecimal(d)) => d
         }
 
-        result2 must contain(237 + 22 + (BigDecimal(237.0) / 22))
+        result2.toSet must_== Set(237 + 22 + BigDecimal(237.0) / 22)
       }
     }
 
@@ -602,7 +602,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(1 - (104 + 138))
+        result2.toSet must_== Set(1 - (104 + 138))
       }
     }
 
@@ -629,7 +629,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(30 - (104 + 138))
+        result2.toSet must_== Set(30 - (104 + 138))
       }
     }
 
@@ -655,7 +655,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d
         }
 
-        result2 must contain(29 - (231 + 138))
+        result2.toSet must_== Set(29 - (231 + 138))
       }
     }
 
@@ -683,7 +683,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(num)) if ids.size == 0 => num
         }
 
-        result2 must contain(22 - (104 + 231))
+        result2.toSet must_== Set(22 - (104 + 231))
       }
     }
 
@@ -729,7 +729,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(218, 147, 118, 172, 224)
+          result2.toSet must_== Set(218, 147, 118, 172, 224)
         }
       }
 
@@ -752,7 +752,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(218, 147, 118, 172, 224)
+          result2.toSet must_== Set(218, 147, 118, 172, 224)
         }
       }
     }
@@ -772,7 +772,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(47, 17, 82, 6, 18)
+          result2.toSet must_== Set(47, 17, 82, 6, 18)
         }
       }
 
@@ -791,7 +791,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(37, 7, 72, -4, 8)
+          result2.toSet must_== Set(37, 7, 72, -4, 8)
         }
       }
 
@@ -809,7 +809,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(210, 60, 385, 5, 65)
+          result2.toSet must_== Set(210, 60, 385, 5, 65)
         }
       }
 
@@ -827,7 +827,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
           }
 
-          result2 must contain(8.4, 2.4, 15.4, 0.2, 2.6)
+          result2.toSet must_== Set(8.4, 2.4, 15.4, 0.2, 2.6)
         }
       }
 
@@ -845,7 +845,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 0 => d.toDouble
           }
 
-          result2 must contain(3)
+          result2.toSet must_== Set(3)
         }
       }
       "mod both negative" >> {
@@ -862,7 +862,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 0 => d.toDouble
           }
 
-          result2 must contain(-3)
+          result2.toSet must_== Set(-3)
         }
       }
       "mod negative left" >> {
@@ -879,7 +879,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 0 => d.toDouble
           }
 
-          result2 must contain(1)
+          result2.toSet must_== Set(1)
         }
       }
       "mod" >> {
@@ -896,7 +896,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 0 => d.toDouble
           }
 
-          result2 must contain(-1)
+          result2.toSet must_== Set(-1)
         }
       }
 
@@ -914,7 +914,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 0 => d.toDouble
           }
 
-          result2 must contain(1331)
+          result2.toSet must_== Set(1331)
         }
       }
     }
@@ -934,7 +934,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(47, 17, 82, 6, 18)
+          result2.toSet must_== Set(47, 17, 82, 6, 18)
         }
       }
 
@@ -952,7 +952,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(37, 7, 72, -4, 8)
+          result2.toSet must_== Set(37, 7, 72, -4, 8)
         }
       }
 
@@ -970,7 +970,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(210, 60, 385, 5, 65)
+          result2.toSet must_== Set(210, 60, 385, 5, 65)
         }
       }
 
@@ -988,7 +988,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
           }
 
-          result2 must contain(8.4, 2.4, 15.4, 0.2, 2.6)
+          result2.toSet must_== Set(8.4, 2.4, 15.4, 0.2, 2.6)
         }
       }
     }
@@ -1013,7 +1013,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.isEmpty => d.toInt
         }
 
-        result2 must contain(100)
+        result2.toSet must_== Set(100)
       }
     }
 
@@ -1081,7 +1081,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SBoolean(d)) if ids.size == 1 => d
         }
 
-        result2 must contain(true)
+        result2.toSet must_== Set(true)
       }
     }
 
@@ -1100,7 +1100,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.isEmpty => d.toInt
         }
 
-        result2 must contain(100)
+        result2.toSet must_== Set(100)
       }
     }
 
@@ -1120,7 +1120,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(43, 13, 78, 2, 14)
+          result2.toSet must_== Set(43, 13, 78, 2, 14)
         }
       }
 
@@ -1139,7 +1139,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(43, 13, 78, 2, 14)
+          result2.toSet must_== Set(43, 13, 78, 2, 14)
         }
       }
 
@@ -1157,7 +1157,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(45, 15, 80, 4, 16)
+          result2.toSet must_== Set(45, 15, 80, 4, 16)
         }
       }
 
@@ -1175,7 +1175,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(45, 15, 80, 4, 16)
+          result2.toSet must_== Set(45, 15, 80, 4, 16)
         }
       }
     }
@@ -1202,7 +1202,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         obj must haveKey("answer")
         obj("answer") must beLike {
-          case SDecimal(d) => d mustEqual 42
+          case SDecimal(d) => d must_== 42
         }
       }
     }
@@ -1233,7 +1233,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         obj("answer") must beLike {
           case SObject(obj) => {
             obj must haveKey("question")
-            obj("question") mustEqual SNull
+            obj("question") must_== SNull
           }
         }
       }
@@ -1281,7 +1281,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         arr must haveSize(1)
         arr.head must beLike {
-          case SDecimal(d) => d mustEqual 42
+          case SDecimal(d) => d must_== 42
         }
       }
     }
@@ -1306,7 +1306,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         val arr = optArr.get
 
         arr must haveSize(1)
-        arr.head mustEqual SNull
+        arr.head must_== SNull
       }
     }
 
@@ -1336,12 +1336,12 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         obj must haveKey("answer")
         obj("answer") must beLike {
-          case SDecimal(d) => d mustEqual 42
+          case SDecimal(d) => d must_== 42
         }
 
         obj must haveKey("question")
         obj("question") must beLike {
-          case SString(str) => str mustEqual "What is six times seven?"
+          case SString(str) => str must_== "What is six times seven?"
         }
       }
     }
@@ -1370,8 +1370,8 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         arr must beLike {
           case Vector(SDecimal(d1), SDecimal(d2)) => {
-            d1 mustEqual 24
-            d2 mustEqual 42
+            d1 must_== 24
+            d2 must_== 42
           }
         }
       }
@@ -1405,9 +1405,9 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         arr must beLike {
           case Vector(SDecimal(d1), SDecimal(d2), SDecimal(d3)) => {
-            d1 mustEqual 12
-            d2 mustEqual 24
-            d3 mustEqual 42
+            d1 must_== 12
+            d2 must_== 24
+            d3 must_== 42
           }
         }
       }
@@ -1443,9 +1443,9 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
           arr must beLike {
             case Vector(SDecimal(d1), SDecimal(d2), SDecimal(d3)) => {
-              d1 mustEqual 24
-              d2 mustEqual 12
-              d3 mustEqual 42
+              d1 must_== 24
+              d2 must_== 12
+              d3 must_== 42
             }
           }
         }
@@ -1480,9 +1480,9 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
           arr must beLike {
             case Vector(SDecimal(d1), SDecimal(d2), SDecimal(d3)) => {
-              d1 mustEqual 42
-              d2 mustEqual 24
-              d3 mustEqual 12
+              d1 must_== 42
+              d2 must_== 24
+              d3 must_== 12
             }
           }
         }
@@ -1503,7 +1503,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -1522,7 +1522,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SNull) if ids.size == 1 => SNull
         }
 
-        result2 must contain(42, 12, 1, 13, SNull)
+        result2.toSet must_== Set(42, 12, 1, 13, SNull)
       }
     }
 
@@ -1543,7 +1543,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SNull) if ids.size == 1 => SNull
         }
 
-        result2 must contain(42, true, "daniel", 1, SNull)
+        result2.toSet must_== Set(42, true, "daniel", 1, SNull)
       }
     }
 
@@ -1577,7 +1577,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SArray(arr)) if ids.size == 0 => arr
         }
 
-        result2 must contain(Vector(SArray(Vector(SDecimal(145), SDecimal(5)))))
+        result2.toSet must_== Set(Vector(SArray(Vector(SDecimal(145), SDecimal(5)))))
       }
     }
 
@@ -1598,7 +1598,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 0 => d.toInt
         }
 
-        result2 must contain(145)
+        result2.toSet must_== Set(145)
       }
     }
 
@@ -1616,7 +1616,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -1634,7 +1634,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -1655,7 +1655,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SNull) if ids.size == 1 => SNull
         }
 
-        result2 must contain(42, true, "daniel", 1, SNull)
+        result2.toSet must_== Set(42, true, "daniel", 1, SNull)
       }
     }
 
@@ -1678,7 +1678,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(36, 12, 115, -165)
+        result2.toSet must_== Set(36, 12, 115, -165)
       }
     }
 
@@ -1701,7 +1701,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
         }
 
-        result2 must contain(7, -2.026315789473684, 0.006024096385542169, 13)
+        result2.toSet must_== Set(7, -2.026315789473684, 0.006024096385542169, 13)
       }
     }
 
@@ -1724,7 +1724,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
         }
 
-        result2 must contain(7, -2.026315789473684, 0.006024096385542169, 13)
+        result2.toSet must_== Set(7, -2.026315789473684, 0.006024096385542169, 13)
       }
     }
 
@@ -1791,7 +1791,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
           case (ids, SString(s)) =>
             ids must haveSize(1)
-            s mustEqual "string cheese"
+            s must_== "string cheese"
         }
       }
     }
@@ -1849,7 +1849,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         val result2 = result collect {
           case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
         }
-        result2 must contain(42, 12, 77, 1, 13, 14, -1, 0)
+        result2.toSet must_== Set(42, 12, 77, 1, 13, 14, -1, 0)
 
         val result3 = result collect {
           case (ids, _) => ids
@@ -1872,7 +1872,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toDouble
         }
 
-        result2 must contain(42, 12, 77, 1, 13, 14, -1, 0)
+        result2.toSet must_== Set(42, 12, 77, 1, 13, 14, -1, 0)
       }
     }
 
@@ -1939,7 +1939,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(6, 12, 24)
+        result2.toSet must_== Set(6, 12, 24)
       }
     }
 
@@ -1961,7 +1961,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(1, 12)
+          result2.toSet must_== Set(1, 12)
         }
       }
 
@@ -1982,7 +1982,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(1, 12)
+          result2.toSet must_== Set(1, 12)
         }
       }
 
@@ -2003,7 +2003,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(12, 1, 13)
+          result2.toSet must_== Set(12, 1, 13)
         }
       }
 
@@ -2024,7 +2024,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 77)
+          result2.toSet must_== Set(42, 77)
         }
       }
 
@@ -2045,7 +2045,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 77, 13)
+          result2.toSet must_== Set(42, 77, 13)
         }
       }
 
@@ -2066,7 +2066,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(13)
+          result2.toSet must_== Set(13)
         }
       }
 
@@ -2084,7 +2084,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SBoolean(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(true, false)
+          result2.toSet must_== Set(true, false)
         }
       }
 
@@ -2103,7 +2103,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 12, 77, 1)
+          result2.toSet must_== Set(42, 12, 77, 1)
         }
       }
 
@@ -2128,7 +2128,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 12, 1)
+          result2.toSet must_== Set(42, 12, 1)
         }
       }
 
@@ -2153,7 +2153,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 12, 1)
+          result2.toSet must_== Set(42, 12, 1)
         }
       }
 
@@ -2178,7 +2178,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(77, 13)
+          result2.toSet must_== Set(77, 13)
         }
       }
 
@@ -2200,7 +2200,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 12, 77, 1)
+          result2.toSet must_== Set(42, 12, 77, 1)
         }
       }
     }
@@ -2223,7 +2223,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(1, 12)
+          result2.toSet must_== Set(1, 12)
         }
       }
 
@@ -2244,7 +2244,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(12, 1, 13)
+          result2.toSet must_== Set(12, 1, 13)
         }
       }
 
@@ -2265,7 +2265,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(12, 1, 13)
+          result2.toSet must_== Set(12, 1, 13)
         }
       }
 
@@ -2286,7 +2286,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 77)
+          result2.toSet must_== Set(42, 77)
         }
       }
 
@@ -2307,7 +2307,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(42, 77, 13)
+          result2.toSet must_== Set(42, 77, 13)
         }
       }
 
@@ -2330,7 +2330,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SBoolean(d)) if ids.size == 1 => d
           }
 
-          result2 must contain(true)
+          result2.toSet must_== Set(true)
         }
       }
 
@@ -2351,7 +2351,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(13)
+          result2.toSet must_== Set(13)
         }
       }
 
@@ -2372,7 +2372,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.size == 1 => arr
           }
 
-          result2 must contain(Vector())
+          result2.toList must_== List(Vector())
         }
       }
 
@@ -2393,7 +2393,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.size == 1 => obj
           }
 
-          result2 must contain(Map())
+          result2.toSet must_== Set(Map())
         }
       }
 
@@ -2418,7 +2418,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.size == 1 => arr
           }
 
-          result2 must contain(Vector(SDecimal(9), SDecimal(10), SDecimal(11)))
+          result2.toSet must_== Set(Vector(SDecimal(9), SDecimal(10), SDecimal(11)))
         }
       }
 
@@ -2444,7 +2444,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.size == 1 => arr
           }
 
-          result2 must contain(Vector(SDecimal(9), SDecimal(10), SDecimal(11)))
+          result2.toSet must_== Set(Vector(SDecimal(9), SDecimal(10), SDecimal(11)))
         }
       }
 
@@ -2488,8 +2488,8 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           }
 
           result2.keySet must contain(Some(true), Some(false))
-          result2(Some(true)).size mustEqual 1
-          result2(Some(false)).size mustEqual 9
+          result2(Some(true)).size must_== 1
+          result2(Some(false)).size must_== 9
         }
       }
 
@@ -2509,8 +2509,8 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           }
 
           result2.keySet must contain(Some(true), Some(false))
-          result2(Some(true)).size mustEqual 9
-          result2(Some(false)).size mustEqual 1
+          result2(Some(true)).size must_== 9
+          result2(Some(false)).size must_== 1
         }
       }
 
@@ -2535,7 +2535,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.size == 1 => arr
           }
 
-          result2 must contain(42, 12, 77, 1, true, false, "daniel",
+          result2.toSet must_== Set(42, 12, 77, 1, true, false, "daniel",
             Map("test" -> SString("fubar")), Vector())
         }
       }
@@ -2558,7 +2558,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.size == 1 => obj
           }
 
-          result2 must contain(Vector(SDecimal(9), SDecimal(10)), Map.empty[String, SValue], Map("foo" -> SNull))
+          result2.toSet must_== Set(Vector(SDecimal(9), SDecimal(10)), Map.empty[String, SValue], Map("foo" -> SNull))
         }
       }
 
@@ -2580,7 +2580,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.size == 1 => obj
           }
 
-          result2 must contain(Vector.empty[SValue], Vector(SDecimal(9), SDecimal(10)), Map("foo" -> SNull))
+          result2.toSet must_== Set(Vector.empty[SValue], Vector(SDecimal(9), SDecimal(10)), Map("foo" -> SNull))
         }
       }
 
@@ -2605,7 +2605,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.size == 1 => obj
           }
 
-          result2 must contain(Map.empty[String, SValue], Vector.empty[SValue], Map("foo" -> SNull))
+          result2.toSet must_== Set(Map.empty[String, SValue], Vector.empty[SValue], Map("foo" -> SNull))
 
         }
       }
@@ -2630,7 +2630,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SObject(obj)) if ids.size == 1 => obj
           }
 
-          result2 must contain(Vector.empty[SValue], Vector(SDecimal(9), SDecimal(10)), Map.empty[String, SValue])
+          result2.toSet must_== Set(Vector.empty[SValue], Vector(SDecimal(9), SDecimal(10)), Map.empty[String, SValue])
 
         }
       }
@@ -2660,7 +2660,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SArray(arr)) if ids.size == 1 => arr
           }
 
-          result2 must contain(42, 12, 1, true, false, "daniel",
+          result2.toSet must_== Set(42, 12, 1, true, false, "daniel",
             Map("test" -> SString("fubar")), Vector())
         }
       }
@@ -2686,7 +2686,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           }
 
-          result2 must contain(77, 13)
+          result2.toSet must_== Set(77, 13)
         }
       }
 
@@ -2705,15 +2705,14 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           result must haveSize(9)
 
           val result2 = result collect {
-            case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
-            case (ids, SBoolean(b)) if ids.size == 1 => b
+            case (ids, SDecimal(d)) if ids.size == 1  => d.toInt
+            case (ids, SBoolean(b)) if ids.size == 1  => b
             case (ids, SString(str)) if ids.size == 1 => str
             case (ids, SObject(obj)) if ids.size == 1 => obj
-            case (ids, SArray(arr)) if ids.size == 1 => arr
+            case (ids, SArray(arr)) if ids.size == 1  => arr
           }
 
-          result2 must contain(42, 12, 77, 1, true, false, "daniel",
-            Map("test" -> SString("fubar")), Vector())
+          result2.toSet must_== Set(42, 12, 77, 1, true, false, "daniel", Map("test" -> SString("fubar")), Vector())
         }
       }
     }
@@ -2738,8 +2737,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must haveSize(23)
 
-        result2.toSet must_== Set(0, -377, -780, 6006, -76, 5929, 1, 156, 169, 2, 1764,
-          2695, 144, 1806, -360, 1176, -832, 182, 4851, -1470, -13, -41, -24)
+        result2.toSet must_== Set(0, -377, -780, 6006, -76, 5929, 1, 156, 169, 2, 1764, 2695, 144, 1806, -360, 1176, -832, 182, 4851, -1470, -13, -41, -24)
       }
     }
 
@@ -2777,7 +2775,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result2 must haveSize(20)
 
-        result2 must contain(0, 1260, -1470, 1722, 1218, -360, -780, 132, -12,
+        result2.toSet must_== Set(0, 1260, -1470, 1722, 1218, -360, -780, 132, -12,
           2695, 5005, 5852, 4928, -41, -11, -76, -377, 13, -832, 156)
       }
     }
@@ -2814,7 +2812,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(55, 13, 119, 25)
+        result2.toSet must_== Set(55, 13, 119, 25)
       }
     }
 
@@ -2893,6 +2891,9 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
       val input = dag.Split(
         dag.Group(1, data, UnfixedSolution(0, data)),
         SplitParam(0, id)(line), id)(line)
+
+      // XXX ???
+      ok
     }
 
     "split where the commonality is a union" in {
@@ -3006,7 +3007,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             }
 
             obj("num") must beLike {
-              case SDecimal(d) => d mustEqual Expected(user)
+              case SDecimal(d) => d must_== Expected(user)
             }
         }
       }
@@ -3068,7 +3069,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             }
 
             obj("num") must beLike {
-              case SDecimal(d) => d mustEqual Expected(user)
+              case SDecimal(d) => d must_== Expected(user)
             }
         }
       }
@@ -3229,7 +3230,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
             obj("user") must beLike { case SString("daniel") => ok }
 
             obj must haveKey("num")
-            obj("num") must beLike { case SDecimal(d) => d mustEqual 9 }
+            obj("num") must beLike { case SDecimal(d) => d must_== 9 }
           }
         }
       }
@@ -3314,7 +3315,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
 
         result must haveAllElementsLike {
           case (ids, SObject(obj)) =>
-            ids.size mustEqual(2)
+            ids.size must_==(2)
             obj must haveSize(2)
             obj must haveKey("aa")
             obj must haveKey("bb")
@@ -3335,7 +3336,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
         }
 
-        result2 must contain(42, 12, 77, 1, 13)
+        result2.toSet must_== Set(42, 12, 77, 1, 13)
       }
     }
 
@@ -3351,12 +3352,12 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
         val result2 = result collect {
           case (ids, SDecimal(d)) if ids.size == 1 => d.toInt
           case (ids, SBoolean(b)) if ids.size == 1 => b
-          case (ids, SString(s)) if ids.size == 1 => s
-          case (ids, SArray(a)) if ids.size == 1 => a
-          case (ids, SObject(o)) if ids.size == 1 => o
+          case (ids, SString(s)) if ids.size == 1  => s
+          case (ids, SArray(a)) if ids.size == 1   => a
+          case (ids, SObject(o)) if ids.size == 1  => o
         }
 
-        result2 must contain(42, 12, 77, 1, 13, true, false, "daniel", Map("test" -> SString("fubar")), Vector())
+        result2.toSet must_== Set(42, 12, 77, 1, 13, true, false, "daniel", Map("test" -> SString("fubar")), Vector())
       }
     }
 
@@ -3393,7 +3394,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           val decis = result.toList collect {
             case (_, SDecimal(d)) => d
           }
-          decis.sorted mustEqual expectedResult.sorted
+          decis.sorted must_== expectedResult.sorted
 
           result must haveAllElementsLike {
             case (ids, SDecimal(d)) =>
@@ -3425,7 +3426,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, SBoolean(b)) if ids.size == 2 => b
         }
 
-        result2 must contain(true)
+        result2.toSet must_== Set(true)
         result2 must not(contain(false))
       }
     }
@@ -3466,7 +3467,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           val decis = result.toList collect {
             case (_, SDecimal(d)) => d
           }
-          decis.sorted mustEqual expectedResult.sorted
+          decis.sorted must_== expectedResult.sorted
 
 
           result must haveAllElementsLike {
@@ -3568,7 +3569,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, sv) if ids.length == 1 => sv
         }
 
-        results.head mustEqual SDecimal(1)
+        results.head must_== SDecimal(1)
       }
     }
 
@@ -3598,7 +3599,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, sv) if ids.length == 1 => sv
         }
 
-        results.head mustEqual SDecimal(1)
+        results.head must_== SDecimal(1)
       }
     }
 
@@ -3628,7 +3629,7 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
           case (ids, sv) if ids.length == 1 => sv
         }
 
-        results.head mustEqual SDecimal(1)
+        results.head must_== SDecimal(1)
       }
     }
 

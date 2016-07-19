@@ -54,9 +54,8 @@ object SampleData extends CValueGenerators {
       depth   <- choose(0, 1)
       jschema <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
-    } yield {
-      try {
-
+    }
+    yield {
       SampleData(
         data.sorted.toStream flatMap {
           // Sometimes the assembly process will generate overlapping values which will
@@ -66,9 +65,6 @@ object SampleData extends CValueGenerators {
         },
         Some((idCount, jschema))
       )
-      } catch {
-        case ex => println("depth: "+depth) ; throw ex
-      }
     }
   )
 

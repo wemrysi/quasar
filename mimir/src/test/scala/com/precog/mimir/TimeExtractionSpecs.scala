@@ -523,7 +523,7 @@ trait TimeExtractionSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (ids, SDecimal(d)) if ids.length == 1 => d.toInt
       }
 
-      result2 must contain(5, 10, 1, 2, 12, 7, 3, 8)
+      result2.toList must_== List(5, 10, 1, 2, 12, 7, 3, 8)
     }
 
     "compute week of year" in {

@@ -106,6 +106,7 @@ class CodecSpec extends Specification with ScalaCheck {
       codec.encodedSize(true) must_== 0
       codec.read(ByteBufferWrap(new Array[Byte](0))) must_== true
       codec.writeUnsafe(true, java.nio.ByteBuffer.allocate(0))
+      ok
     }
   }
 

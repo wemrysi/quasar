@@ -58,7 +58,7 @@ class JNumSpec extends Specification {
     // ensure that for all the numbers given, their BigDecimal, Double, and
     // Long interpretations all agree with their JNum ordering.
     val tpls = nums.map(n => (n, n.toBigDecimal, n.toDouble, n.toLong)).sorted
-    tpls.sliding(2).foreach {
+    tpls.sliding(2) forall {
       case (j1, b1, d1, n1) :: (j2, b2, d2, n2) :: Nil =>
         (b1 compare b2) must be_<(1)
         (d1 compare d2) must be_<(1)
