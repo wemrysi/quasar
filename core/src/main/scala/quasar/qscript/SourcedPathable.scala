@@ -87,7 +87,7 @@ object SourcedPathable {
           case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
             s.show(src) ++ Cord(",") ++
             struct.show ++ Cord(",") ++
-            repair.show ++ Cord(",")
+            repair.show ++ Cord(")")
           case Union(src, l, r) => Cord("Union(") ++
             s.show(src) ++ Cord(",") ++
             l.show ++ Cord(",") ++

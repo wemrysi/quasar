@@ -115,7 +115,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             "name" -> structural.ObjectProject(
               lpRead("/city"),
               LogicalPlan.Constant(Data.Str("name")))))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        QC.inj(
+          Map(RootR,
+            Free.roll(MakeMap(StrLit("name"),
+              Free.roll(ProjectField(
+                Free.roll(ProjectField(UnitF, StrLit("city"))),
+                StrLit("name"))))))).embed.some)
     }
 
     "convert a shift array" in {

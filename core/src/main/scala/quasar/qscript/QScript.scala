@@ -422,11 +422,14 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     values: Func.Input[T[Target], nat._3],
     tpe: JoinType):
       PlannerError \/ TargetT = {
-    val condError: PlannerError \/ JoinFunc[T] =
+    val condError: PlannerError \/ JoinFunc[T] = {
       // FIXME: This won’t work where we join a collection against itself
-      TJ.prj(values(2).transCata[F](_.lower).transCata((new Optimize[T]).applyAll[F]).project).fold(
+      //        We only apply _some_ optimizations at this point to maintain the
+      //        TJ at the end, but that‘s still not guaranteed
+      TJ.prj(values(2).transCata[F](_.lower).transCata((new Optimize[T]).applyMost[F]).project).fold(
         (InternalError("non theta join condition found"): PlannerError).left[JoinFunc[T]])(
         _.combine.right[PlannerError])
+    }
 
     // NB: This is a magic structure. Improve LP to not imply this structure.
     val combine: JoinFunc[T] = Free.roll(ConcatMaps(
@@ -719,40 +722,43 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]](
     implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
-      ThetaJoin[T, T[F]] => F[T[F]] = {
-    case ThetaJoin(src, l, r, on, Inner, combine)
-        if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ equiJF =>
-      QC.inj(Map(src, combine.void))
-    case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
-      (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
-        case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
-          case (Some(Map(\/-(()), mf1)), Some(Map(\/-(()), mf2))) =>
-            QC.inj(Map(src, combine >>= {
-              case LeftSide  => mf1
-              case RightSide => mf2
-            }))
-          case (_, _) => TJ.inj(x)
-        }
-        case (-\/(m1), \/-(())) => (FI.prj(m1) >>= QC.prj) match {
-          case Some(Map(\/-(()), mf1)) =>
-            QC.inj(Map(src, combine >>= {
-              case LeftSide  => mf1
-              case RightSide => UnitF
-            }))
-          case _ => TJ.inj(x)
-        }
-        case (\/-(()), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
-          case Some(Map(\/-(()), mf2)) =>
-            QC.inj(Map(src, combine >>= {
-              case LeftSide  => UnitF
-              case RightSide => mf2
-            }))
-          case _ => TJ.inj(x)
-        }
-        case (_, _) => TJ.inj(x)
+      ThetaJoin[T, ?] ~> F =
+    new (ThetaJoin[T, ?] ~> F) {
+      def apply[A](tj: ThetaJoin[T, A]) = tj match {
+        case ThetaJoin(src, l, r, on, Inner, combine)
+            if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ equiJF =>
+          QC.inj(Map(src, combine.void))
+        case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
+          (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+            case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
+              case (Some(Map(\/-(()), mf1)), Some(Map(\/-(()), mf2))) =>
+                QC.inj(Map(src, combine >>= {
+                  case LeftSide  => mf1
+                  case RightSide => mf2
+                }))
+              case (_, _) => TJ.inj(x)
+            }
+            case (-\/(m1), \/-(())) => (FI.prj(m1) >>= QC.prj) match {
+              case Some(Map(\/-(()), mf1)) =>
+                QC.inj(Map(src, combine >>= {
+                  case LeftSide  => mf1
+                  case RightSide => UnitF
+                }))
+              case _ => TJ.inj(x)
+            }
+            case (\/-(()), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
+              case Some(Map(\/-(()), mf2)) =>
+                QC.inj(Map(src, combine >>= {
+                  case LeftSide  => UnitF
+                  case RightSide => mf2
+                }))
+              case _ => TJ.inj(x)
+            }
+            case (_, _) => TJ.inj(x)
+          }
+        case x => TJ.inj(x)
       }
-    case x => TJ.inj(x)
-  }
+    }
 
   def simplifyProjections:
       ProjectBucket[T, ?] ~> QScriptCore[T, ?] =
@@ -768,13 +774,22 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
   // TODO write extractor for inject
   //SourcedPathable[T, T[CoEnv[A,F, ?]]] => SourcedPathable[T, T[F]] = {
   //F[A] => A  ===> CoEnv[E, F, A] => A
-  def coalesceMaps[F[_]: Functor](
-    implicit QC: QScriptCore[T, ?] :<: F):
+  def coalesceMaps[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[F]] => QScriptCore[T, T[F]] = {
     case x @ Map(Embed(src), mf) => QC.prj(src) match {
       case Some(Map(srcInner, mfInner)) => Map(srcInner, rebase(mf, mfInner))
       case _ => x
     }
+    case x => x
+  }
+
+  def coalesceMapsCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[CoEnv[A, F, ?]]] => QScriptCore[T, T[CoEnv[A, F, ?]]] = {
+    case x @ Map(Embed(src), mf) =>
+      src.run.fold(κ(x), QC.prj(_) match {
+        case Some(Map(srcInner, mfInner)) => Map(srcInner, rebase(mf, mfInner))
+        case _ => x
+      })
     case x => x
   }
 
@@ -802,10 +817,26 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
              FI: F :<: QScriptProject[T, ?]):
       F[T[F]] => F[T[F]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
+    Normalizable[F].normalize ⋙
+    quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
     liftFF(coalesceMaps[F]) ⋙
     liftFG(coalesceMapJoin[F]) ⋙
     Normalizable[F].normalize ⋙
-    liftFG(elideNopJoin[F]) ⋙
+    liftFG(elideNopMap[F])
+
+  // Only used when processing user-provided ThetaJoins
+  def applyMost[F[_]: Functor: Normalizable](
+    implicit QC: QScriptCore[T, ?] :<: F,
+             TJ: ThetaJoin[T, ?] :<: F,
+             PB: ProjectBucket[T, ?] :<: F,
+             FI: F :<: QScriptProject[T, ?]):
+      F[T[F]] => F[T[F]] =
+    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
+    Normalizable[F].normalize ⋙
+    // quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+    liftFF(coalesceMaps[F]) ⋙
+    liftFG(coalesceMapJoin[F]) ⋙
+    Normalizable[F].normalize ⋙
     liftFG(elideNopMap[F])
 
   def applyToFreeQS[F[_]: Functor: Normalizable, A](
@@ -814,8 +845,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptProject[T, ?]):
       F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    (quasar.fp.free.injectedNT[F](simplifyProjections).compose(
-      Normalizable[F].normalize)(_: F[T[CoEnv[A, F, ?]]])) ⋙
+    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[A, F, ?]]])) ⋙
+      Normalizable[F].normalize ⋙
+      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+      liftFF[QScriptCore[T, ?], F, T[CoEnv[A, F, ?]]](coalesceMapsCo[F, A]) ⋙
+      Normalizable[F].normalize ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
 }
 
