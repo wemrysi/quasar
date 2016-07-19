@@ -121,8 +121,8 @@ object SourcedPathable {
           case Union(src, l, r) =>
             Union(
               src,
-              l.mapSuspension(opt.applyToFreeQS),
-              r.mapSuspension(opt.applyToFreeQS))
+              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
+              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])))
         }
       }
     }

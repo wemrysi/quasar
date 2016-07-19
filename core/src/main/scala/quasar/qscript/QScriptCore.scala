@@ -202,13 +202,13 @@ object QScriptCore {
           case Take(src, from, count) =>
             Take(
               src,
-              from.mapSuspension(opt.applyToFreeQS),
-              count.mapSuspension(opt.applyToFreeQS))
+              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
+              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])))
           case Drop(src, from, count) =>
             Drop(
               src,
-              from.mapSuspension(opt.applyToFreeQS),
-              count.mapSuspension(opt.applyToFreeQS))
+              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
+              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])))
         }
       }
     }

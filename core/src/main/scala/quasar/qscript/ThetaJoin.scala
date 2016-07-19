@@ -98,8 +98,8 @@ object ThetaJoin {
         def apply[A](tj: ThetaJoin[T, A]) =
           ThetaJoin(
             tj.src,
-            tj.lBranch.mapSuspension(opt.applyToFreeQS),
-            tj.rBranch.mapSuspension(opt.applyToFreeQS),
+            freeTransCata(tj.lBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
+            freeTransCata(tj.rBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
             normalizeMapFunc(tj.on),
             tj.f,
             normalizeMapFunc(tj.combine))

@@ -708,6 +708,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     case x                          => QC.inj(x)
   }
 
+  def elideNopMapCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] = {
+    case Map(src, mf) if mf ≟ UnitF => src.project
+    case x                          => CoEnv(QC.inj(x).right)
+  }
+
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]](
@@ -801,12 +807,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     liftFG(elideNopJoin[F]) ⋙
     liftFG(elideNopMap[F])
 
-  def applyToFreeQS[F[_]: Functor: Normalizable](
+  def applyToFreeQS[F[_]: Functor: Normalizable, A](
     implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
-             PB: ProjectBucket[T, ?] :<: F):
-      F ~> F =
-    quasar.fp.free.injectedNT[F](simplifyProjections).compose(
-      Normalizable[F].normalize)
+             PB: ProjectBucket[T, ?] :<: F,
+             FI: F :<: QScriptProject[T, ?]):
+      F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
+    (quasar.fp.free.injectedNT[F](simplifyProjections).compose(
+      Normalizable[F].normalize)(_: F[T[CoEnv[A, F, ?]]])) ⋙
+      (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
 }
 
