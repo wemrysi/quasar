@@ -30,7 +30,7 @@ import scalaz._, Scalaz._
   * neither side references the src _more_ than once.)
   *
   * This case represents a full θJoin, but we could have an algebra that
-  * rewites it as
+  * rewrites it as
   *     Filter(_, EquiJoin(...))
   * to simplify behavior for the backend.
   */
