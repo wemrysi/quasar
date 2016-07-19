@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-import org.specs2.specification.Context
 import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
 import SampleData._
@@ -37,7 +36,6 @@ import PrecogSpecs._
 trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int
   import trans._
-  import constants._
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
@@ -78,7 +76,6 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     { spec =>
 
   import trans._
-  import constants._
 
   lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
 
@@ -96,14 +93,10 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
 
   def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
-    val t0 = System.currentTimeMillis()
-    val es = JParser.parseManyFromString(json).valueOr(throw _)
+    val t0    = System.currentTimeMillis()
+    val es    = JParser.parseManyFromString(json).valueOr(throw _)
     val table = fromJson(es.toStream, maxSliceSize)
-    val csv = streamToString(table.renderCsv())
-    val t = System.currentTimeMillis() - t0
-    // uncomment for timing info
-    //println("rendered csv (len=%d) in %d ms" format (csv.length, t))
-    csv
+    streamToString(table.renderCsv())
   }
 
   def testRenderJson(seq: Seq[JValue]) = {
