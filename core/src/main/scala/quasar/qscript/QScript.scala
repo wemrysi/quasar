@@ -566,46 +566,41 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           Free.roll(left).mapSuspension(FI),
           Free.roll(left).mapSuspension(FI))))).right
 
-    case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) => ??? // {
-    //   (for {
-    //     bucket0 <- findBucket(a1)
-    //     (bucketSrc, bucket, thing) = bucket0
-    //     merged0 <- merge3(a2, a3, bucketSrc)
-    //   } yield {
-    //     val Merge3(src, keys, order, buckets, arrays) = merged0
-    //     val rebasedArrays = rebase(thing, arrays)
+    case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
+      val (src, srcBuckets, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
-    //     val keysList: List[FreeMap[T]] = rebase(rebasedArrays, keys) match {
-    //       case ConcatArraysN(as) => as
-    //       case mf => List(mf)
-    //     }
+      // The ana over the freeIso converts from Free to T[CoEnv]. It’s the first step of freeTransCata.
+      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Unit, MapFunc[T, ?]].reverseGet).project match {
+        case ConcatArraysN(as) => as.map(_.cata(CoEnv.freeIso[Unit, MapFunc[T, ?]].get))
+        case mf => List(mf.embed.cata(CoEnv.freeIso[Unit, MapFunc[T, ?]].get))
+      }
 
-    //     // TODO handle errors
-    //     val orderList: PlannerError \/ List[SortDir] = {
-    //       val orderStrs: PlannerError \/ List[String] = rebase(rebasedArrays, order) match {
-    //         case ConcatArraysN(as) => as.traverse(StrLit.unapply(_)) \/> InternalError("unsupported ordering type") // disjunctionify
-    //         case StrLit(str) => List(str).right
-    //         case _ => InternalError("unsupported ordering function").left
-    //       }
-    //       orderStrs.flatMap {
-    //         _.traverse {
-    //           case "ASC" => SortDir.Ascending.right
-    //           case "DESC" => SortDir.Descending.right
-    //           case _ => InternalError("unsupported ordering direction").left
-    //         }
-    //       }
-    //     }
+      // TODO
+      val directionsList: PlannerError \/ List[SortDir] =
+        Nil.right
+      //  val orderStrs = directions.ana(CoEnv.freeIso[Unit, MapFunc[T, ?]].reverseGet).project match {
+      //    case ConcatArraysN(as) => as.traverse(StrLit.unapply(_)) \/> InternalError("unsupported ordering type") // disjunctionify
+      //    case StrLit(str) => List(str).right
+      //    case _ => InternalError("unsupported ordering function").left
+      //  }
+      //  orderStrs.flatMap {
+      //    _.traverse {
+      //      case "ASC" => SortDir.Ascending.right
+      //      case "DESC" => SortDir.Descending.right
+      //      case _ => InternalError("unsupported ordering direction").left
+      //    }
+      //  }
 
-    //     val lists: PlannerError \/ List[(FreeMap[T], SortDir)] =
-    //       orderList.map { keysList.zip(_) }
+      val lists: PlannerError \/ List[(FreeMap[T], SortDir)] =
+        directionsList.map { bucketsList.zip(_) }
 
-    //     lists.map(pairs =>
-    //       QC.inj(Sort(
-    //         TJ.inj(src).embed,
-    //         rebase(bucket, buckets),
-    //         pairs)))
-    //   }).join
-    // }
+      lists.map(pairs =>
+        EnvT((
+          EmptyAnn[T],  // TODO
+          QC.inj(Sort(
+            EnvT((EmptyAnn[T], src)).embed,
+            ordering,
+            pairs)))))
 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
