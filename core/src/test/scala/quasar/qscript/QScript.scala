@@ -38,6 +38,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   type QS[A] = QScriptProject[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
+  val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
   def RootR = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
 
@@ -50,15 +51,40 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
-    "convert a very simple read" in {
-      QueryFile.convertToQScript(lpRead("/foo")).toOption must
-      equal(
-        // Map(Root, ProjectField(Unit, "foo"))
-        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+    "convert a constant boolean" in {
+       // "select true"
+       QueryFile.convertToQScript(LogicalPlan.Constant(Data.Bool(true))).toOption must
+       equal(
+         QC.inj(Map(RootR, BoolLit(true))).embed.some)
+    }
+
+    // TODO EJson does not support Data.Set
+    "fail to convert a constant set" in {
+      // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
+      QueryFile.convertToQScript(
+        LogicalPlan.Constant(Data.Set(List(
+          Data.Obj(ListMap("0" -> Data.Int(2))),
+          Data.Obj(ListMap("0" -> Data.Int(3))))))).toOption must
+      equal(None)
     }
 
     "convert a simple read" in {
-      QueryFile.convertToQScript(lpRead("/some/foo/bar")).toOption must
+      QueryFile.convertToQScript(lpRead("/foo")).toOption must
+      equal(
+        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+    }
+
+    "convert a squashed read" in {
+      // "select * from foo"
+      QueryFile.convertToQScript(
+        identity.Squash(lpRead("/foo"))).toOption must
+      equal(
+        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+    }
+
+    "convert a simple read with path projects" in {
+      QueryFile.convertToQScript(
+        lpRead("/some/foo/bar")).toOption must
       equal(
         QC.inj(
           Map(RootR,
@@ -69,18 +95,39 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                   StrLit("some")),
                 StrLit("foo")),
               StrLit("bar")))).embed.some)
-
-      // Map(Root, ObjectProject(ObjectProject(ObjectProject((), "some"), "foo"), "bar"))
     }
 
     "convert a basic invoke" in {
-      QueryFile.convertToQScript(math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
+      QueryFile.convertToQScript(
+        math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
       equal(
         QC.inj(
           Map(RootR,
             Free.roll(Add(
               ProjectFieldR(UnitF, StrLit("foo")),
               ProjectFieldR(UnitF, StrLit("bar")))))).embed.some)
+    }
+
+    "convert project object and make object" in {
+      QueryFile.convertToQScript(
+        identity.Squash(
+          makeObj(
+            "name" -> structural.ObjectProject(
+              lpRead("/city"),
+              LogicalPlan.Constant(Data.Str("name")))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    "convert a shift array" in {
+      QueryFile.convertToQScript(
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.ArrayConcat[FLP](
+              structural.ArrayConcat[FLP](
+                structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(1))),
+                structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(2)))),
+              structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(3))))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
     }
 
     "convert basic join" in {  // TODO normalization
