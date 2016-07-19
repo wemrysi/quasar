@@ -22,49 +22,20 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.bytecode._
-import com.precog.yggdrasil.jdbm3._
-import com.precog.yggdrasil.util._
 import com.precog.util._
-
-import TransSpecModule._
 
 import scalaz._, Scalaz._
 import scala.collection.mutable
 import org.slf4s.Logging
 
-// TODO: does not deal well with tables too big to fit in memory
-
-object IndicesHelper {
-  def assertSorted(buf: ArrayIntList): Unit = {
-    val len = buf.size
-    if (len == 0) return ()
-    var last = buf.get(0)
-    var i    = 1
-    while (i < len) {
-      val z = buf.get(i)
-      if (last > z) sys.error("buffer is out-of-order: %s" format buf)
-      if (last == z) sys.error("buffer has duplicates: %s" format buf)
-      last = z
-      i += 1
-    }
-  }
-}
-
-import IndicesHelper._
-
-trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] { self: ColumnarTableModule[M] =>
+trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
+  self: ColumnarTableModule[M] =>
 
   // we will warn for tables with >1M rows.
   final def InMemoryLimit = 1000000L
 
-  import TableModule._
   import trans._
-  import trans.constants._
-
-  import Table._
   import SliceTransform._
-  import TransSpec.deepMap
 
   class TableIndex(private[table] val indices: List[SliceIndex]) {
 

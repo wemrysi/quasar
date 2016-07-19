@@ -20,16 +20,15 @@
 package com.precog.yggdrasil
 package jdbm3
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.TableModule._
 import org.apache.jdbm._
 import org.slf4s.Logging
 import java.util.SortedMap
-import java.nio.ByteBuffer
 import scala.collection.JavaConverters._
-import scalaz._, Scalaz._
+import scalaz._
 
 /**
   * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that

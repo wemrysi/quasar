@@ -19,11 +19,9 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import com.precog.bytecode.JType
-import scalaz._
-import java.nio.CharBuffer
 
 object TransSpecModule {
   object paths {
@@ -345,20 +343,6 @@ trait TransSpecModule extends FNModule {
 
         val Left  = DerefObjectStatic(Leaf(SourceLeft), Value)
         val Right = DerefObjectStatic(Leaf(SourceRight), Value)
-      }
-
-      object SourceGroup {
-        val Single = DerefObjectStatic(Leaf(Source), Group)
-
-        val Left  = DerefObjectStatic(Leaf(SourceLeft), Group)
-        val Right = DerefObjectStatic(Leaf(SourceRight), Group)
-      }
-
-      object SourceSortKey {
-        val Single = DerefObjectStatic(Leaf(Source), SortKey)
-
-        val Left  = DerefObjectStatic(Leaf(SourceLeft), SortKey)
-        val Right = DerefObjectStatic(Leaf(SourceRight), SortKey)
       }
     }
   }

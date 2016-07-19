@@ -37,7 +37,7 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   class YggConfig extends IdSourceConfig with BlockStoreColumnarTableModuleConfig with ColumnarTableModuleConfig {
     val idSource = new FreshAtomicIdSource
 
-    val maxSliceSize = 10
+    val maxSliceSize   = 10
     val smallSliceSize = 3
   }
 
@@ -60,6 +60,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 
   case class Projection(data: Stream[JValue]) extends ProjectionLike[M, Slice] {
     type Key = JArray
+
     private val slices = fromJson(data).slices.toStream.copoint
 
     val length: Long = data.length
@@ -67,8 +68,6 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
       case (acc, slice) => acc ++ slice.columns.keySet
     }
     def structure(implicit M: Monad[M]) = M.point(xyz)
-
-    private implicit val keyOrder: ScalazOrder[JArray] = ScalazOrder[List[JValue]].contramap((_: JArray).elements)
 
     def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
@@ -80,11 +79,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
         }
       }
 
-      val slice = id map { key =>
-        findBlockAfter(key, slices)
-      } getOrElse {
-        slices.headOption
-      }
+      val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
 
       slice map { s =>
         val s0 = new Slice {

@@ -139,24 +139,19 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       Stream(emptySlice) ++ tableTakeRange(table, 9, 5) ++
       Stream(emptySlice)
 
-    val toPrint = slices.map(_.size)
-
-    val newTable = Table(StreamT.fromStream(M.point(slices)), table.size)
-    val result = newTable.canonicalize(4)
-
+    val newTable     = Table(StreamT.fromStream(M.point(slices)), table.size)
+    val result       = newTable.canonicalize(4)
     val resultSlices = result.slices.toStream.copoint
-    val resultSizes = resultSlices.map(_.size)
+    val resultSizes  = resultSlices.map(_.size)
 
     resultSizes mustEqual Stream(4, 4, 4, 2)
   }
 
   def testCanonicalizeEmpty = {
-    val table = Table.empty
-
+    val table  = Table.empty
     val result = table.canonicalize(3)
-
     val slices = result.slices.toStream.copoint
-    val sizes = slices.map(_.size)
+    val sizes  = slices.map(_.size)
 
     sizes mustEqual Stream()
   }

@@ -43,7 +43,7 @@ object JavaSerialization {
 import JavaSerialization._
 
 sealed trait Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A, storeFile: StoreFile => A): A
+  def fold[A](ingest: Ingest => A, archive: Archive => A): A
   def split(n: Int): List[Event]
   def length: Int
 }
@@ -51,7 +51,7 @@ sealed trait Event {
 object Event {
   implicit val decomposer: Decomposer[Event] = new Decomposer[Event] {
     override def decompose(event: Event): JValue = {
-      event.fold(_.serialize, _.serialize, _.serialize)
+      event.fold(_.serialize, _.serialize)
     }
   }
 }
@@ -61,7 +61,7 @@ object Event {
   */
 case class Ingest(apiKey: APIKey, path: Path, writeAs: Option[Authorities], data: Seq[JValue], jobId: Option[JobId], timestamp: Instant, streamRef: StreamRef)
     extends Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A, storeFile: StoreFile => A): A = ingest(this)
+  def fold[A](ingest: Ingest => A, archive: Archive => A): A = ingest(this)
 
   def split(n: Int): List[Event] = {
     val splitSize = (data.length / n) max 1
@@ -115,9 +115,9 @@ object Ingest {
 }
 
 case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: Instant) extends Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A, storeFile: StoreFile => A): A = archive(this)
-  def split(n: Int)                                                                     = List(this) // can't split an archive
-  def length                                                                            = 1
+  def fold[A](ingest: Ingest => A, archive: Archive => A): A = archive(this)
+  def split(n: Int)                                          = List(this) // can't split an archive
+  def length                                                 = 1
 }
 
 object Archive {
@@ -153,16 +153,6 @@ object StreamRef {
     case AccessMode.Create  => StreamRef.Create(UUID.randomUUID, terminal)
     case AccessMode.Replace => StreamRef.Replace(UUID.randomUUID, terminal)
     case AccessMode.Append  => StreamRef.Append
-  }
-
-  object NewVersion {
-    def unapply(ref: StreamRef): Option[(UUID, Boolean, Boolean)] = {
-      ref match {
-        case Append                  => None
-        case Create(uuid, terminal)  => Some((uuid, terminal, false))
-        case Replace(uuid, terminal) => Some((uuid, terminal, true))
-      }
-    }
   }
 
   case class Create(streamId: UUID, terminal: Boolean) extends StreamRef {
@@ -204,24 +194,4 @@ object StreamRef {
         }
     }
   }
-}
-
-case class StoreFile(apiKey: APIKey, path: Path, writeAs: Option[Authorities], jobId: JobId, content: FileContent, timestamp: Instant, stream: StreamRef)
-    extends Event {
-  def fold[A](ingest: Ingest => A, archive: Archive => A, storeFile: StoreFile => A): A = storeFile(this)
-  def split(n: Int) = {
-    val splitSize = content.data.length / n
-    content.data.grouped(splitSize).map(d => this.copy(content = FileContent(d, content.mimeType, content.encoding))).toList
-  }
-
-  def length = content.data.length
-}
-
-object StoreFile {
-  import JavaSerialization._
-
-  val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "content" :: "timestamp" :: "streamRef" :: HNil
-
-  implicit val decomposer: Decomposer[StoreFile] = decomposerV[StoreFile](schemaV1, Some("1.0".v))
-  implicit val extractor: Extractor[StoreFile]   = extractorV[StoreFile](schemaV1, Some("1.0".v))
 }

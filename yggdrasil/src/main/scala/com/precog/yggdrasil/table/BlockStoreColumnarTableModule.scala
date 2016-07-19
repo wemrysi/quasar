@@ -27,9 +27,8 @@ import com.precog.bytecode._
 import com.precog.yggdrasil.jdbm3._
 import com.precog.yggdrasil.util._
 import com.precog.util._
-import metadata._
 
-import com.precog.util.{ BitSet, BitSetUtil, Loop }
+import com.precog.util.BitSet
 
 import java.util.SortedMap
 import java.util.Comparator
@@ -53,7 +52,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
 
   import trans._
   import TransSpec.deepMap
-  import SliceTransform._
 
   type YggConfig <: IdSourceConfig with ColumnarTableModuleConfig with BlockStoreColumnarTableModuleConfig
   type TableCompanion <: BlockStoreColumnarTableCompanion
@@ -1154,7 +1152,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
                               valueSpec: TransSpec1,
                               sortOrder: DesiredSortOrder = SortAscending,
                               unique: Boolean = false): M[(List[String], IndexMap)] = {
-      import sortMergeEngine._
 
       // If we don't want unique key values (e.g. preserve duplicates), we need to add
       // in a distinct "row id" for each value to disambiguate it

@@ -1429,7 +1429,6 @@ trait DAG extends Instructions {
   case object UnmatchedSplit          extends StackError
 
   case class OperationOnBucket(instr: Instruction) extends StackError
-  case object BucketOperationOnBucket extends StackError
   case class BucketOperationOnSets(instr: Instruction) extends StackError
   case object BucketAtEnd extends StackError
 

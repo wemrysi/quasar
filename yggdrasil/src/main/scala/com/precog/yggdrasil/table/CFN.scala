@@ -80,19 +80,6 @@ object CF1P {
   }
 }
 
-object CF1Array {
-  def apply[A, M[+ _]](name: String)(pf: PartialFunction[(Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
-    def apply(columns0: Map[ColumnRef, Column], range: Range) = {
-      columns0 collect {
-        case (ColumnRef(CPath.Identity, _), col) if pf isDefinedAt (col, range) => {
-          val (tpe, cols, defined) = pf((col, range))
-          tpe -> (cols.asInstanceOf[Array[Array[_]]], defined)
-        }
-      }
-    }
-  }
-}
-
 trait CF2 extends CF { self =>
   def apply(c1: Column, c2: Column): Option[Column]
 

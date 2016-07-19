@@ -22,10 +22,8 @@ package ingest
 
 import blueeyes._
 import security._
-import com.precog.common.serializationImplicits._
 import jobs.JobId
 
-import blueeyes.core.http.MimeType
 import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.IsoSerialization._
@@ -33,15 +31,7 @@ import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 import blueeyes.json.serialization.JodaSerializationImplicits.{ InstantExtractor, InstantDecomposer }
 
-import java.nio.charset.Charset
-import java.util.UUID
-
-import scalaz._
-import scalaz.Validation._
-import scalaz.syntax.apply._
-import scalaz.syntax.bifunctor._
-import scalaz.syntax.plus._
-import scalaz.syntax.validation._
+import scalaz._, Scalaz._, Validation._
 
 sealed trait EventMessage {
   def apiKey: APIKey

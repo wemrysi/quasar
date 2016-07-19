@@ -27,22 +27,12 @@ import scalaz.effect.IO
 import java.util.concurrent.atomic._
 
 case class Insert(batch: Seq[NIHDB.Batch], responseRequested: Boolean)
-
-case object GetSnapshot
-
 case class Block(id: Long, segments: Seq[Segment], stable: Boolean)
-
-case object GetStatus
 case class Status(cooked: Int, pending: Int, rawSize: Int)
-
-case object GetStructure
 case class Structure(columns: Set[(CPath, CType)])
 
 sealed trait InsertResult
 case class Inserted(offset: Long, size: Int) extends InsertResult
-case object Skipped extends InsertResult
-
-case object Quiesce
 
 object NIHDB {
   final val projectionIdGen = new AtomicInteger()

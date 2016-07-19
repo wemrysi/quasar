@@ -52,11 +52,6 @@ sealed trait IdSequence {
   def next(): (Int, Int)
 }
 
-case object EmptyIdSequence extends IdSequence {
-  def isEmpty(): Boolean = true
-  def next()             = sys.error("No ids available from empty id sequence block")
-}
-
 case class IdSequenceBlock(producerId: Int, firstSequenceId: Int, lastSequenceId: Int) extends IdSequence {
   private val currentSequenceId = new AtomicInteger(firstSequenceId)
 

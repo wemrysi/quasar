@@ -33,7 +33,7 @@ import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
 import TransSpecModule._
 import org.slf4j.Logger
 import org.slf4s.Logging
-import com.precog.util.{ BitSet, BitSetUtil, IOUtils, Loop }
+import com.precog.util.IOUtils
 
 import scala.collection.mutable
 import scalaz._, Scalaz._, Ordering._
@@ -63,7 +63,6 @@ trait ColumnarTableModuleConfig {
 
 object ColumnarTableModule extends Logging {
   def renderJson[M[+ _]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
-    import scalaz.\/._
     def wrap(stream: StreamT[M, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") CharBuffer.wrap(prefix) :: stream
@@ -118,7 +117,6 @@ object ColumnarTableModule extends Logging {
     */
   def renderCsv[M[+ _]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
     import scala.collection.{ Map => GenMap }
-    import scala.util.Sorting
 
     /**
       * Represents the column headers we have. We track three things:
@@ -346,7 +344,6 @@ trait ColumnarTableModule[M[+ _]]
 
   import TableModule._
   import trans._
-  import trans.constants._
 
   type YggConfig <: IdSourceConfig with ColumnarTableModuleConfig
 
