@@ -26,18 +26,12 @@ import com.precog.bytecode._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.TableModule._
-import com.precog.yggdrasil.util.IdSourceConfig
 import com.precog.yggdrasil.vfs._
 import com.precog.util._
 
 import org.slf4j.LoggerFactory
 import scala.collection.immutable.Queue
-
 import scalaz._, Scalaz._, StateT._
-
-trait EvaluatorConfig extends IdSourceConfig {
-  def maxSliceSize: Int
-}
 
 trait EvaluatorModule[M[+ _]]
     extends CrossOrdering
@@ -65,13 +59,9 @@ trait EvaluatorModule[M[+ _]]
       with ReductionFinder
       with StaticInliner
       with JoinOptimizer
-      with PredicatePullups
-      with YggConfigComponent {
-
-    type YggConfig <: EvaluatorConfig
+      with PredicatePullups {
 
     import library._
-    import yggConfig._
     import trans._
     import constants._
 
@@ -447,8 +437,8 @@ trait EvaluatorModule[M[+ _]]
                 val keySpec   = trans.WrapObject(trans.DerefObjectStatic(TransSpec1.Id, paths.Key), paths.Key.name)
                 val valueSpec = trans.WrapObject(trans.DerefObjectStatic(TransSpec1.Id, paths.Value), paths.Value.name)
 
-                val keyTable   = tableData.transform(keySpec).canonicalize(maxSliceSize)
-                val valueTable = tableSamples.transform(valueSpec).canonicalize(maxSliceSize)
+                val keyTable   = tableData.transform(keySpec).canonicalize(yggConfig.maxSliceSize)
+                val valueTable = tableSamples.transform(valueSpec).canonicalize(yggConfig.maxSliceSize)
 
                 transState liftM mn(keyTable.zip(valueTable))
               }
@@ -887,7 +877,7 @@ trait EvaluatorModule[M[+ _]]
       val resultState: StateT[N, EvaluatorState, Table] = fullEval(rewrittenDAG, Map(), Nil)
 
       val resultTable: N[Table] = resultState.eval(EvaluatorState())
-      resultTable map { _ paged maxSliceSize compact DerefObjectStatic(Leaf(Source), paths.Value) }
+      resultTable map { _ paged yggConfig.maxSliceSize compact DerefObjectStatic(Leaf(Source), paths.Value) }
     }
 
     private[this] def stagedOptimizations(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean) =

@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._
-import com.precog.yggdrasil.util.IdSourceConfig
 import blueeyes._, json._
 import org.specs2.ScalaCheck
 import org.specs2.mutable._
@@ -1016,9 +1015,4 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
   "handle non-trivial group alignment with composite key" in testNonTrivial
 }
 
-object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec {
-  type YggConfig = IdSourceConfig
-  val yggConfig = new IdSourceConfig {
-    val idSource = new FreshAtomicIdSource
-  }
-}
+object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec

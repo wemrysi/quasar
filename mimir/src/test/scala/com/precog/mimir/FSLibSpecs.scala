@@ -46,14 +46,6 @@ trait FSLibSpecs extends Specification with FSLibModule[Need] with TestColumnarT
   val library = new FSLib {}
   import library._
 
-  class YggConfig extends IdSourceConfig with ColumnarTableModuleConfig {
-    val maxSliceSize = 10
-    val smallSliceSize = 3
-    val idSource = new FreshAtomicIdSource
-  }
-
-  lazy val yggConfig = new YggConfig
-
   lazy val projectionMetadata: Map[Path, Map[ColumnRef, Long]] = Map(
     Path("/foo/bar1/baz/quux1")   -> Map(ColumnRef(CPath.Identity, CString) -> 10L),
     Path("/foo/bar2/baz/quux1")   -> Map(ColumnRef(CPath.Identity, CString) -> 20L),

@@ -7,6 +7,7 @@ package object blueeyes extends blueeyesstubs.Platform {
   type ListBuffer[A]  = scala.collection.mutable.ListBuffer[A]
   val ArrayBuffer     = scala.collection.mutable.ArrayBuffer
   val ListBuffer      = scala.collection.mutable.ListBuffer
+  type CTag[A]        = scala.reflect.ClassTag[A]
 
   // java stdlib
   type BufferedOutputStream = java.io.BufferedOutputStream
@@ -45,8 +46,6 @@ package object blueeyes extends blueeyesstubs.Platform {
   type Iso[T, L] = shapeless.Generic.Aux[T, L]
   val HNil       = shapeless.HNil
 
-  type Configuration = org.streum.configrity.Configuration
-
   // Can't overload in package objects in scala 2.9!
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)
   def ByteBufferWrap2(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
@@ -69,6 +68,37 @@ package object blueeyes extends blueeyesstubs.Platform {
 }
 
 package blueeyes {
+  final class FreshAtomicIdSource {
+    private val source = new java.util.concurrent.atomic.AtomicLong
+    def nextId() = source.getAndIncrement
+    def nextIdBlock(n: Int): Long = {
+      var nextId = source.get()
+      while (!source.compareAndSet(nextId, nextId + n)) {
+        nextId = source.get()
+      }
+      nextId
+    }
+  }
+
+  object yggConfig {
+    val idSource = new FreshAtomicIdSource
+
+    def hashJoins = true
+
+    def sortBufferSize    = 1000
+
+    def maxSliceSize: Int = 10
+
+    // This is a slice size that we'd like our slices to be at least as large as.
+    def minIdealSliceSize: Int = maxSliceSize / 4
+
+    // This is what we consider a "small" slice. This may affect points where
+    // we take proactive measures to prevent problems caused by small slices.
+    def smallSliceSize: Int = 3
+
+    def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+  }
+
   package util {
     trait Close[A] {
       def close(a: A): Unit

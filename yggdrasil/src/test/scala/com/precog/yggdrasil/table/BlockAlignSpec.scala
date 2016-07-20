@@ -435,11 +435,6 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
 }
 
 object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec {
-  type YggConfig = IdSourceConfig
-  val yggConfig = new IdSourceConfig {
-    val idSource = new FreshAtomicIdSource
-  }
-
   "align" should {
     "a simple example" in alignSimple
     "across slice boundaries" in alignAcrossBoundaries

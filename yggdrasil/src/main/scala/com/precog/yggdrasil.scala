@@ -10,9 +10,6 @@ package object yggdrasil {
   // only usage of commons-primitives
   type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
 
-  // imported from quartz
-  type CronExpression = org.quartz.CronExpression
-
   // renamed from howl
   type HConfiguration  = org.objectweb.howl.log.Configuration
   type HLogger         = org.objectweb.howl.log.Logger

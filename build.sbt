@@ -13,6 +13,8 @@ lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
 
 lazy val blueeyes = (
   project.setup deps (
+
+    "org.scala-lang.modules"                 %% "scala-parser-combinators"    %     "1.0.4",
     "org.objectweb.howl"                      % "howl"                        %    "1.0.1-1",
     "org.slamdata"                            % "jdbm"                        %     "3.0.0",
     "com.google.code.findbugs"                % "jsr305"                      %     "3.0.1",
@@ -22,7 +24,6 @@ lazy val blueeyes = (
     "javolution"                              % "javolution"                  %     "5.5.1",
     "io.netty"                                % "netty"                       %  "3.6.3.Final",
     "org.xlightweb"                           % "xlightweb"                   %     "2.13.2",
-    "org.streum"                             %% "configrity-core"             %  "1.0.1-precog",
     "com.chuusai"                            %% "shapeless"                   %     "2.3.1",
     "org.slf4s"                              %% "slf4s-api"                   %     "1.7.13",
     "org.spire-math"                         %% "spire"                       %     "0.7.4",

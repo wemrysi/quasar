@@ -339,13 +339,10 @@ trait ColumnarTableModule[M[+ _]]
     with IdSourceScannerModule
     with SliceTransforms[M]
     with SamplableColumnarTableModule[M]
-    with IndicesModule[M]
-    with YggConfigComponent {
+    with IndicesModule[M] {
 
   import TableModule._
   import trans._
-
-  type YggConfig <: IdSourceConfig with ColumnarTableModuleConfig
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion

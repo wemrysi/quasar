@@ -46,14 +46,13 @@ trait BlockStoreColumnarTableModuleConfig {
   def hashJoins: Boolean = true
 }
 
-trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with YggConfigComponent { self =>
+trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
   protected lazy val blockModuleLogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.BlockStoreColumnarTableModule")
 
   import trans._
   import TransSpec.deepMap
 
-  type YggConfig <: IdSourceConfig with ColumnarTableModuleConfig with BlockStoreColumnarTableModuleConfig
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
   protected class MergeEngine[KeyType, BlockData <: BlockProjectionData[KeyType, Slice]] {
@@ -137,7 +136,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
           comparatorMatrix
         }
 
-        new CellMatrix { self =>
+        new CellMatrix {
           private[this] val allCells: mutable.Map[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
           private[this] val comparatorMatrix                 = fillMatrix(initialCells)
 
@@ -898,7 +897,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
       Table(StreamT(M.point(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
 
-    /** XXX
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                                         rightKeySpec: TransSpec1,
                                                                                         joinSpec: TransSpec2): M[JoinOrder -> Table] = {
@@ -983,12 +981,9 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] with 
             val (left, right) = (leftE.fold(idT, idT), rightE.fold(idT, idT))
             super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
         }
-      } else {
-        super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
       }
+      else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
-
-    ***/
 
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table]
   }

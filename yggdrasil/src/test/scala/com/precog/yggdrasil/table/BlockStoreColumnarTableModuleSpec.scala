@@ -57,13 +57,4 @@ trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with Block
   }
 }
 
-object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSpec {
-  type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
-
-  val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {
-    val maxSliceSize = 10
-    val smallSliceSize = 3
-
-    val idSource = new FreshAtomicIdSource
-  }
-}
+object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSpec

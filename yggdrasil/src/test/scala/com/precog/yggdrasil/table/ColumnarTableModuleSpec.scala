@@ -22,7 +22,6 @@ package table
 
 import com.precog.common._, security._
 import com.precog.bytecode.JType
-import com.precog.yggdrasil.util.IdSourceConfig
 import org.slf4j.LoggerFactory
 
 import blueeyes._, json._
@@ -623,12 +622,4 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
 object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Need] {
   implicit def M = Need.need
-
-  type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
-  val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {
-    val maxSliceSize = 10
-    val smallSliceSize = 3
-
-    val idSource = new FreshAtomicIdSource
-  }
 }

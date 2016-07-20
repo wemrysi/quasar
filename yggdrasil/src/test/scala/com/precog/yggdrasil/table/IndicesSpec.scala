@@ -211,13 +211,4 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
 object IndicesSpec extends IndicesSpec[Need] {
   implicit def M = Need.need
-
-  type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
-
-  val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {
-    val maxSliceSize = 10
-    val smallSliceSize = 3
-
-    val idSource = new FreshAtomicIdSource
-  }
 }

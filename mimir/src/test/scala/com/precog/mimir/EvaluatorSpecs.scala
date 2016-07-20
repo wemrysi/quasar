@@ -54,11 +54,6 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
       val report = new LoggingQueryLogger[N, instructions.Line] with ExceptionQueryLogger[N, instructions.Line] with TimingQueryLogger[N, instructions.Line] {
         val M = N0
       }
-      class YggConfig extends EvaluatorConfig {
-        val idSource = new FreshAtomicIdSource
-        val maxSliceSize = 10
-      }
-      val yggConfig = new YggConfig
       def freshIdScanner = outer.freshIdScanner
     }
 
@@ -126,20 +121,6 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
   private var currentIndex = 0                                        // if we were doing this for real: j.u.c.a.AtomicInteger
   private val indexLock = new AnyRef                                  // if we were doing this for real: DIE IN A FIRE!!!
 
-  class YggConfig extends IdSourceConfig with ColumnarTableModuleConfig with BlockStoreColumnarTableModuleConfig {
-    val sortBufferSize           = 1000
-    val sortWorkDir: File        = IOUtils.createTmpDir("idsoSpec").unsafePerformIO
-    val clock                    = blueeyes.util.Clock.System
-    val memoizationBufferSize    = 1000
-    val memoizationWorkDir: File = null //no filesystem storage in test!
-    val flatMapTimeout           = 30.seconds
-    val maxSliceSize             = 10
-    val smallSliceSize           = 3
-
-    val idSource = new FreshAtomicIdSource
-  }
-
-  object yggConfig extends YggConfig
 }
 
 trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]

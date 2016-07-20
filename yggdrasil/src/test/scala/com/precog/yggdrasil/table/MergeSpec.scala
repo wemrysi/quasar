@@ -24,7 +24,6 @@ import blueeyes._, json._
 import com.precog.common._
 import com.precog.bytecode.JType
 import com.precog.common.security._
-import com.precog.yggdrasil.util.IdSourceConfig
 import scalaz._, Scalaz._
 
 trait MergeSpec[M[+_]] extends
@@ -299,13 +298,4 @@ trait MergeSpec[M[+_]] extends
 
 object MergeSpec extends MergeSpec[Need] {
   implicit def M = Need.need
-
-  type YggConfig = IdSourceConfig with ColumnarTableModuleConfig
-
-  val yggConfig = new IdSourceConfig with ColumnarTableModuleConfig {
-    val maxSliceSize = 10
-    val smallSliceSize = 3
-
-    val idSource = new FreshAtomicIdSource
-  }
 }

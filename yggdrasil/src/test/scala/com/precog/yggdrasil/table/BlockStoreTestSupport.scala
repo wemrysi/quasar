@@ -34,15 +34,6 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = "groupId(" + groupId.getAndIncrement + ")"
 
-  class YggConfig extends IdSourceConfig with BlockStoreColumnarTableModuleConfig with ColumnarTableModuleConfig {
-    val idSource = new FreshAtomicIdSource
-
-    val maxSliceSize   = 10
-    val smallSliceSize = 3
-  }
-
-  val yggConfig = new YggConfig
-
   trait TableCompanion extends BaseBlockStoreTestTableCompanion
 
   object Table extends TableCompanion

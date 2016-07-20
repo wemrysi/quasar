@@ -21,20 +21,15 @@ package com.precog.yggdrasil.util
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.{ IdSource, TableModule, YggConfigComponent }
+import com.precog.yggdrasil.{ IdSource, TableModule }
 import com.precog.yggdrasil.table._
 
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
 
 import scalaz._
 
-trait IdSourceConfig {
-  def idSource: IdSource
-}
-
-trait IdSourceScannerModule extends YggConfigComponent {
-  type YggConfig <: IdSourceConfig
-
+trait IdSourceScannerModule {
+  val idSource = new FreshAtomicIdSource
   def freshIdScanner = new CScanner {
     type A = Long
     def init = 0
