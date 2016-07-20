@@ -83,8 +83,8 @@ object ThetaJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Unit],
-        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Hole],
+        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Hole]) =
         // TODO: merge two joins with different combine funcs
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
@@ -98,8 +98,8 @@ object ThetaJoin {
         def apply[A](tj: ThetaJoin[T, A]) =
           ThetaJoin(
             tj.src,
-            freeTransCata(tj.lBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
-            freeTransCata(tj.rBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
+            freeTransCata(tj.lBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
+            freeTransCata(tj.rBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
             normalizeMapFunc(tj.on),
             tj.f,
             normalizeMapFunc(tj.combine))

@@ -76,10 +76,18 @@ package object qscript extends LowPriorityImplicits {
     implicit val show: Show[JoinSide] = Show.showFromToString
   }
 
-  type FreeUnit[F[_]] = Free[F, Unit]
+  sealed trait Hole
+  final case object SrcHole extends Hole
 
-  type FreeMap[T[_[_]]] = FreeUnit[MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeUnit[QScriptProject[T, ?]]
+  object Hole {
+    implicit val equal: Equal[Hole] = Equal.equalRef
+    implicit val show: Show[Hole] = Show.showFromToString
+  }
+
+  type FreeHole[F[_]] = Free[F, Hole]
+
+  type FreeMap[T[_[_]]] = FreeHole[MapFunc[T, ?]]
+  type FreeQS[T[_[_]]] = FreeHole[QScriptProject[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
@@ -93,9 +101,8 @@ package object qscript extends LowPriorityImplicits {
       Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
   }
 
-  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, UnitF[T])
-
-  def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
   final case class SrcMerge[A, B](src: A, left: B, right: B)
 
@@ -109,23 +116,23 @@ package object qscript extends LowPriorityImplicits {
     (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
       buckets.zipWithIndex.map(p =>
         Free.roll(ProjectIndex[T, FreeMap[T]](
-          UnitF[T],
-          IntLit[T, Unit](p._2)))))
+          HoleF[T],
+          IntLit[T, Hole](p._2)))))
 
   def concat[T[_[_]]: Corecursive, A](
     l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
       (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0))),
-      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1))))
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
 
   def concat3[T[_[_]]: Corecursive, A](
     l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
       (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
     (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
-      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0))),
-      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1))),
-      Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](2))))
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
   /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
     */
@@ -180,6 +187,6 @@ abstract class LowPriorityImplicits {
   // TODO: move to matryoshka
 
   implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
-    CoEnv.bitraverse[F, Unit].rightTraverse
+    CoEnv.bitraverse[F, Hole].rightTraverse
 }
 

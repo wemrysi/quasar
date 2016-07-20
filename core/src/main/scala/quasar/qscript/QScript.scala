@@ -72,7 +72,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
   type Target[A] = EnvT[Ann[T], F, A]
   type TargetT = Target[T[Target]]
-  type FreeEnv = Free[Target, Unit]
+  type FreeEnv = Free[Target, Hole]
 
   def DeadEndTarget(deadEnd: DeadEnd): TargetT =
     EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](deadEnd))))
@@ -80,7 +80,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   val RootTarget: TargetT = DeadEndTarget(Root)
   val EmptyTarget: TargetT = DeadEndTarget(Empty)
 
-  type Envs = List[Target[Unit]]
+  type Envs = List[Target[Hole]]
 
   case class ZipperSides(
     lSide: FreeMap[T],
@@ -95,12 +95,12 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     sides: ZipperSides,
     tails: ZipperTails)
 
-  def linearize[F[_]: Functor: Foldable]: Algebra[F, List[F[Unit]]] =
-    fl => fl.void :: fl.fold
+  def linearize[F[_]: Functor: Foldable]: Algebra[F, List[F[Hole]]] =
+    fl => fl.map(_ => SrcHole: Hole) :: fl.fold
 
   def linearizeEnv[E, F[_]: Functor: Foldable]:
-      Algebra[EnvT[E, F, ?], List[EnvT[E, F, Unit]]] =
-    fl => fl.void :: fl.lower.fold
+      Algebra[EnvT[E, F, ?], List[EnvT[E, F, Hole]]] =
+    fl => fl.map(_ => SrcHole: Hole) :: fl.lower.fold
 
 
   def delinearizeInner[A]: Coalgebra[Target, List[Target[A]]] = {
@@ -109,23 +109,23 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   }
 
   def delinearizeTargets[F[_]: Functor, A]:
-      ElgotCoalgebra[Unit \/ ?, Target, List[Target[A]]] = {
-    case Nil    => ().left
+      ElgotCoalgebra[Hole \/ ?, Target, List[Target[A]]] = {
+    case Nil    => SrcHole.left[Target[List[Target[A]]]]
     case h :: t => h.map(_ => t).right
   }
 
-  val consZipped: Algebra[ListF[Target[Unit], ?], ZipperAcc] = {
-    case NilF() => ZipperAcc(Nil, ZipperSides(UnitF[T], UnitF[T]), ZipperTails(Nil, Nil))
+  val consZipped: Algebra[ListF[Target[Hole], ?], ZipperAcc] = {
+    case NilF() => ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
   // E, M, F, A => A => M[E[F[A]]]
   val zipper: ElgotCoalgebra[
       ZipperAcc \/ ?,
-      ListF[Target[Unit], ?],
+      ListF[Target[Hole], ?],
       (ZipperSides, ZipperTails)] = {
     case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[Unit], (ZipperSides, ZipperTails)]](
+      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[Hole], (ZipperSides, ZipperTails)]](
         ZipperAcc(Nil, zs, zt).left) {
         case SrcMerge(inn, lmf, rmf) =>
           ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
@@ -134,7 +134,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       ZipperAcc(Nil, sides, tails).left
   }
 
-  type MergeResult = (T[Target], FreeMap[T], FreeMap[T], Free[Target, Unit], Free[Target, Unit])
+  type MergeResult = (T[Target], FreeMap[T], FreeMap[T], Free[Target, Hole], Free[Target, Hole])
 
   def merge(left: T[Target], right: T[Target]): MergeResult = {
     val lLin: Envs = left.cata(linearizeEnv).reverse
@@ -142,16 +142,16 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     val ZipperAcc(common, ZipperSides(lMap, rMap), ZipperTails(lTail, rTail)) =
       elgot(
-        (ZipperSides(UnitF[T], UnitF[T]), ZipperTails(lLin, rLin)))(
+        (ZipperSides(HoleF[T], HoleF[T]), ZipperTails(lLin, rLin)))(
         consZipped, zipper)
 
     val leftF =
-      foldIso(CoEnv.freeIso[Unit, Target])
-        .get(lTail.reverse.ana[T, CoEnv[Unit, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
+      foldIso(CoEnv.freeIso[Hole, Target])
+        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Hole] >>> (CoEnv(_))))
 
     val rightF =
-      foldIso(CoEnv.freeIso[Unit, Target])
-        .get(rTail.reverse.ana[T, CoEnv[Unit, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
+      foldIso(CoEnv.freeIso[Hole, Target])
+        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Hole] >>> (CoEnv(_))))
 
     val commonSrc: T[Target] =
       common.reverse.ana[T, Target](delinearizeInner)
@@ -159,23 +159,23 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     (commonSrc, lMap, rMap, leftF, rightF)
   }
 
-  def rebaseBranch(br: Free[Target, Unit], fm: FreeMap[T]):
-      Free[Target, Unit] =
+  def rebaseBranch(br: Free[Target, Hole], fm: FreeMap[T]):
+      Free[Target, Hole] =
     // TODO: Special-casing the `point` case should be unnecessary after
     //       optimizations are applied across all branches.
-    if (fm ≟ Free.point(()))
+    if (fm ≟ Free.point(SrcHole))
       br
     else
-      br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Unit](()), fm)))))
+      br >> Free.roll(EnvT((EmptyAnn[T], QC.inj(Map(Free.point[Target, Hole](SrcHole), fm)))))
 
   def useMerge(
     res: MergeResult,
-    ap: (T[Target], Free[Target, Unit], Free[Target, Unit]) => (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
+    ap: (T[Target], Free[Target, Hole], Free[Target, Hole]) => (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T])):
       (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T]) = {
 
     val (src, lMap, rMap, lBranch, rBranch) = res
 
-    if (lBranch ≟ Free.point(()) && rBranch ≟ Free.point(())) {
+    if (lBranch ≟ Free.point(SrcHole) && rBranch ≟ Free.point(SrcHole)) {
       val (buck, newBucks) = concatBuckets(src.project.ask.provenance)
       val (mf, baccess, laccess, raccess) = concat3(buck, lMap, rMap)
       (QC.inj(Map(src, mf)), newBucks.map(_ >> baccess), laccess, raccess)
@@ -206,8 +206,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       Ann[T] =
     v.fold(_.ask, κ(default.project.ask))
 
-// CoEnv[Unit, EnvT[Ann, F, ?], ?]
-// EnvT[Ann, CoAnn[Unit, F, ?], ?]
+// CoEnv[Hole, EnvT[Ann, F, ?], ?]
+// EnvT[Ann, CoAnn[Hole, F, ?], ?]
 
   /** This unifies a pair of sources into a single one, with additional
     * expressions to access the combined bucketing info, as well as the left and
@@ -251,7 +251,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       (F[T[Target]], List[FreeMap[T]], FreeMap[T], FreeMap[T], FreeMap[T]) = {
     val (lsrc, lbuckets, lval, cval) = autojoin(left, center)
     val (fullSrc, fullBuckets, bval, rval) =
-      autojoin(EnvT((Ann[T](lbuckets, UnitF), lsrc)).embed, right)
+      autojoin(EnvT((Ann[T](lbuckets, HoleF), lsrc)).embed, right)
 
     (fullSrc, fullBuckets, bval >> lval, bval >> cval, rval)
   }
@@ -296,7 +296,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       Ann(
         prov.shiftMap(shiftAccess >> fullBuckAccess) ::
           newBucks.map(_ >> buckAccess >> fullBuckAccess),
-        UnitF),
+        HoleF),
       SP.inj(LeftShift(
         EnvT((EmptyAnn[T], QC.inj(Map(input, merged)))).embed,
         valAccess,
@@ -311,7 +311,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val (merged, buckAccess, valAccess) = concat(buck, Free.roll(f(value)))
 
     EnvT((
-      Ann(prov.shiftMap(valAccess) :: newBucks.map(_ >> buckAccess), UnitF),
+      Ann(prov.shiftMap(valAccess) :: newBucks.map(_ >> buckAccess), HoleF),
       SP.inj(LeftShift(
         EnvT((EmptyAnn[T], QC.inj(Map(input, merged)))).embed,
         valAccess,
@@ -324,7 +324,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   }
 
   // NB: More complicated LeftShifts are generated as an optimization:
-  // before: ThetaJoin(cs, Map((), mf), LeftShift((), struct, repair), comb)
+  // before: ThetaJoin(cs, Map(Hole, mf), LeftShift(Hole, struct, repair), comb)
   // after: LeftShift(cs, struct, comb.flatMap(LeftSide => mf.map(_ => LeftSide), RS => repair))
   def invokeExpansion1(
     func: UnaryFunc,
@@ -382,10 +382,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       case set.Range =>
         val (src, buckets, lval, rval) = autojoin(values(0), values(1))
         val (bucksArray, newBucks) = concatBuckets(buckets)
-        val (merged, b, v) = concat[T, Unit](bucksArray, Free.roll(Range(lval, rval)))
+        val (merged, b, v) = concat[T, Hole](bucksArray, Free.roll(Range(lval, rval)))
 
         EnvT((
-          Ann[T](NullLit[T, Unit]() :: newBucks.map(b >> _), v),
+          Ann[T](NullLit[T, Hole]() :: newBucks.map(b >> _), v),
           SP.inj(LeftShift(
             EnvT((EmptyAnn[T], src)).embed,
             merged,
@@ -404,8 +404,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
       EnvT[Ann[T], F, T[Target]]((
         Ann[T](
-          provAccess.map(_ >> Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0)))),
-          Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1)))),
+          provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
         QC.inj(Reduce[T, T[Target], nat._1](
           values(0),
           newProvs,
@@ -431,8 +431,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
       EnvT[Ann[T], F, T[Target]]((
         Ann[T](
-          provAccess.map(_ >> Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0)))),
-          Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1)))),
+          provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
         QC.inj(Reduce[T, T[Target], nat._1](
           values(0),
           newProvs,
@@ -481,7 +481,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       // }
 
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         TJ.inj(ThetaJoin(
           commonSrc,
           rebaseBranch(leftSide, lMap).mapSuspension(FI.compose(envtLowerNT)),
@@ -496,7 +496,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val Ann(provenance, values) = prefix.ask
     EnvT[Ann[T], F, T[Target]]((
       Ann[T](prov.projectField(field) :: provenance, values),
-      PB.inj(BucketField(prefix.embed, UnitF[T], field))))
+      PB.inj(BucketField(prefix.embed, HoleF[T], field))))
   }
 
   def pathToProj(path: pathy.Path[_, _, _]): TargetT =
@@ -525,7 +525,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           EmptyAnn[T],
           QC.inj(Map(
             RootTarget.embed,
-            Free.roll[MapFunc[T, ?], Unit](Nullary[T, FreeMap[T]](d)))))))
+            Free.roll[MapFunc[T, ?], Hole](Nullary[T, FreeMap[T]](d)))))))
 
     case LogicalPlan.FreeF(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[TargetT]
@@ -541,7 +541,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       val Ann(buckets, value) = a1.project.ask
       val (buck, newBuckets) = concatBuckets(buckets)
       val (mf, bucketAccess, valAccess) =
-        concat[T, Unit](buck, Free.roll(MapFunc.translateUnaryMapping(func)(UnitF[T])))
+        concat[T, Hole](buck, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))
 
       EnvT((
         Ann(newBuckets.map(_ >> bucketAccess), valAccess),
@@ -550,13 +550,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         PB.inj(BucketField(EnvT((EmptyAnn[T], src)).embed, lval, rval)))).right
 
     case LogicalPlan.InvokeFUnapply(structural.ArrayProject, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         PB.inj(BucketIndex(EnvT((EmptyAnn[T], src)).embed, lval, rval)))).right
 
     case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
@@ -566,17 +566,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3))
         if func.effect ≟ Mapping =>
       merge3Map(Func.Input3(a1, a2, a3))(MapFunc.translateTernaryMapping(func)).right[PlannerError]
-
-    // TODO this should be a binary reduction
-    case LogicalPlan.InvokeFUnapply(structural.UnshiftMap, Sized(a1)) =>
-      val Ann(provs, reduce) = a1.project.ask
-      provs.headOption.fold(a1.project.right) { head =>
-        EnvT[Ann[T], F, T[Target]]((
-          Ann[T](provs.drop(1), UnitF[T]),
-          QC.inj(Map(
-            EnvT((EmptyAnn[T], a1.project.lower)).embed,
-            Free.roll(MakeMap(UnitF[T], head)))))).right
-      }
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>
@@ -588,10 +577,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      val left: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), lval))
-      val right: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), rval))
+      val left: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), lval))
+      val right: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), rval))
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         QC.inj(Take(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
@@ -599,10 +588,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
-      val left: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), lval))
-      val right: F[Free[F, Unit]] = QC.inj(Map[T, Free[F, Unit]](Free.point[F, Unit](()), rval))
+      val left: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), lval))
+      val right: F[Free[F, Hole]] = QC.inj(Map[T, Free[F, Hole]](Free.point[F, Hole](SrcHole), rval))
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         QC.inj(Drop(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
@@ -612,18 +601,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
       // The ana over the freeIso converts from Free to T[CoEnv]. It’s the first step of freeTransCata.
-      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Unit, MapFunc[T, ?]].reverseGet).project match {
-        case ConcatArraysN(as) => as.map(_.cata(CoEnv.freeIso[Unit, MapFunc[T, ?]].get))
-        case mf => List(mf.embed.cata(CoEnv.freeIso[Unit, MapFunc[T, ?]].get))
+      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
+        case StaticArray(as) => as.map(_.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
+        case mf => List(mf.embed.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] =
-          directions.ana(CoEnv.freeIso[Unit, MapFunc[T, ?]].reverseGet).project match {
-            case ConcatArraysN(as) => as.traverse { a =>
-              StrLit.unapply(a.cata(CoEnv.freeIso[Unit, MapFunc[T, ?]].get))
-            } \/> InternalError("unsupported ordering type")
-            //case StrLit(str) => List(str).right // FIXME catch this case too
+          directions.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
+            case StaticArray(as) => {
+              as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
+            }
+            case StrLit(str) => List(str).right
             case _ => InternalError("unsupported ordering function").left
           }
         orderStrs.flatMap {
@@ -640,7 +629,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
       lists.map(pairs =>
         EnvT((
-          Ann[T](bucketsSrc, UnitF[T]),
+          Ann[T](bucketsSrc, HoleF[T]),
           QC.inj(Sort(
             EnvT((EmptyAnn[T], src)).embed,
             ordering,
@@ -649,7 +638,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.Filter, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
       EnvT((
-        Ann[T](buckets, UnitF[T]),
+        Ann[T](buckets, HoleF[T]),
         QC.inj(Map(
           EnvT((
             EmptyAnn[T],
@@ -686,11 +675,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           prov.unionProvenances(
             someAnn(lfree.resume, src).provenance,
             someAnn(rfree.resume, src).provenance),
-          UnitF,
-          UnitF)
+          HoleF,
+          HoleF)
       })
 
-      EnvT((Ann(buckets, UnitF), qs)).right
+      EnvT((Ann(buckets, HoleF), qs)).right
 
     case LogicalPlan.InvokeFUnapply(set.Intersect, Sized(a1, a2)) =>
       val (src, lMap, rMap, left, right) = merge(a1, a2)
@@ -732,9 +721,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
 
   // TODO: These optimizations should give rise to various property tests:
-  //       • elideNopMap ⇒ no `Map(???, UnitF)`
+  //       • elideNopMap ⇒ no `Map(???, HoleF)`
   //       • normalize ⇒ a whole bunch, based on MapFuncs
-  //       • elideNopJoin ⇒ no `ThetaJoin(???, UnitF, UnitF, LeftSide === RightSide, ???, ???)`
+  //       • elideNopJoin ⇒ no `ThetaJoin(???, HoleF, HoleF, LeftSide === RightSide, ???, ???)`
   //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
   //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
 
@@ -747,13 +736,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
 
   def elideNopMap[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[F]] => F[T[F]] = {
-    case Map(src, mf) if mf ≟ UnitF => src.project
+    case Map(src, mf) if mf ≟ HoleF => src.project
     case x                          => QC.inj(x)
   }
 
   def elideNopMapCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] = {
-    case Map(src, mf) if mf ≟ UnitF => src.project
+    case Map(src, mf) if mf ≟ HoleF => src.project
     case x                          => CoEnv(QC.inj(x).right)
   }
 
@@ -765,30 +754,30 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     new (ThetaJoin[T, ?] ~> F) {
       def apply[A](tj: ThetaJoin[T, A]) = tj match {
         case ThetaJoin(src, l, r, on, Inner, combine)
-            if l ≟ Free.point(()) && r ≟ Free.point(()) && on ≟ equiJF =>
-          QC.inj(Map(src, combine.void))
+            if l ≟ Free.point(SrcHole) && r ≟ Free.point(SrcHole) && on ≟ equiJF =>
+          QC.inj(Map(src, combine.map(_ => SrcHole: Hole)))
         case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
           (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
             case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
-              case (Some(Map(\/-(()), mf1)), Some(Map(\/-(()), mf2))) =>
+              case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
                 QC.inj(Map(src, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => mf2
                 }))
               case (_, _) => TJ.inj(x)
             }
-            case (-\/(m1), \/-(())) => (FI.prj(m1) >>= QC.prj) match {
-              case Some(Map(\/-(()), mf1)) =>
+            case (-\/(m1), \/-(SrcHole)) => (FI.prj(m1) >>= QC.prj) match {
+              case Some(Map(\/-(SrcHole), mf1)) =>
                 QC.inj(Map(src, combine >>= {
                   case LeftSide  => mf1
-                  case RightSide => UnitF
+                  case RightSide => HoleF
                 }))
               case _ => TJ.inj(x)
             }
-            case (\/-(()), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
-              case Some(Map(\/-(()), mf2)) =>
+            case (\/-(SrcHole), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
+              case Some(Map(\/-(SrcHole), mf2)) =>
                 QC.inj(Map(src, combine >>= {
-                  case LeftSide  => UnitF
+                  case LeftSide  => HoleF
                   case RightSide => mf2
                 }))
               case _ => TJ.inj(x)
@@ -841,6 +830,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
         tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc[T]))(tj)))
     case x => QC.inj(x)
   }
+
+  //def removeReductionProvenance[F[_]: Functor, A](
+  //  implicit QC: QScriptCore[T, ?] :<: F):
+  //    QScriptCore[T, T[CoEnv[A, F, ?]]] => F[T[F]] = {
+  //  case x @ Map(Reduce(src, bucket, reducers, _), Embed(CoEnv(ProjectIndex(SrcHole, IntLit(i))))) =>
+  //    Reduce(src, bucket, Sized(reducers(i)), MakeArray(Fin(i)))
+  //  case x => QC.inj(x)
+  //}
 
   // The order of optimizations is roughly this:
   // - elide NOPs

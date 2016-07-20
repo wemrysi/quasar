@@ -71,8 +71,8 @@ class Provenance[T[_[_]]: Corecursive] {
       List[FreeMap[T]] =
     leftBuckets.alignWith(rightBuckets) {
       case \&/.Both(l, r) => union(l, r)
-      case \&/.This(l)    => union(l, NullLit[T, Unit]())
-      case \&/.That(r)    => union(NullLit[T, Unit](), r)
+      case \&/.This(l)    => union(l, NullLit[T, Hole]())
+      case \&/.That(r)    => union(NullLit[T, Hole](), r)
     }
 
   def nestProvenances(buckets: List[FreeMap[T]]): List[FreeMap[T]] =

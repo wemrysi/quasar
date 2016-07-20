@@ -71,7 +71,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "convert a simple read" in {
       QueryFile.convertToQScript(lpRead("/foo")).toOption must
       equal(
-        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
     }
 
     "convert a squashed read" in {
@@ -79,7 +79,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       QueryFile.convertToQScript(
         identity.Squash(lpRead("/foo"))).toOption must
       equal(
-        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
     }
 
     "convert a simple read with path projects" in {
@@ -91,7 +91,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             ProjectFieldR(
               ProjectFieldR(
                 ProjectFieldR(
-                  UnitF,
+                  HoleF,
                   StrLit("some")),
                 StrLit("foo")),
               StrLit("bar")))).embed.some)
@@ -104,8 +104,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         QC.inj(
           Map(RootR,
             Free.roll(Add(
-              ProjectFieldR(UnitF, StrLit("foo")),
-              ProjectFieldR(UnitF, StrLit("bar")))))).embed.some)
+              ProjectFieldR(HoleF, StrLit("foo")),
+              ProjectFieldR(HoleF, StrLit("bar")))))).embed.some)
     }
 
     "convert project object and make object" in {
@@ -120,7 +120,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           Map(RootR,
             Free.roll(MakeMap(StrLit("name"),
               Free.roll(ProjectField(
-                Free.roll(ProjectField(UnitF, StrLit("city"))),
+                Free.roll(ProjectField(HoleF, StrLit("city"))),
                 StrLit("name"))))))).embed.some)
     }
 
@@ -130,7 +130,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert a basic reduction wrapped in an object" in {
+    "convert a basic reduction wrapped in an object" in skipped {
       // "select sum(height) from person"
       QueryFile.convertToQScript(
         makeObj(
@@ -139,7 +139,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert a flatten array" in {
+    "convert a flatten array" in skipped {
       // "select loc[:*] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -149,7 +149,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert a constant shift array" in {
+    "convert a constant shift array" in skipped {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
@@ -163,7 +163,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert a shift/unshift array" in {
+    "convert a shift/unshift array" in skipped {
       // "select [loc[_:] * 10 ...] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -177,7 +177,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
-    "convert" in {
+    "convert" in skipped {
       // "select * from person, car",
       QueryFile.convertToQScript(
         LogicalPlan.Let('__tmp0,
@@ -189,7 +189,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert basic join with explicit join condition" in {
+    "convert basic join with explicit join condition" in skipped {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val lp = LP.Let('__tmp0, lpRead("/foo"),
@@ -209,7 +209,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
       QueryFile.convertToQScript(lp).toOption must equal(
-        QC.inj(Map(RootR, ProjectFieldR(UnitF, StrLit("foo")))).embed.some)
+        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
     }
   }
 }

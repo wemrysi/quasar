@@ -103,8 +103,8 @@ object SourcedPathable {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Unit],
-        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Hole],
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Hole]) =
         // TODO: Merge two LeftShifts with different repair functions
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
@@ -121,8 +121,8 @@ object SourcedPathable {
           case Union(src, l, r) =>
             Union(
               src,
-              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])),
-              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Unit])))
+              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
+              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])))
         }
       }
     }

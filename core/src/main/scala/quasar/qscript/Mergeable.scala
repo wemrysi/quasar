@@ -27,8 +27,8 @@ import scalaz._, Scalaz._
 @typeclass trait Mergeable[F[_]] {
   type IT[F[_]]
 
-  def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: EnvT[Ann[IT], F, Unit], a2: EnvT[Ann[IT], F, Unit]):
-      Option[SrcMerge[EnvT[Ann[IT], F, Unit], FreeMap[IT]]]
+  def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: EnvT[Ann[IT], F, Hole], a2: EnvT[Ann[IT], F, Hole]):
+      Option[SrcMerge[EnvT[Ann[IT], F, Hole], FreeMap[IT]]]
 }
 
 object Mergeable {
@@ -44,9 +44,9 @@ object Mergeable {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], Const[DeadEnd, ?], Unit],
-        p2: EnvT[Ann[T], Const[DeadEnd, ?], Unit]) =
-        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[DeadEnd, ?], Unit], FreeMap[IT]](p1, left, right))
+        p1: EnvT[Ann[T], Const[DeadEnd, ?], Hole],
+        p2: EnvT[Ann[T], Const[DeadEnd, ?], Hole]) =
+        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[DeadEnd, ?], Hole], FreeMap[IT]](p1, left, right))
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](
@@ -59,8 +59,8 @@ object Mergeable {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        cp1: EnvT[Ann[IT], Coproduct[F, G, ?], Unit],
-        cp2: EnvT[Ann[IT], Coproduct[F, G, ?], Unit]) =
+        cp1: EnvT[Ann[IT], Coproduct[F, G, ?], Hole],
+        cp2: EnvT[Ann[IT], Coproduct[F, G, ?], Hole]) =
         (cp1.lower.run, cp2.lower.run) match {
           case (-\/(left1), -\/(left2)) =>
             F.mergeSrcs(left, right, EnvT((cp1.ask, left1)), EnvT((cp2.ask, left2))).map {
