@@ -1,4 +1,0 @@
--Xmx4096m
--Xss4m
--XX:MaxPermSize=1024M
--XX:ReservedCodeCacheSize=512m

@@ -13,8 +13,6 @@ lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
 
 lazy val blueeyes = (
   project.setup deps (
-
-    "org.slamdata"       % "jdbm"              %    "3.0.0",
     "org.joda"           % "joda-convert"      %    "1.8.1",
     "joda-time"          % "joda-time"         %    "2.9.4",
     "com.chuusai"       %% "shapeless"         %    "2.3.1",
