@@ -29,9 +29,6 @@ import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Versioned._
 
-import com.google.common.base.Charsets
-import com.google.common.hash.Hashing
-
 import org.joda.time.format.ISODateTimeFormat
 
 import scalaz.Validation
@@ -74,10 +71,6 @@ object Account {
     val saltBytes = new Array[Byte](256)
     randomSource.nextBytes(saltBytes)
     saltBytes.flatMap(byte => Integer.toHexString(0xFF & byte))(collection.breakOut): String
-  }
-
-  def saltAndHashSHA256(password: String, salt: String): String = {
-    Hashing.sha256().hashString(password + salt, Charsets.UTF_8).toString
   }
 
   def newAccountPermissions(accountId: AccountId, accountPath: Path): Set[Permission] = {

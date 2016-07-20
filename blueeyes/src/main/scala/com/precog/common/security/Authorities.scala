@@ -19,9 +19,6 @@
  */
 package com.precog.common.security
 
-import com.google.common.base.Charsets
-import com.google.common.hash.Hashing
-
 import com.precog.common.accounts.AccountId
 
 import blueeyes.json._

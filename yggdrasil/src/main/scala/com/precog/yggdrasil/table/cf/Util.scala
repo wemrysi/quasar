@@ -25,8 +25,6 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util.{ BitSet, BitSetUtil, Loop }
 
-import com.precog.util.DateTimeUtil._
-
 object util {
 
   /**
@@ -203,16 +201,6 @@ object util {
     case (c: NumColumn) =>
       new Map1Column(c) with DoubleColumn {
         def apply(row: Int) = c(row).toDouble
-      }
-  }
-
-  def CoerceToDate = CF1P("builtin:ct:coerceToDate") {
-    case (c: DateColumn) => c
-
-    case (c: StrColumn) =>
-      new DateColumn {
-        def isDefinedAt(row: Int) = c.isDefinedAt(row) && isValidISO(c(row))
-        def apply(row: Int)       = parseDateTime(c(row), true)
       }
   }
 

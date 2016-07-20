@@ -250,7 +250,6 @@ trait StdLibModule[M[+ _]]
     extends InfixLibModule[M]
     with UnaryLibModule[M]
     with ArrayLibModule[M]
-    with TimeLibModule[M]
     with MathLibModule[M]
     with TypeLibModule[M]
     with StringLibModule[M]
@@ -259,8 +258,6 @@ trait StdLibModule[M[+ _]]
     with NormalizationLibModule[M]
     with ClusteringLibModule[M]
     with RandomForestLibModule[M]
-    // with LogisticRegressionLibModule[M]
-    // with LinearRegressionLibModule[M]
     with FSLibModule[M]
     with RandomLibModule[M] {
   type Lib <: StdLib
@@ -269,7 +266,6 @@ trait StdLibModule[M[+ _]]
       extends InfixLib
       with UnaryLib
       with ArrayLib
-      with TimeLib
       with MathLib
       with TypeLib
       with StringLib
@@ -278,11 +274,8 @@ trait StdLibModule[M[+ _]]
       with NormalizationLib
       with ClusteringLib
       with RandomForestLib
-      // with LogisticRegressionLib
-      // with LinearRegressionLib
       with FSLib
       with RandomLib
-      // with PrecogLib
 }
 
 object StdLib {

@@ -37,9 +37,11 @@ package object blueeyes extends blueeyesstubs.Platform {
   type SpireOrder[A]        = spire.algebra.Order[A]
 
   // joda
-  type DateTime = org.joda.time.DateTime
-  type Instant  = org.joda.time.Instant
-  type Period   = org.joda.time.Period
+  type DateTime      = org.joda.time.DateTime
+  type Instant       = org.joda.time.Instant
+  type Period        = org.joda.time.Period
+
+  type LocalDateTime = java.time.LocalDateTime
 
   // shapeless
   val Iso        = shapeless.Generic
@@ -65,6 +67,8 @@ package object blueeyes extends blueeyesstubs.Platform {
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
   type ->[+A, +B] = (A, B)
+
+  def localDateTime(s: String): LocalDateTime = java.time.LocalDateTime parse s
 }
 
 package blueeyes {

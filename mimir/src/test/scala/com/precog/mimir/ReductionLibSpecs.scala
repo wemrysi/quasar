@@ -59,10 +59,6 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   val line = Line(1, 1, "")
 
-  def parseDateTimeFuzzy(time: String) =
-    Operate(BuiltInFunction1Op(ParseDateTimeFuzzy),
-      dag.AbsoluteLoad(Const(CString(time))(line))(line))(line)
-
   "reduce homogeneous sets" >> {
     "singleton count" >> {
       val input = dag.Reduce(Count, Const(CString("alpha"))(line))(line)
@@ -131,36 +127,6 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         dag.AbsoluteLoad(Const(CString("/hom/numbersHet"))(line))(line))(line)
 
       determineResult(input, -500000)
-    }
-
-    "maxTime" >> {
-      val input = dag.Reduce(MaxTime,
-        parseDateTimeFuzzy("/hom/iso8601"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
-    }
-
-    "minTime" >> {
-      val input = dag.Reduce(MinTime,
-        parseDateTimeFuzzy("/hom/iso8601"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2010-04-29T09:37:52.599+08:00")
     }
 
     "standard deviation" >> {
@@ -275,36 +241,6 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       determineResult(input, 1)
     }
 
-    "maxTime" >> {
-      val input = dag.Reduce(MaxTime,
-        parseDateTimeFuzzy("/het/iso8601"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
-    }
-
-    "minTime" >> {
-      val input = dag.Reduce(MinTime,
-        parseDateTimeFuzzy("/het/iso8601"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2010-04-29T09:37:52.599+08:00")
-    }
-
     "standard deviation" >> {
       val input = dag.Reduce(StdDev,
         dag.AbsoluteLoad(Const(CString("/het/numbers"))(line))(line))(line)
@@ -370,36 +306,6 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       determineResult(input, -3)
     }
 
-    "maxTime" >> {
-      val input = dag.Reduce(MaxTime,
-        parseDateTimeFuzzy("/hom/iso8601AcrossSlices"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2012-12-28T22:38:19.430+06:00")
-    }
-
-    "minTime" >> {
-      val input = dag.Reduce(MinTime,
-        parseDateTimeFuzzy("/hom/iso8601AcrossSlices"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2007-02-04T10:58:14.041-01:00")
-    }
-
     "standard deviation" >> {
       val input = dag.Reduce(StdDev,
         dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices"))(line))(line))(line)
@@ -463,36 +369,6 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))(line))(line))(line)
 
       determineResult(input, -14)
-    }
-
-    "maxTime" >> {
-      val input = dag.Reduce(MaxTime,
-        parseDateTimeFuzzy("/het/iso8601AcrossSlices"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2012-05-05T08:58:10.171+10:00")
-    }
-
-    "minTime" >> {
-      val input = dag.Reduce(MinTime,
-        parseDateTimeFuzzy("/het/iso8601AcrossSlices"))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(1)
-
-      val result2 = result collect {
-        case (ids, SString(d)) if ids.length == 0 => d
-      }
-
-      result2.toSet must_== Set("2007-07-14T03:49:30.311-07:00")
     }
 
     "standard deviation" >> {
