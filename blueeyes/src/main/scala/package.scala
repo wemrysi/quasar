@@ -29,17 +29,20 @@ package object blueeyes {
   type IOException          = java.io.IOException
   type InputStream          = java.io.InputStream
   type InputStreamReader    = java.io.InputStreamReader
-  type LocalDateTime        = java.time.LocalDateTime
+  type jLocalDateTime       = java.time.LocalDateTime
   type OutputStream         = java.io.OutputStream
   type OutputStreamWriter   = java.io.OutputStreamWriter
   type PrintStream          = java.io.PrintStream
+  type jDuration            = java.time.Duration
 
   // other outside libs: scalaz, spire, shapeless, joda
   type DateTime       = org.joda.time.DateTime
   type Future[+A]     = scalaz.concurrent.Future[A]
   type Instant        = org.joda.time.Instant
+  type jInstant       = java.time.Instant
   type Iso[T, L]      = shapeless.Generic.Aux[T, L]
   type Period         = org.joda.time.Period
+  type jPeriod        = java.time.Period
   type ScalazOrder[A] = scalaz.Order[A]
   type ScalazOrdering = scalaz.Ordering
   type SpireOrder[A]  = spire.algebra.Order[A]
@@ -70,8 +73,18 @@ package object blueeyes {
   @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
     scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  def localDateTime(s: String): LocalDateTime          = java.time.LocalDateTime parse s
   def futureMonad(ec: ExecutionContext): Monad[Future] = implicitly
+
+  implicit class jInstantOps(private val x: jInstant) {
+    def -(y: jInstant): jDuration = java.time.Duration.between(x, y)
+  }
+  implicit class jPeriodOps(private val x: jPeriod) {
+    def toDuration: jDuration = java.time.Duration from x
+  }
+  implicit class jLocalDateTimeOps(private val x: jLocalDateTime) {
+    import java.time.temporal.ChronoField._
+    def millis: Long = x getLong MILLI_OF_SECOND
+  }
 
   implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
@@ -97,6 +110,16 @@ package object blueeyes {
 }
 
 package blueeyes {
+  object instant {
+    def now(): jInstant                = java.time.Instant.now
+    def fromMillis(ms: Long): jInstant = java.time.Instant.ofEpochMilli(ms)
+  }
+  object localDate {
+    def now(): jLocalDateTime                = java.time.LocalDateTime.now
+    def fromMillis(ms: Long): jLocalDateTime = java.time.LocalDateTime.ofEpochSecond(ms / 1000, (ms % 1000).toInt * 1000000, java.time.ZoneOffset.UTC)
+    def apply(s: String): jLocalDateTime     = java.time.LocalDateTime parse s
+  }
+
   /**
     * This object contains some methods to do faster iteration over primitives.
     *
