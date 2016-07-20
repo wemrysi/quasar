@@ -71,9 +71,10 @@ object Mounter {
       def apply[A](ma: Mounting[A]) = ma match {
         case LookupType(path) =>
           mountConfigs.get(path).map {
-            case ViewConfig(_, _) => ViewType.left
-            case FileSystemConfig(tpe, _) => tpe.right
+            case ViewConfig(_, _)         => MountType.viewMount()
+            case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
           }.run
+
         case Lookup(path) =>
           mountConfigs.get(path).run
 

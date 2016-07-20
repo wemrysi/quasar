@@ -66,7 +66,7 @@ object metadata {
 
     def mkNode(parent: ADir, name: PathSegment): Q.M[FsNode] =
       M.lookupType(parent </> name.fold(dir1, file1)).run
-        .map(mntType => FsNode(name, mntType.map(_.fold(κ("view"), _.value))))
+        .map(mntType => FsNode(name, mntType.map(_.fold(_.value, "view"))))
         .liftM[FileSystemErrT]
 
     def dirMetadata(d: ADir): Free[S, QResponse[S]] = respond(

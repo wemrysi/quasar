@@ -33,10 +33,8 @@ sealed trait Mounting[A]
 
 object Mounting {
 
-  final case object ViewType
-
   final case class LookupType(path: APath)
-    extends Mounting[Option[ViewType.type \/ FileSystemType]]
+    extends Mounting[Option[MountType]]
 
   final case class Lookup(path: APath)
     extends Mounting[Option[MountConfig]]
@@ -70,7 +68,7 @@ object Mounting {
 
     type M[A] = EitherT[F, MountingError, A]
 
-    def lookupType(path: APath): OptionT[F, ViewType.type \/ FileSystemType] =
+    def lookupType(path: APath): OptionT[F, MountType] =
       OptionT(lift(LookupType(path)))
 
     /** Returns the mount configuration for the given mount path or nothing
