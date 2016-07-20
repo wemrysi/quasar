@@ -124,7 +124,34 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 StrLit("name"))))))).embed.some)
     }
 
-    "convert a shift array" in {
+    "convert a basic reduction" in {
+      QueryFile.convertToQScript(
+        agg.Sum[FLP](lpRead("/person"))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    "convert a basic reduction wrapped in an object" in {
+      // "select sum(height) from person"
+      QueryFile.convertToQScript(
+        makeObj(
+          "0" ->
+            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LogicalPlan.Constant(Data.Str("height")))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    "convert a flatten array" in {
+      // "select loc[:*] from zips",
+      QueryFile.convertToQScript(
+        makeObj(
+          "loc" ->
+            structural.FlattenArray[FLP](
+              structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    "convert a constant shift array" in {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
@@ -136,7 +163,33 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert basic join" in {  // TODO normalization
+    "convert a shift/unshift array" in {
+      // "select [loc[_:] * 10 ...] from zips",
+      QueryFile.convertToQScript(
+        makeObj(
+          "0" ->
+            structural.UnshiftArray[FLP](
+              math.Multiply[FLP](
+                structural.ShiftArrayIndices[FLP](
+                  structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))),
+                LogicalPlan.Constant(Data.Int(10)))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    // an example of how logical plan expects magical "left" and "right" fields to exist
+    "convert" in {
+      // "select * from person, car",
+      QueryFile.convertToQScript(
+        LogicalPlan.Let('__tmp0,
+          set.InnerJoin(lpRead("/person"), lpRead("/car"), LogicalPlan.Constant(Data.Bool(true))),
+          identity.Squash[FLP](
+            structural.ObjectConcat[FLP](
+              structural.ObjectProject(LogicalPlan.Free('__tmp0), LogicalPlan.Constant(Data.Str("left"))),
+              structural.ObjectProject(LogicalPlan.Free('__tmp0), LogicalPlan.Constant(Data.Str("right"))))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
+    }
+
+    "convert basic join with explicit join condition" in {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val lp = LP.Let('__tmp0, lpRead("/foo"),

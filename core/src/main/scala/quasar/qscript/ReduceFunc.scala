@@ -30,37 +30,43 @@ object ReduceFunc {
   implicit val equal: Delay[Equal, ReduceFunc] =
     new Delay[Equal, ReduceFunc] {
       def apply[A](eq: Equal[A]) = Equal.equal {
-        case (Count(a),     Count(b))     => eq.equal(a, b)
-        case (Sum(a),       Sum(b))       => eq.equal(a, b)
-        case (Min(a),       Min(b))       => eq.equal(a, b)
-        case (Max(a),       Max(b))       => eq.equal(a, b)
-        case (Avg(a),       Avg(b))       => eq.equal(a, b)
-        case (Arbitrary(a), Arbitrary(b)) => eq.equal(a, b)
-        case (_,            _)            => false
+        case (Count(a),        Count(b))        => eq.equal(a, b)
+        case (Sum(a),          Sum(b))          => eq.equal(a, b)
+        case (Min(a),          Min(b))          => eq.equal(a, b)
+        case (Max(a),          Max(b))          => eq.equal(a, b)
+        case (Avg(a),          Avg(b))          => eq.equal(a, b)
+        case (Arbitrary(a),    Arbitrary(b))    => eq.equal(a, b)
+        case (UnshiftMap(a),   UnshiftMap(b))   => eq.equal(a, b)
+        case (UnshiftArray(a), UnshiftArray(b)) => eq.equal(a, b)
+        case (_,               _)               => false
       }
     }
 
   implicit val show: Delay[Show, ReduceFunc] =
     new Delay[Show, ReduceFunc] {
       def apply[A](show: Show[A]) = Show.show {
-        case Count(a)     => Cord("Count(") ++ show.show(a) ++ Cord(")")
-        case Sum(a)       => Cord("Sum(") ++ show.show(a) ++ Cord(")")
-        case Min(a)       => Cord("Min(") ++ show.show(a) ++ Cord(")")
-        case Max(a)       => Cord("Max(") ++ show.show(a) ++ Cord(")")
-        case Avg(a)       => Cord("Avg(") ++ show.show(a) ++ Cord(")")
-        case Arbitrary(a) => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
+        case Count(a)        => Cord("Count(") ++ show.show(a) ++ Cord(")")
+        case Sum(a)          => Cord("Sum(") ++ show.show(a) ++ Cord(")")
+        case Min(a)          => Cord("Min(") ++ show.show(a) ++ Cord(")")
+        case Max(a)          => Cord("Max(") ++ show.show(a) ++ Cord(")")
+        case Avg(a)          => Cord("Avg(") ++ show.show(a) ++ Cord(")")
+        case Arbitrary(a)    => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
+        case UnshiftMap(a)   => Cord("UnshiftMap(") ++ show.show(a) ++ Cord(")")
+        case UnshiftArray(a) => Cord("UnshiftArray(") ++ show.show(a) ++ Cord(")")
       }
     }
 
   implicit val traverse: Traverse[ReduceFunc] = new Traverse[ReduceFunc] {
     def traverseImpl[G[_]: Applicative, A, B](fa: ReduceFunc[A])(f: (A) ⇒ G[B]) =
       fa match {
-        case Count(a) => f(a) ∘ (Count(_))
-        case Sum(a) => f(a) ∘ (Sum(_))
-        case Min(a) => f(a) ∘ (Min(_))
-        case Max(a) => f(a) ∘ (Max(_))
-        case Avg(a) => f(a) ∘ (Avg(_))
-        case Arbitrary(a) => f(a) ∘ (Arbitrary(_))
+        case Count(a)        => f(a) ∘ (Count(_))
+        case Sum(a)          => f(a) ∘ (Sum(_))
+        case Min(a)          => f(a) ∘ (Min(_))
+        case Max(a)          => f(a) ∘ (Max(_))
+        case Avg(a)          => f(a) ∘ (Avg(_))
+        case Arbitrary(a)    => f(a) ∘ (Arbitrary(_))
+        case UnshiftMap(a)   => f(a) ∘ (UnshiftMap(_))
+        case UnshiftArray(a) => f(a) ∘ (UnshiftArray(_))
       }
   }
 
@@ -71,15 +77,19 @@ object ReduceFunc {
     case agg.Max       => Max(_)
     case agg.Avg       => Avg(_)
     case agg.Arbitrary => Arbitrary(_)
+    case structural.UnshiftMap   => UnshiftMap(_)
+    case structural.UnshiftArray => UnshiftArray(_)
   }
 }
 
 // TODO we should statically verify that these have a `DimensionalEffect` of `Reduction`
 object ReduceFuncs {
-  final case class Count[A](a: A)     extends ReduceFunc[A]
-  final case class Sum[A](a: A)       extends ReduceFunc[A]
-  final case class Min[A](a: A)       extends ReduceFunc[A]
-  final case class Max[A](a: A)       extends ReduceFunc[A]
-  final case class Avg[A](a: A)       extends ReduceFunc[A]
-  final case class Arbitrary[A](a: A) extends ReduceFunc[A]
+  final case class Count[A](a: A)        extends ReduceFunc[A]
+  final case class Sum[A](a: A)          extends ReduceFunc[A]
+  final case class Min[A](a: A)          extends ReduceFunc[A]
+  final case class Max[A](a: A)          extends ReduceFunc[A]
+  final case class Avg[A](a: A)          extends ReduceFunc[A]
+  final case class Arbitrary[A](a: A)    extends ReduceFunc[A]
+  final case class UnshiftMap[A](a: A)   extends ReduceFunc[A]
+  final case class UnshiftArray[A](a: A) extends ReduceFunc[A]
 }
