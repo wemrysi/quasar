@@ -10,16 +10,6 @@ package object yggdrasil {
   // only usage of commons-primitives
   type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
 
-  // renamed from howl
-  type HConfiguration  = org.objectweb.howl.log.Configuration
-  type HLogger         = org.objectweb.howl.log.Logger
-  type HReplayListener = org.objectweb.howl.log.ReplayListener
-  type HLogRecord      = org.objectweb.howl.log.LogRecord
-  type HLogException   = org.objectweb.howl.log.LogException
-
-  val HLogEnd  = org.objectweb.howl.log.LogRecordType.END_OF_LOG
-  val HLogUser = org.objectweb.howl.log.LogRecordType.USER
-
   type Identity   = Long
   type Identities = Array[Identity]
   object Identities {
