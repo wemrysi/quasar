@@ -54,7 +54,7 @@ object EventMessage {
   }
 }
 
-case class EventId(producerId: ProducerId, sequenceId: SequenceId) {
+case class EventId(producerId: Int, sequenceId: Int) { /** ProducerId and SequenceId used to be aliases to Int */
   val uid = (producerId.toLong << 32) | (sequenceId.toLong & 0xFFFFFFFFL)
 }
 
