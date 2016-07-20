@@ -1,12 +1,12 @@
 import precog.PlatformBuild._
 
-def scalazVersion = "7.2.3"
+def scalazVersion = "7.2.4"
 
-lazy val root = project.setup.root.noArtifacts aggregate (blueeyes, yggdrasil, mimir) dependsOn (yggdrasil % BothScopes) also (
+lazy val root = project.setup.root.noArtifacts aggregate (blueeyes, yggdrasil) dependsOn (yggdrasil % BothScopes) also (
   initialCommands in console := "import blueeyes._, json._"
 )
 
-/** This used to be the evaluator project.
+/** mimir used to be the evaluator project.
  */
 lazy val mimir     = project.setup.noArtifacts dependsOn yggdrasil % BothScopes
 lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
