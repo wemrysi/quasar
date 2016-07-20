@@ -358,12 +358,6 @@ object Column {
       } else if (col.isDefinedAt(j)) -1
       else 0
     }
-
-    // def eqv(i: Int, j: Int): Boolean = {
-    //   if (col.isDefinedAt(i)) {
-    //     if (col.isDefinedAt(j)) col.rowEq(i, j) else false
-    //   } else !col.isDefinedAt(j)
-    // }
   }
   @inline def const(cv: CValue): Column = cv match {
     case CBoolean(v)                         => const(v)

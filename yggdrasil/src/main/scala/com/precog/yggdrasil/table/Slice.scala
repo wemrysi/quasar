@@ -718,16 +718,6 @@ trait Slice { source =>
               }
               0
             }
-
-            // def eqv(i: Int, j: Int): Boolean = {
-            //   var k = 0
-            //   while (k < cols.length) {
-            //     if (!cols(k).eqv(i, j))
-            //       return false
-            //     k += 1
-            //   }
-            //   true
-            // }
           }
 
         case Right(cols) =>

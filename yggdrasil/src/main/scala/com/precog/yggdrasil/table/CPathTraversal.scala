@@ -157,8 +157,6 @@ sealed trait CPathTraversal { self =>
       def compare(row1: Int, row2: Int) = {
         pathComp.compare(row1, row2, indices).toInt
       }
-
-      // def eqv(row1: Int, row2: Int) = compare(row1, row2) == 0
     }
   }
 

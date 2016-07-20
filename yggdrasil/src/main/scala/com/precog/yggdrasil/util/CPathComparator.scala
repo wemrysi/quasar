@@ -60,7 +60,10 @@ trait CPathComparator { self =>
 
 object CPathComparator {
   import MaybeOrdering._
-  import ExtraOrders._
+
+  implicit object DateTimeOrder extends SpireOrder[DateTime] {
+    def compare(a: DateTime, b: DateTime) = a compareTo b
+  }
 
   def apply[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
     new CPathComparator {
