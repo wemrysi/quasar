@@ -52,7 +52,6 @@ package object blueeyes {
 
   // Temporary
   type BitSet             = com.precog.util.BitSet
-  // val BitSet              = com.precog.util.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = com.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
@@ -156,10 +155,8 @@ package blueeyes {
   object yggConfig {
     val idSource = new FreshAtomicIdSource
 
-    def hashJoins = true
-
+    def hashJoins         = true
     def sortBufferSize    = 1000
-
     def maxSliceSize: Int = 10
 
     // This is a slice size that we'd like our slices to be at least as large as.

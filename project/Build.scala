@@ -54,6 +54,7 @@ object PlatformBuild {
     def setup: Project = (
       also(
                organization :=  "com.precog",
+            // conflictManager :=  ConflictManager.strict,
                     version :=  "2.6.1-SNAPSHOT",
               scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
                scalaVersion :=  "2.11.8",

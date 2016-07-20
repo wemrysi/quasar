@@ -1,6 +1,7 @@
 import precog.PlatformBuild._
 
 def scalazVersion = "7.2.4"
+def specsVersion  = "3.7"
 
 lazy val root = project.setup.root.noArtifacts aggregate (mimir, blueeyes, yggdrasil) dependsOn (mimir, yggdrasil, blueeyes) also (
   initialCommands in console := "import blueeyes._, json._"
@@ -20,9 +21,10 @@ lazy val blueeyes = (
     "org.spire-math"    %% "spire"             %    "0.7.4",
     "org.scalaz"        %% "scalaz-effect"     % scalazVersion,
     "org.scalaz"        %% "scalaz-concurrent" % scalazVersion,
-    "org.scalaz.stream" %% "scalaz-stream"     %    "0.8.1a"    % Test,
-    "org.specs2"        %% "specs2-scalacheck" %     "3.7"      % Test,
-    "org.specs2"        %% "specs2-core"       %     "3.7"      % Test
+    "org.scalacheck"    %% "scalacheck"        %    "1.12.5"    % Test,
+    "org.scalaz.stream" %% "scalaz-stream"     %    "0.8.3a"    % Test,
+    "org.specs2"        %% "specs2-scalacheck" %  specsVersion  % Test,
+    "org.specs2"        %% "specs2-core"       %  specsVersion  % Test
   )
 )
 

@@ -28,6 +28,13 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
   }
 
   "Functor composition" in {
+    // Works in scalacheck 1.12.5
+    // Fails in ScalaCheck 1.13.0
+    //
+    // [error] /l/w/platform/blueeyes/src/test/scala/blueeyes/json/JsonASTTest.scala:33: could not find implicit value for parameter arbitrary2: org.scalacheck.Arbitrary[blueeyes.json.JValue => blueeyes.json.JValue]
+    // [error]     prop(compositionProp)
+    // [error]         ^
+    // [error] one error found
     val compositionProp = (json: JValue, fa: JValue => JValue, fb: JValue => JValue) => json.mapUp(fb).mapUp(fa) == json.mapUp(fa compose fb)
 
     prop(compositionProp)
