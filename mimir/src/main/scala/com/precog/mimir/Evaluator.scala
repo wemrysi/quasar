@@ -345,6 +345,7 @@ trait EvaluatorModule[M[+ _]]
           def joinSortToJoinKey(sort: JoinSort): JoinKey = sort match {
             case IdentitySort  => IdentityJoin(idMatch.sharedIndices)
             case ValueSort(id) => ValueJoin(id)
+            case x             => sys.error(s"Unexpected arg $x")
           }
 
           def identityJoinSpec(ids: Vector[Int]): TransSpec1 = {
@@ -1043,36 +1044,25 @@ trait EvaluatorModule[M[+ _]]
 
     private def enumerateParents(node: DepGraph): Set[DepGraph] = node match {
       case _: SplitParam | _: SplitGroup | _: Root => Set()
-
-      case dag.New(parent) => Set(parent)
-
-      case dag.Morph1(_, parent)      => Set(parent)
-      case dag.Morph2(_, left, right) => Set(left, right)
-
-      case dag.Assert(pred, child)           => Set(pred, child)
-      case dag.Cond(pred, left, _, right, _) => Set(pred, left, right)
-
-      case dag.Distinct(parent) => Set(parent)
-
-      case dag.AbsoluteLoad(parent, _) => Set(parent)
-      case dag.RelativeLoad(parent, _) => Set(parent)
-
-      case Operate(_, parent) => Set(parent)
-
-      case dag.Reduce(_, parent) => Set(parent)
-      case MegaReduce(_, parent) => Set(parent)
-
-      case dag.Split(spec, _, _) => enumerateSpecParents(spec).toSet
-
-      case IUI(_, left, right) => Set(left, right)
-      case Diff(left, right)   => Set(left, right)
-
-      case Join(_, _, left, right)        => Set(left, right)
-      case dag.Filter(_, target, boolean) => Set(target, boolean)
-
-      case AddSortKey(parent, _, _, _) => Set(parent)
-
-      case Memoize(parent, _) => Set(parent)
+      case dag.New(parent)                         => Set(parent)
+      case dag.Morph1(_, parent)                   => Set(parent)
+      case dag.Morph2(_, left, right)              => Set(left, right)
+      case dag.Assert(pred, child)                 => Set(pred, child)
+      case dag.Cond(pred, left, _, right, _)       => Set(pred, left, right)
+      case dag.Distinct(parent)                    => Set(parent)
+      case dag.AbsoluteLoad(parent, _)             => Set(parent)
+      case dag.RelativeLoad(parent, _)             => Set(parent)
+      case Operate(_, parent)                      => Set(parent)
+      case dag.Reduce(_, parent)                   => Set(parent)
+      case MegaReduce(_, parent)                   => Set(parent)
+      case dag.Split(spec, _, _)                   => enumerateSpecParents(spec).toSet
+      case IUI(_, left, right)                     => Set(left, right)
+      case Diff(left, right)                       => Set(left, right)
+      case Join(_, _, left, right)                 => Set(left, right)
+      case dag.Filter(_, target, boolean)          => Set(target, boolean)
+      case AddSortKey(parent, _, _, _)             => Set(parent)
+      case Memoize(parent, _)                      => Set(parent)
+      case x                                       => sys.error(s"Unexpected arg $x")
     }
 
     private def enumerateSpecParents(spec: BucketSpec): Set[DepGraph] = spec match {

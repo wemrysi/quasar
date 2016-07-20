@@ -1681,6 +1681,8 @@ object Slice {
             acc.getOrElse(ref, MutableNullColumn.empty()).asInstanceOf[MutableNullColumn].unsafeTap { c =>
               c.update(sliceIndex, true)
             }
+          case x =>
+            sys.error(s"Unexpected arg $x")
         }
 
         acc + (ref -> updatedColumn)

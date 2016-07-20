@@ -109,6 +109,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
       sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
         case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
         case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
+        case x                              => sys.error(s"Unexpected arg $x")
       },
       "%09d".format(idx)
     )

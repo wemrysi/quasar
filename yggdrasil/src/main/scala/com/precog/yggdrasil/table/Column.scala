@@ -371,6 +371,7 @@ object Column {
     case CEmptyArray                         => new InfiniteColumn with EmptyArrayColumn
     case CNull                               => new InfiniteColumn with NullColumn
     case CUndefined                          => UndefinedColumn.raw
+    case _                                   => sys.error(s"Unexpected arg $cv")
   }
 
   @inline def uniformDistribution(init: MmixPrng): (Column, MmixPrng) = {
