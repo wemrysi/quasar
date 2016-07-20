@@ -37,13 +37,13 @@ package object fs extends PhysicalErrorPrisms {
   type RDir  = RelDir[Sandboxed]
   type AFile = AbsFile[Sandboxed]
   type RFile = RelFile[Sandboxed]
-  type APath = AbsPath[_]
-  type RPath = RelPath[_]
+  type APath = AbsPath[scala.Any]
+  type RPath = RelPath[scala.Any]
 
   type FilePath[B] = pathy.Path[B,File,Sandboxed]
   type DirPath[B]  = pathy.Path[B,Dir, Sandboxed]
-  type FPath = FilePath[_]
-  type DPath = DirPath[_]
+  type FPath = FilePath[scala.Any]
+  type DPath = DirPath[scala.Any]
 
   type PathSegment = DirName \/ FileName
 

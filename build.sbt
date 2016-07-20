@@ -14,6 +14,8 @@ import sbt.std.Transform.DummyTaskMap
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
+val BothScopes = "test->test;compile->compile"
+
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -183,7 +185,7 @@ lazy val foundation = project
 
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
-  .dependsOn(foundation % "test->test;compile->compile")
+  .dependsOn(foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(libraryDependencies ++= Dependencies.core)
@@ -191,7 +193,7 @@ lazy val ejson = project
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % "test->test;compile->compile")
+  .dependsOn(ejson % BothScopes, foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
@@ -206,8 +208,8 @@ lazy val core = project
 lazy val main = project
   .settings(name := "quasar-main-internal")
   .dependsOn(
-    mongodb  % "test->test;compile->compile",
-    skeleton % "test->test;compile->compile")
+    mongodb  % BothScopes,
+    skeleton % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
@@ -216,7 +218,7 @@ lazy val main = project
 
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(libraryDependencies +=
@@ -225,7 +227,7 @@ lazy val mongodb = project
 
 lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
-  .dependsOn(core % "test->test;compile->compile")
+  .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   // .settings(publishSettings: _*) // NB: uncomment this line when you copy it
   .enablePlugins(AutomateHeaderPlugin)
@@ -238,7 +240,7 @@ lazy val skeleton = project
 
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(main % "test->test;compile->compile")
+  .dependsOn(main % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(noPublishSettings)
   .settings(
@@ -249,7 +251,7 @@ lazy val repl = project
 
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(main % "test->test;compile->compile")
+  .dependsOn(main % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
@@ -263,8 +265,8 @@ lazy val web = project
 lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
-    main % "test->test;compile->compile",
-    web  % "test->test;compile->compile")
+    main % BothScopes,
+    web  % BothScopes)
   .settings(commonSettings: _*)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)

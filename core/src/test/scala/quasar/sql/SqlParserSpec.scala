@@ -390,7 +390,6 @@ class SQLParserSpec extends Specification with ScalaCheck with DisjunctionMatche
     }
 
     "should refuse a semicolon not at the end" in {
-      import shapeless.contrib.scalaz._
       val q = "select foo from (select 5 as foo;) where foo = 7"
       parse(q) must beLeftDisjunction(
         GenericParsingError("operator ')' expected; `;'")
