@@ -19,7 +19,6 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.Variables
 import quasar.fs.{APath, ADir, AFile, PathError, FileSystemType}
-import quasar.specs2.DisjunctionMatchers
 import quasar.sql, sql.Sql
 
 import matryoshka._
@@ -29,12 +28,17 @@ import monocle.std.tuple2._
 import org.specs2.execute._
 import org.specs2.mutable
 import org.specs2.specification._
+import org.specs2.scalaz.DisjunctionMatchers
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
-  extends mutable.Specification with DisjunctionMatchers {
+abstract class MountingSpec[S[_]](
+  implicit
+  S0: Mounting :<: S,
+  S1: MountingFailure :<: S,
+  S2: PathMismatchFailure :<: S
+) extends mutable.Specification with DisjunctionMatchers {
 
   import MountConfig.{viewConfig, fileSystemConfig}
 
@@ -42,8 +46,10 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
   def interpret: S ~> Task
 
   val mnt = Mounting.Ops[S]
+  val mntErr = MountingFailure.Ops[S]
+  val mmErr = PathMismatchFailure.Ops[S]
   // NB: Without the explicit imports, scalac complains of an import cycle
-  import mnt.{F, M, lookup, mountView, mountFileSystem, remount, replace, unmount}
+  import mnt.{F, lookup, mountView, mountFileSystem, remount, replace, unmount}
 
   implicit class StrOps(s: String) {
     def >>*[A: AsResult](a: => F[A]) =
@@ -81,7 +87,7 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
   def maybeExists[A](dj: MountingError \/ A): Option[APath] =
     D.left composePrism pathExists getOption dj
 
-  def mountViewNoVars(loc: AFile, query: Fix[Sql]): M[Unit] =
+  def mountViewNoVars(loc: AFile, query: Fix[Sql]): F[Unit] =
     mountView(loc, query, noVars)
 
   s"$interpName mounting interpreter" should {
@@ -89,15 +95,15 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
       "returns a view config when asked for an existing view path" >>* {
         val f = rootDir </> dir("d1") </> file("f1")
 
-        (mountViewNoVars(f, exprA).toOption *> lookup(f))
-          .run map (_ must beSome(viewCfgA))
+        (mountViewNoVars(f, exprA) *> lookup(f).run)
+          .map(_ must beSome(viewCfgA))
       }
 
       "returns a filesystem config when asked for an existing fs path" >>* {
         val d = rootDir </> dir("d1")
 
-        (mountFileSystem(d, dbType, uriA).toOption *> lookup(d))
-          .run map (_ must beSome(fsCfgA))
+        (mountFileSystem(d, dbType, uriA) *> lookup(d).run)
+          .map(_ must beSome(fsCfgA))
       }
 
       "returns none when nothing mounted at the requested path" >>* {
@@ -113,8 +119,8 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
       "allow mounting a view at a file path" >>* {
         val f = rootDir </> file("f1")
 
-        (mountViewNoVars(f, exprA).toOption *> lookup(f))
-          .run map (_ must beSome(viewCfgA))
+        (mountViewNoVars(f, exprA) *> lookup(f).run)
+          .map(_ must beSome(viewCfgA))
       }
 
       "allow mounting a view above another view" >>* {
@@ -124,9 +130,9 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val r = (
           mountViewNoVars(f1, exprA) *>
           mountViewNoVars(f2, exprB)
-        ).toOption *> lookup(f2)
+        ) *> lookup(f2).run
 
-        r.run map (_ must beSome(viewCfgB))
+        r map (_ must beSome(viewCfgB))
       }
 
       "allow mounting a view below another view" >>* {
@@ -136,9 +142,9 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val r = (
           mountViewNoVars(f1, exprA) *>
           mountViewNoVars(f2, exprB)
-        ).toOption *> lookup(f2)
+        ) *> lookup(f2).run
 
-        r.run map (_ must beSome(viewCfgB))
+        r map (_ must beSome(viewCfgB))
       }
 
       "allow mounting a view above a filesystem" >>* {
@@ -148,9 +154,9 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ).toOption *> lookup(f)
+        ) *> lookup(f).run
 
-        r.run map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA))
       }
 
       "allow mounting a view at a file with the same name as an fs mount" >>* {
@@ -160,9 +166,9 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ).toOption *> lookup(f)
+        ) *> lookup(f).run
 
-        r.run map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA))
       }
 
       "allow mounting a view below a filesystem" >>* {
@@ -172,53 +178,54 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val r = (
           mountFileSystem(d, dbType, uriA) *>
           mountViewNoVars(f, exprA)
-        ).toOption *> lookup(f)
+        ) *> lookup(f).run
 
-        r.run map (_ must beSome(viewCfgA))
+        r map (_ must beSome(viewCfgA))
       }
 
       "fail when a view is already mounted at the file path" >>* {
         val f = rootDir </> dir("d1") </> file("f1")
 
-        (mountViewNoVars(f, exprA) *> mountViewNoVars(f, exprB)).run map { r =>
+        mntErr.attempt(mountViewNoVars(f, exprA) *> mountViewNoVars(f, exprB)) map { r =>
           maybeExists(r) must beSome(f)
         }
       }
     }
 
     "mountFileSystem" >> {
-      def mountFF(d1: ADir, d2: ADir): M[Unit] =
+      def mountFF(d1: ADir, d2: ADir): F[Unit] =
         mountFileSystem(d1, dbType, uriA) *> mountFileSystem(d2, dbType, uriB)
 
-      def mountVF(f: AFile, d: ADir): OptionT[F, MountConfig] =
-        (mountViewNoVars(f, exprA) *> mountFileSystem(d, dbType, uriA))
-          .toOption *> lookup(d)
+      def mountVF(f: AFile, d: ADir): F[Option[MountConfig]] =
+        mountViewNoVars(f, exprA)        *>
+        mountFileSystem(d, dbType, uriA) *>
+        lookup(d).run
 
       "mounts a filesystem at a directory" >>* {
         val d = rootDir </> dir("d1")
 
-        (mountFileSystem(d, dbType, uriA).toOption *> lookup(d))
-          .run map (_ must beSome(fsCfgA))
+        (mountFileSystem(d, dbType, uriA) *> lookup(d).run)
+          .map(_ must beSome(fsCfgA))
       }
 
       "succeed mounting above an existing fs mount" >>* {
         val d1 = rootDir </> dir("d1")
         val d2 = d1 </> dir("d2")
 
-        (mountFF(d2, d1).toOption *> lookup(d1)).run map (_ must beSome(fsCfgB))
+        (mountFF(d2, d1) *> lookup(d1).run) map (_ must beSome(fsCfgB))
       }
 
       "succeed mounting below an existing fs mount" >>* {
         val d1 = rootDir </> dir("d1")
         val d2 = d1 </> dir("d2")
 
-        (mountFF(d1, d2).toOption *> lookup(d2)).run map (_ must beSome(fsCfgB))
+        (mountFF(d1, d2) *> lookup(d2).run) map (_ must beSome(fsCfgB))
       }
 
       "fail when mounting at an existing fs mount" >>* {
         val d = rootDir </> dir("exists")
 
-        mountFF(d, d).run.tuple(lookup(d).run) map { case (dj, cfg) =>
+        mntErr.attempt(mountFF(d, d)).tuple(lookup(d).run) map { case (dj, cfg) =>
           maybeExists(dj).tuple(cfg) must beSome((d, fsCfgA))
         }
       }
@@ -227,21 +234,21 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val d = rootDir </> dir("d1")
         val f = d </> file("view")
 
-        mountVF(f, d).run map (_ must beSome(fsCfgA))
+        mountVF(f, d) map (_ must beSome(fsCfgA))
       }
 
       "succeed when mounting at a dir with same name as existing view mount" >>* {
         val f = rootDir </> dir("d2") </> file("view")
         val d = rootDir </> dir("d2") </> dir("view")
 
-        mountVF(f, d).run map (_ must beSome(fsCfgA))
+        mountVF(f, d) map (_ must beSome(fsCfgA))
       }
 
       "succeed when mounting below an existing view mount" >>* {
         val f = rootDir </> dir("d2") </> file("view")
         val d = rootDir </> dir("d2") </> dir("view") </> dir("db")
 
-        mountVF(f, d).run map (_ must beSome(fsCfgA))
+        mountVF(f, d) map (_ must beSome(fsCfgA))
       }
     }
 
@@ -249,19 +256,19 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
       "succeeds when loc and config agree" >>* {
         val f = rootDir </> file("view")
 
-        (mnt.mount(f, viewCfgA).toOption *> lookup(f))
-          .run map (_ must beSome(viewCfgA))
+        (mnt.mount(f, viewCfgA) *> lookup(f).run)
+          .map(_ must beSome(viewCfgA))
       }
 
       "fails when using a dir for a view" >>* {
-        mnt.mount(rootDir, viewCfgA) .run map (_ must_==
-          \/-(-\/(Mounting.PathTypeMismatch(rootDir))))
+        mmErr.attempt(mnt.mount(rootDir, viewCfgA))
+          .map(_ must be_-\/(Mounting.PathTypeMismatch(rootDir)))
       }
 
       "fails when using a file for a filesystem" >>* {
         val f = rootDir </> file("foo")
-        mnt.mount(f, fsCfgA) .run map (_ must_==
-          \/-(-\/(Mounting.PathTypeMismatch(f))))
+        mmErr.attempt(mnt.mount(f, fsCfgA))
+          .map(_ must be_-\/(Mounting.PathTypeMismatch(f)))
       }
     }
 
@@ -271,8 +278,8 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val d2 = rootDir </> dir("d2")
 
         val r =
-          (mnt.mount(d1, fsCfgA) *> remount(d1, d2))
-            .run *> (lookup(d1).run.tuple(lookup(d2).run))
+          (mnt.mount(d1, fsCfgA) *> remount(d1, d2)) *>
+          (lookup(d1).run.tuple(lookup(d2).run))
 
         r map (_ must_== ((None, Some(fsCfgA))))
       }
@@ -282,8 +289,8 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val d2 = rootDir </> file("d2")
 
         val r =
-          (mnt.mount(d1, viewCfgA) *> remount(d1, d2))
-            .run *> (lookup(d1).run.tuple(lookup(d2).run))
+          (mnt.mount(d1, viewCfgA) *> remount(d1, d2)) *>
+          (lookup(d1).run.tuple(lookup(d2).run))
 
         r map (_ must_== ((None, Some(viewCfgA))))
       }
@@ -292,16 +299,18 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val d = rootDir </> dir("srcdst")
 
         val r =
-          (mnt.mount(d, fsCfgB) *> remount(d, d))
-            .toOption *> lookup(d)
+          mnt.mount(d, fsCfgB) *>
+          remount(d, d)        *>
+          lookup(d).run
 
-        r.run map (_ must beSome(fsCfgB))
+        r map (_ must beSome(fsCfgB))
       }
 
       "fails if there is no mount at src" >>* {
         val d = rootDir </> dir("dne")
 
-        remount(d, rootDir).run map (dj => maybeNotFound(dj) must beSome(d))
+        mntErr.attempt(remount(d, rootDir)) map (dj =>
+          maybeNotFound(dj) must beSome(d))
       }
 
       "restores the mount at src if mounting fails at dst" >>* {
@@ -313,7 +322,7 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
           mountViewNoVars(f2, exprB) *>
           remount(f1, f2)
 
-        r.run.tuple(lookup(f1).run) map { case (dj, cfg) =>
+        mntErr.attempt(r).tuple(lookup(f1).run) map { case (dj, cfg) =>
           maybeExists(dj).tuple(cfg) must beSome((f2, viewCfgA))
         }
       }
@@ -324,25 +333,26 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val d = rootDir </> dir("replace")
 
         val r =
-          (mnt.mount(d, fsCfgA) *> replace(d, fsCfgB))
-            .toOption *> lookup(d)
+          mnt.mount(d, fsCfgA) *>
+          replace(d, fsCfgB)   *>
+          lookup(d).run
 
-        r.run map (_ must beSome(fsCfgB))
+        r map (_ must beSome(fsCfgB))
       }
 
       "fails if there is no mount at the given src location" >>* {
         val f = rootDir </> dir("dne") </> file("f1")
 
-        replace(f, viewCfgA).run map (dj => maybeNotFound(dj) must beSome(f))
+        mntErr.attempt(replace(f, viewCfgA)) map (dj =>
+          maybeNotFound(dj) must beSome(f))
       }
 
       "restores the previous mount if mounting the new config fails" >>* {
         val f = rootDir </> file("f1")
         val r = mountViewNoVars(f, exprA) *> replace(f, fsCfgB)
 
-        r.run.tuple(lookup(f).run) map { _ must_==(
-          (\/-(-\/(Mounting.PathTypeMismatch(f))), Some(viewCfgA)))
-        }
+        mmErr.attempt(r).tuple(lookup(f).run)
+          .map(_ must_== ((-\/(Mounting.PathTypeMismatch(f)), Some(viewCfgA))))
       }
     }
 
@@ -351,25 +361,27 @@ abstract class MountingSpec[S[_]](implicit S: Mounting :<: S)
         val f = rootDir </> file("tounmount")
 
         val r =
-          (mountViewNoVars(f, exprA) *> unmount(f))
-            .toOption *> lookup(f)
+          mountViewNoVars(f, exprA) *>
+          unmount(f)                *>
+          lookup(f).run
 
-        r.run map (_ must beNone)
+        r map (_ must beNone)
       }
 
       "should remove an existing fs mount" >>* {
         val d = rootDir </> dir("tounmount")
 
         val r =
-          (mountFileSystem(d, dbType, uriB) *> unmount(d))
-            .toOption *> lookup(d)
+          mountFileSystem(d, dbType, uriB) *>
+          unmount(d)                       *>
+          lookup(d).run
 
-        r.run map (_ must beNone)
+        r map (_ must beNone)
       }
 
       "should fail when nothing mounted at path" >>* {
         val f = rootDir </> dir("nothing") </> file("there")
-        unmount(f).run map (dj => maybeNotFound(dj) must beSome(f))
+        mntErr.attempt(unmount(f)) map (dj => maybeNotFound(dj) must beSome(f))
       }
     }
   }

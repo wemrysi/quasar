@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
-import quasar.effect.KeyValueStore
+import quasar.effect.{Failure, KeyValueStore}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
@@ -36,15 +36,17 @@ import org.specs2.scalaz.ScalazMatchers._
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
-import scalaz._, Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 class MountServiceSpec extends Specification with ScalaCheck with Http4s with PathUtils {
   import quasar.fs.mount.ViewMounterSpec._
   import posixCodec.printPath
-  import PathError._
+  import PathError._, Mounting.PathTypeMismatch
 
-  type Eff[A]  = Coproduct[Task, Mounting, A]
+  type Eff0[A] = Coproduct[MountingFailure, PathMismatchFailure, A]
+  type Eff1[A] = Coproduct[Mounting, Eff0, A]
+  type Eff[A]  = Coproduct[Task, Eff1, A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
@@ -76,25 +78,30 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         mntReq => mountedRef.modify(_ - mntReq).void
       )
 
-      val store: MountConfigs ~> Task = KeyValueStore.fromTaskRef(configsRef)
-      val mt: MEff ~> Task = NaturalTransformation.refl[Task] :+: store
-      val tf: Mounting ~> Task = foldMapNT(mt) compose mounter
-      def eff: Eff ~> Task = NaturalTransformation.refl[Task] :+: tf
+      val meff: MEff ~> Task =
+        reflNT[Task] :+: KeyValueStore.fromTaskRef(configsRef)
 
-      val service = mount.service[Eff].toHttpService(liftMT[Task, ResponseT] compose eff)
+      val effR: Eff ~> ResponseOr =
+        liftMT[Task, ResponseT]              :+:
+        (liftMT[Task, ResponseT] compose
+          (foldMapNT(meff) compose mounter)) :+:
+        failureResponseOr[MountingError]     :+:
+        failureResponseOr[PathTypeMismatch]
+
+      val effT: Eff ~> Task =
+        reflNT[Task]                                   :+:
+        (foldMapNT(meff) compose mounter)              :+:
+        Failure.toRuntimeError[Task, MountingError]    :+:
+        Failure.toRuntimeError[Task, PathTypeMismatch]
+
+      val service = mount.service[Eff].toHttpService(effR)
 
       val testSvc: TestSvc =
         req => injectFT[Task, Eff] apply (service(req) flatMap (mountedRef.read strengthL _))
 
-      f(testSvc) foldMap eff
+      f(testSvc) foldMap effT
     }.unsafePerformSync
   }
-
-  def orFail[A](v: MountingError \/ A): Task[A] =
-    Task.fromDisjunction(v.leftMap(e => new RuntimeException(e.shows)))
-
-  def orFailF[A](v: MountingError \/ A): M.F[A] =
-    free.lift(orFail(v)).into[Eff]
 
   def beMountNotFoundError(path: APath) =
     beApiErrorWithMessage(
@@ -113,7 +120,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
-                        .run.flatMap(orFailF)
               r    <- service(Request(uri = pathUri(d)))
               (res, _) = r
               body <- lift(res.as[Json]).into[Eff]
@@ -132,7 +138,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
         runTest { service =>
           for {
             _    <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
-                      .run.flatMap(orFailF)
             r    <- service(Request(uri = pathUri(d)))
             (res, _) = r
             body <- lift(res.as[Json]).into[Eff]
@@ -150,7 +155,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
-              _    <- M.mountView(f, cfg._1, cfg._2).run.flatMap(orFailF)
+              _    <- M.mountView(f, cfg._1, cfg._2)
 
               r    <- service(Request(uri = pathUri(f)))
               (res, _) = r
@@ -180,7 +185,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
           for {
             _   <- M.mountFileSystem(dp, StubFs, ConnectionUri("foo"))
-                     .run.flatMap(orFailF)
             r   <- service(Request(uri = pathUri(fp)))
             (res, _) = r
             err <- lift(res.as[ApiError]).into[Eff]
@@ -205,7 +209,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             val dst = rootDir </> dir(dstHead) </> dstTail
             for {
               _        <- M.mountFileSystem(src, StubFs, fooUri)
-                            .run.flatMap(orFailF)
 
               r        <- service(Request(
                             method = MOVE,
@@ -250,7 +253,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _   <- M.mountFileSystem(src, StubFs, fooUri)
-                       .run.flatMap(orFailF)
 
               r   <- service(Request(
                         method = MOVE,
@@ -271,7 +273,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _   <- M.mountFileSystem(src, StubFs, fooUri)
-                       .run.flatMap(orFailF)
 
               r   <- service(Request(
                        method = MOVE,
@@ -295,7 +296,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _   <- M.mountFileSystem(src, StubFs, fooUri)
-                       .run.flatMap(orFailF)
 
               r   <- service(Request(
                        method = MOVE,
@@ -402,7 +402,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               for {
                 _         <- M.mountFileSystem(fs, StubFs, fooUri)
-                               .run.flatMap(orFailF)
 
                 req       <- reqBuilder(fs, viewSuffix, cfgStr)
                 r         <- service(req)
@@ -435,7 +434,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               for {
                 _     <- M.mountFileSystem(fs, StubFs, fooUri)
-                           .run.flatMap(orFailF)
 
                 req   <- reqBuilder(d, view, cfgStr)
                 r     <- service(req)
@@ -464,7 +462,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
               for {
                 _     <- M.mountFileSystem(fs1, StubFs, fooUri)
-                           .run.flatMap(orFailF)
 
                 req   <- reqBuilder(d, fs, cfgStr)
                 r     <- service(req)
@@ -576,7 +573,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
 
           for {
             _     <- M.mountFileSystem(mntPath, StubFs, barUri)
-                       .run.flatMap(orFailF)
 
             req   <- lift(Request(
                        method = POST,
@@ -625,7 +621,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _     <- M.mountFileSystem(fsDir, StubFs, barUri)
-                         .run.flatMap(orFailF)
 
               req   <- lift(Request(
                          method = PUT,
@@ -656,7 +651,6 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
           runTest { service =>
             for {
               _     <- M.mountFileSystem(d, StubFs, ConnectionUri("foo"))
-                         .run.flatMap(orFailF)
 
               r     <- service(Request(
                          method = DELETE,
@@ -681,7 +675,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             val cfg = viewConfig("select * from zips where pop > :cutoff", "cutoff" -> "1000")
 
             for {
-              _     <- M.mountView(f, cfg._1, cfg._2).run.flatMap(orFailF)
+              _     <- M.mountView(f, cfg._1, cfg._2)
 
               r     <- service(Request(
                          method = DELETE,

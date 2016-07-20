@@ -14,6 +14,22 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package quasar.fs.mount
 
 import quasar.Predef._
@@ -66,8 +82,6 @@ object Mounting {
 
     import MountConfig._
 
-    type M[A] = EitherT[F, MountingError, A]
-
     def lookupType(path: APath): OptionT[F, MountType] =
       OptionT(lift(LookupType(path)))
 
@@ -78,79 +92,102 @@ object Mounting {
       OptionT(lift(Lookup(path)))
 
     /** Create a view mount at the given location. */
-    def mountView(loc: AFile, query: Fix[Sql], vars: Variables): M[Unit] =
-      EitherT(lift(MountView(loc, query, vars)))
+    def mountView(
+      loc: AFile,
+      query: Fix[Sql],
+      vars: Variables
+    )(implicit
+      S: MountingFailure :<: S
+    ): F[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(MountView(loc, query, vars)))
 
     /** Create a filesystem mount at the given location. */
-    def mountFileSystem(loc: ADir, typ: FileSystemType, uri: ConnectionUri): M[Unit] =
-      EitherT(lift(MountFileSystem(loc, typ, uri)))
+    def mountFileSystem(
+      loc: ADir,
+      typ: FileSystemType,
+      uri: ConnectionUri
+    )(implicit
+      S: MountingFailure :<: S
+    ): F[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(MountFileSystem(loc, typ, uri)))
 
     /** Attempt to create a mount described by the given configuration at the
       * given location.
       */
-    def mount(loc: APath, config: MountConfig): M[PathTypeMismatch \/ Unit] =
+    def mount(
+      loc: APath,
+      config: MountConfig
+    )(implicit
+      S0: MountingFailure :<: S,
+      S1: PathMismatchFailure :<: S
+    ): F[Unit] = {
+      val mmErr = PathMismatchFailure.Ops[S]
+
       config match {
         case ViewConfig(query, vars) =>
           D.right.getOption(refineType(loc)) cata (
-            file => mountView(file, query, vars).map(_.right),
-            PathTypeMismatch(loc).left.point[M])
+            file => mountView(file, query, vars),
+            mmErr.fail(PathTypeMismatch(loc)))
 
         case FileSystemConfig(typ, uri) =>
           D.left.getOption(refineType(loc)) cata (
-            dir => mountFileSystem(dir, typ, uri).map(_.right),
-            PathTypeMismatch(loc).left.point[M])
+            dir => mountFileSystem(dir, typ, uri),
+            mmErr.fail(PathTypeMismatch(loc)))
       }
+    }
 
     /** Remount `src` at `dst`, results in an error if there is no mount at
       * `src`.
       */
-    def remount[T](src: Path[Abs,T,Sandboxed], dst: Path[Abs,T,Sandboxed]): M[Unit] =
+    def remount[T](
+      src: Path[Abs,T,Sandboxed],
+      dst: Path[Abs,T,Sandboxed]
+    )(implicit
+      S0: MountingFailure :<: S,
+      S1: PathMismatchFailure :<: S
+    ): F[Unit] =
       modify(src, dst, ι).void
 
     /** Replace the mount at the given path with one described by the
       * provided config.
       */
-    def replace(loc: APath, config: MountConfig): M[PathTypeMismatch \/ Unit] =
+    def replace(
+      loc: APath,
+      config: MountConfig
+    )(implicit
+      S0: MountingFailure :<: S,
+      S1: PathMismatchFailure :<: S
+    ): F[Unit] =
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
-    def unmount(path: APath): M[Unit] =
-      EitherT(lift(Unmount(path)))
+    def unmount(path: APath)(implicit S: MountingFailure :<: S): F[Unit] =
+      MountingFailure.Ops[S].unattempt(lift(Unmount(path)))
 
     ////
 
-    private type ErrFM[A] = EitherT[F, MountingError \/ PathTypeMismatch, A]
-
-    private def bifold[G[_]: Functor, E, A, EE, AA](v: EitherT[G,E,A])(e: E => EE \/ AA, a: A => EE \/ AA): EitherT[G, EE, AA] =
-      EitherT[G,EE,AA](v.run.map(_.fold(e, a)))
-
-    private def toLeft[G[_]: Functor, E1, E2, A](v: EitherT[G, E1, E2 \/ A]): EitherT[G, E1 \/ E2, A] =
-      bifold(v)(_.left.left, _.fold(_.right.left, _.right))
-
-    private def toRight[G[_]: Functor, E1, E2, A](v: EitherT[G, E1 \/ E2, A]): EitherT[G, E1, E2 \/ A] =
-      bifold(v)(_.fold(_.left, _.left.right), _.right.right)
-
     private val notFound: Prism[MountingError, APath] =
       MountingError.pathError composePrism PathError.pathNotFound
-
-    private val invalidPath: Prism[MountingError, (APath, String)] =
-      MountingError.pathError composePrism PathError.invalidPath
 
     private def modify[T](
       src: Path[Abs,T,Sandboxed],
       dst: Path[Abs,T,Sandboxed],
       f: MountConfig => MountConfig
-    ): M[PathTypeMismatch \/ Unit] = {
-      val mErr = MonadError[ErrFM, MountingError \/ PathTypeMismatch]
-      import mErr._
+    )(implicit
+      S0: MountingFailure :<: S,
+      S1: PathMismatchFailure :<: S
+    ): F[Unit] = {
+      val mntErr = MountingFailure.Ops[S]
+      val mmErr = PathMismatchFailure.Ops[S]
 
       for {
-        cfg <- lookup(src) toRight notFound(src)
-        _   <- unmount(src)
-        rez <- toRight(handleError(toLeft(mount(dst, f(cfg)))) { err =>
-                 toLeft(mount(src, cfg)) *> raiseError(err)
-               })
-      } yield rez
+        cfg     <- lookup(src) getOrElseF mntErr.fail(notFound(src))
+        _       <- unmount(src)
+        mod     =  mount(dst, f(cfg))
+        restore =  mount(src, cfg)
+        res1    =  mntErr.onFail(mod, err => restore *> mntErr.fail(err))
+        _       <- mmErr.onFail(res1, err => restore *> mmErr.fail(err))
+      } yield ()
     }
   }
 

@@ -18,11 +18,11 @@ package quasar.server
 
 import quasar.Predef._
 import quasar.api.services._
-import quasar.api.{redirectService, staticFileService, ResponseOr}
+import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.config._
 import quasar.console.{logErrors, stderr}
-import quasar.fp.TaskRef
-import quasar.fp.free.foldMapNT
+import quasar.fp.{reflNT, liftMT, TaskRef}
+import quasar.fp.free._
 import quasar.main._
 
 import argonaut.DecodeJson
@@ -128,7 +128,10 @@ object Server {
       failedMnts   <- attemptMountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi
       // TODO: Still need to expose these in the HTTP API, see SD-1131
       _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-      durableApi   =  foldMapNT(toResponseOr(mntCfgsT)) compose coreApi
+      cfgsErrsRor  =  (liftMT[Task, ResponseT] compose reflNT[Task]) :+:
+                      (liftMT[Task, ResponseT] compose mntCfgsT)     :+:
+                      qErrsToResponseOr
+      durableApi   =  foldMapNT(cfgsErrsRor) compose coreApi
     } yield service(
       webConfig.server.port,
       qConfig.staticContent,

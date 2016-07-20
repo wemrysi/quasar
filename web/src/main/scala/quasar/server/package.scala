@@ -19,24 +19,22 @@ package quasar
 import quasar.api._
 import quasar.fp._, free._
 import quasar.fs.{FileSystemError, PhysicalError}
-import quasar.fs.mount.MountConfigs
+import quasar.fs.mount.{Mounting, MountingError}
 import quasar.main._
 
-import org.http4s.Response
-import scalaz.{~>, EitherT, Monad}
+import scalaz.{~>, Monad}
 import scalaz.concurrent.Task
 
 package object server {
-  def toResponseIOT[F[_]: Monad](
-    eval: MountConfigs ~> F
-  ): CfgsErrs ~> ResponseIOT[F, ?] = {
-    failureResponseIOT[F, FileSystemError] :+:
-    failureResponseIOT[F, PhysicalError]   :+:
-    (liftMT[F, EitherT[?[_], Task[Response], ?]] compose eval)
-  }
+  import Mounting.PathTypeMismatch
+
+  def qErrsToResponseIOT[F[_]: Monad]: QErrs ~> ResponseIOT[F, ?] =
+    failureResponseIOT[F, PathTypeMismatch] :+:
+    failureResponseIOT[F, MountingError]    :+:
+    failureResponseIOT[F, FileSystemError]  :+:
+    failureResponseIOT[F, PhysicalError]
 
   /** Interprets errors into `Response`s, for use in web services. */
-  def toResponseOr(eval: MountConfigs ~> Task): CfgsErrsIO ~> ResponseOr =
-    liftMT[Task, ResponseT]                         :+:
-    joinResponseOr.compose(toResponseIOT[Task](eval))
+  val qErrsToResponseOr: QErrs ~> ResponseOr =
+    joinResponseOr compose qErrsToResponseIOT[Task]
 }
