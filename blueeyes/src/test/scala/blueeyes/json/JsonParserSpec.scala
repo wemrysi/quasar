@@ -108,7 +108,7 @@ object AsyncParserSpec extends Specification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs = mutable.ArrayBuffer.empty[JValue]
+    var vs = ArrayBuffer.empty[JValue]
     val n = data.length
     var i                   = 0
     var parser: AsyncParser = async

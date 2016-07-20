@@ -20,7 +20,7 @@
 package com.precog
 package mimir
 
-import scala.collection.mutable
+import blueeyes._
 
 trait DAGTransform extends DAG {
   import dag._
@@ -28,7 +28,7 @@ trait DAGTransform extends DAG {
 
   def transformBottomUp(graph: DepGraph)(f: DepGraph => DepGraph): DepGraph = {
 
-    val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
+    val memotable = scmMap[DepGraphWrapper, DepGraph]()
 
     def transformSpec(spec: BucketSpec): BucketSpec = spec match {
       case UnionBucketSpec(left, right) =>

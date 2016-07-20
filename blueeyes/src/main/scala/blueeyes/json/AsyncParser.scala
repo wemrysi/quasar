@@ -157,8 +157,8 @@ final class AsyncParser protected[json] (
     }
 
     // accumulates errors and results
-    val errors  = mutable.ArrayBuffer.empty[ParseException]
-    val results = mutable.ArrayBuffer.empty[JValue]
+    val errors  = ArrayBuffer.empty[ParseException]
+    val results = ArrayBuffer.empty[JValue]
 
     // we rely on exceptions to tell us when we run out of data
     try {

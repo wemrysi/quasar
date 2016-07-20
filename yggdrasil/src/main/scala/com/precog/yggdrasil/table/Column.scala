@@ -376,7 +376,7 @@ object Column {
 
   @inline def uniformDistribution(init: MmixPrng): (Column, MmixPrng) = {
     val col = new InfiniteColumn with DoubleColumn {
-      var memo = scala.collection.mutable.ArrayBuffer.empty[Double]
+      var memo = ArrayBuffer.empty[Double]
 
       def apply(row: Int) = {
         val maxRowComputed = memo.length

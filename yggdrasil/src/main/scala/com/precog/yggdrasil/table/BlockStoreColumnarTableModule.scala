@@ -136,7 +136,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         }
 
         new CellMatrix {
-          private[this] val allCells: mutable.Map[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
+          private[this] val allCells: scmMap[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
           private[this] val comparatorMatrix                 = fillMatrix(initialCells)
 
           def cells = allCells.values

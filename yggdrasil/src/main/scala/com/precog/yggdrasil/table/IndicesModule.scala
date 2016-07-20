@@ -97,7 +97,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       */
     def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
 
-      def accumulate(buf: mutable.ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
+      def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
         stream.uncons flatMap {
           case None             => M.point(new TableIndex(buf.toList))
           case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
@@ -116,7 +116,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
         StreamT wrapEffect streamTM
       }
 
-      accumulate(mutable.ListBuffer.empty[SliceIndex], indices)
+      accumulate(ListBuffer.empty[SliceIndex], indices)
     }
 
     /**
@@ -173,8 +173,8 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     * valueSlice should already be materialized.
     */
   class SliceIndex(
-      private[table] val vals: mutable.Map[Int, mutable.Set[RValue]],
-      private[table] val dict: mutable.Map[(Int, RValue), ArrayIntList],
+      private[table] val vals: scmMap[Int, mutable.Set[RValue]],
+      private[table] val dict: scmMap[(Int, RValue), ArrayIntList],
       private[table] val keyset: mutable.Set[Seq[RValue]],
       private[table] val valueSlice: Slice
   ) { self =>
@@ -269,9 +269,9 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * Constructs an empty SliceIndex instance.
       */
     def empty = new SliceIndex(
-      mutable.Map.empty[Int, mutable.Set[RValue]],
-      mutable.Map.empty[(Int, RValue), ArrayIntList],
-      mutable.Set.empty[Seq[RValue]],
+      scmMap[Int, scmSet[RValue]](),
+      scmMap[(Int, RValue), ArrayIntList](),
+      scmSet[Seq[RValue]](),
       new Slice {
         def size    = 0
         def columns = Map.empty[ColumnRef, Column]
@@ -309,8 +309,8 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): M[SliceIndex] = {
       val numKeys = sts.length
       val n       = slice.size
-      val vals    = mutable.Map.empty[Int, mutable.Set[RValue]]
-      val dict    = mutable.Map.empty[(Int, RValue), ArrayIntList]
+      val vals    = scmMap[Int, scmSet[RValue]]()
+      val dict    = scmMap[(Int, RValue), ArrayIntList]()
       val keyset  = mutable.Set.empty[Seq[RValue]]
 
       readKeys(slice, sts) flatMap { keys =>
@@ -371,8 +371,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
     private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
       val n       = slice.size
       val numKeys = sts.length
-
-      val keys: mutable.ArrayBuffer[M[Array[RValue]]] = new mutable.ArrayBuffer[M[Array[RValue]]](numKeys)
+      val keys    = new ArrayBuffer[M[Array[RValue]]](numKeys)
 
       (0 until numKeys) foreach { _ =>
         keys += null.asInstanceOf[M[Array[RValue]]]

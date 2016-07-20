@@ -20,11 +20,8 @@
 package com.precog
 package mimir
 
-import scala.collection.mutable
-
-import scalaz.std.set._
-import scalaz.std.map._
-import scalaz.syntax.monoid._
+import blueeyes._
+import scalaz._, Scalaz._
 
 trait Memoizer extends DAG {
   import dag._
@@ -40,7 +37,7 @@ trait Memoizer extends DAG {
 
   private def applyMemoizations(target: DepGraph, refs: Map[DepGraph, Set[OpSide]]): DepGraph = {
     // todo investigate why if we use a `DepGraphWrapper` here, tests fail in MiscStackSpecs
-    val memotable = mutable.Map[DepGraph, DepGraph]()
+    val memotable = scmMap[DepGraph, DepGraph]()
 
     def numRefs(node: DepGraph) = refs get node map { _.size } getOrElse 0
 

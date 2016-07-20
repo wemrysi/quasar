@@ -4,8 +4,6 @@ package json
 // context used by JParser, taken from jawn under MIT license.
 // (https://github.com/non/jawn)
 
-import scala.collection.mutable
-
 private[json] sealed trait Context {
   def add(s: String): Unit
   def add(v: JValue): Unit
@@ -22,7 +20,7 @@ private[json] final class SingleContext extends Context {
 }
 
 private[json] final class ArrContext extends Context {
-  private val vs = mutable.ArrayBuffer.empty[JValue]
+  private val vs = ArrayBuffer[JValue]()
 
   def add(s: String): Unit = vs.append(JString(s))
   def add(v: JValue): Unit = vs.append(v)
@@ -32,7 +30,7 @@ private[json] final class ArrContext extends Context {
 
 private[json] final class ObjContext extends Context {
   private var key: String = null
-  private val vs = mutable.Map.empty[String, JValue]
+  private val vs          = scmMap[String, JValue]()
 
   def add(s: String): Unit =
     if (key == null) {

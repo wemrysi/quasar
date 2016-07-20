@@ -1,4 +1,5 @@
 import scalaz._
+import scala.collection.mutable
 
 package object blueeyes {
   // scala stdlib
@@ -58,6 +59,11 @@ package object blueeyes {
   type RawBitSet          = Array[Int]
   val RawBitSet           = com.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+
+  type scmMap[K, V] = mutable.Map[K, V]
+  type scmSet[A]    = mutable.Set[A]
+  val scmMap        = mutable.HashMap
+  val scmSet        = mutable.HashSet
 
   // Can't overload in package objects in scala 2.9!
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)

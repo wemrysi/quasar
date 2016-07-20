@@ -134,7 +134,7 @@ object ColumnarTableModule extends Logging {
       def getPaths: Array[String]     = a
       def columnForPath(path: String) = m(path)
       def combine(that: Indices): Indices = {
-        val buf = new mutable.ArrayBuffer[String](a.length)
+        val buf = new ArrayBuffer[String](a.length)
         buf ++= a
         that.getPaths.foreach(p => if (!m.contains(p)) buf.append(p))
         Indices.fromPaths(buf.toArray)
@@ -168,7 +168,7 @@ object ColumnarTableModule extends Logging {
 
       def fromPaths(ps: Array[String]): Indices = {
         val paths = ps.sorted
-        val m     = mutable.Map.empty[String, Int]
+        val m     = scmMap[String, Int]()
         var i = 0
         val len = paths.length
         while (i < len) { m(paths(i)) = i; i += 1 }

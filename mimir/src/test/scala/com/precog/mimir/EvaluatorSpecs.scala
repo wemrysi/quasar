@@ -31,7 +31,6 @@ import com.precog.yggdrasil.vfs._
 import com.precog.yggdrasil.util._
 
 import com.precog.common.security._
-// import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
 
 import scalaz._, Scalaz._, Validation._
@@ -115,9 +114,9 @@ trait EvaluatorTestSupport[M[+_]] extends StdLibEvaluatorStack[M]
 
   object Table extends TableCompanion
 
-  private var initialIndices = collection.mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
-  private var currentIndex = 0                                        // if we were doing this for real: j.u.c.a.AtomicInteger
-  private val indexLock = new AnyRef                                  // if we were doing this for real: DIE IN A FIRE!!!
+  private var initialIndices = scmMap[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
+  private var currentIndex   = 0                                        // if we were doing this for real: j.u.c.a.AtomicInteger
+  private val indexLock      = new AnyRef                                  // if we were doing this for real: DIE IN A FIRE!!!
 
 }
 

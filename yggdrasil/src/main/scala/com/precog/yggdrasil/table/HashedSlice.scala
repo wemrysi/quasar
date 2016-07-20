@@ -50,8 +50,8 @@ final class HashedSlice private (slice0: Slice, rowMap: scala.collection.Map[Int
 object HashedSlice {
   def apply(slice: Slice): HashedSlice = {
     val hasher = new SliceHasher(slice)
+    val rowMap = scmMap[Int, IntList]()
 
-    val rowMap: mutable.Map[Int, IntList] = mutable.Map.empty
     Loop.range(0, slice.size) { row =>
       val hash = hasher.hash(row)
       val rows = rowMap.getOrElse(hash, IntNil)

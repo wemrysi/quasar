@@ -55,14 +55,14 @@ class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) exte
 
     val rootAPIKeyRecord = APIKeyRecord(rootAPIKey, some("root-apiKey"), some("The root API key"), rootAPIKey, Set(rootGrantId), true)
 
-    (rootAPIKeyRecord, mutable.Map(rootGrantId -> rootGrant), mutable.Map(rootAPIKey -> rootAPIKeyRecord))
+    (rootAPIKeyRecord, scmMap(rootGrantId -> rootGrant), scmMap(rootAPIKey -> rootAPIKeyRecord))
   }
 
   def rootAPIKey: M[APIKey]   = rootAPIKeyRecord.apiKey.point[M]
   def rootGrantId: M[GrantId] = rootAPIKeyRecord.grants.head.point[M]
 
-  private val deletedAPIKeys = mutable.Map.empty[APIKey, APIKeyRecord]
-  private val deletedGrants  = mutable.Map.empty[GrantId, Grant]
+  private val deletedAPIKeys = scmMap[APIKey, APIKeyRecord]()
+  private val deletedGrants  = scmMap[GrantId, Grant]()
 
   def createAPIKey(name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId]): M[APIKeyRecord] = {
     val record = APIKeyRecord(APIKeyManager.newAPIKey(), name, description, issuerKey, grants, false)

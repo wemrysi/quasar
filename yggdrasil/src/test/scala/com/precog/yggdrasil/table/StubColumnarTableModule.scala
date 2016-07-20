@@ -33,9 +33,9 @@ trait StubColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
 
   implicit def M: Monad[M] with Comonad[M]
 
-  private var initialIndices = collection.mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
-  private var currentIndex = 0                                        // if we were doing this for real: j.u.c.a.AtomicInteger
-  private val indexLock = new AnyRef                                  // if we were doing this for real: DIE IN A FIRE!!!
+  private var initialIndices = Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
+  private var currentIndex   = 0                   // if we were doing this for real: j.u.c.a.AtomicInteger
+  private val indexLock      = new AnyRef          // if we were doing this for real: DIE IN A FIRE!!!
 
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[M, Slice], size: TableSize): Table = new Table(slices, size)

@@ -20,6 +20,7 @@
 package com.precog
 package mimir
 
+import blueeyes._
 import com.precog.yggdrasil.TableModule
 
 import scala.collection.mutable
@@ -29,7 +30,7 @@ trait CrossOrdering extends DAG {
   import dag._
 
   def orderCrosses(node: DepGraph): DepGraph = {
-    val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
+    val memotable = scmMap[DepGraphWrapper, DepGraph]()
 
     def memoizedSpec(spec: BucketSpec): BucketSpec = spec match {
       case UnionBucketSpec(left, right) =>

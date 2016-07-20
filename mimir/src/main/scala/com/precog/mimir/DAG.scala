@@ -448,7 +448,7 @@ trait DAG extends Instructions {
     def containsSplitArg: Boolean
 
     def mapDown(body: (DepGraph => DepGraph) => PartialFunction[DepGraph, DepGraph]): DepGraph = {
-      val memotable = mutable.Map[DepGraphWrapper, DepGraph]()
+      val memotable = scmMap[DepGraphWrapper, DepGraph]()
 
       def memoized(node: DepGraph): DepGraph = {
         lazy val pf: PartialFunction[DepGraph, DepGraph] = body(memoized)
@@ -604,7 +604,7 @@ trait DAG extends Instructions {
       type BucketSpecState = State[SubstitutionState, BucketSpec]
       type DepGraphState   = State[SubstitutionState, DepGraph]
 
-      val memotable = mutable.Map.empty[DepGraph, DepGraphState]
+      val memotable = scmMap[DepGraph, DepGraphState]()
 
       def memoized(node: DepGraph): DepGraphState = {
 

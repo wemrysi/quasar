@@ -41,7 +41,7 @@ object CTypeFlags {
   def getFlagFor(ctype: CType): Array[Byte] = {
     import Flags._
 
-    val buffer = new mutable.ArrayBuffer[Byte]()
+    val buffer = new ArrayBuffer[Byte]()
 
     def flagForCType(t: CType) {
       @tailrec

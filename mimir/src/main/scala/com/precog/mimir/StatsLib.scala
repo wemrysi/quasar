@@ -1175,8 +1175,8 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
       // decimals are going to be a significant performance problem for rank
       // (compared to sorting) and this simplifies the algorithm a lot.
       protected def decimalize(m: Map[ColumnRef, Column], r: Range): Map[ColumnRef, Column] = {
-        val m2   = mutable.Map.empty[ColumnRef, Column]
-        val nums = mutable.Map.empty[CPath, List[Column]]
+        val m2   = scmMap[ColumnRef, Column]()
+        val nums = scmMap[CPath, List[Column]]()
 
         m.foreach {
           case (ref @ ColumnRef(path, ctype), col) =>

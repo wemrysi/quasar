@@ -1,8 +1,6 @@
 package blueeyes
 package json
 
-import scala.collection.mutable
-
 private[json] trait SyncParser extends Parser {
 
   /**
@@ -36,7 +34,7 @@ private[json] trait SyncParser extends Parser {
     * and other characters will become parse errors.
     */
   final def parseMany(): Seq[JValue] = {
-    val results = mutable.ArrayBuffer.empty[JValue]
+    val results = ArrayBuffer.empty[JValue]
     var i = 0
     while (!atEof(i)) {
       (at(i): @switch) match {

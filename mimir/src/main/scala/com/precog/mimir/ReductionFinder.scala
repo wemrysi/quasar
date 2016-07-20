@@ -94,7 +94,7 @@ trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] w
     }
 
     def megaReduce(node: DepGraph, st: MegaReduceState): DepGraph = {
-      val reduceTable = mutable.Map[DepGraph, dag.MegaReduce]()
+      val reduceTable = scmMap[DepGraph, dag.MegaReduce]()
 
       node mapDown { recurse =>
         {
