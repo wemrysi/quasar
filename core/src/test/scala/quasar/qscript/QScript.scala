@@ -153,13 +153,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
-        identity.Squash[FLP](
+        LogicalPlan.Let('x, lpRead("/foo/bar"),
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(1))),
-                structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(2)))),
-              structural.MakeArrayN[Fix](LogicalPlan.Constant(Data.Int(3))))))).toOption must
+                structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("baz"))),
+                structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("quux")))),
+              structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("ducks"))))))).toOption must
       equal(RootR.some) // TODO incorrect expectation
     }
 
