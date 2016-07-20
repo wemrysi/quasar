@@ -99,6 +99,10 @@ object MapFunc {
   }
 
   // TODO subtyping is preventing embeding of MapFuncs
+  /** This returns the set of exressions that are concatted together. It can
+    * include statically known pieces, like MakeArray and Nullary(Arr), but also
+    * arbitrary expressions that may evaluate to an array of any size.
+    */
   object ConcatArraysN {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
 
@@ -179,17 +183,11 @@ object MapFunc {
           CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](
             Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
               ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
-        case ProjectIndex(Embed(ConcatArraysN(as)), Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Int(index)))))))) =>
-          as.foldLeftM[Option[CoMFR[T, T2, A]] \/ ?, BigInt](index)((i, mf) =>
-            if (i ≟ 0) mf match {
-              // TODO: Handle the literal array case
-              case Embed(CoEnv(\/-(MakeArray(Embed(value))))) => value.some.left
-              case _ => None.left
-            }
-            else mf match {
-              case Embed(CoEnv(\/-(MakeArray(_)))) => (index - 1).right
-              case _ => None.left
-            }).fold(ι, κ(None))
+
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Int(index)))))))) =>
+          if (index.isValidInt)
+            as.lift(index.intValue).map(_.project)
+          else None
         case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Nullary(field))))) =>
           //scala.Predef.println(s"hit normalize case")
           as.collectFirst {
