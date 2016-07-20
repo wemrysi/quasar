@@ -14,7 +14,6 @@ lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
 lazy val blueeyes = (
   project.setup deps (
 
-    "org.scala-lang.modules"   %% "scala-parser-combinators" %    "1.0.4",
     "org.slamdata"              % "jdbm"                     %    "3.0.0",
     "com.google.code.findbugs"  % "jsr305"                   %    "3.0.1",
     "com.google.guava"          % "guava"                    %    "19.0",
