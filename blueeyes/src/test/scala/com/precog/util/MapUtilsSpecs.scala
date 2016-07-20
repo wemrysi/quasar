@@ -19,10 +19,9 @@
  */
 package com.precog.util
 
-import org.scalacheck.Prop._
 import blueeyes._
 import PrecogSpecs._
-import scalaz._, Scalaz._
+import scalaz._
 
 object MapUtilsSpecs extends Specification with ScalaCheck with MapUtils {
   private type Ints     = List[Int]

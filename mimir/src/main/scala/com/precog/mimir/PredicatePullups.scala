@@ -20,16 +20,8 @@
 package com.precog
 package mimir
 
-import scala.collection.mutable
-import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
-
-import scalaz._
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.std.string._
-import scalaz.std.tuple._
-import scalaz.syntax.monoid._
+import scalaz._, Scalaz._
 
 trait PredicatePullupsModule[M[+ _]] extends TransSpecableModule[M] {
   trait PredicatePullups extends TransSpecable {

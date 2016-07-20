@@ -20,14 +20,11 @@
 package com.precog
 package mimir
 
-import scala.collection.mutable
-
 import com.precog.bytecode._
-import com.precog.yggdrasil._
 import com.precog.util.Identifier
 
 trait TypeInferencer extends DAG {
-  import instructions.{ BinaryOperation, ArraySwap, WrapArray, WrapObject, DerefArray, DerefObject }
+  import instructions.{ BinaryOperation, ArraySwap, WrapObject, DerefArray, DerefObject }
   import dag._
 
   def inferTypes(jtpe: JType)(graph: DepGraph): DepGraph = {

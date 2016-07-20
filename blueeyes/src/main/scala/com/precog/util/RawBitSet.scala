@@ -19,8 +19,7 @@
  */
 package com.precog.util
 
-import scala.annotation.tailrec
-
+import blueeyes._
 import java.util.Arrays.fill
 
 object RawBitSet {

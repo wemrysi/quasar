@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import scala.util.Random
 
-import com.precog.util.{ BitSet, BitSetUtil }
+import com.precog.util.BitSet
 
 import scalaz._, Scalaz._
 import org.specs2.mutable._

@@ -3,7 +3,6 @@ package util.metrics
 
 import org.specs2.mutable.Specification
 import org.specs2.ScalaCheck
-import org.scalacheck.Prop._
 import org.scalacheck._
 
 class DataSizeSpec extends Specification with ScalaCheck {

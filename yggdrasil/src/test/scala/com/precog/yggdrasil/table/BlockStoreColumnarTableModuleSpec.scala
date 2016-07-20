@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes._
-import com.precog.yggdrasil.util._
 import scalaz._
 import TableModule._
 

@@ -31,7 +31,6 @@ import TableModule.SortAscending
 trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLibModule[M] {
   //import library._
   import trans._
-  import constants._
 
   trait StatsLib extends ColumnarTableLib with ReductionLib {
     import BigDecimalOperations._
@@ -51,8 +50,6 @@ trait StatsLibModule[M[+ _]] extends ColumnarTableLibModule[M] with ReductionLib
         DoubleExponentialSmoothing)
 
     object Median extends Morphism1(EmptyNamespace, "median") {
-      import Mean._
-
       val tpe = UnaryOperationType(JNumberT, JNumberT)
 
       def apply(table: Table, ctx: MorphContext) = { //TODO write tests for the empty table case

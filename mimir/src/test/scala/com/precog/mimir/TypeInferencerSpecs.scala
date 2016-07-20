@@ -20,17 +20,10 @@
 package com.precog
 package mimir
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-import bytecode.RandomLibrary
 import yggdrasil._
 import com.precog.util.Identifier
-
-import org.specs2.execute.Result
-import org.specs2.mutable._
-
-import blueeyes.json._
-
 import scalaz._
 
 trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
@@ -42,8 +35,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
     BuiltInFunction2Op,
     Add, Neg,
     DerefArray, DerefObject,
-    ArraySwap, WrapObject, JoinObject,
-    Map2Cross, Map2Match
+    ArraySwap, WrapObject, JoinObject
   }
   import bytecode._
   import library._

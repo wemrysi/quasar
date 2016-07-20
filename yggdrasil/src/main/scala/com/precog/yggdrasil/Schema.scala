@@ -19,9 +19,9 @@
  */
 package com.precog.yggdrasil
 
+import blueeyes._
 import com.precog.util.BitSet
 import table._
-import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
 

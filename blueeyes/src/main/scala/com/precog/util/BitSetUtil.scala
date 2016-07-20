@@ -17,11 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.util
-
-import scala.collection.mutable
-
-import scala.annotation.tailrec
+package blueeyes
 
 object BitSetUtil {
   class BitSetOperations(bs: BitSet) {

@@ -20,7 +20,7 @@
 package com.precog.yggdrasil
 package jdbm3
 
-import java.io.{ DataInput, DataOutput, Externalizable, ObjectInput, ObjectInputStream, ObjectOutput }
+// import java.io.{ DataInput, DataOutput, Externalizable, ObjectInput, ObjectInputStream, ObjectOutput }
 import java.util.Comparator
 
 object SortingKeyComparator {

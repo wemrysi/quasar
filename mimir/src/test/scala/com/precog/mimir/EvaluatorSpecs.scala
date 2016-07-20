@@ -23,17 +23,15 @@ package mimir
 import com.precog.common._
 import com.precog.common.accounts._
 import com.precog.util._
-import blueeyes.util.metrics.Duration._
 
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.serialization._
 import com.precog.yggdrasil.vfs._
 import com.precog.yggdrasil.util._
 
 import com.precog.common.security._
-import com.precog.util.{IOUtils, Identifier}
+// import com.precog.util.{IOUtils, Identifier}
 import com.precog.bytecode._
 
 import scalaz._, Scalaz._, Validation._
@@ -560,8 +558,6 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     "evaluate a rewrite/eval of a 3-way mega reduce" in {
-      import trans._
-
       val line = Line(1, 1, "")
 
       val load = dag.AbsoluteLoad(Const(CString("/hom/heightWeightAcrossSlices"))(line))(line)
@@ -588,8 +584,6 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     "evaluate a rewrite/eval of reductions" in {
-      import trans._
-
       val line = Line(1, 1, "")
 
       val load = dag.AbsoluteLoad(Const(CString("/hom/heightWeightAcrossSlices"))(line))(line)
@@ -615,8 +609,6 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     "three reductions on the same dataset" in {
-      import trans._
-
       val line = Line(1, 1, "")
 
       val load = dag.AbsoluteLoad(Const(CString("/hom/heightWeightAcrossSlices"))(line))(line)
@@ -641,8 +633,6 @@ trait EvaluatorSpecs[M[+_]] extends EvaluatorSpecification[M]
     }
 
     "the same reduction on three datasets" in {
-      import trans._
-
       val line = Line(1, 1, "")
 
       val load = dag.AbsoluteLoad(Const(CString("/hom/heightWeightAcrossSlices"))(line))(line)

@@ -22,10 +22,8 @@ package metadata
 
 import blueeyes._
 import com.precog.common._
-import com.precog.common.security._
-import com.precog.yggdrasil.vfs._
 import blueeyes.core.http.MimeType
-import scalaz._, Scalaz._
+import scalaz._
 
 case class PathMetadata(path: Path, pathType: PathMetadata.PathType)
 

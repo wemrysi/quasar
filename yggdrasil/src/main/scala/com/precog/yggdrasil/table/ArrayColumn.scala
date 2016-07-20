@@ -22,7 +22,7 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.util.{ BitSet, BitSetUtil }
+import com.precog.util.BitSet
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet

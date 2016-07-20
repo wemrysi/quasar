@@ -20,7 +20,7 @@
 package com.precog.common
 
 import blueeyes._
-import com.precog.util._
+import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }

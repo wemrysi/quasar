@@ -25,7 +25,7 @@ import com.precog.common._
 import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import yggdrasil.table._
-import blueeyes._, json._
+import blueeyes._
 import scalaz._, Scalaz._
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {

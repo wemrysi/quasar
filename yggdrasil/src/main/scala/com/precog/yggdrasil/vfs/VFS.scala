@@ -42,7 +42,6 @@ import java.nio.charset.{ Charset, CoderResult }
 import org.slf4s.Logging
 
 import scalaz._, Scalaz._
-import EitherT._
 import scalaz.effect.IO
 
 sealed trait Version

@@ -20,7 +20,6 @@
 package com.precog.common
 package security
 
-import com.precog.common.accounts._
 import com.precog.common.security.service._
 
 import blueeyes._

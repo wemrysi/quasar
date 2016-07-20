@@ -23,18 +23,11 @@ package mimir
 import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._
-import com.precog.bytecode.Library
 import com.precog.util._
 
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.table._
-
-import scalaz._
-import scalaz.std.option._
-
 import java.util.regex.{ Pattern, PatternSyntaxException }
-
-import TransSpecModule._
 
 /* DEPRECATED
  *
@@ -50,8 +43,7 @@ import TransSpecModule._
 
 trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait StringLib extends ColumnarTableLib {
-    import trans._
-    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, StrAndDateT, dateToStrCol }
+    import StdLib._
 
     val StringNamespace = Vector("std", "string")
 

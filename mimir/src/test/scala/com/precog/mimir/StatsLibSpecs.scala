@@ -21,8 +21,8 @@ package com.precog.mimir
 
 import com.precog.common._
 import com.precog.yggdrasil._
-import blueeyes._, json._
-import scalaz._, Scalaz._
+import blueeyes._
+import scalaz._
 
 case class Precision(p: Double)
 class AlmostEqual(d: Double) {
@@ -31,8 +31,6 @@ class AlmostEqual(d: Double) {
 
 trait StatsLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M]{ self =>
-
-  import Function._
 
   import dag._
   import instructions._

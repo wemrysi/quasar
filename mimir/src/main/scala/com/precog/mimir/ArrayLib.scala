@@ -34,7 +34,6 @@ trait ArrayLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     object Flatten extends Morphism1(Vector(), "flatten") {
       import trans._
       import TransSpecModule._
-      import scalaz.syntax.monad._
 
       val tpe = UnaryOperationType(JArrayUnfixedT, JType.JUniverseT)
 

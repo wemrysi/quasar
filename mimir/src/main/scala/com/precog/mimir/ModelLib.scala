@@ -20,17 +20,12 @@
 package com.precog
 package mimir
 
-import util._
-
+import blueeyes._
+// import util._
 import yggdrasil._
 import table._
-
-import bytecode._
-
 import common._
-
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 
 trait ModelLibModule[M[+ _]] {
   trait ModelSupport {

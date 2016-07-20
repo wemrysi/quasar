@@ -23,8 +23,6 @@ package mimir
 import bytecode._
 
 import yggdrasil._
-import yggdrasil.table._
-import TransSpecModule._
 
 trait TypeLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait TypeLib extends ColumnarTableLib {

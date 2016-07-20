@@ -20,19 +20,13 @@
 package com.precog
 package mimir
 
-import bytecode.{ BinaryOperationType, UnaryOperationType, JNumberT }
-import bytecode.Library
-
 import blueeyes._
-import com.precog.common._
+import bytecode._
 import yggdrasil._
 import yggdrasil.table._
-import TransSpecModule._
 
 trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {
   trait MathLib extends ColumnarTableLib with InfixLib {
-    import trans._
-
     val MathNamespace = Vector("std", "math")
 
     override def _lib1 =

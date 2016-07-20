@@ -24,9 +24,6 @@ import scala.util.Random._
 import blueeyes._
 import com.precog.common._
 import com.precog.util.IOUtils
-import com.precog.yggdrasil._
-
-import blueeyes.json._
 import spire.implicits._
 
 trait ClusteringTestSupport {

@@ -22,12 +22,9 @@ package com.precog.common
 import blueeyes._, json._
 import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
-
 import scalaz._
-import scalaz.syntax.apply._
 
 sealed trait MetadataType
 

@@ -23,7 +23,6 @@ import blueeyes._
 import java.util.Comparator
 import scala.collection.JavaConverters._
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.ConcurrentHashMap
 import scalaz._, Scalaz._
 
 package util {
@@ -46,62 +45,14 @@ package util {
       }
     }
   }
-
-  final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
-    private val m = new ConcurrentHashMap[A, C]()
-
-    def iterator: Iterator[(A, C)] = source.keysIterator map { a =>
-      (a, apply(a))
-    }
-
-    def get(a: A): Option[C] = m get a match {
-      case null =>
-        source get a map { b =>
-          val c = f(b)
-          m.putIfAbsent(a, c)
-          c
-        }
-      case x => Some(x)
-    }
-
-    def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
-    def -(a: A): Map[A, C]                  = iterator.toMap - a
-  }
-
-  sealed trait LazyMapValues[A, B] {
-    protected def source: Map[A, B]
-    def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
-  }
 }
 
 package object util {
-  type RawBitSet          = Array[Int]
-  type ByteBufferPoolS[A] = State[ByteBufferPool -> List[ByteBuffer], A]
-
-  /**
-    * A `Monad` for working with `ByteBuffer`s.
-    */
-  // implicit object ByteBufferPoolS extends Monad[ByteBufferPoolS] {
-  //   def point[A](a: => A): ByteBufferPoolS[A]                                              = State.state(a)
-  //   def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] = State { s => val (s1, a) = fa(s) ; f(a)(s1) }
-  //   def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer]                                   = ByteBufferPool acquire min
-  // }
-
   def flipBytes(buffer: ByteBuffer): Array[Byte] = {
     val bytes = new Array[Byte](buffer.remaining())
     buffer.get(bytes)
     buffer.flip()
     bytes
-  }
-  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
-    val len = a1.length
-    if (len != a2.length) return false
-    var i = 0
-    while (i < len) {
-      if (a1(i) != a2(i)) return false
-      i += 1
-    }
-    true
   }
 
   implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
@@ -118,7 +69,6 @@ package object util {
     def append(v1: BigDecimal, v2: => BigDecimal): BigDecimal = v1 + v2
   }
 
-  implicit def lazyValueMapper[A, B](m: Map[A, B]) = new LazyMapValues[A, B] { val source = m }
   implicit val InstantOrdering: ScalaMathOrdering[Instant] = scala.math.Ordering.Long.on[Instant](_.getMillis)
 
   implicit val FutureBind: Bind[Future] = new Bind[Future] {

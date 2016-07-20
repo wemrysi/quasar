@@ -24,11 +24,8 @@ import scalaz._
 import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
-import bytecode._
-import org.specs2.mutable._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
-import scala.collection.mutable
 
 trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 

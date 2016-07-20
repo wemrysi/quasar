@@ -21,7 +21,6 @@ package com.precog.niflheim
 
 import blueeyes._, json._
 import org.joda.time.format.DateTimeFormat
-import com.precog.util._
 
 private[niflheim] object RawLoader {
   private val fmt = DateTimeFormat.forPattern("yyyyMMddHHmmssSSS")

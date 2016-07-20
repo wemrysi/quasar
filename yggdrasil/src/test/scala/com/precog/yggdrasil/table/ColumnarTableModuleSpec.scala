@@ -30,7 +30,6 @@ import scalaz._, Scalaz._
 import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
 import SampleData._
-import PrecogSpecs._
 
 trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int

@@ -21,7 +21,6 @@ package com.precog.niflheim
 
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 
 trait StorageReader {
   def snapshot(pathConstraints: Option[Set[CPath]]): Block

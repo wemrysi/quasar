@@ -21,9 +21,6 @@ package com.precog.niflheim
 
 import blueeyes._
 import com.precog.common._
-import com.precog.common.accounts.AccountId
-import com.precog.common.ingest.EventId
-import com.precog.common.security.Authorities
 import com.precog.util._
 
 import org.slf4j.LoggerFactory

@@ -21,8 +21,7 @@ package com.precog
 package mimir
 
 import blueeyes._
-import bytecode.{ BinaryOperationType, JNumberT, JBooleanT, JTextT, Library, Instructions }
-
+import bytecode._
 import yggdrasil._
 import yggdrasil.table._
 

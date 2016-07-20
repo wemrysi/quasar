@@ -23,9 +23,8 @@ package jdbm3
 import table._
 import blueeyes._
 import com.precog.common._
-import com.precog.util.{ flipBytes => _, _ }
 import scalaz._, Scalaz._
-import ByteBufferPool._
+import com.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]
@@ -98,8 +97,6 @@ object RowFormat {
 }
 
 trait RowFormatSupport { self: StdCodecs =>
-  import ByteBufferPool._
-
   protected trait ColumnValueEncoder {
     def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]]
   }
@@ -500,8 +497,6 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
   }
 
   def ColumnEncoder(cols: Seq[Column]) = {
-    import ByteBufferPool._
-
     val colValueEncoders: Array[ColumnValueEncoder] = zipWithSelectors(cols).map({
       case (_, colsAndTypes) =>
         val writers: Seq[ColumnValueEncoder] = colsAndTypes map {

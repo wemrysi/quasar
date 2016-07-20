@@ -23,7 +23,7 @@ package table
 import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._
-import com.precog.util._
+import com.precog.util.RingDeque
 
 import TransSpecModule._
 import blueeyes._, json._

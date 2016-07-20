@@ -20,10 +20,8 @@
 package com.precog
 package mimir
 
-import org.specs2.mutable._
 import blueeyes._
 import com.precog.common._
-import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import scalaz.Need
 
@@ -31,7 +29,6 @@ trait StaticInlinerSpecs[M[+_]] extends EvaluatorSpecification[M] {
 
   import dag._
   import instructions._
-  import library._
 
   object inliner extends StdLibStaticInliner with StdLibOpFinder {
     def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext = new MorphContext(ctx, null)

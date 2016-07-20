@@ -20,21 +20,14 @@
 package com.precog.common
 package ingest
 
-import util._
-
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
-
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck._
 
 import blueeyes.json._
-import blueeyes.json.serialization.{ Extractor, Decomposer }
 import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.Extractor._
 
 import scalaz._
-import scalaz.std.list._
-import scalaz.syntax.traverse._
 
 class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCheck {
   implicit val arbArchive = Arbitrary(genRandomArchive)

@@ -23,16 +23,11 @@ package mimir
 import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
-import org.specs2.execute.Result
-import org.specs2.mutable.Specification
-
 import scalaz._
-import yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 
 trait PredicatePullupSpecs[M[+_]] extends EvaluatorSpecification[M] {
   import dag._
-  import library._
 
   val ctx = defaultEvaluationContext
 

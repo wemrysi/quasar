@@ -3,10 +3,8 @@ package json
 package serialization
 
 import DefaultSerialization._
-import IsoSerialization._
 import Extractor._
 
-import shapeless._
 import scalaz._
 
 import org.specs2.mutable.Specification

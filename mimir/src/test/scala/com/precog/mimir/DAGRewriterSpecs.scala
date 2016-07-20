@@ -19,16 +19,12 @@
  */
 package com.precog.mimir
 
-import org.specs2.mutable._
-
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil._
 
 import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction
 import scalaz.std.option.optionFirst
-import scalaz.syntax.comonad._
 
 trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
 

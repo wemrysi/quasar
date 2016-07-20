@@ -28,8 +28,7 @@ import blueeyes.json.serialization.SerializationImplicits._
 import blueeyes.json.serialization._
 
 import blueeyes.util.Clock
-
-import org.slf4j.{ LoggerFactory, Logger }
+import org.slf4j.LoggerFactory
 
 import scalaz._
 import scalaz.syntax.monad._

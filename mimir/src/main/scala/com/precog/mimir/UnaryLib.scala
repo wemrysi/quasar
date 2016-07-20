@@ -20,17 +20,14 @@
 package com.precog
 package mimir
 
-import bytecode.{ Library, UnaryOperationType, JNumberT, JBooleanT }
-
+import bytecode._
 import yggdrasil._
 import yggdrasil.table._
-
-import TransSpecModule._
 
 trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
   trait UnaryLib extends ColumnarTableLib {
     import trans._
-    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined }
+    import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }
 
     object Unary {
       val UnaryNamespace = Vector("std", "unary")

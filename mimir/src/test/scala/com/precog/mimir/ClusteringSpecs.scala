@@ -24,9 +24,8 @@ import com.precog.yggdrasil._
 
 import spire.implicits._
 import scala.util.Random
-import blueeyes._, json._
+import blueeyes._
 import scalaz._
-import org.specs2.mutable._
 
 trait ClusteringLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with ClusteringTestSupport

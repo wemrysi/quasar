@@ -23,8 +23,6 @@ package table
 import blueeyes._
 import com.precog.common._
 
-import blueeyes.json._
-
 class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extends Slice {
 
   private val forwardIndex: Map[CPathNode, Map[ColumnRef, Column]] = source.columns.foldLeft(Map.empty[CPathNode, Map[ColumnRef, Column]]) {

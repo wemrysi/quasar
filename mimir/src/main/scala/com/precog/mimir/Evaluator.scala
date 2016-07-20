@@ -21,7 +21,7 @@ package com.precog
 package mimir
 
 import blueeyes._
-import com.precog.common._, security._, accounts._
+import com.precog.common._, accounts._
 import com.precog.bytecode._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
@@ -838,8 +838,6 @@ trait EvaluatorModule[M[+ _]]
         * it will perforce be evaluated last.
         */
       def fullEval(graph: DepGraph, splits: Map[Identifier, Int => N[Table]], parentSplits: List[Identifier]): StateT[N, EvaluatorState, Table] = {
-        import scalaz.syntax.monoid._
-
         type EvaluatorStateT[A] = StateT[N, EvaluatorState, A]
 
         def stage(toEval: List[StagingPoint], graph: DepGraph): EvaluatorStateT[DepGraph] = {

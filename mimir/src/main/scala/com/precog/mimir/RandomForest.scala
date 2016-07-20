@@ -391,7 +391,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
   }
 
-  private def extract[@specialized(Double) A: Manifest](table: Table)(pf: PartialFunction[Column, Int => A]): M[Array[A]] = {
+  private def extract[A: Manifest](table: Table)(pf: PartialFunction[Column, Int => A]): M[Array[A]] = {
     def die = sys.error("Cannot handle undefined rows. Expected dense column.")
 
     def loop(stream: StreamT[M, Slice], acc: List[Array[A]]): M[Array[A]] = {

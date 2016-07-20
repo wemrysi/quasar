@@ -25,8 +25,6 @@ import yggdrasil.table._
 
 import common._
 import bytecode._
-import util._
-
 import scalaz._, Scalaz._
 
 trait SummaryLibModule[M[+ _]] extends ReductionLibModule[M] {

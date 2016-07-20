@@ -22,17 +22,11 @@ package mimir
 
 import blueeyes._
 import com.precog.common._
-import common.Path
-
 import org.specs2.execute.Result
-import org.specs2.mutable.Specification
-
 import com.precog.bytecode.JType.JUniverseT
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.util.IdGen
-
-import scala.Function._
 import scalaz._
 
 trait JoinOptimizerSpecs[M[+_]] extends EvaluatorSpecification[M]

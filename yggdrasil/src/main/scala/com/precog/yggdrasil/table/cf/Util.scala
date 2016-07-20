@@ -22,8 +22,6 @@ package table
 package cf
 
 import blueeyes._
-import com.precog.common._
-import com.precog.util.{ BitSet, BitSetUtil, Loop }
 
 object util {
 

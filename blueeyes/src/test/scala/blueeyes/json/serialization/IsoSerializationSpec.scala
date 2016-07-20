@@ -8,7 +8,6 @@ import DefaultSerialization._
 import IsoSerialization._
 
 import shapeless._
-import scalaz._
 
 object IsoSerializationSpec {
   case class Foo(s: String, i: Option[Int], b: Boolean)

@@ -21,10 +21,6 @@ package com.precog.common
 
 import blueeyes._
 import com.precog.util.{ ByteBufferPool, RawBitSet }
-
-import com.precog.util.BitSet
-import com.precog.util.BitSetUtil
-
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{Shrink, Arbitrary, Gen}

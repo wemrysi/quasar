@@ -1,4 +1,4 @@
-import scalaz._, Scalaz._
+import scalaz._
 
 package object blueeyes {
   // scala stdlib
@@ -50,6 +50,13 @@ package object blueeyes {
   val ScalazOrder     = scalaz.Order
   val ScalazOrdering  = scalaz.Ordering
 
+  // Temporary
+  type BitSet             = com.precog.util.BitSet
+  // val BitSet              = com.precog.util.BitSet
+  type RawBitSet          = Array[Int]
+  val RawBitSet           = com.precog.util.RawBitSet
+  type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+
   // Can't overload in package objects in scala 2.9!
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                         = java.nio.ByteBuffer.wrap(xs)
   def ByteBufferWrap2(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
@@ -74,9 +81,66 @@ package object blueeyes {
     def sortMe(implicit z: scalaz.Order[A]): Vector[A] =
       xs sortWith ((a, b) => z.order(a, b) == Ordering.LT) toVector
   }
+  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
+    val len = a1.length
+    if (len != a2.length) return false
+    var i = 0
+    while (i < len) {
+      if (a1(i) != a2(i)) return false
+      i += 1
+    }
+    true
+  }
+
+  implicit class LazyMapValues[A, B](source: Map[A, B]) {
+    def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
+  }
 }
 
 package blueeyes {
+  /**
+    * This object contains some methods to do faster iteration over primitives.
+    *
+    * In particular it doesn't box, allocate intermediate objects, or use a (slow)
+    * shared interface with scala collections.
+    */
+  object Loop {
+    @tailrec
+    def range(i: Int, limit: Int)(f: Int => Unit) {
+      if (i < limit) {
+        f(i)
+        range(i + 1, limit)(f)
+      }
+    }
+
+    final def forall[@specialized A](as: Array[A])(f: A => Boolean): Boolean = {
+      @tailrec def loop(i: Int): Boolean = i == as.length || f(as(i)) && loop(i + 1)
+
+      loop(0)
+    }
+  }
+
+  final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
+    private val m = new java.util.concurrent.ConcurrentHashMap[A, C]()
+
+    def iterator: Iterator[(A, C)] = source.keysIterator map { a =>
+      (a, apply(a))
+    }
+
+    def get(a: A): Option[C] = m get a match {
+      case null =>
+        source get a map { b =>
+          val c = f(b)
+          m.putIfAbsent(a, c)
+          c
+        }
+      case x => Some(x)
+    }
+
+    def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
+    def -(a: A): Map[A, C]                  = iterator.toMap - a
+  }
+
   final class FreshAtomicIdSource {
     private val source = new java.util.concurrent.atomic.AtomicLong
     def nextId() = source.getAndIncrement

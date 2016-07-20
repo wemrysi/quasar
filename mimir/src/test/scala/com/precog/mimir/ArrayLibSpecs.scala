@@ -19,18 +19,13 @@
  */
 package com.precog.mimir
 
-import org.specs2.mutable._
-
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil._
 import scalaz._
-import scalaz.std.list._
 
 trait ArrayLibSpecs[M[+_]] extends EvaluatorSpecification[M]
     with LongIdMemoryDatasetConsumer[M] { self =>
-
-  import Function._
 
   import dag._
   import instructions._

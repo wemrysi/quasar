@@ -23,8 +23,7 @@ import com.precog.util.PrecogUnit
 
 import blueeyes._
 import java.nio.channels.{ ReadableByteChannel, WritableByteChannel }
-import java.nio.ByteBuffer
-import scalaz.{ Validation, Success, Failure }
+import scalaz._
 
 /**
   * A `VersionedSegmentFormat` wraps formats and is used to deal with multiple

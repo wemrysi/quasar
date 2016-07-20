@@ -33,7 +33,6 @@ import scalaz.syntax.bifunctor._
 trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] with ObjectConcatHelpers with ArrayConcatHelpers with MapUtils {
 
   import trans._
-  import trans.constants._
 
   protected object SliceTransform {
     def identity[A](initial: A) = SliceTransform1.liftM[A](initial, (a: A, s: Slice) => (a, s))
@@ -966,7 +965,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
   }
 
   object SliceTransform2 {
-    import SliceTransform1.{ SliceTransform1S, SliceTransform1M, SliceTransform1SMS, MappedState1 }
+    import SliceTransform1._
 
     def liftM[A](init: A, f: (A, Slice, Slice) => (A, Slice)): SliceTransform2[A] =
       SliceTransform2S(init, f)

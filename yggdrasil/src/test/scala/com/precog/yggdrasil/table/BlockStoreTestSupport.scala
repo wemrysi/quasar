@@ -22,7 +22,6 @@ package table
 
 import com.precog.common._
 import com.precog.common.security.APIKey
-import com.precog.yggdrasil.util._
 
 import blueeyes._, json._
 import scalaz._, Scalaz._

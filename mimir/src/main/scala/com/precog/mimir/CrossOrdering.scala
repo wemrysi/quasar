@@ -26,7 +26,6 @@ import scala.collection.mutable
 
 trait CrossOrdering extends DAG {
   import TableModule.CrossOrder // TODO: Move CrossOrder out somewhere else.
-  import instructions._
   import dag._
 
   def orderCrosses(node: DepGraph): DepGraph = {

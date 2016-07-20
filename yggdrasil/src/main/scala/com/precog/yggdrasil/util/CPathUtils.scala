@@ -23,7 +23,6 @@ package util
 import blueeyes._
 import com.precog.common._
 import blueeyes.json._
-import scalaz._
 
 object CPathUtils {
   def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {

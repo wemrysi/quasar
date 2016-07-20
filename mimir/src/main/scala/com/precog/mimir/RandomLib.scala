@@ -26,8 +26,6 @@ import yggdrasil._
 import yggdrasil.table._
 import TransSpecModule._
 
-import com.precog.util.{ BitSet, BitSetUtil }
-
 import scalaz._
 import scalaz.std.anyVal._
 import scalaz.std.option._

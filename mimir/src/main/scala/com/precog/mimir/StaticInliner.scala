@@ -22,14 +22,11 @@ package mimir
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 
 import Function._
 
 trait StaticInlinerModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] {
-  import dag._
-
   trait StaticInliner extends EvaluatorMethods {
     def inlineStatics(graph: DepGraph, ctx: EvaluationContext): DepGraph
   }
@@ -37,7 +34,6 @@ trait StaticInlinerModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] {
 
 trait StdLibStaticInlinerModule[M[+ _]] extends StaticInlinerModule[M] with StdLibModule[M] {
   import dag._
-  import library._
   import instructions._
 
   trait StdLibStaticInliner extends StaticInliner {

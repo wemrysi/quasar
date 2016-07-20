@@ -21,7 +21,7 @@ package com.precog
 package mimir
 
 import yggdrasil._
-import bytecode.{ BinaryOperationType, JNumberT, JBooleanT, JTextT, Library, Instructions }
+import bytecode._
 
 trait OpFinderModule[M[+ _]] extends Instructions with TableModule[M] with TableLibModule[M] {
   import instructions._

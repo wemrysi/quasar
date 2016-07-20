@@ -19,9 +19,8 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
-import com.precog.util.PrecogUnit
 import scalaz._, Scalaz._
 
 trait ProjectionModule[M[+ _], Block] {

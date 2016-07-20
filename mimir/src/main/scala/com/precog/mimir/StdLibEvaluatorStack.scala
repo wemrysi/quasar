@@ -19,7 +19,6 @@
  */
 package com.precog.mimir
 
-import com.precog.yggdrasil._
 import com.precog.yggdrasil.table.cf
 import scalaz._
 

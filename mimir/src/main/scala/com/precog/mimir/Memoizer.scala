@@ -39,8 +39,6 @@ trait Memoizer extends DAG {
   def scaleMemoPriority(count: Int): Int = count // TODO exponential function?
 
   private def applyMemoizations(target: DepGraph, refs: Map[DepGraph, Set[OpSide]]): DepGraph = {
-    import OpSide._
-
     // todo investigate why if we use a `DepGraphWrapper` here, tests fail in MiscStackSpecs
     val memotable = mutable.Map[DepGraph, DepGraph]()
 

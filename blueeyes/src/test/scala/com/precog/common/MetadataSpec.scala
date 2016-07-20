@@ -25,12 +25,11 @@ import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._, Scalaz._
 import org.specs2._
 import org.specs2.mutable.Specification
-import org.scalacheck._, Gen.{ choose, frequency, listOfN }, Arbitrary.arbitrary
+import org.scalacheck._, Gen._
+// import org.scalacheck._, Gen.{ choose, frequency, listOfN }, Arbitrary.arbitrary
 import PrecogScalacheck._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
-  import Prop._
-
   val sampleSize = 100
 
   "simple metadata" should {

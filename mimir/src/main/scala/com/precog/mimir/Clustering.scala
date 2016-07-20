@@ -24,9 +24,7 @@ import bytecode._
 import yggdrasil._
 import yggdrasil.table._
 import common._
-import com.precog.util._
-
-import blueeyes._, json._
+import blueeyes._
 import scalaz._, Scalaz._
 
 trait KMediansCoreSetClustering {

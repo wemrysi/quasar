@@ -19,9 +19,7 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.DefaultSerialization._
+import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._
 

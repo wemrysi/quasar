@@ -21,12 +21,10 @@ package com.precog.yggdrasil
 package table
 
 import com.precog.common._, security._
-import com.precog.yggdrasil.util._
 import com.precog.bytecode.JType
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import PrecogSpecs._
 
 // TODO: mix in a trait rather than defining Table directly
 

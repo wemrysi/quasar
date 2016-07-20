@@ -23,7 +23,7 @@ package table
 import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen.{ listOfN, containerOfN }, Arbitrary._
-import com.precog.util.{ BitSet, BitSetUtil }
+import com.precog.util.BitSet
 import PrecogScalacheck._
 
 trait ArbitrarySlice {

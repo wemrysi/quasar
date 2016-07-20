@@ -21,12 +21,7 @@ package com.precog.yggdrasil.util
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.{ IdSource, TableModule }
 import com.precog.yggdrasil.table._
-
-import com.precog.util.{ BitSet, BitSetUtil, Loop }
-
-import scalaz._
 
 trait IdSourceScannerModule {
   val idSource = new FreshAtomicIdSource

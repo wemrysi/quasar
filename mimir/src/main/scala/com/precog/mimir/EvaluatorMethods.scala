@@ -19,25 +19,16 @@
  */
 package com.precog.mimir
 
-import scalaz.Monoid
-
-import scala.collection.mutable
-
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 import com.precog.yggdrasil._
 import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.TableModule.paths
 
-import scalaz.std.map._
-
 trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableLibModule[M] with OpFinderModule[M] {
   import dag._
   import instructions._
-  import library._
   import trans._
-  import trans.constants._
 
   trait EvaluatorMethods extends OpFinder {
     def MorphContext(ctx: EvaluationContext, node: DepGraph): MorphContext
