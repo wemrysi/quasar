@@ -36,8 +36,8 @@ object ReduceFunc {
         case (Max(a),          Max(b))          => eq.equal(a, b)
         case (Avg(a),          Avg(b))          => eq.equal(a, b)
         case (Arbitrary(a),    Arbitrary(b))    => eq.equal(a, b)
-        case (UnshiftMap(a),   UnshiftMap(b))   => eq.equal(a, b)
         case (UnshiftArray(a), UnshiftArray(b)) => eq.equal(a, b)
+        case (UnshiftMap(a1, a2), UnshiftMap(b1, b2)) => eq.equal(a1, b1) && eq.equal(a2, b2)
         case (_,               _)               => false
       }
     }
@@ -51,8 +51,8 @@ object ReduceFunc {
         case Max(a)          => Cord("Max(") ++ show.show(a) ++ Cord(")")
         case Avg(a)          => Cord("Avg(") ++ show.show(a) ++ Cord(")")
         case Arbitrary(a)    => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
-        case UnshiftMap(a)   => Cord("UnshiftMap(") ++ show.show(a) ++ Cord(")")
         case UnshiftArray(a) => Cord("UnshiftArray(") ++ show.show(a) ++ Cord(")")
+        case UnshiftMap(a1, a2) => Cord("UnshiftMap(") ++ show.show(a1) ++ Cord(", ") ++ show.show(a2) ++ Cord(")")
       }
     }
 
@@ -65,20 +65,23 @@ object ReduceFunc {
         case Max(a)          => f(a) ∘ (Max(_))
         case Avg(a)          => f(a) ∘ (Avg(_))
         case Arbitrary(a)    => f(a) ∘ (Arbitrary(_))
-        case UnshiftMap(a)   => f(a) ∘ (UnshiftMap(_))
         case UnshiftArray(a) => f(a) ∘ (UnshiftArray(_))
+        case UnshiftMap(a1, a2) => (f(a1) ⊛ f(a2))(UnshiftMap(_, _))
       }
   }
 
-  def translateReduction[A]: UnaryFunc => A => ReduceFunc[A] = {
+  def translateUnaryReduction[A]: UnaryFunc => A => ReduceFunc[A] = {
     case agg.Count     => Count(_)
     case agg.Sum       => Sum(_)
     case agg.Min       => Min(_)
     case agg.Max       => Max(_)
     case agg.Avg       => Avg(_)
     case agg.Arbitrary => Arbitrary(_)
-    case structural.UnshiftMap   => UnshiftMap(_)
     case structural.UnshiftArray => UnshiftArray(_)
+  }
+
+  def translateBinaryReduction[A]: BinaryFunc => (A, A) => ReduceFunc[A] = {
+    case structural.UnshiftMap => UnshiftMap(_, _)
   }
 }
 
@@ -90,6 +93,6 @@ object ReduceFuncs {
   final case class Max[A](a: A)          extends ReduceFunc[A]
   final case class Avg[A](a: A)          extends ReduceFunc[A]
   final case class Arbitrary[A](a: A)    extends ReduceFunc[A]
-  final case class UnshiftMap[A](a: A)   extends ReduceFunc[A]
   final case class UnshiftArray[A](a: A) extends ReduceFunc[A]
+  final case class UnshiftMap[A](a1: A, a2: A) extends ReduceFunc[A]
 }

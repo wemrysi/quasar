@@ -289,12 +289,7 @@ trait StructuralLib extends Library {
     "Zooms in on the values of a map, adding the keys as a new dimension",
     Top,
     Func.Input1(AnyObject),
-    new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(UnshiftMap, (Sized(Embed(set))))))) => set.some
-        case _                                                                => None
-      }
-    },
+    noSimplification,
     partialTyperV[nat._1] {
       case Sized(x) if x.objectLike =>
         x.objectType.fold[ValidationNel[SemanticError, Type]](
@@ -312,7 +307,7 @@ trait StructuralLib extends Library {
     new Func.Simplifier {
       def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
         case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(UnshiftArray, Sized(Embed(set)))))) => set.some
-        case _                                                                  => None
+        case _                                                                                => None
       }
     },
     partialTyperV[nat._1] {
@@ -350,32 +345,33 @@ trait StructuralLib extends Library {
       case Int => Func.Input1(FlexArr(0, None, Top))
     })
 
-  val UnshiftMap: UnaryFunc = UnaryFunc(
+  val UnshiftMap: BinaryFunc = BinaryFunc(
     Reduction,
-    "{...}",
-    "Unshifts a dimension from the set identity, creating a map with the dimensional values as the keys.",
+    "({...})",
+    "Puts the value into a map with the key.",
     AnyObject,
-    Func.Input1(Top),
-    new Func.Simplifier {
-      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
-        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
-        case _                                                              => None
-      }
+    Func.Input2(Top, Top),
+    noSimplification,
+    // new Func.Simplifier {
+    //   def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) = orig match {
+    //     case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(ShiftMap, Sized(Embed(map)))))) => map.some
+    //     case _                                                                            => None
+    //   }
+    // },
+    partialTyper[nat._2] {
+      case Sized(_, value) => Obj(Map(), Some(value))
     },
-    partialTyper[nat._1] {
-      case Sized(tpe) => Obj(Map(), Some(tpe))
-    },
-    partialUntyperV[nat._1] {
+    partialUntyperV[nat._2] {
       case tpe if tpe.objectLike =>
-        tpe.objectType.fold[Func.VDomain[nat._1]](
+        tpe.objectType.fold[Func.VDomain[nat._2]](
           failure(NonEmptyList(GenericError("internal error: objectLike, but no objectType"))))(
-          x => success(Func.Input1(x)))
+          x => success(Func.Input2(Top, x)))
     })
 
   val UnshiftArray: UnaryFunc = UnaryFunc(
     Reduction,
     "[...]",
-    "Unshifts an integral dimension from the set identity, creating an array with the dimensional values as the indices.",
+    "Puts the values into an array.",
     AnyArray,
     Func.Input1(Top),
     new Func.Simplifier {
@@ -406,12 +402,12 @@ trait StructuralLib extends Library {
     MakeArray :: FlattenMap :: FlattenArray ::
     FlattenMapKeys :: FlattenArrayIndices ::
     ShiftMap :: ShiftArray :: ShiftMapKeys ::
-    ShiftArrayIndices :: UnshiftMap :: UnshiftArray :: Nil
+    ShiftArrayIndices :: UnshiftArray :: Nil
 
   def binaryFunctions: List[GenericFunc[nat._2]] =
     MakeObject :: ObjectConcat :: ArrayConcat ::
     ConcatOp :: ObjectProject :: ArrayProject ::
-    DeleteField :: Nil
+    DeleteField :: UnshiftMap :: Nil
 
   def ternaryFunctions: List[GenericFunc[nat._3]] = Nil
 
@@ -462,3 +458,4 @@ trait StructuralLib extends Library {
 }
 
 object StructuralLib extends StructuralLib
+

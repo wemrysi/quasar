@@ -295,8 +295,10 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     deref_expr * (op("^") ^^^ (Pow(_: T[Sql], _: T[Sql]).embed))
 
   def unshift_expr: Parser[T[Sql]] =
-    op("{") ~> expr <~ op("...") <~ op("}") ^^ (UnshiftMap(_).embed) |
-    op("[") ~> expr <~ op("...") <~ op("]") ^^ (UnshiftArray(_).embed)
+    op("[") ~> expr <~ op("...") <~ op("]") ^^ (UnshiftArray(_).embed) |
+    op("{") ~ expr ~ op(":") ~ expr <~ op("...") <~ op("}") ^^ {
+      case _ ~ k ~ _ ~ v => UnshiftMap(k, v).embed
+    }
 
   def deref_expr: Parser[T[Sql]] = primary_expr ~ (rep(
     (op(".") ~> (
@@ -305,7 +307,7 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       (op("{*}") | op("{:*}")) ^^^ DimChange[T](FlattenMapValues)    |
       op("{_:}")               ^^^ DimChange[T](ShiftMapKeys)        |
       (op("{_}") | op("{:_}")) ^^^ DimChange[T](ShiftMapValues)      |
-      (op("{") ~> (expr ^^ (ObjectDeref(_))) <~ op("}"))          |
+      (op("{") ~> (expr ^^ (ObjectDeref(_))) <~ op("}"))             |
       op("[*:]")               ^^^ DimChange[T](FlattenArrayIndices) |
       (op("[*]") | op("[:*]")) ^^^ DimChange[T](FlattenArrayValues)  |
       op("[_:]")               ^^^ DimChange[T](ShiftArrayIndices)   |

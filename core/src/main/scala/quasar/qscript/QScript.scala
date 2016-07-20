@@ -411,7 +411,34 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           newProvs,
           Sized[List](
             ReduceFuncs.Arbitrary(newProvs),
-            ReduceFunc.translateReduction[FreeMap[T]](func)(reduce)),
+            ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.point(Fin[nat._0, nat._2]))),
+            Free.roll(MakeArray(Free.point(Fin[nat._1, nat._2])))))))))
+    }
+  }
+
+  def invokeReduction2(
+    func: BinaryFunc,
+    values: Func.Input[T[Target], nat._2]):
+      TargetT = {
+    val (src, provs, lMap, rMap) = autojoin(values(0), values(1))
+
+    // NB: If there’s no provenance, then there’s nothing to reduce. We’re
+    //     already holding a single value.
+    provs.tailOption.fold(EnvT((EmptyAnn[T], src))) { tail =>
+      val (newProvs, provAccess) = concatBuckets(tail)
+
+      EnvT[Ann[T], F, T[Target]]((
+        Ann[T](
+          provAccess.map(_ >> Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](0)))),
+          Free.roll(ProjectIndex(UnitF[T], IntLit[T, Unit](1)))),
+        QC.inj(Reduce[T, T[Target], nat._1](
+          values(0),
+          newProvs,
+          Sized[List](
+            ReduceFuncs.Arbitrary(newProvs),
+            ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.point(Fin[nat._0, nat._2]))),
             Free.roll(MakeArray(Free.point(Fin[nat._1, nat._2])))))))))
@@ -554,6 +581,10 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Reduction =>
       invokeReduction1(func, Func.Input1(a1)).right
+
+    case LogicalPlan.InvokeFUnapply(func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2))
+        if func.effect ≟ Reduction =>
+      invokeReduction2(func, Func.Input2(a1, a2)).right
 
     case LogicalPlan.InvokeFUnapply(set.Take, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -779,46 +810,26 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
       }
     }
 
-  def coalesceQC[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
-      QScriptCore[T, T[F]] => Option[QScriptCore[T, T[F]]] = {
-    case Map(Embed(src), mf) => QC.prj(src) >>= {
-      case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
-      case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
-      case _ => None
+  // TODO write extractor for inject
+  //SourcedPathable[T, T[CoEnv[A,F, ?]]] => SourcedPathable[T, T[F]] = {
+  //F[A] => A  ===> CoEnv[E, F, A] => A
+  def coalesceMaps[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[F]] => QScriptCore[T, T[F]] = {
+    case x @ Map(Embed(src), mf) => QC.prj(src) match {
+      case Some(Map(srcInner, mfInner)) => Map(srcInner, rebase(mf, mfInner))
+      case _ => x
     }
-    // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
-    case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(QC.inj(Take(src, fromInner, count)).embed, mf).some
-        case _ => None
-      }
-    case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(QC.inj(Drop(src, fromInner, count)).embed, mf).some
-        case _ => None
-      }
-    case _ => None
+    case x => x
   }
 
-  def coalesceQCCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
-      QScriptCore[T, T[CoEnv[A, F, ?]]] => Option[QScriptCore[T, T[CoEnv[A, F, ?]]]] = {
-    case Map(Embed(src), mf) =>
-      src.run.toOption >>= QC.prj >>= {
-        case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
-        case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
-        case _ => None
-      }
-    case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(CoEnv(QC.inj(Take(src, fromInner, count)).right[A]).embed, mf).some
-        case _ => None
-      }
-    case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(CoEnv(QC.inj(Drop(src, fromInner, count)).right[A]).embed, mf).some
-        case _ => None
-      }
-    case _ => None
+  def coalesceMapsCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[CoEnv[A, F, ?]]] => QScriptCore[T, T[CoEnv[A, F, ?]]] = {
+    case x @ Map(Embed(src), mf) =>
+      src.run.fold(κ(x), QC.prj(_) match {
+        case Some(Map(srcInner, mfInner)) => Map(srcInner, rebase(mf, mfInner))
+        case _ => x
+      })
+    case x => x
   }
 
   def coalesceMapJoin[F[_]: Functor](
@@ -845,12 +856,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
              FI: F :<: QScriptProject[T, ?]):
       F[T[F]] => F[T[F]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
-      Normalizable[F].normalize ⋙
-      quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFF(repeatedly(coalesceQC[F])) ⋙
-      liftFG(coalesceMapJoin[F]) ⋙
-      Normalizable[F].normalize ⋙
-      liftFG(elideNopMap[F])
+    Normalizable[F].normalize ⋙
+    quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+    liftFF(coalesceMaps[F]) ⋙
+    liftFG(coalesceMapJoin[F]) ⋙
+    Normalizable[F].normalize ⋙
+    liftFG(elideNopMap[F])
 
   // Only used when processing user-provided ThetaJoins
   def applyMost[F[_]: Functor: Normalizable](
@@ -860,12 +871,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
              FI: F :<: QScriptProject[T, ?]):
       F[T[F]] => F[T[F]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
-      Normalizable[F].normalize ⋙
-      // quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFF(repeatedly(coalesceQC[F])) ⋙
-      liftFG(coalesceMapJoin[F]) ⋙
-      Normalizable[F].normalize ⋙
-      liftFG(elideNopMap[F])
+    Normalizable[F].normalize ⋙
+    // quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
+    liftFF(coalesceMaps[F]) ⋙
+    liftFG(coalesceMapJoin[F]) ⋙
+    Normalizable[F].normalize ⋙
+    liftFG(elideNopMap[F])
 
   def applyToFreeQS[F[_]: Functor: Normalizable, A](
     implicit QC: QScriptCore[T, ?] :<: F,
@@ -876,7 +887,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[A, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFF[QScriptCore[T, ?], F, T[CoEnv[A, F, ?]]](repeatedly(coalesceQCCo[F, A])) ⋙
+      liftFF[QScriptCore[T, ?], F, T[CoEnv[A, F, ?]]](coalesceMapsCo[F, A]) ⋙
       Normalizable[F].normalize ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
 }

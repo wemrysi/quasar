@@ -811,18 +811,23 @@ class CompilerSpec extends Specification with CompilerHelpers with PendingWithAc
     }
 
     "compile map shift / unshift" in {
+      val inner = ShiftMap[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), Constant(Data.Str("commit"))), Constant(Data.Str("author"))))
+
       testLogicalPlanCompile(
-        "select {length(commit.author{:_})...} from slamengine_commits",
-        Squash(makeObj("0" ->
-          UnshiftMap[FLP](
-            Length[FLP](
-              ShiftMap[FLP](ObjectProject[FLP](ObjectProject(read("slamengine_commits"), Constant(Data.Str("commit"))), Constant(Data.Str("author")))))))))
+        "select {commit.author{:_}: length(commit.author{:_}) ...} from slamengine_commits",
+        Let('__tmp0, read("slamengine_commits"),
+          Squash(makeObj("0" ->
+            UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
 
     "compile map shift / unshift keys" in {
+      val inner = ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(Free('__tmp0), Constant(Data.Str("commit"))), Constant(Data.Str("author"))))
+
       testLogicalPlanCompile(
-        "select {length(commit.author{_:})...} from slamengine_commits",
-        Squash(makeObj("0" -> UnshiftMap[FLP](Length[FLP](ShiftMapKeys[FLP](ObjectProject[FLP](ObjectProject(read("slamengine_commits"), Constant(Data.Str("commit"))), Constant(Data.Str("author")))))))))
+        "select {commit.author{_:}: length(commit.author{_:})...} from slamengine_commits",
+        Let('__tmp0, read("slamengine_commits"),
+          Squash(makeObj("0" ->
+            UnshiftMap[FLP](inner, Length[FLP](inner))))))
     }
 
     "compile array shift / unshift" in {

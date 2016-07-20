@@ -234,7 +234,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
           err.message,
           "value" := value)
       case InternalError(msg) =>
-        fromMsg_(InternalServerError withReason "Failed to plan query.", msg)
+        fromMsg_(
+          InternalServerError withReason "Failed to plan query.", msg)
+      case UnboundVariable(v) =>
+        fromMsg_(
+          InternalServerError withReason "Unbound variable.", v.toString)
     })
   }
 
