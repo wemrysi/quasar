@@ -270,7 +270,7 @@ class ViewFSSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMat
       viewInterpTrace(views, Map(), f) must_=== ViewInterpResultTrace(
         Vector.empty,
         VS.emptyWithViews(views),
-        -\/(FileSystemError.pathErr(PathError.invalidPath(p, "cannot write to view"))))
+        -\/(FileSystemError.pathErr(PathError.invalidPath(p, "Cannot write to a view."))))
     }
   }
 
