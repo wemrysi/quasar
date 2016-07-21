@@ -94,7 +94,7 @@ trait JobManager[M[+ _]] { self =>
     * Starts a job if it is in the `NotStarted` state, otherwise an error string
     * is returned.
     */
-  def start(job: JobId, startedAt: DateTime = new DateTime): M[Either[String, Job]]
+  def start(job: JobId, startedAt: DateTime = dateTime.now): M[Either[String, Job]]
 
   /**
     * Cancels a job. This doesn't necessarily mean the job has actually stopped,
@@ -104,24 +104,24 @@ trait JobManager[M[+ _]] { self =>
     * should give a useful string about why the cancellation was requested (eg.
     * "User action." or "Server restart.").
     */
-  def cancel(job: JobId, reason: String, cancelledAt: DateTime = new DateTime): M[Either[String, Job]]
+  def cancel(job: JobId, reason: String, cancelledAt: DateTime = dateTime.now): M[Either[String, Job]]
 
   /**
     * Aborts a job by putting it into the `Aborted` state. This is a terminal
     * state.
     */
-  def abort(job: JobId, reason: String, abortedAt: DateTime = new DateTime): M[Either[String, Job]]
+  def abort(job: JobId, reason: String, abortedAt: DateTime = dateTime.now): M[Either[String, Job]]
 
   /**
     * Moves the job to the `Finished` terminal state, with the given value as
     * the result.
     */
-  def finish(job: JobId, finishedAt: DateTime = new DateTime): M[Either[String, Job]]
+  def finish(job: JobId, finishedAt: DateTime = dateTime.now): M[Either[String, Job]]
 
   /**
     * Moves the job to the `Expired` terminal state.
     */
-  def expire(job: JobId, expiredAt: DateTime = new DateTime): M[Either[String, Job]]
+  def expire(job: JobId, expiredAt: DateTime = dateTime.now): M[Either[String, Job]]
 
   def setResult(job: JobId, mimeType: Option[MimeType], data: StreamT[M, Array[Byte]]): M[Either[String, Unit]]
 
@@ -156,15 +156,15 @@ trait JobManager[M[+ _]] { self =>
 
     def listMessages(job: JobId, channel: ChannelId, since: Option[MessageId]): N[Seq[Message]] = t(self.listMessages(job, channel, since))
 
-    def start(job: JobId, startedAt: DateTime = new DateTime): N[Either[String, Job]] = t(self.start(job, startedAt))
+    def start(job: JobId, startedAt: DateTime = dateTime.now): N[Either[String, Job]] = t(self.start(job, startedAt))
 
-    def cancel(job: JobId, reason: String, cancelledAt: DateTime = new DateTime): N[Either[String, Job]] = t(self.cancel(job, reason, cancelledAt))
+    def cancel(job: JobId, reason: String, cancelledAt: DateTime = dateTime.now): N[Either[String, Job]] = t(self.cancel(job, reason, cancelledAt))
 
-    def abort(job: JobId, reason: String, abortedAt: DateTime = new DateTime): N[Either[String, Job]] = t(self.abort(job, reason, abortedAt))
+    def abort(job: JobId, reason: String, abortedAt: DateTime = dateTime.now): N[Either[String, Job]] = t(self.abort(job, reason, abortedAt))
 
-    def finish(job: JobId, finishedAt: DateTime = new DateTime): N[Either[String, Job]] = t(self.finish(job, finishedAt))
+    def finish(job: JobId, finishedAt: DateTime = dateTime.now): N[Either[String, Job]] = t(self.finish(job, finishedAt))
 
-    def expire(job: JobId, expiredAt: DateTime = new DateTime): N[Either[String, Job]] = t(self.expire(job, expiredAt))
+    def expire(job: JobId, expiredAt: DateTime = dateTime.now): N[Either[String, Job]] = t(self.expire(job, expiredAt))
 
     def setResult(job: JobId, mimeType: Option[MimeType], data: StreamT[N, Array[Byte]]): N[Either[String, Unit]] =
       t(self.setResult(job, mimeType, transformStreamBack(data)))
@@ -190,26 +190,26 @@ trait JobStateManager[M[+ _]] { self: JobManager[M] =>
     case badState   => Left("Cannot start job. %s" format JobState.describe(badState))
   }
 
-  def cancel(id: JobId, reason: String, cancelledAt: DateTime = new DateTime): M[Either[String, Job]] = transition(id) {
+  def cancel(id: JobId, reason: String, cancelledAt: DateTime = dateTime.now): M[Either[String, Job]] = transition(id) {
     case prev @ (NotStarted | Started(_, _)) => Right(Cancelled(reason, cancelledAt, prev))
     case badState                            => Left(JobState.describe(badState))
   }
 
-  def abort(id: JobId, reason: String, abortedAt: DateTime = new DateTime): M[Either[String, Job]] = transition(id) {
+  def abort(id: JobId, reason: String, abortedAt: DateTime = dateTime.now): M[Either[String, Job]] = transition(id) {
     case prev @ (NotStarted | Started(_, _) | Cancelled(_, _, _)) =>
       Right(Aborted(reason, abortedAt, prev))
     case badState =>
       Left("Job already in terminal state. %s" format JobState.describe(badState))
   }
 
-  def finish(id: JobId, finishedAt: DateTime = new DateTime): M[Either[String, Job]] = transition(id) {
+  def finish(id: JobId, finishedAt: DateTime = dateTime.now): M[Either[String, Job]] = transition(id) {
     case prev @ (NotStarted | Started(_, _) | Cancelled(_, _, _)) =>
       Right(Finished(finishedAt, prev))
     case badState =>
       Left("Job already in terminal state. %s" format JobState.describe(badState))
   }
 
-  def expire(id: JobId, expiredAt: DateTime = new DateTime): M[Either[String, Job]] = transition(id) {
+  def expire(id: JobId, expiredAt: DateTime = dateTime.now): M[Either[String, Job]] = transition(id) {
     case prev @ (NotStarted | Started(_, _) | Cancelled(_, _, _)) =>
       Right(Expired(expiredAt, prev))
     case badState =>

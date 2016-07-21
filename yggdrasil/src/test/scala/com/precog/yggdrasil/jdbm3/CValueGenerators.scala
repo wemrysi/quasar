@@ -49,7 +49,7 @@ trait CValueGenerators {
       scale  <- arbInt.arbitrary
       bigInt <- arbBigInt.arbitrary
     } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
-    case CDate                => choose[Long](0, Long.MaxValue) map (new DateTime(_)) map (CDate(_))
+    case CDate                => choose[Long](0, Long.MaxValue) map (n => CDate(dateTime fromMillis n))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.manifest), CArrayType(elemType))

@@ -19,7 +19,7 @@ trait Clock {
     f.map { result =>
       val end = now()
 
-      (new Period(start, end), result)
+      (newPeriod(start, end), result)
     }
   }
 
@@ -32,7 +32,7 @@ trait Clock {
 
     val end = now()
 
-    (new Period(start, end), result)
+    (newPeriod(start, end), result)
   }
 }
 
@@ -42,18 +42,16 @@ object Clock {
 
 trait ClockSystem {
   implicit val realtimeClock = new Clock {
-    def now(): DateTime = new DateTime(JodaUTC)
-
-    def instant(): Instant = new Instant()
-
-    def nanoTime(): Long = System.nanoTime()
+    def now(): DateTime    = dateTime.now()
+    def instant(): Instant = blueeyes.instant.now()
+    def nanoTime(): Long   = System.nanoTime()
   }
 }
 object ClockSystem extends ClockSystem
 
 trait ClockMock {
   protected class MockClock extends Clock {
-    private var _now: DateTime  = new DateTime(0, JodaUTC)
+    private var _now: DateTime  = dateTime.zero
     private var _nanoTime: Long = 0
 
     def now() = _now
@@ -64,7 +62,7 @@ trait ClockMock {
 
     def setNow(dateTime: DateTime): DateTime = { _now = dateTime; _now }
 
-    def setNow(millis: Long): DateTime = new DateTime(millis, JodaUTC)
+    def setNow(millis: Long): DateTime = dateTime fromMillis millis
 
     def setNanoTime(time: Long): Long = { _nanoTime = time; _nanoTime }
   }

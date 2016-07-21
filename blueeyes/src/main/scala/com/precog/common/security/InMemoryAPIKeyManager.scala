@@ -49,7 +49,7 @@ class InMemoryAPIKeyManager[M[+ _]](clock: Clock)(implicit val M: Monad[M]) exte
         WritePermission(Path.Root, WriteAsAny),
         DeletePermission(Path.Root, WrittenByAny)
       ),
-      new Instant(0L),
+      instant.zero,
       None
     )
 

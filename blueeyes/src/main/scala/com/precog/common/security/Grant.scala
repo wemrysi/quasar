@@ -61,7 +61,7 @@ case class Grant(grantId: GrantId,
 }
 
 object Grant extends Logging {
-  val schemaV1 = "grantId" :: "name" :: "description" :: ("issuerKey" ||| "(undefined)") :: "parentIds" :: "permissions" :: ("createdAt" ||| new Instant(0L)) :: "expirationDate" :: HNil
+  val schemaV1 = "grantId" :: "name" :: "description" :: ("issuerKey" ||| "(undefined)") :: "parentIds" :: "permissions" :: ("createdAt" ||| instant.zero) :: "expirationDate" :: HNil
 
   val decomposerV1: Decomposer[Grant] = decomposerV[Grant](schemaV1, Some("1.0".v))
   val extractorV2: Extractor[Grant]   = extractorV[Grant](schemaV1, Some("1.0".v))
@@ -75,7 +75,7 @@ object Grant extends Logging {
             obj.validated[Option[GrantId]]("issuer") |@|
             obj.validated[Permission]("permission")(Permission.extractorV0) |@|
             obj.validated[Option[DateTime]]("permission.expirationDate")).apply { (gid, cid, issuer, permission, expiration) =>
-        Grant(gid, None, None, cid, issuer.toSet, Set(permission), new Instant(0L), expiration)
+        Grant(gid, None, None, cid, issuer.toSet, Set(permission), instant.zero, expiration)
       }
     }
   }

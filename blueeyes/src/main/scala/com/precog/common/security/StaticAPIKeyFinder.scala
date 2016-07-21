@@ -38,7 +38,7 @@ class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) exten
     DeletePermission(Path("/"), WrittenByAny)
   )
 
-  val rootGrant        = v1.GrantDetails(java.util.UUID.randomUUID.toString, None, None, permissions, new Instant(0l), None)
+  val rootGrant        = v1.GrantDetails(java.util.UUID.randomUUID.toString, None, None, permissions, instant.zero, None)
   val rootAPIKeyRecord = v1.APIKeyDetails(apiKey, Some("Static api key"), None, Set(rootGrant), Nil)
 
   val rootGrantId = M.point(rootGrant.grantId)

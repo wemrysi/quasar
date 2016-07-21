@@ -56,7 +56,7 @@ trait MiscSerializers {
   import DefaultExtractors._, DefaultDecomposers._
   import SerializationImplicits._
 
-  implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(new Instant(_))
+  implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(instant fromMillis _)
   implicit val DurationExtractorDecomposer = by[JodaDuration](_.getMillis)(new JodaDuration(_))
   implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(UUID fromString _)
   implicit val MimeTypeExtractorDecomposer = by[MimeType].opt(x => JString(x.toString): JValue)(jv =>
@@ -97,25 +97,16 @@ object SerializationImplicits extends SerializationImplicits
   * implicits for natural serialization of core supported types.
   */
 object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
-  implicit val DateTimeExtractorDecomposer = by[DateTime].opt(x => JNum(x.getMillis): JValue)(jv =>
-    LongExtractor validated jv map (new DateTime(_, org.joda.time.DateTimeZone.UTC))
-  )
+  implicit val DateTimeExtractorDecomposer =
+    by[DateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map dateTime.fromMillis)
 }
 
 // when we want to serialize dates as ISO8601 not as numbers
 object Iso8601Serialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
   import Extractor._
-
-  private val isoFormat = org.joda.time.format.ISODateTimeFormat.dateTime
-
-  implicit val TZDateTimeDecomposer: Decomposer[DateTime] = new Decomposer[DateTime] {
-    override def decompose(d: DateTime): JValue = JString(isoFormat.print(d))
-  }
-
-  implicit val TZDateTimeExtractor: Extractor[DateTime] = new Extractor[DateTime] {
-    override def validated(obj: JValue): Validation[Error, DateTime] = obj match {
-      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(isoFormat.parseDateTime(dt))
+  implicit val TZDateTimeExtractorDecomposer =
+    by[DateTime].opt(d => JString(dateTime showIso d): JValue) {
+      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(dateTime fromIso dt)
       case _           => Failure(Invalid("Date time must be represented as JSON string"))
     }
-  }
 }

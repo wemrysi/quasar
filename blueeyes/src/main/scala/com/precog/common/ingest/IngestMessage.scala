@@ -40,7 +40,7 @@ object EventMessage {
   type EventMessageExtraction = (APIKey, Path, Authorities => EventMessage) \/ EventMessage
 
   // an instant that's close enough to the start of timestamping for our purposes
-  val defaultTimestamp = new Instant(1362465101979L)
+  val defaultTimestamp = instant fromMillis 1362465101979L
 
   implicit val decomposer: Decomposer[EventMessage] = new Decomposer[EventMessage] {
     override def decompose(eventMessage: EventMessage): JValue = {

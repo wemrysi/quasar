@@ -360,9 +360,8 @@ object Codec {
     }
   }
 
-  implicit val DateCodec = Codec[Long].as[DateTime](_.getMillis, new DateTime(_))
-
-  implicit val PeriodCodec = Codec[Long].as[Period](_.getMillis, new Period(_))
+  implicit val DateCodec   = Codec[Long].as[DateTime](_.getMillis, dateTime.fromMillis)
+  implicit val PeriodCodec = Codec[Long].as[Period](_.getMillis, period.fromMillis)
 
   implicit case object DoubleCodec extends FixedWidthCodec[Double] {
     val size = 8

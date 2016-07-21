@@ -128,9 +128,9 @@ trait APIKeyFinderSpec[M[+_]] extends Specification {
         DeletePermission(path, WrittenByAny)
       )
 
-      val expiration = new DateTime(100)
-      val beforeExpiration = new DateTime(50)
-      val afterExpiration = new DateTime(150)
+      val expiration       = dateTime fromMillis 100
+      val beforeExpiration = dateTime fromMillis 50
+      val afterExpiration  = dateTime fromMillis 150
 
       val (key0, key1, grantId, mgr) = (for {
         mgr <- M.point(emptyAPIKeyManager)

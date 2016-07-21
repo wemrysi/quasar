@@ -212,7 +212,7 @@ class AccessControlSpec extends Specification {
         DeletePermission(Path("/other"), WrittenByAny)
       )
 
-      val expiredAccessOtherGrant = apiKeyManager.deriveAndAddGrant(None, None, otherAPIKey, accessOther, userAPIKey, Some(new DateTime().minusYears(1000))).get
+      val expiredAccessOtherGrant = apiKeyManager.deriveAndAddGrant(None, None, otherAPIKey, accessOther, userAPIKey, Some(dateTime.now minusYears 1000)).get
 
       hasCapability(userAPIKey, Set(ReadPermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beFalse
       hasCapability(userAPIKey, Set(ReducePermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beFalse

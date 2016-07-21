@@ -48,13 +48,13 @@ trait SegmentFormatSupport {
   }
 
   def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {
-    case CPeriod          => arbitrary[Long].map(new Period(_))
+    case CPeriod          => arbitrary[Long] map (period fromMillis _)
     case CBoolean         => arbitrary[Boolean]
     case CString          => arbitrary[String]
     case CLong            => arbitrary[Long]
     case CDouble          => arbitrary[Double]
     case CNum             => arbitrary[BigDecimal]
-    case CDate            => arbitrary[Long] map (new DateTime(_))
+    case CDate            => arbitrary[Long] map (dateTime fromMillis _)
     case CArrayType(elem) => arrayOf(genForCType(elem))(elem.manifest)
   }
 

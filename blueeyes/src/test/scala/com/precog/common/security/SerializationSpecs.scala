@@ -30,7 +30,7 @@ import scalaz._, Scalaz._, Validation.FlatMap._
 class SerializationSpecs extends Specification {
   import Permission._
 
-  val i0 = new Instant(0L)
+  val i0 = instant.zero
 
   "APIKeyRecord deserialization" should {
     "Handle V0 formats" in {

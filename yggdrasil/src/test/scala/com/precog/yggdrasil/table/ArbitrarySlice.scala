@@ -42,8 +42,8 @@ trait ArbitrarySlice {
       case CDouble       => containerOfN[Array, Double](size, arbitrary[Double]) map { doubles => ArrayDoubleColumn(bs, doubles) }
       case CNum          => containerOfN[List, Double](size, arbitrary[Double]) map { arr => ArrayNumColumn(bs, arr.map(v => BigDecimal(v)).toArray) }
       case CNull         => arbitraryBitSet(size) map { s => new BitsetColumn(s) with NullColumn }
-      case CDate         => containerOfN[Array, Long](size, arbitrary[Long]) map { longs => ArrayDateColumn(bs, longs.map { l => new DateTime(l) }) }
-      case CPeriod       => containerOfN[Array, Long](size, arbitrary[Long]) map { longs => ArrayPeriodColumn(bs, longs.map { l => new Period(l) }) }
+      case CDate         => containerOfN[Array, Long](size, arbitrary[Long]) map (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
+      case CPeriod       => containerOfN[Array, Long](size, arbitrary[Long]) map (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
       case CEmptyObject  => arbitraryBitSet(size) map { s => new BitsetColumn(s) with EmptyObjectColumn }
       case CEmptyArray   => arbitraryBitSet(size) map { s => new BitsetColumn(s) with EmptyArrayColumn }
       case CUndefined    => Gen.const(UndefinedColumn.raw)

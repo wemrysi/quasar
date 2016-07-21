@@ -56,9 +56,8 @@ trait FSLibSpecs extends Specification with FSLibModule[Need] with TestColumnarT
   }
 
   val testAPIKey = "testAPIKey"
-  def testAccount = AccountDetails("00001", "test@email.com",
-    new DateTime, "testAPIKey", Path.Root, AccountPlan.Free)
-  val defaultEvaluationContext = EvaluationContext(testAPIKey, testAccount, Path.Root, Path.Root, new DateTime)
+  def testAccount = AccountDetails("00001", "test@email.com", dateTime.now, "testAPIKey", Path.Root, AccountPlan.Free)
+  val defaultEvaluationContext = EvaluationContext(testAPIKey, testAccount, Path.Root, Path.Root, dateTime.now)
   val defaultMorphContext = MorphContext(defaultEvaluationContext, new MorphLogger {
     def info(msg: String): Need[Unit]  = M.point(())
     def warn(msg: String): Need[Unit]  = M.point(())
