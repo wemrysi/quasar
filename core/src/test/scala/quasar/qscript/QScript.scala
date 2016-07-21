@@ -30,6 +30,7 @@ import matryoshka._
 import org.specs2.scalaz._
 import pathy.Path._
 import scalaz._, Scalaz._
+import shapeless.{Fin, nat, Sized}
 
 class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   val transform = new Transform[Fix, QScriptProject[Fix, ?]]
@@ -124,19 +125,33 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 StrLit("name"))))))).embed.some)
     }
 
+    // TODO: Needs list compaction
     "convert a basic reduction" in {
       QueryFile.convertToQScript(
         agg.Sum[FLP](lpRead("/person"))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        QC.inj(Reduce(
+          QC.inj(Map(RootR, Free.roll(ProjectField(UnitF, StrLit("person"))))).embed,
+          NullLit(),
+          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](UnitF)),
+          Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))).embed.some)
     }
 
-    "convert a basic reduction wrapped in an object" in skipped {
+    // TODO: Needs list compaction, and simplification of join with Map
+    "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
       QueryFile.convertToQScript(
         makeObj(
           "0" ->
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LogicalPlan.Constant(Data.Str("height")))))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        QC.inj(Reduce(
+          QC.inj(Map(RootR, Free.roll(ProjectField(Free.roll(ProjectField(UnitF, StrLit("person"))), StrLit("height"))))).embed,
+          NullLit(),
+          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](UnitF)),
+          Free.roll(MakeMap(
+            StrLit[Fix, Fin[nat._1]]("0"),
+            Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))))).embed.some)
     }
 
     "convert a flatten array" in skipped {
@@ -146,7 +161,15 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           "loc" ->
             structural.FlattenArray[FLP](
               structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        SP.inj(LeftShift(
+          QC.inj(Map(
+            RootR,
+            Free.roll(ProjectField(
+              Free.roll(ProjectField(UnitF, StrLit("zips"))),
+              StrLit("loc"))))).embed,
+          UnitF,
+          Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
     "convert a constant shift array" in skipped {
