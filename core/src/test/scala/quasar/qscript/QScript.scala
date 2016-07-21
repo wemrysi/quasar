@@ -127,7 +127,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     // TODO: Needs list compaction
-    "convert a basic reduction" in {
+    "convert a basic reduction" in skipped {
       QueryFile.convertToQScript(
         agg.Sum[FLP](lpRead("/person"))).toOption must
       equal(
@@ -139,7 +139,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     // TODO: Needs list compaction, and simplification of join with Map
-    "convert a basic reduction wrapped in an object" in {
+    "convert a basic reduction wrapped in an object" in skipped {
       // "select sum(height) from person"
       QueryFile.convertToQScript(
         makeObj(

@@ -45,6 +45,7 @@ sealed abstract class QScriptCore[T[_[_]], A] {
   *
   * @group MRA
   */
+ // FIXME: equality is broken - remove shapeless dep here
 @Lenses final case class Reduce[T[_[_]], A, N <: Nat](
   src: A,
   bucket: FreeMap[T],
@@ -195,7 +196,16 @@ object QScriptCore {
         def apply[A](qc: QScriptCore[T, A]) = qc match {
           case Map(src, f) => Map(src, normalizeMapFunc(f))
           case Reduce(src, bucket, reducers, repair) =>
-            Reduce(src, normalizeMapFunc(bucket), reducers.map(_.map(normalizeMapFunc(_))), normalizeMapFunc(repair))
+            val normBuck = normalizeMapFunc(bucket)
+            Reduce(
+              src,
+              // NB: all single-bucket reductions should reduce on `null`
+              normBuck.resume.fold({
+                case Nullary(_) => MapFuncs.NullLit[T, Hole]()
+                case _          => normBuck
+              }, κ(normBuck)),
+              reducers.map(_.map(normalizeMapFunc(_))),
+              normalizeMapFunc(repair))
           case Sort(src, bucket, order) =>
             Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
           case Filter(src, f) => Filter(src, normalizeMapFunc(f))
