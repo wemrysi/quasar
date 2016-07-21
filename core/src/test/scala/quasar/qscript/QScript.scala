@@ -39,6 +39,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   type QS[A] = QScriptProject[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
+  val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
   def RootR = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
@@ -131,9 +132,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         agg.Sum[FLP](lpRead("/person"))).toOption must
       equal(
         QC.inj(Reduce(
-          QC.inj(Map(RootR, Free.roll(ProjectField(UnitF, StrLit("person"))))).embed,
+          QC.inj(Map(RootR, Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
           NullLit(),
-          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](UnitF)),
+          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
           Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))).embed.some)
     }
 
@@ -146,9 +147,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LogicalPlan.Constant(Data.Str("height")))))).toOption must
       equal(
         QC.inj(Reduce(
-          QC.inj(Map(RootR, Free.roll(ProjectField(Free.roll(ProjectField(UnitF, StrLit("person"))), StrLit("height"))))).embed,
+          QC.inj(Map(RootR, Free.roll(ProjectField(Free.roll(ProjectField(HoleF, StrLit("person"))), StrLit("height"))))).embed,
           NullLit(),
-          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](UnitF)),
+          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
           Free.roll(MakeMap(
             StrLit[Fix, Fin[nat._1]]("0"),
             Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))))).embed.some)
@@ -166,9 +167,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           QC.inj(Map(
             RootR,
             Free.roll(ProjectField(
-              Free.roll(ProjectField(UnitF, StrLit("zips"))),
+              Free.roll(ProjectField(HoleF, StrLit("zips"))),
               StrLit("loc"))))).embed,
-          UnitF,
+          HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
