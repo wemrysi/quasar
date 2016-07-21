@@ -21,8 +21,10 @@ import quasar.api.services._
 import quasar.api.{redirectService, staticFileService, ResponseOr, ResponseT}
 import quasar.config._
 import quasar.console.{logErrors, stderr}
-import quasar.fp.{reflNT, liftMT, TaskRef}
+import quasar.fp.{liftMT, TaskRef}
 import quasar.fp.free._
+import quasar.fs.Empty
+import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 
 import argonaut.DecodeJson
@@ -110,7 +112,8 @@ object Server {
 
     (reload: Int => Task[Unit]) =>
       finalizeServices(
-        toHttpServices(eval, coreServices[CoreEff]) ++ additionalServices
+        toHttpServices(liftMT[Task, ResponseT] :+: eval, coreServices[CoreEffIO]) ++
+        additionalServices
       ) orElse nonApiService(initialPort, reload, staticContent, redirect)
   }
 
@@ -122,21 +125,30 @@ object Server {
   ): MainTask[(Int => Task[Unit]) => HttpService] =
     for {
       cfgRef       <- TaskRef(webConfig).liftM[MainErrT]
-      mntCfgsT     =  writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath)
-      coreApi      <- CoreEff.interpreter.liftM[MainErrT]
-      ephemeralApi =  foldMapNT(CfgsErrsIO.toMainTask(ephemeralMountConfigs[Task])) compose coreApi
-      failedMnts   <- attemptMountAll[CoreEff](webConfig.mountings) foldMap ephemeralApi
+      hfsRef       <- TaskRef(Empty.fileSystem[HierarchicalFsEffM]).liftM[MainErrT]
+      mntdRef      <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]]).liftM[MainErrT]
+
+      ephemeralMnt =  KvsMounter.interpreter[Task, QErrsIO](
+                        KvsMounter.ephemeralMountConfigs[Task],
+                        hfsRef, mntdRef)
+      initMnts     =  foldMapNT(QErrsIO.toMainTask) compose ephemeralMnt
       // TODO: Still need to expose these in the HTTP API, see SD-1131
+      failedMnts   <- attemptMountAll[Mounting](webConfig.mountings) foldMap initMnts
       _            <- failedMnts.toList.traverse_(logFailedMount).liftM[MainErrT]
-      cfgsErrsRor  =  (liftMT[Task, ResponseT] compose reflNT[Task]) :+:
-                      (liftMT[Task, ResponseT] compose mntCfgsT)     :+:
-                      qErrsToResponseOr
-      durableApi   =  foldMapNT(cfgsErrsRor) compose coreApi
+
+      durableMnt   =  KvsMounter.interpreter[Task, QErrsIO](
+                        writeConfig(WebConfig.mountings, cfgRef, qConfig.configPath),
+                        hfsRef, mntdRef)
+      toQErrsIOM   =  injectFT[Task, QErrsIO] :+: durableMnt :+: injectFT[QErrs, QErrsIO]
+      runCore      <- CoreEff.runFs[QEffIO](hfsRef).liftM[MainErrT]
+
+      qErrsIORor   =  liftMT[Task, ResponseT] :+: qErrsToResponseOr
+      coreApi      =  foldMapNT(qErrsIORor) compose foldMapNT(toQErrsIOM) compose runCore
     } yield service(
       webConfig.server.port,
       qConfig.staticContent,
       qConfig.redirect,
-      durableApi)
+      coreApi)
 
   def main(args: Array[String]): Unit = {
     implicit val configOps = ConfigOps[WebConfig]

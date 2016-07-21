@@ -298,9 +298,6 @@ object hierarchical {
   ): FileSystemError \/ (ADir, A) = {
     import LogicalPlan._
 
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-
     type MntA = (ADir, A)
     type F[A] = State[Option[MntA], A]
     type M[A] = FileSystemErrT[F, A]

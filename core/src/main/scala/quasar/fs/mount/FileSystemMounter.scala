@@ -28,20 +28,25 @@ import scalaz.syntax.either._
 final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
   import MountingError._, PathError._, MountConfig._, FileSystemDef._
 
-  type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[F]], A]
+  type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[F]], A]
+
+  object MountedFsRef {
+    def Ops[S[_]](implicit S: MountedFsRef :<: S) =
+      AtomicRef.Ops[Mounts[DefinitionResult[F]], S]
+  }
 
   /** Attempts to mount a filesystem at the given location, using the provided
     * definition.
     */
   def mount[S[_]]
       (loc: ADir, typ: FileSystemType, uri: ConnectionUri)
-      (implicit S0: F :<: S, S1: MountedFs :<: S)
+      (implicit S0: F :<: S, S1: MountedFsRef :<: S)
       : Free[S, MountingError \/ Unit] = {
 
     type M[A] = Free[S, A]
 
     val failUnlessCandidate: MntErrT[M, Unit] =
-      EitherT[M, MountingError, Unit](mounts[S].get map { mnts =>
+      EitherT[M, MountingError, Unit](MountedFsRef.Ops[S].get map { mnts =>
         mnts.candidacy(loc).leftMap(r => pathError(invalidPath(loc, r)))
       })
 
@@ -55,7 +60,7 @@ final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
       def cleanupOnError(err: String) =
         free.lift(fsr.close).into[S] as pathError(invalidPath(loc, err))
 
-      EitherT[M, MountingError, Unit](mounts[S].modifyS(mnts =>
+      EitherT[M, MountingError, Unit](MountedFsRef.Ops[S].modifyS(mnts =>
         mnts.add(loc, fsr).fold(
           err => (mnts, cleanupOnError(err) map (_.left[Unit])),
           nxt => (nxt, cleanup[S](mnts, loc) map (_.right[MountingError])))
@@ -67,10 +72,10 @@ final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
 
   def unmount[S[_]]
       (loc: ADir)
-      (implicit S0: F :<: S, S1: MountedFs :<: S)
+      (implicit S0: F :<: S, S1: MountedFsRef :<: S)
       : Free[S, Unit] = {
 
-    mounts[S].modifyS(mnts => (mnts - loc, cleanup[S](mnts, loc))).join
+    MountedFsRef.Ops[S].modifyS(mnts => (mnts - loc, cleanup[S](mnts, loc))).join
   }
 
   ////
@@ -83,9 +88,6 @@ final class FileSystemMounter[F[_]](fsDef: FileSystemDef[F]) {
     mnts.lookup(loc).map(_.close)
       .fold(().point[Free[S, ?]])(free.lift(_).into[S])
   }
-
-  private def mounts[S[_]](implicit S: MountedFs :<: S) =
-    AtomicRef.Ops[Mounts[DefinitionResult[F]], S]
 }
 
 object FileSystemMounter {

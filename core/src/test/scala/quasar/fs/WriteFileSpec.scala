@@ -53,9 +53,6 @@ class WriteFileSpec extends quasar.QuasarSpecification with ScalaCheck with File
       s"$n should consume input and close write handle when finished" ! prop {
         (f: AFile, xs: Vector[Data]) =>
 
-        // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-        import EitherT.eitherTMonad
-
         val p = wt(f, xs.toProcess).drain ++ read.scanAll(f)
 
         type Result[A] = FileSystemErrT[MemStateTask,A]
