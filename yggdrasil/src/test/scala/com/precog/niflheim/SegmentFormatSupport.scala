@@ -54,7 +54,7 @@ trait SegmentFormatSupport {
     case CLong            => arbitrary[Long]
     case CDouble          => arbitrary[Double]
     case CNum             => arbitrary[BigDecimal]
-    case CDate            => arbitrary[Long] map (dateTime fromMillis _)
+    case CDate            => genPosLong ^^ dateTime.fromMillis
     case CArrayType(elem) => arrayOf(genForCType(elem))(elem.manifest)
   }
 

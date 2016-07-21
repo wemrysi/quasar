@@ -24,7 +24,6 @@ import blueeyes._
 import bytecode._
 import com.precog.util._
 import com.precog.common._
-import org.joda.time.Period
 
 import yggdrasil.table._
 import scalaz._, Scalaz._
@@ -111,12 +110,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: DateTime = {
-                val init = dateTime.zero
-                val min  = -292275054 - 1970 //the smallest Int value jodatime accepts
-
-                init.plus(Period.years(min))
-              }
+              var zmax: DateTime = dateTime.minimum
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (NumericComparisons.compare(z, zmax) > 0) zmax = z
@@ -161,12 +155,7 @@ trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         def reduce(schema: CSchema, range: Range): Result = {
           val maxs = schema.columns(JDateT) map {
             case col: DateColumn =>
-              var zmax: DateTime = {
-                val init = dateTime.zero
-                val max  = 292278993 - 1970 //the largest Int value jodatime accepts
-
-                init.plus(Period.years(max))
-              }
+              var zmax: DateTime = dateTime.maximum
               val seen = RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (NumericComparisons.compare(z, zmax) < 0) zmax = z

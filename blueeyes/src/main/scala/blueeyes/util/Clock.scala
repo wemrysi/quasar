@@ -56,7 +56,7 @@ trait ClockMock {
 
     def now() = _now
 
-    def instant() = _now.toInstant()
+    def instant() = _now.toUtcInstant
 
     def nanoTime() = _nanoTime
 

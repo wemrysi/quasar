@@ -33,8 +33,6 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   import SampleData._
   import trans._
 
-  val resultTimeout = Duration(5, "seconds")
-
   def checkTransformLeaf = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>

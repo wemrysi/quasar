@@ -178,7 +178,7 @@ object CValue {
     case (CDouble(ad), CDouble(bd))   => ad.compareTo(bd)
     case (CNum(an), CNum(bn))         => an.compare(bn)
     case (CDate(ad), CDate(bd))       => ad.compareTo(bd)
-    case (CPeriod(ad), CPeriod(bd))   => (ad.toStandardDuration).compareTo(bd.toStandardDuration)
+    case (CPeriod(ad), CPeriod(bd))   => ad.toDuration compareTo bd.toDuration
     case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe =>
       (as.view zip bs.view) map {
         case (a, b) =>
@@ -563,7 +563,7 @@ case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
 }
 
 case object CDate extends CValueType[DateTime] {
-  val manifest: Manifest[DateTime] = implicitly[Manifest[DateTime]]
+  val manifest: Manifest[DateTime]      = implicitly[Manifest[DateTime]]
   def readResolve()                     = CDate
   def order(v1: DateTime, v2: DateTime) = sys.error("todo")
   def jValueFor(v: DateTime)            = JString(v.toString)
@@ -574,7 +574,7 @@ case class CPeriod(value: Period) extends CWrappedValue[Period] {
 }
 
 case object CPeriod extends CValueType[Period] {
-  val manifest: Manifest[Period] = implicitly[Manifest[Period]]
+  val manifest: Manifest[Period]    = implicitly[Manifest[Period]]
   def readResolve()                 = CPeriod
   def order(v1: Period, v2: Period) = sys.error("todo")
   def jValueFor(v: Period)          = JString(v.toString)

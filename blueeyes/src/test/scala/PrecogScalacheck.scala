@@ -52,11 +52,7 @@ object PrecogScalacheck {
 
   def arrayOfN[A: ClassManifest](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
   def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]              = containerOfN[Vector, A](len, gen)
-  // def listOfN[A](len: Int, gen: Gen[A]): Gen[List[A]]                  = containerOfN[List, A](len, gen)
   def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]                    = containerOfN[Set, A](len, gen)
-
-   // vectorOfN(len, gen) map (_.toArray)
-  // vectorOf[A](g) map (_.toArray)
 
   def genIndex(size: Int): Gen[Int] = Gen.choose(0, size - 1)
   def genBool: Gen[Boolean]         = Arbitrary.arbBool.arbitrary
@@ -66,7 +62,8 @@ object PrecogScalacheck {
   def genBigInt: Gen[BigInt]        = Arbitrary.arbBigInt.arbitrary
   def genString: Gen[String]        = Arbitrary.arbString.arbitrary
   def genIdentifier: Gen[String]    = Gen.identifier filter (_ != null)
-  def genPosLong: Gen[Long]         = posNum[Long]
+  def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
+  def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
   def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary map (d => BigDecimal(d.bigDecimal, d.mc))
 

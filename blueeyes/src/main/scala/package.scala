@@ -1,5 +1,6 @@
 import scalaz._
 import scala.collection.mutable
+import java.time.ZoneOffset.UTC
 
 trait ScodecImplicits {
   import scodec._
@@ -65,7 +66,7 @@ package object blueeyes extends ScodecImplicits {
   type OutputStreamWriter   = java.io.OutputStreamWriter
   type PrintStream          = java.io.PrintStream
 
-  // other outside libs: scalaz, spire, shapeless, joda
+  // other outside libs: scalaz, spire, shapeless, scodec
   type Future[+A]       = scalaz.concurrent.Future[A]
   type Iso[T, L]        = shapeless.Generic.Aux[T, L]
   type ScalazOrder[A]   = scalaz.Order[A]
@@ -82,38 +83,22 @@ package object blueeyes extends ScodecImplicits {
   def jDuration(millis: Long): jDuration = java.time.Duration ofMillis millis
   def jPeriod(millis: Long): jPeriod     = java.time.Period from jDuration(millis)
 
-  def newPeriod(start: DateTime, end: DateTime): Period = new JodaPeriod(start, end)
+  def newPeriod(start: DateTime, end: DateTime): Period = java.time.Period.between(start.toLocalDate, end.toLocalDate)
 
-  type Instant  = JodaInstant
-  type Period   = JodaPeriod
-  type Duration = sDuration
-  type DateTime = JodaDateTime
+  type Instant  = jInstant
+  type Period   = jPeriod
+  type Duration = jDuration
+  type DateTime = jLocalDateTime
 
-  // type Instant  = jInstant
-  // type Period   = jPeriod
-  // type Duration = jDuration
-  // type DateTime = jLocalDateTime
-
-  // implicit def jodaToJava(x: JodaPeriod): jPeriod = jPeriod(x.getMillis)
-  // implicit def javaToJoda(x: jPeriod): JodaPeriod = new JodaPeriod(x.getMillis)
-
-  type sDuration = scala.concurrent.duration.Duration
-
+  type sDuration      = scala.concurrent.duration.Duration
+  type jLocalDate     = java.time.LocalDate
   type jInstant       = java.time.Instant
   type jPeriod        = java.time.Period
   type jDuration      = java.time.Duration
   type jLocalDateTime = java.time.LocalDateTime
   type jZonedDateTime = java.time.ZonedDateTime
 
-  type JodaPeriod       = org.joda.time.Period
-  type JodaInstant      = org.joda.time.Instant
-  type JodaDateTime     = org.joda.time.DateTime
-  type JodaDuration     = org.joda.time.Duration
-  type JodaDateTimeZone = org.joda.time.DateTimeZone
-  def JodaDateFormat    = org.joda.time.format.DateTimeFormat forPattern "yyyyMMddHHmmssSSS"
-
-  def Utf8Charset    = java.nio.charset.Charset forName "UTF-8"
-
+  def Utf8Charset                       = java.nio.charset.Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte] = s getBytes Utf8Charset
 
   // Temporary
@@ -143,15 +128,20 @@ package object blueeyes extends ScodecImplicits {
 
   def futureMonad(ec: ExecutionContext): Monad[Future] = implicitly
 
+  implicit class jDurationOps(private val x: jDuration) {
+    def getMillis: Long = x.toMillis
+  }
   implicit class jInstantOps(private val x: jInstant) {
+    def getMillis: Long           = x.toEpochMilli
     def -(y: jInstant): jDuration = java.time.Duration.between(x, y)
   }
   implicit class jPeriodOps(private val x: jPeriod) {
+    def getMillis: Long       = toDuration.getMillis
     def toDuration: jDuration = java.time.Duration from x
   }
   implicit class jLocalDateTimeOps(private val x: jLocalDateTime) {
-    import java.time.temporal.ChronoField._
-    def millis: Long = x getLong MILLI_OF_SECOND
+    def toUtcInstant: Instant = x toInstant UTC
+    def getMillis: Long       = toUtcInstant.toEpochMilli
   }
 
   implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
@@ -179,38 +169,30 @@ package object blueeyes extends ScodecImplicits {
 
 package blueeyes {
   object duration {
-    def fromMillis(ms: Long): JodaDuration = new JodaDuration(ms)
+    def fromMillis(ms: Long): Duration = java.time.Duration ofMillis ms
   }
   object period {
-    def fromMillis(ms: Long): Period = new JodaPeriod(ms)
+    def fromMillis(ms: Long): Period = java.time.Period from (duration fromMillis ms)
   }
   object instant {
-    def zero: Instant                 = fromMillis(0L)
-    def now(): Instant                = new JodaInstant()
-    def fromMillis(ms: Long): Instant = new JodaInstant(ms)
+    def zero: Instant                             = fromMillis(0L)
+    def ofEpoch(secs: Long, nanos: Long): Instant = java.time.Instant.ofEpochSecond(secs, nanos)
+    def now(): Instant                            = java.time.Instant.now
+    def fromMillis(ms: Long): Instant             = java.time.Instant.ofEpochMilli(ms)
+    def apply(s: String): Instant                 = java.time.Instant parse s
   }
   object dateTime {
-    private val tz        = org.joda.time.DateTimeZone.UTC
-    private val isoFormat = org.joda.time.format.ISODateTimeFormat.dateTime
+    import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 
-    def zero: DateTime                 = fromMillis(0L)
-    def now(): DateTime                = org.joda.time.DateTime now tz
-    def fromMillis(ms: Long): DateTime = new JodaDateTime(ms, tz)
-    def apply(s: String): DateTime     = org.joda.time.DateTime parse s
-    def showIso(d: DateTime): String   = isoFormat print d
-    def fromIso(dt: String): DateTime  = isoFormat parseDateTime dt
+    def minimum: DateTime              = java.time.LocalDateTime.MIN
+    def maximum: DateTime              = java.time.LocalDateTime.MAX
+    def fromIso(s: String): DateTime   = java.time.LocalDateTime.parse(s, ISO_DATE_TIME)
+    def showIso(d: DateTime): String   = d format ISO_DATE_TIME
+    def zero: DateTime                 = fromMillis(0)
+    def now(): DateTime                = java.time.LocalDateTime.now
+    def fromMillis(ms: Long): DateTime = java.time.LocalDateTime.ofInstant(instant fromMillis ms, UTC)
+    def apply(s: String): DateTime     = java.time.LocalDateTime.parse(s)
   }
-
-  // object instant {
-  //   def zero: Instant                  = fromMillis(0L)
-  //   def now(): jInstant                = java.time.Instant.now
-  //   def fromMillis(ms: Long): jInstant = java.time.Instant.ofEpochMilli(ms)
-  // }
-  // object localDate {
-  //   def now(): jLocalDateTime                = java.time.LocalDateTime.now
-  //   def fromMillis(ms: Long): jLocalDateTime = java.time.LocalDateTime.ofEpochSecond(ms / 1000, (ms % 1000).toInt * 1000000, java.time.ZoneOffset.UTC)
-  //   def apply(s: String): jLocalDateTime     = java.time.LocalDateTime parse s
-  // }
 
   /**
     * This object contains some methods to do faster iteration over primitives.

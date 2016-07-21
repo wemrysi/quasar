@@ -57,7 +57,7 @@ trait MiscSerializers {
   import SerializationImplicits._
 
   implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(instant fromMillis _)
-  implicit val DurationExtractorDecomposer = by[JodaDuration](_.getMillis)(new JodaDuration(_))
+  implicit val DurationExtractorDecomposer = by[Duration](_.getMillis)(duration fromMillis _)
   implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(UUID fromString _)
   implicit val MimeTypeExtractorDecomposer = by[MimeType].opt(x => JString(x.toString): JValue)(jv =>
     StringExtractor validated jv map (MimeTypes parseMimeTypes _ toList) flatMap {
@@ -87,8 +87,7 @@ trait SerializationImplicits extends MiscSerializers {
   }
 
   implicit def JValueToTValue[T](jvalue: JValue): DeserializableJValue = DeserializableJValue(jvalue)
-
-  implicit def TValueToJValue[T](tvalue: T): SerializableTValue[T] = SerializableTValue[T](tvalue)
+  implicit def TValueToJValue[T](tvalue: T): SerializableTValue[T]     = SerializableTValue[T](tvalue)
 }
 
 object SerializationImplicits extends SerializationImplicits
@@ -98,7 +97,7 @@ object SerializationImplicits extends SerializationImplicits
   */
 object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
   implicit val DateTimeExtractorDecomposer =
-    by[DateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map dateTime.fromMillis)
+    by[DateTime].opt(x => JNum(x.getMillis): JValue)(_.validated[Long] map (dateTime fromMillis _))
 }
 
 // when we want to serialize dates as ISO8601 not as numbers
