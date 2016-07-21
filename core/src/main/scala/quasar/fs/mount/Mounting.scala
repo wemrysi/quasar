@@ -52,7 +52,7 @@ object Mounting {
   final case class LookupType(path: APath)
     extends Mounting[Option[MountType]]
 
-  final case class Lookup(path: APath)
+  final case class LookupConfig(path: APath)
     extends Mounting[Option[MountConfig]]
 
   final case class MountView(loc: AFile, query: Fix[Sql], vars: Variables)
@@ -82,14 +82,13 @@ object Mounting {
 
     import MountConfig._
 
+    /** Returns the mount configuration if the given path represents a mount. */
+    def lookupConfig(path: APath): OptionT[F, MountConfig] =
+      OptionT(lift(LookupConfig(path)))
+
+    /** Returns the type of mount the path represents, if any. */
     def lookupType(path: APath): OptionT[F, MountType] =
       OptionT(lift(LookupType(path)))
-
-    /** Returns the mount configuration for the given mount path or nothing
-      * if the path does not refer to a mount.
-      */
-    def lookup(path: APath): OptionT[F, MountConfig] =
-      OptionT(lift(Lookup(path)))
 
     /** Create a view mount at the given location. */
     def mountView(
@@ -97,7 +96,7 @@ object Mounting {
       query: Fix[Sql],
       vars: Variables
     )(implicit
-      S: MountingFailure :<: S
+      S0: MountingFailure :<: S
     ): F[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountView(loc, query, vars)))
 
@@ -107,7 +106,7 @@ object Mounting {
       typ: FileSystemType,
       uri: ConnectionUri
     )(implicit
-      S: MountingFailure :<: S
+      S0: MountingFailure :<: S
     ): F[Unit] =
       MountingFailure.Ops[S].unattempt(lift(MountFileSystem(loc, typ, uri)))
 
@@ -161,7 +160,7 @@ object Mounting {
       modify(loc, loc, κ(config))
 
     /** Remove the mount at the given path. */
-    def unmount(path: APath)(implicit S: MountingFailure :<: S): F[Unit] =
+    def unmount(path: APath)(implicit S0: MountingFailure :<: S): F[Unit] =
       MountingFailure.Ops[S].unattempt(lift(Unmount(path)))
 
     ////
@@ -181,7 +180,7 @@ object Mounting {
       val mmErr = PathMismatchFailure.Ops[S]
 
       for {
-        cfg     <- lookup(src) getOrElseF mntErr.fail(notFound(src))
+        cfg     <- lookupConfig(src) getOrElseF mntErr.fail(notFound(src))
         _       <- unmount(src)
         mod     =  mount(dst, f(cfg))
         restore =  mount(src, cfg)

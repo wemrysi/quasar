@@ -75,7 +75,7 @@ object Mounter {
             case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
           }.run
 
-        case Lookup(path) =>
+        case LookupConfig(path) =>
           mountConfigs.get(path).run
 
         case MountView(loc, query, vars) =>

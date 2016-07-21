@@ -68,7 +68,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
       val cfg = MountConfig.fileSystemConfig(dbType, invalidUri)
 
       mntErr.attempt(mnt.mountFileSystem(loc, dbType, invalidUri))
-        .tuple(mnt.lookup(loc).run)
+        .tuple(mnt.lookupConfig(loc).run)
         .map(_ must_== ((MountingError.invalidConfig(cfg, "invalid URI".wrapNel).left, None)))
     }
   }

@@ -46,7 +46,7 @@ object mount {
           NotFound withReason "Mount point not found.",
           s"There is no mount point at ${printPath(path)}",
           "path" := path)
-        respondT(M.lookup(path).toRight(err))
+        respondT(M.lookupConfig(path).toRight(err))
 
       case req @ MOVE -> AsPath(src) =>
         respondT(requiredHeader(Destination, req).map(_.value).fold(
@@ -120,7 +120,7 @@ object mount {
                    parseErrorMsg).left,
                  (msg, _) => ApiError.fromMsg_(
                    BadRequest, msg).left))
-      exists <- M.lookup(path).isDefined.liftM[ApiErrT]
+      exists <- M.lookupType(path).isDefined.liftM[ApiErrT]
       mnt    =  if (replaceIfExists && exists) M.replace(path, bConf)
                 else M.mount(path, bConf)
       _      <- mnt.liftM[ApiErrT]

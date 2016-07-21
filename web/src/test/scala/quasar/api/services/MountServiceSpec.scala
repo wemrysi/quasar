@@ -218,8 +218,8 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               (res, mntd) = r
               body     <- lift(res.as[String]).into[Eff]
 
-              srcAfter <- M.lookup(src).run
-              dstAfter <- M.lookup(dst).run
+              srcAfter <- M.lookupConfig(src).run
+              dstAfter <- M.lookupConfig(dst).run
             } yield {
               (body must_== s"moved ${printPath(src)} to ${printPath(dst)}") and
               (res.status must_== Ok)                                        and
@@ -358,7 +358,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 (res, mntd) = r
                 body  <- lift(res.as[String]).into[Eff]
                 dst   =  parent </> fsDir
-                after <- M.lookup(dst).run
+                after <- M.lookupConfig(dst).run
               } yield {
                 (body must_== s"added ${printPath(dst)}")                   and
                 (res.status must_== Ok)                                     and
@@ -381,7 +381,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 (res, mntd) = r
                 body  <- lift(res.as[String]).into[Eff]
                 dst   =  parent </> f
-                after <- M.lookup(dst).run
+                after <- M.lookupConfig(dst).run
               } yield {
                 (body must_== s"added ${printPath(dst)}")         and
                 (res.status must_== Ok)                           and
@@ -408,8 +408,8 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 (res, mntd) = r
                 body      <- lift(res.as[String]).into[Eff]
 
-                afterFs   <- M.lookup(fs).run
-                afterView <- M.lookup(view).run
+                afterFs   <- M.lookupConfig(fs).run
+                afterView <- M.lookupConfig(view).run
               } yield {
                 (body must_== s"added ${printPath(view)}") and
                 (res.status must_== Ok)                    and
@@ -440,7 +440,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 (res, mntd) = r
                 body  <- lift(res.as[String]).into[Eff]
                 vdst  =  d </> view
-                after <- M.lookup(vdst).run
+                after <- M.lookupConfig(vdst).run
               } yield {
                 (body must_== s"added ${printPath(vdst)}") and
                 (res.status must_== Ok)                    and
@@ -468,7 +468,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
                 (res, mntd) = r
                 jerr  <- lift(res.as[Json]).into[Eff]
                 dst   =  d </> fs
-                after <- M.lookup(dst).run
+                after <- M.lookupConfig(dst).run
               } yield {
                 (jerr must_== Json("error" := s"cannot mount at ${printPath(dst)} because existing mount below: ${printPath(fs1)}")) and
                 (res.status must_== Conflict)                               and
@@ -584,7 +584,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
             (res, mntd) = r
             err   <- lift(res.as[ApiError]).into[Eff]
 
-            after <- M.lookup(mntPath).run
+            after <- M.lookupConfig(mntPath).run
           } yield {
             (err must beApiErrorLike(pathExists(mntPath)))                  and
             (mntd must_== Set(MR.mountFileSystem(mntPath, StubFs, barUri))) and
@@ -631,7 +631,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookup(fsDir).run
+              after <- M.lookupConfig(fsDir).run
             } yield {
               (body must_== s"updated ${printPath(fsDir)}")                 and
               (res.status must_== Ok)                                       and
@@ -658,7 +658,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookup(d).run
+              after <- M.lookupConfig(d).run
             } yield {
               (body must_== s"deleted ${printPath(d)}") and
               (res.status must_== Ok)                   and
@@ -683,7 +683,7 @@ class MountServiceSpec extends Specification with ScalaCheck with Http4s with Pa
               (res, mntd) = r
               body  <- lift(res.as[String]).into[Eff]
 
-              after <- M.lookup(f).run
+              after <- M.lookupConfig(f).run
             } yield {
               (body must_== s"deleted ${printPath(f)}") and
               (res.status must_== Ok)                   and
