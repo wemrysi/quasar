@@ -224,4 +224,3 @@ object IsoSerialization {
       (new IsoDecomposer(fields, iso, decomposer), new IsoExtractor(fields, iso, extractor))
   }
 }
-// vim: set ts=4 sw=4 et:

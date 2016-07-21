@@ -1,8 +1,6 @@
 package blueeyes
 package util
 
-import org.joda.time.{ DateTime, DateTimeZone, Period, Instant }
-
 trait Clock {
 
   /** Returns the current time.
@@ -44,7 +42,7 @@ object Clock {
 
 trait ClockSystem {
   implicit val realtimeClock = new Clock {
-    def now(): DateTime = new DateTime(DateTimeZone.UTC)
+    def now(): DateTime = new DateTime(JodaUTC)
 
     def instant(): Instant = new Instant()
 
@@ -55,7 +53,7 @@ object ClockSystem extends ClockSystem
 
 trait ClockMock {
   protected class MockClock extends Clock {
-    private var _now: DateTime  = new DateTime(0, DateTimeZone.UTC)
+    private var _now: DateTime  = new DateTime(0, JodaUTC)
     private var _nanoTime: Long = 0
 
     def now() = _now
@@ -66,7 +64,7 @@ trait ClockMock {
 
     def setNow(dateTime: DateTime): DateTime = { _now = dateTime; _now }
 
-    def setNow(millis: Long): DateTime = new DateTime(millis, DateTimeZone.UTC)
+    def setNow(millis: Long): DateTime = new DateTime(millis, JodaUTC)
 
     def setNanoTime(time: Long): Long = { _nanoTime = time; _nanoTime }
   }

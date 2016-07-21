@@ -73,8 +73,6 @@ trait DefaultExtractors {
     }
   }
 
-  implicit val DateExtractor: Extractor[java.util.Date] = LongExtractor map { new java.util.Date(_) }
-
   implicit def OptionExtractor[T](implicit extractor: Extractor[T]): Extractor[Option[T]] = new Extractor[Option[T]] {
     def validated(jvalue: JValue) = jvalue match {
       case JUndefined | JNull => Success(None)
@@ -182,14 +180,6 @@ trait DefaultExtractors {
 
       case other =>
         ListExtractor(Tuple2Extractor(StringExtractor, valueExtractor)).validated(other).map(_.toMap)
-    }
-  }
-
-  implicit val DateTimeExtractor = new Extractor[DateTime] {
-    def validated(jvalue: JValue) = {
-      LongExtractor.validated(jvalue) map { millis =>
-        new DateTime(millis, org.joda.time.DateTimeZone.UTC)
-      }
     }
   }
 }

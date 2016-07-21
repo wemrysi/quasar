@@ -25,9 +25,6 @@ import blueeyes._, json._, serialization._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
-import blueeyes.json.serialization.JodaSerializationImplicits._
-
-import com.precog.common.serializationImplicits._
 import com.precog.util.{ FileLock, IOUtils, PrecogUnit }
 import org.slf4s.Logging
 import java.util.UUID

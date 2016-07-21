@@ -20,12 +20,11 @@
 package com.precog.common
 package jobs
 
-import com.precog.common.security._
 
 import blueeyes._, json._
 import blueeyes.json.serialization.{ Decomposer, Extractor }
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
-
+import blueeyes.json.serialization.Iso8601Serialization._
+// import com.precog.common.security._
 import scalaz._
 
 /**

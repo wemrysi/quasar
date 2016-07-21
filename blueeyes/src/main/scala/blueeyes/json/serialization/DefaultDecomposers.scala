@@ -104,10 +104,6 @@ trait DefaultDecomposers {
         JField(key, valueDecomposer(tvalue.apply(key)))
       })
   }
-
-  implicit val DateTimeDecomposer = new Decomposer[DateTime] {
-    def decompose(dateTime: DateTime): JValue = JNum(dateTime.getMillis)
-  }
 }
 
 object DefaultDecomposers extends DefaultDecomposers

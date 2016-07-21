@@ -25,22 +25,10 @@ import security._
 import jobs.JobId
 
 import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.DefaultSerialization._
-import blueeyes.json.serialization.IsoSerialization._
-import blueeyes.json.serialization.Versioned._
-import blueeyes.json.serialization.JodaSerializationImplicits.{ InstantExtractor, InstantDecomposer }
-
+import IsoSerialization._, Iso8601Serialization._, Versioned._
+import Extractor._
 import java.util.UUID
-
 import scalaz._, Scalaz._, Validation._
-
-object JavaSerialization {
-  implicit val uuidDecomposer: Decomposer[UUID] = implicitly[Decomposer[String]].contramap((_: UUID).toString)
-  implicit val uuidExtractor: Extractor[UUID]   = implicitly[Extractor[String]].map(UUID.fromString)
-}
-
-import JavaSerialization._
 
 sealed trait Event {
   def fold[A](ingest: Ingest => A, archive: Archive => A): A

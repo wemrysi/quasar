@@ -20,8 +20,6 @@
 package com.precog.common
 package ingest
 
-import com.precog.common.serializationImplicits._
-
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.core.http.{ MimeTypes, MimeType }
@@ -30,10 +28,7 @@ import Versioned._
 import Extractor._
 
 import slamdata.java.util.Base64
-
-import scalaz._
-import scalaz.syntax.apply._
-import scalaz.syntax.std.option._
+import scalaz._, Scalaz._
 
 sealed trait ContentEncoding {
   def id: String

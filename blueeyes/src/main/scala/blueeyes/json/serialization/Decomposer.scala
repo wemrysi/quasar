@@ -2,7 +2,8 @@ package blueeyes
 package json
 package serialization
 
-import scalaz.Validation
+import scalaz._, Scalaz._
+import ExtractorDecomposer.by
 
 /** Decomposes the value into a JSON object.
   */
@@ -24,6 +25,48 @@ object Decomposer {
   def apply[A](implicit d: Decomposer[A]): Decomposer[A] = d
 }
 
+class ExtractorDecomposer[A](toJson: A => JValue, fromJson: JValue => Validation[Extractor.Error, A]) extends Extractor[A] with Decomposer[A] {
+  def decompose(x: A)      = toJson(x)
+  def validated(x: JValue) = fromJson(x)
+}
+object ExtractorDecomposer {
+  def makeOpt[A, B](fg: A => B, gf: B => Validation[Extractor.Error, A])(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] = {
+    new ExtractorDecomposer[A](
+      v => dz decompose fg(v),
+      j => ez validated j flatMap gf
+    )
+  }
+
+  def make[A, B](fg: A => B, gf: B => A)(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] = {
+    new ExtractorDecomposer[A](
+      v => dz decompose fg(v),
+      j => ez validated j map gf
+    )
+  }
+
+  def by[A] = new {
+    def apply[B](fg: A => B)(gf: B => A)(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A]                            = make[A, B](fg, gf)
+    def opt[B](fg: A => B)(gf: B => Validation[Extractor.Error, A])(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] = makeOpt[A, B](fg, gf)
+  }
+}
+
+trait MiscSerializers {
+  import java.util.UUID
+  import blueeyes.core.http.{ MimeType, MimeTypes }
+  import DefaultExtractors._, DefaultDecomposers._
+  import SerializationImplicits._
+
+  implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(new Instant(_))
+  implicit val DurationExtractorDecomposer = by[JodaDuration](_.getMillis)(new JodaDuration(_))
+  implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(UUID fromString _)
+  implicit val MimeTypeExtractorDecomposer = by[MimeType].opt(x => JString(x.toString): JValue)(jv =>
+    StringExtractor validated jv map (MimeTypes parseMimeTypes _ toList) flatMap {
+      case Nil        => Failure(Extractor.Error.invalid("No mime types found in " + jv.renderCompact))
+      case first :: _ => Success(first)
+    }
+  )
+}
+
 /** Serialization implicits allow a convenient syntax for serialization and
   * deserialization when implicit decomposers and extractors are in scope.
   * <p>
@@ -31,7 +74,7 @@ object Decomposer {
   * <p>
   * jvalue.deserialize[Foo]
   */
-trait SerializationImplicits {
+trait SerializationImplicits extends MiscSerializers {
   case class DeserializableJValue(jvalue: JValue) {
     def deserialize[T](implicit e: Extractor[T]): T                            = e.extract(jvalue)
     def validated[T](implicit e: Extractor[T]): Validation[Extractor.Error, T] = e.validated(jvalue)
@@ -53,5 +96,26 @@ object SerializationImplicits extends SerializationImplicits
 /** Bundles default extractors, default decomposers, and serialization
   * implicits for natural serialization of core supported types.
   */
-object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits
-// vim: set ts=4 sw=4 et:
+object DefaultSerialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
+  implicit val DateTimeExtractorDecomposer = by[DateTime].opt(x => JNum(x.getMillis): JValue)(jv =>
+    LongExtractor validated jv map (new DateTime(_, org.joda.time.DateTimeZone.UTC))
+  )
+}
+
+// when we want to serialize dates as ISO8601 not as numbers
+object Iso8601Serialization extends DefaultExtractors with DefaultDecomposers with SerializationImplicits {
+  import Extractor._
+
+  private val isoFormat = org.joda.time.format.ISODateTimeFormat.dateTime
+
+  implicit val TZDateTimeDecomposer: Decomposer[DateTime] = new Decomposer[DateTime] {
+    override def decompose(d: DateTime): JValue = JString(isoFormat.print(d))
+  }
+
+  implicit val TZDateTimeExtractor: Extractor[DateTime] = new Extractor[DateTime] {
+    override def validated(obj: JValue): Validation[Error, DateTime] = obj match {
+      case JString(dt) => (Thrown.apply _) <-: Validation.fromTryCatchNonFatal(isoFormat.parseDateTime(dt))
+      case _           => Failure(Invalid("Date time must be represented as JSON string"))
+    }
+  }
+}

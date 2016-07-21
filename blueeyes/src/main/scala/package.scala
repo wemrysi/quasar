@@ -69,23 +69,31 @@ package object blueeyes extends ScodecImplicits {
   type jDuration            = java.time.Duration
 
   // other outside libs: scalaz, spire, shapeless, joda
-  type DateTime       = org.joda.time.DateTime
-  type Future[+A]     = scalaz.concurrent.Future[A]
-  type Instant        = org.joda.time.Instant
-  type jInstant       = java.time.Instant
-  type Iso[T, L]      = shapeless.Generic.Aux[T, L]
-  type Period         = org.joda.time.Period
-  type jPeriod        = java.time.Period
-  type ScalazOrder[A] = scalaz.Order[A]
-  type ScalazOrdering = scalaz.Ordering
-  type SpireOrder[A]  = spire.algebra.Order[A]
-  type Task[+A]       = scalaz.concurrent.Task[A]
-  val Future          = scalaz.concurrent.Future
-  val HNil            = shapeless.HNil
-  val Iso             = shapeless.Generic
-  val ScalazOrder     = scalaz.Order
-  val ScalazOrdering  = scalaz.Ordering
-  type ByteVector     = scodec.bits.ByteVector
+  type DateTime         = org.joda.time.DateTime
+  type Future[+A]       = scalaz.concurrent.Future[A]
+  type Instant          = org.joda.time.Instant
+  type jInstant         = java.time.Instant
+  type Iso[T, L]        = shapeless.Generic.Aux[T, L]
+  type Period           = org.joda.time.Period
+  type jPeriod          = java.time.Period
+  type ScalazOrder[A]   = scalaz.Order[A]
+  type ScalazOrdering   = scalaz.Ordering
+  type SpireOrder[A]    = spire.algebra.Order[A]
+  type Task[+A]         = scalaz.concurrent.Task[A]
+  val Future            = scalaz.concurrent.Future
+  val HNil              = shapeless.HNil
+  val Iso               = shapeless.Generic
+  val ScalazOrder       = scalaz.Order
+  val ScalazOrdering    = scalaz.Ordering
+  type ByteVector       = scodec.bits.ByteVector
+  type JodaDuration     = org.joda.time.Duration
+  type JodaDateTimeZone = org.joda.time.DateTimeZone
+
+  def JodaUTC        = org.joda.time.DateTimeZone.UTC
+  def Utf8Charset    = java.nio.charset.Charset forName "UTF-8"
+  def JodaDateFormat = org.joda.time.format.DateTimeFormat forPattern "yyyyMMddHHmmssSSS"
+
+  def utf8Bytes(s: String): Array[Byte] = s getBytes Utf8Charset
 
   // Temporary
   type BitSet             = com.precog.util.BitSet

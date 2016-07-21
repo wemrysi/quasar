@@ -24,7 +24,7 @@ import blueeyes._
 import bytecode._
 import com.precog.util._
 import com.precog.common._
-import org.joda.time.{ DateTime => _, _ }
+import org.joda.time.Period
 
 import yggdrasil.table._
 import scalaz._, Scalaz._

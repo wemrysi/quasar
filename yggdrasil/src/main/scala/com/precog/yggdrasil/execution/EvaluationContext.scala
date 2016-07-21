@@ -21,11 +21,8 @@ package com.precog.yggdrasil
 package execution
 
 import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.Versioned._
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
-import com.precog.common._
-import com.precog.common.security._
-import com.precog.common.accounts._
+import IsoSerialization._, Iso8601Serialization._, Versioned._
+import com.precog.common._, security._, accounts._
 
 case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
 

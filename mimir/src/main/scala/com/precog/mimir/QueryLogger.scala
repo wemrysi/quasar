@@ -22,10 +22,8 @@ package com.precog.mimir
 import com.precog.common.jobs._
 import com.precog.common.security._
 
-import blueeyes.json._
-import blueeyes.json.{ serialization => _, _ }
-import blueeyes.json.serialization.SerializationImplicits._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
+import Iso8601Serialization._
 
 import blueeyes.util.Clock
 import org.slf4j.LoggerFactory
@@ -34,8 +32,6 @@ import scalaz._
 import scalaz.syntax.monad._
 
 import scala.collection.JavaConverters._
-import scala.annotation.tailrec
-
 import java.util.concurrent.ConcurrentHashMap
 
 trait QueryLogger[M[+ _], -P] { self =>

@@ -21,15 +21,8 @@ package com.precog.common
 package jobs
 
 import com.precog.common.security._
-
-import blueeyes._, json._, serialization.{ Decomposer, Extractor }
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
-import blueeyes.json.serialization.IsoSerialization._
-import blueeyes.json.serialization.Versioned._
-
-import blueeyes.json.{ serialization => _, _ }
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeExtractor => _, DateTimeDecomposer => _, _ }
-
+import blueeyes._, json._, serialization._
+import IsoSerialization._, Iso8601Serialization._, Versioned._
 import scalaz._
 import scalaz.syntax.std.boolean._
 

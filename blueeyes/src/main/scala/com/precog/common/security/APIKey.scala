@@ -21,12 +21,8 @@ package com.precog.common
 package security
 
 import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.IsoSerialization._
-import blueeyes.json.serialization.DefaultSerialization.{ DateTimeDecomposer => _, DateTimeExtractor => _, _ }
-import blueeyes.json.serialization.Versioned._
-
-import scalaz.Scalaz._
-import scalaz.Validation
+import IsoSerialization._, Iso8601Serialization._, Versioned._
+import scalaz._, Scalaz._
 
 case class APIKeyRecord(apiKey: APIKey, name: Option[String], description: Option[String], issuerKey: APIKey, grants: Set[GrantId], isRoot: Boolean)
 
@@ -44,4 +40,3 @@ object APIKeyRecord {
   implicit val decomposer: Decomposer[APIKeyRecord] = decomposerV1
   implicit val extractor: Extractor[APIKeyRecord]   = extractorV2 <+> extractorV1 <+> extractorV0
 }
-// vim: set ts=4 sw=4 et:
