@@ -3,10 +3,6 @@ package json.serialization
 
 import blueeyes.json._
 import Extractor._
-
-import java.util.{ Date => JDate }
-import org.joda.time.{ DateTime, DateTimeZone }
-
 import scalaz._, Scalaz._
 
 /** Extractors for all basic types.
@@ -77,7 +73,7 @@ trait DefaultExtractors {
     }
   }
 
-  implicit val DateExtractor: Extractor[JDate] = LongExtractor map { new JDate(_) }
+  implicit val DateExtractor: Extractor[java.util.Date] = LongExtractor map { new java.util.Date(_) }
 
   implicit def OptionExtractor[T](implicit extractor: Extractor[T]): Extractor[Option[T]] = new Extractor[Option[T]] {
     def validated(jvalue: JValue) = jvalue match {
@@ -192,7 +188,7 @@ trait DefaultExtractors {
   implicit val DateTimeExtractor = new Extractor[DateTime] {
     def validated(jvalue: JValue) = {
       LongExtractor.validated(jvalue) map { millis =>
-        new DateTime(millis, DateTimeZone.UTC)
+        new DateTime(millis, org.joda.time.DateTimeZone.UTC)
       }
     }
   }
