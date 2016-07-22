@@ -27,6 +27,8 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
   def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
 
+  def doto[A](x: A)(f: A => Unit): A = { f(x) ; x }
+
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
 
@@ -51,6 +53,10 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
       i += 1
     }
     true
+  }
+
+  implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
+    def |>[B](f: A => B): B = f(x)
   }
 
   implicit class LazyMapValues[A, B](source: Map[A, B]) {

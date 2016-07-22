@@ -22,6 +22,7 @@ package com.precog.yggdrasil
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._
+import scala.collection.breakOut
 
 sealed trait SValue {
   def isA(valueType: SType): Boolean
@@ -117,8 +118,8 @@ sealed trait SValue {
   }
 
   lazy val toJValue: JValue = this match {
-    case SObject(obj) => JObject(obj.map({ case (k, v) => JField(k, v.toJValue) })(collection.breakOut))
-    case SArray(arr)  => JArray(arr.map(_.toJValue)(collection.breakOut): _*)
+    case SObject(obj) => JObject(obj.map({ case (k, v) => JField(k, v.toJValue) })(breakOut))
+    case SArray(arr)  => JArray(arr.map(_.toJValue)(breakOut): _*)
     case SString(s)   => JString(s)
     case STrue        => JBool(true)
     case SFalse       => JBool(false)
@@ -129,7 +130,7 @@ sealed trait SValue {
 
   lazy val toRValue: RValue = this match {
     case SObject(obj) => RObject(obj.map({ case (k, v) => (k, v.toRValue) }))
-    case SArray(arr)  => RArray(arr.map(_.toRValue)(collection.breakOut): _*)
+    case SArray(arr)  => RArray(arr.map(_.toRValue)(breakOut): _*)
     case SString(s)   => CString(s)
     case STrue        => CBoolean(true)
     case SFalse       => CBoolean(false)
@@ -242,27 +243,26 @@ trait SValueInstances {
 object SValue extends SValueInstances {
   @inline
   def fromCValue(cv: CValue): SValue = cv match {
-    case CString(s)  => SString(s)
-    case CBoolean(b) => SBoolean(b)
-    case CLong(n)    => SDecimal(BigDecimal(n))
-    case CDouble(n)  => SDecimal(BigDecimal(n))
-    case CNum(n)     => SDecimal(n)
-    case CDate(d)    => sys.error("todo") // Should this be SString(d.toString)?
-    case CPeriod(p)  => sys.error("todo") // Should this be SString(d.toString)?
-    case CArray(as, CArrayType(aType)) =>
-      SArray(as.map(a => fromCValue(aType(a)))(collection.breakOut))
-    case CNull        => SNull
-    case CEmptyArray  => SArray(Vector())
-    case CEmptyObject => SObject(Map())
-    case CUndefined   => SUndefined
+    case CString(s)                    => SString(s)
+    case CBoolean(b)                   => SBoolean(b)
+    case CLong(n)                      => SDecimal(BigDecimal(n))
+    case CDouble(n)                    => SDecimal(BigDecimal(n))
+    case CNum(n)                       => SDecimal(n)
+    case CDate(d)                      => sys.error("todo") // Should this be SString(d.toString)?
+    case CPeriod(p)                    => sys.error("todo") // Should this be SString(d.toString)?
+    case CArray(as, CArrayType(aType)) => SArray(as.map(a => fromCValue(aType(a)))(breakOut))
+    case CNull                         => SNull
+    case CEmptyArray                   => SArray(Vector())
+    case CEmptyObject                  => SObject(Map())
+    case CUndefined                    => SUndefined
   }
 
   // Note this conversion has a peer for CValues that should always be changed
   // in conjunction with this mapping.
   @inline
   def fromJValue(jv: JValue): SValue = jv match {
-    case JObject(fields)  => SObject(fields.map { case JField(name, v) => (name, fromJValue(v)) }(collection.breakOut))
-    case JArray(elements) => SArray((elements map fromJValue)(collection.breakOut))
+    case JObject(fields)  => SObject(fields.map { case JField(name, v) => (name, fromJValue(v)) }(breakOut))
+    case JArray(elements) => SArray((elements map fromJValue)(breakOut))
     case JString(s)       => SString(s)
     case JBool(s)         => SBoolean(s)
     case JNum(d)          => SDecimal(d)
@@ -302,7 +302,7 @@ case object SObject extends SType {
   }
 }
 
-case class SArray(elements: Vector[SValue]) extends SValue {
+final case class SArray(elements: Vector[SValue]) extends SValue {
   def isA(stype: SType) = stype == SArray
 }
 

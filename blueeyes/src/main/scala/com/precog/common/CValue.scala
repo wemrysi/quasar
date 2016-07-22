@@ -21,10 +21,8 @@ package com.precog
 package common
 
 import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.DefaultSerialization._
-
-import scalaz._, Scalaz._
-import scalaz.Ordering._
+import DefaultSerialization._
+import scalaz._, Scalaz._, Ordering._
 import java.math.MathContext.UNLIMITED
 
 sealed trait RValue { self =>
@@ -206,26 +204,18 @@ sealed trait CType extends Serializable {
 
   @inline
   private[common] final def typeIndex = this match {
-    case CUndefined => 0
-
-    case CBoolean => 1
-
-    case CString => 2
-
-    case CLong   => 4
-    case CDouble => 6
-    case CNum    => 7
-
-    case CEmptyObject => 8
-
-    case CEmptyArray => 9
-
+    case CUndefined    => 0
+    case CBoolean      => 1
+    case CString       => 2
+    case CLong         => 4
+    case CDouble       => 6
+    case CNum          => 7
+    case CEmptyObject  => 8
+    case CEmptyArray   => 9
     case CArrayType(_) => 10 // TODO: Should this account for the element type?
-
-    case CNull => 11
-
-    case CDate   => 12
-    case CPeriod => 13
+    case CNull         => 11
+    case CDate         => 12
+    case CPeriod       => 13
   }
 }
 
