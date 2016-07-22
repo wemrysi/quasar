@@ -120,7 +120,8 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
 
   /** Gets the specified value located at the terminal of the specified path.
     */
-  def apply(path: JPath): JValue = get(path)
+  def apply(path: JPath): JValue     = get(path)
+  def apply(node: JPathNode): JValue = get(JPath(node))
 
   def get(path: JPath): JValue = path.extract(self)
 
@@ -1027,15 +1028,8 @@ case object JObject extends (Map[String, JValue] => JObject) {
 
   implicit val order = Order.orderBy((x: JObject) => x.fields.toVector.sortMe filterNot (_._2 eq JUndefined) sortBy (_._2))
 
-  //   case
-
-  // : Order[JObject] =
-
-  // Order[List[JField]].contramap((_: JObject).fields.toList.sorted.filter(_._2 ne JUndefined).sortBy(_._2))
-
   def apply(fields: Traversable[JField]): JObject = JObject(fields.toMap)
-
-  def apply(fields: JField*): JObject = JObject(fields.toMap)
+  def apply(fields: JField*): JObject             = JObject(fields.toMap)
 
   def unapplySeq(value: JValue): Option[Seq[JField]] = value match {
     case JObject(fields) => Some(fields.toSeq)
