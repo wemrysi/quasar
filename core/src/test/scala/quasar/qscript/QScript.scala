@@ -30,7 +30,6 @@ import matryoshka._
 import org.specs2.scalaz._
 import pathy.Path._
 import scalaz._, Scalaz._
-import shapeless.{Fin, nat, Sized}
 
 class QScriptSpec extends CompilerHelpers with ScalazMatchers {
   val transform = new Transform[Fix, QScriptProject[Fix, ?]]
@@ -134,8 +133,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         QC.inj(Reduce(
           QC.inj(Map(RootR, Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
           NullLit(),
-          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
-          Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))).embed.some)
+          List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+          Free.point(ReduceIndex(0)))).embed.some)
     }
 
     // TODO: Needs list compaction, and simplification of join with Map
@@ -149,10 +148,10 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         QC.inj(Reduce(
           QC.inj(Map(RootR, Free.roll(ProjectField(Free.roll(ProjectField(HoleF, StrLit("person"))), StrLit("height"))))).embed,
           NullLit(),
-          Sized[List](ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+          List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
           Free.roll(MakeMap(
-            StrLit[Fix, Fin[nat._1]]("0"),
-            Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))))).embed.some)
+            StrLit[Fix, ReduceIndex]("0"),
+            Free.point(ReduceIndex(0)))))).embed.some)
     }
 
     "convert a flatten array" in pending {

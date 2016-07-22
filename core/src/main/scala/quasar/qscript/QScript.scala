@@ -28,7 +28,7 @@ import quasar.std.StdLib._
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
-import shapeless.{Fin, nat, Sized}
+import shapeless.{nat, Sized}
 
 // Need to keep track of our non-type-ensured guarantees:
 // - all conditions in a ThetaJoin will refer to both sides of the join
@@ -388,15 +388,15 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](
           provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
           Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-        QC.inj(Reduce[T, T[Target], nat._1](
+        QC.inj(Reduce[T, T[Target]](
           values(0),
           newProvs,
-          Sized[List](
+          List(
             ReduceFuncs.Arbitrary(newProvs),
             ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
           Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(Fin[nat._0, nat._2]))),
-            Free.roll(MakeArray(Free.point(Fin[nat._1, nat._2])))))))))
+            Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
+            Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
     }
   }
 
@@ -415,15 +415,15 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](
           provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
           Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-        QC.inj(Reduce[T, T[Target], nat._1](
+        QC.inj(Reduce[T, T[Target]](
           values(0),
           newProvs,
-          Sized[List](
+          List(
             ReduceFuncs.Arbitrary(newProvs),
             ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
           Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(Fin[nat._0, nat._2]))),
-            Free.roll(MakeArray(Free.point(Fin[nat._1, nat._2])))))))))
+            Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
+            Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
     }
   }
 

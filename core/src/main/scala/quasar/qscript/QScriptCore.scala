@@ -23,7 +23,6 @@ import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
-import shapeless.{Fin, Nat, Sized, Succ}
 
 sealed abstract class QScriptCore[T[_[_]], A] {
   def src: A
@@ -34,6 +33,19 @@ sealed abstract class QScriptCore[T[_[_]], A] {
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
+@Lenses final case class ReduceIndex(idx: Int)
+
+object ReduceIndex {
+  implicit def equal: Equal[ReduceIndex] =
+    Equal.equal((a, b) => a.idx ≟ b.idx)
+
+  implicit def show: Show[ReduceIndex] =
+    Show.show {
+      case ReduceIndex(idx) =>
+        Cord("ReduceIndex(") ++ idx.show ++ Cord(")")
+    }
+}
+
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
@@ -43,12 +55,12 @@ sealed abstract class QScriptCore[T[_[_]], A] {
   *
   * @group MRA
   */
- // FIXME: equality is broken - remove shapeless dep here
-@Lenses final case class Reduce[T[_[_]], A, N <: Nat](
+ // TODO: type level guarantees about indexing with `repair` into `reducers`
+@Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
-  reducers: Sized[List[ReduceFunc[FreeMap[T]]], Succ[N]],
-  repair: Free[MapFunc[T, ?], Fin[Succ[N]]])
+  reducers: List[ReduceFunc[FreeMap[T]]],
+  repair: Free[MapFunc[T, ?], ReduceIndex])
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
