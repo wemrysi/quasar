@@ -32,7 +32,7 @@ trait ProjectionModule[M[+ _], Block] {
   trait ProjectionCompanionLike[M0[+ _]] { self =>
     def apply(path: Path): M0[Option[Projection]]
 
-    def liftM[T[_ [+ _], + _]](implicit T: Hoist[T], M0: Monad[M0]) = new ProjectionCompanionLike[({ type λ[+α] = T[M0, α] })#λ] {
+    def liftM[T[_ [+ _], + _]](implicit T: Hoist[T], M0: Monad[M0]) = new ProjectionCompanionLike[T[M0, ?]] {
       def apply(path: Path) = self.apply(path).liftM[T]
     }
   }

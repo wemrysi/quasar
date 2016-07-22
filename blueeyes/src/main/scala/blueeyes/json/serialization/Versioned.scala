@@ -69,7 +69,7 @@ object Versioned {
       def validated(jv: JValue) = {
         import scalaz.syntax.traverse._
 
-        version.traverse[({ type λ[α] = Validation[Error, α] })#λ, Version] { v =>
+        version.traverse[Validation[Error, ?], Version] { v =>
           jv.validated[Option[Version]]("schemaVersion") flatMap {
             case Some(vrec) =>
               if (v.isBackwardCompatible(vrec)) success(vrec)

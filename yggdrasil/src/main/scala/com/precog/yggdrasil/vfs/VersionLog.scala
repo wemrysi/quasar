@@ -93,7 +93,7 @@ object VersionLog {
     val allVersions: Validation[Error, List[VersionEntry]] = if (logFile.exists) {
       for {
         jvs <- JParser.parseManyFromFile(logFile).leftMap(Error.thrown)
-        versions <- jvs.toList.traverse[({ type λ[α] = Validation[Error, α] })#λ, VersionEntry](_.validated[VersionEntry])
+        versions <- jvs.toList.traverse[Validation[Error, ?], VersionEntry](_.validated[VersionEntry])
       } yield versions
     } else {
       Success(Nil)
@@ -102,7 +102,7 @@ object VersionLog {
     val completedVersions: Validation[Error, Set[UUID]] = if (completedFile.exists) {
       for {
         jvs <- JParser.parseManyFromFile(completedFile).leftMap(Error.thrown)
-        versions <- jvs.toList.traverse[({ type λ[α] = Validation[Error, α] })#λ, UUID](_.validated[UUID])
+        versions <- jvs.toList.traverse[Validation[Error, ?], UUID](_.validated[UUID])
       } yield versions.toSet
     } else {
       Success(Set.empty)

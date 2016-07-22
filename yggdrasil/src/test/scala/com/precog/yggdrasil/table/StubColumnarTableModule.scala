@@ -63,7 +63,7 @@ trait StubColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
 
     override def load(apiKey: APIKey, jtpe: JType) = EitherT {
       self.toJson map { events =>
-        val parsedV = events.toStream.traverse[({ type λ[α] = Validation[ResourceError, α] })#λ, Stream[JObject]] {
+        val parsedV = events.toStream.traverse[Validation[ResourceError, ?], Stream[JObject]] {
           case JString(pathStr) => success {
             indexLock synchronized {      // block the WHOLE WORLD
               val path = Path(pathStr)

@@ -32,7 +32,7 @@ trait Extractor[A] { self =>
     def validated(jvalue: JValue) = self.validated(jvalue) flatMap f
   }
 
-  def kleisli = Kleisli[({ type λ[+α] = Validation[Error, α] })#λ, JValue, A](validated _)
+  def kleisli = Kleisli[Validation[Error, ?], JValue, A](validated _)
 
   def apply(jvalue: JValue): A = extract(jvalue)
 }
