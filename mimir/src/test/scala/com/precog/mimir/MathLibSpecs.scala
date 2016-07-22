@@ -473,21 +473,6 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       result2.toSet must_== Set(4.9E-324, 2.220446049250313E-16, 2.220446049250313E-16, 7.105427357601002E-15, 3.552713678800501E-15)
     }
-    "compute min" in {
-      val input = Join(BuiltInFunction2Op(min), Cross(None),
-        dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
-        Const(CLong(7))(line))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(6)
-
-      val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1  => d
-      }
-
-      result2.toSet must_== Set(0, 1, -1, 7, -23)
-    }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbers4"))(line))(line),
@@ -977,21 +962,6 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       }
 
       result2.toSet must_== Set(4.9E-324, 2.220446049250313E-16, 2.220446049250313E-16, 7.105427357601002E-15, 3.552713678800501E-15)
-    }
-    "compute min" in {
-      val input = Join(BuiltInFunction2Op(min), Cross(None),
-        dag.AbsoluteLoad(Const(CString("/het/numbers4"))(line))(line),
-        Const(CLong(7))(line))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(6)
-
-      val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1  => d
-      }
-
-      result2.toSet must_== Set(0, 1, -1, 7, -23)
     }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),
@@ -1508,21 +1478,6 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       result2.toSet must_== Set(1.7763568394002505E-15, 8.881784197001252E-16, 4.440892098500626E-16, 4.9E-324)
     }
-    "compute min" in {
-      val input = Join(BuiltInFunction2Op(min), Cross(None),
-        dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))(line))(line),
-        Const(CLong(7))(line))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(22)
-
-      val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
-      }
-
-      result2.toSet must_== Set(0, -7, -3, -12, 6, -5, 7, -14, -9, -13)
-    }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),
         dag.AbsoluteLoad(Const(CString("/hom/numbersAcrossSlices"))(line))(line),
@@ -1992,21 +1947,6 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
       }
 
       result2.toSet must_== Set(2.220446049250313E-16, 4.9E-324, 1.7763568394002505E-15, 8.881784197001252E-16, 4.440892098500626E-16)
-    }
-    "compute min" in {
-      val input = Join(BuiltInFunction2Op(min), Cross(None),
-        dag.AbsoluteLoad(Const(CString("/het/numbersAcrossSlices"))(line))(line),
-        Const(CLong(7))(line))(line)
-
-      val result = testEval(input)
-
-      result must haveSize(9)
-
-      val result2 = result collect {
-        case (ids, SDecimal(d)) if ids.length == 1 => d
-      }
-
-      result2.toSet must_== Set(0, 5, -3, 1, 2, 7, -1)
     }
     "compute hypot" in {
       val input = Join(BuiltInFunction2Op(hypot), Cross(None),

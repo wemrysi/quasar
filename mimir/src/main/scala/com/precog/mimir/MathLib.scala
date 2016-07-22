@@ -58,7 +58,7 @@ trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModul
         acos,
         ulp)
 
-    override def _lib2 = super._lib2 ++ Set(minOf, min, hypot, pow, maxOf, max, atan2, copySign, roundTo, IEEEremainder)
+    override def _lib2 = super._lib2 ++ Set(minOf, hypot, pow, maxOf, atan2, copySign, roundTo, IEEEremainder)
 
     import StdLib.{ DoubleFrom, doubleIsDefined }
     import java.lang.Math
@@ -167,17 +167,9 @@ trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModul
 
     object minOf extends Op2DDD("minOf", bothDefined, Math.min)
 
-    object min extends Op2DDD("min", bothDefined, Math.min) {
-      override val deprecation = Some("use minOf instead")
-    }
-
     object hypot extends Op2DDD("hypot", bothDefined, Math.hypot)
 
     object maxOf extends Op2DDD("maxOf", bothDefined, Math.max)
-
-    object max extends Op2DDD("max", bothDefined, Math.max) {
-      override val deprecation = Some("use maxOf instead")
-    }
 
     object atan2 extends Op2DDD("atan2", bothDefined, Math.atan2)
 

@@ -287,7 +287,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val line = Line(1, 1, "")
 
       val input =
-        Join(BuiltInFunction2Op(min), IdentitySort,
+        Join(BuiltInFunction2Op(minOf), IdentitySort,
           Join(DerefObject, Cross(None),
             AbsoluteLoad(Const(CString("/file0"))(line))(line),
             Const(CString("column0"))(line))(line),

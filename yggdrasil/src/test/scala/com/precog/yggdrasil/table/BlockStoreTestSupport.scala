@@ -95,13 +95,13 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 
   def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
     case (_: JNum, CNum | CLong | CDouble) => true
-    case (JUndefined, CUndefined) => true
-    case (JNull, CNull) => true
-    case (_: JBool, CBoolean) => true
-    case (_: JString, CString) => true
-    case (JObject(fields), CEmptyObject) if fields.isEmpty => true
-    case (JArray(Nil), CEmptyArray) => true
-    case _ => false
+    case (JUndefined, CUndefined)          => true
+    case (JNull, CNull)                    => true
+    case (_: JBool, CBoolean)              => true
+    case (_: JString, CString)             => true
+    case (JObject(fields), CEmptyObject)   => fields.isEmpty
+    case (JArray(Nil), CEmptyArray)        => true
+    case _                                 => false
   }
 
   def sortTransspec(sortKeys: CPath*): TransSpec1 = InnerObjectConcat(sortKeys.zipWithIndex.map {

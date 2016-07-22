@@ -43,9 +43,7 @@ trait RandomLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
 
     object UniformDistribution extends Morphism1(RandomNamespace, "uniform") {
       // todo currently we are seeding with a number, change this to a String
-      val tpe                 = UnaryOperationType(JNumberT, JNumberT)
-      override val isInfinite = true
-
+      val tpe = UnaryOperationType(JNumberT, JNumberT)
       type Result = Option[Long]
 
       def reducer(ctx: MorphContext) = new Reducer[Result] {

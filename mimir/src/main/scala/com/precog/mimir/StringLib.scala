@@ -64,8 +64,6 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
         dropRight,
         matches,
         regexMatch,
-        compareTo,
-        compareToIgnoreCase,
         compare,
         compareIgnoreCase,
         equals,
@@ -299,15 +297,7 @@ trait StringLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    object compareTo extends Op2SSL("compareTo", _ compareTo _) {
-      override val deprecation = Some("use compare instead")
-    }
-
     object compare extends Op2SSL("compare", _ compareTo _)
-
-    object compareToIgnoreCase extends Op2SSL("compareToIgnoreCase", _ compareToIgnoreCase _) {
-      override val deprecation = Some("use compareIgnoreCase instead")
-    }
 
     object compareIgnoreCase extends Op2SSL("compareIgnoreCase", _ compareToIgnoreCase _)
 
