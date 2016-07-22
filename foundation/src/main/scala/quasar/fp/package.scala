@@ -429,6 +429,9 @@ package object fp
     */
   def ignore[A](a: A): Unit = ()
 
+  def reflNT[F[_]]: F ~> F =
+    NaturalTransformation.refl[F]
+
   /** `liftM` as a natural transformation
     *
     * TODO: PR to scalaz

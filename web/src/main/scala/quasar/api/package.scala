@@ -42,6 +42,8 @@ package object api {
   type ResponseIOT[F[_], A] = EitherT[F, Task[Response], A]
   type ResponseOr[A]        = ResponseT[Task, A]
 
+  type ApiErrT[F[_], A] = EitherT[F, ApiError, A]
+
   /** Interpret a `Failure` effect into `ResponseOr` given evidence the
     * failure type can be converted to a `QResponse`.
     */

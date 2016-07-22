@@ -172,21 +172,23 @@ package object main {
     evalNT[F, Map[APath, MountConfig]](Map()) compose toState
   }
 
+  /** The possible types of failure in the system. */
+  type QErrs0[A] = Coproduct[FileSystemFailure, PhysErr, A]
+  type QErrs1[A] = Coproduct[MountingFailure, QErrs0, A]
+  type QErrs[A]  = Coproduct[PathMismatchFailure, QErrs1, A]
+
+  object QErrs {
+    def toCatchable[F[_]: Catchable]: QErrs ~> F =
+      Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
+      Failure.toRuntimeError[F, MountingError]             :+:
+      Failure.toRuntimeError[F, FileSystemError]           :+:
+      Failure.toRuntimeError[F, PhysicalError]
+  }
+
   /** Encompasses all the failure effects and mount config effect, all of
     * which we need to evaluate using more than one implementation.
     */
-  type CfgsErrs0[A]   = Coproduct[PhysErr, MountConfigs, A]
-  type CfgsErrs[A]    = Coproduct[FileSystemFailure, CfgsErrs0, A]
-
-  object CfgsErrs {
-    def toCatchable[F[_]: Catchable](
-      eval: MountConfigs ~> F
-    ): CfgsErrs ~> F =
-      Failure.toRuntimeError[F, FileSystemError] :+:
-      Failure.toRuntimeError[F, PhysicalError] :+:
-      eval
-  }
-
+  type CfgsErrs[A]    = Coproduct[MountConfigs, QErrs, A]
   type CfgsErrsIO[A]  = Coproduct[Task, CfgsErrs, A]
   type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
 
@@ -194,8 +196,7 @@ package object main {
     /** Interprets errors into strings. */
     def toMainTask(eval: MountConfigs ~> Task): CfgsErrsIO ~> MainTask = {
       val f =
-        NaturalTransformation.refl[Task] :+:
-        CfgsErrs.toCatchable(eval)
+        reflNT[Task] :+: eval :+: QErrs.toCatchable[Task]
 
       new (CfgsErrsIO ~> MainTask) {
         def apply[A](a: CfgsErrsIO[A]) =
@@ -207,7 +208,9 @@ package object main {
   /** Effect required by the core Quasar services */
   type CoreEff0[A] = Coproduct[Mounting, FileSystem, A]
   type CoreEff1[A] = Coproduct[FileSystemFailure, CoreEff0, A]
-  type CoreEff[A]  = Coproduct[Task, CoreEff1, A]
+  type CoreEff2[A] = Coproduct[MountingFailure, CoreEff1, A]
+  type CoreEff3[A] = Coproduct[PathMismatchFailure, CoreEff2, A]
+  type CoreEff[A]  = Coproduct[Task, CoreEff3, A]
   type CoreEffM[A] = Free[CoreEff, A]
 
   // TODO: Accept an initial set of mounts?
@@ -240,9 +243,11 @@ package object main {
         val mounting: Mounting ~> CfgsErrsIOM =
           free.foldMapNT(mnt) compose mounter
 
-        liftTask                                :+:
-        injectFT[FileSystemFailure, CfgsErrsIO] :+:
-        mounting                                :+:
+        liftTask                                  :+:
+        injectFT[PathMismatchFailure, CfgsErrsIO] :+:
+        injectFT[MountingFailure, CfgsErrsIO]     :+:
+        injectFT[FileSystemFailure, CfgsErrsIO]   :+:
+        mounting                                  :+:
         (translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
       }
   }
@@ -253,14 +258,29 @@ package object main {
   def attemptMountAll[S[_]](
     config: MountingsConfig
   )(implicit
-    mounting: Mounting.Ops[S]
+    S: Mounting :<: S
   ): Free[S, Map[APath, String]] = {
+    import Mounting.PathTypeMismatch
+    import Failure.{mapError, toError}
+
+    type T0[A] = Coproduct[MountingFailure, S, A]
+    type T[A]  = Coproduct[PathMismatchFailure, T0, A]
+    type Errs  = PathTypeMismatch \/ MountingError
+    type M[A]  = EitherT[Free[S, ?], Errs, A]
+
+    val mounting = Mounting.Ops[T]
+
+    val runErrs: T ~> M =
+      (toError[M, Errs] compose mapError[PathTypeMismatch, Errs](\/.left)) :+:
+      (toError[M, Errs] compose mapError[MountingError, Errs](\/.right))   :+:
+      (liftMT[Free[S, ?], EitherT[?[_], Errs, ?]] compose liftFT[S])
+
     val attemptMount: ((APath, MountConfig)) => Free[S, Map[APath, String]] = {
       case (path, cfg) =>
-        mounting.mount(path, cfg).run map {
-          case \/-(\/-(_)) => Map.empty
-          case \/-(-\/(e)) => Map(path -> e.shows)
-          case -\/(e)      => Map(path -> e.shows)
+        mounting.mount(path, cfg).foldMap(runErrs).run map {
+          case \/-(_)      => Map.empty
+          case -\/(-\/(e)) => Map(path -> e.shows)
+          case -\/(\/-(e)) => Map(path -> e.shows)
         }
     }
 

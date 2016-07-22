@@ -16,19 +16,31 @@
 
 package quasar.fs
 
-import quasar.Predef.Map
+import quasar.Predef.{Map, Vector}
 import quasar.effect._
-import quasar.fp.{TaskRef}
+import quasar.fp.TaskRef
 import quasar.fp.free, free._
 
-import scala.collection.immutable.Vector
-
 import monocle.Lens
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, Failure => _, _}
 import scalaz.concurrent.Task
 
 package object mount {
   type MntErrT[F[_], A] = EitherT[F, MountingError, A]
+
+  type MountingFailure[A] = Failure[MountingError, A]
+
+  object MountingFailure {
+    def Ops[S[_]](implicit S: MountingFailure :<: S) =
+      Failure.Ops[MountingError, S]
+  }
+
+  type PathMismatchFailure[A] = Failure[Mounting.PathTypeMismatch, A]
+
+  object PathMismatchFailure {
+    def Ops[S[_]](implicit S: PathMismatchFailure :<: S) =
+      Failure.Ops[Mounting.PathTypeMismatch, S]
+  }
 
   type MountConfigs[A] = KeyValueStore[APath, MountConfig, A]
 

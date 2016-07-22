@@ -79,11 +79,19 @@ package object services {
       BadRequest withReason s"'${key.name}' header missing.",
       "headerName" := key.name.toString)
 
-  def respond[S[_], A, F[_]](a: Free[S, A])(implicit ev: ToQResponse[A, F]): Free[S, QResponse[F]] =
-    a.map(ev.toResponse)
+  def respond[S[_], A](a: Free[S, A])(implicit A: ToQResponse[A, S]): Free[S, QResponse[S]] =
+    a.map(A.toResponse)
 
-  def respond_[S[_], A, F[_]](a: A)(implicit ev: ToQResponse[A, F]): Free[S, QResponse[F]] =
+  def respond_[S[_], A](a: A)(implicit A: ToQResponse[A, S]): Free[S, QResponse[S]] =
     respond(Free.pure(a))
+
+  def respondT[S[_], A, B](
+    a: EitherT[Free[S, ?], A, B]
+  )(implicit
+    A: ToQResponse[A, S],
+    B: ToQResponse[B, S]
+  ): Free[S, QResponse[S]] =
+    a.fold(A.toResponse, B.toResponse)
 
   object Offset extends OptionalValidatingQueryParamDecoderMatcher[Natural]("offset")
 

@@ -32,33 +32,53 @@ import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
 
 class RestApiSpecs extends Specification {
-  import InMemory._
+  import InMemory._, Mounting.PathTypeMismatch
 
   type Eff0[A] = Coproduct[FileSystemFailure, MountingFileSystem, A]
-  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff1[A] = Coproduct[MountingFailure, Eff0, A]
+  type Eff2[A] = Coproduct[PathMismatchFailure, Eff1, A]
+  type Eff[A]  = Coproduct[Task, Eff2, A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {
-      def apply[A](m: Mounting[A]): Task[A] = Task.fail(new RuntimeException("unimplemented"))
+      def apply[A](m: Mounting[A]): Task[A] =
+        Task.fail(new RuntimeException("unimplemented"))
     }
-    val fs = runFs(InMemState.empty).map(interpretMountingFileSystem(mount, _)).unsafePerformSync
-    val eff =
-      NaturalTransformation.refl[Task]             :+:
-      Failure.toRuntimeError[Task,FileSystemError] :+:
-      fs
-    val service = RestApi.finalizeServices(
-      RestApi.toHttpServices(liftMT[Task, ResponseT] compose eff, RestApi.coreServices[Eff]))
 
-    def testAdvertise(path: String,
-                      additionalHeaders: List[Header],
-                      resultHeaderKey: HeaderKey.Extractable,
-                      expected: List[String]) = {
+    val fs =
+      runFs(InMemState.empty)
+        .map(interpretMountingFileSystem(mount, _))
+
+    val eff = fs map { runFs =>
+      NaturalTransformation.refl[Task]               :+:
+      Failure.toRuntimeError[Task, PathTypeMismatch] :+:
+      Failure.toRuntimeError[Task, MountingError]    :+:
+      Failure.toRuntimeError[Task, FileSystemError]  :+:
+      runFs
+    }
+
+    val service = eff map { runEff =>
+      RestApi.finalizeServices(RestApi.toHttpServices(
+        liftMT[Task, ResponseT] compose runEff,
+        RestApi.coreServices[Eff]))
+    }
+
+    def testAdvertise(
+      path: String,
+      additionalHeaders: List[Header],
+      resultHeaderKey: HeaderKey.Extractable,
+      expected: List[String]
+    ) = {
       val req = Request(
         uri = Uri(path = path),
         method = OPTIONS,
         headers = Headers(Header("Origin", "") :: additionalHeaders))
-      val response = service(req).unsafePerformSync
-      response.headers.get(resultHeaderKey).get.value.split(", ").toList must contain(allOf(expected: _*))
+
+      service.flatMap(_(req)).map { response =>
+        response.headers.get(resultHeaderKey)
+          .get.value.split(", ")
+          .toList must contain(allOf(expected: _*))
+      }.unsafePerformSync
     }
 
     def advertisesMethodsCorrectly(path: String, expected: List[Method]) =
@@ -71,7 +91,9 @@ class RestApiSpecs extends Specification {
         resultHeaderKey = `Access-Control-Allow-Headers`,
         expected = expected.map(_.name.value))
 
-    "advertise GET and POST for /query path" >> advertisesMethodsCorrectly("/query/fs", List(GET, POST))
+    "advertise GET and POST for /query path" >> {
+      advertisesMethodsCorrectly("/query/fs", List(GET, POST))
+    }
 
     "advertise Destination header for /query path and method POST" >> {
       advertisesHeadersCorrectly("/query/fs", POST, List(Destination))

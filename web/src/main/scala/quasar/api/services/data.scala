@@ -145,7 +145,7 @@ object data {
       persistErrors: FreeFS[Vector[FileSystemError]]
     ): Free[S, QResponse[S]] =
       decodeErrors.toList.toNel
-        .map(errs => respond_[S, ApiError, S](ApiError.apiError(
+        .map(errs => respond_[S, ApiError](ApiError.apiError(
           BadRequest withReason "Malformed upload data.",
           "errors" := errs.map(_.shows))))
         .getOrElse(persistErrors.fold(_.toResponse[S], errs =>
