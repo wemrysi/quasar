@@ -311,7 +311,7 @@ trait DAG extends Instructions {
           } getOrElse (Trampoline delay Left(UnableToLocateSplitDescribingId(id)))
         }
 
-        case instr: RootInstr => {
+        case instr @ RootInstr() => {
           val rvalue = instr match {
             case PushString(str) => CString(str)
             case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
@@ -320,6 +320,7 @@ trait DAG extends Instructions {
             case PushNull        => CNull
             case PushObject      => RObject.empty
             case PushArray       => RArray.empty
+            case _               => sys.error("Not a root instr")
           }
           loop(loc, Right(Const(rvalue)(loc)) :: roots, splits, stream.tail)
         }
@@ -341,19 +342,16 @@ trait DAG extends Instructions {
     }
 
     def findFirstRoot(line: Option[Line], stream: Vector[Instruction]): Either[StackError, (Root, Vector[Instruction])] = {
-      def buildConstRoot(instr: RootInstr): Either[StackError, (Root, Vector[Instruction])] = {
+      def buildConstRoot(instr: Instruction): Either[StackError, (Root, Vector[Instruction])] = {
         val rvalue = instr match {
           case PushString(str) => CString(str)
-
-          // get the numeric coersion
-          case PushNum(num) =>
-            CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
-
-          case PushTrue   => CBoolean(true)
-          case PushFalse  => CBoolean(false)
-          case PushNull   => CNull
-          case PushObject => RObject.empty
-          case PushArray  => RArray.empty
+          case PushNum(num)    => CType.toCValue(JNum(BigDecimal(num, MathContext.UNLIMITED)))
+          case PushTrue        => CBoolean(true)
+          case PushFalse       => CBoolean(false)
+          case PushNull        => CNull
+          case PushObject      => RObject.empty
+          case PushArray       => RArray.empty
+          case _               => sys.error("impossible")
         }
 
         line map { ln =>

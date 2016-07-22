@@ -105,6 +105,7 @@ package object blueeyes extends ScodecImplicits {
   def utf8Bytes(s: String): Array[Byte] = s getBytes Utf8Charset
   def uuid(s: String): UUID             = java.util.UUID fromString s
   def randomUuid(): UUID                = java.util.UUID.randomUUID
+  def randomInt(end: Int): Int          = scala.util.Random.nextInt(end)
 
   // Temporary
   type BitSet             = com.precog.util.BitSet

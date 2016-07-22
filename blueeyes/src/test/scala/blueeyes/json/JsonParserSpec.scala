@@ -54,7 +54,7 @@ object JsonParserSpec extends Specification with ArbitraryJValue with ScalaCheck
   }
 }
 
-object ParserBugs extends Specification {
+object ParserBugsSpec extends Specification {
   "Unicode ffff is a valid char in string literal" in {
     JParser.parseFromString(""" {"x":"\uffff"} """) must not(throwAn[java.lang.Exception])
   }

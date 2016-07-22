@@ -22,187 +22,108 @@ package com.precog.bytecode
 trait Instructions {
   type Lib <: Library
   val library: Lib
+  object instructions extends InstructionSet[library.type](library)
+}
 
+class InstructionSet[Lib <: Library](val library: Lib) {
   import library._
 
   sealed trait Instruction
 
-  // namespace
-  object instructions {
-    sealed trait DataInstr extends Instruction
-
-    sealed trait JoinInstr extends Instruction
-
-    case class Map1(op: UnaryOperation)       extends Instruction
-    case class Map2Match(op: BinaryOperation) extends Instruction with JoinInstr
-    case class Map2Cross(op: BinaryOperation) extends Instruction with JoinInstr
-
-    case class Reduce(red: BuiltInReduction) extends Instruction
-    case class Morph1(m1: BuiltInMorphism1)  extends Instruction
-    case class Morph2(m2: BuiltInMorphism2)  extends Instruction
-
-    case object Observe extends Instruction with JoinInstr
-
-    case object Assert extends Instruction with JoinInstr
-
-    case object IUnion        extends Instruction with JoinInstr
-    case object IIntersect    extends Instruction with JoinInstr
-    case object SetDifference extends Instruction with JoinInstr
-
-    case class Group(id: Int)             extends Instruction
-    case class MergeBuckets(and: Boolean) extends Instruction
-    case class KeyPart(id: Int)           extends Instruction
-    case object Extra extends Instruction
-
-    case object Split extends Instruction
-    case object Merge extends Instruction
-
-    case object FilterMatch extends Instruction with DataInstr
-    case object FilterCross extends Instruction with DataInstr
-
-    case object Dup  extends Instruction
-    case object Drop extends Instruction
-    case class Swap(depth: Int) extends Instruction with DataInstr
-
-    case class Line(line: Int, col: Int, text: String) extends Instruction with DataInstr {
-      override def toString = "<%d:%d>".format(line, col)
+  object RootInstr {
+    def unapply(in: Instruction): Boolean = in match {
+      case _: PushString => true
+      case _: PushNum    => true
+      case PushTrue      => true
+      case PushFalse     => true
+      case PushNull      => true
+      case PushObject    => true
+      case PushArray     => true
+      case _             => false
     }
-
-    case object AbsoluteLoad extends Instruction
-    case object RelativeLoad extends Instruction
-    case object Distinct     extends Instruction
-
-    sealed trait RootInstr extends Instruction
-
-    case class PushString(str: String) extends Instruction with DataInstr with RootInstr
-    case class PushNum(num: String)    extends Instruction with DataInstr with RootInstr
-    case object PushTrue   extends Instruction with RootInstr
-    case object PushFalse  extends Instruction with RootInstr
-    case object PushNull   extends Instruction with RootInstr
-    case object PushObject extends Instruction with RootInstr
-    case object PushArray  extends Instruction with RootInstr
-
-    case object PushUndefined extends Instruction
-    case class PushGroup(id: Int) extends Instruction
-    case class PushKey(id: Int)   extends Instruction
-
-    object Map2 {
-      def unapply(instr: JoinInstr): Option[BinaryOperationType] = instr match {
-        case Map2Match(op) => Some(op.tpe)
-        case Map2Cross(op) => Some(op.tpe)
-        case _             => None
-      }
-    }
-
-    sealed trait UnaryOperation {
-      val tpe: UnaryOperationType
-    }
-
-    trait NumericUnaryOperation extends UnaryOperation {
-      val tpe = UnaryOperationType(JNumberT, JNumberT)
-    }
-
-    trait BooleanUnaryOperation extends UnaryOperation {
-      val tpe = UnaryOperationType(JBooleanT, JBooleanT)
-    }
-
-    trait UnfixedUnaryOperation extends UnaryOperation {
-      val tpe = UnaryOperationType(JType.JUniverseT, JType.JUniverseT)
-    }
-
-    sealed trait BinaryOperation {
-      val tpe: BinaryOperationType
-    }
-
-    trait NumericBinaryOperation extends BinaryOperation {
-      val tpe = BinaryOperationType(JNumberT, JNumberT, JNumberT)
-    }
-
-    trait NumericComparisonOperation extends BinaryOperation {
-      val dateAndNum = JUnionT(JNumberT, JDateT)
-      val tpe        = BinaryOperationType(dateAndNum, dateAndNum, JBooleanT)
-    }
-
-    trait BooleanBinaryOperation extends BinaryOperation {
-      val tpe = BinaryOperationType(JBooleanT, JBooleanT, JBooleanT)
-    }
-
-    trait EqualityOperation extends BinaryOperation {
-      val tpe = BinaryOperationType(JType.JUniverseT, JType.JUniverseT, JBooleanT)
-    }
-
-    trait UnfixedBinaryOperation extends BinaryOperation {
-      val tpe = BinaryOperationType(JType.JUniverseT, JType.JUniverseT, JType.JUniverseT)
-    }
-
-    case class BuiltInFunction1Op(op: Op1) extends UnaryOperation {
-      val tpe = op.tpe
-    }
-
-    case class BuiltInFunction2Op(op: Op2) extends BinaryOperation {
-      val tpe = op.tpe
-    }
-
-    case class BuiltInMorphism1(mor: Morphism1) extends UnaryOperation {
-      val tpe = mor.tpe
-    }
-
-    case class BuiltInMorphism2(mor: Morphism2) extends BinaryOperation {
-      val tpe = mor.tpe
-    }
-
-    case class BuiltInReduction(red: Reduction) extends UnaryOperation {
-      val tpe = red.tpe
-    }
-
-    case object Add extends NumericBinaryOperation
-    case object Sub extends NumericBinaryOperation
-    case object Mul extends NumericBinaryOperation
-    case object Div extends NumericBinaryOperation
-    case object Mod extends NumericBinaryOperation
-    case object Pow extends NumericBinaryOperation
-
-    case object Lt   extends NumericComparisonOperation
-    case object LtEq extends NumericComparisonOperation
-    case object Gt   extends NumericComparisonOperation
-    case object GtEq extends NumericComparisonOperation
-
-    case object Eq    extends EqualityOperation
-    case object NotEq extends EqualityOperation
-
-    case object Or  extends BooleanBinaryOperation
-    case object And extends BooleanBinaryOperation
-
-    case object New  extends UnfixedUnaryOperation
-    case object Comp extends BooleanUnaryOperation
-    case object Neg  extends NumericUnaryOperation
-
-    case object WrapObject extends BinaryOperation {
-      val tpe = BinaryOperationType(JTextT, JType.JUniverseT, JObjectUnfixedT)
-    }
-    case object WrapArray extends UnaryOperation {
-      val tpe = UnaryOperationType(JType.JUniverseT, JArrayUnfixedT)
-    }
-
-    case object JoinObject extends BinaryOperation {
-      val tpe = BinaryOperationType(JObjectUnfixedT, JObjectUnfixedT, JObjectUnfixedT)
-    }
-    case object JoinArray extends BinaryOperation {
-      val tpe = BinaryOperationType(JArrayUnfixedT, JArrayUnfixedT, JArrayUnfixedT)
-    }
-
-    case object ArraySwap extends BinaryOperation {
-      val tpe = BinaryOperationType(JArrayUnfixedT, JNumberT, JArrayUnfixedT)
-    }
-
-    case object DerefObject extends BinaryOperation {
-      val tpe = BinaryOperationType(JObjectUnfixedT, JTextT, JType.JUniverseT)
-    }
-    case object DerefMetadata extends UnfixedBinaryOperation
-    case object DerefArray extends BinaryOperation {
-      val tpe = BinaryOperationType(JArrayUnfixedT, JNumberT, JType.JUniverseT)
-    }
-
-    case object Range
   }
+
+  sealed trait JoinInstr                          extends Instruction
+  final case class Map2Cross(op: BinaryOperation) extends JoinInstr
+  final case class Map2Match(op: BinaryOperation) extends JoinInstr
+  final case object Assert                        extends JoinInstr
+  final case object IIntersect                    extends JoinInstr
+  final case object IUnion                        extends JoinInstr
+  final case object Observe                       extends JoinInstr
+  final case object SetDifference                 extends JoinInstr
+
+  sealed trait DataInstr                                   extends Instruction
+  final case class Line(line: Int, col: Int, text: String) extends DataInstr { override def toString = s"<$line:$col>" }
+  final case class PushNum(num: String)                    extends DataInstr
+  final case class PushString(str: String)                 extends DataInstr
+  final case class Swap(depth: Int)                        extends DataInstr
+  final case object FilterCross                            extends DataInstr
+  final case object FilterMatch                            extends DataInstr
+
+  final case class Group(id: Int)                extends Instruction
+  final case class KeyPart(id: Int)              extends Instruction
+  final case class Map1(op: UnaryOperation)      extends Instruction
+  final case class MergeBuckets(and: Boolean)    extends Instruction
+  final case class Morph1(m1: BuiltInMorphism1)  extends Instruction
+  final case class Morph2(m2: BuiltInMorphism2)  extends Instruction
+  final case class PushGroup(id: Int)            extends Instruction
+  final case class PushKey(id: Int)              extends Instruction
+  final case class Reduce(red: BuiltInReduction) extends Instruction
+  final case object AbsoluteLoad                 extends Instruction
+  final case object Distinct                     extends Instruction
+  final case object Drop                         extends Instruction
+  final case object Dup                          extends Instruction
+  final case object Extra                        extends Instruction
+  final case object Merge                        extends Instruction
+  final case object PushArray                    extends Instruction
+  final case object PushFalse                    extends Instruction
+  final case object PushNull                     extends Instruction
+  final case object PushObject                   extends Instruction
+  final case object PushTrue                     extends Instruction
+  final case object PushUndefined                extends Instruction
+  final case object RelativeLoad                 extends Instruction
+  final case object Split                        extends Instruction
+
+  private def DateNumUnion         = JUnionT(JNumberT, JDateT)
+  private def BinOpType(tp: JType) = BinaryOperationType(tp, tp, tp)
+  import JType.JUniverseT
+
+  sealed abstract class UnaryOperation(val tpe: UnaryOperationType)
+  sealed abstract class BinaryOperation(val tpe: BinaryOperationType)
+  sealed abstract class NumericBinaryOperation     extends BinaryOperation(BinOpType(JNumberT))
+  sealed abstract class NumericComparisonOperation extends BinaryOperation(BinaryOperationType(DateNumUnion, DateNumUnion, JBooleanT))
+  sealed abstract class BooleanBinaryOperation     extends BinaryOperation(BinOpType(JBooleanT))
+  sealed abstract class EqualityOperation          extends BinaryOperation(BinaryOperationType(JUniverseT, JUniverseT, JBooleanT))
+
+  final case class BuiltInFunction1Op(op: Op1)      extends UnaryOperation(op.tpe)
+  final case class BuiltInFunction2Op(op: Op2)      extends BinaryOperation(op.tpe)
+  final case class BuiltInMorphism1(mor: Morphism1) extends UnaryOperation(mor.tpe)
+  final case class BuiltInMorphism2(mor: Morphism2) extends BinaryOperation(mor.tpe)
+  final case class BuiltInReduction(red: Reduction) extends UnaryOperation(red.tpe)
+
+  final case object Add           extends NumericBinaryOperation
+  final case object And           extends BooleanBinaryOperation
+  final case object ArraySwap     extends BinaryOperation(BinaryOperationType(JArrayUnfixedT, JNumberT, JArrayUnfixedT))
+  final case object Comp          extends UnaryOperation(UnaryOperationType(JBooleanT, JBooleanT))
+  final case object DerefArray    extends BinaryOperation(BinaryOperationType(JArrayUnfixedT, JNumberT, JUniverseT))
+  final case object DerefMetadata extends BinaryOperation(BinOpType(JUniverseT))
+  final case object DerefObject   extends BinaryOperation(BinaryOperationType(JObjectUnfixedT, JTextT, JUniverseT))
+  final case object Div           extends NumericBinaryOperation
+  final case object Eq            extends EqualityOperation
+  final case object Gt            extends NumericComparisonOperation
+  final case object GtEq          extends NumericComparisonOperation
+  final case object JoinArray     extends BinaryOperation(BinOpType(JArrayUnfixedT))
+  final case object JoinObject    extends BinaryOperation(BinOpType(JObjectUnfixedT))
+  final case object Lt            extends NumericComparisonOperation
+  final case object LtEq          extends NumericComparisonOperation
+  final case object Mod           extends NumericBinaryOperation
+  final case object Mul           extends NumericBinaryOperation
+  final case object Neg           extends UnaryOperation(UnaryOperationType(JNumberT, JNumberT))
+  final case object New           extends UnaryOperation(UnaryOperationType(JUniverseT, JUniverseT))
+  final case object NotEq         extends EqualityOperation
+  final case object Or            extends BooleanBinaryOperation
+  final case object Pow           extends NumericBinaryOperation
+  final case object Sub           extends NumericBinaryOperation
+  final case object WrapArray     extends UnaryOperation(UnaryOperationType(JUniverseT, JArrayUnfixedT))
+  final case object WrapObject    extends BinaryOperation(BinaryOperationType(JTextT, JUniverseT, JObjectUnfixedT))
 }
