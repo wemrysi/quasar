@@ -16,11 +16,7 @@
 
 package quasar.qscript
 
-import quasar.Predef._
-import quasar.fp._
-
-import matryoshka._
-import scalaz._, Scalaz._
+import scalaz._
 
 sealed abstract class DeadEnd
 
@@ -33,20 +29,4 @@ final case object Empty extends DeadEnd
 object DeadEnd {
   implicit def equal: Equal[DeadEnd] = Equal.equalRef
   implicit def show: Show[DeadEnd] = Show.showFromToString
-
-  implicit def mergeable[T[_[_]]]: Mergeable.Aux[T, DeadEnd] =
-    new Mergeable[DeadEnd] {
-      type IT[F[_]] = T[F]
-
-      def mergeSrcs(
-        left: FreeMap[IT],
-        right: FreeMap[IT],
-        p1: DeadEnd,
-        p2: DeadEnd) =
-        OptionT(state(
-          if (p1 ≟ p2)
-            SrcMerge[DeadEnd, FreeMap[IT]](p1, UnitF, UnitF).some
-          else
-            None))
-    }
 }

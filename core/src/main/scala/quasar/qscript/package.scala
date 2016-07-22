@@ -17,11 +17,13 @@
 package quasar
 
 import quasar.Predef._
-import quasar.Planner._
-import quasar.namegen._
+import quasar.fp._
 
 import scala.Predef.implicitly
 
+import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka.patterns._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -31,7 +33,7 @@ import scalaz._, Scalaz._
   * here, and autojoin_d has been replaced with a lower-level join operation
   * that doesn’t include the cross portion.
   */
-package object qscript {
+package object qscript extends LowPriorityImplicits {
   type Pathable[T[_[_]], A] = Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
   /** These are the operations included in all forms of QScript.
@@ -43,10 +45,6 @@ package object qscript {
     */
   type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
   type QScriptProject[T[_[_]], A] = Coproduct[ProjectBucket[T, ?], QScriptPure[T, ?], A]
-
-  type Bucketing[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], ProjectBucket[T, ?], A]
-
-  type QScriptInternal[T[_[_]], A] = Coproduct[QScriptBucket[T, ?], QScriptProject[T, ?], A]
 
   /** These nodes exist in all QScript structures that a backend sees.
     */
@@ -78,18 +76,117 @@ package object qscript {
     implicit val show: Show[JoinSide] = Show.showFromToString
   }
 
-  type FreeUnit[F[_]] = Free[F, Unit]
+  sealed trait Hole
+  final case object SrcHole extends Hole
 
-  type FreeMap[T[_[_]]] = FreeUnit[MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeUnit[QScriptInternal[T, ?]]
+  object Hole {
+    implicit val equal: Equal[Hole] = Equal.equalRef
+    implicit val show: Show[Hole] = Show.showFromToString
+  }
+
+  type FreeHole[F[_]] = Free[F, Hole]
+
+  type FreeMap[T[_[_]]] = FreeHole[MapFunc[T, ?]]
+  type FreeQS[T[_[_]]] = FreeHole[QScriptProject[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
-  type QSState[A] = StateT[PlannerError \/ ?, NameGen, A]
+  @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
 
-  def UnitF[T[_[_]]] = ().point[Free[MapFunc[T, ?], ?]]
+  object Ann {
+    implicit def equal[T[_[_]]: EqualT]: Equal[Ann[T]] =
+      Equal.equal((a, b) => a.provenance ≟ b.provenance && a.values ≟ b.values)
+
+    implicit def show[T[_[_]]: ShowT]: Show[Ann[T]] =
+      Show.show(ann => Cord("Ann(") ++ ann.provenance.show ++ Cord(", ") ++ ann.values.show ++ Cord(")"))
+  }
+
+  def HoleF[T[_[_]]]: FreeMap[T] = Free.point[MapFunc[T, ?], Hole](SrcHole)
+  def EmptyAnn[T[_[_]]]: Ann[T] = Ann[T](Nil, HoleF[T])
 
   final case class SrcMerge[A, B](src: A, left: B, right: B)
 
   def rebase[M[_]: Bind, A](in: M[A], field: M[A]): M[A] = in >> field
+
+  import MapFunc._
+  import MapFuncs._
+
+  def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
+      (FreeMap[T], List[FreeMap[T]]) =
+    (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
+      buckets.zipWithIndex.map(p =>
+        Free.roll(ProjectIndex[T, FreeMap[T]](
+          HoleF[T],
+          IntLit[T, Hole](p._2)))))
+
+  def concat[T[_[_]]: Corecursive, A](
+    l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
+      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(r)))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))))
+
+  def concat3[T[_[_]]: Corecursive, A](
+    l: Free[MapFunc[T, ?], A], c: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
+      (Free[MapFunc[T, ?], A], FreeMap[T], FreeMap[T], FreeMap[T]) =
+    (Free.roll(ConcatArrays(Free.roll(ConcatArrays(Free.roll(MakeArray(l)), Free.roll(MakeArray(c)))), Free.roll(MakeArray(r)))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
+      Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
+
+  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
+    */
+  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
+    free: Free[F, A])(
+    f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      Free[F, A] =
+    free
+      .ana[T, CoEnv[A, F, ?]](CoEnv.freeIso[A, F].reverseGet)
+      .transCata[CoEnv[A, F, ?]](f)
+      .cata(CoEnv.freeIso[A, F].get)
+
+  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
+    co => co.run.fold(κ(co), f)
+
+  // TODO: move to matryoshka
+
+  implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
+    CoEnv.bifunctor[F].rightFunctor
+
+  implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
+      Delay[Equal, EnvT[E, F, ?]] =
+    new Delay[Equal, EnvT[E, F, ?]] {
+      def apply[A](eq: Equal[A]) =
+        Equal.equal {
+          case (env1, env2) =>
+            env1.ask ≟ env2.ask && F(eq).equal(env1.lower, env2.lower)
+        }
+    }
+
+  implicit def envtShow[E: Show, F[_]](implicit F: Delay[Show, F]):
+      Delay[Show, EnvT[E, F, ?]] =
+    new Delay[Show, EnvT[E, F, ?]] {
+      def apply[A](sh: Show[A]) =
+        Show.show {
+          envt => Cord("EnvT(") ++ envt.ask.show ++ Cord(", ") ++ F(sh).show(envt.lower) ++ Cord(")")
+        }
+    }
+
+  def envtHmap[F[_], G[_], E, A](f: F ~> G): EnvT[E, F, ?] ~> EnvT[E, G, ?] =
+    new (EnvT[E, F, ?] ~> EnvT[E, G, ?]) {
+      def apply[A](env: EnvT[E, F, A]) = EnvT((env.ask, f(env.lower)))
+    }
+
+  def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
+    def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
+  }
 }
+
+abstract class LowPriorityImplicits {
+  // TODO: move to matryoshka
+
+  implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
+    CoEnv.bitraverse[F, Hole].rightTraverse
+}
+

@@ -22,7 +22,8 @@ import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.qscript._
 
-import matryoshka._, TraverseT.ops._
+import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka.patterns._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.iteratee._
@@ -41,17 +42,19 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix, QScriptInternal[Fix, ?]]
+  val qscript = new Transform[Fix, QScriptProject[Fix, ?]]
   val optimize = new Optimize[Fix]
-  val elide = scala.Predef.implicitly[ElideBuckets.Aux[Fix, QScriptInternal[Fix, ?], QScriptProject[Fix, ?]]]
-
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
   val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptProject[Fix, ?]] =
-    _.transCataM(qscript.lpToQScript).evalZero.map(
-      _.transCata(elide.purify ⋙ optimize.applyAll))
+    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
+    //       so we don’t duplicate work.
+    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
+      .transCataM(qscript.lpToQScript).map(qs =>
+      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptProject[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[Fix], QScriptProject[Fix, ?], Fix[QScriptProject[Fix, ?]]]).lower) ⋙ optimize.applyAll))
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.

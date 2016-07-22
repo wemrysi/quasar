@@ -48,7 +48,7 @@ object Server {
 
   object QuasarConfig {
     def fromArgs(args: Array[String]): MainTask[QuasarConfig] =
-      CliOptions.parser.parse(args, CliOptions.default)
+      CliOptions.parser.parse(args.toSeq, CliOptions.default)
         .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
         .flatMap(fromCliOptions)
 

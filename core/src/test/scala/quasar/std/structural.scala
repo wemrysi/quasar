@@ -202,11 +202,11 @@ class StructuralSpecs extends Specification with ScalaCheck with ValidationMatch
 
   "UnshiftMap" should {
     "convert to a map type from some value type" in {
-      UnshiftMap.tpe(Func.Input1(Str)) must beSuccessful(Obj(Map(), Str.some))
+      UnshiftMap.tpe(Func.Input2(Top, Str)) must beSuccessful(Obj(Map(), Str.some))
     }
 
     "untype from a map type to the type of its values" in {
-      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(List(Str))
+      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(List(Top, Str))
     }
   }
 

@@ -20,34 +20,26 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.qscript.MapFunc._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
-import matryoshka.patterns._
+import matryoshka._
 import scalaz._
 import simulacrum.typeclass
 
 @typeclass trait Normalizable[F[_]] {
   def normalize: F ~> F
 
-  // NB: This is overly complicated due to the use of Free instead of Mu[CoEnv]
   def normalizeMapFunc[T[_[_]]: Recursive: Corecursive: EqualT, A](fm: Free[MapFunc[T, ?], A]):
       Free[MapFunc[T, ?], A] =
-    fm.ana[Mu, CoEnv[A, MapFunc[T, ?], ?]](CoEnv.freeIso[A, MapFunc[T, ?]].reverseGet)
-      .transCata[CoMF[T, A, ?]](repeatedly(MapFunc.normalize))
-      .cata(CoEnv.freeIso[A, MapFunc[T, ?]].get)
+    freeTransCata[T, MapFunc[T, ?], A](fm)(repeatedly(MapFunc.normalize))
 }
 
-trait NormalizableInstances0 {
-  /** This case matches _everything_. I.e., if something _isn’t_ normalizable,
-    * then normalization is identity.
-    */
-  implicit def default[F[_]]: Normalizable[F] = new Normalizable[F] {
-    def normalize = new (F ~> F) {
-      def apply[A](sp: F[A]) = sp
+trait NormalizableInstances {
+  implicit def const[A]: Normalizable[Const[A, ?]] =
+    new Normalizable[Const[A, ?]] {
+      def normalize = new (Const[A, ?] ~> Const[A, ?]) {
+        def apply[B](const: Const[A, B]) = const
+      }
     }
-  }
-}
 
-trait NormalizableInstances extends NormalizableInstances0 {
   implicit def coproduct[F[_], G[_]](
     implicit F: Normalizable[F], G: Normalizable[G]):
       Normalizable[Coproduct[F, G, ?]] =
@@ -60,3 +52,4 @@ trait NormalizableInstances extends NormalizableInstances0 {
 }
 
 object Normalizable extends NormalizableInstances
+

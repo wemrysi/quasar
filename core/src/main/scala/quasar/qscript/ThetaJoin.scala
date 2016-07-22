@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -75,37 +76,34 @@ object ThetaJoin {
       }
     }
 
-  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, Unit]] =
-    new Mergeable[ThetaJoin[T, Unit]] {
+  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, ?]] =
+    new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: ThetaJoin[IT, Unit],
-        p2: ThetaJoin[IT, Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
-    }
-
-  implicit def diggable[T[_[_]]]: Diggable.Aux[T, ThetaJoin[T, ?]] =
-    new Diggable[ThetaJoin[T, ?]] {
-      type IT[G[_]] = T[G]
-
-      def digForBucket[G[_]](tj: ThetaJoin[T, IT[G]]) = IndexedStateT.stateT(tj)
+        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Hole],
+        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Hole]) =
+        // TODO: merge two joins with different combine funcs
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Normalizable[ThetaJoin[T, ?]] =
     new Normalizable[ThetaJoin[T, ?]] {
+      val opt = new Optimize[T]
+
       def normalize = new (ThetaJoin[T, ?] ~> ThetaJoin[T, ?]) {
         def apply[A](tj: ThetaJoin[T, A]) =
           ThetaJoin(
             tj.src,
-            tj.lBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
-            tj.rBranch.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize),
+            freeTransCata(tj.lBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
+            freeTransCata(tj.rBranch)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
             normalizeMapFunc(tj.on),
             tj.f,
             normalizeMapFunc(tj.combine))
       }
     }
 }
+

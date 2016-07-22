@@ -485,8 +485,6 @@ package object fp
     final def mapAccumLeft1[B, C](c: C)(f: (C, A) => (C, B)): (C, List[B]) = self.mapAccumLeft(c, f)
   }
 
-  type Delay[F[_], G[_]] = F ~> (F ∘ G)#λ
-
   implicit def coproductEqual[F[_], G[_]](
     implicit F: Delay[Equal, F], G: Delay[Equal, G]):
       Delay[Equal, Coproduct[F, G, ?]] =
@@ -504,15 +502,6 @@ package object fp
       Delay[Show, Coproduct[F, G, ?]] =
     new Delay[Show, Coproduct[F, G, ?]] {
       def apply[α](sh: Show[α]) = Show.show(_.run.fold(F(sh).show, G(sh).show))
-    }
-
-  implicit def freeShow[F[_]: Functor](implicit F: Delay[Show, F]):
-      Delay[Show, Free[F, ?]] =
-    new Delay[Show, Free[F, ?]] {
-      def apply[α](sh: Show[α]): Show[Free[F, α]] =
-        Show.show(_.resume.fold(
-          Cord("Roll(") ++ F(freeShow[F].apply(sh)).show(_) ++ Cord(")"),
-          Cord("Point(") ++ sh.show(_) ++ Cord(")")))
     }
 
   implicit def constEqual[A: Equal]: Delay[Equal, Const[A, ?]] = new Delay[Equal, Const[A, ?]] {
@@ -607,4 +596,15 @@ package object fp
     def h(a: A): M[B] = ψ(a) >>= (_.traverse(_.traverse(h) >>= φ).map(_.merge))
     h(a)
   }
+
+  // TODO: This should definitely be in Matryoshka.
+  // apomorphism - short circuit by returning left
+  def substitute[T[_[_]], F[_]](original: T[F], replacement: T[F])(implicit T: Equal[T[F]]):
+      T[F] => T[F] \/ T[F] =
+   tf => if (tf ≟ original) replacement.left else original.right
+
+  // TODO: This should definitely be in Matryoshka.
+  def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
+      T[F] =
+    f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 }

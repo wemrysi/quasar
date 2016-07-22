@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -86,7 +87,7 @@ object SourcedPathable {
           case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
             s.show(src) ++ Cord(",") ++
             struct.show ++ Cord(",") ++
-            repair.show ++ Cord(",")
+            repair.show ++ Cord(")")
           case Union(src, l, r) => Cord("Union(") ++
             s.show(src) ++ Cord(",") ++
             l.show ++ Cord(",") ++
@@ -95,34 +96,33 @@ object SourcedPathable {
     }
 
   implicit def mergeable[T[_[_]]: EqualT]:
-      Mergeable.Aux[T, SourcedPathable[T, Unit]] =
-    new Mergeable[SourcedPathable[T, Unit]] {
+      Mergeable.Aux[T, SourcedPathable[T, ?]] =
+    new Mergeable[SourcedPathable[T, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: SourcedPathable[IT, Unit],
-        p2: SourcedPathable[IT, Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
-    }
-
-  implicit def diggable[T[_[_]]: Corecursive]:
-      Diggable.Aux[T, SourcedPathable[T, ?]] =
-    new Diggable[SourcedPathable[T, ?]] {
-      type IT[G[_]] = T[G]
-
-      def digForBucket[G[_]](fg: SourcedPathable[T, IT[G]]) =
-        IndexedStateT.stateT(fg)
+        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Hole],
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Hole]) =
+        // TODO: Merge two LeftShifts with different repair functions
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Normalizable[SourcedPathable[T, ?]] =
     new Normalizable[SourcedPathable[T, ?]] {
+      val opt = new Optimize[T]
+
       def normalize = new (SourcedPathable[T, ?] ~> SourcedPathable[T, ?]) {
         def apply[A](sp: SourcedPathable[T, A]) = sp match {
-          case LeftShift(src, s, r) => LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
-          case Union(src, l, r) => Union(src, l.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize), r.mapSuspension(Normalizable[QScriptInternal[T, ?]].normalize))
+          case LeftShift(src, s, r) =>
+            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
+          case Union(src, l, r) =>
+            Union(
+              src,
+              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
+              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])))
         }
       }
     }

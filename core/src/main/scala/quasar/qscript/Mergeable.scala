@@ -17,61 +17,63 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.namegen._
+import quasar.fp._
 
+import matryoshka._
+import matryoshka.patterns._
 import simulacrum.typeclass
-import scalaz._
+import scalaz._, Scalaz._
 
-@typeclass trait Mergeable[A] {
+@typeclass trait Mergeable[F[_]] {
   type IT[F[_]]
 
-  def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: A, a2: A):
-      OptionT[State[NameGen, ?], SrcMerge[A, FreeMap[IT]]]
+  def mergeSrcs(fm1: FreeMap[IT], fm2: FreeMap[IT], a1: EnvT[Ann[IT], F, Hole], a2: EnvT[Ann[IT], F, Hole]):
+      Option[SrcMerge[EnvT[Ann[IT], F, Hole], FreeMap[IT]]]
 }
 
 object Mergeable {
-  type Aux[T[_[_]], A] = Mergeable[A] { type IT[F[_]] = T[F] }
+  type Aux[T[_[_]], F[_]] = Mergeable[F] { type IT[F[_]] = T[F] }
 
-  implicit def const[T[_[_]], A](implicit ma: Mergeable.Aux[T, A]):
-      Mergeable.Aux[T, Const[A, Unit]] =
-    new Mergeable[Const[A, Unit]] {
+  implicit def const[T[_[_]]: EqualT]: Mergeable.Aux[T, Const[DeadEnd, ?]] =
+    new Mergeable[Const[DeadEnd, ?]] {
       type IT[F[_]] = T[F]
 
+      // NB: I think it is true that the buckets on p1 and p2 _must_ be equal
+      //     for us to even get to this point, so we can always pick one
+      //     arbitrarily for the result.
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: Const[A, Unit],
-        p2: Const[A, Unit]) =
-        ma.mergeSrcs(left, right, p1.getConst, p2.getConst).map {
-          case SrcMerge(src, l, r) => SrcMerge(Const(src), l, r)
-        }
+        p1: EnvT[Ann[T], Const[DeadEnd, ?], Hole],
+        p2: EnvT[Ann[T], Const[DeadEnd, ?], Hole]) =
+        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[DeadEnd, ?], Hole], FreeMap[IT]](p1, left, right))
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit mf: Mergeable.Aux[T, F[Unit]],
-             mg: Mergeable.Aux[T, G[Unit]]):
-      Mergeable.Aux[T, Coproduct[F, G, Unit]] =
-    new Mergeable[Coproduct[F, G, Unit]] {
+    implicit F: Mergeable.Aux[T, F], G: Mergeable.Aux[T, G],
+             FC: F :<: Coproduct[F, G, ?], GC: G :<: Coproduct[F, G, ?]):
+      Mergeable.Aux[T, Coproduct[F, G, ?]] =
+    new Mergeable[Coproduct[F, G, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        cp1: Coproduct[F, G, Unit],
-        cp2: Coproduct[F, G, Unit]) = {
-        (cp1.run, cp2.run) match {
+        cp1: EnvT[Ann[IT], Coproduct[F, G, ?], Hole],
+        cp2: EnvT[Ann[IT], Coproduct[F, G, ?], Hole]) =
+        (cp1.lower.run, cp2.lower.run) match {
           case (-\/(left1), -\/(left2)) =>
-            mf.mergeSrcs(left, right, left1, left2).map {
-              case SrcMerge(src, left, right) => SrcMerge(Coproduct(-\/(src)), left, right)
+            F.mergeSrcs(left, right, EnvT((cp1.ask, left1)), EnvT((cp2.ask, left2))).map {
+              case SrcMerge(src, left, right) =>
+                SrcMerge(envtHmap(FC)(src), left, right)
             }
           case (\/-(right1), \/-(right2)) =>
-            mg.mergeSrcs(left, right, right1, right2).map {
-              case SrcMerge(src, left, right) => SrcMerge(Coproduct(\/-(src)), left, right)
+            G.mergeSrcs(left, right, EnvT((cp1.ask, right1)), EnvT((cp2.ask, right2))).map {
+              case SrcMerge(src, left, right) =>
+                SrcMerge(envtHmap(GC)(src), left, right)
             }
-          case (_, _) => OptionT.none
+          case (_, _) => None
         }
-      }
     }
-
-
 }
+

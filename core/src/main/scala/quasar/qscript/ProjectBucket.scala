@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -88,61 +89,28 @@ object ProjectBucket {
     }
 
   implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
-      Mergeable.Aux[T, ProjectBucket[T, Unit]] =
-    new Mergeable[ProjectBucket[T, Unit]] {
+      Mergeable.Aux[T, ProjectBucket[T, ?]] =
+    new Mergeable[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]
 
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: ProjectBucket[IT, Unit],
-        p2: ProjectBucket[IT, Unit]) =
-        OptionT(state((p1 ≟ p2).option(SrcMerge(p1, left, right))))
+        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], Hole],
+        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], Hole]) =
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 
-  implicit def diggable[T[_[_]]: Corecursive]:
-      Diggable.Aux[T, ProjectBucket[T, ?]] =
-    new Diggable[ProjectBucket[T, ?]] {
-      implicit val PB =
-        scala.Predef.implicitly[ProjectBucket[T, ?] :<: Bucketing[T, ?]]
-
-      type IT[G[_]] = T[G]
-
-      def digForBucket[G[_]](fg: ProjectBucket[T, IT[G]]) =
-        StateT(s => if (s ≟ 0) PB.inj(fg).left else ((s - 1, fg)).right)
-    }
-
-  implicit def bucketable[T[_[_]]: Corecursive]:
-      Bucketable.Aux[T, ProjectBucket[T, ?]] =
-    new Bucketable[ProjectBucket[T, ?]] {
-      implicit val PB =
-        scala.Predef.implicitly[ProjectBucket[T, ?] :<: Bucketing[T, ?]]
-
-      type IT[G[_]] = T[G]
-
-      def applyBucket[G[_]: Functor](
-        ft: ProjectBucket[IT, IT[G]], inner: IT[G])(
-        f: (IT[G],
-            IT[G],
-            SrcMerge[ThetaJoin[IT, IT[G]], FreeMap[IT]] =>
-                (IT[G], FreeMap[IT], FreeMap[IT])) =>
-              QSState[(IT[G], FreeMap[IT], FreeMap[IT])])(
-        implicit TJ: ThetaJoin[IT, ?] :<: G) =
-        ft match {
-          case BucketField(src, _, name) =>
-            f(
-              src,
-              inner,
-              { case SrcMerge(src, mfl, mfr) =>
-                (TJ.inj(src).embed, rebase(name, mfl), mfr)
-              })
-          case BucketIndex(src, _, index) =>
-            f(
-              src,
-              inner,
-              { case SrcMerge(src, mfl, mfr) =>
-                (TJ.inj(src).embed, rebase(index, mfl), mfr)
-              })
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
+      Normalizable[ProjectBucket[T, ?]] =
+    new Normalizable[ProjectBucket[T, ?]] {
+      def normalize = new (ProjectBucket[T, ?] ~> ProjectBucket[T, ?]) {
+        def apply[A](pb: ProjectBucket[T, A]) = pb match {
+          case BucketField(a, v, f) =>
+            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(f))
+          case BucketIndex(a, v, i) =>
+            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(i))
         }
+      }
     }
 }

@@ -62,6 +62,10 @@ object Planner {
     def message = "Conversion of operation/value to JavaScript not implemented: " + value
   }
 
+  final case class UnboundVariable(name: Symbol) extends PlannerError {
+    def message = s"The variable “$name” is unbound at a use site."
+  }
+
   final case class InternalError(message: String) extends PlannerError
 
   implicit val PlannerErrorRenderTree: RenderTree[PlannerError] = new RenderTree[PlannerError] {

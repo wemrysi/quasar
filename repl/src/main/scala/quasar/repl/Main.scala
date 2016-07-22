@@ -120,7 +120,7 @@ object Main {
     val cfgOps = ConfigOps[CoreConfig]
 
     val main0: MainTask[Unit] = for {
-      opts         <- CliOptions.parser.parse(args, CliOptions.default)
+      opts         <- CliOptions.parser.parse(args.toSeq, CliOptions.default)
                       .cata(_.point[MainTask], MainTask.raiseError("Couldn't parse options."))
       cfgPath      <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
                         FsPath.parseSystemFile(cfg)
