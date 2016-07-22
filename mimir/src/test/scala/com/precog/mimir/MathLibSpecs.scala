@@ -1566,7 +1566,7 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
         case (Seq(_), SDecimal(d)) => d
       }
 
-      result2.toSet must_== Set(0, -3, 1, 2, -1, -2)
+      result2.toVector.sorted must_== Vector(0, -3, 1, 2, -1, -2).sorted
     }.pendingUntilFixed
     "compute roundTo" in {
       val input = inputOp2(roundTo, "/hom/numbersAcrossSlices", CLong(0))
