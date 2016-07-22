@@ -27,7 +27,6 @@ import blueeyes.json.serialization.Extractor._
 import blueeyes.json.serialization.Versioned._
 import com.precog.util.{ FileLock, IOUtils, PrecogUnit }
 import org.slf4s.Logging
-import java.util.UUID
 import scalaz._, Scalaz._
 import scalaz.effect.IO
 

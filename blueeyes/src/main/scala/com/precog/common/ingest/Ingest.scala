@@ -27,7 +27,6 @@ import jobs.JobId
 import blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import Extractor._
-import java.util.UUID
 import scalaz._, Scalaz._, Validation._
 
 sealed trait Event {
@@ -138,8 +137,8 @@ sealed trait StreamRef {
 
 object StreamRef {
   def forWriteMode(mode: WriteMode, terminal: Boolean): StreamRef = mode match {
-    case AccessMode.Create  => StreamRef.Create(UUID.randomUUID, terminal)
-    case AccessMode.Replace => StreamRef.Replace(UUID.randomUUID, terminal)
+    case AccessMode.Create  => StreamRef.Create(randomUuid, terminal)
+    case AccessMode.Replace => StreamRef.Replace(randomUuid, terminal)
     case AccessMode.Append  => StreamRef.Append
   }
 

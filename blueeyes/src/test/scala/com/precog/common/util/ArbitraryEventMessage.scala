@@ -21,7 +21,6 @@ package com.precog.common
 package ingest
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.UUID
 import com.precog.common.util.ArbitraryJValue
 
 import security._
@@ -30,7 +29,7 @@ import org.scalacheck._, Gen._, Arbitrary._
 import PrecogScalacheck._
 
 trait ArbitraryEventMessage extends ArbitraryJValue {
-  def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(UUID.randomUUID), Gen const None)
+  def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
 
   def genContentJValue: Gen[JValue] =
     frequency(

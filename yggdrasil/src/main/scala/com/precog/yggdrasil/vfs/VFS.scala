@@ -33,16 +33,12 @@ import com.precog.util._
 import blueeyes.core.http.MimeType
 import blueeyes.json._
 
-import java.util.UUID
-import java.nio.ByteBuffer
 import java.util.Arrays
 import java.nio.CharBuffer
 import java.nio.charset.{ Charset, CoderResult }
 
 import org.slf4s.Logging
-
 import scalaz._, Scalaz._
-import scalaz.effect.IO
 
 sealed trait Version
 object Version {

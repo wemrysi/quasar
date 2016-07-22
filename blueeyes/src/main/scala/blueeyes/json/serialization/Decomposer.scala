@@ -51,14 +51,13 @@ object ExtractorDecomposer {
 }
 
 trait MiscSerializers {
-  import java.util.UUID
-  import blueeyes.core.http.{ MimeType, MimeTypes }
+    import blueeyes.core.http.{ MimeType, MimeTypes }
   import DefaultExtractors._, DefaultDecomposers._
   import SerializationImplicits._
 
   implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(instant fromMillis _)
   implicit val DurationExtractorDecomposer = by[Duration](_.getMillis)(duration fromMillis _)
-  implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(UUID fromString _)
+  implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(uuid)
   implicit val MimeTypeExtractorDecomposer = by[MimeType].opt(x => JString(x.toString): JValue)(jv =>
     StringExtractor validated jv map (MimeTypes parseMimeTypes _ toList) flatMap {
       case Nil        => Failure(Extractor.Error.invalid("No mime types found in " + jv.renderCompact))

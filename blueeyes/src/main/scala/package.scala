@@ -65,20 +65,23 @@ package object blueeyes extends ScodecImplicits {
   type OutputStream         = java.io.OutputStream
   type OutputStreamWriter   = java.io.OutputStreamWriter
   type PrintStream          = java.io.PrintStream
+  type UUID                 = java.util.UUID
 
   // other outside libs: scalaz, spire, shapeless, scodec
-  type Future[+A]       = scalaz.concurrent.Future[A]
-  type Iso[T, L]        = shapeless.Generic.Aux[T, L]
-  type ScalazOrder[A]   = scalaz.Order[A]
-  type ScalazOrdering   = scalaz.Ordering
-  type SpireOrder[A]    = spire.algebra.Order[A]
-  type Task[+A]         = scalaz.concurrent.Task[A]
-  val Future            = scalaz.concurrent.Future
-  val HNil              = shapeless.HNil
-  val Iso               = shapeless.Generic
-  val ScalazOrder       = scalaz.Order
-  val ScalazOrdering    = scalaz.Ordering
-  type ByteVector       = scodec.bits.ByteVector
+  type Future[+A]     = scalaz.concurrent.Future[A]
+  type Iso[T, L]      = shapeless.Generic.Aux[T, L]
+  type ScalazOrder[A] = scalaz.Order[A]
+  type ScalazOrdering = scalaz.Ordering
+  type SpireOrder[A]  = spire.algebra.Order[A]
+  type Task[+A]       = scalaz.concurrent.Task[A]
+  val Future          = scalaz.concurrent.Future
+  val HNil            = shapeless.HNil
+  val Iso             = shapeless.Generic
+  val ScalazOrder     = scalaz.Order
+  val ScalazOrdering  = scalaz.Ordering
+  type ByteVector     = scodec.bits.ByteVector
+  type Logging        = org.slf4s.Logging
+  type IO[A]          = scalaz.effect.IO[A]
 
   def jDuration(millis: Long): jDuration = java.time.Duration ofMillis millis
   def jPeriod(millis: Long): jPeriod     = java.time.Period from jDuration(millis)
@@ -100,6 +103,8 @@ package object blueeyes extends ScodecImplicits {
 
   def Utf8Charset                       = java.nio.charset.Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte] = s getBytes Utf8Charset
+  def uuid(s: String): UUID             = java.util.UUID fromString s
+  def randomUuid(): UUID                = java.util.UUID.randomUUID
 
   // Temporary
   type BitSet             = com.precog.util.BitSet
