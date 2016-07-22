@@ -38,6 +38,5 @@ lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugi
                   run in Jmh <<= (run in Jmh) dependsOn (Keys.compile in Jmh)
 )
 
-lazy val all = project.setup.root.noArtifacts aggregate (mimir, yggdrasil, blueeyes) dependsOn (mimir, yggdrasil, blueeyes)
-
 addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
+addCommandAlias("test-all", "{.}/test")
