@@ -2,8 +2,6 @@ package blueeyes
 package json
 
 import scala.math.max
-import scala.collection.mutable
-import java.nio.ByteBuffer
 
 case class AsyncParse(errors: Seq[ParseException], values: Seq[JValue])
 

@@ -24,7 +24,7 @@ import com.precog.util.{ ByteBufferPool, RawBitSet }
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{Shrink, Arbitrary, Gen}
-import PrecogArb._, PrecogSpecs._
+import quasar.precog.TestSupportWithArb._
 
 class CodecSpec extends Specification with ScalaCheck {
   // import Arbitrary._

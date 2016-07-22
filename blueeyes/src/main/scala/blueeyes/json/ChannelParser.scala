@@ -1,7 +1,6 @@
 package blueeyes
 package json
 
-import java.io.{ File, FileInputStream }
 import java.nio.channels.ReadableByteChannel
 
 object ChannelParser {

@@ -19,7 +19,7 @@ trait Clock {
     f.map { result =>
       val end = now()
 
-      (newPeriod(start, end), result)
+      (start until end, result)
     }
   }
 
@@ -32,7 +32,7 @@ trait Clock {
 
     val end = now()
 
-    (newPeriod(start, end), result)
+    (start until end, result)
   }
 }
 

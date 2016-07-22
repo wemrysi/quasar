@@ -23,7 +23,7 @@ package jdbm3
 import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen._, Arbitrary._
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 trait CValueGenerators {
   def maxArrayDepth = 3

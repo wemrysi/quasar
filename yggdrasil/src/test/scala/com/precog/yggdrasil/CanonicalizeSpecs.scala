@@ -28,8 +28,7 @@ import scalaz.syntax.comonad._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
 

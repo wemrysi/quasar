@@ -28,8 +28,7 @@ import com.precog.util.BitSet
 
 import scalaz._, Scalaz._
 import org.specs2.mutable._
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._

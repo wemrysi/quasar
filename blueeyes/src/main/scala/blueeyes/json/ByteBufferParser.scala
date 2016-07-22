@@ -1,8 +1,6 @@
 package blueeyes
 package json
 
-import java.nio.ByteBuffer
-
 /**
   * Basic ByteBuffer parser.
   */

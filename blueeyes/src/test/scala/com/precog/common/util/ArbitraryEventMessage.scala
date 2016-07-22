@@ -20,23 +20,13 @@
 package com.precog.common
 package ingest
 
-import java.util.concurrent.atomic.AtomicInteger
-import com.precog.common.util.ArbitraryJValue
-
 import security._
 import blueeyes._, json._
 import org.scalacheck._, Gen._, Arbitrary._
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 trait ArbitraryEventMessage extends ArbitraryJValue {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
-
-  def genContentJValue: Gen[JValue] =
-    frequency(
-      (1, genSimple),
-      (1, wrap(choose(0, 5) flatMap genArray)),
-      (1, wrap(choose(0, 5) flatMap genObject))
-    )
 
   def genPath: Gen[Path] = Gen.resize(10, Gen.containerOf[List, String](alphaStr)) map { elements =>
     Path(elements.filter(_.length > 0))
@@ -62,7 +52,7 @@ trait ArbitraryEventMessage extends ArbitraryJValue {
       apiKey <- alphaStr
       path <- genPath
       ownerAccountId <- alphaStr
-      content <- vectorOf(genContentJValue)
+      content <- vectorOf(genJValue)
       if !content.isEmpty
       jobId <- genIdentifier.optional
       streamRef <- genStreamRef
@@ -105,7 +95,7 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
 
   lazy val producers = 4
 
-  lazy val eventIds: Map[Int, AtomicInteger] = 0.until(producers).map(_ -> new AtomicInteger).toMap
+  lazy val eventIds: Map[Int, AtomicInt] = 0.until(producers).map(_ -> new AtomicInt).toMap
 
   lazy val paths = buildBoundedPaths(3)
   lazy val jpaths = buildBoundedJPaths(3)
@@ -135,7 +125,7 @@ trait RealisticEventMessage extends ArbitraryEventMessage {
 
   def genIngestData: Gen[JValue] = for {
     paths  <- containerOfN[Set, JPath](10, genStableJPath)
-    values <- containerOfN[Set, JValue](10, genSimpleNotNull)
+    values <- containerOfN[Set, JValue](10, genSimple)
   } yield {
     (paths zip values).foldLeft[JValue](JObject(Nil)) {
       case (obj, (path, value)) => obj.set(path, value)

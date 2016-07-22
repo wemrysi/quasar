@@ -23,8 +23,7 @@ import blueeyes._
 import com.precog.common._
 import org.scalacheck._
 import scalaz._
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 class V1CookedBlockFormatSpecs extends CookedBlockFormatSpecs {
   val format = V1CookedBlockFormat
 }

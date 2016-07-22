@@ -23,13 +23,11 @@ import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import java.net.URLDecoder
 import scala.util.control.Exception._
-import java.nio.ByteBuffer
 import scala.io.Source
 import scalaz._
 import scala.math.min
 import scala.util.Random.nextInt
-import scala.collection.mutable
-import PrecogSpecs._
+import quasar.precog.TestSupport._
 
 object JsonParserSpec extends Specification with ArbitraryJValue with ScalaCheck {
   import JParser._
@@ -104,7 +102,7 @@ object AsyncParserSpec extends Specification {
 
   private def chunk(data: Array[Byte], i: Int, j: Int) = {
     val len = min(j, data.length) - i
-    if (len > 0) More(ByteBufferWrap2(data, i, len)) else Done
+    if (len > 0) More(ByteBufferWrap(data, i, len)) else Done
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
@@ -343,7 +341,6 @@ object ArrayUnwrappingSpec extends Specification {
   }
 
   "Unwrapping array parser performs adequately" in {
-    import scala.collection.mutable
     import scala.math.min
     import java.nio._
 

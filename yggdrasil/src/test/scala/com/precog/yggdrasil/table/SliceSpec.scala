@@ -27,8 +27,7 @@ import com.precog.common._
 import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck._
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering

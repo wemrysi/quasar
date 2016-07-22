@@ -19,8 +19,7 @@ package json
 
 import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath with ArbitraryJValue {
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
@@ -104,16 +103,6 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath wit
             false
           }) == x
     prop(removeNothingProp)
-  }
-
-  "Remove removes only matching elements (in case of a field, the field is removed)" in {
-    val removeProp = (json: JValue, x: Class[_ <: JValue]) => {
-      val removed       = json remove typePredicate(x)
-      val Diff(c, a, d) = json diff removed
-
-      removed.flatten.forall(_.getClass != x)
-    }
-    prop(removeProp)
   }
 
   "flattenWithPath includes empty object values" in {

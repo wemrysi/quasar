@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import org.scalacheck._, Gen.{ listOfN, containerOfN }, Arbitrary._
 import com.precog.util.BitSet
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 trait ArbitrarySlice {
   def arbitraryBitSet(size: Int): Gen[BitSet] = {

@@ -20,7 +20,7 @@
 package com.precog.util
 
 import blueeyes._
-import PrecogSpecs._
+import quasar.precog.TestSupport._
 import scalaz._
 
 object MapUtilsSpecs extends Specification with ScalaCheck with MapUtils {

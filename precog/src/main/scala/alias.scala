@@ -1,0 +1,56 @@
+package blueeyes
+
+// package precog
+
+import scala.collection.mutable
+
+trait PackageAliases {
+  // scala stdlib
+  type ->[+A, +B]           = (A, B)
+  type ArrayBuffer[A]       = mutable.ArrayBuffer[A]
+  type BigDecimal           = scala.math.BigDecimal
+  type CTag[A]              = scala.reflect.ClassTag[A]
+  type ListBuffer[A]        = mutable.ListBuffer[A]
+  type ScalaMathOrdering[A] = scala.math.Ordering[A] // so many orders
+  type scmMap[K, V]         = mutable.Map[K, V]
+  type scmSet[A]            = mutable.Set[A]
+  val ArrayBuffer           = mutable.ArrayBuffer
+  val BigDecimal            = scala.math.BigDecimal
+  val ListBuffer            = mutable.ListBuffer
+  val scmMap                = mutable.HashMap
+  val scmSet                = mutable.HashSet
+
+  // java stdlib
+  type AtomicInt            = java.util.concurrent.atomic.AtomicInteger
+  type AtomicLong           = java.util.concurrent.atomic.AtomicLong
+  type BufferedOutputStream = java.io.BufferedOutputStream
+  type BufferedReader       = java.io.BufferedReader
+  type ByteBuffer           = java.nio.ByteBuffer
+  type CharBuffer           = java.nio.CharBuffer
+  type Charset              = java.nio.charset.Charset
+  type ExecutionContext     = java.util.concurrent.ExecutorService
+  type File                 = java.io.File
+  type FileInputStream      = java.io.FileInputStream
+  type FileOutputStream     = java.io.FileOutputStream
+  type IOException          = java.io.IOException
+  type InputStream          = java.io.InputStream
+  type InputStreamReader    = java.io.InputStreamReader
+  type OutputStream         = java.io.OutputStream
+  type OutputStreamWriter   = java.io.OutputStreamWriter
+  type PrintStream          = java.io.PrintStream
+  type UUID                 = java.util.UUID
+
+  // other outside libs: scalaz, spire, shapeless, scodec
+  type ByteVector     = scodec.bits.ByteVector
+  type Future[+A]     = scalaz.concurrent.Future[A]
+  type IO[A]          = scalaz.effect.IO[A]
+  type Iso[T, L]      = shapeless.Generic.Aux[T, L]
+  type Logging        = org.slf4s.Logging
+  type ScalazOrder[A] = scalaz.Order[A]
+  type ScalazOrdering = scalaz.Ordering
+  type SpireOrder[A]  = spire.algebra.Order[A]
+  type Task[+A]       = scalaz.concurrent.Task[A]
+  val Future          = scalaz.concurrent.Future
+  val ScalazOrder     = scalaz.Order
+  val ScalazOrdering  = scalaz.Ordering
+}

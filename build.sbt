@@ -1,9 +1,9 @@
-import precog.PlatformBuild._
+import precogbuild.PlatformBuild._
 
 def scalazVersion = "7.2.4"
 def specsVersion  = "3.7"
 
-lazy val root = project.setup.root.noArtifacts aggregate (yggdrasil, blueeyes) dependsOn (mimir, yggdrasil, blueeyes) also (
+lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) dependsOn (yggdrasil) also (
   initialCommands in console := "import blueeyes._, json._"
 )
 
@@ -11,8 +11,10 @@ lazy val root = project.setup.root.noArtifacts aggregate (yggdrasil, blueeyes) d
  */
 lazy val mimir     = project.setup.noArtifacts dependsOn yggdrasil % BothScopes
 lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
+lazy val blueeyes  = project.setup dependsOn precog % BothScopes deps (
+)
 
-lazy val blueeyes = (
+lazy val precog = (
   project.setup deps (
     "org.openjdk.jmh"    % "jmh-generator-annprocess" %    "1.12",
     "com.chuusai"       %% "shapeless"                %    "2.3.1",
@@ -40,3 +42,4 @@ lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugi
 
 addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
 addCommandAlias("test-all", "{.}/test")
+addCommandAlias("cc", "{.}/test:compile")

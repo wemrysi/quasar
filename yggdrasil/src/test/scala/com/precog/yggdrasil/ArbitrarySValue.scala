@@ -25,7 +25,7 @@ import blueeyes.json._
 import java.math.MathContext
 import org.scalacheck._, Gen._, Arbitrary._
 import scalaz._, Scalaz._
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 object CValueGenerators {
   type JSchema = Seq[(JPath, CType)]

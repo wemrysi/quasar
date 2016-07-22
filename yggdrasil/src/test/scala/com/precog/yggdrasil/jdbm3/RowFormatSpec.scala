@@ -26,7 +26,7 @@ import com.precog.yggdrasil.table._
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{ Shrink, Arbitrary, Gen }
-import PrecogScalacheck._, PrecogSpecs._
+import quasar.precog.TestSupport._
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
   import Arbitrary._

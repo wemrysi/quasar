@@ -27,7 +27,7 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._, Arbitrary._
 import scalaz._
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 trait SegmentFormatSupport {
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(

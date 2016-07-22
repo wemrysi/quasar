@@ -1,12 +1,21 @@
-package blueeyes
+package quasar
+package precog
 
 import org.scalacheck._, Gen._
 import scala.collection.mutable.Builder
 import scalaz._
+import java.io.File
 import java.math.MathContext, MathContext._
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
-object PrecogSpecs {
+object TestSupport extends ScalacheckSupport with SpecsSupport
+object TestSupportWithArb extends ScalacheckSupport with SpecsSupport with ArbitrarySupport
+
+trait ArbitrarySupport {
+  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)
+}
+
+trait SpecsSupport {
   import org.specs2._, execute._, matcher._
   import mutable.SpecificationLike
 
@@ -23,11 +32,7 @@ object PrecogSpecs {
   }
 }
 
-object PrecogArb {
-  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)
-}
-
-object PrecogScalacheck {
+trait ScalacheckSupport {
   type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
   val Pretty                   = org.scalacheck.util.Pretty
   type Pretty                  = org.scalacheck.util.Pretty

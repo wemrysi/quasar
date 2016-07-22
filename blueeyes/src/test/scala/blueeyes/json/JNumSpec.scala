@@ -2,8 +2,7 @@ package blueeyes
 package json
 
 import org.specs2.mutable.Specification
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 class JNumSpec extends Specification {
   "JNums must sort correctly" in {
     val s1: JNum = JNumStr("123.456")

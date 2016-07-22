@@ -314,7 +314,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
   def encode(cValues: List[CValue]) = getBytesFrom(RowCodec.writeAll(cValues)(pool.acquire _).reverse)
 
   def decode(bytes: Array[Byte], offset: Int): List[CValue] =
-    RowCodec.read(ByteBufferWrap2(bytes, offset, bytes.length - offset))
+    RowCodec.read(ByteBufferWrap(bytes, offset, bytes.length - offset))
 
   def ColumnEncoder(cols: Seq[Column]) = {
     require(columnRefs.size == cols.size)
@@ -356,7 +356,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
 
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
-        val buf       = ByteBufferWrap2(src, offset, src.length - offset)
+        val buf       = ByteBufferWrap(src, offset, src.length - offset)
         val undefined = Codec[RawBitSet].read(buf)
         @tailrec
         def helper(i: Int, decs: List[ColumnValueDecoder]) {
@@ -559,7 +559,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
-        val buf = ByteBufferWrap2(src, offset, src.length - offset)
+        val buf = ByteBufferWrap(src, offset, src.length - offset)
 
         @tailrec
         def decode(decoders: List[Map[Byte, ColumnValueDecoder]]): Unit = decoders match {

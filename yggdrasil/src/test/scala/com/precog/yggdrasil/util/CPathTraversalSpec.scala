@@ -25,8 +25,7 @@ import com.precog.common._
 import com.precog.yggdrasil.table._
 
 import com.precog.util._
-import PrecogSpecs._
-
+import quasar.precog.TestSupport._
 class CPathTraversalSpec extends Specification {
   import CPathTraversal._
 

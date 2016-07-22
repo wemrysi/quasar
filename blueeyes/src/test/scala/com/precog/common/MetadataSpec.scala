@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import blueeyes._
+import blueeyes._, json._
 import blueeyes.json.serialization.DefaultSerialization._
 
 import scalaz._, Scalaz._
@@ -27,7 +27,7 @@ import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._
 // import org.scalacheck._, Gen.{ choose, frequency, listOfN }, Arbitrary.arbitrary
-import PrecogScalacheck._
+import quasar.precog.TestSupport._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   val sampleSize = 100
@@ -103,7 +103,7 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   }
 }
 
-trait MetadataGenerators extends util.ArbitraryJValue {
+trait MetadataGenerators extends ArbitraryJValue {
   implicit val arbMetadata: Arbitrary[Metadata] = Arbitrary(genMetadata)
   implicit val arbMetadataMap: Arbitrary[Map[MetadataType, Metadata]] = Arbitrary(genMetadataMap)
 

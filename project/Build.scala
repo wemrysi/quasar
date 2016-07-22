@@ -1,4 +1,4 @@
-package precog
+package precogbuild
 
 import sbt._, Keys._
 
