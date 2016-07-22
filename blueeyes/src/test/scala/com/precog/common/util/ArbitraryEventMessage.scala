@@ -23,9 +23,9 @@ package ingest
 import security._
 import blueeyes._, json._
 import org.scalacheck._, Gen._, Arbitrary._
-import quasar.precog.TestSupport._
+import quasar.precog.JsonTestSupport._
 
-trait ArbitraryEventMessage extends ArbitraryJValue {
+trait ArbitraryEventMessage {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
 
   def genPath: Gen[Path] = Gen.resize(10, Gen.containerOf[List, String](alphaStr)) map { elements =>

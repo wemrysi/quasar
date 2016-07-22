@@ -14,61 +14,52 @@
  * limitations under the License.
  */
 
-package blueeyes
-package json
+package quasar.precog {
+  import blueeyes._, json._
 
-import org.scalacheck._
-import Gen._
-import Arbitrary.arbitrary
-import quasar.precog.TestSupport._
+  object JsonTestSupport extends quasar.precog.TestSupport with ArbitraryJValue
+}
 
-trait ArbitraryJValue {
-  def genJValue: Gen[JValue] = frequency(
-    5 -> genSimple,
-    1 -> delay(genSmallInt >> genJList ^^ JArray),
-    1 -> delay(genJObject)
-  )
+package blueeyes.json {
+  import org.scalacheck._
+  import Gen._
+  import Arbitrary.arbitrary
+  import quasar.precog.TestSupport._
 
-  def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
-  def genSmallInt: Gen[Int]    = choose(0, 5)
-  def genJNum: Gen[JNum]       = genBigDecimal map (JNum(_))
-  def genJBool: Gen[JBool]     = arbitrary[Boolean].map(JBool(_))
-  def genJString: Gen[JString] = alphaStr.map(JString(_))
-  def genJField: Gen[JField]   = alphaStr >> (name => genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
-  def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs.toMap))
+  trait ArbitraryJValue {
+    def genJValue: Gen[JValue] = frequency(
+      5 -> genSimple,
+      1 -> delay(genJArray),
+      1 -> delay(genJObject)
+    )
 
-  def genJList(size: Int): Gen[List[JValue]]      = listOfN(size, genJValue)
-  def genJFieldList(size: Int): Gen[List[JField]] = listOfN(size, genJField)
+    def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
+    def genSmallInt: Gen[Int]    = choose(0, 5)
+    def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
+    def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
+    def genJString: Gen[JString] = alphaStr ^^ (s => JString(s))
+    def genJField: Gen[JField]   = alphaStr >> (name => genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
+    def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs.toMap))
+    def genJArray: Gen[JArray]   = genSmallInt >> genJList ^^ JArray
 
-  implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
-  implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
+    def genJList(size: Int): Gen[List[JValue]]      = listOfN(size, genJValue)
+    def genJFieldList(size: Int): Gen[List[JField]] = listOfN(size, genJField)
 
-  // // def genSimple: Gen[JValue]   = oneOf[JValue](const(JNull), genJNum, genJBool, genJString)
-  // def genArray: Gen[JValue]                  = for (l <- genList) yield JArray(l)
-  // def genObject: Gen[JObject]                = for (l <- genFieldList) yield JObject(l)
+    implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
+    implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
 
-  // def genJArray(size: Int): Gen[JValue]           = for (l <- genList(size)) yield JArray(l)
-  // def genJObject(size: Int): Gen[JObject]         = for (l <- genFieldList(size)) yield JObject(l)
-  // def genJValueList(size: Int): Gen[List[JValue]] = Gen.containerOfN[List, JValue](size, genJValue)
-  // def genJFieldList(size: Int): Gen[List[JField]] = Gen.containerOfN[List, JField](size, genField)
-  // def genJField: Gen[JField]                      = for (name <- alphaStr; value <- genJValue; id <- genPosInt) yield JField(name+id, value)
+    // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
+    implicit def arbBigDecimal: Arbitrary[BigDecimal] =
+      Arbitrary(for {
+        mantissa <- arbitrary[Long]
+        exponent <- arbitrary[Int]
 
-  // def genList      = Gen.containerOfN[List, JValue](listSize, genJValue)
-  // def genFieldList = Gen.containerOfN[List, JField](listSize, genField)
-  // def genField     = for (name <- alphaStr; value <- genJValue; id <- choose(0, 1000000)) yield JField(name + id, value)
-
-
-  // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-  implicit def arbBigDecimal: Arbitrary[BigDecimal] =
-    Arbitrary(for {
-      mantissa <- arbitrary[Long]
-      exponent <- arbitrary[Int]
-
-      adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
-        exponent - mantissa.toString.length
-      else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
-        exponent + mantissa.toString.length
-      else
-        exponent
-    } yield BigDecimal(mantissa, adjusted, java.math.MathContext.UNLIMITED))
+        adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
+          exponent - mantissa.toString.length
+        else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
+          exponent + mantissa.toString.length
+        else
+          exponent
+      } yield BigDecimal(mantissa, adjusted, java.math.MathContext.UNLIMITED))
+  }
 }

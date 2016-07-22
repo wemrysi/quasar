@@ -8,8 +8,10 @@ import java.io.File
 import java.math.MathContext, MathContext._
 import quasar.precog.TestSupport._
 
-object TestSupport extends ScalacheckSupport with SpecsSupport
-object TestSupportWithArb extends ScalacheckSupport with SpecsSupport with ArbitrarySupport
+object TestSupport extends TestSupport
+object TestSupportWithArb extends TestSupport with ArbitrarySupport
+
+trait TestSupport extends ScalacheckSupport with SpecsSupport
 
 trait ArbitrarySupport {
   implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)

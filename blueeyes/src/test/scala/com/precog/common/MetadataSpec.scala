@@ -26,8 +26,7 @@ import scalaz._, Scalaz._
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck._, Gen._
-// import org.scalacheck._, Gen.{ choose, frequency, listOfN }, Arbitrary.arbitrary
-import quasar.precog.TestSupport._
+import quasar.precog.JsonTestSupport._
 
 class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
   val sampleSize = 100
@@ -103,21 +102,18 @@ class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck
   }
 }
 
-trait MetadataGenerators extends ArbitraryJValue {
+trait MetadataGenerators  {
   implicit val arbMetadata: Arbitrary[Metadata] = Arbitrary(genMetadata)
   implicit val arbMetadataMap: Arbitrary[Map[MetadataType, Metadata]] = Arbitrary(genMetadataMap)
 
   val metadataGenerators = List[Gen[Metadata]](genBooleanMetadata, genLongMetadata, genDoubleMetadata, genBigDecimalMetadata, genStringMetadata)
 
-  def genMetadataList: Gen[List[Metadata]] = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l }
-
+  def genMetadataList: Gen[List[Metadata]]             = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l }
   def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l => Map( l.map( m => (m.metadataType, m) ): _* ) }
-
-  def genMetadata: Gen[Metadata] = frequency( metadataGenerators.map { (1, _) }: _* )
-
-  def genBooleanMetadata: Gen[BooleanValueStats] = for(count <- choose(0, 1000); trueCount <- choose(0, count)) yield BooleanValueStats(count, trueCount)
-  def genLongMetadata: Gen[LongValueStats] = for(count <- choose(0, 1000); a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
-  def genDoubleMetadata: Gen[DoubleValueStats] = for(count <- choose(0, 1000); a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
+  def genMetadata: Gen[Metadata]                       = frequency( metadataGenerators.map { (1, _) }: _* )
+  def genBooleanMetadata: Gen[BooleanValueStats]       = for(count <- choose(0, 1000); trueCount <- choose(0, count)) yield BooleanValueStats(count, trueCount)
+  def genLongMetadata: Gen[LongValueStats]             = for(count <- choose(0, 1000); a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
+  def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- choose(0, 1000); a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
   def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- choose(0, 1000); a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats] = for(count <- choose(0, 1000); a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
+  def genStringMetadata: Gen[StringValueStats]         = for(count <- choose(0, 1000); a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
 }

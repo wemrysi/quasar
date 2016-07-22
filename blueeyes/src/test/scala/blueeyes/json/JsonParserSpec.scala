@@ -27,9 +27,9 @@ import scala.io.Source
 import scalaz._
 import scala.math.min
 import scala.util.Random.nextInt
-import quasar.precog.TestSupport._
+import quasar.precog.JsonTestSupport._
 
-object JsonParserSpec extends Specification with ArbitraryJValue with ScalaCheck {
+class JsonParserSpec extends Specification with ScalaCheck {
   import JParser._
   import AsyncParser._
 
