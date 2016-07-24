@@ -18,7 +18,6 @@
  *
  */
 package com.precog.yggdrasil
-package util
 
 import blueeyes._
 import com.precog.common._

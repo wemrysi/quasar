@@ -19,7 +19,6 @@ trait ArbitrarySupport {
 
 trait SpecsSupport {
   import org.specs2._, execute._, matcher._
-  import mutable.SpecificationLike
 
   type ScalaCheck         = org.specs2.ScalaCheck
   val SpecsFailure        = org.specs2.execute.Failure
@@ -27,6 +26,7 @@ trait SpecsSupport {
   type SpecsFailure       = org.specs2.execute.Failure
   type SpecsResult        = org.specs2.execute.Result
   type Specification      = org.specs2.mutable.Specification
+  type SpecificationLike  = org.specs2.mutable.SpecificationLike
   type ThrownExpectations = org.specs2.matcher.ThrownExpectations
 
   trait SpecificationHelp extends SpecificationLike with ThrownMessages {
