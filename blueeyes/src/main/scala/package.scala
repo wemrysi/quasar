@@ -7,7 +7,7 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   type tailrec = scala.annotation.tailrec
 
   // Temporary
-  type BitSet             = com.precog.util.BitSet
+  type BitSet             = com.precog.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = com.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
@@ -62,4 +62,6 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   implicit class LazyMapValues[A, B](source: Map[A, B]) {
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
+
+  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
 }

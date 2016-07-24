@@ -5,9 +5,8 @@ import sbt._, Keys._
 object PlatformBuild {
   val BothScopes = "compile->compile;test->test"
 
-  def envArgs      = sys.env.getOrElse("ARGS", "") split "\\s+" toList
-  def optimizeOpts = if (sys.props contains "precog.optimize") Seq("-optimize") else Seq()
-  def debugOpts    = if (sys.props contains "precog.dev") Seq("-deprecation", "-unchecked") else Seq()
+  def envArgs     = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
+  def warningOpts = Seq("-g:vars", "-deprecation", "-unchecked", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
 
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...
@@ -46,25 +45,24 @@ object PlatformBuild {
       packagedArtifacts := Map()
     )
     def root: Project                                 = p in file(".")
-    def inTestScope: ClasspathDependency              = p % "test->test"
     def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
-    def also(s: Setting[_], ss: Setting[_]*): Project = also(s +: ss.toSeq)
-    def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
-    def compileArgs(args: String*): Project           = also(scalacOptions in Compile ++= args.toList)
+    def also(s: Setting[_], ss: Setting[_]*): Project = also(s :: ss.toList)
+    def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toList)
+    def scalacArgs(args: String*): Project            = also(scalacOptions ++= args.toList)
     def strictVersions: Project                       = also(conflictManager := ConflictManager.strict)
     def serialTests: Project                          = also(parallelExecution in Test := false)
-    def withWarnings: Project                         = compileArgs("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
-    def logImplicits: Project                         = compileArgs("-Xlog-implicits")
+    def withWarnings: Project                         = scalacArgs(warningOpts: _*)
+    def logImplicits: Project                         = scalacArgs("-Xlog-implicits")
+    def crossJavaTargets: Project                     = also(inBoth(doubleCross))
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
 
     def setup: Project = (
-      serialTests also inBoth(doubleCross) scalacPlugins (kindProjector) compileArgs (envArgs: _*) also(
+      serialTests scalacPlugins (kindProjector) also(
                organization :=  "com.precog",
-                    version :=  "2.6.1-SNAPSHOT",
-              scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
+                    version :=  "0.1",
+              scalacOptions ++= envArgs,
                scalaVersion :=  "2.11.8",
-        logBuffered in Test :=  false,
-                   ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
+        logBuffered in Test :=  false
       )
     )
   }

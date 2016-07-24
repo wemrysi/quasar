@@ -22,7 +22,6 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.util.BitSet
 
 class BitsetColumn(definedAt: BitSet) {
   this: Column =>

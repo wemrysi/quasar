@@ -23,7 +23,6 @@ package table
 import blueeyes.json._
 import blueeyes._
 import com.precog.common._
-import com.precog.util.BitSet
 import scalaz.Semigroup
 
 sealed trait Column {

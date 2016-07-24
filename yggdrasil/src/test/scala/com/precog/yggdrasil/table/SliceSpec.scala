@@ -23,11 +23,12 @@ package table
 import scala.util.Random
 import blueeyes._
 import com.precog.common._
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
-import org.scalacheck._
+import org.scalacheck.{ Arbitrary, Gen }
+import Gen.{ listOfN, containerOfN }, Arbitrary.arbitrary
 import quasar.precog.TestSupport._
-class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
+import ArbitrarySlice._
+
+class SliceSpec extends Specification with ScalaCheck {
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
@@ -132,7 +133,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
 
   "concat" should {
     "concat arbitrary slices together" in {
-      implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 23))
+      implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))
 
       prop { slices: List[Slice] =>
         val slice = Slice.concat(slices)
@@ -141,7 +142,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     }
 
     "concat small singleton together" in {
-      implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 1))
+      implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 1))
 
       prop { slices: List[Slice] =>
         val slice = Slice.concat(slices)
@@ -155,7 +156,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
     }
 
     "concat empty slices correctly" in {
-      implicit def arbSlice = Arbitrary(genSlice(0, concatProjDesc, 23))
+      implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))
 
       prop { fullSlices: List[Slice] =>
         val slices = fullSlices collect {
@@ -169,7 +170,7 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
 
     "concat heterogeneous slices" in {
       val pds = List.fill(25)(concatProjDesc filter (_ => Random.nextBoolean))
-      val g1 :: g2 :: gs = pds.map(genSlice(0, _, 17))
+      val g1 :: g2 :: gs = pds.map(genSlice(_, 17))
 
       implicit val arbSlice = Arbitrary(Gen.oneOf(g1, g2, gs: _*))
 
@@ -183,3 +184,33 @@ class SliceSpec extends Specification with ArbitrarySlice with ScalaCheck {
   }
 }
 
+
+object ArbitrarySlice {
+  private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
+
+  def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
+    def bs = BitSetUtil.range(0, size)
+    col.ctype match {
+      case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
+      case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
+      case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
+      case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
+      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
+      case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
+      case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
+      case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
+      case CEmptyObject  => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
+      case CEmptyArray   => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
+      case CUndefined    => UndefinedColumn.raw
+      case CArrayType(_) => abort("undefined")
+    }
+  }
+
+  def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
+    val zero    = Nil: Gen[List[ColumnRef -> Column]]
+    val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
+    val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
+
+    genData ^^ (data => Slice(data.toMap, sz))
+  }
+}

@@ -1,4 +1,4 @@
-package com.precog.util;
+package com.precog;
 
 import java.io.ObjectStreamException;
 

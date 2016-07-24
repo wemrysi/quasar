@@ -20,14 +20,12 @@
 package com.precog.common
 package ingest
 
-import blueeyes.json._
-import blueeyes.json.serialization._
+import blueeyes._, json._, serialization._
 import blueeyes.core.http.{ MimeTypes, MimeType }
 import DefaultSerialization._
 import Versioned._
 import Extractor._
-
-import slamdata.java.util.Base64
+import java.util.Base64
 import scalaz._, Scalaz._
 
 sealed trait ContentEncoding {

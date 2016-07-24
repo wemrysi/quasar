@@ -27,8 +27,6 @@ import com.precog.bytecode._
 import com.precog.yggdrasil.jdbm3._
 import com.precog.util._
 
-import com.precog.util.BitSet
-
 import java.util.SortedMap
 import java.util.Comparator
 

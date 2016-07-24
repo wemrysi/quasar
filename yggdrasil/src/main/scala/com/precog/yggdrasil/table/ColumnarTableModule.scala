@@ -27,15 +27,12 @@ import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.bytecode._
 import com.precog.yggdrasil.util._
-// import com.precog.util.{ }
 import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
 import org.slf4j.Logger
 import org.slf4s.Logging
 import com.precog.util.IOUtils
-
-import scala.collection.mutable
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 

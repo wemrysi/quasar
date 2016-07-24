@@ -20,7 +20,7 @@
 package blueeyes
 
 object BitSetUtil {
-  class BitSetOperations(bs: BitSet) {
+  class BitSetOperations(private val bs: BitSet) extends AnyVal {
     def toList(): List[Int] = bitSetToList(bs)
 
     def +(elem: Int)      = { val b = bs.copy; b.set(elem); b }

@@ -38,41 +38,4 @@ package util {
     def nextInt(): Int = currentId.getAndIncrement()
   }
 
-  class Order2JComparator[A](order: scalaz.Order[A]) {
-    def toJavaComparator: Comparator[A] = new Comparator[A] {
-      def compare(a1: A, a2: A) = {
-        order.order(a1, a2).toInt
-      }
-    }
-  }
-}
-
-package object util {
-  def flipBytes(buffer: ByteBuffer): Array[Byte] = {
-    val bytes = new Array[Byte](buffer.remaining())
-    buffer.get(bytes)
-    buffer.flip()
-    bytes
-  }
-
-  implicit def bitSetOps(bs: BitSet): BitSetUtil.BitSetOperations = new BitSetUtil.BitSetOperations(bs)
-
-  implicit def Order2JComparator[A](order: scalaz.Order[A]): Order2JComparator[A] = new Order2JComparator(order)
-
-  implicit def vectorMonoid[A]: Monoid[Vector[A]] = new Monoid[Vector[A]] {
-    def zero: Vector[A]                         = Vector.empty[A]
-    def append(v1: Vector[A], v2: => Vector[A]) = v1 ++ v2
-  }
-
-  implicit def bigDecimalMonoid: Monoid[BigDecimal] = new Monoid[BigDecimal] {
-    def zero: BigDecimal                                      = BigDecimal(0)
-    def append(v1: BigDecimal, v2: => BigDecimal): BigDecimal = v1 + v2
-  }
-
-  implicit val InstantOrdering: ScalaMathOrdering[Instant] = scala.math.Ordering.Long.on[Instant](_.getMillis)
-
-  implicit val FutureBind: Bind[Future] = new Bind[Future] {
-    def map[A, B](fut: Future[A])(f: A => B)          = fut.map(f)
-    def bind[A, B](fut: Future[A])(f: A => Future[B]) = fut.flatMap(f)
-  }
 }
