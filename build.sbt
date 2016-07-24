@@ -6,7 +6,7 @@ def pathyVersion    = "0.2.1"
 def argonautVersion = "6.2-M3"
 
 lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) dependsOn (yggdrasil) also (
-  initialCommands in console := "import blueeyes._, json._"
+  initialCommands in console := "import blueeyes._, json._, quasar.precog._"
 )
 lazy val all = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil, mimir)
 

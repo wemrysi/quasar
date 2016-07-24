@@ -108,7 +108,7 @@ object Examples extends Specification {
       .collect { case (p, j) => (p, j) }
 
     val formed = form(
-      JPath.Identity,
+      NoJPath,
       JPath("person"),
       JPath("person.age"),
       JPath("person.name"),

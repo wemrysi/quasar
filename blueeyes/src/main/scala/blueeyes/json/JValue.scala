@@ -125,11 +125,9 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
 
   def get(path: JPath): JValue = path.extract(self)
 
-  def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = {
-    value match {
-      case JUndefined => success[Throwable, JValue](this)
-      case value      => Validation fromTryCatchNonFatal { unsafeInsert(path, value) }
-    }
+  def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = value match {
+    case JUndefined => success[Throwable, JValue](this)
+    case value      => Validation fromTryCatchNonFatal { unsafeInsert(path, value) }
   }
 
   /**
@@ -146,7 +144,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
   }
 
   def set(path: JPath, value: JValue): JValue =
-    if (path == JPath.Identity) value
+    if (path == NoJPath) value
     else {
       def arraySet(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
         def update(l: List[JValue], j: Int): List[JValue] = l match {
@@ -254,7 +252,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       }
     }
 
-    rec(z, JPath.Identity, self)
+    rec(z, NoJPath, self)
   }
 
   /** Return a combined value by folding over JSON by applying a function <code>f</code>
@@ -285,7 +283,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       }, p, v)
     }
 
-    rec(z, JPath.Identity, self)
+    rec(z, NoJPath, self)
   }
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
@@ -317,7 +315,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
 
       case x => f(p, x)
     }
-    rec(JPath.Identity, self)
+    rec(NoJPath, self)
   }
 
   /** Return a new JValue resulting from applying the given function <code>f</code>
@@ -351,7 +349,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       }
     }
 
-    rec(JPath.Identity, self)
+    rec(NoJPath, self)
   }
 
   /** Return a new JValue resulting from applying the given partial function <code>f</code>
@@ -453,7 +451,7 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       case leaf => List(path -> leaf)
     }
 
-    flatten0(JPath.Identity)(self)
+    flatten0(NoJPath)(self)
   }
 
   /** Concatenate with another JSON.
@@ -489,6 +487,8 @@ sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with
       case value            => Some(value)
     }
   }
+
+  override def toString = renderPretty
 }
 
 object JValue {
@@ -518,7 +518,7 @@ object JValue {
 
       val (xp, xv) = sorted.head
 
-      if (xp == JPath.Identity && sorted.size == 1) xv
+      if (xp == NoJPath && sorted.size == 1) xv
       else if (xp.path.startsWith("[")) unflattenArray(sorted)
       else unflattenObject(sorted)
     }
@@ -557,8 +557,10 @@ object JValue {
   }
 
   def unsafeInsert(rootTarget: JValue, rootPath: JPath, rootValue: JValue): JValue = {
+    // println(s"$rootTarget \\ $rootPath := $rootValue")
+
     def rec(target: JValue, path: JPath, value: JValue): JValue = {
-      if ((target == JNull || target == JUndefined) && path == JPath.Identity) value
+      if ((target == JNull || target == JUndefined) && path == NoJPath) value
       else {
         def arrayInsert(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
           def update(l: List[JValue], j: Int): List[JValue] = l match {
@@ -568,30 +570,32 @@ object JValue {
 
           update(l.padTo(i + 1, JUndefined), 0)
         }
+        def fail(): Nothing = {
+          val msg = s"""
+            |JValue insert would overwrite existing data:
+            |  $target \\ $path := $value
+            |Initial call was
+            |  $rootValue \\ $rootPath := $rootValue
+            |""".stripMargin.trim
+          sys error msg
+        }
 
         target match {
           case obj @ JObject(fields) =>
             path.nodes match {
               case JPathField(name) :: nodes =>
                 val (child, rest) = obj.partitionField(name)
-
                 rest + JField(name, rec(child, JPath(nodes), value))
 
               case JPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case Nil =>
-                sys.error(
-                  "JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
-                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+              case Nil                => fail()
             }
 
           case arr @ JArray(elements) =>
             path.nodes match {
               case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
               case JPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-              case Nil =>
-                sys.error(
-                  "JValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
-                    " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+              case Nil                        => fail()
             }
 
           case JNull | JUndefined =>
@@ -602,9 +606,8 @@ object JValue {
             }
 
           case x =>
-            sys.error(
-              "JValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
-                " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
+            // println(s"Target is $x ${x.getClass}")
+            fail()
         }
       }
     }

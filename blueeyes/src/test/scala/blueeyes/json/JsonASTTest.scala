@@ -21,7 +21,7 @@ import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 
-object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath {
+object JsonASTSpec extends Specification with ScalaCheck {
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)
@@ -125,7 +125,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath {
   "flattenWithPath for values produces a single value with the identity path" in {
     val test = JNum(1)
 
-    val expected = List((JPath.Identity, test))
+    val expected = List((NoJPath, test))
 
     test.flattenWithPath must_== expected
   }
@@ -225,51 +225,9 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath {
   }
 
   def runArbitraryPathSpec = {
-    implicit val arbJPath: Arbitrary[JPath] = Arbitrary {
-      import Gen._
-
-      val genIndex = for {
-        index <- choose(0, 10)
-      } yield JPathIndex(index)
-
-      val genField = for {
-        name <- identifier
-      } yield JPathField(name)
-
-      val genIndexOrField = Gen.frequency((1, genIndex), (9, genField))
-
-      for {
-        length <- choose(0, 10)
-        listOfNodes <- listOfN(length, genIndexOrField)
-      } yield JPath(listOfNodes)
-    }
-
-    def badPath(jv: JValue, p: JPath): Boolean = {
-      p.nodes match {
-        case JPathIndex(index) :: xs =>
-          jv match {
-            case JArray(nodes) =>
-              index > nodes.length ||
-                (index < nodes.length && badPath(nodes(index), JPath(xs))) ||
-                badPath(JArray(Nil), JPath(xs))
-
-            case JObject(_) => true
-            case _          => index != 0 || badPath(JArray(Nil), JPath(xs))
-          }
-
-        case JPathField(name) :: xs =>
-          jv match {
-            case JArray(_) => true
-            case _         => badPath(jv \ name, JPath(xs))
-          }
-
-        case Nil => false
-      }
-    }
-
     val setProp = (jv: JValue, p: JPath, toSet: JValue) => {
       (!badPath(jv, p)) ==> {
-        ((p == JPath.Identity) && (jv.set(p, toSet) == toSet)) ||
+        ((p == NoJPath) && (jv.set(p, toSet) == toSet)) ||
         (jv.set(p, toSet).get(p) == toSet)
       }
     }
@@ -278,7 +236,7 @@ object JsonASTSpec extends Specification with ScalaCheck with ArbitraryJPath {
       (!badPath(jv, p) && (jv(p) == JUndefined)) ==> {
         (jv, p.nodes) match {
           case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) | (JNull | JUndefined, _) =>
-            ((p == JPath.Identity) && (jv.unsafeInsert(p, toSet) == toSet)) ||
+            ((p == NoJPath) && (jv.unsafeInsert(p, toSet) == toSet)) ||
               (jv.unsafeInsert(p, toSet).get(p) == toSet)
 
           case _ =>

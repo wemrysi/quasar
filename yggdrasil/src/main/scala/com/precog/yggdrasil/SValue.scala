@@ -28,7 +28,7 @@ sealed trait SValue {
   def isA(valueType: SType): Boolean
 
   def \(selector: JPath): Option[SValue] = {
-    if (selector == JPath.Identity) {
+    if (selector == NoJPath) {
       Some(this)
     } else {
       this match {
@@ -74,7 +74,7 @@ sealed trait SValue {
           arr.lift(i).getOrElse(child).set(JPath(xs), value).map(sv => SArray(arr.padTo(i + 1, SNull).updated(i, sv)))
       }
 
-    case SNull if (selector == JPath.Identity) => Some(value)
+    case SNull if (selector == NoJPath) => Some(value)
 
     case _ => None
   }

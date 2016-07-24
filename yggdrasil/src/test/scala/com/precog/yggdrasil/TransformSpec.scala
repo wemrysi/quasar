@@ -162,7 +162,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   }
 
   def checkFilter = {
-    implicit val gen = sample(_ => Gen.const(Seq(JPath.Identity -> CLong)))
+    implicit val gen = sample(_ => Gen.const(Seq(NoJPath -> CLong)))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
@@ -1322,7 +1322,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     implicit val gen = sample(objectSchema(_, 3))
 
     def randomDeletionMask(schema: CValueGenerators.JSchema): Option[JPathField] = {
-      Random.shuffle(schema).headOption.map({ case (JPath(x @ JPathField(_), _ @ _*), _) => x })
+      Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) :: _), _) => x })
     }
 
     prop { (sample: SampleData) =>
@@ -1342,147 +1342,6 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
   }
-
-  /*
-  def checkObjectDelete = {
-    implicit val gen = sample(schema)
-    def randomDeleteMask(schema: JSchema): Option[JType]  = {
-      lazy val buildJType: PartialFunction[(CPath, CType), JType] = {
-        case (CPath(CPathField(f), xs @ _*), ctype) =>
-          if (Random.nextBoolean) JObjectFixedT(Map(f -> buildJType((CPath(xs: _*), ctype))))
-          else JObjectFixedT(Map(f -> JType.JUniverseT))
-
-        case (CPath(CPathIndex(i), xs @ _*), ctype) =>
-          if (Random.nextBoolean) JArrayFixedT(Map(i -> buildJType((CPath(xs: _*), ctype))))
-          else JArrayFixedT(Map(i -> JType.JUniverseT))
-
-        case (CPath.Identity, ctype) =>
-          if (Random.nextBoolean) {
-            JType.JUniverseT
-          } else {
-            ctype match {
-              case CString => JTextT
-              case CBoolean => JBooleanT
-              case CLong | CDouble | CNum => JNumberT
-              case CNull => JNullT
-              case CEmptyObject => JObjectFixedT(Map())
-              case CEmptyArray  => JArrayFixedT(Map())
-            }
-          }
-      }
-
-      val result = Random.shuffle(schema).headOption map buildJType
-      println("schema: " + schema)
-      println("mask: " + result)
-      result
-    }
-
-    def mask(jv: JValue, tpe: JType): JValue = {
-      ((jv, tpe): @unchecked) match {
-        case (JObject(fields), JObjectFixedT(m)) =>
-          m.headOption map {
-            case (field, tpe @ JObjectFixedT(_)) =>
-              JObject(fields.map {
-                case JField(`field`, child) => JField(field, mask(child, tpe))
-                case unchanged => unchanged
-              })
-
-            case (field, tpe @ JArrayFixedT(_)) =>
-              JObject(fields.map {
-                case JField(`field`, child) => JField(field, mask(child, tpe))
-                case unchanged => unchanged
-              })
-
-            case (field, JType.JUniverseT) =>
-              JObject(fields.filter {
-                case JField(`field`, _) => false
-                case _ => true
-              })
-
-            case (field, JType.JPrimitiveUnfixedT) =>
-              JObject(fields.filter {
-                case JField(`field`, JObject(_) | JArray(_)) => true
-                case _ => false
-              })
-
-            case (field, JNumberT) => JObject(fields.filter {
-              case JField(`field`, JInt(_) | JDouble(_)) => false
-              case _ => true
-            })
-
-            case (field, JTextT) => JObject(fields.filter {
-              case JField(`field`, JString(_)) => false
-              case _ => true
-            })
-
-            case (field, JBooleanT) => JObject(fields.filter {
-              case JField(`field`, JBool(_)) => false
-              case _ => true
-            })
-
-            case (field, JNullT) => JObject(fields filter {
-              case JField(`field`, JNull) => false
-              case _ => true
-            })
-          } getOrElse {
-            JObject(Nil)
-          }
-
-        case (JArray(elements), JArrayFixedT(m)) =>
-          m.headOption map {
-            case (index, tpe @ JObjectFixedT(_)) =>
-               JArray(elements.zipWithIndex map {
-                case (elem, idx) => if (idx == index) mask(elem, tpe) else elem
-              })
-
-            case (index, tpe @ JArrayFixedT(_)) =>
-               JArray(elements.zipWithIndex map {
-                case (elem, idx) => if (idx == index) mask(elem, tpe) else elem
-              })
-
-            case (index, JType.JPrimitiveUnfixedT) =>
-              JArray(elements.zipWithIndex map {
-                case (v @ JObject(_), _) => v
-                case (v @ JArray(_), _) => v
-                case (_, `index`) => JUndefined
-                case (v, _) => v
-              })
-
-            case (index, JType.JUniverseT) => JArray(elements.updated(index, JUndefined))
-            case (index, JNumberT) => JArray(elements.updated(index, JUndefined))
-            case (index, JTextT) => JArray(elements.updated(index, JUndefined))
-            case (index, JBooleanT) => JArray(elements.updated(index, JUndefined))
-            case (index, JNullT) => JArray(elements.updated(index, JUndefined))
-          } getOrElse {
-            if (elements.isEmpty) JUndefined else JArray(elements)
-          }
-
-        case (JInt(_) | JDouble(_) | JString(_) | JBool(_) | JNull, JType.JPrimitiveUnfixedT) => JUndefined
-        case (JInt(_) | JDouble(_), JNumberT) => JUndefined
-        case (JString(_), JTextT) => JUndefined
-        case (JBool(_), JBooleanT) => JUndefined
-        case (JNull, JNullT) => JUndefined
-      }
-    }
-
-    prop { (sample: SampleData) =>
-      val toDelete = sample.schema.flatMap(randomDeleteMask)
-      toDelete.isDefined ==> {
-        val table = fromSample(sample)
-
-        val Some(jtpe) = toDelete
-
-        val result = toJson(table.transform {
-          ObjectDelete(DerefObjectStatic(Leaf(Source), CPathField("value")), jtpe)
-        })
-
-        val expected = sample.data.map { jv => mask(jv \ "value", jtpe).remove(v => v == JUndefined || v == JArray(Nil)) }
-
-        result must_== expected
-      }
-    }
-  }
-  */
 
   def testIsTypeNumeric = {
     val JArray(elements) = JParser.parseUnsafe("""[
@@ -1528,9 +1387,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     ]""")
 
     val sample = SampleData(elements.toStream)
-    val table = fromSample(sample)
-
-    val jtpe = JUnionT(JNumberT, JNullT)
+    val table  = fromSample(sample)
+    val jtpe   = JUnionT(JNumberT, JNullT)
     val results = toJson(table.transform {
       IsType(Leaf(Source), jtpe)
     })
@@ -1731,7 +1589,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
     """)
 
-    val sample = SampleData(elements.toStream, Some((3, Seq((JPath.Identity, CEmptyArray)))))
+    val sample = SampleData(elements.toStream, Some((3, Seq((NoJPath, CEmptyArray)))))
 
     testIsType(sample)
   }
@@ -2126,7 +1984,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   }
 
   def checkScan = {
-    implicit val gen = sample(_ => Seq(JPath.Identity -> CLong))
+    implicit val gen = sample(_ => Seq(NoJPath -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table.transform {
@@ -2226,7 +2084,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
   }
 
   def checkCond = {
-    implicit val gen = sample(_ => Gen.const(Seq(JPath.Identity -> CLong)))
+    implicit val gen = sample(_ => Gen.const(Seq(NoJPath -> CLong)))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val results = toJson(table transform {
@@ -2254,26 +2112,22 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       val paths = jv.flattenWithPath.toMap.keys.toList
 
       val filtered = jv.flattenWithPath filter {
-        case (JPath(JPathField("value"), tail @ _*), leaf) =>
-          included.get(JPath(tail: _*)).exists { ctpes =>
+        case (JPath(JPathField("value") :: tail), leaf) =>
+          included get JPath(tail) exists { ctpes =>
+            // if an object or array is nonempty, then leaf is a nonempty object and
+            // consequently can't conform to any leaf type.
             leaf match {
-              case JBool(_) => ctpes.contains(CBoolean)
-              case JString(_) => ctpes.contains(CString)
-              case JNum(_) => ctpes.contains(CLong) || ctpes.contains(CDouble) || ctpes.contains(CNum)
-              case JNull => ctpes.contains(CNull)
-              case JObject(elements) =>
-                // if elements is nonempty, then leaf is a nonempty object and consequently can't conform
-                // to any leaf type.
-                elements.isEmpty && ctpes.contains(CEmptyObject)
-
-              case JArray(elements) =>
-                // if elements is nonempty, then leaf is a nonemtpy array and consequently can't conform
-                // to any leaf type.
-                elements.isEmpty && ctpes.contains(CEmptyArray)
+              case JBool(_)       => ctpes.contains(CBoolean)
+              case JString(_)     => ctpes.contains(CString)
+              case JNum(_)        => ctpes.contains(CLong) || ctpes.contains(CDouble) || ctpes.contains(CNum)
+              case JNull          => ctpes.contains(CNull)
+              case JObject(Seq()) => ctpes.contains(CEmptyObject)
+              case JArray(Seq())  => ctpes.contains(CEmptyArray)
+              case _              => false
             }
           }
 
-        case (JPath(JPathField("key"), _*), _) => true
+        case (JPath(JPathField("key") :: _), _) => true
         case _ => sys.error("Unexpected JValue schema for " + jv)
       }
 

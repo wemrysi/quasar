@@ -15,7 +15,7 @@ import Prop.forAll
 import Arbitrary._
 import quasar.precog.JsonTestSupport._
 
-object VersionedSpec extends Specification with ScalaCheck with ArbitraryJPath {
+object VersionedSpec extends Specification with ScalaCheck {
   import IsoSerializationSpec._
   import Versioned._
 

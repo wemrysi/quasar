@@ -32,7 +32,7 @@ object CPathUtils {
       val CArrayType(elemType) = es.cType
       es.value.toList.zipWithIndex flatMap { case (e, i) => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
     // case (CPathMeta(_) :: _, _) => Nil
-    case (Nil, _)  => List((JPath.Identity, value))
+    case (Nil, _)  => List((NoJPath, value))
     case (path, _) => sys.error("Bad news, bob! " + path)
   }
 

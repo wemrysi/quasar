@@ -42,7 +42,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
   def flattenType(jtpe : JType) : Map[JPath, Set[CType]] = {
     def flattenAux(jtpe : JType) : Set[(JPath, Option[CType])] = jtpe match {
-      case p : JPrimitiveType => Schema.ctypes(p).map(tpe => (JPath.Identity, Some(tpe)))
+      case p : JPrimitiveType => Schema.ctypes(p).map(tpe => (NoJPath, Some(tpe)))
 
       case JArrayFixedT(elems) =>
         for((i, jtpe) <- elems.toSet; (path, ctpes) <- flattenAux(jtpe)) yield (JPathIndex(i) \ path, ctpes)
@@ -52,7 +52,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       case JUnionT(left, right) => flattenAux(left) ++ flattenAux(right)
 
-      case u @ (JArrayUnfixedT | JObjectUnfixedT) => Set((JPath.Identity, None))
+      case u @ (JArrayUnfixedT | JObjectUnfixedT) => Set((NoJPath, None))
 
       case x => sys.error("Unexpected: " + x)
     }
@@ -543,7 +543,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
       val result = extractLoads(inferTypes(JType.JPrimitiveUnfixedT)(input))
 
       val expected = Map(
-        "/clicks" -> Map(JPath.Identity -> cLiterals))
+        "/clicks" -> Map(NoJPath -> cLiterals))
 
       result mustEqual expected
     }
@@ -586,7 +586,7 @@ trait TypeInferencerSpecs[M[+_]] extends EvaluatorSpecification[M]
 
       val expected = Map(
         "/clicks" -> Map(
-          JPath.Identity -> cLiterals,
+          NoJPath -> cLiterals,
           JPath("time") -> cLiterals))
 
       result mustEqual expected

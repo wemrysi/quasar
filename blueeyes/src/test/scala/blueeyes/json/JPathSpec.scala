@@ -26,7 +26,7 @@ import org.specs2.ScalaCheck
 import org.scalacheck._
 import quasar.precog.JsonTestSupport._
 
-object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath {
+object JPathSpec extends Specification with ScalaCheck {
   "Parser" should {
     "parse all valid JPath strings" in {
       prop { (jpath: JPath) =>
@@ -70,21 +70,21 @@ object JPathSpec extends Specification with ScalaCheck with ArbitraryJPath {
     }
 
     "return Identity for path 1 level deep" in {
-      JPath(".foo").parent must beSome(JPath.Identity)
+      JPath(".foo").parent must beSome(NoJPath)
     }
 
     "return None when there is no parent" in {
-      JPath.Identity.parent mustEqual None
+      NoJPath.parent mustEqual None
     }
   }
 
   "Ancestors" should {
     "return two ancestors" in {
-      JPath(".foo.bar.baz").ancestors mustEqual List(JPath(".foo.bar"), JPath(".foo"), JPath.Identity)
+      JPath(".foo.bar.baz").ancestors mustEqual List(JPath(".foo.bar"), JPath(".foo"), NoJPath)
     }
 
     "return empty list for identity" in {
-      JPath.Identity.ancestors mustEqual Nil
+      NoJPath.ancestors mustEqual Nil
     }
   }
 

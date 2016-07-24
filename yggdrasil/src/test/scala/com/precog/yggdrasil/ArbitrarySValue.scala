@@ -85,7 +85,7 @@ trait CValueGenerators extends ArbitraryBigDecimal {
     }
   }
 
-  def leafSchema: Gen[JSchema] = ctype map { t => (JPath.Identity -> t) :: Nil }
+  def leafSchema: Gen[JSchema] = ctype map { t => (NoJPath -> t) :: Nil }
 
   def ctype: Gen[CType] = oneOf(
     CString,

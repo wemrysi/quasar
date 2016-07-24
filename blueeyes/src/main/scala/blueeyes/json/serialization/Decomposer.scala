@@ -54,6 +54,9 @@ trait MiscSerializers {
   import DefaultExtractors._, DefaultDecomposers._
   import SerializationImplicits._
 
+  implicit val JPathExtractorDecomposer: ExtractorDecomposer[JPath] =
+    ExtractorDecomposer.by[JPath].opt(x => JString(x.toString): JValue)(_.validated[String] map (JPath(_)))
+
   implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(instant fromMillis _)
   implicit val DurationExtractorDecomposer = by[Duration](_.getMillis)(duration fromMillis _)
   implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(uuid)
