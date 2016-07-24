@@ -35,6 +35,7 @@ object PlatformBuild {
 
   def javaSpecVersion: String                       = sys.props("java.specification.version")
   def inBoth[A](f: Configuration => Seq[A]): Seq[A] = List(Test, Compile) flatMap f
+  def kindProjector                                 = "org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary
 
   implicit class ProjectOps(val p: sbt.Project) {
     def noArtifacts: Project = also(
@@ -50,12 +51,14 @@ object PlatformBuild {
     def also(s: Setting[_], ss: Setting[_]*): Project = also(s +: ss.toSeq)
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toSeq)
     def compileArgs(args: String*): Project           = also(scalacOptions in Compile ++= args.toList)
-    def strictConflict: Project                       = also(conflictManager := ConflictManager.strict)
+    def strictVersions: Project                       = also(conflictManager := ConflictManager.strict)
+    def serialTests: Project                          = also(parallelExecution in Test := false)
     def withWarnings: Project                         = compileArgs("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
     def logImplicits: Project                         = compileArgs("-Xlog-implicits")
+    def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
 
     def setup: Project = (
-      also(
+      serialTests also inBoth(doubleCross) scalacPlugins (kindProjector) compileArgs (envArgs: _*) also(
                organization :=  "com.precog",
                     version :=  "2.6.1-SNAPSHOT",
               scalacOptions ++= Seq("-g:vars") ++ optimizeOpts ++ debugOpts,
@@ -63,9 +66,6 @@ object PlatformBuild {
         logBuffered in Test :=  false,
                    ivyScala :=  ivyScala.value map (_.copy(overrideScalaVersion = true))
       )
-      also inBoth(doubleCross)
-      also addCompilerPlugin("org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary)
-      compileArgs(envArgs: _*)
     )
   }
 }
