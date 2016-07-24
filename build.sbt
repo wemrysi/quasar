@@ -18,6 +18,7 @@ lazy val blueeyes  = project.setup dependsOn precog % BothScopes deps (
 
 lazy val precog = (
   project.setup deps (
+
     "org.openjdk.jmh"    % "jmh-generator-annprocess" %     "1.12",
     "com.slamdata"      %% "pathy-core"               %  pathyVersion,
     "com.slamdata"      %% "pathy-argonaut"           %  pathyVersion,
@@ -28,6 +29,8 @@ lazy val precog = (
     "org.spire-math"    %% "spire"                    %     "0.7.4",
     "org.scodec"        %% "scodec-bits"              %     "1.1.0",
     "org.scodec"        %% "scodec-scalaz"            %    "1.3.0a",
+    // "io.github.jto"     %% "validation-playjson"      %      "2.0",
+    // "com.typesafe.play" %% "play-json"                %     "2.5.3",
     "org.scalaz"        %% "scalaz-effect"            %  scalazVersion,
     "org.scalaz"        %% "scalaz-concurrent"        %  scalazVersion,
     "com.slamdata"      %% "pathy-scalacheck"         %   pathyVersion   % Test,

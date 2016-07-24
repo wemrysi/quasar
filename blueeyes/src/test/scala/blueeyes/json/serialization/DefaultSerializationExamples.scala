@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 package blueeyes
-package json.serialization
+package json
+package serialization
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
+import DefaultSerialization._
 
-object DefaultSerializationExamples extends Specification {
-  import _root_.blueeyes.json._
-
-  import DefaultSerialization._
-
+class DefaultSerializationExamplesSpec extends Specification {
   "Primitives can be extracted from strings" in {
     IntExtractor(JString("12")) mustEqual 12
     LongExtractor(JString("12")) mustEqual 12

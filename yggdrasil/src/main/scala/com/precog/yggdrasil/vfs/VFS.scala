@@ -115,7 +115,6 @@ trait VFSModule[M[+ _], Block] extends Logging {
   }
 
   trait ProjectionResource extends Resource {
-    def append(data: NIHDB.Batch): IO[PrecogUnit]
     def recordCount(implicit M: Monad[M]): M[Long]
     def projection(implicit M: Monad[M]): M[Projection]
 
@@ -183,7 +182,5 @@ trait VFSModule[M[+ _], Block] extends Logging {
     def findDirectChildren(path: Path): EitherT[M, ResourceError, Set[PathMetadata]]
 
     def findPathMetadata(path: Path): EitherT[M, ResourceError, PathMetadata]
-
-    def currentVersion(path: Path): M[Option[VersionEntry]]
   }
 }

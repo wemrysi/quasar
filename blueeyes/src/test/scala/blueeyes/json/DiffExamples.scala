@@ -17,9 +17,9 @@
 package blueeyes
 package json
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
-object DiffExamples extends Specification {
+class DiffExamplesSpec extends Specification {
   import JParser._
   import MergeExamples.{ scala1, scala2, lotto1, lotto2, mergedLottoResult }
 

@@ -23,9 +23,9 @@ package util
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
-
 import com.precog.util._
 import quasar.precog.TestSupport._
+
 class CPathTraversalSpec extends Specification {
   import CPathTraversal._
 
@@ -40,12 +40,12 @@ class CPathTraversalSpec extends Specification {
       }
     }
 
-    implicit val LongColBuilder = builder[Long](ArrayLongColumn(_, _))
-    implicit val StrColBuilder = builder[String](ArrayStrColumn(_, _))
-    implicit val BoolColBuilder = builder[Boolean](ArrayBoolColumn(_, _))
+    implicit val LongColBuilder   = builder[Long](ArrayLongColumn(_, _))
+    implicit val StrColBuilder    = builder[String](ArrayStrColumn(_, _))
+    implicit val BoolColBuilder   = builder[Boolean](ArrayBoolColumn(_, _))
     implicit val DoubleColBuilder = builder[Double](ArrayDoubleColumn(_, _))
-    implicit val NumColBuilder = builder[BigDecimal](ArrayNumColumn(_, _))
-    implicit val DateColBuilder = builder[DateTime](ArrayDateColumn(_, _))
+    implicit val NumColBuilder    = builder[BigDecimal](ArrayNumColumn(_, _))
+    implicit val DateColBuilder   = builder[DateTime](ArrayDateColumn(_, _))
     implicit def HomogeneousArrayColBuilder[@spec(Boolean, Long, Double) A: CValueType] =
       builder[Array[A]](ArrayHomogeneousArrayColumn(_, _))
   }
