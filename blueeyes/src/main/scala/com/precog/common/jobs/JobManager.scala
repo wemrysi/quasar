@@ -21,10 +21,7 @@ package com.precog.common
 package jobs
 
 import blueeyes._, json._
-import blueeyes.core.http.MimeType
-
 import com.precog.common.security._
-
 import scalaz._
 
 object JobManager {

@@ -20,8 +20,7 @@
 package com.precog.common
 package jobs
 
-import blueeyes.core.http.MimeType
-
+import blueeyes._
 import scalaz.StreamT
 
 case class FileData[M[+ _]](mimeType: Option[MimeType], data: StreamT[M, Array[Byte]])

@@ -1,8 +1,5 @@
-package blueeyes
-package core.http
-
-import scala.util.matching.Regex
-import blueeyes.util.ProductPrefixUnmangler
+package quasar
+package precog
 
 /*
 Usage:
@@ -53,7 +50,7 @@ object MimeType {
 object MimeTypes {
 
   def parseMimeTypes(inString: String): Array[MimeType] = {
-    def MimeTypeRegex = new Regex("""((application)|(text)|(audio)|(multipart)|(image)|(video)|(\*))/(([a-z\-]+)|\*)""")
+    def MimeTypeRegex = """((application)|(text)|(audio)|(multipart)|(image)|(video)|(\*))/(([a-z\-]+)|\*)""".r
 
     /* Split the string on commas, which separate the mimes */
     for {
@@ -373,4 +370,30 @@ object MimeTypes {
       override def extensions = videoType.extensions
     }
   }
+}
+
+trait ProductPrefixUnmangler {
+  def productPrefix: String
+
+  lazy val unmangledName = unmangleName(productPrefix)
+  private def unmangleName(name: String): String = operators.foldLeft(name)((n, o) => n.replace(o._1, o._2))
+
+  private val operators = Map(
+    "$eq"      -> "=",
+    "$greater" -> ">",
+    "$less"    -> "<",
+    "$plus"    -> "+",
+    "$minus"   -> "-",
+    "$times"   -> "*",
+    "$div"     -> "/",
+    "$bang"    -> "!",
+    "$at"      -> "@",
+    "$hash"    -> "#",
+    "$percent" -> "%",
+    "$up"      -> "^",
+    "$amp"     -> "&",
+    "$tilde"   -> "~",
+    "$qmark"   -> "?",
+    "$bar"     -> "|",
+    "$bslash"  -> "\\")
 }

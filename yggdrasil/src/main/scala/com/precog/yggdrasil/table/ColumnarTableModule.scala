@@ -21,8 +21,6 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes._, json._
-import blueeyes.core.http.{ MimeType, MimeTypes }
-
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.bytecode._

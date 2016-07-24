@@ -51,7 +51,6 @@ object ExtractorDecomposer {
 }
 
 trait MiscSerializers {
-  import blueeyes.core.http.{ MimeType, MimeTypes }
   import DefaultExtractors._, DefaultDecomposers._
   import SerializationImplicits._
 

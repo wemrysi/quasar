@@ -6,6 +6,10 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   type switch  = scala.annotation.switch
   type tailrec = scala.annotation.tailrec
 
+  type MimeType = quasar.precog.MimeType
+  val MimeType  = quasar.precog.MimeType
+  val MimeTypes = quasar.precog.MimeTypes
+
   // Temporary
   type BitSet             = com.precog.BitSet
   type RawBitSet          = Array[Int]

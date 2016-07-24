@@ -21,7 +21,6 @@ package com.precog.common
 package ingest
 
 import blueeyes._, json._, serialization._
-import blueeyes.core.http.{ MimeTypes, MimeType }
 import DefaultSerialization._
 import Versioned._
 import Extractor._

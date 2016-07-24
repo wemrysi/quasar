@@ -2,23 +2,24 @@ package blueeyes
 
 // package precog
 
-import scala.collection.mutable
+import scala.collection.{ mutable => scm }
 
 trait PackageAliases {
   // scala stdlib
   type ->[+A, +B]           = (A, B)
-  type ArrayBuffer[A]       = mutable.ArrayBuffer[A]
+  type ArrayBuffer[A]       = scm.ArrayBuffer[A]
   type BigDecimal           = scala.math.BigDecimal
   type CTag[A]              = scala.reflect.ClassTag[A]
-  type ListBuffer[A]        = mutable.ListBuffer[A]
+  type ListBuffer[A]        = scm.ListBuffer[A]
+  type Regex                = scala.util.matching.Regex
   type ScalaMathOrdering[A] = scala.math.Ordering[A] // so many orders
-  type scmMap[K, V]         = mutable.Map[K, V]
-  type scmSet[A]            = mutable.Set[A]
-  val ArrayBuffer           = mutable.ArrayBuffer
+  type scmMap[K, V]         = scm.Map[K, V]
+  type scmSet[A]            = scm.Set[A]
+  val ArrayBuffer           = scm.ArrayBuffer
   val BigDecimal            = scala.math.BigDecimal
-  val ListBuffer            = mutable.ListBuffer
-  val scmMap                = mutable.HashMap
-  val scmSet                = mutable.HashSet
+  val ListBuffer            = scm.ListBuffer
+  val scmMap                = scm.HashMap
+  val scmSet                = scm.HashSet
 
   // java stdlib
   type AtomicInt            = java.util.concurrent.atomic.AtomicInteger

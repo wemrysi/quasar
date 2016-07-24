@@ -23,15 +23,12 @@ package vfs
 import metadata.PathMetadata
 import metadata.PathStructure
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._
 import com.precog.niflheim._
 import com.precog.util._
-
-import blueeyes.core.http.MimeType
-import blueeyes.json._
 
 import java.util.Arrays
 import java.nio.CharBuffer

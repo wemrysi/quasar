@@ -22,7 +22,6 @@ package metadata
 
 import blueeyes._
 import com.precog.common._
-import blueeyes.core.http.MimeType
 import scalaz._
 
 case class PathMetadata(path: Path, pathType: PathMetadata.PathType)
