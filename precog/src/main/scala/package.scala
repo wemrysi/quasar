@@ -8,9 +8,10 @@ import java.nio.file._
  *  everything under the sun even if we never touch it.
  */
 package object precog /*extends ScodecImplicits*/ {
-  val Try      = scala.util.Try
-  type Try[+A] = scala.util.Try[A]
-  type jPath   = java.nio.file.Path
+  val Try          = scala.util.Try
+  type Try[+A]     = scala.util.Try[A]
+  type jPath       = java.nio.file.Path
+  type =?>[-A, +B] = scala.PartialFunction[A, B]
 
   def jPath(path: String): jPath = Paths get path
 

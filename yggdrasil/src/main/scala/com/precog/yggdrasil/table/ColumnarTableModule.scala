@@ -294,20 +294,13 @@ object ColumnarTableModule extends Logging {
   def toCharBuffers[N[+ _]: Monad](output: MimeType, slices: StreamT[N, Slice]): StreamT[N, CharBuffer] = {
     import FileContent._
     import MimeTypes._
-
     val AnyMimeType = anymaintype / anysubtype
 
     output match {
-      case ApplicationJson | AnyMimeType =>
-        ColumnarTableModule.renderJson(slices, "[", ",", "]")
-
-      case XJsonStream =>
-        ColumnarTableModule.renderJson(slices, "", "\n", "")
-
-      case TextCSV =>
-        ColumnarTableModule.renderCsv(slices)
-
-      case other =>
+      case ApplicationJson | AnyMimeType => ColumnarTableModule.renderJson(slices, "[", ",", "]")
+      case XJsonStream                   => ColumnarTableModule.renderJson(slices, "", "\n", "")
+      case TextCSV                       => ColumnarTableModule.renderCsv(slices)
+      case other                         =>
         log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
         StreamT.empty[N, CharBuffer]
     }
