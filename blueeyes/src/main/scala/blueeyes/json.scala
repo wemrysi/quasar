@@ -307,16 +307,13 @@ package object json {
     def \\(nameToFind: String): JValue = {
       def find(json: JValue): List[JValue] = json match {
         case JObject(l) =>
-          l.foldLeft(List.empty[JValue]) {
-            case (acc, field) =>
-              val newAcc = if (field._1 == nameToFind) field._2 :: acc else acc
-
-              newAcc ::: find(field._2)
+          l.foldLeft(List[JValue]()) {
+            case (acc, (`nameToFind`, v)) => v :: acc ::: find(v)
+            case (acc, (_, v))            => acc ::: find(v)
           }
 
-        case JArray(l) => l.flatMap(find)
-
-        case _ => Nil
+        case JArray(l) => l flatMap find
+        case _         => Nil
       }
       find(self) match {
         case x :: Nil => x
@@ -339,7 +336,7 @@ package object json {
 
     def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = value match {
       case JUndefined => success(self)
-      case value      => Validation fromTryCatchNonFatal { unsafeInsert(path, value) }
+      case value      => Validation fromTryCatchNonFatal unsafeInsert(path, value)
     }
 
     /**

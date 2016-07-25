@@ -31,6 +31,16 @@ sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int
   def to_s = this.renderPretty
 }
+sealed trait JContainer extends JValue {
+  assert(contained forall (_ != null), contained)
+
+  def contained: Iterable[JValue]
+  def hasDefinedChild: Boolean = contained exists (_ != JUndefined)
+  def isNested: Boolean = contained exists {
+    case _: JContainer => true
+    case _             => false
+  }
+}
 
 object JValue {
   sealed trait RenderMode
@@ -62,28 +72,6 @@ object JValue {
       if (xp == NoJPath && sorted.size == 1) xv
       else if (xp.path.startsWith("[")) unflattenArray(sorted)
       else unflattenObject(sorted)
-    }
-  }
-
-  case class paired(jv1: JValue, jv2: JValue) {
-    assert(jv1 != null && jv2 != null)
-    final def fold[A](default: => A)(obj: Map[String, JValue] => Map[String, JValue] => A,
-                                     arr: List[JValue] => List[JValue] => A,
-                                     str: String => String => A,
-                                     num: BigDecimal => BigDecimal => A,
-                                     bool: Boolean => Boolean => A,
-                                     nul: => A,
-                                     nothing: => A) = {
-      (jv1, jv2) match {
-        case (JObject(o1), JObject(o2)) => obj(o1)(o2)
-        case (JArray(a1), JArray(a2))   => arr(a1)(a2)
-        case (JString(s1), JString(s2)) => str(s1)(s2)
-        case (JBool(b1), JBool(b2))     => bool(b1)(b2)
-        case (JNum(d1), JNum(d2))       => num(d1)(d2)
-        case (JNull, JNull)             => nul
-        case (JUndefined, JUndefined)   => nul
-        case _                          => default
-      }
     }
   }
 
@@ -161,27 +149,14 @@ case object JNull extends JValue {
   final def compare(that: JValue) = this.typeIndex compare that.typeIndex
 }
 
-sealed trait JBool extends JValue {
-  def value: Boolean
-}
-
-case object JTrue extends JBool {
-  final def value                 = true
+sealed abstract class JBool(val value: Boolean) extends JValue {
   final def compare(that: JValue) = that match {
-    case JTrue  => 0
-    case JFalse => 1
-    case _      => this.typeIndex compare that.typeIndex
+    case JBool(v) => value compare v
+    case _        => this.typeIndex compare that.typeIndex
   }
 }
-
-case object JFalse extends JBool {
-  final def value                 = false
-  final def compare(that: JValue) = that match {
-    case JTrue  => -1
-    case JFalse => 0
-    case _      => this.typeIndex compare that.typeIndex
-  }
-}
+final case object JTrue extends JBool(true)
+final case object JFalse extends JBool(false)
 
 object JBool {
   def apply(value: Boolean): JBool         = if (value) JTrue else JFalse
@@ -388,37 +363,17 @@ case object JField extends ((String, JValue) => JField) {
   }
 }
 
-case class JObject(fields: Map[String, JValue]) extends JValue {
-  assert(fields != null)
-  assert(fields.values.forall(_ != null))
+case class JObject(fields: Map[String, JValue]) extends JContainer {
+  def contained = fields.values
 
-  def sortedFields: Vector[JField] = fields.toVector.sortMe filterNot (_._2 eq JUndefined)
+  def sortedFields: Vector[JField] = fields.toVector.sorted filterNot (_._2 eq JUndefined) sortBy (_._2)
 
-  override def toString(): String = "JObject(<%d fields>)" format fields.size
+  def get(name: String): JValue = fields.getOrElse(name, JUndefined)
 
-  def get(name: String): JValue = fields.get(name).getOrElse(JUndefined)
-
-  def hasDefinedChild: Boolean = fields.values.exists(_ != JUndefined)
-
-  def +(field: JField): JObject = copy(fields = fields + field)
-
-  def -(name: String): JObject = copy(fields = fields - name)
-
-  def partitionField(field: String): (JValue, JObject) = {
-    (get(field), JObject(fields - field))
-  }
-
-  def partition(f: JField => Boolean): (JObject, JObject) = {
-    fields.partition(f).bimap(JObject(_), JObject(_))
-  }
-
-  def mapFields(f: JField => JField) = JObject(fields.map(f))
-
-  def isNested: Boolean = fields.values.exists {
-    case _: JArray  => true
-    case _: JObject => true
-    case _          => false
-  }
+  def +(field: JField): JObject                           = copy(fields = fields + field)
+  def -(name: String): JObject                            = copy(fields = fields - name)
+  def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)
+  def partition(f: JField => Boolean): (JObject, JObject) = fields.partition(f).bimap(JObject(_), JObject(_))
 
   private def fieldsCmp(m1: Map[String, JValue], m2: Map[String, JValue]): Int = {
     @tailrec def rec(fields: Array[String], i: Int): Int = {
@@ -426,7 +381,6 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
         val key = fields(i)
         val v1  = m1.getOrElse(key, JUndefined)
         val v2  = m2.getOrElse(key, JUndefined)
-
         if (v1 == JUndefined && v2 == JUndefined) rec(fields, i + 1)
         else if (v1 == JUndefined) 1
         else if (v2 == JUndefined) -1
@@ -434,32 +388,21 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
           val cres = (v1 compare v2)
           if (cres == 0) rec(fields, i + 1) else cres
         }
-      } else {
-        0
       }
+      else 0
     }
-
     val arr: Array[String] = (m1.keySet ++ m2.keySet).toArray
     quickSort(arr)
     rec(arr, 0)
   }
 
   override def compare(that: JValue): Int = that match {
-    case o: JObject => sortedFields ?|? o.sortedFields toInt
+    case o: JObject => fieldsCmp(fields, o.fields)
     case _          => this.typeIndex compare that.typeIndex
   }
-
-  private def fieldsEq(m1: Map[String, JValue], m2: Map[String, JValue]): Boolean = {
-    (m1.keySet ++ m2.keySet) forall { key =>
-      val v1 = m1.getOrElse(key, JUndefined)
-      val v2 = m2.getOrElse(key, JUndefined)
-      v1 == v2
-    }
-  }
-
   override def hashCode = fields.##
   override def equals(other: Any) = other match {
-    case o: JObject => fieldsEq(fields, o.fields)
+    case o: JObject => compare(o) == 0
     case _          => false
   }
 }
@@ -467,39 +410,13 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 final object JObject {
   final val empty = JObject(Nil)
 
-  def apply(fields: Traversable[JField]): JObject   = JObject(fields.toMap)
-  def apply(fields: JField*): JObject               = JObject(fields.toMap)
-  def unapplySeq(value: JObject): Some[Seq[JField]] = Some(value.sortedFields)
+  def apply(fields: Traversable[JField]): JObject      = JObject(fields.toMap)
+  def apply(fields: JField*): JObject                  = JObject(fields.toMap)
+  def unapplySeq(value: JObject): Some[Vector[JField]] = Some(value.sortedFields)
 }
 
-case class JArray(elements: List[JValue]) extends JValue {
-  assert(elements.forall(_ != null))
-
-  override def toString(): String = "JArray(<%d values>)" format elements.length
-
-  def hasDefinedChild: Boolean = elements exists { _ != JUndefined }
-
-  def isNested: Boolean = elements.exists {
-    case _: JArray  => true
-    case _: JObject => true
-    case _          => false
-  }
-
-  @tailrec
-  private def elementsEq(js1: List[JValue], js2: List[JValue]): Boolean = {
-    js1 match {
-      case Nil =>
-        js2 match {
-          case Nil => true
-          case _   => false
-        }
-      case h1 :: t1 =>
-        js2 match {
-          case Nil      => false
-          case h2 :: t2 => if (h1 equals h2) elementsEq(t1, t2) else false
-        }
-    }
-  }
+case class JArray(elements: List[JValue]) extends JContainer {
+  def contained = elements
   override def compare(that: JValue): Int = that match {
     case JArray(xs) => elements ?|? xs toInt
     case _          => this.typeIndex compare that.typeIndex
@@ -508,5 +425,6 @@ case class JArray(elements: List[JValue]) extends JValue {
 
 case object JArray extends (List[JValue] => JArray) {
   final val empty = JArray(Nil)
+
   final def apply(vals: JValue*): JArray = JArray(vals.toList)
 }
