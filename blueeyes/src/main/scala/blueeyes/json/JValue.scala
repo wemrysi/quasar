@@ -29,8 +29,6 @@ import quasar.precog._
   */
 sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int
-  def sort: JValue
-
   def to_s = this.renderPretty
 }
 
@@ -87,10 +85,6 @@ object JValue {
         case _                          => default
       }
     }
-  }
-
-  implicit final val jnumOrder: Order[JNum] = new Order[JNum] {
-    def order(v1: JNum, v2: JNum) = Ordering.fromInt(v1 numCompare v2)
   }
 
   implicit final val order: Order[JValue] = new Order[JValue] {
@@ -160,17 +154,14 @@ object JValue {
 case class UndefinedNormalizeError(msg: String) extends Exception(msg)
 
 case object JUndefined extends JValue {
-  final def sort: JValue              = this
-  final def compare(that: JValue)     = this.typeIndex compare that.typeIndex
+  final def compare(that: JValue) = this.typeIndex compare that.typeIndex
 }
 
 case object JNull extends JValue {
-  final def sort: JValue              = this
-  final def compare(that: JValue)     = this.typeIndex compare that.typeIndex
+  final def compare(that: JValue) = this.typeIndex compare that.typeIndex
 }
 
 sealed trait JBool extends JValue {
-  final def sort: JBool               = this
   def value: Boolean
 }
 
@@ -202,8 +193,6 @@ sealed trait JNum extends JValue {
   def toLong: Long
   def toDouble: Double
   def toRawString: String
-
-  def sort: JNum = this
 
   // SI-6173: to avoid hashCode on BigDecimal, we use a hardcoded hashcode to
   // ensure JNum("123.45").hashCode == JNum(123.45).hashCode
@@ -317,8 +306,6 @@ case object JNum {
 }
 
 case class JString(value: String) extends JValue {
-  final def sort: JString = this
-
   final def compare(that: JValue): Int = that match {
     case JString(s) => value compare s
     case _          => this.typeIndex compare that.typeIndex
@@ -405,6 +392,8 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
   assert(fields != null)
   assert(fields.values.forall(_ != null))
 
+  def sortedFields: Vector[JField] = fields.toVector.sortMe filterNot (_._2 eq JUndefined)
+
   override def toString(): String = "JObject(<%d fields>)" format fields.size
 
   def get(name: String): JValue = fields.get(name).getOrElse(JUndefined)
@@ -415,8 +404,6 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
   def -(name: String): JObject = copy(fields = fields - name)
 
-  def merge(other: JObject): JObject = JObject(Merge.mergeFields(this.fields, other.fields))
-
   def partitionField(field: String): (JValue, JObject) = {
     (get(field), JObject(fields - field))
   }
@@ -424,8 +411,6 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
   def partition(f: JField => Boolean): (JObject, JObject) = {
     fields.partition(f).bimap(JObject(_), JObject(_))
   }
-
-  def sort: JObject = JObject(fields.filter(_._2 ne JUndefined).map(_.map(_.sort)))
 
   def mapFields(f: JField => JField) = JObject(fields.map(f))
 
@@ -460,7 +445,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
   }
 
   override def compare(that: JValue): Int = that match {
-    case o: JObject => fieldsCmp(fields, o.fields)
+    case o: JObject => sortedFields ?|? o.sortedFields toInt
     case _          => this.typeIndex compare that.typeIndex
   }
 
@@ -472,24 +457,19 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
     }
   }
 
+  override def hashCode = fields.##
   override def equals(other: Any) = other match {
     case o: JObject => fieldsEq(fields, o.fields)
     case _          => false
   }
 }
 
-case object JObject extends (Map[String, JValue] => JObject) {
-  final val empty                          = JObject(Nil)
+final object JObject {
+  final val empty = JObject(Nil)
 
-  implicit val order = Order.orderBy((x: JObject) => x.fields.toVector.sortMe filterNot (_._2 eq JUndefined) sortBy (_._2))
-
-  def apply(fields: Traversable[JField]): JObject = JObject(fields.toMap)
-  def apply(fields: JField*): JObject             = JObject(fields.toMap)
-
-  def unapplySeq(value: JValue): Option[Seq[JField]] = value match {
-    case JObject(fields) => Some(fields.toSeq)
-    case _               => None
-  }
+  def apply(fields: Traversable[JField]): JObject   = JObject(fields.toMap)
+  def apply(fields: JField*): JObject               = JObject(fields.toMap)
+  def unapplySeq(value: JObject): Some[Seq[JField]] = Some(value.sortedFields)
 }
 
 case class JArray(elements: List[JValue]) extends JValue {
@@ -498,12 +478,6 @@ case class JArray(elements: List[JValue]) extends JValue {
   override def toString(): String = "JArray(<%d values>)" format elements.length
 
   def hasDefinedChild: Boolean = elements exists { _ != JUndefined }
-
-  def sort: JArray = JArray(elements.filter(_ ne JUndefined).map(_.sort).sorted)
-
-  // override def apply(i: Int): JValue = elements.lift(i).getOrElse(JUndefined)
-
-  def merge(other: JArray): JArray = JArray(Merge.mergeVals(this.elements, other.elements))
 
   def isNested: Boolean = elements.exists {
     case _: JArray  => true
@@ -534,7 +508,5 @@ case class JArray(elements: List[JValue]) extends JValue {
 
 case object JArray extends (List[JValue] => JArray) {
   final val empty = JArray(Nil)
-
-  final implicit val order: Order[JArray] = Order[List[JValue]].contramap((_: JArray).elements)
   final def apply(vals: JValue*): JArray = JArray(vals.toList)
 }
