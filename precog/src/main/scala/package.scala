@@ -3,5 +3,8 @@ package quasar
 import scalaz._
 import scala.collection.mutable
 
-package object precog extends ScodecImplicits {
+/** For some reason extending ScodecImplicits makes sbt recompile
+ *  everything under the sun even if we never touch it.
+ */
+package object precog /*extends ScodecImplicits*/ {
 }

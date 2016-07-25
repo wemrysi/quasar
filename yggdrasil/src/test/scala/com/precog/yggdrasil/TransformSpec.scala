@@ -21,12 +21,11 @@ package com.precog.yggdrasil
 
 import com.precog.common._
 import blueeyes._, json._
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
 import scala.util.Random
-import org.scalacheck._, Gen._, Arbitrary._
+import org.scalacheck.{ Gen, Arbitrary }
 import com.precog.bytecode._
 import scalaz._, Scalaz._
+import quasar.precog.TestSupport._
 
 trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import CValueGenerators._
@@ -1605,19 +1604,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       "key" -> JArrayUnfixedT
     ))
 
-    val table = fromSample(sample)
-    val results = toJson(table.transform(
-      IsType(Leaf(Source), jtpe)))
-
+    val table                           = fromSample(sample)
+    val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
     val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(Seq(_))
-    val schemas0 = schemasSeq map { inferSchema(_) }
-    val schemas = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
-
-    val expected0 = schemas map { schema => Schema.subsumes(schema, jtpe) }
-    val expected = expected0 map {
-      case true  => JTrue
-      case false => JFalse
-    }
+    val schemas0                        = schemasSeq map { inferSchema(_) }
+    val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
+    val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
 
     results.copoint mustEqual expected
   }
@@ -1671,22 +1663,17 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       "key" -> JArrayUnfixedT
     ))
 
-    val table = fromSample(sample)
-    val results = toJson(table.transform(
-      Typed(Leaf(Source), jtpe)))
-
+    val table    = fromSample(sample)
+    val results  = toJson(table.transform(Typed(Leaf(Source), jtpe)))
     val included = schema.groupBy(_._1).mapValues(_.map(_._2).toSet)
-
-    val sampleSchema = inferSchema(sample.data.toSeq) map { case (jpath, ctype) => (CPath(jpath), ctype) }
-    val subsumes: Boolean = Schema.subsumes(sampleSchema, jtpe)
-    val expected = expectedResult(sample.data, included, subsumes)
+    val expected = expectedResult(sample.data, included)
 
     results.copoint must_== expected
   }
 
   def checkTyped = {
     implicit val gen = sample(schema)
-    prop { testTyped _ }.set(minTestsOk = 10000)
+    prop(testTyped _)
   }
 
   def testTypedAtSliceBoundary = {
@@ -1715,13 +1702,10 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[2], "value":23}
     ]""")
 
-    val sample = SampleData(elements.toStream)
-    val table = fromSample(sample)
-
-    val jtpe = JObjectFixedT(Map("value" -> JTextT, "key" -> JArrayUnfixedT))
-    val results = toJson(table.transform {
-      Typed(Leaf(Source), jtpe)
-    })
+    val sample  = SampleData(elements.toStream)
+    val table   = fromSample(sample)
+    val jtpe    = JObjectFixedT(Map("value" -> JTextT, "key" -> JArrayUnfixedT))
+    val results = toJson(table.transform(Typed(Leaf(Source), jtpe)))
 
     val JArray(expected) = JParser.parseUnsafe("""[
       {"key":[1], "value":"value1"},
@@ -1846,10 +1830,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JPath(List(JPathIndex(1))) -> Set(CEmptyArray),
       JPath(List(JPathIndex(2))) -> Set(CNull))
 
-    val sampleSchema = inferSchema(data.toSeq) map { case (jpath, ctype) => (CPath(jpath), ctype) }
-    val subsumes: Boolean = Schema.subsumes(sampleSchema, jtpe)
-
-    results.copoint must_== expectedResult(data, included, subsumes)
+    results.copoint must_== expectedResult(data, included)
   }
 
   def testTypedArray4 = {
@@ -1857,13 +1838,11 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       Stream(
         JObject(List(JField("value", JArray(List(JNum(2.4), JNum(12), JBool(true), JArray(List())))), JField("key", JArray(List(JNum(1)))))),
         JObject(List(JField("value", JArray(List(JNum(3.5), JNull, JBool(false)))), JField("key", JArray(List(JNum(2)))))))
-    val sample = SampleData(data)
-    val table = fromSample(sample)
 
-    val jtpe = JObjectFixedT(Map("value" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JNumberT, 2 -> JBooleanT, 3 -> JArrayFixedT(Map()))), "key" -> JArrayUnfixedT))
-    val results = toJson(table.transform {
-      Typed(Leaf(Source), jtpe)
-    })
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
+    val jtpe    = JObjectFixedT(Map("value" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JNumberT, 2 -> JBooleanT, 3 -> JArrayFixedT(Map()))), "key" -> JArrayUnfixedT))
+    val results = toJson(table.transform(Typed(Leaf(Source), jtpe)))
 
     val included: Map[JPath, Set[CType]] = Map(
       JPath(List(JPathIndex(0))) -> Set(CNum),
@@ -1871,10 +1850,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JPath(List(JPathIndex(2))) -> Set(CBoolean),
       JPath(List(JPathIndex(3))) -> Set(CEmptyArray))
 
-    val sampleSchema = inferSchema(data.toSeq) map { case (jpath, ctype) => (CPath(jpath), ctype) }
-    val subsumes: Boolean = Schema.subsumes(sampleSchema, jtpe)
-
-    results.copoint must_== expectedResult(data, included, subsumes)
+    results.copoint must_== expectedResult(data, included)
   }
 
   def testTypedNumber = {
@@ -2107,7 +2083,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     }.set(minTestsOk =  200)
   }
 
-  def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]], subsumes: Boolean): Stream[JValue] = {
+  def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
     data map { jv =>
       val paths = jv.flattenWithPath.toMap.keys.toList
 

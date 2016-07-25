@@ -3,16 +3,8 @@ package json
 package serialization
 
 import DefaultSerialization._
-import Extractor._
-
+import Extractor.Invalid
 import scalaz._
-
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
-import org.scalacheck._
-
-import Prop.forAll
-import Arbitrary._
 import quasar.precog.JsonTestSupport._
 
 object VersionedSpec extends Specification with ScalaCheck {

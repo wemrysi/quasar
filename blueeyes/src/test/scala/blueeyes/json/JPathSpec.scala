@@ -17,13 +17,8 @@
 package blueeyes
 package json
 
-import org.specs2.mutable.Specification
-import org.scalacheck.{ Gen, Arbitrary, Prop }
-import Prop.forAll
-import Arbitrary._
-
-import org.specs2.ScalaCheck
-import org.scalacheck._
+import org.scalacheck.Prop
+import org.scalacheck.Arbitrary, Arbitrary.arbitrary
 import quasar.precog.JsonTestSupport._
 
 object JPathSpec extends Specification with ScalaCheck {
