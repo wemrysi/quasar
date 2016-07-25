@@ -90,7 +90,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
     
 
   private def inter(implicit sc: SparkContext): ReadFile ~> Task =
-    readfile.interpret[Eff](local_readfile.input[Eff]) andThen foldMapNT[Eff, Task](run)
+    readfile.interpret[Eff](local.readfile.input[Eff]) andThen foldMapNT[Eff, Task](run)
 
   private def newSc(): SparkContext = {
     val config = new SparkConf().setMaster("local[*]").setAppName(this.getClass().getName())
