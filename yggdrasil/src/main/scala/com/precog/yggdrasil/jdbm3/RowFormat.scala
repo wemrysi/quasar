@@ -49,14 +49,14 @@ trait RowFormat {
     val aVals     = selectors zip decode(a) groupBy (_._1)
     val bVals     = selectors zip decode(b) groupBy (_._1)
 
-    val cmp = selectors.distinct.iterator map { cPath =>
+    val cmp: Int = selectors.distinct.iterator map { cPath =>
       val a = aVals(cPath) find (_._2 != CUndefined)
       val b = bVals(cPath) find (_._2 != CUndefined)
       (a, b) match {
         case (None, None)                 => 0
         case (None, _)                    => -1
         case (_, None)                    => 1
-        case (Some((_, a)), Some((_, b))) => CValue.compareValues(a, b)
+        case (Some((_, a)), Some((_, b))) => (a ?|? b).toInt
       }
     } find (_ != 0) getOrElse 0
 
@@ -738,13 +738,8 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 
 object SortingRowFormat {
   def writeFlagFor[M[_]](cType: CType)(implicit M: ByteBufferMonad[M]): M[Unit] = {
-    // import scalaz.syntax.monad._
-
     val flag = flagForCType(cType)
-    for (buf <- M.getBuffer(1)) yield {
-      buf.put(flag)
-      ()
-    }
+    M getBuffer 1 map (_ put flag)
   }
 
   def flagForCType(cType: CType): Byte = cType match {

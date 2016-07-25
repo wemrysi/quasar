@@ -169,32 +169,17 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 }
 
 object CValue {
-  def compareValues(a: CValue, b: CValue): Int = (a, b) match {
-    case (CString(as), CString(bs))   => as.compare(bs)
-    case (CBoolean(ab), CBoolean(bb)) => ab.compare(bb)
-    case (CLong(al), CLong(bl))       => al.compare(bl)
-    case (CDouble(ad), CDouble(bd))   => ad.compare(bd)
-    case (CNum(an), CNum(bn))         => an.compare(bn)
-    case (CDate(ad), CDate(bd))       => ad.compareTo(bd)
-    case (CPeriod(ad), CPeriod(bd))   => ad.toDuration compareTo bd.toDuration
-    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe =>
-      (as.view zip bs.view) map {
-        case (a, b) =>
-          compareValues(atpe(a), btpe(b))
-      } find (_ != 0) getOrElse (as.size - bs.size)
-    case (a: CNumericValue[_], b: CNumericValue[_]) =>
-      compareValues(a.toCNum, b.toCNum) // The only safe way to compare any mix of the 3 types.
-    case (a: CNullValue, b: CNullValue) if a.cType == b.cType => 0
-    case (a, b)                                               => a.cType.typeIndex - b.cType.typeIndex
-  }
-
-  implicit object CValueOrder extends ScalazOrder[CValue] {
-    def order(a: CValue, b: CValue): Ordering =
-      if (a.cType == b.cType) {
-        Ordering.fromInt(compareValues(a, b))
-      } else {
-        CType.CTypeOrder.order(a.cType, b.cType)
-      }
+  implicit val CValueOrder: ScalazOrder[CValue] = Order order {
+    case (CString(as), CString(bs))                                                   => as ?|? bs
+    case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
+    case (CLong(al), CLong(bl))                                                       => al ?|? bl
+    case (CDouble(ad), CDouble(bd))                                                   => ad ?|? bd
+    case (CNum(an), CNum(bn))                                                         => fromInt(an compare bn)
+    case (CDate(ad), CDate(bd))                                                       => fromInt(ad compareTo bd)
+    case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
+    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
+    case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
+    case (a, b)                                                                       => a.cType ?|? b.cType
   }
 }
 
@@ -340,15 +325,13 @@ object CType {
     case JNull         => Some(CNull)
     case JArray(Nil)   => Some(CEmptyArray)
     case JObject.empty => Some(CEmptyObject)
-    case JArrays.empty => None // TODO Allow homogeneous JArrays -> CType
+    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
     case _             => None
   }
 
-  implicit object CTypeOrder extends ScalazOrder[CType] {
-    def order(t1: CType, t2: CType): Ordering = (t1, t2) match {
-      case (CArrayType(t1), CArrayType(t2)) => order(t1, t2)
-      case (_, _)                           => ScalazOrder[Int].order(t1.typeIndex, t2.typeIndex)
-    }
+  implicit val CTypeOrder: ScalazOrder[CType] = Order order {
+    case (CArrayType(t1), CArrayType(t2)) => (t1: CType) ?|? t2
+    case (x, y)                           => x.typeIndex ?|? y.typeIndex
   }
 }
 
