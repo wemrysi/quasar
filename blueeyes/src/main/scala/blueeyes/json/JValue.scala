@@ -28,7 +28,7 @@ import quasar.precog._
   * Data type for Json AST.
   */
 sealed trait JValue extends Product with Ordered[JValue] with ToString {
-  def compare(that: JValue): Int
+  def compare(that: JValue): Int = this.typeIndex compare that.typeIndex
   def to_s = this.renderPretty
 }
 sealed trait JContainer extends JValue {
@@ -139,20 +139,13 @@ object JValue {
   }
 }
 
-case class UndefinedNormalizeError(msg: String) extends Exception(msg)
-
-case object JUndefined extends JValue {
-  final def compare(that: JValue) = this.typeIndex compare that.typeIndex
-}
-
-case object JNull extends JValue {
-  final def compare(that: JValue) = this.typeIndex compare that.typeIndex
-}
+case object JUndefined extends JValue
+case object JNull extends JValue
 
 sealed abstract class JBool(val value: Boolean) extends JValue {
-  final def compare(that: JValue) = that match {
+  override def compare(that: JValue) = that match {
     case JBool(v) => value compare v
-    case _        => this.typeIndex compare that.typeIndex
+    case _        => super.compare(that)
   }
 }
 final case object JTrue extends JBool(true)
@@ -173,9 +166,9 @@ sealed trait JNum extends JValue {
   // ensure JNum("123.45").hashCode == JNum(123.45).hashCode
   override val hashCode = 6173
 
-  final def compare(that: JValue): Int = that match {
+  override def compare(that: JValue): Int = that match {
     case num: JNum => numCompare(num)
-    case _         => this.typeIndex compare that.typeIndex
+    case _         => super.compare(that)
   }
 
   protected[json] def numCompare(other: JNum): Int
@@ -269,21 +262,15 @@ case object JNum {
 
   private[json] def apply(value: String): JNum = JNumStr(value)
 
-  def apply(value: Long): JNum = JNumLong(value)
-
-  def apply(value: BigDecimal): JNum = JNumBigDec(value)
-
-  def compare(v1: JNum, v2: JNum) = v1.numCompare(v2)
-
-  def unapply(value: JNum): Option[BigDecimal] = {
-    try { Some(value.toBigDecimal) } catch { case _: NumberFormatException => None }
-  }
+  def apply(value: Long): JNum                 = JNumLong(value)
+  def apply(value: BigDecimal): JNum           = JNumBigDec(value)
+  def unapply(value: JNum): Option[BigDecimal] = Try(value.toBigDecimal).toOption
 }
 
 case class JString(value: String) extends JValue {
-  final def compare(that: JValue): Int = that match {
+  override def compare(that: JValue): Int = that match {
     case JString(s) => value compare s
-    case _          => this.typeIndex compare that.typeIndex
+    case _          => super.compare(that)
   }
 }
 
@@ -398,7 +385,7 @@ case class JObject(fields: Map[String, JValue]) extends JContainer {
 
   override def compare(that: JValue): Int = that match {
     case o: JObject => fieldsCmp(fields, o.fields)
-    case _          => this.typeIndex compare that.typeIndex
+    case _          => super.compare(that)
   }
   override def hashCode = fields.##
   override def equals(other: Any) = other match {
@@ -419,7 +406,7 @@ case class JArray(elements: List[JValue]) extends JContainer {
   def contained = elements
   override def compare(that: JValue): Int = that match {
     case JArray(xs) => elements ?|? xs toInt
-    case _          => this.typeIndex compare that.typeIndex
+    case _          => super.compare(that)
   }
 }
 

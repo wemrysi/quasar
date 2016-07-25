@@ -7,4 +7,6 @@ import scala.collection.mutable
  *  everything under the sun even if we never touch it.
  */
 package object precog /*extends ScodecImplicits*/ {
+  val Try      = scala.util.Try
+  type Try[+A] = scala.util.Try[A]
 }

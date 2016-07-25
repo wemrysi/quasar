@@ -246,7 +246,7 @@ package object json {
     def to_s = renderPretty
 
     def normalize: JValue = self match {
-      case JUndefined       => throw UndefinedNormalizeError("Can't normalize JUndefined")
+      case JUndefined       => sys error "Can't normalize JUndefined"
       case JObject(fields)  => JObject(fields filter (_._2.isDefined) mapValues (_.normalize) toMap)
       case JArray(elements) => JArray(elements filter (_.isDefined) map (_.normalize))
       case _                => self
