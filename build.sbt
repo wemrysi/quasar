@@ -5,14 +5,18 @@ def specsVersion    = "3.7"
 def pathyVersion    = "0.2.1"
 def argonautVersion = "6.2-M3"
 
-lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) dependsOn (yggdrasil) also (
-  initialCommands in console := "import blueeyes._, json._, quasar.precog._"
+lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) also (
+  console in Compile <<= console in Compile in yggdrasil,
+     console in Test <<= console in Test in yggdrasil
 )
 
 /** mimir used to be the evaluator project.
  */
 lazy val mimir     = project.setup.noArtifacts dependsOn (yggdrasil % BothScopes, blueeyes, precog)
-lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes
+lazy val yggdrasil = project.setup dependsOn blueeyes % BothScopes also (
+  initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
+     initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
+)
 lazy val blueeyes  = project.setup dependsOn precog % BothScopes
 
 lazy val precog = (

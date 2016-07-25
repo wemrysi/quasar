@@ -2117,13 +2117,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
             // if an object or array is nonempty, then leaf is a nonempty object and
             // consequently can't conform to any leaf type.
             leaf match {
-              case JBool(_)       => ctpes.contains(CBoolean)
-              case JString(_)     => ctpes.contains(CString)
-              case JNum(_)        => ctpes.contains(CLong) || ctpes.contains(CDouble) || ctpes.contains(CNum)
-              case JNull          => ctpes.contains(CNull)
-              case JObject(Seq()) => ctpes.contains(CEmptyObject)
-              case JArray(Seq())  => ctpes.contains(CEmptyArray)
-              case _              => false
+              case JBool(_)    => ctpes.contains(CBoolean)
+              case JString(_)  => ctpes.contains(CString)
+              case JNum(_)     => ctpes.contains(CLong) || ctpes.contains(CDouble) || ctpes.contains(CNum)
+              case JNull       => ctpes.contains(CNull)
+              case JObject(xs) => xs.isEmpty && ctpes.contains(CEmptyObject)
+              case JArray(xs)  => xs.isEmpty && ctpes.contains(CEmptyArray)
             }
           }
 
