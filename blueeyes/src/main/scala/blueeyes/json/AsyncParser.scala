@@ -306,7 +306,7 @@ final class AsyncParser protected[json] (
     val size = k - i
     val arr  = new Array[Byte](size)
     System.arraycopy(data, i, arr, 0, size)
-    new String(arr, utf8)
+    new String(arr, Utf8Charset)
   }
 
   // the basic idea is that we don't signal EOF until done is true, which means

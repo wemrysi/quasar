@@ -369,9 +369,6 @@ object Codec {
     def read(src: ByteBuffer): Double = src.getDouble()
   }
 
-  // TODO I guess UTF-8 is always available?
-  val Utf8Charset = Charset.forName("UTF-8")
-
   implicit case object Utf8Codec extends Codec[String] {
 
     type S = Either[String, (CharBuffer, CharsetEncoder)]

@@ -24,7 +24,7 @@ private[json] final class ByteBufferParser(src: ByteBuffer) extends SyncParser w
     src.position(i + start)
     src.get(arr, 0, len)
     src.position(start)
-    new String(arr, utf8)
+    new String(arr, Utf8Charset)
   }
 
   final def atEof(i: Int) = i >= limit

@@ -100,13 +100,13 @@ private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncPar
     val len = k - i
 
     if (k <= bufsize) {
-      new String(curr, i, len, utf8)
+      new String(curr, i, len, Utf8Charset)
     } else {
       val arr = new Array[Byte](len)
       val mid = bufsize - i
       System.arraycopy(curr, i, arr, 0, mid)
       System.arraycopy(next, 0, arr, mid, k - bufsize)
-      new String(arr, utf8)
+      new String(arr, Utf8Charset)
     }
   }
 

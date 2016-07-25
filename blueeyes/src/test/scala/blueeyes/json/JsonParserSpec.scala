@@ -17,17 +17,12 @@
 package blueeyes
 package json
 
-import _root_.org.scalacheck.Prop._
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
-import org.scalacheck.Gen
 import java.net.URLDecoder
 import scala.util.control.Exception._
-import scala.io.Source
 import scalaz._
 import scala.math.min
 import scala.util.Random.nextInt
-import quasar.precog.JsonTestSupport._
+import quasar.precog._, JsonTestSupport._
 
 class JsonParserSpec extends Specification with ScalaCheck {
   import JParser._
@@ -95,10 +90,7 @@ object ParsingByteBufferSpec extends Specification {
 object AsyncParserSpec extends Specification {
   import AsyncParser._
 
-  val utf8 = java.nio.charset.Charset.forName("UTF-8")
-
-  private def loadBytes(path: String): Array[Byte] =
-    Source.fromFile(path).mkString.getBytes(utf8)
+  private def loadBytes(path: String): Array[Byte] = jPath(path).slurpBytes
 
   private def chunk(data: Array[Byte], i: Int, j: Int) = {
     val len = min(j, data.length) - i
@@ -254,7 +246,7 @@ xyz
 {"foo": 123, "bar": 999}
 {"foo": 123, "bar": 999}"""
 
-    val bs = json.getBytes(utf8)
+    val bs = json.getBytes(Utf8Charset)
     val c  = chunk(bs, 0, bs.length)
 
     var p = AsyncParser.stream()
@@ -293,8 +285,6 @@ xyz
 object ArrayUnwrappingSpec extends Specification {
   import JParser._
   import AsyncParser._
-
-  val utf8 = java.nio.charset.Charset.forName("UTF-8")
 
   def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))
   def j(s: String, n: Int) = JObject(Map(s -> JNum(n)))

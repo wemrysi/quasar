@@ -19,6 +19,7 @@
  */
 package com.precog.util
 
+import blueeyes._
 import java.io._
 import java.util.Properties
 import org.slf4s.Logging
@@ -28,8 +29,6 @@ import scalaz.syntax.semigroup._
 import java.nio.file.Files
 
 object IOUtils extends Logging {
-  final val Utf8Charset = java.nio.charset.Charset forName "UTF-8"
-
   val dotDirs = "." :: ".." :: Nil
 
   def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)

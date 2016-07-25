@@ -12,12 +12,9 @@ case class ParseException(msg: String, index: Int, line: Int, col: Int) extends 
 case class IncompleteParseException(msg: String)                        extends Exception(msg)
 
 /**
-  * Parser contains the state machine that does all the work. The only 
+  * Parser contains the state machine that does all the work. The only
   */
 private[json] trait Parser {
-
-  protected[this] final val utf8 = Charset.forName("UTF-8")
-
   /**
     * Read the byte/char at 'i' as a Char.
     *
