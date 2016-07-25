@@ -8,7 +8,6 @@ def argonautVersion = "6.2-M3"
 lazy val root = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil) dependsOn (yggdrasil) also (
   initialCommands in console := "import blueeyes._, json._, quasar.precog._"
 )
-lazy val all = project.setup.root.noArtifacts aggregate (precog, blueeyes, yggdrasil, mimir)
 
 /** mimir used to be the evaluator project.
  */
@@ -49,8 +48,3 @@ lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugi
               compile in Jmh <<= (compile in Jmh) dependsOn (compile in Test),
                   run in Jmh <<= (run in Jmh) dependsOn (Keys.compile in Jmh)
 )
-
-addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
-addCommandAlias("cc", "all/test:compile")
-addCommandAlias("tt", "; cc ; {.}/test")
-addCommandAlias("ttq", "; cc ; all/testQuick")
