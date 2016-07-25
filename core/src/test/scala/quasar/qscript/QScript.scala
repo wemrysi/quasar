@@ -127,7 +127,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     // TODO: Needs list compaction
-    "convert a basic reduction" in skipped {
+    "convert a basic reduction" in pending {
       QueryFile.convertToQScript(
         agg.Sum[FLP](lpRead("/person"))).toOption must
       equal(
@@ -139,7 +139,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     // TODO: Needs list compaction, and simplification of join with Map
-    "convert a basic reduction wrapped in an object" in skipped {
+    "convert a basic reduction wrapped in an object" in pending {
       // "select sum(height) from person"
       QueryFile.convertToQScript(
         makeObj(
@@ -155,7 +155,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             Free.point[MapFunc[Fix, ?], Fin[nat._1]](Fin[nat._0, nat._1]))))).embed.some)
     }
 
-    "convert a flatten array" in skipped {
+    "convert a flatten array" in pending {
       // "select loc[:*] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -164,16 +164,14 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
       equal(
         SP.inj(LeftShift(
-          QC.inj(Map(
-            RootR,
-            Free.roll(ProjectField(
-              Free.roll(ProjectField(HoleF, StrLit("zips"))),
-              StrLit("loc"))))).embed,
-          HoleF,
+          RootR,
+          Free.roll(ProjectField(
+            Free.roll(ProjectField(HoleF, StrLit("zips"))),
+            StrLit("loc"))),
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array" in skipped {
+    "convert a constant shift array" in pending {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
@@ -184,10 +182,30 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("baz"))),
                 structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("quux")))),
               structural.ObjectProject[FLP](LogicalPlan.Free('x), LogicalPlan.Constant(Data.Str("ducks"))))))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        SP.inj(LeftShift(
+          RootR,
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              Free.roll(ProjectField(
+                Free.roll(ProjectField(
+                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
+                  StrLit("bar"))),
+                StrLit("baz"))),
+              Free.roll(ProjectField(
+                Free.roll(ProjectField(
+                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
+                  StrLit("bar"))),
+                StrLit("quux"))))),
+            Free.roll(ProjectField(
+              Free.roll(ProjectField(
+                Free.roll(ProjectField(HoleF, StrLit("foo"))),
+                StrLit("bar"))),
+              StrLit("ducks"))))),
+          Free.point(RightSide))).embed.some)
     }
 
-    "convert a shift/unshift array" in skipped {
+    "convert a shift/unshift array" in pending {
       // "select [loc[_:] * 10 ...] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -197,11 +215,24 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 structural.ShiftArrayIndices[FLP](
                   structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))),
                 LogicalPlan.Constant(Data.Int(10)))))).toOption must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(
+        QC.inj(Reduce(
+          SP.inj(LeftShift(
+            RootR,
+            Free.roll(DupArrayIndices(
+              Free.roll(ProjectField(
+                Free.roll(ProjectField(HoleF, StrLit("zips"))),
+                StrLit("loc"))))),
+            Free.roll(Multiply(Free.point(RightSide), IntLit(10))))).embed,
+          HoleF,
+          Sized[List](ReduceFuncs.UnshiftArray(HoleF[Fix])),
+          Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], Fin[nat._1]]](
+            StrLit[Fix, Fin[nat._1]]("0"),
+            Free.point(Fin[nat._0, nat._1]))))).embed.some)
     }
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
-    "convert" in skipped {
+    "convert" in pending {
       // "select * from person, car",
       QueryFile.convertToQScript(
         LogicalPlan.Let('__tmp0,
@@ -213,7 +244,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(RootR.some) // TODO incorrect expectation
     }
 
-    "convert basic join with explicit join condition" in skipped {
+    "convert basic join with explicit join condition" in pending {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val lp = LP.Let('__tmp0, lpRead("/foo"),

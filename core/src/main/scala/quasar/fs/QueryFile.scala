@@ -54,7 +54,9 @@ object QueryFile {
     _.transCata(orOriginal(Optimizer.elideLets[Fix]))
       .transCataM(qscript.lpToQScript).map(qs =>
       EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptProject[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QScriptProject[Fix, ?], Fix[QScriptProject[Fix, ?]]]).lower) ⋙ optimize.applyAll))
+        .transCata(((_: EnvT[Ann[Fix], QScriptProject[Fix, ?], Fix[QScriptProject[Fix, ?]]]).lower) ⋙ optimize.applyAll)
+        // TODO: Rather than simply applying twice, we should apply repeatedly until unchanged.
+        .transCata(optimize.applyAll))
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.
