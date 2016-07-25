@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package util
 
+import quasar.precog._
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
@@ -116,8 +117,8 @@ object CPathComparator {
         new CPathComparator with ArrayCPathComparatorSupport {
           val lMask     = makeMask(lPath)
           val rMask     = makeMask(rPath)
-          val lSelector = new ArraySelector()(tpe1.manifest)
-          val rSelector = new ArraySelector()(tpe2.manifest)
+          val lSelector = new ArraySelector()(tpe1.classTag)
+          val rSelector = new ArraySelector()(tpe2.classTag)
 
           def compare(r1: Int, r2: Int, indices: Array[Int]): MaybeOrdering = {
             val lPluckable = lSelector.canPluck(lCol(r1), indices, lMask)
@@ -154,7 +155,7 @@ object CPathComparator {
         val ordering = MaybeOrdering.fromInt(implicitly[ScalazOrder[CType]].apply(tpe1, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {
           val mask     = makeMask(lPath)
-          val selector = new ArraySelector()(tpe1.manifest)
+          val selector = new ArraySelector()(tpe1.classTag)
           def compare(r1: Int, r2: Int, indices: Array[Int]): MaybeOrdering = {
             if (selector.canPluck(lCol(r1), indices, mask)) {
               ordering
@@ -189,7 +190,7 @@ private[yggdrasil] trait ArrayCPathComparatorSupport {
 private[yggdrasil] final class HalfArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
-    rCol: Int => B)(implicit ma: Manifest[A], ho: HetOrder[A, B])
+    rCol: Int => B)(implicit ma: CTag[A], ho: HetOrder[A, B])
     extends CPathComparator
     with ArrayCPathComparatorSupport {
 
@@ -221,7 +222,7 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
     rPath: CPath,
-    rCol: HomogeneousArrayColumn[_])(implicit ma: Manifest[A], mb: Manifest[B], ho: HetOrder[A, B])
+    rCol: HomogeneousArrayColumn[_])(implicit ma: CTag[A], mb: CTag[B], ho: HetOrder[A, B])
     extends CPathComparator
     with ArrayCPathComparatorSupport {
 
@@ -264,8 +265,8 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
   * ArraySelector provides a non-boxing way of accessing the leaf elements in a
   * bunch of nested arrays.
   */
-private[yggdrasil] final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: Manifest[A]) {
-  private val am = m.arrayManifest
+private[yggdrasil] final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
+  private val am = m.wrap
 
   def canPluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): Boolean = {
     var arr: Array[_] = a

@@ -9,7 +9,6 @@ trait PackageAliases {
   type ->[+A, +B]           = (A, B)
   type ArrayBuffer[A]       = scm.ArrayBuffer[A]
   type BigDecimal           = scala.math.BigDecimal
-  type CTag[A]              = scala.reflect.ClassTag[A]
   type ListBuffer[A]        = scm.ListBuffer[A]
   type Regex                = scala.util.matching.Regex
   type ScalaMathOrdering[A] = scala.math.Ordering[A] // so many orders

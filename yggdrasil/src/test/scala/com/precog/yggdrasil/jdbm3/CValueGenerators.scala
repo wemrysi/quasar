@@ -52,7 +52,7 @@ trait CValueGenerators {
     case CDate                => genPosLong ^^ (n => CDate(dateTime fromMillis n))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
-        CArray(xs.toArray(elemType.manifest), CArrayType(elemType))
+        CArray(xs.toArray(elemType.classTag), CArrayType(elemType))
       }
     case CPeriod => abort("undefined")
   }

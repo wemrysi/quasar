@@ -447,7 +447,7 @@ object Column {
       new HomogeneousArrayColumn[Array[a]] {
         val tpe = CArrayType(col.tpe)
         def isDefinedAt(row: Int)            = col.isDefinedAt(row)
-        def apply(row: Int): Array[Array[a]] = Array(col(row))(col.tpe.manifest)
+        def apply(row: Int): Array[Array[a]] = Array(col(row))(col.tpe.classTag)
       }
     case _ => sys.error("Cannot lift non-value column.")
   }

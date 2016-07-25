@@ -19,6 +19,7 @@
  */
 package com.precog.niflheim
 
+import quasar.precog._
 import blueeyes._
 import com.precog.common._
 
@@ -39,7 +40,7 @@ sealed trait Segment {
 
 sealed trait ValueSegment[@spec(Boolean, Long, Double) A] extends Segment {
   def ctype: CValueType[A]
-  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](f: A => B): ValueSegment[B]
+  def map[@spec(Boolean, Long, Double) B: CValueType: CTag](f: A => B): ValueSegment[B]
 
   def normalize: ValueSegment[A] = this match {
     case seg: ArraySegment[_] if seg.ctype == CBoolean =>
@@ -57,7 +58,7 @@ sealed trait ValueSegment[@spec(Boolean, Long, Double) A] extends Segment {
 
 case class ArraySegment[@spec(Boolean, Long, Double) A](blockid: Long, cpath: CPath, ctype: CValueType[A], defined: BitSet, values: Array[A])
     extends ValueSegment[A] {
-  private implicit def m = ctype.manifest
+  private implicit def m = ctype.classTag
 
   override def equals(that: Any): Boolean = that match {
     case ArraySegment(`blockid`, `cpath`, ct2, d2, values2) =>
@@ -76,7 +77,7 @@ case class ArraySegment[@spec(Boolean, Long, Double) A](blockid: Long, cpath: CP
     ArraySegment(blockid, cpath, ctype, defined.copy, arr)
   }
 
-  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](f: A => B): ValueSegment[B] = {
+  def map[@spec(Boolean, Long, Double) B: CValueType: CTag](f: A => B): ValueSegment[B] = {
     val values0 = new Array[B](values.length)
     defined.foreach { row =>
       values0(row) = f(values(row))
@@ -97,7 +98,7 @@ case class BooleanSegment(blockid: Long, cpath: CPath, defined: BitSet, values: 
 
   def extend(amount: Int) = BooleanSegment(blockid, cpath, defined.copy, values.copy, length + amount)
 
-  def map[@spec(Boolean, Long, Double) B: CValueType: Manifest](f: Boolean => B): ValueSegment[B] = {
+  def map[@spec(Boolean, Long, Double) B: CValueType: CTag](f: Boolean => B): ValueSegment[B] = {
     val values0 = new Array[B](values.length)
     defined.foreach { row =>
       values0(row) = f(values(row))

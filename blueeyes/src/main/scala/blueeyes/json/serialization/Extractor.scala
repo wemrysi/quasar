@@ -2,6 +2,7 @@ package blueeyes
 package json
 package serialization
 
+import quasar.precog._
 import scalaz._, Scalaz._, Validation._
 
 /** Extracts the value from a JSON object. You must implement either validated or extract.
@@ -86,10 +87,10 @@ object Extractor {
     def map[A, B](e: Extractor[A])(f: A => B): Extractor[B] = e map f
   }
 
-  def apply[A: Manifest](f: PartialFunction[JValue, A]): Extractor[A] = new Extractor[A] {
+  def apply[A: CTag](f: PartialFunction[JValue, A]): Extractor[A] = new Extractor[A] {
     def validated(jvalue: JValue) = {
       if (f.isDefinedAt(jvalue)) Success(f(jvalue))
-      else Failure(Invalid("Extraction not defined from value " + jvalue + " to type " + implicitly[Manifest[A]].erasure.getName))
+      else Failure(Invalid("Extraction not defined from value " + jvalue + " to type " + implicitly[CTag[A]].erasure.getName))
     }
   }
 }

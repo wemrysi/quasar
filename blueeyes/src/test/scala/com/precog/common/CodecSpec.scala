@@ -24,7 +24,7 @@ import com.precog.util.{ ByteBufferPool, RawBitSet }
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck.{Shrink, Arbitrary, Gen}
-import quasar.precog.TestSupportWithArb._
+import quasar.precog._, TestSupportWithArb._
 
 class CodecSpec extends Specification with ScalaCheck {
   // import Arbitrary._
@@ -69,7 +69,7 @@ class CodecSpec extends Specification with ScalaCheck {
   implicit def arbIndexedSeq[A](implicit a: Arbitrary[A]): Arbitrary[IndexedSeq[A]] =
     Arbitrary(Gen.listOf(a.arbitrary) map (Vector(_: _*)))
 
-  implicit def arbArray[A: Manifest: Gen]: Arbitrary[Array[A]] = Arbitrary(for {
+  implicit def arbArray[A: CTag: Gen]: Arbitrary[Array[A]] = Arbitrary(for {
     values <- Gen.listOf(implicitly[Gen[A]])
   } yield {
     val array: Array[A] = values.toArray

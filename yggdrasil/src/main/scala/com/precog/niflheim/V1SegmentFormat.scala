@@ -53,7 +53,7 @@ object V1SegmentFormat extends SegmentFormat {
           val length  = buffer.getInt()
           val defined = Codec.BitSetCodec.read(buffer)
           val codec   = getCodecFor(ctype)
-          val values  = ctype.manifest.newArray(length)
+          val values  = ctype.classTag.newArray(length)
           defined.foreach { row =>
             values(row) = codec.read(buffer)
           }
@@ -221,6 +221,6 @@ object V1SegmentFormat extends SegmentFormat {
     case CDouble              => Codec.DoubleCodec
     case CNum                 => Codec.BigDecimalCodec
     case CDate                => Codec.DateCodec
-    case CArrayType(elemType) => Codec.ArrayCodec(getCodecFor(elemType))(elemType.manifest)
+    case CArrayType(elemType) => Codec.ArrayCodec(getCodecFor(elemType))(elemType.classTag)
   }
 }

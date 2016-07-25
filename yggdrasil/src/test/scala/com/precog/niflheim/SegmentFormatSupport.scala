@@ -23,11 +23,9 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util._
 import java.nio.channels._
-import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
-import org.scalacheck._, Gen._, Arbitrary._
+import org.scalacheck._, Gen._
 import scalaz._
-import quasar.precog.TestSupport._
+import quasar.precog._, TestSupport._
 
 trait SegmentFormatSupport {
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
@@ -55,7 +53,7 @@ trait SegmentFormatSupport {
     case CDouble          => arbitrary[Double]
     case CNum             => arbitrary[BigDecimal]
     case CDate            => genPosLong ^^ dateTime.fromMillis
-    case CArrayType(elem) => arrayOf(genForCType(elem))(elem.manifest)
+    case CArrayType(elem) => arrayOf(genForCType(elem))(elem.classTag)
   }
 
   def genCValueType(maxDepth: Int = 2): Gen[CValueType[_]] = {
@@ -67,10 +65,10 @@ trait SegmentFormatSupport {
     }
   }
 
-  def genArray[A: Manifest](length: Int, g: Gen[A]): Gen[Array[A]] = for {
+  def genArray[A: CTag](length: Int, g: Gen[A]): Gen[Array[A]] = for {
     values <- listOfN(length, g)
   } yield {
-    val array = manifest[A].newArray(length)
+    val array = new Array[A](length)
     values.zipWithIndex foreach { case (v, i) =>
       array(i) = v
     }
@@ -83,12 +81,12 @@ trait SegmentFormatSupport {
       blockId <- arbitrary[Long]
       cpath <- genCPath
       defined <- genBitSet(length, 0.5)
-      values <- genArray(length, g)(ctype.manifest) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
+      values <- genArray(length, g)(ctype.classTag)
     } yield ArraySegment(blockId, cpath, ctype, defined, values)
   }
 
   def genArraySegment(length: Int): Gen[ArraySegment[_]] = for {
-    ctype <- genCValueType(2) filter (_ != CBoolean) // Note: CArrayType(CBoolean) is OK!
+    ctype <- genCValueType(2) filter (_ != CBoolean)
     segment <- genArraySegmentForCType(ctype, length)
   } yield segment
 

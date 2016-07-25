@@ -23,7 +23,7 @@ import blueeyes._
 import com.precog.common._
 import blueeyes.json._
 import java.math.MathContext
-import org.scalacheck._, Gen._, Arbitrary._
+import org.scalacheck._, Gen._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 

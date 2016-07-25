@@ -39,6 +39,8 @@ trait ScalacheckSupport {
   val Pretty                   = org.scalacheck.util.Pretty
   type Pretty                  = org.scalacheck.util.Pretty
 
+  def arbitrary[A](implicit z: Arbitrary[A]): Gen[A] = z.arbitrary
+
   def maxSequenceLength = 16
 
   implicit def liftGenerator[A](g: Gen[A]): Arbitrary[A] = Arbitrary(g)
@@ -52,12 +54,12 @@ trait ScalacheckSupport {
   def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
     sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
-  def arrayOf[A: ClassManifest](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
+  def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
   def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]              = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
   def listOf[A](gen: Gen[A]): Gen[List[A]]                  = containerOfAtMostN[List, A](maxSequenceLength, gen)
   def setOf[A](gen: Gen[A]): Gen[Set[A]]                    = containerOfAtMostN[Set, A](maxSequenceLength, gen)
 
-  def arrayOfN[A: ClassManifest](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
+  def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
   def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]              = containerOfN[Vector, A](len, gen)
   def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]                    = containerOfN[Set, A](len, gen)
 

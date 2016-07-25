@@ -23,7 +23,7 @@ import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
 import com.precog.util._
-import quasar.precog.TestSupport._
+import quasar.precog._, TestSupport._
 
 class CPathTraversalSpec extends Specification {
   import CPathTraversal._
@@ -63,7 +63,7 @@ class CPathTraversalSpec extends Specification {
       )))
     }
   }
-  def col[@spec(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: Manifest[A]) = {
+  def col[@spec(Boolean, Long, Double) A](defined: Int*)(values: A*)(implicit builder: ColBuilder[A], m: CTag[A]) = {
     val max = defined.max + 1
     val column = m.newArray(max)
     (defined zip values) foreach { case (i, x) =>

@@ -586,7 +586,7 @@ trait ClusteringLibModule[M[+ _]] extends ColumnarTableModule[M] with AssignClus
 
           // we know that there is only one item in `features`
           val values: Option[Array[Array[Double]]] = features collectFirst {
-            case c: HomogeneousArrayColumn[_] if c.tpe.manifest.erasure == classOf[Array[Double]] =>
+            case c: HomogeneousArrayColumn[_] if c.tpe.classTag.erasure == classOf[Array[Double]] =>
               val mapped = range.toArray filter { r =>
                 c.isDefinedAt(r)
               } map { i =>

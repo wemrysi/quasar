@@ -20,6 +20,7 @@
 package com.precog
 package common
 
+import quasar.precog._
 import blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz._, Scalaz._, Ordering._
@@ -207,7 +208,7 @@ sealed trait CType extends Serializable {
 sealed trait CNullType extends CType with CNullValue
 
 sealed trait CValueType[A] extends CType { self =>
-  def manifest: Manifest[A]
+  def classTag: CTag[A]
   def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
   def order(a: A, b: A): ScalazOrdering
@@ -406,7 +407,7 @@ case object CArray {
 
 case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]] {
   // Spec. bug: Leave lazy here.
-  lazy val manifest: Manifest[Array[A]] = elemType.manifest.arrayManifest
+  lazy val classTag: CTag[Array[A]] = elemType.classTag.wrap //elemType.classTag.arrayCTag
 
   type tpe = A
 
@@ -432,7 +433,7 @@ case class CString(value: String) extends CWrappedValue[String] {
 }
 
 case object CString extends CValueType[String] {
-  val manifest: Manifest[String] = implicitly[Manifest[String]]
+  val classTag: CTag[String] = implicitly[CTag[String]]
   def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
   def jValueFor(s: String)          = JString(s)
@@ -451,7 +452,7 @@ case object CFalse extends CBoolean(false)
 object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)    = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean) = Some(cbool.value)
-  val manifest: Manifest[Boolean] = implicitly[Manifest[Boolean]]
+  val classTag: CTag[Boolean] = implicitly[CTag[Boolean]]
   def readResolve()                   = CBoolean
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)
   def jValueFor(v: Boolean)           = JBool(v)
@@ -465,7 +466,7 @@ case class CLong(value: Long) extends CNumericValue[Long] {
 }
 
 case object CLong extends CNumericType[Long] {
-  val manifest: Manifest[Long] = implicitly[Manifest[Long]]
+  val classTag: CTag[Long] = implicitly[CTag[Long]]
   def readResolve()              = CLong
   def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
   def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
@@ -477,7 +478,7 @@ case class CDouble(value: Double) extends CNumericValue[Double] {
 }
 
 case object CDouble extends CNumericType[Double] {
-  val manifest: Manifest[Double] = implicitly[Manifest[Double]]
+  val classTag: CTag[Double] = implicitly[CTag[Double]]
   def readResolve()                 = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
   def jValueFor(v: Double)          = JNum(BigDecimal(v.toString, UNLIMITED))
@@ -489,7 +490,7 @@ case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
 }
 
 case object CNum extends CNumericType[BigDecimal] {
-  val manifest: Manifest[BigDecimal] = implicitly[Manifest[BigDecimal]]
+  val classTag: CTag[BigDecimal] = implicitly[CTag[BigDecimal]]
   def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def jValueFor(v: BigDecimal)              = JNum(v)
@@ -504,7 +505,7 @@ case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
 }
 
 case object CDate extends CValueType[DateTime] {
-  val manifest: Manifest[DateTime]      = implicitly[Manifest[DateTime]]
+  val classTag: CTag[DateTime]      = implicitly[CTag[DateTime]]
   def readResolve()                     = CDate
   def order(v1: DateTime, v2: DateTime) = sys.error("todo")
   def jValueFor(v: DateTime)            = JString(v.toString)
@@ -515,7 +516,7 @@ case class CPeriod(value: Period) extends CWrappedValue[Period] {
 }
 
 case object CPeriod extends CValueType[Period] {
-  val manifest: Manifest[Period]    = implicitly[Manifest[Period]]
+  val classTag: CTag[Period]    = implicitly[CTag[Period]]
   def readResolve()                 = CPeriod
   def order(v1: Period, v2: Period) = sys.error("todo")
   def jValueFor(v: Period)          = JString(v.toString)

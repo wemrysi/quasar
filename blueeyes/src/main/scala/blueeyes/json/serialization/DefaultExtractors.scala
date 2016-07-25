@@ -1,6 +1,7 @@
 package blueeyes
 package json.serialization
 
+import quasar.precog._
 import blueeyes.json._
 import Extractor._
 import scalaz._, Scalaz._
@@ -132,7 +133,7 @@ trait DefaultExtractors {
     }
   }
 
-  implicit def ArrayExtractor[T](implicit m: ClassManifest[T], elementExtractor: Extractor[T]): Extractor[Array[T]] = new Extractor[Array[T]] {
+  implicit def ArrayExtractor[T](implicit m: CTag[T], elementExtractor: Extractor[T]): Extractor[Array[T]] = new Extractor[Array[T]] {
     def validated(jvalue: JValue) = jvalue match {
       case JArray(values) => values.map(elementExtractor.validated _).sequence[VE, T].map(_.toArray)
       case _              => invalidv("Expected JArray but found: " + jvalue)

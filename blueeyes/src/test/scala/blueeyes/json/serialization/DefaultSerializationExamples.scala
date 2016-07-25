@@ -17,7 +17,7 @@ package blueeyes
 package json
 package serialization
 
-import quasar.precog.TestSupport._
+import quasar.precog._, TestSupport._
 import DefaultSerialization._
 
 class DefaultSerializationExamplesSpec extends Specification {
@@ -63,6 +63,6 @@ class DefaultSerializationExamplesSpec extends Specification {
 
     val s = ArrayDecomposer(IntDecomposer).decompose(l)
 
-    ArrayExtractor(scala.reflect.ClassManifest.Int, IntExtractor).extract(s).toList mustEqual l.toList
+    ArrayExtractor(ctag[Int], IntExtractor).extract(s).toList mustEqual l.toList
   }
 }

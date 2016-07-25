@@ -22,7 +22,7 @@ package ingest
 
 import security._
 import blueeyes._, json._
-import org.scalacheck._, Gen._, Arbitrary._
+import org.scalacheck._, Gen._
 import quasar.precog.JsonTestSupport._
 
 trait ArbitraryEventMessage {

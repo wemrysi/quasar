@@ -16,7 +16,6 @@
 
 import org.scalacheck._
 import Gen._
-import Arbitrary.arbitrary
 import blueeyes._, json._
 
 package quasar.precog {

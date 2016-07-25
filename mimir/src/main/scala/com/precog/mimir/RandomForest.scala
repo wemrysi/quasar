@@ -23,6 +23,7 @@
 package com.precog
 package mimir
 
+import quasar.precog._
 import yggdrasil._
 import yggdrasil.table._
 
@@ -352,7 +353,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
   }
 
-  private def collapse[@specialized(Double) A: Manifest](chunks0: List[Array[A]]): Array[A] = {
+  private def collapse[@specialized(Double) A: CTag](chunks0: List[Array[A]]): Array[A] = {
     val len   = chunks0.foldLeft(0)(_ + _.length)
     val array = new Array[A](len)
     def mkArray(init: Int, chunks: List[Array[A]]): Unit = chunks match {
@@ -372,7 +373,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     array
   }
 
-  private def sliceToArray[@specialized(Double) A: Manifest](slice: Slice, zero: => A)(pf: PartialFunction[Column, Int => A]): Option[Array[A]] = {
+  private def sliceToArray[@specialized(Double) A: CTag](slice: Slice, zero: => A)(pf: PartialFunction[Column, Int => A]): Option[Array[A]] = {
     slice.columns.values.collectFirst {
       case c if pf.isDefinedAt(c) => {
         val extract = pf(c)
@@ -391,7 +392,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
     }
   }
 
-  private def extract[A: Manifest](table: Table)(pf: PartialFunction[Column, Int => A]): M[Array[A]] = {
+  private def extract[A: CTag](table: Table)(pf: PartialFunction[Column, Int => A]): M[Array[A]] = {
     def die = sys.error("Cannot handle undefined rows. Expected dense column.")
 
     def loop(stream: StreamT[M, Slice], acc: List[Array[A]]): M[Array[A]] = {
@@ -512,7 +513,7 @@ trait RandomForestLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       }
     }
 
-    abstract class RandomForest[A: Manifest, F <: Forest[A]: Monoid](namespace: Vector[String], name: String) extends Morphism2(namespace, name) {
+    abstract class RandomForest[A: CTag, F <: Forest[A]: Monoid](namespace: Vector[String], name: String) extends Morphism2(namespace, name) {
       import trans._
       import TransSpecModule._
 

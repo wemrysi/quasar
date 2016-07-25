@@ -19,8 +19,8 @@
  */
 package com.precog.util
 
-import scala.annotation.tailrec
-import scala.collection.mutable
+import blueeyes._
+import quasar.precog._
 
 /**
   * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None
@@ -30,7 +30,7 @@ import scala.collection.mutable
   *
   * No objects were allocated in the making of this film.
   */
-final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: ClassManifest](_bound: Int) {
+final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
   val bound = _bound + 1
 
   private val ring = new Array[A](bound)

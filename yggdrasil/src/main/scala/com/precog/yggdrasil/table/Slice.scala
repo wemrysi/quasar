@@ -20,6 +20,7 @@
 package com.precog.yggdrasil
 package table
 
+import quasar.precog._
 import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._
@@ -101,7 +102,7 @@ trait Slice { source =>
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
     val cols  = cols0 map { case (_, col)                      => col }
 
-    def inflate[@spec A: Manifest](cols: Array[Int => A], row: Int) = {
+    def inflate[@spec A: CTag](cols: Array[Int => A], row: Int) = {
       val as = new Array[A](cols.length)
       var i = 0
       while (i < cols.length) {
@@ -459,7 +460,7 @@ trait Slice { source =>
             val xs = col(row)
             if (index >= xs.length) xs
             else {
-              val ys = tpe.elemType.manifest.newArray(xs.length)
+              val ys = tpe.elemType.classTag.newArray(xs.length)
 
               var i = 1
               while (i < ys.length) {

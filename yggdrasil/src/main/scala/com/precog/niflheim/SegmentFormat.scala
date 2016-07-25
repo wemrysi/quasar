@@ -19,6 +19,7 @@
  */
 package com.precog.niflheim
 
+import quasar.precog._
 import blueeyes._
 import com.precog.util.PrecogUnit
 import java.nio.channels._
