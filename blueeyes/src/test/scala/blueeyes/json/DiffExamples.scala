@@ -25,6 +25,7 @@ class DiffExamplesSpec extends Specification {
 
   "Diff example" in {
     val Diff(changed, added, deleted) = scala1 diff scala2
+
     changed mustEqual expectedChanges
     added mustEqual expectedAdditions
     deleted mustEqual expectedDeletions
@@ -67,6 +68,7 @@ class DiffExamplesSpec extends Specification {
     val expectedDeletions = read("/diff-example-expected-deletions.json")
 
     val Diff(changes, additions, deletions) = json1 diff json2
+
     changes.renderCanonical mustEqual expectedChanges.renderCanonical
     additions.renderCanonical mustEqual expectedAdditions.renderCanonical
     deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
