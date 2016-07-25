@@ -64,7 +64,7 @@ sealed trait RValue { self =>
 
 object RValue {
   def fromJValue(jv: JValue): RValue = jv match {
-    case JObject(fields)  => RObject(fields map { case (k, v) => (k, fromJValue(v)) })
+    case JObject(fields)  => RObject(fields mapValues fromJValue toMap)
     case JArray(elements) => RArray(elements map fromJValue)
     case other            => CType.toCValue(other)
   }
@@ -128,7 +128,7 @@ object RValue {
 }
 
 case class RObject(fields: Map[String, RValue]) extends RValue {
-  def toJValue                     = JObject(fields map { case (k, v) => (k, v.toJValue) })
+  def toJValue                     = JObject(fields mapValues (_.toJValue) toMap)
   def \(fieldName: String): RValue = fields(fieldName)
 }
 
@@ -170,10 +170,10 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 
 object CValue {
   def compareValues(a: CValue, b: CValue): Int = (a, b) match {
-    case (CString(as), CString(bs))   => as.compareTo(bs)
-    case (CBoolean(ab), CBoolean(bb)) => ab.compareTo(bb)
-    case (CLong(al), CLong(bl))       => al.compareTo(bl)
-    case (CDouble(ad), CDouble(bd))   => ad.compareTo(bd)
+    case (CString(as), CString(bs))   => as.compare(bs)
+    case (CBoolean(ab), CBoolean(bb)) => ab.compare(bb)
+    case (CLong(al), CLong(bl))       => al.compare(bl)
+    case (CDouble(ad), CDouble(bd))   => ad.compare(bd)
     case (CNum(an), CNum(bn))         => an.compare(bn)
     case (CDate(ad), CDate(bd))       => ad.compareTo(bd)
     case (CPeriod(ad), CPeriod(bd))   => ad.toDuration compareTo bd.toDuration
@@ -223,7 +223,6 @@ sealed trait CNullType extends CType with CNullValue
 
 sealed trait CValueType[A] extends CType { self =>
   def manifest: Manifest[A]
-
   def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
   def order(a: A, b: A): ScalazOrdering
@@ -254,22 +253,18 @@ object CType {
   val ArrayName = """Array[(.*)]""".r
 
   def fromName(n: String): Option[CType] = n match {
-    case "String"      => Some(CString)
-    case "Boolean"     => Some(CBoolean)
-    case "Long"        => Some(CLong)
-    case "Double"      => Some(CDouble)
-    case "Decimal"     => Some(CNum)
-    case "Null"        => Some(CNull)
-    case "EmptyObject" => Some(CEmptyObject)
-    case "EmptyArray"  => Some(CEmptyArray)
-    case ArrayName(elemName) =>
-      fromName(elemName) flatMap {
-        case elemType: CValueType[_] => Some(CArrayType(elemType))
-        case _                       => None
-      }
-    case "Timestamp" => Some(CDate)
-    case "Period"    => Some(CPeriod)
-    case _           => None
+    case "String"        => Some(CString)
+    case "Boolean"       => Some(CBoolean)
+    case "Long"          => Some(CLong)
+    case "Double"        => Some(CDouble)
+    case "Decimal"       => Some(CNum)
+    case "Null"          => Some(CNull)
+    case "EmptyObject"   => Some(CEmptyObject)
+    case "EmptyArray"    => Some(CEmptyArray)
+    case "Timestamp"     => Some(CDate)
+    case "Period"        => Some(CPeriod)
+    case ArrayName(elem) => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
+    case _               => None
   }
 
   implicit val decomposer: Decomposer[CType] = new Decomposer[CType] {
@@ -292,56 +287,29 @@ object CType {
   def canCompare(t1: CType, t2: CType): Boolean =
     (t1 == t2) || (t1.isNumeric && t2.isNumeric)
 
-  def unify(t1: CType, t2: CType): Option[CType] = {
-    (t1, t2) match {
-      case (CLong, CLong)     => Some(CLong)
-      case (CLong, CDouble)   => Some(CNum)
-      case (CLong, CNum)      => Some(CNum)
-      case (CDouble, CLong)   => Some(CNum)
-      case (CDouble, CDouble) => Some(CDouble)
-      case (CDouble, CNum)    => Some(CNum)
-      case (CNum, CLong)      => Some(CNum)
-      case (CNum, CDouble)    => Some(CNum)
-      case (CNum, CNum)       => Some(CNum)
-
-      case (CString, CString) => Some(CString)
-
-      case (CDate, CDate)     => Some(CDate)
-      case (CPeriod, CPeriod) => Some(CPeriod)
-
-      case (CArrayType(et1), CArrayType(et2)) =>
-        unify(et1, et2) flatMap {
-          case t: CValueType[_] => Some(CArrayType(t))
-          case _                => None
-        }
-
-      case _ => None
-    }
+  def unify(t1: CType, t2: CType): Option[CType] = (t1, t2) match {
+    case _ if t1 == t2                                    => Some(t1)
+    case (CLong | CDouble | CNum, CLong | CDouble | CNum) => Some(CNum)
+    case (CArrayType(et1), CArrayType(et2))               => unify(et1, et2) collect { case t: CValueType[_] => CArrayType(t) }
+    case _                                                => None
   }
 
   // TODO Should return Option[CValue]... is this even used?
   // Yes; it is used only in RoutingTable.scala
-  private val emptyJArray  = JArray()
-  private val emptyJObject = JObject()
-
   @inline
   final def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
-    case JString(s) => CString(s)
-
-    case JNum(d) => {
-      val ctype = forJValue(jval)
-      ctype match {
+    case JString(s)    => CString(s)
+    case JBool(b)      => CBoolean(b)
+    case JNull         => CNull
+    case JObject.empty => CEmptyObject
+    case JArray.empty  => CEmptyArray
+    case JNum(d)       =>
+      forJValue(jval) match {
         case Some(CLong)   => CLong(d.toLong)
         case Some(CDouble) => CDouble(d.toDouble)
         case _             => CNum(d)
       }
-    }
-
-    case JBool(b)                    => CBoolean(b)
-    case JNull                       => CNull
-    case JObject(es) if es.size == 0 => CEmptyObject
-    case JArray(Nil)                 => CEmptyArray
-    case JArray(values) =>
+    case JArray(_) =>
       sys.error("TODO: Allow for homogeneous JArrays -> CArray.")
   }
 
@@ -368,12 +336,12 @@ object CType {
         Some(CNum)
     }
 
-    case JString(_)                      => Some(CString)
-    case JNull                           => Some(CNull)
-    case JArray(Nil)                     => Some(CEmptyArray)
-    case o: JObject if o == emptyJObject => Some(CEmptyObject)
-    case o: JArray if o == emptyJArray   => None // TODO Allow homogeneous JArrays -> CType
-    case _                               => None
+    case JString(_)    => Some(CString)
+    case JNull         => Some(CNull)
+    case JArray(Nil)   => Some(CEmptyArray)
+    case JObject.empty => Some(CEmptyObject)
+    case JArrays.empty => None // TODO Allow homogeneous JArrays -> CType
+    case _             => None
   }
 
   implicit object CTypeOrder extends ScalazOrder[CType] {
@@ -389,7 +357,6 @@ object CValueType {
   def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
 
   // These let us do, def const[A: CValueType](a: A): CValue = CValueType[A](a)
-
   implicit def string: CValueType[String]                 = CString
   implicit def boolean: CValueType[Boolean]               = CBoolean
   implicit def long: CValueType[Long]                     = CLong
