@@ -207,6 +207,19 @@ package object json {
   implicit class JValueOps(private val self: JValue) {
     import Validation._
 
+    def diff(other: JValue)          = Diff.diff(self, other)
+    def merge(other: JValue): JValue = Merge.merge(self, other)
+
+    def typeIndex: Int = self match {
+      case JUndefined => -1
+      case JNull      => 0
+      case _: JBool   => 1
+      case _: JNum    => 4
+      case _: JString => 5
+      case _: JArray  => 6
+      case _: JObject => 7
+    }
+
     def isDefined = self != JUndefined
 
     def renderPretty: String = self match {

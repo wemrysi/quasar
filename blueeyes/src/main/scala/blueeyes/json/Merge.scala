@@ -61,12 +61,4 @@ object Merge {
 
     mergeRec(vs1, vs2)
   }
-
-  private[json] trait Mergeable {
-    this: JValue =>
-
-    /** Return merged JSON.
-      */
-    def merge(other: JValue): JValue = Merge.merge(this, other)
-  }
 }

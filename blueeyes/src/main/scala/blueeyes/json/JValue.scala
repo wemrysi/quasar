@@ -27,8 +27,7 @@ import quasar.precog._
 /**
   * Data type for Json AST.
   */
-sealed trait JValue extends Merge.Mergeable with Diff.Diffable with Product with Ordered[JValue] with ToString { self =>
-  protected[json] def typeIndex: Int
+sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int
   def sort: JValue
 
@@ -89,8 +88,6 @@ object JValue {
       }
     }
   }
-
-  @inline final def typeIndex(jv: JValue) = jv.typeIndex
 
   implicit final val jnumOrder: Order[JNum] = new Order[JNum] {
     def order(v1: JNum, v2: JNum) = Ordering.fromInt(v1 numCompare v2)
@@ -164,19 +161,16 @@ case class UndefinedNormalizeError(msg: String) extends Exception(msg)
 
 case object JUndefined extends JValue {
   final def sort: JValue              = this
-  protected[json] final def typeIndex = -1
-  final def compare(that: JValue)     = typeIndex compare that.typeIndex
+  final def compare(that: JValue)     = this.typeIndex compare that.typeIndex
 }
 
 case object JNull extends JValue {
   final def sort: JValue              = this
-  protected[json] final def typeIndex = 0
-  final def compare(that: JValue)     = typeIndex compare that.typeIndex
+  final def compare(that: JValue)     = this.typeIndex compare that.typeIndex
 }
 
 sealed trait JBool extends JValue {
   final def sort: JBool               = this
-  protected[json] final def typeIndex = 1
   def value: Boolean
 }
 
@@ -185,7 +179,7 @@ case object JTrue extends JBool {
   final def compare(that: JValue) = that match {
     case JTrue  => 0
     case JFalse => 1
-    case _      => typeIndex compare that.typeIndex
+    case _      => this.typeIndex compare that.typeIndex
   }
 }
 
@@ -194,13 +188,13 @@ case object JFalse extends JBool {
   final def compare(that: JValue) = that match {
     case JTrue  => -1
     case JFalse => 0
-    case _      => typeIndex compare that.typeIndex
+    case _      => this.typeIndex compare that.typeIndex
   }
 }
 
 object JBool {
-  def apply(value: Boolean): JBool           = if (value) JTrue else JFalse
-  def unapply(value: JBool): Option[Boolean] = Some(value.value)
+  def apply(value: Boolean): JBool         = if (value) JTrue else JFalse
+  def unapply(value: JBool): Some[Boolean] = Some(value.value)
 }
 
 sealed trait JNum extends JValue {
@@ -215,11 +209,9 @@ sealed trait JNum extends JValue {
   // ensure JNum("123.45").hashCode == JNum(123.45).hashCode
   override val hashCode = 6173
 
-  protected[json] final def typeIndex = 4
-
   final def compare(that: JValue): Int = that match {
     case num: JNum => numCompare(num)
-    case _         => typeIndex compare that.typeIndex
+    case _         => this.typeIndex compare that.typeIndex
   }
 
   protected[json] def numCompare(other: JNum): Int
@@ -327,11 +319,9 @@ case object JNum {
 case class JString(value: String) extends JValue {
   final def sort: JString = this
 
-  protected[json] final def typeIndex = 5
-
   final def compare(that: JValue): Int = that match {
     case JString(s) => value compare s
-    case _          => typeIndex compare that.typeIndex
+    case _          => this.typeIndex compare that.typeIndex
   }
 }
 
@@ -445,8 +435,6 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
     case _          => false
   }
 
-  protected[json] final def typeIndex = 7
-
   private def fieldsCmp(m1: Map[String, JValue], m2: Map[String, JValue]): Int = {
     @tailrec def rec(fields: Array[String], i: Int): Int = {
       if (i < fields.length) {
@@ -473,7 +461,7 @@ case class JObject(fields: Map[String, JValue]) extends JValue {
 
   override def compare(that: JValue): Int = that match {
     case o: JObject => fieldsCmp(fields, o.fields)
-    case _          => typeIndex compare that.typeIndex
+    case _          => this.typeIndex compare that.typeIndex
   }
 
   private def fieldsEq(m1: Map[String, JValue], m2: Map[String, JValue]): Boolean = {
@@ -523,8 +511,6 @@ case class JArray(elements: List[JValue]) extends JValue {
     case _          => false
   }
 
-  protected[json] final def typeIndex = 6
-
   @tailrec
   private def elementsEq(js1: List[JValue], js2: List[JValue]): Boolean = {
     js1 match {
@@ -540,34 +526,9 @@ case class JArray(elements: List[JValue]) extends JValue {
         }
     }
   }
-
-  override def equals(other: Any) = other match {
-    case o: JArray => elementsEq(elements, o.elements)
-    case _         => false
-  }
-
-  @tailrec
-  private def elementsCmp(js1: List[JValue], js2: List[JValue]): Int = {
-    js1 match {
-      case Nil =>
-        js2 match {
-          case Nil => 0
-          case _   => -1
-        }
-
-      case h1 :: t1 =>
-        js2 match {
-          case Nil => 1
-          case h2 :: t2 =>
-            val i = (h1 compare h2)
-            if (i == 0) elementsCmp(t1, t2) else i
-        }
-    }
-  }
-
-  override def compare(other: JValue): Int = other match {
-    case o: JArray => elementsCmp(elements, o.elements)
-    case o         => JValue.typeIndex(this) compare JValue.typeIndex(o)
+  override def compare(that: JValue): Int = that match {
+    case JArray(xs) => elements ?|? xs toInt
+    case _          => this.typeIndex compare that.typeIndex
   }
 }
 

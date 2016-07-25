@@ -82,12 +82,4 @@ object Diff {
 
     diffRec(vs1, vs2)
   }
-
-  private[json] trait Diffable {
-    this: JValue =>
-
-    /** Return a diff.
-      */
-    def diff(other: JValue) = Diff.diff(this, other)
-  }
 }
