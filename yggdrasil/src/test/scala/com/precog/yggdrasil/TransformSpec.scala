@@ -392,8 +392,9 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val expected = (data map {
       case jo @ JObject(fields) if fields.contains("value") => {
         if (fields("value") == JArray(List(JNum(9), JNum(10), JNum(11))))
-          JObject(fields - "value" + JField("value", JBool(true)))
-        else JObject(fields - "value" + JField("value", JBool(false)))
+          jo + JField("value", JBool(true))
+        else
+          jo + JField("value", JBool(false))
       }
       case _ => sys.error("unreachable case")
     }).toStream

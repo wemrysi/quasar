@@ -6,7 +6,7 @@ import blueeyes.json.serialization.Decomposer
 package object json {
   import JValue._
 
-  type JField = (String, JValue)
+  type JFieldTuple = String -> JValue
 
   def jarray(elements: JValue*): JValue                                    = JArray(elements.toList)
   def jobject(fields: JField*): JValue                                     = JObject(fields.toList)
@@ -396,7 +396,7 @@ package object json {
       path.nodes match {
         case JPathField(name) :: xs =>
           self match {
-            case JObject(fields) =>
+            case JObjectFields(fields) =>
               Some(
                 JObject(fields flatMap {
                   case JField(`name`, value) =>
@@ -575,7 +575,7 @@ package object json {
           head match {
             case JPathField(name1) =>
               j match {
-                case JObject(fields) =>
+                case JObjectFields(fields) =>
                   JObject(fields.map {
                     case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
 
@@ -676,10 +676,10 @@ package object json {
       */
     def minimize: Option[JValue] = {
       self match {
-        case JObject(fields)  => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
-        case JArray(elements) => Some(JArray(elements.flatMap(_.minimize)))
-        case JUndefined       => None
-        case value            => Some(value)
+        case JObjectFields(fields) => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
+        case JArray(elements)      => Some(JArray(elements.flatMap(_.minimize)))
+        case JUndefined            => None
+        case value                 => Some(value)
       }
     }
   }

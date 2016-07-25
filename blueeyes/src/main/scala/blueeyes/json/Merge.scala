@@ -39,9 +39,8 @@ object Merge {
         val xs       = xleft.tail
 
         yleft.get(xn) match {
-          case Some(yv) => mergeRec(xs, yleft - xn) + JField(xn, merge(xv, yv))
-
-          case None => mergeRec(xs, yleft) + JField(xn, xv)
+          case Some(yv) => mergeRec(xs, yleft - xn) + ((xn, merge(xv, yv)))
+          case None     => mergeRec(xs, yleft) + ((xn, xv))
         }
       }
     }

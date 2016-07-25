@@ -42,6 +42,6 @@ private[json] final class ObjContext extends Context {
 
   def add(v: JValue): Unit = { vs(key) = v; key = null }
 
-  def finish = JObject(vs)
+  def finish = JObject(vs.toMap)
   def isObj  = true
 }

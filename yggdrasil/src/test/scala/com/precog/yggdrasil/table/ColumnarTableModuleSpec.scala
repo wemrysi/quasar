@@ -208,7 +208,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       }
 
       "fully undefined object" >> {
-        testRenderJson(JObject(Map.empty) :: Nil)
+        testRenderJson(JObject() :: Nil)
       }
 
       "undefined row" >> {

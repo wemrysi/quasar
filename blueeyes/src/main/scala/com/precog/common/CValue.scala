@@ -321,8 +321,9 @@ object CType {
 
   // TODO Should return Option[CValue]... is this even used?
   // Yes; it is used only in RoutingTable.scala
-  private val emptyJArray  = JArray(Nil)
-  private val emptyJObject = JObject(Map())
+  private val emptyJArray  = JArray()
+  private val emptyJObject = JObject()
+
   @inline
   final def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
     case JString(s) => CString(s)

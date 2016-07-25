@@ -261,13 +261,13 @@ object SValue extends SValueInstances {
   // in conjunction with this mapping.
   @inline
   def fromJValue(jv: JValue): SValue = jv match {
-    case JObject(fields)  => SObject(fields.map { case JField(name, v) => (name, fromJValue(v)) }(breakOut))
-    case JArray(elements) => SArray((elements map fromJValue)(breakOut))
-    case JString(s)       => SString(s)
-    case JBool(s)         => SBoolean(s)
-    case JNum(d)          => SDecimal(d)
-    case JNull            => SNull
-    case _                => sys.error("Fix JValue")
+    case JObjectFields(fields) => SObject(fields.map { case JField(name, v) => (name, fromJValue(v)) }(breakOut))
+    case JArray(elements)      => SArray((elements map fromJValue)(breakOut))
+    case JString(s)            => SString(s)
+    case JBool(s)              => SBoolean(s)
+    case JNum(d)               => SDecimal(d)
+    case JNull                 => SNull
+    case _                     => sys.error("Fix JValue")
   }
 
   def apply(selector: JPath, cv: CValue): SValue = {

@@ -62,7 +62,7 @@ object Diff {
           case None =>
             val Diff(c, a, d) = diffRec(xs, yleft)
 
-            Diff(c, a, JObject(x :: Nil) merge d)
+            Diff(c, a, JObject(x) merge d)
         }
       }
     }

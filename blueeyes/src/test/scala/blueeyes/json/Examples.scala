@@ -17,9 +17,10 @@
 package blueeyes
 package json
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
+import Examples._
 
-object Examples extends Specification {
+class ExamplesSpec extends Specification {
   import JParser._
 
   "Lotto example" in {
@@ -129,6 +130,9 @@ object Examples extends Specification {
   //  //output mustEqual """JObject("lotto",JObject("lotto-id",JNum(5)::"winning-numbers",JArray(JNum(2)::JNum(45)::JNum(34)::JNum(23)::JNum(7)::JNum(5)::JNum(3)::Nil)::"winners",JArray(JObject("winner-id",JNum(23)::"numbers",JArray(JNum(2)::JNum(45)::JNum(34)::JNum(23)::JNum(3)::JNum(5)::Nil)::Nil)::JObject("winner-id",JNum(54)::"numbers",JArray(JNum(52)::JNum(3)::JNum(12)::JNum(11)::JNum(18)::JNum(22)::Nil)::Nil)::Nil)::Nil)::Nil)"""
   //}
 
+}
+
+object Examples {
   def lotto = """
 {
   "lotto":{

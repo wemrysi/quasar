@@ -48,14 +48,14 @@ class QueryExamplesSpec extends Specification {
   "Servers sorted by uptime" in {
     case class Server(ip: String, uptime: Long)
 
-    val servers = for {
+    val ss = for {
       JArray(servers) <- json \\ "servers"
-      JObject(server) <- servers
+      JObjectFields(server) <- servers
       JField("ip", JString(ip)) <- server
       JField("uptime", JNum(uptime)) <- server
     } yield Server(ip, uptime.longValue)
 
-    servers sortWith (_.uptime > _.uptime) mustEqual List(
+    ss sortWith (_.uptime > _.uptime) mustEqual List(
       Server("192.168.1.127", 901214),
       Server("192.168.2.125", 453423),
       Server("192.168.2.126", 214312),
@@ -65,7 +65,7 @@ class QueryExamplesSpec extends Specification {
 
   "Clusters administered by liza" in {
     val clusters = for {
-      JObject(cluster) <- json
+      JObjectFields(cluster) <- json
       JField("admins", JArray(admins)) <- cluster
       if admins contains JString("liza")
       JField("name", JString(name)) <- cluster

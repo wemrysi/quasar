@@ -302,65 +302,52 @@ object JString {
   }
 }
 
-case object JField extends ((String, JValue) => JField) {
-  def apply(name: String, value: JValue): JField = (name, value)
+final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
+  def _1                        = name
+  def _2                        = value
+  def toTuple: String -> JValue = name -> value
+  def isUndefined               = value == JUndefined
+}
 
-  def unapply(value: JField): Option[(String, JValue)] = Some(value)
+final object JField {
+  def apply(x: JFieldTuple): JField = JField(x._1, x._2)
 
-  implicit final val order: Order[JField] = new Order[JField] {
-    def order(f1: JField, f2: JField) = (f1._1 ?|? f2._1) |+| (f1._2 ?|? f2._2)
+  implicit def liftTuple(x: JFieldTuple): JField = apply(x)
+
+  implicit final val jFieldOrder: Order[JField] = Order.orderBy(x => x._1 -> x._2)
+
+  def liftFilter(f: JField => Boolean): JValue => JValue = {
+    case JObjectFields(fields) => JObject(fields filter f)
+    case value                 => value
   }
-
-  implicit final val ordering = order.toScalaOrdering
-
-  def liftFilter(f: JField => Boolean): JValue => JValue =
-    (value: JValue) =>
-      value match {
-        case JObject(fields) => JObject(fields.filter(f))
-        case _               => value
-    }
-
-  def liftFind(f: JField => Boolean): JValue => Boolean = (jvalue: JValue) => {
-    jvalue match {
-      case JObject(fields) => !fields.filter(f).isEmpty
-      case _               => false
-    }
+  def liftFind(f: JField => Boolean): JValue => Boolean = {
+    case JObjectFields(fields) => fields exists f
+    case _                     => false
   }
-
-  def liftMap(f: JField => JField): JValue => JValue = (jvalue: JValue) => {
-    jvalue match {
-      case JObject(fields) => JObject(fields.map(f))
-      case _               => jvalue
-    }
+  def liftMap(f: JField => JField): JValue => JValue = {
+    case JObjectFields(fields) => JObject(fields map f)
+    case value                 => value
   }
-
-  def liftCollect(f: PartialFunction[JField, JField]): PartialFunction[JValue, JValue] = new PartialFunction[JValue, JValue] {
-    def isDefinedAt(value: JValue): Boolean = !applyOpt(value).isEmpty
-
-    def apply(value: JValue): JValue = applyOpt(value).get
-
-    def applyOpt(value: JValue): Option[JValue] = value match {
-      case JObject(fields) =>
-        val newFields = fields.collect(f)
-
-        if (newFields.isEmpty) None else Some(JObject(newFields))
-
-      case _ => None
-    }
+  def liftCollect(f: PartialFunction[JField, JField]): PartialFunction[JValue, JValue] = {
+    case JObjectFields(fields) if fields exists f.isDefinedAt => JObject(fields collect f)
   }
+}
+
+object JObjectFields {
+  def unapply(m: JObject): Some[Vector[JField]] = Some(m.sortedFields)
 }
 
 case class JObject(fields: Map[String, JValue]) extends JContainer {
   def contained = fields.values
 
-  def sortedFields: Vector[JField] = fields.toVector.sorted filterNot (_._2 eq JUndefined) sortBy (_._2)
+  def sortedFields: Vector[JField] = fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
 
   def get(name: String): JValue = fields.getOrElse(name, JUndefined)
 
-  def +(field: JField): JObject                           = copy(fields = fields + field)
+  def +(field: JField): JObject                           = copy(fields = fields + field.toTuple)
   def -(name: String): JObject                            = copy(fields = fields - name)
   def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)
-  def partition(f: JField => Boolean): (JObject, JObject) = fields.partition(f).bimap(JObject(_), JObject(_))
+  def partition(f: JField => Boolean): (JObject, JObject) = fields partition (x => f(JField(x._1, x._2))) bimap (JObject(_), JObject(_))
 
   private def fieldsCmp(m1: Map[String, JValue], m2: Map[String, JValue]): Int = {
     @tailrec def rec(fields: Array[String], i: Int): Int = {
@@ -397,8 +384,8 @@ case class JObject(fields: Map[String, JValue]) extends JContainer {
 final object JObject {
   final val empty = JObject(Nil)
 
-  def apply(fields: Traversable[JField]): JObject      = JObject(fields.toMap)
-  def apply(fields: JField*): JObject                  = JObject(fields.toMap)
+  def apply(fields: Traversable[JField]): JObject      = JObject(fields.map(_.toTuple).toMap)
+  def apply(fields: JField*): JObject                  = JObject(fields.map(_.toTuple).toMap)
   def unapplySeq(value: JObject): Some[Vector[JField]] = Some(value.sortedFields)
 }
 

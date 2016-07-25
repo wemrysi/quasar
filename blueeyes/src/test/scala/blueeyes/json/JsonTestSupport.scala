@@ -74,7 +74,7 @@ package blueeyes.json {
     def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
     def genJString: Gen[JString] = genIdent ^^ (s => JString(s))
     def genJField: Gen[JField]   = genIdent >> (name => genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
-    def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs.toMap))
+    def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs: _*))
     def genJArray: Gen[JArray]   = genSmallInt >> genJList ^^ JArray
 
     def genJList(size: Int): Gen[List[JValue]]      = listOfN(size, genJValue)
