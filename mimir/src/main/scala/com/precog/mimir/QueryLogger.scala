@@ -19,6 +19,7 @@
  */
 package com.precog.mimir
 
+import com.precog.common._
 import com.precog.common.jobs._
 import com.precog.common.security._
 
@@ -89,47 +90,6 @@ trait QueryLogger[M[+ _], -P] { self =>
   def timing(pos: P, nanos: Long): M[Unit]
 
   def done: M[Unit]
-}
-
-/**
-  * Reports errors to a job's channel.
-  */
-trait JobQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
-  import JobManager._
-
-  implicit def M: Monad[M]
-
-  def jobManager: JobManager[M]
-  def jobId: JobId
-  def clock: Clock
-
-  protected def decomposer: Decomposer[P]
-
-  protected def mkMessage(pos: P, msg: String): JValue = {
-    JObject(
-      JField("message", JString(msg)) ::
-        JField("timestamp", clock.now().serialize) ::
-          JField("position", decomposer.decompose(pos)) ::
-            Nil)
-  }
-
-  private def send(channel: String, pos: P, msg: String): M[Unit] =
-    jobManager.addMessage(jobId, channel, mkMessage(pos, msg)) map { _ =>
-      ()
-    }
-
-  def die(): M[Unit] =
-    for {
-      _ <- jobManager.cancel(jobId, "Cancelled because of error.", clock.now())
-    } yield ()
-
-  def error(pos: P, msg: String): M[Unit] = send(channels.Error, pos, msg)
-
-  def warn(pos: P, msg: String): M[Unit] = send(channels.Warning, pos, msg)
-
-  def info(pos: P, msg: String): M[Unit] = send(channels.Info, pos, msg)
-
-  def log(pos: P, msg: String): M[Unit] = send(channels.Log, pos, msg)
 }
 
 trait LoggingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {

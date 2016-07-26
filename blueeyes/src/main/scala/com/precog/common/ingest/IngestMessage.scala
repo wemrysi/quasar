@@ -22,7 +22,6 @@ package ingest
 
 import blueeyes._
 import security._
-import jobs.JobId
 
 import blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._

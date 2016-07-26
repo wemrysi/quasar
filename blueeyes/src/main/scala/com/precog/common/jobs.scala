@@ -21,7 +21,6 @@ package com.precog.common
 
 package object jobs {
   type ChannelId = String
-  type JobId     = String
   type MessageId = Long
   type StatusId  = Long
 

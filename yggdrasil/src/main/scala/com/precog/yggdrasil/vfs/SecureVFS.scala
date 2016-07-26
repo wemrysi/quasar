@@ -22,95 +22,12 @@ package vfs
 
 import blueeyes._
 import com.precog.common._
-import com.precog.common.accounts._
-import com.precog.common.ingest._
 import com.precog.common.security._
-import com.precog.common.jobs._
 import com.precog.yggdrasil.metadata._
-import ResourceError._
-import Permission._
-
-import blueeyes.util.Clock
-
-import org.slf4s.Logging
-
 import scalaz._, Scalaz._
 
 trait VFSMetadata[M[+ _]] {
   def findDirectChildren(apiKey: APIKey, path: Path): EitherT[M, ResourceError, Set[PathMetadata]]
   def pathStructure(apiKey: APIKey, path: Path, property: CPath, version: Version): EitherT[M, ResourceError, PathStructure]
   def size(apiKey: APIKey, path: Path, version: Version): EitherT[M, ResourceError, Long]
-}
-
-trait SecureVFSModule[M[+ _], Block] extends VFSModule[M, Block] {
-  case class StoredQueryResult(data: StreamT[M, Block], cachedAt: Option[Instant], cachingJob: Option[JobId])
-
-  class SecureVFS(vfs: VFS, permissionsFinder: PermissionsFinder[M], jobManager: JobManager[M], clock: Clock)(implicit M: Monad[M])
-      extends VFSMetadata[M]
-      with Logging {
-    final val unsecured = vfs
-
-    private def verifyResourceAccess(apiKey: APIKey, path: Path, readMode: ReadMode): Resource => EitherT[M, ResourceError, Resource] = { resource =>
-      log.debug("Verifying access to %s as %s on %s (mode %s)".format(resource, apiKey, path, readMode))
-      import AccessMode._
-      val permissions: Set[Permission] = resource.authorities.accountIds map { accountId =>
-        val writtenBy = WrittenBy(accountId)
-        readMode match {
-          case Read         => ReadPermission(path, writtenBy)
-          case Execute      => ExecutePermission(path, writtenBy)
-          case ReadMetadata => ReducePermission(path, writtenBy)
-        }
-      }
-
-      EitherT {
-        permissionsFinder.apiKeyFinder.hasCapability(apiKey, permissions, Some(clock.now())) map {
-          case true  => \/.right(resource)
-          case false => \/.left(permissionsError("API key %s does not provide %s permission to resource at path %s.".format(apiKey, readMode.name, path.path)))
-        }
-      }
-    }
-
-    final def readResource(apiKey: APIKey, path: Path, version: Version, readMode: ReadMode): EitherT[M, ResourceError, Resource] = {
-      vfs.readResource(path, version) >>=
-        verifyResourceAccess(apiKey, path, readMode)
-    }
-
-    final def readProjection(apiKey: APIKey, path: Path, version: Version, readMode: ReadMode): EitherT[M, ResourceError, Projection] = {
-      readResource(apiKey, path, version, readMode) >>=
-        Resource.asProjection(path, version)
-    }
-
-    final def size(apiKey: APIKey, path: Path, version: Version): EitherT[M, ResourceError, Long] = {
-      readResource(apiKey, path, version, AccessMode.ReadMetadata) flatMap { //need mapM
-        _.fold(br => EitherT.right(br.byteLength.point[M]), pr => EitherT.right(pr.recordCount))
-      }
-    }
-
-    final def pathStructure(apiKey: APIKey, path: Path, selector: CPath, version: Version): EitherT[M, ResourceError, PathStructure] = {
-      readProjection(apiKey, path, version, AccessMode.ReadMetadata) >>=
-        VFS.pathStructure(selector)
-    }
-
-    final def findDirectChildren(apiKey: APIKey, path: Path): EitherT[M, ResourceError, Set[PathMetadata]] = path match {
-      // If asked for the root path, we simply determine children
-      // based on the api key permissions to avoid a massive tree walk
-      case Path.Root =>
-        log.debug("Defaulting on root-level child browse to account path")
-        for {
-          children <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
-          nonRoot = children.filterNot(_ == Path.Root)
-          childMetadata <- nonRoot.toList.traverseU(vfs.findPathMetadata)
-        } yield {
-          childMetadata.toSet
-        }
-
-      case other =>
-        for {
-          children <- vfs.findDirectChildren(path)
-          permitted <- EitherT.right(permissionsFinder.findBrowsableChildren(apiKey, path))
-        } yield {
-          children filter { case PathMetadata(child, _) => permitted.exists(_.isEqualOrParentOf(path / child)) }
-        }
-    }
-  }
 }

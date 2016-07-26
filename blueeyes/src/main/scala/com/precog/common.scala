@@ -20,6 +20,7 @@
 package com.precog
 
 package object common {
+  type JobId = String
   implicit def stringExtensions(s: String): StringExtensions = new StringExtensions(s)
 }
 
