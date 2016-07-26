@@ -798,6 +798,33 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
     case _ => None
   }
 
+  def coalesceMapShift[F[_]: Functor](implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[F]] => F[T[F]] = {
+    case x @ Map(Embed(src), mf) => (SP.prj(src) >>= {
+      case LeftShift(srcInner, struct, repair) =>
+        SP.inj(LeftShift(srcInner, struct, mf >> repair)).some
+      case _ => None
+    }).getOrElse(QC.inj(x))
+    case x => QC.inj(x)
+  }
+
+  def simplifySP[F[_]: Functor](
+    implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      SourcedPathable[T, T[F]] => F[T[F]] = {
+    case x @ LeftShift(src, struct, repair) =>
+      if (!repair.element(RightSide))
+        QC.inj(Map(src, repair ∘ κ(SrcHole)))
+      else if (!repair.element(LeftSide))
+        (QC.prj(src.project) >>= {
+          case Map(innerSrc, mf) =>
+            SP.inj(LeftShift(innerSrc, struct >> mf, repair)).some
+          case _ => None
+        }).getOrElse(SP.inj(x))
+      else
+        SP.inj(x)
+    case x => SP.inj(x)
+  }
+
   def coalesceQCCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
       QScriptCore[T, T[CoEnv[A, F, ?]]] => Option[QScriptCore[T, T[CoEnv[A, F, ?]]]] = {
     case Map(Embed(src), mf) =>
@@ -846,6 +873,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
   // TODO: Apply this to FreeQS structures.
   def applyAll[F[_]: Functor: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
+             SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptProject[T, ?]):
@@ -854,13 +882,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFF(repeatedly(coalesceQC[F])) ⋙
+      liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
+      liftFG(simplifySP[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFG(elideNopMap[F])
 
   // Only used when processing user-provided ThetaJoins
   def applyMost[F[_]: Functor: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
+             SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptProject[T, ?]):
@@ -869,7 +900,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT] extends Helpers[T] {
       Normalizable[F].normalize ⋙
       // quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFF(repeatedly(coalesceQC[F])) ⋙
+      liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
+      liftFG(simplifySP[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFG(elideNopMap[F])
 
