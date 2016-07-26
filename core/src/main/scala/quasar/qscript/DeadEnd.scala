@@ -24,7 +24,6 @@ sealed abstract class DeadEnd
   * in the structure a backend sees, it represents the mount point.
   */
 final case object Root extends DeadEnd
-final case object Empty extends DeadEnd
 
 object DeadEnd {
   implicit def equal: Equal[DeadEnd] = Equal.equalRef

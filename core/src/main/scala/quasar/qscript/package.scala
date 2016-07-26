@@ -33,36 +33,28 @@ import scalaz._, Scalaz._
   * here, and autojoin_d has been replaced with a lower-level join operation
   * that doesn’t include the cross portion.
   */
-package object qscript extends LowPriorityImplicits {
-  type Pathable[T[_[_]], A] = Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
+package object qscript {
+  private type CommonPathable[T[_[_]], A] =
+    Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
-  /** These are the operations included in all forms of QScript.
+  /** Statically known path components. Provided to filesystems for potential
+    * conversion to `Read`.
     */
-  type QScriptPrim[T[_[_]], A] = Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]
+  type Pathable[T[_[_]], A] =
+    Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
 
-  /** This is the target of the core compiler. Normalization is applied to this
-    * structure, and it contains no Read or EquiJoin.
+  private type QScriptTotal0[T[_[_]], A] =
+    Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]
+  private type QScriptTotal1[T[_[_]], A] =
+    Coproduct[ThetaJoin[T, ?], QScriptTotal0[T, ?], A]
+  private type QScriptTotal2[T[_[_]], A] =
+    Coproduct[EquiJoin[T, ?], QScriptTotal1[T, ?], A]
+  /** This type is used for join branch-like structures. It’s an unfortunate
+    * consequence of not having mutually-recursive data structures. Once we do,
+    * this can go away.
     */
-  type QScriptPure[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptPrim[T, ?], A]
-  type QScriptProject[T[_[_]], A] = Coproduct[ProjectBucket[T, ?], QScriptPure[T, ?], A]
-
-  /** These nodes exist in all QScript structures that a backend sees.
-    */
-  type QScriptCommon[T[_[_]], A] = Coproduct[Read, QScriptPrim[T, ?], A]
-
-  // The following two types are the only ones that should be seen by a backend.
-
-  /** This is the primary form seen by a backend. It contains reads of files.
-    */
-  type QScript[T[_[_]], A] = Coproduct[ThetaJoin[T, ?], QScriptCommon[T, ?], A]
-
-
-  /** A variant with a simpler join type. A backend can choose to operate on
-    * this structure by applying the `equiJoinsOnly` transformation. Backends
-    * without true join support will likely find it easier to work with this
-    * than to handle full ThetaJoins.
-    */
-  type EquiQScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScriptCommon[T, ?], A]
+  type QScriptTotal[T[_[_]], A] =
+    Coproduct[Const[Read, ?], QScriptTotal2[T, ?], A]
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
@@ -87,7 +79,7 @@ package object qscript extends LowPriorityImplicits {
   type FreeHole[F[_]] = Free[F, Hole]
 
   type FreeMap[T[_[_]]] = FreeHole[MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeHole[QScriptProject[T, ?]]
+  type FreeQS[T[_[_]]] = FreeHole[QScriptTotal[T, ?]]
 
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
@@ -151,9 +143,6 @@ package object qscript extends LowPriorityImplicits {
 
   // TODO: move to matryoshka
 
-  implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
-    CoEnv.bifunctor[F].rightFunctor
-
   implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
       Delay[Equal, EnvT[E, F, ?]] =
     new Delay[Equal, EnvT[E, F, ?]] {
@@ -183,10 +172,4 @@ package object qscript extends LowPriorityImplicits {
   }
 }
 
-abstract class LowPriorityImplicits {
-  // TODO: move to matryoshka
-
-  implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
-    CoEnv.bitraverse[F, Hole].rightTraverse
-}
 

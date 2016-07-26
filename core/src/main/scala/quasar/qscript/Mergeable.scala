@@ -34,8 +34,8 @@ import scalaz._, Scalaz._
 object Mergeable {
   type Aux[T[_[_]], F[_]] = Mergeable[F] { type IT[F[_]] = T[F] }
 
-  implicit def const[T[_[_]]: EqualT]: Mergeable.Aux[T, Const[DeadEnd, ?]] =
-    new Mergeable[Const[DeadEnd, ?]] {
+  implicit def const[T[_[_]]: EqualT, A: Equal]: Mergeable.Aux[T, Const[A, ?]] =
+    new Mergeable[Const[A, ?]] {
       type IT[F[_]] = T[F]
 
       // NB: I think it is true that the buckets on p1 and p2 _must_ be equal
@@ -44,9 +44,9 @@ object Mergeable {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], Const[DeadEnd, ?], Hole],
-        p2: EnvT[Ann[T], Const[DeadEnd, ?], Hole]) =
-        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[DeadEnd, ?], Hole], FreeMap[IT]](p1, left, right))
+        p1: EnvT[Ann[T], Const[A, ?], Hole],
+        p2: EnvT[Ann[T], Const[A, ?], Hole]) =
+        (p1 ≟ p2).option(SrcMerge[EnvT[Ann[T], Const[A, ?], Hole], FreeMap[IT]](p1, left, right))
     }
 
   implicit def coproduct[T[_[_]], F[_], G[_]](

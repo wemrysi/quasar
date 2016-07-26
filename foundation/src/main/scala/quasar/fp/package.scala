@@ -358,6 +358,18 @@ trait StringOps {
   }
 }
 
+trait LowPriorityCoEnvImplicits {
+  // TODO: move to matryoshka
+
+  implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
+    CoEnv.bitraverse[F, Hole].rightTraverse
+}
+
+trait CoEnvInstances extends LowPriorityCoEnvImplicits {
+  implicit def coenvFunctor[F[_]: Functor, E]: Functor[CoEnv[E, F, ?]] =
+    CoEnv.bifunctor[F].rightFunctor
+}
+
 package object fp
     extends TreeInstances
     with ListMapInstances
@@ -365,6 +377,7 @@ package object fp
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
+    with CoEnvInstances
     with ToCatchableOps
     with PartialFunctionOps
     with JsonOps
@@ -607,4 +620,10 @@ package object fp
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
       T[F] =
     f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
+
+  def freeCata[F[_]: Traverse, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
+    free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
+
+  def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
+    free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
 }

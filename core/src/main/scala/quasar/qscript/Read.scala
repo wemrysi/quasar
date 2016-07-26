@@ -20,24 +20,15 @@ import quasar.fp._
 
 import matryoshka._
 import monocle.macros.Lenses
-import pathy.Path._
+import pathy._, Path._
 import scalaz._, Scalaz._
 
+// TODO: Abstract Read over the backend’s preferred path representation.
 /** A backend-resolved `Root`, which is now a path. */
-@Lenses final case class Read[A](src: A, path: AbsFile[Sandboxed])
+@Lenses final case class Read(path: AbsFile[Sandboxed])
 
 object Read {
-  implicit def equal[T[_[_]]]: Delay[Equal, Read] =
-    new Delay[Equal, Read] {
-      def apply[A](eq: Equal[A]) =
-        Equal.equal {
-          case (Read(a1, p1), Read(a2, p2)) => eq.equal(a1, a2) && p1 ≟ p2
-        }
-    }
-
-  implicit def traverse[T[_[_]]]: Traverse[Read] =
-    new Traverse[Read] {
-      def traverseImpl[G[_]: Applicative, A, B](fa: Read[A])(f: A => G[B]) =
-        f(fa.src) ∘ (Read(_, fa.path))
-    }
+  implicit def equal: Equal[Read] = Equal.equalBy(_.path)
+  implicit def show: Show[Read] =
+    Show.show(Cord("Read(") ++ _.path.show ++ Cord(")"))
 }
