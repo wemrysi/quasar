@@ -23,7 +23,7 @@ import quasar.precog._
 import blueeyes._
 import com.precog.common._
 
-case class SegmentId(blockid: Long, cpath: CPath, ctype: CType)
+final case class SegmentId(blockid: Long, cpath: CPath, ctype: CType)
 
 sealed trait Segment {
   def id: SegmentId = SegmentId(blockid, cpath, ctype)
