@@ -55,5 +55,6 @@ lazy val benchmark = project.setup dependsOn (blueeyes % BothScopes) enablePlugi
 
 addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
 addCommandAlias("cc", "; mimir/test:compile ; test:compile")
-addCommandAlias("tt", "mimir/test test")
-addCommandAlias("ttq", "mimir/testQuick testQuick")
+addCommandAlias("tt", "; mimir/test ; test")
+addCommandAlias("ttq", "; mimir/testQuick ; testQuick")
+addCommandAlias("cover", "; coverage ; test ; coverageReport ; coverageAggregate")
