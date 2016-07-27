@@ -21,9 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-import org.scalacheck._, Gen._, Arbitrary._
+import quasar.precog.TestSupport._
 
 trait TestLib[M[+_]] extends TableModule[M] {
   def lookupF1(namespace: List[String], name: String): F1

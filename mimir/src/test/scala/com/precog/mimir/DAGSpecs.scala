@@ -23,9 +23,9 @@ package mimir
 import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
-import org.specs2.mutable._
 import bytecode._
 import com.precog.yggdrasil._
+import quasar.precog.TestSupport._
 
 object DAGSpecs extends Specification with DAG with FNDummyModule {
   import instructions._

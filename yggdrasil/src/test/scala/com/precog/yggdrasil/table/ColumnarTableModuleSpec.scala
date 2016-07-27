@@ -26,10 +26,9 @@ import org.slf4j.LoggerFactory
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-
-import org.scalacheck._, Gen._, Arbitrary._
 import TableModule._
 import SampleData._
+import quasar.precog.TestSupport._, Gen._
 
 trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
   type GroupId = Int
@@ -67,13 +66,28 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     with CanonicalizeSpec[M]
     with PartitionMergeSpec[M]
     with ToArraySpec[M]
-    with ConcatSpec[M]
     with SampleSpec[M]
     with DistinctSpec[M]
     with SchemasSpec[M]
     { spec =>
 
   import trans._
+
+  def testConcat = {
+    val json1 = """{ "a": 1, "b": "x", "c": null }"""
+    val json2 = """[4, "foo", null, true]"""
+
+    val data1: Stream[JValue] = Stream.fill(25)(JParser.parse(json1))
+    val data2: Stream[JValue] = Stream.fill(35)(JParser.parse(json2))
+
+    val table1 = fromSample(SampleData(data1), Some(10))
+    val table2 = fromSample(SampleData(data2), Some(10))
+
+    val results = toJson(table1.concat(table2))
+    val expected = data1 ++ data2
+
+    results.copoint must_== expected
+  }
 
   lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
 

@@ -25,7 +25,6 @@ import blueeyes._, json._
 import scalaz.StreamT
 import scalaz.syntax.comonad._
 
-import org.specs2.mutable._
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._

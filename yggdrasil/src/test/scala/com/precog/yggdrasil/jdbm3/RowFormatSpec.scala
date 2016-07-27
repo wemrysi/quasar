@@ -23,9 +23,7 @@ package jdbm3
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
-import org.specs2._
-import org.specs2.mutable.Specification
-import org.scalacheck.{ Shrink, Arbitrary, Gen }
+import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
 
 class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {

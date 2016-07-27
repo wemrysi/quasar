@@ -23,8 +23,8 @@ package mimir
 import blueeyes._
 import com.precog.common._
 import bytecode._
-import org.specs2.mutable._
 import com.precog.yggdrasil._
+import quasar.precog.TestSupport._
 
 object CrossOrderingSpecs extends Specification with CrossOrdering with FNDummyModule {
   import instructions._

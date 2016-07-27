@@ -21,7 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes._
 import com.precog.common._
-import org.specs2.mutable.SpecificationLike
+import quasar.precog.TestSupport._
 
 trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike {
   import trans._

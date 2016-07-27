@@ -21,10 +21,8 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes.json._
-
 import scalaz.syntax.comonad._
-
-import org.specs2.mutable._
+import quasar.precog.TestSupport._
 
 trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike {
   def testToArrayHomogeneous = {

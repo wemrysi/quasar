@@ -21,12 +21,8 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes.json._
-
 import scalaz.syntax.comonad._
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-import org.scalacheck.Gen
+import quasar.precog.TestSupport._
 
 trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._

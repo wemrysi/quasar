@@ -21,10 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes.json._
 import scalaz.syntax.comonad._
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-
+import quasar.precog.TestSupport._
 
 trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
