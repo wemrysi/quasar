@@ -92,16 +92,15 @@ trait KMediansCoreSetClustering {
       CoreSetTree(prefix ++ rec(suffix, coreset, level), k)
     }
 
-    def ++(coreSetTree: CoreSetTree): CoreSetTree = {
-      if (coreSetTree.k < k) {
-        coreSetTree ++ this
-      } else {
-        coreSetTree.tree.foldLeft(this) {
-          case (acc, (level, coreset)) =>
-            acc.insertCoreSet(coreset, level)
-        }
+    def ++(that: CoreSetTree): CoreSetTree = (
+      if (that.k < k)
+        that ++ this
+      else {
+        var acc: CoreSetTree = this
+        for ((level, coreset) <- that.tree) acc = acc.insertCoreSet(coreset, level)
+        acc
       }
-    }
+    )
   }
 
   object CoreSetTree {
