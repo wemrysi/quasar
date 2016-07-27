@@ -20,7 +20,6 @@
 package com.precog.mimir
 
 import com.precog.common._
-import com.precog.common.jobs._
 import com.precog.common.security._
 
 import blueeyes._, json._, serialization._
