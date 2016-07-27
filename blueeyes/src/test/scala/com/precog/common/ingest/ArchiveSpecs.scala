@@ -97,4 +97,3 @@ class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCh
 }
 
 
-// vim: set ts=4 sw=4 et:

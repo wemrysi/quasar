@@ -36,4 +36,3 @@ final class FreshAtomicIdSource extends IdSource {
   }
 }
 
-// vim: set ts=4 sw=4 et:

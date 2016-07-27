@@ -283,4 +283,3 @@ derefBy.columns.headOption collect {
   slice.columns
 }
  */
-// vim: set ts=4 sw=4 et:
