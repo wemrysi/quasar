@@ -24,7 +24,6 @@ import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest._
 import com.precog.common.security._
-import com.precog.niflheim._
 import com.precog.util._
 
 import java.util.Arrays
