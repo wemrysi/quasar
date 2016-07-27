@@ -22,8 +22,7 @@ package ingest
 
 import security._
 import blueeyes._, json._
-import org.scalacheck._, Gen._
-import quasar.precog.JsonTestSupport._
+import quasar.precog.JsonTestSupport._, Gen._
 
 trait ArbitraryEventMessage {
   def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)

@@ -22,11 +22,8 @@ package table
 
 import blueeyes._, json._
 import com.precog.common._
-
 import scalaz.syntax.comonad._
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
+import quasar.precog.TestSupport._
 
 trait SampleSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import trans._

@@ -20,9 +20,6 @@
 package com.precog.common
 package ingest
 
-import org.specs2.ScalaCheck
-import org.scalacheck._
-
 import blueeyes.json._
 import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._

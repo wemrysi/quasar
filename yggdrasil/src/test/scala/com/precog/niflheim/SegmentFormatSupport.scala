@@ -23,9 +23,8 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util._
 import java.nio.channels._
-import org.scalacheck._, Gen._
 import scalaz._
-import quasar.precog._, TestSupport._
+import quasar.precog._, TestSupport._, Gen._
 
 trait SegmentFormatSupport {
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(

@@ -23,9 +23,8 @@ import blueeyes._
 import com.precog.common._
 import blueeyes.json._
 import java.math.MathContext
-import org.scalacheck._, Gen._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+import quasar.precog.TestSupport._, Gen._
 
 object CValueGenerators {
   type JSchema = Seq[(JPath, CType)]

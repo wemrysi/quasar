@@ -22,9 +22,9 @@ package com.precog.niflheim
 import blueeyes._
 import com.precog.common._
 import com.precog.util._
-import org.scalacheck._
 import scalaz._
 import quasar.precog.TestSupport._
+
 class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
 }

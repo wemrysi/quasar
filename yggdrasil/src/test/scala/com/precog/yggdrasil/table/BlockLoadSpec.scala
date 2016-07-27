@@ -20,20 +20,14 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
-
 import scalaz._
 import scalaz.syntax.comonad._
 import scalaz.syntax.std.boolean._
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-import org.scalacheck._, Gen._, Arbitrary._
-
 import SampleData._
 import CValueGenerators._
+import quasar.precog.TestSupport._, Gen._
 
 trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[Need] {

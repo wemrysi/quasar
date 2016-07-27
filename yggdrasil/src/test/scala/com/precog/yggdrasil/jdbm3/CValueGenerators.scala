@@ -22,8 +22,7 @@ package jdbm3
 
 import blueeyes._
 import com.precog.common._
-import org.scalacheck._, Gen._, Arbitrary._
-import quasar.precog.TestSupport._
+import quasar.precog.TestSupport._, Gen._
 
 trait CValueGenerators {
   def maxArrayDepth = 3
@@ -41,13 +40,13 @@ trait CValueGenerators {
   def genCType: Gen[CType] = frequency(7 -> genCValueType(), 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
   def genValueForCValueType[A](cType: CValueType[A]): Gen[CWrappedValue[A]] = cType match {
-    case CString  => arbString.arbitrary map (CString(_))
-    case CBoolean => Gen.oneOf(true, false) map (CBoolean(_))
-    case CLong    => arbLong.arbitrary map (CLong(_))
-    case CDouble  => arbDouble.arbitrary map (CDouble(_))
+    case CString  => genString map (CString(_))
+    case CBoolean => genBool map (CBoolean(_))
+    case CLong    => genLong map (CLong(_))
+    case CDouble  => genDouble map (CDouble(_))
     case CNum     => for {
-      scale  <- arbInt.arbitrary
-      bigInt <- arbBigInt.arbitrary
+      scale  <- genInt
+      bigInt <- genBigInt
     } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
     case CDate                => genPosLong ^^ (n => CDate(dateTime fromMillis n))
     case CArrayType(elemType) =>

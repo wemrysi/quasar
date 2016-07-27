@@ -20,15 +20,11 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
-
 import scalaz._, Scalaz._
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
-import org.scalacheck._, Gen._, Arbitrary._
-
+import quasar.precog.TestSupport._
+// import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 import TableModule._
 

@@ -22,10 +22,10 @@ package table
 
 import com.precog.bytecode._
 import com.precog.common._
+
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import org.specs2.ScalaCheck
-import org.specs2.mutable._
+import quasar.precog.TestSupport._
 
 trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import trans._

@@ -1,7 +1,6 @@
 package quasar
 package precog
 
-import org.scalacheck._, Gen._
 import scala.collection.mutable.Builder
 import scalaz._
 import java.io.File
@@ -35,9 +34,18 @@ trait SpecsSupport {
 }
 
 trait ScalacheckSupport {
-  type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
+  val Arbitrary                = org.scalacheck.Arbitrary
+  val Gen                      = org.scalacheck.Gen
   val Pretty                   = org.scalacheck.util.Pretty
+  val Prop                     = org.scalacheck.Prop
+
+  type Arbitrary[A]            = org.scalacheck.Arbitrary[A]
+  type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
+  type Gen[+A]                 = org.scalacheck.Gen[A]
   type Pretty                  = org.scalacheck.util.Pretty
+  type Prop                    = org.scalacheck.Prop
+
+  import Gen._
 
   def arbitrary[A](implicit z: Arbitrary[A]): Gen[A] = z.arbitrary
 
