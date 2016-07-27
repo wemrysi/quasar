@@ -16,8 +16,8 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   val RawBitSet           = com.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
 
-  val HNil            = shapeless.HNil
-  val Iso             = shapeless.Generic
+  val HNil = shapeless.HNil
+  val Iso  = shapeless.Generic
 
   def Utf8Charset: Charset                                               = java.nio.charset.Charset forName "UTF-8"
   def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset

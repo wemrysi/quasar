@@ -37,6 +37,7 @@ trait PackageAliases {
   type InputStreamReader    = java.io.InputStreamReader
   type OutputStream         = java.io.OutputStream
   type OutputStreamWriter   = java.io.OutputStreamWriter
+  type Properties           = java.util.Properties
   type PrintStream          = java.io.PrintStream
   type UUID                 = java.util.UUID
 
@@ -50,7 +51,9 @@ trait PackageAliases {
   type ScalazOrdering = scalaz.Ordering
   type SpireOrder[A]  = spire.algebra.Order[A]
   type Task[+A]       = scalaz.concurrent.Task[A]
-  val Future          = scalaz.concurrent.Future
-  val ScalazOrder     = scalaz.Order
-  val ScalazOrdering  = scalaz.Ordering
+
+  val Future         = scalaz.concurrent.Future
+  val ScalazOrder    = scalaz.Order
+  val ScalazOrdering = scalaz.Ordering
+  val IO             = scalaz.effect.IO
 }
