@@ -1,7 +1,7 @@
 package blueeyes
 package util
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 class CommandLineArgumentsSpec extends Specification {
   "No parameters or values should be parsed properly" in {

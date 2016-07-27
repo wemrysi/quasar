@@ -20,9 +20,8 @@
 package com.precog
 package util
 
-import java.io.File
-
-import org.specs2.mutable._
+import blueeyes._
+import quasar.precog.TestSupport._
 
 class IOUtilsSpecs extends Specification {
   "IOUtils" should {

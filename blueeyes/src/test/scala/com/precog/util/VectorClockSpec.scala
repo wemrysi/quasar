@@ -19,7 +19,7 @@
  */
 package com.precog.util
 
-import org.specs2.mutable._
+import quasar.precog.TestSupport._
 
 object VectorClockSpec extends Specification {
   "vector clock" should {

@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 class CPathSpec extends Specification {
   import CPath._

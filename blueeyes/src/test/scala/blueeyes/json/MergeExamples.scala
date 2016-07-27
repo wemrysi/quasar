@@ -17,7 +17,7 @@
 package blueeyes
 package json
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 object MergeExamples extends Specification {
   import JParser._
@@ -33,7 +33,7 @@ object MergeExamples extends Specification {
       "tags": ["fp", "oo"],
       "features": {
         "key1":"val1",
-        "key2":"val2" 
+        "key2":"val2"
       }
     }""")
 
@@ -79,7 +79,7 @@ object MergeExamples extends Specification {
 
   def lotto2 = parseUnsafe("""
     {
-      "lotto":{ 
+      "lotto":{
         "winners":[{
           "winner-id":54,
           "numbers":[52,3,12,11,18,22]

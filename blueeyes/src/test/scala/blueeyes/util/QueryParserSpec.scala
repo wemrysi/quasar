@@ -3,8 +3,8 @@ package util
 
 import QueryParser._
 import java.net.URI
-import org.specs2.mutable.Specification
 import java.net.URLEncoder._
+import quasar.precog.TestSupport._
 
 class QueryParserSpec extends Specification {
   val baseURI  = "http://www.socialmedia.com/test?"

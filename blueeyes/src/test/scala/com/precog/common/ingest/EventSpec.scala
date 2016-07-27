@@ -20,15 +20,12 @@
 package com.precog.common
 package ingest
 
-import org.specs2.mutable._
-import org.specs2.ScalaCheck
 import org.scalacheck._
-
 import blueeyes.json._
 import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
-
 import scalaz._
+import quasar.precog.TestSupport._
 
 class EventSpec extends Specification with ArbitraryEventMessage with ScalaCheck {
   implicit val arbEvent = Arbitrary(genRandomIngest)

@@ -17,20 +17,18 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+package com.precog
+package mimir
 
-import com.precog.common._
-import com.precog.common.Path
-import com.precog.common.accounts._
-
-import com.precog.yggdrasil._
-import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.vfs._
-
-import org.specs2.mutable.Specification
+import common._
+import common.accounts._
+import yggdrasil._
+import yggdrasil.table._
+import yggdrasil.vfs._
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
+import quasar.precog.TestSupport._
 
 trait FSLibSpecs extends Specification with FSLibModule[Need] with TestColumnarTableModule[Need] {
   implicit def M = Need.need

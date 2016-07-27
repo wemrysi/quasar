@@ -19,8 +19,7 @@
  */
 package com.precog.common
 
-import org.specs2.mutable.Specification
-import org.specs2.ScalaCheck
+import quasar.precog.TestSupport._
 
 class PathSpec extends Specification with ScalaCheck {
   "rollups for a path" should {

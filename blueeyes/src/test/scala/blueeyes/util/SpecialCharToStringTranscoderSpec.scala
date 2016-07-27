@@ -1,7 +1,7 @@
 package blueeyes
 package util
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 class SpecialCharToStringTranscoderSpec extends Specification {
   val transcoder = SpecialCharToStringTranscoder({ case c: Char if (c == '.' | c == '@') => new String(Array('%', c, c)) }, {

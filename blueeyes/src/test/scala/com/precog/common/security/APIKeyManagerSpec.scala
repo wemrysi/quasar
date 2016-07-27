@@ -21,12 +21,9 @@ package com.precog.common
 package security
 
 import accounts._
-
 import com.precog.common.security.service._
-
-import org.specs2.mutable.Specification
-
 import scalaz._, Scalaz._
+import quasar.precog.TestSupport._
 
 trait APIKeyManagerSpec[M[+_]] extends Specification {
   implicit def M: Monad[M] with Comonad[M]

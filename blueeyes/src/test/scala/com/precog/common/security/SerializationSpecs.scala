@@ -22,10 +22,9 @@ package security
 
 import ingest._
 import service.v1
-
 import blueeyes._, json._, serialization._, DefaultSerialization._
-import org.specs2.mutable.Specification
 import scalaz._, Scalaz._, Validation.FlatMap._
+import quasar.precog.TestSupport._
 
 class SerializationSpecs extends Specification {
   import Permission._

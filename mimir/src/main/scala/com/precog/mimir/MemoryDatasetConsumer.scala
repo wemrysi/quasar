@@ -17,7 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+package com.precog
+package mimir
 
 import com.precog.common._
 import com.precog.yggdrasil._

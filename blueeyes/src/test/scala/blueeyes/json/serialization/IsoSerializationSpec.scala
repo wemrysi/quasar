@@ -2,12 +2,10 @@ package blueeyes
 package json
 package serialization
 
-import org.specs2.mutable.Specification
-
 import DefaultSerialization._
 import IsoSerialization._
-
 import shapeless._
+import quasar.precog.TestSupport._
 
 object IsoSerializationSpec {
   case class Foo(s: String, i: Option[Int], b: Boolean)

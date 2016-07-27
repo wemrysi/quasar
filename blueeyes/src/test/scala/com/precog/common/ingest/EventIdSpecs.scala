@@ -20,9 +20,7 @@
 package com.precog.common.ingest
 
 import org.scalacheck.Gen
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 object EventIdSpecs extends Specification with ScalaCheck {
   implicit val idRange = Gen.chooseNum[Int](0, Int.MaxValue)

@@ -17,17 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+package com.precog
+package mimir
 
 import blueeyes._
 import com.precog.common._
-
 import com.precog.bytecode._
 import com.precog.yggdrasil._
-
-import scalaz._
-import scalaz.std.option._
-import scalaz.syntax.monadPlus._
+import scalaz._, Scalaz._
 
 trait TransSpecableModule[M[+ _]] extends TransSpecModule with TableModule[M] with EvaluatorMethodsModule[M] {
   import dag._

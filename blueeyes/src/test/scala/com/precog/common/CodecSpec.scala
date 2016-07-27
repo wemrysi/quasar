@@ -21,8 +21,7 @@ package com.precog.common
 
 import blueeyes._
 import com.precog.util.{ ByteBufferPool, RawBitSet }
-import org.specs2._
-import org.specs2.mutable.Specification
+// import org.specs2._
 import org.scalacheck.{Shrink, Arbitrary, Gen}
 import quasar.precog._, TestSupportWithArb._
 

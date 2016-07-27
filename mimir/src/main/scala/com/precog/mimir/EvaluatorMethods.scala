@@ -17,7 +17,8 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.mimir
+package com.precog
+package mimir
 
 import blueeyes._
 import com.precog.common._

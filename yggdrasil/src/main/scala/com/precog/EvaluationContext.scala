@@ -17,13 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package com.precog
 
+import yggdrasil._
 import blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import com.precog.common._, security._, accounts._
 
-case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
+final case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
 
 object EvaluationContext {
   val schemaV1 = "apiKey" :: "account" :: "basePath" :: "scriptPath" :: "startTime" :: HNil

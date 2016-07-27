@@ -1,7 +1,6 @@
 package blueeyes
 package json
 
-import org.specs2.mutable.Specification
 import quasar.precog.TestSupport._
 class JNumSpec extends Specification {
   "JNums must sort correctly" in {

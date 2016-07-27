@@ -21,12 +21,10 @@ package com.precog.common
 package security
 
 import com.precog.common.security.service._
-
 import blueeyes._
 import blueeyes.util.Clock
-
-import org.specs2.mutable.Specification
 import scalaz._, Scalaz._
+import quasar.precog.TestSupport._
 
 trait APIKeyFinderSpec[M[+_]] extends Specification {
   import Permission._

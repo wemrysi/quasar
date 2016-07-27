@@ -1,7 +1,7 @@
 package blueeyes
 package util
 
-import org.specs2.mutable.Specification
+import quasar.precog.TestSupport._
 
 class SpecialCharTranscoderSpec extends Specification {
   val transcoder = SpecialCharTranscoder.fromMap('_', Map('.' -> 'd', '@' -> 'a'))
