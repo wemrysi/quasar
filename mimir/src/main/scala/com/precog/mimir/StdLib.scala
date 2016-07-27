@@ -23,7 +23,6 @@ package mimir
 import bytecode._
 import com.precog.common._
 import yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 import yggdrasil.table._
 import blueeyes._
 import scalaz._, Scalaz._

@@ -23,7 +23,6 @@ package vfs
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
-import com.precog.yggdrasil.metadata._
 import scalaz._, Scalaz._
 
 trait VFSMetadata[M[+ _]] {

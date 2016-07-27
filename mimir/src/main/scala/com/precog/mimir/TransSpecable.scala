@@ -24,7 +24,6 @@ import com.precog.common._
 
 import com.precog.bytecode._
 import com.precog.yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 
 import scalaz._
 import scalaz.std.option._

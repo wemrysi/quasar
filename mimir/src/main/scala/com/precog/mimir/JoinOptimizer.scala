@@ -21,7 +21,6 @@ package com.precog
 package mimir
 
 import com.precog.yggdrasil.TableModule
-import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.util.IdGen
 import blueeyes._
 import com.precog.common._

@@ -22,7 +22,6 @@ package mimir
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.execution.EvaluationContext
 
 import Function._
 

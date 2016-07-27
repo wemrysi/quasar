@@ -24,7 +24,6 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
 import scalaz._
-import com.precog.yggdrasil.execution.EvaluationContext
 
 trait PredicatePullupSpecs[M[+_]] extends EvaluatorSpecification[M] {
   import dag._

@@ -20,9 +20,6 @@
 package com.precog.yggdrasil
 package vfs
 
-import metadata.PathMetadata
-import metadata.PathStructure
-
 import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest._

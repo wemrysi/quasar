@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package vfs
 
 import ResourceError.NotFound
-import metadata._
 import com.precog.common._, security._, ingest._
 import scalaz._, Scalaz._
 

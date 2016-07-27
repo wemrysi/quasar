@@ -25,7 +25,6 @@ import blueeyes._
 import com.precog.common._
 import com.precog.util.Identifier
 import com.precog.yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 
 trait ReductionFinderSpecs[M[+_]] extends EvaluatorSpecification[M] {
 

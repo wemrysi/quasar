@@ -18,17 +18,22 @@
  *
  */
 package com.precog.yggdrasil
-package execution
 
-import blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
-import com.precog.common._, security._, accounts._
+import blueeyes._
+import com.precog.common._
+import scalaz._
 
-case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
+case class PathMetadata(path: Path, pathType: PathMetadata.PathType)
 
-object EvaluationContext {
-  val schemaV1 = "apiKey" :: "account" :: "basePath" :: "scriptPath" :: "startTime" :: HNil
+object PathMetadata {
+  sealed trait PathType
+  case class DataDir(contentType: MimeType)  extends PathType
+  case class DataOnly(contentType: MimeType) extends PathType
+  case object PathOnly extends PathType
+}
 
-  implicit val decomposer: Decomposer[EvaluationContext] = decomposerV(schemaV1, Some("1.0".v))
-  implicit val extractor: Extractor[EvaluationContext]   = extractorV(schemaV1, Some("1.0".v))
+case class PathStructure(types: Map[CType, Long], children: Set[CPath])
+
+object PathStructure {
+  val Empty = PathStructure(Map.empty, Set.empty)
 }

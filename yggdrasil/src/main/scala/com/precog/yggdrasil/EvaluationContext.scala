@@ -17,18 +17,17 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil.serialization
+package com.precog.yggdrasil
 
-import java.io._
-import java.util.zip._
+import blueeyes._, json._, serialization._
+import IsoSerialization._, Iso8601Serialization._, Versioned._
+import com.precog.common._, security._, accounts._
 
-trait StreamSerialization {
-  def iStream(file: File): DataInputStream
-  def oStream(file: File): DataOutputStream
+case class EvaluationContext(apiKey: APIKey, account: AccountDetails, basePath: Path, scriptPath: Path, startTime: DateTime)
+
+object EvaluationContext {
+  val schemaV1 = "apiKey" :: "account" :: "basePath" :: "scriptPath" :: "startTime" :: HNil
+
+  implicit val decomposer: Decomposer[EvaluationContext] = decomposerV(schemaV1, Some("1.0".v))
+  implicit val extractor: Extractor[EvaluationContext]   = extractorV(schemaV1, Some("1.0".v))
 }
-
-trait ZippedStreamSerialization extends StreamSerialization {
-  def iStream(file: File) = new DataInputStream(new GZIPInputStream(new FileInputStream(file)))
-  def oStream(file: File) = new DataOutputStream(new GZIPOutputStream(new FileOutputStream(file)))
-}
-// vim: set ts=4 sw=4 et:

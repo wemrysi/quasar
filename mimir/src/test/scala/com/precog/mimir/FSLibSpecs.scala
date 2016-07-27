@@ -24,7 +24,6 @@ import com.precog.common.Path
 import com.precog.common.accounts._
 
 import com.precog.yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.vfs._
 

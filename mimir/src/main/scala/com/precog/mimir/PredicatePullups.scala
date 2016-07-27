@@ -20,7 +20,6 @@
 package com.precog
 package mimir
 
-import com.precog.yggdrasil.execution.EvaluationContext
 import scalaz._, Scalaz._
 
 trait PredicatePullupsModule[M[+ _]] extends TransSpecableModule[M] {

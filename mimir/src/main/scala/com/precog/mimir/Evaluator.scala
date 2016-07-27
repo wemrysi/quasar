@@ -24,7 +24,6 @@ import blueeyes._
 import com.precog.common._, accounts._
 import com.precog.bytecode._
 import com.precog.yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 import com.precog.yggdrasil.TableModule._
 import com.precog.yggdrasil.vfs._
 import com.precog.util._

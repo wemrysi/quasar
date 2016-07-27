@@ -21,7 +21,6 @@ package com.precog.mimir
 
 import com.precog.common._
 import com.precog.yggdrasil._
-import com.precog.yggdrasil.execution.EvaluationContext
 import scalaz._, Scalaz._
 import blueeyes._, json._
 
