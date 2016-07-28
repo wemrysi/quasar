@@ -42,19 +42,19 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix, QScriptProject[Fix, ?]]
+  val qscript = new Transform[Fix, QScriptTotal[Fix, ?]]
   val optimize = new Optimize[Fix]
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptProject[Fix, ?]] =
+  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptTotal[Fix, ?]] =
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
     _.transCata(orOriginal(Optimizer.elideLets[Fix]))
       .transCataM(qscript.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptProject[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QScriptProject[Fix, ?], Fix[QScriptProject[Fix, ?]]]).lower) ⋙ optimize.applyAll)
+      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[Fix], QScriptTotal[Fix, ?], Fix[QScriptTotal[Fix, ?]]]).lower) ⋙ optimize.applyAll)
         // TODO: Rather than simply applying twice, we should apply repeatedly until unchanged.
         .transCata(optimize.applyAll))
 

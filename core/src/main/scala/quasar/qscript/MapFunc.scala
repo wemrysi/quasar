@@ -229,6 +229,8 @@ object MapFunc {
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
         case DupArrayIndices(a1) => f(a1) ∘ (DupArrayIndices(_))
         case DupMapKeys(a1) => f(a1) ∘ (DupMapKeys(_))
+        case ZipArrayIndices(a1) => f(a1) ∘ (ZipArrayIndices(_))
+        case ZipMapKeys(a1) => f(a1) ∘ (ZipMapKeys(_))
 
         // binary
         case Extract(a1, a2) => (f(a1) ⊛ f(a2))(Extract(_, _))
@@ -293,6 +295,8 @@ object MapFunc {
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
         case (DupArrayIndices(a1), DupArrayIndices(b1)) => in.equal(a1, b1)
         case (DupMapKeys(a1), DupMapKeys(b1)) => in.equal(a1, b1)
+        case (ZipArrayIndices(a1), ZipArrayIndices(b1)) => in.equal(a1, b1)
+        case (ZipMapKeys(a1), ZipMapKeys(b1)) => in.equal(a1, b1)
 
         case (Extract(a1, a2), Extract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -358,6 +362,8 @@ object MapFunc {
         case MakeArray(a1) => Cord("MakeArray(") ++ sh.show(a1) ++ Cord(")")
         case DupArrayIndices(a1) => Cord("DupArrayIndices(") ++ sh.show(a1) ++ Cord(")")
         case DupMapKeys(a1) => Cord("DupMapKeys(") ++ sh.show(a1) ++ Cord(")")
+        case ZipArrayIndices(a1) => Cord("ZipArrayIndices(") ++ sh.show(a1) ++ Cord(")")
+        case ZipMapKeys(a1) => Cord("ZipMapKeys(") ++ sh.show(a1) ++ Cord(")")
 
         // binary
         case Extract(a1, a2) => Cord("Extract(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
@@ -529,6 +535,8 @@ object MapFuncs {
   // helpers & QScript-specific
   @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ZipMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)

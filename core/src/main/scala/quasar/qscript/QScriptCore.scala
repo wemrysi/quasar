@@ -223,13 +223,13 @@ object QScriptCore {
           case Take(src, from, count) =>
             Take(
               src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])))
+              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])),
+              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])))
           case Drop(src, from, count) =>
             Drop(
               src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptProject[T, ?], Hole])))
+              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])),
+              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])))
         }
       }
     }

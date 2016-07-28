@@ -62,7 +62,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
            TJ: ThetaJoin[T, ?] :<: F,
            PB: ProjectBucket[T, ?] :<: F,
            // TODO: Remove this one once we have multi-sorted AST
-           FI: F :<: QScriptProject[T, ?],
+           FI: F :<: QScriptTotal[T, ?],
            mergeable:  Mergeable.Aux[T, F],
            eq:         Delay[Equal, F],
            show:       Delay[Show, F])
@@ -78,7 +78,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](deadEnd))))
 
   val RootTarget: TargetT = DeadEndTarget(Root)
-  val EmptyTarget: TargetT = DeadEndTarget(Empty)
 
   type Envs = List[Target[Hole]]
 
@@ -268,7 +267,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def shiftValues(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
       Target[T[Target]] = {
     val Ann(provs, value) = input.project.ask
-    val (merged, shiftAccess, valAccess) = concat(Free.roll(f(value)), value)
     val (sides, leftAccess, rightAccess) =
       concat(
         Free.point[MapFunc[T, ?], JoinSide](LeftSide),
@@ -276,9 +274,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     EnvT((
       Ann(
-        prov.shiftMap(shiftAccess >> rightAccess) :: provs.map(_ >> leftAccess),
-        valAccess >> rightAccess),
-      SP.inj(LeftShift(input, merged, sides))))
+        prov.shiftMap(Free.roll[MapFunc[T, ?], Hole](ProjectIndex(rightAccess, IntLit(0)))) :: provs.map(_ >> leftAccess),
+        Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
+      SP.inj(LeftShift(input, Free.roll(f(value)), sides))))
   }
 
   def shiftIds(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
@@ -317,9 +315,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       //   id(p, x:bar) - 2
       // (one bucket)
       case structural.FlattenMap =>
-        flatten(shiftValues(values(0), DupMapKeys(_)))
+        flatten(shiftValues(values(0), ZipMapKeys(_)))
       case structural.FlattenArray =>
-        flatten(shiftValues(values(0), DupArrayIndices(_)))
+        flatten(shiftValues(values(0), ZipArrayIndices(_)))
 
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -340,8 +338,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       //   id(p, y, foo) - 1
       //   id(p, y, bar) - 2
       // (two buckets)
-      case structural.ShiftMap   => shiftValues(values(0), DupMapKeys(_))
-      case structural.ShiftArray => shiftValues(values(0), DupArrayIndices(_))
+      case structural.ShiftMap   => shiftValues(values(0), ZipMapKeys(_))
+      case structural.ShiftArray => shiftValues(values(0), ZipArrayIndices(_))
 
       // id(p, x) - {foo: 12, bar: 18}
       // id(p, y) - {foo: 1, bar: 2}
@@ -727,7 +725,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]](
-    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
+    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
       ThetaJoin[T, ?] ~> F =
     new (ThetaJoin[T, ?] ~> F) {
       def apply[A](tj: ThetaJoin[T, A]) = tj match {
@@ -766,11 +764,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       }
     }
 
-  def rebaseT[F[_]: Traverse](target: FreeQS[T], src: T[F])(implicit FI: F :<: QScriptProject[T, ?]): Option[T[F]] =
-    (target.map(_ => src.transAna(FI))).ana(CoEnv.freeIso[T[QScriptProject[T, ?]], QScriptProject[T, ?]].reverseGet).cata(recover(_.embed)).transAnaM(FI.prj)
+  def rebaseT[F[_]: Traverse](
+    target: FreeQS[T], src: T[F])(
+    implicit FI: F :<: QScriptTotal[T, ?]):
+      Option[T[F]] =
+    freeCata(target.map(_ => src.transAna(FI)))(recover(_.embed))
+      .transAnaM(FI.prj)
 
   def elideConstantJoin[F[_]: Traverse](
-    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F,
+             FI: F :<: QScriptTotal[T, ?]):
       ThetaJoin[T, T[F]] => F[T[F]] = {
     case x @ ThetaJoin(src0, l, r, on, Inner, combine) if on ≟ BoolLit(true) =>
       (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
@@ -825,7 +829,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       }
     }
 
-  def coalesceQC[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
+  def coalesceQC[F[_]: Functor](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
       QScriptCore[T, T[F]] => Option[QScriptCore[T, T[F]]] = {
     case Map(Embed(src), mf) => QC.prj(src) >>= {
       case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
@@ -847,7 +851,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
   }
 
   // TODO merge with `coalesceQC`
-  def coalesceQCCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptProject[T, ?]):
+  def coalesceQCCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
       QScriptCore[T, T[CoEnv[A, F, ?]]] => Option[QScriptCore[T, T[CoEnv[A, F, ?]]]] = {
     case Map(Embed(src), mf) =>
       src.run.toOption >>= QC.prj >>= {
@@ -944,7 +948,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptProject[T, ?]):
+             FI: F :<: QScriptTotal[T, ?]):
       F[T[F]] => F[T[F]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
       Normalizable[F].normalize ⋙
@@ -964,7 +968,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptProject[T, ?]):
+             FI: F :<: QScriptTotal[T, ?]):
       F[T[F]] => F[T[F]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
       Normalizable[F].normalize ⋙
@@ -981,7 +985,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptProject[T, ?]):
+             FI: F :<: QScriptTotal[T, ?]):
       F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[A, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙

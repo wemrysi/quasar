@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.fp._
 
 import matryoshka._
+import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
@@ -55,6 +56,21 @@ object EquiJoin {
         }
     }
 
+  implicit def show[T[_[_]]: ShowT]: Delay[Show, EquiJoin[T, ?]] =
+    new Delay[Show, EquiJoin[T, ?]] {
+      def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
+        case EquiJoin(src, lBr, rBr, lkey, rkey, f, combine) =>
+          Cord("ThetaJoin(") ++
+          showA.show(src) ++ Cord(",") ++
+          lBr.show ++ Cord(",") ++
+          rBr.show ++ Cord(",") ++
+          lkey.show ++ Cord(",") ++
+          rkey.show ++ Cord(",") ++
+          f.show ++ Cord(",") ++
+          combine.show ++ Cord(")")
+      }
+    }
+
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {
       def traverseImpl[G[_]: Applicative, A, B](
@@ -62,5 +78,36 @@ object EquiJoin {
         f: A => G[B]) =
         f(fa.src) ∘
           (EquiJoin(_, fa.lBranch, fa.rBranch, fa.lKey, fa.rKey, fa.f, fa.combine))
+    }
+
+  implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, EquiJoin[T, ?]] =
+    new Mergeable[EquiJoin[T, ?]] {
+      type IT[F[_]] = T[F]
+
+      def mergeSrcs(
+        left: FreeMap[IT],
+        right: FreeMap[IT],
+        p1: EnvT[Ann[T], EquiJoin[IT, ?], Hole],
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], Hole]) =
+        // TODO: merge two joins with different combine funcs
+        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+    }
+
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
+      Normalizable[EquiJoin[T, ?]] =
+    new Normalizable[EquiJoin[T, ?]] {
+      val opt = new Optimize[T]
+
+      def normalize = new (EquiJoin[T, ?] ~> EquiJoin[T, ?]) {
+        def apply[A](ej: EquiJoin[T, A]) =
+          EquiJoin(
+            ej.src,
+            freeTransCata(ej.lBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])),
+            freeTransCata(ej.rBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?], Hole])),
+            normalizeMapFunc(ej.lKey),
+            normalizeMapFunc(ej.rKey),
+            ej.f,
+            normalizeMapFunc(ej.combine))
+      }
     }
 }

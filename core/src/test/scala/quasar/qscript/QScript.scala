@@ -32,10 +32,10 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptSpec extends CompilerHelpers with ScalazMatchers {
-  val transform = new Transform[Fix, QScriptProject[Fix, ?]]
+  val transform = new Transform[Fix, QScriptTotal[Fix, ?]]
 
   // TODO: Narrow this to QScriptPure
-  type QS[A] = QScriptProject[Fix, A]
+  type QS[A] = QScriptTotal[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
