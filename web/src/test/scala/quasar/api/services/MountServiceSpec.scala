@@ -17,6 +17,7 @@
 package quasar.api.services
 
 import quasar.Predef._
+import quasar.Variables
 import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
@@ -25,8 +26,10 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
 import quasar.fs.mount.{MountRequest => MR, _}
+import quasar.sql
 
 import argonaut._, Argonaut._
+import matryoshka.Fix
 import org.http4s._, Status._
 import org.http4s.argonaut._
 import org.specs2.specification.core.Fragments
@@ -38,7 +41,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Http4s with PathUtils {
-  import quasar.fs.mount.ViewMounterSpec._
+  import MountServiceSpec._
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
@@ -149,7 +152,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
       "succeed with correct view path" ! prop { f: AFile =>
         !hasDot(f) ==> {
           runTest { service =>
-            val cfg = viewConfig("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+            val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
             val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
@@ -370,7 +373,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
         "succeed with view path" ! prop { (parent: ADir, f: RFile) =>
           !hasDot(parent </> f) ==> {
             runTest { service =>
-              val (expr, vars) = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
               for {
@@ -393,7 +396,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
         "succeed with view under existing fs path" ! prop { (fs: ADir, viewSuffix: RFile) =>
           !hasDot(fs </> viewSuffix) ==> {
             runTest { service =>
-              val (expr, vars) = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
               val view = fs </> viewSuffix
@@ -425,7 +428,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
         "succeed with view 'above' existing fs path" ! prop { (d: ADir, view: RFile, fsSuffix: RDir) =>
           !hasDot(d </> view) ==> {
             runTest { service =>
-              val (expr, vars) = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+              val (expr, vars) = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
               val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(expr, vars))
 
               val fs = d </> posixCodec.parseRelDir(posixCodec.printPath(view) + "/").flatMap(sandbox(currentDir, _)).get </> fsSuffix
@@ -495,7 +498,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
 
         "be 400 with view config and dir path in X-File-Name header" ! prop { (parent: ADir, viewDir: RDir) =>
           runTest { service =>
-            val cfg = viewConfig("select * from zips where pop < :cutoff", "cutoff" -> "1000")
+            val cfg = unsafeViewCfg("select * from zips where pop < :cutoff", "cutoff" -> "1000")
             val cfgStr = EncodeJson.of[MountConfig].encode(MountConfig.viewConfig(cfg))
 
             for {
@@ -670,7 +673,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
       "succeed with view path" ! prop { (f: AFile) =>
         !hasDot(f) ==> {
           runTest { service =>
-            val cfg = viewConfig("select * from zips where pop > :cutoff", "cutoff" -> "1000")
+            val cfg = unsafeViewCfg("select * from zips where pop > :cutoff", "cutoff" -> "1000")
 
             for {
               _     <- M.mountView(f, cfg._1, cfg._2)
@@ -706,4 +709,12 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
       }
     }
   }
+}
+
+object MountServiceSpec {
+  def unsafeViewCfg(q: String, vars: (String, String)*): (Fix[sql.Sql], Variables) =
+    (
+      sql.fixParser.parse(sql.Query(q)).toOption.get,
+      Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
+    )
 }

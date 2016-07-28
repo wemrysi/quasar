@@ -44,24 +44,30 @@ package object mount {
 
   type MountConfigs[A] = KeyValueStore[APath, MountConfig, A]
 
+  object MountConfigs {
+    def Ops[S[_]](implicit S: MountConfigs :<: S) =
+      KeyValueStore.Ops[APath, MountConfig, S]
+  }
+
   type MountingFileSystem[A] = Coproduct[Mounting, FileSystem, A]
 
-  def interpretMountingFileSystem[M[_]](
-    m: Mounting ~> M,
-    fs: FileSystem ~> M
-  ): MountingFileSystem ~> M =
-    m :+: fs
+  object MountingFileSystem {
+    def interpret[F[_]](
+      mounting: Mounting ~> F,
+      fileSystem: FileSystem ~> F
+    ): MountingFileSystem ~> F =
+      mounting :+: fileSystem
+  }
 
   //-- Views --
 
-  sealed trait ResultSet
+  sealed abstract class ResultSet
+
   object ResultSet {
     final case class Data(values: Vector[quasar.Data])       extends ResultSet
     final case class Read(handle: ReadFile.ReadHandle)       extends ResultSet
     final case class Results(handle: QueryFile.ResultHandle) extends ResultSet
   }
-
-  type ViewHandles = Map[ReadFile.ReadHandle, ResultSet]
 
   type ViewState[A] = KeyValueStore[ReadFile.ReadHandle, ResultSet, A]
 
@@ -70,6 +76,8 @@ package object mount {
       implicit S: ViewState :<: S
     ): KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S] =
       KeyValueStore.Ops[ReadFile.ReadHandle, ResultSet, S]
+
+    type ViewHandles = Map[ReadFile.ReadHandle, ResultSet]
 
     def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
       TaskRef(initial) map KeyValueStore.fromTaskRef
@@ -80,13 +88,19 @@ package object mount {
 
   type ViewFileSystem0[A] = Coproduct[MonotonicSeq, FileSystem, A]
   type ViewFileSystem1[A] = Coproduct[ViewState, ViewFileSystem0, A]
-  type ViewFileSystem[A]  = Coproduct[MountConfigs, ViewFileSystem1, A]
+  type ViewFileSystem2[A] = Coproduct[MountingFailure, ViewFileSystem1, A]
+  type ViewFileSystem3[A] = Coproduct[PathMismatchFailure, ViewFileSystem2, A]
+  type ViewFileSystem[A]  = Coproduct[Mounting, ViewFileSystem3, A]
 
-  def interpretViewFileSystem[M[_]](
-    mc: MountConfigs ~> M,
-    v: ViewState ~> M,
-    s: MonotonicSeq ~> M,
-    fs: FileSystem ~> M
-  ): ViewFileSystem ~> M =
-    mc :+: v :+: s :+: fs
+  object ViewFileSystem {
+    def interpret[F[_]](
+      mounting: Mounting ~> F,
+      mismatchFailure: PathMismatchFailure ~> F,
+      mountingFailure: MountingFailure ~> F,
+      viewState: ViewState ~> F,
+      monotonicSeq: MonotonicSeq ~> F,
+      fileSystem: FileSystem ~> F
+    ): ViewFileSystem ~> F =
+      mounting :+: mismatchFailure :+: mountingFailure :+: viewState :+: monotonicSeq :+: fileSystem
+  }
 }

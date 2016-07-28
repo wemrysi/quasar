@@ -171,6 +171,16 @@ trait EitherTInstances {
         EitherT[F, E, A](Catchable[F].fail(t))
     }
 
+  implicit def eitherTMonadState[F[_], S, E](implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
+    new MonadState[EitherT[F, E, ?], S] {
+      def init = F.init.liftM[EitherT[?[_], E, ?]]
+      def get = F.get.liftM[EitherT[?[_], E, ?]]
+      def put(s: S) = F.put(s).liftM[EitherT[?[_], E, ?]]
+      override def map[A, B](fa: EitherT[F, E, A])(f: A => B) = fa map f
+      def bind[A, B](fa: EitherT[F, E, A])(f: A => EitherT[F, E, B]) = fa flatMap f
+      def point[A](a: => A) = F.point(a).liftM[EitherT[?[_], E, ?]]
+    }
+
   // Temporary workaround for a bug in scalaz 7.1, where the "right" value is
   // sequenced twice.
   // TODO: Remove this when we update to scalaz 7.2.

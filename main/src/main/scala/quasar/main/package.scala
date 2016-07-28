@@ -38,219 +38,261 @@ package object main {
 
   type MainErrT[F[_], A] = EitherT[F, String, A]
   type MainTask[A]       = MainErrT[Task, A]
+  val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
-  val MainTask           = MonadError[EitherT[Task,String,?], String]
-
-  /** Effects that physical filesystems require.
-    */
-  type PhysFsEff[A]  = Coproduct[PhysErr, Task, A]
-  type PhysFsEffM[A] = Free[PhysFsEff, A]
-
-  object PhysFsEff {
-    // Lift into FsEvalIOM
-    val toFsEvalIOM: PhysFsEff ~> FsEvalIOM =
-      injectFT[PhysErr, FsEvalIO] :+:
-      injectFT[Task, FsEvalIO]
-  }
-
-  /** The physical filesystems currently supported.
-    *
-    * NB: Will eventually be the lcd of all physical filesystems, or we limit
-    * to a fixed set of effects that filesystems must interpret into.
-    */
+  /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] =
     quasar.physical.skeleton.fs.definition[PhysFsEff]          |+|
     quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff] |+|
     quasar.physical.postgresql.fs.definition[PhysFsEff]
 
-  /** The intermediate effect FileSystem operations are interpreted into.
+  /** A "terminal" effect, encompassing failures and other effects which
+    * we may want to interpret using more than one implementation.
     */
-  type FsEff0[A] = Coproduct[ViewState, MountedResultH, A]
-  type FsEff1[A] = Coproduct[MonotonicSeq, FsEff0, A]
-  type FsEff2[A] = Coproduct[PhysFsEffM, FsEff1, A]
-  type FsEff[A]  = Coproduct[MountConfigs, FsEff2, A]
-  type FsEffM[A] = Free[FsEff, A]
+  type QEffIO[A]  = Coproduct[Task, QEff, A]
+  type QEff[A]    = Coproduct[Mounting, QErrs, A]
 
-  object FsEff {
-    /** Interpret all effects except failures. */
-    def toFsEvalIOM(
+  /** All possible types of failure in the system (apis + physical). */
+  type QErrsIO[A]  = Coproduct[Task, QErrs, A]
+  type QErrs[A]    = Coproduct[PhysErr, CoreErrs, A]
+
+  object QErrsIO {
+    /** Interprets errors into strings. */
+    val toMainTask: QErrsIO ~> MainTask = {
+      val f = reflNT[Task] :+: QErrs.toCatchable[Task]
+
+      new (QErrsIO ~> MainTask) {
+        def apply[A](a: QErrsIO[A]) =
+          EitherT(f(a).attempt).leftMap(_.getMessage)
+      }
+    }
+  }
+
+  object QErrs {
+    def toCatchable[F[_]: Catchable]: QErrs ~> F =
+      Failure.toRuntimeError[F, PhysicalError]             :+:
+      Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
+      Failure.toRuntimeError[F, MountingError]             :+:
+      Failure.toRuntimeError[F, FileSystemError]
+  }
+
+  /** Effect comprising the core Quasar apis. */
+  type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
+  type CoreEff[A]   = Coproduct[Mounting, CoreEff0, A]
+  type CoreEff0[A]  = Coproduct[QueryFile, CoreEff1, A]
+  type CoreEff1[A]  = Coproduct[ReadFile, CoreEff2, A]
+  type CoreEff2[A]  = Coproduct[WriteFile, CoreEff3, A]
+  type CoreEff3[A]  = Coproduct[ManageFile, CoreErrs, A]
+
+  object CoreEff {
+    def runFs[S[_]](
+      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+    )(
+      implicit
+      S0: Task :<: S,
+      S1: Mounting :<: S,
+      S2: PhysErr :<: S,
+      S3: MountingFailure :<: S,
+      S4: PathMismatchFailure :<: S,
+      S5: FileSystemFailure :<: S
+    ): Task[CoreEff ~> Free[S, ?]] =
+      CompositeFileSystem.interpreter[S](hfsRef) map { compFs =>
+        injectFT[Mounting, S]                           :+:
+        (compFs compose Inject[QueryFile, FileSystem])  :+:
+        (compFs compose Inject[ReadFile, FileSystem])   :+:
+        (compFs compose Inject[WriteFile, FileSystem])  :+:
+        (compFs compose Inject[ManageFile, FileSystem]) :+:
+        injectFT[PathMismatchFailure, S]                :+:
+        injectFT[MountingFailure, S]                    :+:
+        injectFT[FileSystemFailure, S]
+      }
+  }
+
+  /** The types of failure from core apis. */
+  type CoreErrs[A]  = Coproduct[PathMismatchFailure, CoreErrs0, A]
+  type CoreErrs0[A] = Coproduct[MountingFailure, FileSystemFailure, A]
+
+
+  //---- FileSystems ----
+
+  /** A FileSystem supporting views and physical filesystems mounted at various
+    * points in the hierarchy.
+    */
+  object CompositeFileSystem {
+    /** Interprets FileSystem given a TaskRef containing a hierarchical
+      * FileSystem interpreter.
+      *
+      * TODO: The TaskRef is used as a communications channel so that
+      *       the part of the system that deals with mounting can make
+      *       new interpreters available to the part of the system that
+      *       needs to interpret FileSystem operations.
+      *
+      *       This would probably be better served with a
+      *       `Process[Task, FileSystem ~> HierarchicalFsEffM]` to allow
+      *       for more flexible production of interpreters.
+      */
+    def interpreter[S[_]](
+      hfsRef: TaskRef[FileSystem ~> HierarchicalFsEffM]
+    )(implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S,
+      S2: Mounting :<: S,
+      S3: MountingFailure :<: S,
+      S4: PathMismatchFailure :<: S
+    ): Task[FileSystem ~> Free[S, ?]] =
+      for {
+        startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
+        seqRef     <- TaskRef(startSeq)
+        viewHRef   <- TaskRef[ViewState.ViewHandles](Map())
+        mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
+      } yield {
+        val hierarchicalFs: FileSystem ~> Free[S, ?] =
+          HierarchicalFsEff.dynamicFileSystem(
+            hfsRef,
+            HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
+
+        val compFs: V ~> Free[S, ?] =
+          injectFT[Task, S].compose(KeyValueStore.fromTaskRef(viewHRef)) :+:
+          injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))    :+:
+          injectFT[Mounting, S]                                          :+:
+          injectFT[MountingFailure, S]                                   :+:
+          injectFT[PathMismatchFailure, S]                               :+:
+          hierarchicalFs
+
+        flatMapSNT(compFs) compose view.fileSystem[V]
+      }
+
+    private type V[A]  = Coproduct[ViewState, V0, A]
+    private type V0[A] = Coproduct[MonotonicSeq, V1, A]
+    private type V1[A] = Coproduct[Mounting, V2, A]
+    private type V2[A] = Coproduct[MountingFailure, V3, A]
+    private type V3[A] = Coproduct[PathMismatchFailure, FileSystem, A]
+  }
+
+  /** The effects required by hierarchical FileSystem operations. */
+  type HierarchicalFsEffM[A] = Free[HierarchicalFsEff, A]
+  type HierarchicalFsEff[A]  = Coproduct[PhysFsEffM, HierarchicalFsEff0, A]
+  type HierarchicalFsEff0[A] = Coproduct[MountedResultH, MonotonicSeq, A]
+
+  object HierarchicalFsEff {
+    def interpreter[S[_]](
       seqRef: TaskRef[Long],
-      viewHandlesRef: TaskRef[ViewHandles],
       mntResRef: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
-    ): FsEff ~> FsEvalIOM = {
-      def injTask[E[_]](f: E ~> Task): E ~> FsEvalIOM =
-        injectFT[Task, FsEvalIO] compose f
+    )(implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S
+    ): HierarchicalFsEff ~> Free[S, ?] = {
+      val injTask = injectFT[Task, S]
 
-      injectFT[MountConfigs, FsEvalIO]                              :+:
-      foldMapNT(PhysFsEff.toFsEvalIOM)                              :+:
-      injTask[MonotonicSeq](MonotonicSeq.fromTaskRef(seqRef))       :+:
-      injTask[ViewState](KeyValueStore.fromTaskRef(viewHandlesRef)) :+:
-      injTask[MountedResultH](KeyValueStore.fromTaskRef(mntResRef))
+      foldMapNT(liftFT compose PhysFsEff.inject[S])         :+:
+      injTask.compose(KeyValueStore.fromTaskRef(mntResRef)) :+:
+      injTask.compose(MonotonicSeq.fromTaskRef(seqRef))
     }
 
     /** A dynamic `FileSystem` evaluator formed by internally fetching an
       * interpreter from a `TaskRef`, allowing for the behavior to change over
       * time as the ref is updated.
       */
-    def evalFSFromRef[S[_]](
-      ref: TaskRef[FileSystem ~> FsEffM],
-      f: FsEff ~> Free[S, ?]
-    )(implicit S: Task :<: S): FileSystem ~> Free[S, ?] = {
-      type F[A] = Free[S, A]
-      new (FileSystem ~> F) {
+    def dynamicFileSystem[S[_]](
+      ref: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      hfs: HierarchicalFsEff ~> Free[S, ?]
+    )(implicit
+      S: Task :<: S
+    ): FileSystem ~> Free[S, ?] =
+      new (FileSystem ~> Free[S, ?]) {
         def apply[A](fs: FileSystem[A]) =
-          injectFT[Task, S].apply(ref.read.map(free.foldMapNT[FsEff, F](f) compose _))
-            .flatMap(_.apply(fs))
+          lift(ref.read.map(free.foldMapNT(hfs) compose _))
+            .into[S]
+            .flatMap(_ apply fs)
       }
-    }
   }
 
-  /** The effects involved in FileSystem evaluation.
-    *
-    * We interpret into this effect to defer error handling and mount
-    * configuration based on the final context of interpretation
-    * (i.e. web service vs cmd line).
+  /** Effects that physical filesystems are permitted. */
+  type PhysFsEffM[A] = Free[PhysFsEff, A]
+  type PhysFsEff[A]  = Coproduct[Task, PhysErr, A]
+
+  object PhysFsEff {
+    def inject[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): PhysFsEff ~> S =
+      S0 :+: S1
+  }
+
+
+  //--- Mounting ---
+
+  /** Provides the mount handlers to update the hierarchical
+    * filesystem whenever a mount is added or removed.
     */
-  type FsEval[A]    = Coproduct[PhysErr, MountConfigs, A]
-  type FsEvalIO[A]  = Coproduct[Task, FsEval, A]
-  type FsEvalIOM[A] = Free[FsEvalIO, A]
+  val mountHandler = MountRequestHandler[PhysFsEffM, HierarchicalFsEff](physicalFileSystems)
+  import mountHandler.HierarchicalFsRef
 
+  type MountedFsRef[A] = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
 
-  //--- Composite FileSystem ---
+  /** Effects required for mounting. */
+  type MountEffM[A] = Free[MountEff, A]
+  type MountEff[A]  = Coproduct[PhysFsEffM, MountEff0, A]
+  type MountEff0[A] = Coproduct[HierarchicalFsRef, MountedFsRef, A]
 
-  /** Provides the mount handlers to update the composite
-    * (view + hierarchical + physical) filesystem whenever a mount is added
-    * or removed.
-    */
-  val mountHandler = EvaluatorMounter[PhysFsEffM, FsEff](physicalFileSystems)
-  import mountHandler.EvalFSRef
-
-  /** An atomic reference holding the mapping between mount points and
-    * physical filesystem interpreters.
-    */
-  type MountedFs[A]  = AtomicRef[Mounts[DefinitionResult[PhysFsEffM]], A]
-
-  /** Effect required by the composite (view + hierarchical + physical)
-    * filesystem.
-    */
-  type CompFsEff0[A] = Coproduct[MountedFs, MountConfigs, A]
-  type CompFsEff1[A] = Coproduct[PhysFsEffM, CompFsEff0, A]
-  type CompFsEff[A]  = Coproduct[EvalFSRef, CompFsEff1, A]
-  type CompFsEffM[A] = Free[CompFsEff, A]
-
-  object CompFsEff {
-    def toFsEvalIOM(
-      evalRef: TaskRef[FileSystem ~> FsEffM],
+  object MountEff {
+    def interpreter[S[_]](
+      hrchRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
       mntsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
-    ): CompFsEff ~> FsEvalIOM = {
-      def injTask[E[_]](f: E ~> Task): E ~> FsEvalIOM =
-        injectFT[Task, FsEvalIO] compose f
+    )(implicit
+      S0: Task :<: S,
+      S1: PhysErr :<: S
+    ): MountEff ~> Free[S, ?] = {
+      val injTask = injectFT[Task, S]
 
-      injTask[EvalFSRef](AtomicRef.fromTaskRef(evalRef)) :+:
-      foldMapNT(PhysFsEff.toFsEvalIOM)                   :+:
-      injTask[MountedFs](AtomicRef.fromTaskRef(mntsRef)) :+:
-      injectFT[MountConfigs, FsEvalIO]
+      foldMapNT(liftFT compose PhysFsEff.inject[S])   :+:
+      injTask.compose(AtomicRef.fromTaskRef(hrchRef)) :+:
+      injTask.compose(AtomicRef.fromTaskRef(mntsRef))
     }
   }
 
-  /** Effect required by the "complete" filesystem supporting modifying mounts,
-    * views, hierarchical mounts and physical implementations.
-    */
-  type CompleteFsEff[A] = Coproduct[MountConfigs, CompFsEffM, A]
-  type CompleteFsEffM[A] = Free[CompleteFsEff, A]
+  object KvsMounter {
+    /** A `Mounting` interpreter that uses a `KeyValueStore` to store
+      * `MountConfig`s.
+      *
+      * TODO: We'd like to not have to expose the `Mounts` `TaskRef`, but
+      *       currently need to due to how we initialize the system using
+      *       one mounting interpreter that updates these refs, but doesn't
+      *       persist configs, and then switch to another that does persist
+      *       configs post-initialization.
+      *
+      *       This should be unnecessary once we switch to lazy, on-demand
+      *       mounting.
+      *
+      * @param cfgsImpl  a `KeyValueStore` interpreter to `Task`
+      * @param hrchFsRef the current hierarchical FileSystem interpreter, updated whenever mounts change
+      * @param mntdFsRef the current mapping of directories to filesystem definitions,
+      *                  updated whenever mounts change
+      */
+    def interpreter[F[_], S[_]](
+      cfgsImpl: MountConfigs ~> F,
+      hrchFsRef: TaskRef[FileSystem ~> HierarchicalFsEffM],
+      mntdFsRef: TaskRef[Mounts[DefinitionResult[PhysFsEffM]]]
+    )(implicit
+      S0: F :<: S,
+      S1: Task :<: S,
+      S2: PhysErr :<: S
+    ): Mounting ~> Free[S, ?] = {
+      type G[A] = Coproduct[MountConfigs, MountEffM, A]
 
-  val mounter: Mounting ~> CompleteFsEffM =
-    quasar.fs.mount.Mounter[CompFsEffM, CompleteFsEff](
-      mountHandler.mount[CompFsEff](_),
-      mountHandler.unmount[CompFsEff](_))
+      val f: G ~> Free[S, ?] =
+        injectFT[F, S].compose(cfgsImpl) :+:
+        free.foldMapNT(MountEff.interpreter[S](hrchFsRef, mntdFsRef))
 
-  def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
-    type ST[A] = StateT[F, Map[APath, MountConfig], A]
+      val mounter: Mounting ~> Free[G, ?] =
+        quasar.fs.mount.Mounter[MountEffM, G](
+          mountHandler.mount[MountEff](_),
+          mountHandler.unmount[MountEff](_))
 
-    val toState: MountConfigs ~> ST =
-      KeyValueStore.toState[ST](Lens.id[Map[APath, MountConfig]])
-
-    evalNT[F, Map[APath, MountConfig]](Map()) compose toState
-  }
-
-  /** The possible types of failure in the system. */
-  type QErrs0[A] = Coproduct[FileSystemFailure, PhysErr, A]
-  type QErrs1[A] = Coproduct[MountingFailure, QErrs0, A]
-  type QErrs[A]  = Coproduct[PathMismatchFailure, QErrs1, A]
-
-  object QErrs {
-    def toCatchable[F[_]: Catchable]: QErrs ~> F =
-      Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
-      Failure.toRuntimeError[F, MountingError]             :+:
-      Failure.toRuntimeError[F, FileSystemError]           :+:
-      Failure.toRuntimeError[F, PhysicalError]
-  }
-
-  /** Encompasses all the failure effects and mount config effect, all of
-    * which we need to evaluate using more than one implementation.
-    */
-  type CfgsErrs[A]    = Coproduct[MountConfigs, QErrs, A]
-  type CfgsErrsIO[A]  = Coproduct[Task, CfgsErrs, A]
-  type CfgsErrsIOM[A] = Free[CfgsErrsIO, A]
-
-  object CfgsErrsIO {
-    /** Interprets errors into strings. */
-    def toMainTask(eval: MountConfigs ~> Task): CfgsErrsIO ~> MainTask = {
-      val f =
-        reflNT[Task] :+: eval :+: QErrs.toCatchable[Task]
-
-      new (CfgsErrsIO ~> MainTask) {
-        def apply[A](a: CfgsErrsIO[A]) =
-          EitherT(f(a).attempt).leftMap(_.getMessage)
-      }
+      free.foldMapNT(f) compose mounter
     }
-  }
 
-  /** Effect required by the core Quasar services */
-  type CoreEff0[A] = Coproduct[Mounting, FileSystem, A]
-  type CoreEff1[A] = Coproduct[FileSystemFailure, CoreEff0, A]
-  type CoreEff2[A] = Coproduct[MountingFailure, CoreEff1, A]
-  type CoreEff3[A] = Coproduct[PathMismatchFailure, CoreEff2, A]
-  type CoreEff[A]  = Coproduct[Task, CoreEff3, A]
-  type CoreEffM[A] = Free[CoreEff, A]
-
-  // TODO: Accept an initial set of mounts?
-  object CoreEff {
-    val interpreter: Task[CoreEff ~> CfgsErrsIOM] =
-      for {
-        startSeq   <- Task.delay(scala.util.Random.nextInt.toLong)
-        seqRef     <- TaskRef(startSeq)
-        viewHRef   <- TaskRef[ViewHandles](Map())
-        mntedRHRef <- TaskRef(Map[ResultHandle, (ADir, ResultHandle)]())
-        evalFsRef  <- TaskRef(Empty.fileSystem[FsEffM])
-        mntsRef    <- TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
-      } yield {
-        val f: FsEff ~> FsEvalIOM = FsEff.toFsEvalIOM(seqRef, viewHRef, mntedRHRef)
-        val g: CompFsEff ~> FsEvalIOM = CompFsEff.toFsEvalIOM(evalFsRef, mntsRef)
-
-        val liftTask: Task ~> CfgsErrsIOM =
-          injectFT[Task, CfgsErrsIO]
-
-        val translateFsErrs: FsEvalIOM ~> CfgsErrsIOM =
-          free.foldMapNT[FsEvalIO, CfgsErrsIOM](
-            liftTask                           :+:
-            injectFT[PhysErr, CfgsErrsIO]     :+:
-            injectFT[MountConfigs, CfgsErrsIO])
-
-        val mnt: CompleteFsEff ~> CfgsErrsIOM =
-          injectFT[MountConfigs, CfgsErrsIO] :+:
-          translateFsErrs.compose[CompFsEffM](free.foldMapNT(g))
-
-        val mounting: Mounting ~> CfgsErrsIOM =
-          free.foldMapNT(mnt) compose mounter
-
-        liftTask                                  :+:
-        injectFT[PathMismatchFailure, CfgsErrsIO] :+:
-        injectFT[MountingFailure, CfgsErrsIO]     :+:
-        injectFT[FileSystemFailure, CfgsErrsIO]   :+:
-        mounting                                  :+:
-        (translateFsErrs compose FsEff.evalFSFromRef(evalFsRef, f))
-      }
+    def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
+      type S = Map[APath, MountConfig]
+      evalNT[F, S](Map()) compose KeyValueStore.toState[StateT[F, S, ?]](Lens.id[S])
+    }
   }
 
   /** Mount all the mounts defined in the given configuration, returning
