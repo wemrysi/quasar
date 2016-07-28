@@ -18,10 +18,13 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.fp.numeric._
+import quasar.fp.free._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 object impl {
 
@@ -29,7 +32,7 @@ object impl {
 
   def read[S[_], C](
     open: (AFile, ReadOpts) => Free[S,FileSystemError \/ C],
-    read: C => Free[S,FileSystemError \/ Vector[Data]],
+    read: C => Free[S,FileSystemError \/ (C, Vector[Data])],
     close: C => Free[S,Unit])(implicit
     cursors: KeyValueStore.Ops[ReadFile.ReadHandle, C, S],
     idGen: MonotonicSeq.Ops[S]
@@ -46,7 +49,9 @@ object impl {
       case ReadFile.Read(handle) =>
         (for {
           cursor <- cursors.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
-          data <- EitherT(read(cursor))
+          result <- EitherT(read(cursor))
+          (newCursor, data) = result
+          _ <- cursors.put(handle, newCursor).liftM[FileSystemErrT]
         } yield data).run
 
       case ReadFile.Close(handle) =>
@@ -57,4 +62,42 @@ object impl {
         } yield ()).run.void
     }
   }
+
+  type ReadStream = Process[Task, FileSystemError \/ Vector[Data]]
+
+  def readFromProcess[S[_]](f: (AFile, ReadOpts) => FileSystemError \/ ReadStream)(
+    implicit
+      state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream, S],
+      idGen: MonotonicSeq.Ops[S],
+      S0: Task :<: S
+  ): ReadFile ~> Free[S, ?] =
+    new (ReadFile ~> Free[S, ?]) {
+      def apply[A](fa: ReadFile[A]): Free[S, A] = fa match {
+        case ReadFile.Open(file, offset, limit) =>
+          (for {
+            readStream <- EitherT(f(file, ReadOpts(offset, limit)).pure[Free[S,?]])
+            id <- idGen.next.liftM[FileSystemErrT]
+            handle = ReadFile.ReadHandle(file, id)
+            _ <- state.put(handle, readStream).liftM[FileSystemErrT]
+          } yield handle).run
+
+        case ReadFile.Read(handle) =>
+          (for {
+            stream <- state.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
+            data   <- EitherT(lift(stream.unconsOption).into[S].flatMap {
+                        case Some((value, streamTail)) =>
+                          state.put(handle, streamTail).as(value)
+                        case None                      =>
+                          state.delete(handle).as(Vector.empty[Data].right[FileSystemError])
+                      })
+          } yield data).run
+
+        case ReadFile.Close(handle) =>
+          (for {
+            stream <- state.get(handle)
+            _      <- injectFT[Task, S].apply(stream.kill.run).liftM[OptionT]
+            _      <- state.delete(handle).liftM[OptionT]
+          } yield ()).run.void
+      }
+    }
 }
