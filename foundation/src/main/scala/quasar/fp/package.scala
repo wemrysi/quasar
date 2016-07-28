@@ -614,7 +614,7 @@ package object fp
   // apomorphism - short circuit by returning left
   def substitute[T[_[_]], F[_]](original: T[F], replacement: T[F])(implicit T: Equal[T[F]]):
       T[F] => T[F] \/ T[F] =
-   tf => if (tf ≟ original) replacement.left else original.right
+   tf => if (tf ≟ original) replacement.left else tf.right
 
   // TODO: This should definitely be in Matryoshka.
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):

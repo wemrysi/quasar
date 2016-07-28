@@ -899,6 +899,50 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => SP.inj(x)
   }
 
+  def jfToCoEnv(jf: JoinFunc[T]): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+    jf.ana(CoEnv.freeIso[JoinSide, MapFunc[T, ?]].reverseGet)
+
+  def jfFromCoEnv(coenv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]]): JoinFunc[T] =
+    coenv.cata(CoEnv.freeIso[JoinSide, MapFunc[T, ?]].get)
+
+  def compactLeftShift[F[_]: Functor](
+    implicit SP: SourcedPathable[T, ?] :<: F):
+      SourcedPathable[T, T[F]] => F[T[F]] = {
+    case x @ LeftShift(src, struct, repair0) =>
+      struct.resume match {
+        case -\/(ZipArrayIndices(elem)) => {
+          val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            jfToCoEnv(repair0)
+          val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            jfToCoEnv(Free.point(RightSide))
+
+          val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            jfToCoEnv(Free.roll(ProjectIndex(Free.point(RightSide), IntLit(0))))
+          val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            jfToCoEnv(Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))))
+
+          val zerosCount: Int = repair.para(count(zeroRef))
+          val onesCount: Int = repair.para(count(oneRef))
+
+          if (zerosCount < 1 && onesCount < 1) {   // access neither element
+            SP.inj(x) // TODO `struct` is never used - should we remove it? 
+          } else if (onesCount < 1) {   // only access element 0
+            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+              transApoT(repair)(substitute(zeroRef, rightSide))
+            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), jfFromCoEnv(replacement)))
+          } else if (zerosCount < 1) {   // only access element 1
+            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+              transApoT(repair)(substitute(oneRef, rightSide))
+            SP.inj(LeftShift(src, elem, jfFromCoEnv(replacement)))
+          } else {   // access both elements
+            SP.inj(x)
+          }
+        }
+        case _ => SP.inj(x)
+      }
+    case x => SP.inj(x)
+  }
+
   def coalesceMapJoin[F[_]: Functor](
     implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
       QScriptCore[T, T[F]] => F[T[F]] = {
@@ -958,6 +1002,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])

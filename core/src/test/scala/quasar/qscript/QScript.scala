@@ -152,7 +152,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             Free.point(ReduceIndex(0)))))).embed.some)
     }
 
-    "convert a flatten array" in pending {
+    "convert a flatten array" in {
       // "select loc[:*] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -168,7 +168,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array" in pending {
+    "convert a constant shift array" in {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
