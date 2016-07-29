@@ -1018,6 +1018,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
