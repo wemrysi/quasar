@@ -637,11 +637,15 @@ package object fp
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
     free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
 
-  def toCoEnv[T[_[_]]: Corecursive, F[_]: Functor, E](free: Free[F, E]): T[CoEnv[E, F, ?]] =
-    free.ana(CoEnv.freeIso[E, F].reverseGet)
+  implicit final class FreeOps[F[_], E](val self: Free[F, E]) extends scala.AnyVal {
+    final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =
+      self.ana(CoEnv.freeIso[E, F].reverseGet)
+  }
 
-  def fromCoEnv[T[_[_]]: Recursive, F[_]: Functor, E](coenv: T[CoEnv[E, F, ?]]): Free[F, E] =
-    coenv.cata(CoEnv.freeIso[E, F].get)
+  implicit final class CoEnvOps[T[_[_]], F[_], E](val self: T[CoEnv[E, F, ?]]) extends scala.AnyVal {
+    final def fromCoEnv(implicit fa: Functor[F], tr: Recursive[T]): Free[F, E] =
+      self.cata(CoEnv.freeIso[E, F].get)
+  }
 
   /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
     */
@@ -649,10 +653,7 @@ package object fp
     free: Free[F, A])(
     f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       Free[F, A] =
-    free
-      .ana[T, CoEnv[A, F, ?]](CoEnv.freeIso[A, F].reverseGet)
-      .transCata[CoEnv[A, F, ?]](f)
-      .cata(CoEnv.freeIso[A, F].get)
+    free.toCoEnv[T].transCata[CoEnv[A, F, ?]](f).fromCoEnv
 
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =

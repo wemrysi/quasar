@@ -576,14 +576,14 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
-      val bucketsList: List[FreeMap[T]] = toCoEnv[T, MapFunc[T, ?], Hole](buckets).project match {
-        case StaticArray(as) => as.map(fromCoEnv[T, MapFunc[T, ?], Hole](_))
-        case mf => List(fromCoEnv[T, MapFunc[T, ?], Hole](mf.embed))
+      val bucketsList: List[FreeMap[T]] = buckets.toCoEnv[T].project match {
+        case StaticArray(as) => as.map(_.fromCoEnv)
+        case mf => List(mf.embed.fromCoEnv)
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] =
-          toCoEnv[T, MapFunc[T, ?], Hole](directions).project match {
+          directions.toCoEnv[T].project match {
             case StaticArray(as) => {
               as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
             }
@@ -905,14 +905,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       struct.resume match {
         case -\/(ZipArrayIndices(elem)) => {
           val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            toCoEnv(repair0)
+            repair0.toCoEnv[T]
           val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            toCoEnv(Free.point(RightSide))
+            Free.point[MapFunc[T, ?], JoinSide](RightSide).toCoEnv[T]
 
           val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            toCoEnv(Free.roll(ProjectIndex(Free.point(RightSide), IntLit(0))))
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(Free.point[MapFunc[T, ?], JoinSide](RightSide), IntLit(0))).toCoEnv[T]
           val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            toCoEnv(Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))))
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(Free.point[MapFunc[T, ?], JoinSide](RightSide), IntLit(1))).toCoEnv[T]
 
           val zerosCount: Int = repair.para(count(zeroRef))
           val onesCount: Int = repair.para(count(oneRef))
@@ -922,11 +922,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           } else if (onesCount < 1) {   // only access element 0
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(zeroRef, rightSide))
-            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), fromCoEnv(replacement)))
+            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), replacement.fromCoEnv))
           } else if (zerosCount < 1) {   // only access element 1
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(oneRef, rightSide))
-            SP.inj(LeftShift(src, elem, fromCoEnv(replacement)))
+            SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
           } else {   // access both elements
             SP.inj(x)
           }

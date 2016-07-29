@@ -108,7 +108,7 @@ object MapFunc {
 
     def apply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Corecursive, A](args: List[Free[MapFunc[T2, ?], A]]):
         Free[MapFunc[T2, ?], A] =
-      fromCoEnv[T, MapFunc[T2, ?], A](apply(args.map(toCoEnv[T, MapFunc[T2, ?], A](_))).embed)
+      apply(args.map(_.toCoEnv[T])).embed.fromCoEnv
 
     def apply[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Corecursive, A](args: List[T[CoEnv[A, MapFunc[T2, ?], ?]]]):
         CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]] = {
