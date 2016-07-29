@@ -901,9 +901,15 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
   def compactLeftShift[F[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F):
       SourcedPathable[T, T[F]] => F[T[F]] = {
-    case x @ LeftShift(src, struct, repair0) =>
-      struct.resume match {
-        case -\/(ZipArrayIndices(elem)) => {
+    case x @ LeftShift(src, struct, repair0) => {
+      val pattern: Option[(FreeMap[T], FreeMap[T] => Unary[T, FreeMap[T]])] = struct.resume match {
+        case -\/(ZipArrayIndices(elem)) => Some((elem, fm => DupArrayIndices(fm)))
+        case -\/(ZipMapKeys(elem)) => Some((elem, fm => DupMapKeys(fm)))
+        case _ => None
+      }
+
+      pattern match {
+        case Some((elem, dup)) => {
           val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
             repair0.toCoEnv[T]
 
@@ -923,7 +929,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
-            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), replacement.fromCoEnv))
+            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
           } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(oneRef, rightSideCoEnv))
@@ -932,8 +938,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
             SP.inj(x)
           }
         }
-        case _ => SP.inj(x)
+        case None => SP.inj(x)
       }
+    }
     case x => SP.inj(x)
   }
 
