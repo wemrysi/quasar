@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{LogicalPlan, Data, CompilerHelpers}
 import quasar.{LogicalPlan => LP}
+import quasar.ejson
 import quasar.fp._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
@@ -145,8 +146,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               LogicalPlan.Constant(Data.Str("name")))))).toOption must
       equal(
         SP.inj(LeftShift(
-          QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("city")))).embed,
-          Free.roll(ZipMapKeys(HoleF)),
+          RootR,
+          Free.roll(ZipMapKeys(ProjectFieldR(HoleF, StrLit("city")))),
           Free.roll(MakeMap[Fix, JoinFunc[Fix]](
             StrLit[Fix, JoinSide]("name"),
             Free.roll(ProjectField(
@@ -186,10 +187,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
-            QC.inj(Map(
-              RootR,
-              Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
-            Free.roll(ZipMapKeys(HoleF)),
+            RootR,
+            Free.roll(ZipMapKeys(Free.roll(ProjectField(HoleF, StrLit("person"))))),
             Free.roll(ProjectField(
               Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
               StrLit("height"))))).embed,
@@ -212,14 +211,17 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
       equal(
         SP.inj(LeftShift(
-          RootR,
-          Free.roll(ProjectField(
-            Free.roll(ProjectField(HoleF, StrLit("zips"))),
-            StrLit("loc"))),
+          SP.inj(LeftShift(
+            RootR,
+            Free.roll(ZipMapKeys(Free.roll(ProjectField(HoleF, StrLit("zips"))))),
+            Free.roll(ProjectField(
+              Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
+              StrLit("loc"))))).embed,
+          HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array" in {
+    "convert a constant shift array" in pending {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
@@ -233,23 +235,11 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(
-                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                  StrLit("bar"))),
-                StrLit("baz"))),
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(
-                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                  StrLit("bar"))),
-                StrLit("quux"))))),
-            Free.roll(ProjectField(
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                StrLit("bar"))),
-              StrLit("ducks"))))),
+          Free.roll(Nullary(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](1)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
           Free.point(RightSide))).embed.some)
     }
 
