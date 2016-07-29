@@ -912,10 +912,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
             rightSide.toCoEnv[T]
 
-          val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(0))).toCoEnv[T]
-          val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(1))).toCoEnv[T]
+          def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
+
+          val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+          val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
 
           val zerosCount: Int = repair.para(count(zeroRef))
           val onesCount: Int = repair.para(count(oneRef))
