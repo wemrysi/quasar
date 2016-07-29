@@ -21,7 +21,7 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -626,4 +626,10 @@ package object fp
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
     free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
+
+  def toCoEnv[T[_[_]]: Corecursive, F[_]: Functor, E](free: Free[F, E]): T[CoEnv[E, F, ?]] =
+    free.ana(CoEnv.freeIso[E, F].reverseGet)
+
+  def fromCoEnv[T[_[_]]: Recursive, F[_]: Functor, E](coenv: T[CoEnv[E, F, ?]]): Free[F, E] =
+    coenv.cata(CoEnv.freeIso[E, F].get)
 }
