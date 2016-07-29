@@ -18,10 +18,11 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendName, Data, TestConfig}
-import quasar.fp.{eitherTCatchable, TaskRef}
+import quasar.fp.{eitherTCatchable, TaskRef, reflNT}
 import quasar.fp.free._
-import quasar.fs.mount._
+import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._
+import quasar.main.{KvsMounter, HierarchicalFsEffM, PhysFsEff, PhysFsEffM}
 import quasar.physical._
 import quasar.regression.{interpretHfsIO, HfsIO}
 
@@ -138,12 +139,29 @@ object FileSystemTest {
     ).sequence
 
   def nullViewUT: Task[FileSystemUT[FileSystem]] =
-    (inMemUT |@| TaskRef(0L) |@| ViewState.toTask(Map())) {
-      (mem, seqRef, viewState) =>
+    (
+      inMemUT                                             |@|
+      TaskRef(0L)                                         |@|
+      ViewState.toTask(Map())                             |@|
+      TaskRef(Map[APath, MountConfig]())                  |@|
+      TaskRef(Empty.fileSystem[HierarchicalFsEffM])       |@|
+      TaskRef(Mounts.empty[DefinitionResult[PhysFsEffM]])
+    ) {
+      (mem, seqRef, viewState, cfgsRef, hfsRef, mntdRef) =>
+
+      val mounting: Mounting ~> Task = {
+        val toPhysFs = KvsMounter.interpreter[Task, PhysFsEff](
+          KeyValueStore.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+
+        foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
+          .compose(toPhysFs)
+      }
 
       val memPlus: ViewFileSystem ~> Task =
-        interpretViewFileSystem(
-          KeyValueStore.fromTaskRef(TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync),
+        ViewFileSystem.interpret(
+          mounting,
+          Failure.toRuntimeError[Task, Mounting.PathTypeMismatch],
+          Failure.toRuntimeError[Task, MountingError],
           viewState,
           MonotonicSeq.fromTaskRef(seqRef),
           mem.testInterp)

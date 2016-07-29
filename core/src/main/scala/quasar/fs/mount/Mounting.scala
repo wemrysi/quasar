@@ -93,11 +93,23 @@ object Mounting {
     def havingPrefix(dir: ADir): F[Map[APath, MountType]] =
       lift(HavingPrefix(dir))
 
-    /** Returns the mount configuration if the given path represents a mount. */
+    /** The views mounted at paths having the given prefix. */
+    def viewsHavingPrefix(dir: ADir): F[Set[AFile]] =
+      rPathsHavingPrefix(dir).map(_.foldMap(_.toSet))
+
+    /** The filesystems mounted at paths having the given prefix. */
+    def fsHavingPrefix(dir: ADir): F[Set[ADir]] =
+      rPathsHavingPrefix(dir).map(_.foldMap(_.swap.toSet))
+
+    /** Whether the given path refers to a mount. */
+    def exists(path: APath): F[Boolean] =
+      lookupType(path).isDefined
+
+    /** Returns the mount configuration if the given path refers to a mount. */
     def lookupConfig(path: APath): OptionT[F, MountConfig] =
       OptionT(lift(LookupConfig(path)))
 
-    /** Returns the type of mount the path represents, if any. */
+    /** Returns the type of mount the path refers to, if any. */
     def lookupType(path: APath): OptionT[F, MountType] =
       OptionT(lift(LookupType(path)))
 
@@ -199,6 +211,9 @@ object Mounting {
         _       <- mmErr.onFail(res1, err => restore *> mmErr.fail(err))
       } yield ()
     }
+
+    private def rPathsHavingPrefix(dir: ADir): F[Set[ADir \/ AFile]] =
+      havingPrefix(dir).map(_.keySet.map(refineType))
   }
 
   object Ops {

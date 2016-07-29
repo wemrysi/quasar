@@ -46,7 +46,7 @@ class RestApiSpecs extends quasar.QuasarSpecification {
 
     val fs =
       runFs(InMemState.empty)
-        .map(interpretMountingFileSystem(mount, _))
+        .map(MountingFileSystem.interpret(mount, _))
 
     val eff = fs map { runFs =>
       NaturalTransformation.refl[Task]               :+:
