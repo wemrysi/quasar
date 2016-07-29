@@ -59,23 +59,6 @@ package object qscript {
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
 
-  sealed trait JoinSide
-  final case object LeftSide extends JoinSide
-  final case object RightSide extends JoinSide
-
-  object JoinSide {
-    implicit val equal: Equal[JoinSide] = Equal.equalRef
-    implicit val show: Show[JoinSide] = Show.showFromToString
-  }
-
-  sealed trait Hole
-  final case object SrcHole extends Hole
-
-  object Hole {
-    implicit val equal: Equal[Hole] = Equal.equalRef
-    implicit val show: Show[Hole] = Show.showFromToString
-  }
-
   type FreeHole[F[_]] = Free[F, Hole]
 
   type FreeMap[T[_[_]]] = FreeHole[MapFunc[T, ?]]

@@ -1,0 +1,1 @@
+- temporarily insert QS.LeftShift after processing LP.Read

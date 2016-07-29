@@ -493,7 +493,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   // TODO: Replace disjunction with validation.
   def lpToQScript: LogicalPlan[T[Target]] => PlannerError \/ TargetT = {
     case LogicalPlan.ReadF(path) =>
-      pathToProj(path).right
+      // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
+      //       however doing that would break the old Mongo backend, and we can
+      //       handle it here for now. But it should be moved to the SQL²
+      //       compiler when the old Mongo backend is replaced. (#1298)
+      shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
       fromData(data).map(d =>
