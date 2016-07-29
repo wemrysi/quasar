@@ -906,13 +906,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
         case -\/(ZipArrayIndices(elem)) => {
           val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
             repair0.toCoEnv[T]
-          val rightSide: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.point[MapFunc[T, ?], JoinSide](RightSide).toCoEnv[T]
+
+          val rightSide: JoinFunc[T] =
+            Free.point[MapFunc[T, ?], JoinSide](RightSide)
+          val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            rightSide.toCoEnv[T]
 
           val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(Free.point[MapFunc[T, ?], JoinSide](RightSide), IntLit(0))).toCoEnv[T]
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(0))).toCoEnv[T]
           val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(Free.point[MapFunc[T, ?], JoinSide](RightSide), IntLit(1))).toCoEnv[T]
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(1))).toCoEnv[T]
 
           val zerosCount: Int = repair.para(count(zeroRef))
           val onesCount: Int = repair.para(count(oneRef))
@@ -921,11 +924,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
             SP.inj(x) // TODO `struct` is never used - should we remove it? 
           } else if (onesCount < 1) {   // only access element 0
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              transApoT(repair)(substitute(zeroRef, rightSide))
+              transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
             SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), replacement.fromCoEnv))
           } else if (zerosCount < 1) {   // only access element 1
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              transApoT(repair)(substitute(oneRef, rightSide))
+              transApoT(repair)(substitute(oneRef, rightSideCoEnv))
             SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
           } else {   // access both elements
             SP.inj(x)
