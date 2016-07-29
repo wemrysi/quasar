@@ -21,7 +21,7 @@ import quasar.fp._
 
 import scala.Predef.implicitly
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
@@ -126,21 +126,6 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
-  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
-    */
-  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
-    free: Free[F, A])(
-    f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
-      Free[F, A] =
-    free
-      .ana[T, CoEnv[A, F, ?]](CoEnv.freeIso[A, F].reverseGet)
-      .transCata[CoEnv[A, F, ?]](f)
-      .cata(CoEnv.freeIso[A, F].get)
-
-  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
-      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    co => co.run.fold(κ(co), f)
-
   // TODO: move to matryoshka
 
   implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
@@ -171,5 +156,3 @@ package object qscript {
     def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
   }
 }
-
-

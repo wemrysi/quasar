@@ -576,15 +576,14 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
-      // The ana over the freeIso converts from Free to T[CoEnv]. It’s the first step of freeTransCata.
-      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
-        case StaticArray(as) => as.map(_.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
-        case mf => List(mf.embed.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
+      val bucketsList: List[FreeMap[T]] = toCoEnv[T, MapFunc[T, ?], Hole](buckets).project match {
+        case StaticArray(as) => as.map(fromCoEnv[T, MapFunc[T, ?], Hole](_))
+        case mf => List(fromCoEnv[T, MapFunc[T, ?], Hole](mf.embed))
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] =
-          directions.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
+          toCoEnv[T, MapFunc[T, ?], Hole](directions).project match {
             case StaticArray(as) => {
               as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
             }

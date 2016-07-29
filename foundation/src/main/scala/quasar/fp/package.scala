@@ -21,7 +21,7 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -632,4 +632,20 @@ package object fp
 
   def fromCoEnv[T[_[_]]: Recursive, F[_]: Functor, E](coenv: T[CoEnv[E, F, ?]]): Free[F, E] =
     coenv.cata(CoEnv.freeIso[E, F].get)
+
+  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
+    */
+  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
+    free: Free[F, A])(
+    f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      Free[F, A] =
+    free
+      .ana[T, CoEnv[A, F, ?]](CoEnv.freeIso[A, F].reverseGet)
+      .transCata[CoEnv[A, F, ?]](f)
+      .cata(CoEnv.freeIso[A, F].get)
+
+  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
+    co => co.run.fold(κ(co), f)
+
 }
