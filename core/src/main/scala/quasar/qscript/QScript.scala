@@ -580,15 +580,14 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
-      // The ana over the freeIso converts from Free to T[CoEnv]. It’s the first step of freeTransCata.
-      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
-        case StaticArray(as) => as.map(_.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
-        case mf => List(mf.embed.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
+      val bucketsList: List[FreeMap[T]] = buckets.toCoEnv[T].project match {
+        case StaticArray(as) => as.map(_.fromCoEnv)
+        case mf => List(mf.embed.fromCoEnv)
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] =
-          directions.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
+          directions.toCoEnv[T].project match {
             case StaticArray(as) => {
               as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
             }
@@ -903,6 +902,48 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => SP.inj(x)
   }
 
+  def compactLeftShift[F[_]: Functor](
+    implicit SP: SourcedPathable[T, ?] :<: F):
+      SourcedPathable[T, T[F]] => F[T[F]] = {
+    case x @ LeftShift(src, struct, repair0) =>
+      struct.resume match {
+        case -\/(ZipArrayIndices(elem)) => {
+          val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            repair0.toCoEnv[T]
+
+          val rightSide: JoinFunc[T] =
+            Free.point[MapFunc[T, ?], JoinSide](RightSide)
+          val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            rightSide.toCoEnv[T]
+
+          def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
+
+          val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+          val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
+
+          val zerosCount: Int = repair.para(count(zeroRef))
+          val onesCount: Int = repair.para(count(oneRef))
+
+          if (zerosCount < 1 && onesCount < 1) {   // access neither element
+            SP.inj(x) // TODO `struct` is never used - should we remove it? 
+          } else if (onesCount < 1) {   // only access element 0
+            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+              transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
+            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), replacement.fromCoEnv))
+          } else if (zerosCount < 1) {   // only access element 1
+            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+              transApoT(repair)(substitute(oneRef, rightSideCoEnv))
+            SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
+          } else {   // access both elements
+            SP.inj(x)
+          }
+        }
+        case _ => SP.inj(x)
+      }
+    case x => SP.inj(x)
+  }
+
   def coalesceMapJoin[F[_]: Functor](
     implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
       QScriptCore[T, T[F]] => F[T[F]] = {
@@ -962,6 +1003,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
@@ -981,6 +1023,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
