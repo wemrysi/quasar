@@ -901,44 +901,45 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
   def compactLeftShift[F[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F):
       SourcedPathable[T, T[F]] => F[T[F]] = {
-    case x @ LeftShift(src, struct, repair0) => {
-      val pattern: Option[(FreeMap[T], FreeMap[T] => Unary[T, FreeMap[T]])] = struct.resume match {
-        case -\/(ZipArrayIndices(elem)) => Some((elem, fm => DupArrayIndices(fm)))
-        case -\/(ZipMapKeys(elem)) => Some((elem, fm => DupMapKeys(fm)))
-        case _ => None
-      }
+    case x @ LeftShift(src, struct, repair) => {
+      def rewrite(
+        src: T[F],
+        repair0: JoinFunc[T],
+        elem: FreeMap[T],
+        dup: FreeMap[T] => Unary[T, FreeMap[T]]):
+          F[T[F]] = {
+        val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          repair0.toCoEnv[T]
 
-      pattern match {
-        case Some((elem, dup)) => {
-          val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            repair0.toCoEnv[T]
+        val rightSide: JoinFunc[T] =
+          Free.point[MapFunc[T, ?], JoinSide](RightSide)
+        val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          rightSide.toCoEnv[T]
 
-          val rightSide: JoinFunc[T] =
-            Free.point[MapFunc[T, ?], JoinSide](RightSide)
-          val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            rightSide.toCoEnv[T]
+        def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
 
-          def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-            Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
+        val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+        val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
 
-          val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
-          val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
+        val rightCount: Int = repair.para(count(rightSideCoEnv))
 
-          val rightCount: Int = repair.para(count(rightSideCoEnv))
-
-          if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
-            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
-            SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
-          } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
-            val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
-              transApoT(repair)(substitute(oneRef, rightSideCoEnv))
-            SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
-          } else {
-            SP.inj(x)
-          }
+        if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
+          val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
+          SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
+        } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
+          val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            transApoT(repair)(substitute(oneRef, rightSideCoEnv))
+          SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
+        } else {
+          SP.inj(x)
         }
-        case None => SP.inj(x)
+      }
+      struct.resume match {
+        case -\/(ZipArrayIndices(elem)) => rewrite(src, repair, elem, fm => DupArrayIndices(fm))
+        case -\/(ZipMapKeys(elem)) => rewrite(src, repair, elem, fm => DupMapKeys(fm))
+        case _ => SP.inj(x)
       }
     }
     case x => SP.inj(x)
