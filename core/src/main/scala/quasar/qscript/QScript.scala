@@ -918,20 +918,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
           val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
 
-          val zerosCount: Int = repair.para(count(zeroRef))
-          val onesCount: Int = repair.para(count(oneRef))
+          val rightCount: Int = repair.para(count(rightSideCoEnv))
 
-          if (zerosCount < 1 && onesCount < 1) {   // access neither element
-            SP.inj(x) // TODO `struct` is never used - should we remove it? 
-          } else if (onesCount < 1) {   // only access element 0
+          if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
             SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](DupArrayIndices(elem)), replacement.fromCoEnv))
-          } else if (zerosCount < 1) {   // only access element 1
+          } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
             val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
               transApoT(repair)(substitute(oneRef, rightSideCoEnv))
             SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
-          } else {   // access both elements
+          } else {
             SP.inj(x)
           }
         }
