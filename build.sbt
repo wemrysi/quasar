@@ -160,8 +160,8 @@ lazy val root = project.in(file("."))
   .aggregate(
         foundation,
 //     / / | | \ \
-//
-      ejson, pillars,
+//        
+   ejson, pillars, js,
 //          |
           core,
 //      / / | \ \
@@ -201,9 +201,17 @@ lazy val pillars = project
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val js = project
+  .settings(name := "quasar-js-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, pillars % BothScopes, foundation % BothScopes)
+  .dependsOn(ejson % BothScopes, pillars % BothScopes, js % BothScopes, foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
