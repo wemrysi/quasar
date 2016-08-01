@@ -74,8 +74,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ZipMapKeys(ProjectFieldR(HoleF, StrLit("foo")))),
-          Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))))).embed.some)
+          ProjectFieldR(HoleF, StrLit("foo")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a squashed read" in {
@@ -85,8 +85,8 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ZipMapKeys(ProjectFieldR(HoleF, StrLit("foo")))),
-          Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))))).embed.some)
+          ProjectFieldR(HoleF, StrLit("foo")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a simple read with path projects" in {
@@ -95,13 +95,12 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ZipMapKeys(
+          ProjectFieldR(
             ProjectFieldR(
-              ProjectFieldR(
-                ProjectFieldR(HoleF, StrLit("some")),
-                StrLit("foo")),
-              StrLit("bar")))),
-          Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))))).embed.some)
+              ProjectFieldR(HoleF, StrLit("some")),
+              StrLit("foo")),
+            StrLit("bar")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a basic invoke" in {
@@ -147,13 +146,11 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ZipMapKeys(ProjectFieldR(HoleF, StrLit("city")))),
+          ProjectFieldR(HoleF, StrLit("city")),
           Free.roll(MakeMap[Fix, JoinFunc[Fix]](
             StrLit[Fix, JoinSide]("name"),
             Free.roll(ProjectField(
-              Free.roll[MapFunc[Fix, ?], JoinSide](ProjectIndex(
-                Free.point[MapFunc[Fix, ?], JoinSide](RightSide),
-                IntLit[Fix, JoinSide](1))),
+              Free.point[MapFunc[Fix, ?], JoinSide](RightSide),
               StrLit[Fix, JoinSide]("name"))))))).embed.some)
     }
 
@@ -188,9 +185,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         QC.inj(Reduce(
           SP.inj(LeftShift(
             RootR,
-            Free.roll(ZipMapKeys(Free.roll(ProjectField(HoleF, StrLit("person"))))),
+            Free.roll(ProjectField(HoleF, StrLit("person"))),
             Free.roll(ProjectField(
-              Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
+              Free.point(RightSide),
               StrLit("height"))))).embed,
           Free.roll(MakeArray(
             Free.roll(MakeMap(
@@ -213,9 +210,9 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         SP.inj(LeftShift(
           SP.inj(LeftShift(
             RootR,
-            Free.roll(ZipMapKeys(Free.roll(ProjectField(HoleF, StrLit("zips"))))),
+            Free.roll(ProjectField(HoleF, StrLit("zips"))),
             Free.roll(ProjectField(
-              Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
+              Free.point(RightSide),
               StrLit("loc"))))).embed,
           HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
