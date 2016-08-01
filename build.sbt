@@ -257,6 +257,7 @@ lazy val postgresql = project
   .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
 // FIXME: Disabled because it breaks the Travis build

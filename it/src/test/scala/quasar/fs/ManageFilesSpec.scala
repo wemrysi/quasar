@@ -164,16 +164,17 @@ class ManageFilesSpec extends FileSystemTest[FileSystem](
       }
 
       "[SD-1846] moving a directory with a name that is a prefix of another directory" >> {
+        // TODO: folder filenames have been shortened to workaround PostgreSQL table name length restriction — revisit
         val pnt = managePrefix </> dir("SD-1846")
-        val uf1 = pnt </> dir("Untitled Folder")   </> file("one")
-        val uf2 = pnt </> dir("Untitled Folder 1") </> file("two")
-        val uf3 = pnt </> dir("Untitled Folder 2") </> file("three")
+        val uf1 = pnt </> dir("UF")   </> file("one")
+        val uf2 = pnt </> dir("UF 1") </> file("two")
+        val uf3 = pnt </> dir("UF 2") </> file("three")
 
         val thirdDoc: Vector[Data] =
           Vector(Data.Obj(ListMap("c" -> Data.Int(1))))
 
-        val src = pnt </> dir("Untitled Folder")
-        val dst = pnt </> dir("Untitled Folder 1") </> dir("Untitled Folder")
+        val src = pnt </> dir("UF")
+        val dst = pnt </> dir("UF 1") </> dir("UF")
 
         val setupAndMove =
           write.saveThese(uf1, oneDoc)     *>
