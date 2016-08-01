@@ -493,7 +493,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   // TODO: Replace disjunction with validation.
   def lpToQScript: LogicalPlan[T[Target]] => PlannerError \/ TargetT = {
     case LogicalPlan.ReadF(path) =>
-      pathToProj(path).right
+      // TODO: Compilation of SQL² should insert a ShiftMap at each FROM,
+      //       however doing that would break the old Mongo backend, and we can
+      //       handle it here for now. But it should be moved to the SQL²
+      //       compiler when the old Mongo backend is replaced. (#1298)
+      shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
       fromData(data).map(d =>
@@ -576,15 +580,14 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
 
-      // The ana over the freeIso converts from Free to T[CoEnv]. It’s the first step of freeTransCata.
-      val bucketsList: List[FreeMap[T]] = buckets.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
-        case StaticArray(as) => as.map(_.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
-        case mf => List(mf.embed.cata(CoEnv.freeIso[Hole, MapFunc[T, ?]].get))
+      val bucketsList: List[FreeMap[T]] = buckets.toCoEnv[T].project match {
+        case StaticArray(as) => as.map(_.fromCoEnv)
+        case mf => List(mf.embed.fromCoEnv)
       }
 
       val directionsList: PlannerError \/ List[SortDir] = {
         val orderStrs: PlannerError \/ List[String] =
-          directions.ana(CoEnv.freeIso[Hole, MapFunc[T, ?]].reverseGet).project match {
+          directions.toCoEnv[T].project match {
             case StaticArray(as) => {
               as.traverse(x => StrLit.unapply(x.project)) \/> InternalError("unsupported ordering type")
             }
@@ -899,6 +902,53 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => SP.inj(x)
   }
 
+  def compactLeftShift[F[_]: Functor](
+    implicit SP: SourcedPathable[T, ?] :<: F):
+      SourcedPathable[T, T[F]] => F[T[F]] = {
+    case x @ LeftShift(src, struct, repair) => {
+      def rewrite(
+        src: T[F],
+        repair0: JoinFunc[T],
+        elem: FreeMap[T],
+        dup: FreeMap[T] => Unary[T, FreeMap[T]]):
+          F[T[F]] = {
+        val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          repair0.toCoEnv[T]
+
+        val rightSide: JoinFunc[T] =
+          Free.point[MapFunc[T, ?], JoinSide](RightSide)
+        val rightSideCoEnv: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          rightSide.toCoEnv[T]
+
+        def makeRef(idx: Int): T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+          Free.roll[MapFunc[T, ?], JoinSide](ProjectIndex(rightSide, IntLit(idx))).toCoEnv[T]
+
+        val zeroRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(0)
+        val oneRef: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] = makeRef(1)
+
+        val rightCount: Int = repair.para(count(rightSideCoEnv))
+
+        if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
+          val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
+          SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
+        } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
+          val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
+            transApoT(repair)(substitute(oneRef, rightSideCoEnv))
+          SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
+        } else {
+          SP.inj(x)
+        }
+      }
+      struct.resume match {
+        case -\/(ZipArrayIndices(elem)) => rewrite(src, repair, elem, fm => DupArrayIndices(fm))
+        case -\/(ZipMapKeys(elem)) => rewrite(src, repair, elem, fm => DupMapKeys(fm))
+        case _ => SP.inj(x)
+      }
+    }
+    case x => SP.inj(x)
+  }
+
   def coalesceMapJoin[F[_]: Functor](
     implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
       QScriptCore[T, T[F]] => F[T[F]] = {
@@ -958,6 +1008,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
@@ -977,6 +1028,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
       liftFG(simplifySP[F]) ⋙
+      liftFG(compactLeftShift[F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
