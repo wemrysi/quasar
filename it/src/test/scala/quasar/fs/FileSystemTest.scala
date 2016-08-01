@@ -87,6 +87,9 @@ abstract class FileSystemTest[S[_]](
   implicit class RunFsTask[A](fst: FsTask[A]) {
     import Leibniz.===
 
+    def run_\/ : FileSystemError \/ A =
+      fst.run.unsafePerformSync
+
     def runEither: Either[FileSystemError, A] =
       fst.run.unsafePerformSync.toEither
 
