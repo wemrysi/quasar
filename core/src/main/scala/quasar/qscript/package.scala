@@ -21,7 +21,7 @@ import quasar.fp._
 
 import scala.Predef.implicitly
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
@@ -58,23 +58,6 @@ package object qscript {
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
-
-  sealed trait JoinSide
-  final case object LeftSide extends JoinSide
-  final case object RightSide extends JoinSide
-
-  object JoinSide {
-    implicit val equal: Equal[JoinSide] = Equal.equalRef
-    implicit val show: Show[JoinSide] = Show.showFromToString
-  }
-
-  sealed trait Hole
-  final case object SrcHole extends Hole
-
-  object Hole {
-    implicit val equal: Equal[Hole] = Equal.equalRef
-    implicit val show: Show[Hole] = Show.showFromToString
-  }
 
   type FreeHole[F[_]] = Free[F, Hole]
 
@@ -126,21 +109,6 @@ package object qscript {
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1))),
       Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](2))))
 
-  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
-    */
-  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
-    free: Free[F, A])(
-    f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
-      Free[F, A] =
-    free
-      .ana[T, CoEnv[A, F, ?]](CoEnv.freeIso[A, F].reverseGet)
-      .transCata[CoEnv[A, F, ?]](f)
-      .cata(CoEnv.freeIso[A, F].get)
-
-  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
-      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    co => co.run.fold(κ(co), f)
-
   // TODO: move to matryoshka
 
   implicit def envtEqual[E: Equal, F[_]](implicit F: Delay[Equal, F]):
@@ -171,5 +139,3 @@ package object qscript {
     def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
   }
 }
-
-
