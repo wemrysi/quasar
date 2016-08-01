@@ -11,6 +11,7 @@ import de.heikoseeberger.sbtheader.HeaderPlugin
 import de.heikoseeberger.sbtheader.license.Apache2_0
 import sbt._, Aggregation.KeyValue, Keys._
 import sbt.std.Transform.DummyTaskMap
+import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
@@ -80,9 +81,9 @@ lazy val commonSettings = Seq(
     Wart.Serializable,          // /
     Wart.ToString),
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
-  testOptions in Test := Seq(Tests.Argument("exclude", "exclusive")),
+  testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
-  testOptions in ExclusiveTests := Seq(Tests.Argument("include", "exclusive")),
+  testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
   // Tasks tagged with `ExclusiveTest` should be run exclusively.
   concurrentRestrictions in Global := Seq(Tags.exclusive(ExclusiveTest)),
 
