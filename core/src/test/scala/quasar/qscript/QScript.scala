@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{LogicalPlan, Data, CompilerHelpers}
 import quasar.{LogicalPlan => LP}
+import quasar.ejson
 import quasar.fp._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
@@ -59,7 +60,6 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
          QC.inj(Map(RootR, BoolLit(true))).embed.some)
     }
 
-    // TODO EJson does not support Data.Set
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
       QueryFile.convertToQScript(
@@ -72,7 +72,10 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "convert a simple read" in {
       QueryFile.convertToQScript(lpRead("/foo")).toOption must
       equal(
-        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
+        SP.inj(LeftShift(
+          RootR,
+          ProjectFieldR(HoleF, StrLit("foo")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a squashed read" in {
@@ -80,33 +83,57 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       QueryFile.convertToQScript(
         identity.Squash(lpRead("/foo"))).toOption must
       equal(
-        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
+        SP.inj(LeftShift(
+          RootR,
+          ProjectFieldR(HoleF, StrLit("foo")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a simple read with path projects" in {
       QueryFile.convertToQScript(
         lpRead("/some/foo/bar")).toOption must
       equal(
-        QC.inj(
-          Map(RootR,
+        SP.inj(LeftShift(
+          RootR,
+          ProjectFieldR(
             ProjectFieldR(
-              ProjectFieldR(
-                ProjectFieldR(
-                  HoleF,
-                  StrLit("some")),
-                StrLit("foo")),
-              StrLit("bar")))).embed.some)
+              ProjectFieldR(HoleF, StrLit("some")),
+              StrLit("foo")),
+            StrLit("bar")),
+          Free.point(RightSide))).embed.some)
     }
 
     "convert a basic invoke" in {
       QueryFile.convertToQScript(
         math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
       equal(
-        QC.inj(
-          Map(RootR,
-            Free.roll(Add(
-              ProjectFieldR(HoleF, StrLit("foo")),
-              ProjectFieldR(HoleF, StrLit("bar")))))).embed.some)
+        TJ.inj(ThetaJoin(
+          RootR,
+          Free.roll(SP.inj(LeftShift(
+            Free.roll(QC.inj(Map(
+              Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("foo"))))),
+            Free.roll(ZipMapKeys(HoleF)),
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.point(LeftSide))),
+              Free.roll(MakeArray(Free.point(RightSide)))))))),
+          Free.roll(SP.inj(LeftShift(
+            Free.roll(QC.inj(Map(
+              Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("bar"))))),
+            Free.roll(ZipMapKeys(HoleF)),
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.point(LeftSide))),
+              Free.roll(MakeArray(Free.point(RightSide)))))))),
+          BoolLit(true),
+          Inner,
+          Free.roll(Add(
+            Free.roll(ProjectIndex(
+              Free.roll(ProjectIndex(Free.point(LeftSide), IntLit(1))),
+              IntLit(1))),
+            Free.roll(ProjectIndex(
+              Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
+              IntLit(1))))))).embed.some)
     }
 
     "convert project object and make object" in {
@@ -117,12 +144,14 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               lpRead("/city"),
               LogicalPlan.Constant(Data.Str("name")))))).toOption must
       equal(
-        QC.inj(
-          Map(RootR,
-            Free.roll(MakeMap(StrLit("name"),
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(HoleF, StrLit("city"))),
-                StrLit("name"))))))).embed.some)
+        SP.inj(LeftShift(
+          RootR,
+          ProjectFieldR(HoleF, StrLit("city")),
+          Free.roll(MakeMap[Fix, JoinFunc[Fix]](
+            StrLit[Fix, JoinSide]("name"),
+            Free.roll(ProjectField(
+              Free.point[MapFunc[Fix, ?], JoinSide](RightSide),
+              StrLit[Fix, JoinSide]("name"))))))).embed.some)
     }
 
     "convert a basic reduction" in {
@@ -130,9 +159,19 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
         agg.Sum[FLP](lpRead("/person"))).toOption must
       equal(
         QC.inj(Reduce(
-          QC.inj(Map(RootR, Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
-          NullLit(),
-          List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
+          SP.inj(LeftShift(
+            QC.inj(Map(
+              RootR,
+              Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
+            Free.roll(ZipMapKeys(HoleF)),
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.point(LeftSide))),
+              Free.roll(MakeArray(Free.point(RightSide))))))).embed,
+          Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
+          List(ReduceFuncs.Sum[FreeMap[Fix]](
+            Free.roll(ProjectIndex(
+              Free.roll(ProjectIndex(HoleF, IntLit(1))),
+              IntLit(1))))),
           Free.point(ReduceIndex(0)))).embed.some)
     }
 
@@ -144,15 +183,23 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LogicalPlan.Constant(Data.Str("height")))))).toOption must
       equal(
         QC.inj(Reduce(
-          QC.inj(Map(RootR, Free.roll(ProjectField(Free.roll(ProjectField(HoleF, StrLit("person"))), StrLit("height"))))).embed,
-          NullLit(),
+          SP.inj(LeftShift(
+            RootR,
+            Free.roll(ProjectField(HoleF, StrLit("person"))),
+            Free.roll(ProjectField(
+              Free.point(RightSide),
+              StrLit("height"))))).embed,
+          Free.roll(MakeArray(
+            Free.roll(MakeMap(
+              StrLit("j"),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
+                Free.roll(MakeArray(NullLit())))))))),
           List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
-          Free.roll(MakeMap(
-            StrLit[Fix, ReduceIndex]("0"),
-            Free.point(ReduceIndex(0)))))).embed.some)
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))).embed.some)
     }
 
-    "convert a flatten array" in pending {
+    "convert a flatten array" in {
       // "select loc[:*] from zips",
       QueryFile.convertToQScript(
         makeObj(
@@ -161,10 +208,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               structural.ObjectProject(lpRead("/zips"), LogicalPlan.Constant(Data.Str("loc")))))).toOption must
       equal(
         SP.inj(LeftShift(
-          RootR,
-          Free.roll(ProjectField(
+          SP.inj(LeftShift(
+            RootR,
             Free.roll(ProjectField(HoleF, StrLit("zips"))),
-            StrLit("loc"))),
+            Free.roll(ProjectField(
+              Free.point(RightSide),
+              StrLit("loc"))))).embed,
+          HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
@@ -182,23 +232,11 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(
-                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                  StrLit("bar"))),
-                StrLit("baz"))),
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(
-                  Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                  StrLit("bar"))),
-                StrLit("quux"))))),
-            Free.roll(ProjectField(
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(HoleF, StrLit("foo"))),
-                StrLit("bar"))),
-              StrLit("ducks"))))),
+          Free.roll(Nullary(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](1)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
           Free.point(RightSide))).embed.some)
     }
 
