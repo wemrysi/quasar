@@ -19,7 +19,7 @@ package quasar.physical.mongodb.workflowtask
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
-import quasar.physical.mongodb._
+import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector, Workflow}
 
 import scalaz._, Scalaz._
 
@@ -79,7 +79,7 @@ object WorkflowTaskF {
         }
     }
 
-  implicit def renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
+  implicit val renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
     new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
       def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
         val RC = RenderTree[Collection]
@@ -105,7 +105,7 @@ object WorkflowTaskF {
             val nt = "PipelineTask" :: WorkflowTaskNodeType
             NonTerminal(nt, None,
               ra.render(source) ::
-              NonTerminal("Pipeline" :: nt, None, pipeline.map(RO.render(_))) ::
+              NonTerminal("Pipeline" :: nt, None, pipeline.map(p => RO.render(p.op))) ::
                 Nil)
 
           case MapReduceTaskF(source, MapReduce(map, reduce, selectorOpt, sortOpt, limitOpt, finalizerOpt, scopeOpt, jsModeOpt, verboseOpt), outAct) =>
