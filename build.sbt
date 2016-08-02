@@ -152,7 +152,6 @@ lazy val oneJarSettings =
   Seq(
     GithubKeys.assets := { Seq(oneJar.value) },
     GithubKeys.repoSlug := "quasar-analytics/quasar",
-
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
     releaseProcess := Seq[ReleaseStep](
@@ -174,7 +173,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, // sparkcore,
+  mongodb, skeleton, postgresql, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -256,15 +255,12 @@ lazy val postgresql = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
-/* FIXME: Disabled because it breaks the Travis build
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies +=
-    "org.apache.spark" % "spark-core_2.11" % "1.6.2")
+  .settings(libraryDependencies ++= Dependencies.sparkcore)
   .enablePlugins(AutomateHeaderPlugin)
-*/
 
 
 // frontends

@@ -57,6 +57,15 @@ object Dependencies {
     "io.netty"    % "netty-buffer"         % nettyVersion,
     "io.netty"    % "netty-handler"        % nettyVersion
   )
+  def sparkcore = Seq(
+    "io.netty"          %  "netty-all"                 % nettyVersion            % "compile",
+    ("org.apache.spark" %% "spark-core"                % "1.6.2"                 % "compile")
+      .exclude("commons-beanutils", "commons-beanutils-core")
+      .exclude("commons-collections", "commons-collections")
+      .exclude("com.esotericsoftware.minlog", "minlog")
+      .exclude("org.spark-project.spark", "unused")
+      .exclude("io.netty", "netty-all")
+  )
   def web = Seq(
     "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
