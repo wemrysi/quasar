@@ -148,21 +148,20 @@ lazy val noPublishSettings = Seq(
 
 lazy val oneJarSettings =
   com.github.retronym.SbtOneJar.oneJarSettings ++
-    commonSettings ++
-    githubSettings ++
-    Seq(
-      GithubKeys.assets := { Seq(oneJar.value) },
-      GithubKeys.repoSlug := "quasar-analytics/quasar",
+  githubSettings ++
+  Seq(
+    GithubKeys.assets := { Seq(oneJar.value) },
+    GithubKeys.repoSlug := "quasar-analytics/quasar",
 
-      releaseVersionFile := file("version.sbt"),
-      releaseUseGlobalVersion := true,
-      releaseProcess := Seq[ReleaseStep](
-        checkSnapshotDependencies,
-        inquireVersions,
-        runTest,
-        setReleaseVersion,
-        commitReleaseVersion,
-        pushChanges))
+    releaseVersionFile := file("version.sbt"),
+    releaseUseGlobalVersion := true,
+    releaseProcess := Seq[ReleaseStep](
+      checkSnapshotDependencies,
+      inquireVersions,
+      runTest,
+      setReleaseVersion,
+      commitReleaseVersion,
+      pushChanges))
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -188,7 +187,7 @@ lazy val root = project.in(file("."))
 
 lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
@@ -196,23 +195,21 @@ lazy val foundation = project
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
-  .settings(oneJarSettings: _*)
-  .settings(publishSettings: _*)
+  .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
   .settings(name := "quasar-js-internal")
   .dependsOn(foundation % BothScopes)
-  .settings(oneJarSettings: _*)
-  .settings(publishSettings: _*)
+  .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -220,7 +217,7 @@ lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(ejson % BothScopes, foundation % BothScopes)
   .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes, foundation % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
     libraryDependencies ++= Dependencies.core,
@@ -235,9 +232,9 @@ lazy val main = project
   .dependsOn(
     mongodb    % BothScopes,
     skeleton   % BothScopes,
-    sparkcore   % BothScopes,
+    sparkcore  % BothScopes,
     postgresql % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 // filesystems (backends)
@@ -245,7 +242,7 @@ lazy val main = project
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
   .dependsOn(core % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(libraryDependencies +=
     "org.mongodb" % "mongodb-driver-async" % "3.2.2")
   .enablePlugins(AutomateHeaderPlugin)
@@ -253,21 +250,21 @@ lazy val mongodb = project
 lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
   .dependsOn(core % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(core % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(core % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(libraryDependencies +=
-    "org.apache.spark"  %  "spark-core_2.11"           % "1.6.2")
+    "org.apache.spark" % "spark-core_2.11" % "1.6.2")
   .enablePlugins(AutomateHeaderPlugin)
 
 
@@ -280,8 +277,9 @@ lazy val sparkcore = project
 lazy val repl = project
   .settings(name := "quasar-repl")
   .dependsOn(main % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(oneJarSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -291,8 +289,9 @@ lazy val repl = project
 lazy val web = project
   .settings(name := "quasar-web")
   .dependsOn(main % BothScopes)
-  .settings(oneJarSettings)
+  .settings(commonSettings)
   .settings(publishTestsSettings)
+  .settings(oneJarSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
