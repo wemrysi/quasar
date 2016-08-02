@@ -433,7 +433,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       // FIXME: This won’t work where we join a collection against itself
       //        We only apply _some_ optimizations at this point to maintain the
       //        TJ at the end, but that‘s still not guaranteed
-      TJ.prj(values(2).transCata[F](_.lower).transCata((new Optimize[T]).applyMost[F]).project).fold(
+      TJ.prj(values(2).transCata[F](_.lower).project).fold(
         (InternalError("non theta join condition found"): PlannerError).left[JoinFunc[T]])(
         _.combine.right[PlannerError])
     }
@@ -1004,26 +1004,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F]) ⋙
-      liftFF(repeatedly(coalesceQC[F])) ⋙
-      liftFG(coalesceMapShift[F]) ⋙
-      liftFG(coalesceMapJoin[F]) ⋙
-      liftFG(simplifySP[F]) ⋙
-      liftFG(compactLeftShift[F]) ⋙
-      Normalizable[F].normalize ⋙
-      liftFF(compactReduction[F]) ⋙
-      liftFG(elideNopMap[F])
-
-  // Only used when processing user-provided ThetaJoins
-  def applyMost[F[_]: Functor: Normalizable](
-    implicit QC: QScriptCore[T, ?] :<: F,
-             SP: SourcedPathable[T, ?] :<: F,
-             TJ: ThetaJoin[T, ?] :<: F,
-             PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
-      F[T[F]] => F[T[F]] =
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
-      Normalizable[F].normalize ⋙
-      // quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFF(repeatedly(coalesceQC[F])) ⋙
       liftFG(coalesceMapShift[F]) ⋙
       liftFG(coalesceMapJoin[F]) ⋙
