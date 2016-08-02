@@ -853,7 +853,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case _ => None
   }
 
-  // TODO merge with `coalesceQC`
   def coalesceQCCo[F[_]: Functor, A](implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
       QScriptCore[T, T[CoEnv[A, F, ?]]] => Option[QScriptCore[T, T[CoEnv[A, F, ?]]]] = {
     case Map(Embed(src), mf) =>
@@ -885,6 +884,36 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => QC.inj(x)
   }
 
+  def coalesceMapShiftCo[F[_]: Functor, A](implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[CoEnv[A, F, ?]]] => F[T[CoEnv[A, F, ?]]] = {
+    case x @ Map(Embed(src), mf) => (src.run.toOption >>= SP.prj >>= {
+      case LeftShift(srcInner, struct, repair) =>
+        SP.inj(LeftShift(srcInner, struct, mf >> repair)).some
+      case _ => None
+    }).getOrElse(QC.inj(x))
+    case x => QC.inj(x)
+  }
+
+  def coalesceMapJoin[F[_]: Functor](
+    implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
+      QScriptCore[T, T[F]] => F[T[F]] = {
+    case x @ Map(Embed(src), mf) =>
+      TJ.prj(src).fold(
+        QC.inj(x))(
+        tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc[T]))(tj)))
+    case x => QC.inj(x)
+  }
+
+  def coalesceMapJoinCo[F[_]: Functor, A](
+    implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
+      QScriptCore[T, T[CoEnv[A, F, ?]]] => F[T[CoEnv[A, F, ?]]] = {
+    case x @ Map(Embed(src), mf) =>
+      (src.run.toOption >>= TJ.prj).fold(
+        QC.inj(x))(
+        tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc[T]))(tj)))
+    case x => QC.inj(x)
+  }
+
   def simplifySP[F[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
       SourcedPathable[T, T[F]] => F[T[F]] = {
@@ -893,6 +922,23 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
         QC.inj(Map(src, repair ∘ κ(SrcHole)))
       else if (!repair.element(LeftSide))
         (QC.prj(src.project) >>= {
+          case Map(innerSrc, mf) =>
+            SP.inj(LeftShift(innerSrc, struct >> mf, repair)).some
+          case _ => None
+        }).getOrElse(SP.inj(x))
+      else
+        SP.inj(x)
+    case x => SP.inj(x)
+  }
+
+  def simplifySPCo[F[_]: Functor, A](
+    implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      SourcedPathable[T, T[CoEnv[A, F, ?]]] => F[T[CoEnv[A, F, ?]]] = {
+    case x @ LeftShift(src, struct, repair) =>
+      if (!repair.element(RightSide))
+        QC.inj(Map(src, repair ∘ κ(SrcHole)))
+      else if (!repair.element(LeftSide))
+        (src.project.run.toOption >>= QC.prj >>= {
           case Map(innerSrc, mf) =>
             SP.inj(LeftShift(innerSrc, struct >> mf, repair)).some
           case _ => None
@@ -949,16 +995,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => SP.inj(x)
   }
 
-  def coalesceMapJoin[F[_]: Functor](
-    implicit QC: QScriptCore[T, ?] :<: F, TJ: ThetaJoin[T, ?] :<: F):
-      QScriptCore[T, T[F]] => F[T[F]] = {
-    case x @ Map(Embed(src), mf) =>
-      TJ.prj(src).fold(
-        QC.inj(x))(
-        tj => TJ.inj(ThetaJoin.combine.modify(mf >> (_: JoinFunc[T]))(tj)))
-    case x => QC.inj(x)
-  }
-
   def compactReduction[F[_]: Functor]:
       QScriptCore[T, T[F]] => QScriptCore[T, T[F]] = {
     case x @ Reduce(src, bucket, reducers0, repair0) => {
@@ -992,7 +1028,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
   // - convert any remaning projects to maps
   // - coalesce nodes
   // - normalize mapfunc
-  // TODO: Apply this to FreeQS structures.
   def applyAll[F[_]: Traverse: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
              SP: SourcedPathable[T, ?] :<: F,
@@ -1013,8 +1048,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
 
+  // TODO all the `CoEnv` versions of optimizations should not be copy and pasted from their regular versions
   def applyToFreeQS[F[_]: Traverse: Normalizable, A](
     implicit QC: QScriptCore[T, ?] :<: F,
+             SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
@@ -1022,8 +1059,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[A, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      //liftFG(elideConstantJoin[CoEnv[A, F, ?]]) ⋙
+      //liftFG(elideConstantJoin[CoEnv[A, F, ?]]) ⋙  // TODO
       liftFF(repeatedly(coalesceQCCo[F, A])) ⋙
+      liftFG(coalesceMapShiftCo[F, A]) ⋙
+      liftFG(coalesceMapJoinCo[F, A]) ⋙
+      liftFG(simplifySPCo[F, A]) ⋙
+      //liftFG(compactLeftShift[CoEnv[A, F, ?]]) ⋙  // TODO
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[A, F, ?]]) ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
