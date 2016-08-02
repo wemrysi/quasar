@@ -59,16 +59,19 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
   import Workflow._
   import IdHandling._
 
-  val readFoo = $read(Collection("db", "foo"))
+  val readFoo = $read[WorkflowF](Collection("db", "foo"))
+
+  val cry = Crystallize[WorkflowF]
+  import cry.crystallize
 
   "smart constructors" should {
     "put match before sort" in {
-      val given = chain(
+      val given = chain[Workflow](
         readFoo,
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
-      val expected = chain(
+      val expected = chain[Workflow](
         readFoo,
         $match(Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))),
@@ -78,22 +81,22 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "choose smallest limit" in {
-      val expected = chain(readFoo, $limit(5))
-      chain(readFoo, $limit(10), $limit(5)) must_== expected
-      chain(readFoo, $limit(5), $limit(10)) must_== expected
+      val expected = chain[Workflow](readFoo, $limit(5))
+      chain[Workflow](readFoo, $limit(10), $limit(5)) must_== expected
+      chain[Workflow](readFoo, $limit(5), $limit(10)) must_== expected
     }
 
     "sum skips" in {
-      chain(readFoo, $skip(10), $skip(5)) must beTree(chain(readFoo, $skip(15)))
+      chain[Workflow](readFoo, $skip(10), $skip(5)) must beTree(chain[Workflow](readFoo, $skip(15)))
     }
 
     "flatten foldLefts when possible" in {
-      val given = $foldLeft(
+      val given = $foldLeft[WorkflowF](
         $foldLeft(
           readFoo,
           $read(Collection("db", "zips"))),
         $read(Collection("db", "olympics")))
-      val expected = $foldLeft(
+      val expected = $foldLeft[WorkflowF](
         readFoo,
         $read(Collection("db", "zips")),
         $read(Collection("db", "olympics")))
@@ -102,7 +105,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "flatten project into group/unwind" in {
-      val given = chain(
+      val given = chain[Workflow](
         readFoo,
         $group(
           Grouped(ListMap(
@@ -113,7 +116,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           BsonField.Name("city") -> \/-($field("value", "city")))),
           IncludeId))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readFoo,
         $group(
           Grouped(ListMap(
@@ -125,7 +128,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }.pendingUntilFixed("SD-538")
 
     "not flatten project into group/unwind with _id excluded" in {
-      val given = chain(
+      val given = chain[Workflow](
         readFoo,
         $group(
           Grouped(ListMap(
@@ -140,21 +143,21 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "resolve `Include`" in {
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($include()))),
           ExcludeId),
         $project(Reshape(ListMap(
           BsonField.Name("_id") -> \/-($field("bar")))),
           IncludeId)) must_==
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("_id") -> \/-($field("bar")))),
           IncludeId))
     }
 
     "traverse `Include`" in {
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") ->
             \/-($divide(
@@ -164,7 +167,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($include()))),
           IncludeId)) must_==
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") ->
             \/-($divide($field("baz"), $literal(Bson.Int32(92)))))),
@@ -172,7 +175,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "resolve implied `_id`" in {
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($field("bar")),
           BsonField.Name("_id") ->
@@ -182,7 +185,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           BsonField.Name("bar") ->
             \/-($field("bar")))),
           IncludeId)) must_==
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($field("bar")),
           BsonField.Name("_id") ->
@@ -191,7 +194,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "not resolve excluded `_id`" in {
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($field("bar")),
           BsonField.Name("_id") ->
@@ -201,7 +204,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           BsonField.Name("bar") ->
             \/-($field("bar")))),
           ExcludeId)) must_==
-      chain($read(Collection("db", "zips")),
+      chain[Workflow]($read(Collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("bar") ->
             \/-($field("bar")))),
@@ -209,7 +212,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "inline $project with field reference" in {
-      chain(
+      chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           Reshape(ListMap(
@@ -219,7 +222,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           Reshape(ListMap(
             BsonField.Name("__tmp1") -> \/-($field("__tmp0", "foo")))),
           IgnoreId)) must_==
-      chain(
+      chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           Reshape(ListMap(
@@ -231,7 +234,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
       // NB: simulates a pair of type-checks, which cannot be inlined in a simple way
       // because the second digs into the structure created by the first.
 
-      val op = chain(
+      val op = chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           Reshape(ListMap(
@@ -245,7 +248,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           IgnoreId))
 
       (op.unFix match {
-        case $Project(Fix($Project(_, Reshape(s1), _)), Reshape(s2), _) =>
+        case $project(Fix($project(_, Reshape(s1), _)), Reshape(s2), _) =>
           s1.keys must_== Set(BsonField.Name("__tmp0"))
           s2.keys must_== Set(BsonField.Name("__tmp1"))
         case _ => failure
@@ -256,7 +259,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
       // NB: in a case like this, the original structure is preserved so it
       // can be debugged more easily.
 
-      val op = chain(
+      val op = chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           Reshape(ListMap(
@@ -268,7 +271,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           IgnoreId))
 
       (op.unFix match {
-        case $Project(Fix($Project(_, Reshape(s1), _)), Reshape(s2), _) =>
+        case $project(Fix($project(_, Reshape(s1), _)), Reshape(s2), _) =>
           s1.keys must_== Set(BsonField.Name("__tmp0"))
           s2.keys must_== Set(BsonField.Name("__tmp1"))
         case _ => failure
@@ -279,16 +282,17 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
   "crystallize" should {
     import quasar.jscore, jscore._
 
+    val readZips = $read[WorkflowF](Collection("db", "zips"))
+
     "coalesce previous projection into a map" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
           IncludeId),
         $simpleMap((MapExpr(JsFn(Name("x"), BinOp(Add, jscore.Literal(Js.Num(4, false)), Select(ident("x"), "value")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           NonEmptyList(
@@ -299,8 +303,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "coalesce previous projection into a flatMap" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
@@ -309,7 +312,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           (FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           NonEmptyList(
@@ -321,33 +324,31 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "convert previous projection before a reduce" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
           IncludeId),
-        $reduce($Reduce.reduceNOP, ListMap()))
+        $reduce($ReduceF.reduceNOP, ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           (MapExpr(JsFn(Name("x"), Obj(ListMap(Name("value") -> ident("x"))))):CardinalExpr[JsFn]).wrapNel,
           ListMap()),
-        $reduce($Reduce.reduceNOP, ListMap()))
+        $reduce($ReduceF.reduceNOP, ListMap()))
 
       crystallize(given) must beTree(Crystallized(expected))
     }
 
     "coalesce previous unwind into a map" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $unwind(DocVar.ROOT(BsonField.Name("loc"))),
         $simpleMap((MapExpr(JsFn(Name("x"),
           BinOp(Add, jscore.Literal(Js.Num(4, false)), ident("x")))):CardinalExpr[JsFn]).wrapNel, ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           NonEmptyList(
@@ -360,15 +361,14 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "coalesce previous unwind into a flatMap" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $unwind(DocVar.ROOT(BsonField.Name("loc"))),
         $simpleMap(
           (FlatExpr(JsFn(Name("x"), Select(ident("x"), "lat"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           NonEmptyList(
@@ -380,61 +380,58 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "convert previous unwind before a reduce" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = chain(
+      val given = chain[Workflow](
         readZips,
         $unwind(DocVar.ROOT(BsonField.Name("loc"))),
-        $reduce($Reduce.reduceNOP, ListMap()))
+        $reduce($ReduceF.reduceNOP, ListMap()))
 
-      val expected = chain(
+      val expected = chain[Workflow](
         readZips,
         $simpleMap(
           (FlatExpr(JsFn(Name("x"), Select(ident("x"), "loc"))):CardinalExpr[JsFn]).wrapNel,
           ListMap()),
-        $reduce($Reduce.reduceNOP, ListMap()))
+        $reduce($ReduceF.reduceNOP, ListMap()))
 
       crystallize(given) must beTree(Crystallized(expected))
     }
 
-    "patch $FoldLeft" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = $foldLeft(readZips, readZips)
+    "patch $FoldLeftF" in {
+      val given = $foldLeft[WorkflowF](readZips, readZips)
 
       val expected = $foldLeft(
-        chain(readZips, $project(Reshape(ListMap(
+        chain[Workflow](readZips, $project(Reshape(ListMap(
           BsonField.Name("value") -> \/-($$ROOT))),
           IncludeId)),
-        chain(readZips, $reduce($Reduce.reduceFoldLeft, ListMap())))
+        chain[Workflow](readZips, $reduce($ReduceF.reduceFoldLeft, ListMap())))
 
       crystallize(given) must beTree(Crystallized(expected))
     }
 
-    "patch $FoldLeft with existing reduce" in {
-      val readZips = $read(Collection("db", "zips"))
-      val given = $foldLeft(
+    "patch $FoldLeftF with existing reduce" in {
+      val given = $foldLeft[WorkflowF](
         readZips,
-        chain(readZips, $reduce($Reduce.reduceNOP, ListMap())))
+        chain[Workflow](readZips, $reduce($ReduceF.reduceNOP, ListMap())))
 
       val expected = $foldLeft(
-        chain(
+        chain[Workflow](
           readZips,
           $project(Reshape(ListMap(
             BsonField.Name("value") -> \/-($$ROOT))),
             IncludeId)),
-        chain(readZips, $reduce($Reduce.reduceNOP, ListMap())))
+        chain[Workflow](readZips, $reduce($ReduceF.reduceNOP, ListMap())))
 
       crystallize(given) must beTree(Crystallized(expected))
     }
 
     "avoid dangling map with known shape" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj(
             "first" -> Select(ident("x"), "pop"),
             "second" -> Select(ident("x"), "city"))))),
           ListMap()))) must
-      beTree(Crystallized(chain(
+      beTree(Crystallized(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -448,7 +445,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "avoid dangling flatMap with known shape" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(
           NonEmptyList(
@@ -457,7 +454,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
               "second" -> ident("x")))),
             FlatExpr(JsFn(Name("x"), Select(ident("x"), "city")))),
           ListMap()))) must
-      beTree(Crystallized(chain(
+      beTree(Crystallized(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(
           NonEmptyList(
@@ -473,13 +470,13 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "fold unwind into SimpleMap" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $unwind(DocField(BsonField.Name("loc"))),
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj("0" -> Select(ident("x"), "loc"))))),
           ListMap()))) must
-      beTree(Crystallized(chain(
+      beTree(Crystallized(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(
           NonEmptyList(
@@ -493,7 +490,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "not fold unwind into SimpleMap with preceding pipeline op" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(Reshape(ListMap(
             BsonField.Name("loc") -> \/-($var(DocField(BsonField.Name("loc")))))),
@@ -502,7 +499,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
         $simpleMap(
           NonEmptyList(MapExpr(JsFn(Name("x"), obj("0" -> Select(ident("x"), "loc"))))),
           ListMap()))) must
-        beTree(Crystallized(chain(
+        beTree(Crystallized(chain[Workflow](
           $read(Collection("db", "zips")),
           $project(Reshape(ListMap(
               BsonField.Name("loc") -> \/-($field("loc")))),
@@ -519,7 +516,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "fold multiple unwinds into a SimpleMap" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "foo")),
         $unwind(DocField(BsonField.Name("bar"))),
         $unwind(DocField(BsonField.Name("baz"))),
@@ -529,7 +526,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
               "0" -> Select(ident("x"), "bar"),
               "1" -> Select(ident("x"), "baz"))))),
           ListMap()))) must
-      beTree(Crystallized(chain(
+      beTree(Crystallized(chain[Workflow](
         $read(Collection("db", "foo")),
         $simpleMap(
           NonEmptyList(
@@ -547,7 +544,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     }
 
     "not fold multiple unwinds into SimpleMap with preceding pipeline op" in {
-      crystallize(chain(
+      crystallize(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(Reshape(ListMap(
             BsonField.Name("loc") -> \/-($var(DocField(BsonField.Name("loc")))))),
@@ -560,7 +557,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
               "0" -> Select(ident("x"), "bar"),
               "1" -> Select(ident("x"), "baz"))))),
           ListMap()))) must
-      beTree(Crystallized(chain(
+      beTree(Crystallized(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(Reshape(ListMap(
             BsonField.Name("loc") -> \/-($field("loc")))),
@@ -586,7 +583,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     import quasar.jscore._
 
     "convert $match with $where into map/reduce" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.Where(Js.BinOp("<",
           Js.Select(Js.Select(Js.Ident("this"), "city"), "length"),
@@ -594,7 +591,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(Collection("db", "zips")),
-          MapReduce($Map.mapFn($Map.mapNOP), $Reduce.reduceNOP,
+          MapReduce($MapF.mapFn($MapF.mapNOP), $ReduceF.reduceNOP,
             selection = Some(Selector.Where(Js.BinOp("<",
               Js.Select(Js.Select(Js.Ident("this"), "city"), "length"),
               Js.Num(4, false))))),
@@ -603,7 +600,7 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
 
     "always pipeline unconverted aggregation ops" in {
       // Tricky: don't want to actually finalize here, just testing `task` behavior
-      task(Crystallized(chain(
+      task(Crystallized(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           Grouped(ListMap(
@@ -626,62 +623,63 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
       beTree[WorkflowTask](
         PipelineTask(ReadTask(Collection("db", "zips")),
           List(
-            $Group((),
+            $GroupF((),
               Grouped(ListMap(
                 BsonField.Name("__sd_tmp_1") -> $push($field("lEft")))),
-              \/-($literal(Bson.Null))),
-            $Project((),
+              \/-($literal(Bson.Null))).pipeline,
+            $ProjectF((),
               Reshape(ListMap(
                 BsonField.Name("a")      -> \/-($include()),
                 BsonField.Name("b")      -> \/-($include()),
                 BsonField.Name("equal?") -> \/-($eq($field("a"), $field("b"))))),
-              IncludeId),
-            $Match((),
+              IncludeId).pipeline,
+            $MatchF((),
               Selector.Doc(
-                BsonField.Name("equal?") -> Selector.Eq(Bson.Bool(true)))),
-            $Sort((), NonEmptyList(BsonField.Name("a") -> SortDir.Descending)),
-            $Limit((), 100),
-            $Skip((), 5),
-            $Project((),
+                BsonField.Name("equal?") -> Selector.Eq(Bson.Bool(true)))).shapePreserving,
+            $SortF((), NonEmptyList(BsonField.Name("a") -> SortDir.Descending)).shapePreserving,
+            $LimitF((), 100).shapePreserving,
+            $SkipF((), 5).shapePreserving,
+            $ProjectF((),
               Reshape(ListMap(
                 BsonField.Name("a") -> \/-($include()),
                 BsonField.Name("b") -> \/-($include()))),
-              IncludeId))))
+              IncludeId).pipeline)
+          .map(PipelineOp(_))))
     }
 
     "create maximal map/reduce" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
           BsonField.Name("loc") \ BsonField.Name("0") ->
             Selector.Lt(Bson.Int64(-73)))),
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
         $limit(100),
-        $map($Map.mapMap("value",
+        $map($MapF.mapMap("value",
           Js.Access(Js.Ident("value"), Js.Num(0, false))),
           ListMap()),
-        $reduce($Reduce.reduceFoldLeft, ListMap()),
-        $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $reduce($ReduceF.reduceFoldLeft, ListMap()),
+        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(Collection("db", "zips")),
           MapReduce(
-            $Map.mapFn($Map.mapMap("value",
+            $MapF.mapFn($MapF.mapMap("value",
               Js.Access(Js.Ident("value"), Js.Num(0, false)))),
-            $Reduce.reduceFoldLeft,
+            $ReduceF.reduceFoldLeft,
             selection = Some(Selector.Doc(
               BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($Map.finalizerFn($Map.mapMap("value",
+            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
               Js.Ident("value"))))),
           None))
     }
 
     "create maximal map/reduce with flatMap" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
           BsonField.Name("loc") \ BsonField.Name("0") ->
@@ -692,56 +690,56 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
           Js.AnonElem(List(
             Js.AnonElem(List(Js.Ident("key"), Js.Ident("value"))))))),
           ListMap()),
-        $reduce($Reduce.reduceFoldLeft, ListMap()),
-        $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $reduce($ReduceF.reduceFoldLeft, ListMap()),
+        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(Collection("db", "zips")),
           MapReduce(
-            $FlatMap.mapFn(Js.AnonFunDecl(List("key", "value"), List(
+            $FlatMapF.mapFn(Js.AnonFunDecl(List("key", "value"), List(
               Js.AnonElem(List(
                 Js.AnonElem(List(Js.Ident("key"), Js.Ident("value")))))))),
-            $Reduce.reduceFoldLeft,
+            $ReduceF.reduceFoldLeft,
             selection = Some(Selector.Doc(
               BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($Map.finalizerFn($Map.mapMap("value",
+            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
               Js.Ident("value"))))),
           None))
     }
 
     "create map/reduce without map" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.Doc(
           BsonField.Name("loc") \ BsonField.Name("0") ->
             Selector.Lt(Bson.Int64(-73)))),
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
         $limit(100),
-        $reduce($Reduce.reduceFoldLeft, ListMap()),
-        $map($Map.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $reduce($ReduceF.reduceFoldLeft, ListMap()),
+        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(Collection("db", "zips")),
           MapReduce(
-            $Map.mapFn($Map.mapNOP),
-            $Reduce.reduceFoldLeft,
+            $MapF.mapFn($MapF.mapNOP),
+            $ReduceF.reduceFoldLeft,
             selection = Some(Selector.Doc(
               BsonField.Name("loc") \ BsonField.Name("0") ->
                 Selector.Lt(Bson.Int64(-73)))),
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($Map.finalizerFn($Map.mapMap("value",
+            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
               Js.Ident("value"))))),
           None))
     }
 
     "fold unwind into SimpleMap (when finalize is used)" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "zips")),
         $unwind(DocField(BsonField.Name("loc"))),
         $simpleMap(
@@ -775,18 +773,18 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
                   List(
                     Js.AnonFunDecl(List("__rez"), List(
                       Js.Call(Js.Select(Js.Ident("emit"), "apply"), List(Js.Null, Js.Ident("__rez"))))))))),
-              $Reduce.reduceNOP,
-              scope = $SimpleMap.implicitScope(Set("clone"))),
+              $ReduceF.reduceNOP,
+              scope = $SimpleMapF.implicitScope(Set("clone"))),
             None),
           List(
-            $Project((),
+            PipelineOp($ProjectF((),
               Reshape(ListMap(
                 BsonField.Name("0") -> \/-($field("value", "0")))),
-              IgnoreId))))
+              IgnoreId).pipeline))))
     }
 
     "fold multiple unwinds into SimpleMap (when finalize is used)" in {
-      task(crystallize(chain(
+      task(crystallize(chain[Workflow](
         $read(Collection("db", "foo")),
         $unwind(DocField(BsonField.Name("bar"))),
         $unwind(DocField(BsonField.Name("baz"))),
@@ -830,15 +828,15 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
                   List(
                     Js.AnonFunDecl(List("__rez"), List(
                       Js.Call(Js.Select(Js.Ident("emit"), "apply"), List(Js.Null, Js.Ident("__rez"))))))))),
-              $Reduce.reduceNOP,
-              scope = $SimpleMap.implicitScope(Set("clone"))),
+              $ReduceF.reduceNOP,
+              scope = $SimpleMapF.implicitScope(Set("clone"))),
             None),
           List(
-            $Project((),
+            PipelineOp($ProjectF((),
               Reshape(ListMap(
                 BsonField.Name("0") -> \/-($field("value", "0")),
                 BsonField.Name("1") -> \/-($field("value", "1")))),
-              IgnoreId))))
+              IgnoreId).pipeline))))
     }
   }
 
@@ -847,22 +845,22 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
 
     "raw" should {
       "extract one" in {
-        val op = $SimpleMap((),
+        val op = $SimpleMapF((),
           NonEmptyList(MapExpr(JsFn(Name("x"), Select(ident("x"), "foo")))),
           ListMap())
         (op.raw match {
-          case $Map(_, fn, _) =>
+          case $MapF(_, fn, _) =>
             fn.pprint(0) must_== "function (key, value) { return [key, value.foo] }"
           case _ => failure
         }): org.specs2.execute.Result
       }
 
       "flatten one" in {
-        val op = $SimpleMap((),
+        val op = $SimpleMapF((),
           NonEmptyList(FlatExpr(JsFn(Name("x"), Select(ident("x"), "foo")))),
           ListMap())
         (op.raw match {
-          case $FlatMap(_, fn, _) =>
+          case $FlatMapF(_, fn, _) =>
             fn.pprint(0) must_==
               """function (key, value) {
                 |  var rez = [];
@@ -882,9 +880,9 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
   "$redact" should {
 
     "render result variables" in {
-      $Redact.DESCEND.bson must_== Bson.Text("$$DESCEND")
-      $Redact.PRUNE.bson   must_== Bson.Text("$$PRUNE")
-      $Redact.KEEP.bson    must_== Bson.Text("$$KEEP")
+      $RedactF.DESCEND.bson must_== Bson.Text("$$DESCEND")
+      $RedactF.PRUNE.bson   must_== Bson.Text("$$PRUNE")
+      $RedactF.KEEP.bson    must_== Bson.Text("$$KEEP")
     }
   }
 
@@ -892,11 +890,11 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     def render(op: Workflow)(implicit RO: RenderTree[Workflow]): String = RO.render(op).draw.mkString("\n")
 
     "render read" in {
-      render(readFoo) must_== "$Read(db; foo)"
+      render(readFoo) must_== "$ReadF(db; foo)"
     }
 
     "render simple project" in {
-      val op = chain(readFoo,
+      val op = chain[Workflow](readFoo,
         $project(
           Reshape(ListMap(
             BsonField.Name("bar") -> \/-($field("baz")))),
@@ -904,14 +902,14 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
-          |╰─ $Project
+          |├─ $ReadF(db; foo)
+          |╰─ $ProjectF
           |   ├─ Name("bar" -> "$baz")
           |   ╰─ IncludeId""".stripMargin
     }
 
     "render nested project" in {
-      val op = chain(readFoo,
+      val op = chain[Workflow](readFoo,
         $project(
           Reshape(ListMap(
             BsonField.Name("bar") -> -\/(Reshape(ListMap(
@@ -920,15 +918,15 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
-          |╰─ $Project
+          |├─ $ReadF(db; foo)
+          |╰─ $ProjectF
           |   ├─ Name("bar")
           |   │  ╰─ Name("0" -> "$baz")
           |   ╰─ IncludeId""".stripMargin
     }
 
     "render map/reduce ops" in {
-      val op = chain(readFoo,
+      val op = chain[Workflow](readFoo,
         $map(Js.AnonFunDecl(List("key"), Nil), ListMap()),
         $project(Reshape(ListMap(
           BsonField.Name("bar") -> \/-($field("baz")))),
@@ -941,17 +939,17 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
 
       render(op) must_==
         """Chain
-          |├─ $Read(db; foo)
-          |├─ $Map
+          |├─ $ReadF(db; foo)
+          |├─ $MapF
           |│  ├─ JavaScript(function (key) {})
           |│  ╰─ Scope(Map())
-          |├─ $Project
+          |├─ $ProjectF
           |│  ├─ Name("bar" -> "$baz")
           |│  ╰─ IncludeId
-          |├─ $FlatMap
+          |├─ $FlatMapF
           |│  ├─ JavaScript(function (key) {})
           |│  ╰─ Scope(Map())
-          |╰─ $Reduce
+          |╰─ $ReduceF
           |   ├─ JavaScript(function (key, values) { return values[1] })
           |   ╰─ Scope(Map())""".stripMargin
     }
@@ -959,27 +957,27 @@ class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
     "render unchained" in {
       val op =
         $foldLeft(
-          chain(readFoo,
+          chain[Workflow](readFoo,
             $project(Reshape(ListMap(
               BsonField.Name("bar") -> \/-($field("baz")))),
               IncludeId)),
-          chain(readFoo,
+          chain[Workflow](readFoo,
             $map(Js.AnonFunDecl(List("key"), Nil), ListMap()),
-            $reduce($Reduce.reduceNOP, ListMap())))
+            $reduce($ReduceF.reduceNOP, ListMap())))
 
       render(op) must_==
-      """$FoldLeft
+      """$FoldLeftF
         |├─ Chain
-        |│  ├─ $Read(db; foo)
-        |│  ╰─ $Project
+        |│  ├─ $ReadF(db; foo)
+        |│  ╰─ $ProjectF
         |│     ├─ Name("bar" -> "$baz")
         |│     ╰─ IncludeId
         |╰─ Chain
-        |   ├─ $Read(db; foo)
-        |   ├─ $Map
+        |   ├─ $ReadF(db; foo)
+        |   ├─ $MapF
         |   │  ├─ JavaScript(function (key) {})
         |   │  ╰─ Scope(Map())
-        |   ╰─ $Reduce
+        |   ╰─ $ReduceF
         |      ├─ JavaScript(function (key, values) { return values[0] })
         |      ╰─ Scope(Map())""".stripMargin
     }

@@ -21,7 +21,7 @@ import quasar.RenderTree.ops._
 
 import java.lang.NumberFormatException
 
-import matryoshka._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
 import monocle.Lens
 import scalaz.{Lens => _, _}, Liskov._, Scalaz._
@@ -372,7 +372,7 @@ trait LowPriorityCoEnvImplicits {
   // TODO: move to matryoshka
 
   implicit def coenvTraverse[F[_]: Traverse, E]: Traverse[CoEnv[E, F, ?]] =
-    CoEnv.bitraverse[F, Hole].rightTraverse
+    CoEnv.bitraverse[F, E].rightTraverse
 }
 
 trait CoEnvInstances extends LowPriorityCoEnvImplicits {
@@ -624,7 +624,7 @@ package object fp
   // apomorphism - short circuit by returning left
   def substitute[T[_[_]], F[_]](original: T[F], replacement: T[F])(implicit T: Equal[T[F]]):
       T[F] => T[F] \/ T[F] =
-   tf => if (tf ≟ original) replacement.left else original.right
+   tf => if (tf ≟ original) replacement.left else tf.right
 
   // TODO: This should definitely be in Matryoshka.
   def transApoT[T[_[_]]: FunctorT, F[_]: Functor](t: T[F])(f: T[F] => T[F] \/ T[F]):
@@ -636,4 +636,27 @@ package object fp
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
     free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
+
+  implicit final class FreeOps[F[_], E](val self: Free[F, E]) extends scala.AnyVal {
+    final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =
+      self.ana(CoEnv.freeIso[E, F].reverseGet)
+  }
+
+  implicit final class CoEnvOps[T[_[_]], F[_], E](val self: T[CoEnv[E, F, ?]]) extends scala.AnyVal {
+    final def fromCoEnv(implicit fa: Functor[F], tr: Recursive[T]): Free[F, E] =
+      self.cata(CoEnv.freeIso[E, F].get)
+  }
+
+  /** Applies a transformation over `Free`, treating it like `T[CoEnv]`.
+    */
+  def freeTransCata[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A](
+    free: Free[F, A])(
+    f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      Free[F, A] =
+    free.toCoEnv[T].transCata[CoEnv[A, F, ?]](f).fromCoEnv
+
+  def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
+      CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
+    co => co.run.fold(κ(co), f)
+
 }

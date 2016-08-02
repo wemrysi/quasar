@@ -59,10 +59,10 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     EitherT[Writer[Vector[PhaseResult], ?], E, A](Writer(log, v))
 
   case class equalToWorkflow(expected: Workflow)
-      extends Matcher[Crystallized] {
-    def apply[S <: Crystallized](s: Expectable[S]) = {
+      extends Matcher[Crystallized[WorkflowF]] {
+    def apply[S <: Crystallized[WorkflowF]](s: Expectable[S]) = {
       def diff(l: S, r: Workflow): String = {
-        val lt = RenderTree[Crystallized].render(l)
+        val lt = RenderTree[Crystallized[WorkflowF]].render(l)
         (lt diff r.render).shows
       }
       result(expected == s.value.op,
@@ -81,20 +81,20 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       // tests currently run into that.
       .flatMap(_.fold(
         e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_).leftMap(CPlannerError(_))))
+        MongoDbPlanner.plan(_, MongoQueryModel.`3.2`).leftMap(CPlannerError(_))))
 
-  def plan(query: String): Either[CompilationError, Crystallized] = {
+  def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] = {
     fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
       queryPlanner(_).run).value.toEither
   }
 
-  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized] = {
+  def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified)
+      phys       <- MongoDbPlanner.plan(simplified, MongoQueryModel.`3.2`)
     } yield phys).run.value.toEither
   }
 
@@ -111,12 +111,13 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
   "plan from query string" should {
     "plan simple select *" in {
-      plan("select * from foo") must beWorkflow($read(Collection("db", "foo")))
+      plan("select * from foo") must beWorkflow(
+        $read[WorkflowF](Collection("db", "foo")))
     }
 
     "plan count(*)" in {
       plan("select count(*) from foo") must beWorkflow(
-        chain(
+        chain[Workflow](
           $read(Collection("db", "foo")),
           $group(
             grouped("0" -> $sum($literal(Bson.Int32(1)))),
@@ -125,7 +126,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple field projection on single set" in {
       plan("select foo.bar from foo") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "foo")),
           $project(
             reshape("bar" -> $field("bar")),
@@ -134,7 +135,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple field projection on single set when table name is inferred" in {
       plan("select bar from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("bar" -> $field("bar")),
@@ -143,7 +144,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan multiple field projection on single set when table name is inferred" in {
       plan("select bar, baz from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -154,7 +155,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple addition on two fields" in {
       plan("select foo + bar from baz") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "baz")),
          $project(
            reshape("0" ->
@@ -178,7 +179,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan concat" in {
       plan("select concat(bar, baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("0" ->
@@ -198,7 +199,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan concat strings with ||" in {
       plan("select city || \", \" || state from zips") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "zips")),
          $project(
            reshape(
@@ -229,7 +230,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan concat strings with ||, constant on the right" in {
       plan("select a || b || \"...\" from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -265,7 +266,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan lower" in {
       plan("select lower(bar) from foo") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(
           reshape("0" ->
@@ -280,7 +281,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan coalesce" in {
       plan("select coalesce(bar, baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("0" -> $ifNull($field("bar"), $field("baz"))),
@@ -289,7 +290,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan date field extraction" in {
       plan("select date_part(\"day\", baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("0" ->
@@ -304,7 +305,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan complex date field extraction" in {
       plan("select date_part(\"quarter\", baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -322,7 +323,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan date field extraction: \"dow\"" in {
       plan("select date_part(\"dow\", baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -338,7 +339,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan date field extraction: \"isodow\"" in {
       plan("select date_part(\"isodow\", baz) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -356,7 +357,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter by date field (SD-1508)" in {
       plan("select * from foo where date_part(\"year\", ts) = 2016") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape(
@@ -379,7 +380,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter array element" in {
       plan("select loc from zips where loc[0] < -73") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.Where(
           If(
@@ -405,7 +406,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select array element" in {
       plan("select loc[0] from zips") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "0" ->
@@ -420,7 +421,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan array length" in {
       plan("select array_length(bar, 1) from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("0" ->
@@ -435,7 +436,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sum in expression" in {
       plan("select sum(pop) * 100 from zips") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped("__tmp4" ->
@@ -454,7 +455,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan conditional" in {
       plan("select case when pop < 10000 then city else loc end from zips") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "zips")),
          $project(
            reshape(
@@ -476,7 +477,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan negate" in {
       plan("select -bar from foo") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $project(
            reshape("0" ->
@@ -491,7 +492,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple filter" in {
       plan("select * from foo where bar > 10") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(Selector.And(
            Selector.Or(
@@ -514,7 +515,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple reversed filter" in {
       plan("select * from foo where 10 < bar") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(Selector.And(
            Selector.Or(
@@ -537,7 +538,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple filter with expression in projection" in {
       plan("select a + b from foo where bar > 10") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(Selector.And(
            Selector.Or(
@@ -580,7 +581,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       import javascript._
 
       plan("select * from zips where length(city) < 4") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -606,7 +607,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       import javascript._
 
       plan("select * from zips where length(city) < 4 and pop < 20000") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         // FIXME: Inline this $simpleMap with the $match (SD-456)
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -642,7 +643,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with between" in {
       plan("select * from foo where bar between 10 and 100") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(
            Selector.And(
@@ -669,7 +670,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with like" in {
       plan("select * from foo where bar like \"A.%\"") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(Selector.And(
            Selector.Doc(BsonField.Name("bar") ->
@@ -681,7 +682,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with LIKE and OR" in {
       plan("select * from foo where bar like \"A%\" or bar like \"Z%\"") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(
            Selector.Or(
@@ -699,7 +700,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with field in constant set" in {
       plan("select * from zips where state in (\"AZ\", \"CO\")") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.In(Bson.Arr(List(Bson.Text("AZ"), Bson.Text("CO"))))))))
@@ -707,7 +708,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with field containing constant value" in {
       plan("select * from zips where 43.058514 in loc[_]") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Where(
             If(Call(Select(ident("Array"), "isArray"), List(Select(ident("this"), "loc"))),
@@ -717,7 +718,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "filter field in single-element set" in {
       plan("""select * from zips where state in ("NV")""") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.Eq(Bson.Text("NV"))))))
@@ -725,7 +726,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "filter field “in” a bare value" in {
       plan("""select * from zips where state in "PA"""") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Doc(BsonField.Name("state") ->
             Selector.Eq(Bson.Text("PA"))))))
@@ -734,7 +735,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan filter with field containing other field" in {
       import jscore._
       plan("select * from zips where pop in loc[_]") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Where(
             If(
@@ -747,7 +748,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan filter with ~" in {
-      plan("select * from zips where city ~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
+      plan("select * from zips where city ~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -757,7 +758,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan filter with ~*" in {
-      plan("select * from zips where city ~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
+      plan("select * from zips where city ~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -767,7 +768,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan filter with !~" in {
-      plan("select * from zips where city !~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
+      plan("select * from zips where city !~ \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -777,7 +778,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan filter with !~*" in {
-      plan("select * from zips where city !~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain(
+      plan("select * from zips where city !~* \"^B[AEIOU]+LD.*\"") must beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $match(Selector.And(
           Selector.Doc(
@@ -787,7 +788,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan filter with alternative ~" in {
-      plan("select * from a where \"foo\" ~ pattern or target ~ pattern") must beWorkflow(chain(
+      plan("select * from a where \"foo\" ~ pattern or target ~ pattern") must beWorkflow(chain[Workflow](
         $read(Collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "__tmp8" -> Call(
@@ -823,7 +824,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with negate(s)" in {
       plan("select * from foo where bar != -10 and baz > -1.0") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(
            Selector.And(
@@ -850,7 +851,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan complex filter" in {
       plan("select * from foo where bar > 10 and (baz = \"quux\" or foop = \"zebra\")") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "foo")),
          $match(
            Selector.And(
@@ -879,7 +880,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with not" in {
       plan("select * from zips where not (pop > 0 and pop < 1000)") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "zips")),
          $match(
            Selector.And(
@@ -922,7 +923,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with not and equality" in {
       plan("select * from zips where not (pop = 0)") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(
             Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -931,7 +932,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with \"is not null\"" in {
       plan("select * from zips where city is not null") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(
             Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
@@ -940,7 +941,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter with both index and field projections" in {
       plan("select count(parents[0].sha) as count from slamengine_commits where parents[0].sha = \"56d1caf5d082d1a6840090986e277d36d03f1859\"") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "slamengine_commits")),
           $match(Selector.Where(
             If(
@@ -977,7 +978,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple having filter" in {
       plan("select city from zips group by city having count(*) > 10") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(
@@ -992,7 +993,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan having with multiple projections" in {
       plan("select city, sum(pop) from zips group by city having sum(pop) > 50000") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(
@@ -1016,7 +1017,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "prefer projection+filter over JS filter" in {
       plan("select * from zips where city <> state") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
@@ -1033,7 +1034,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "prefer projection+filter over nested JS filter" in {
       plan("select * from zips where city <> state and pop < 10000") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
@@ -1067,7 +1068,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "select partially-applied substing" in {
       plan ("select substring(\"abcdefghijklmnop\", 5, pop / 10000) from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $project(
             reshape(
@@ -1086,14 +1087,14 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "drop nothing" in {
       plan("select * from zips limit 5 offset 0") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $limit(5)))
     }
 
     "concat with empty string" in {
       plan("select \"\" || city || \"\" from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $project(
             reshape("0" ->
@@ -1112,7 +1113,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple sort with field in projection" in {
       plan("select bar from foo order by bar") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "foo")),
           $project(
             reshape("bar" -> $field("bar")),
@@ -1122,14 +1123,14 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple sort with wildcard" in {
       plan("select * from zips order by pop") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $sort(NonEmptyList(BsonField.Name("pop") -> SortDir.Ascending))))
     }
 
     "plan sort with expression in key" in {
       plan("select baz from foo order by bar/10") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "foo")),
           $project(
             reshape(
@@ -1154,7 +1155,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select with wildcard and field" in {
       plan("select *, pop from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -1167,7 +1168,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select with wildcard and two fields" in {
       plan("select *, city as city2, pop as pop2 from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -1182,7 +1183,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select with wildcard and two constants" in {
       plan("select *, \"1\", \"2\" from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -1197,7 +1198,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select with multiple wildcards and fields" in {
       plan("select state as state2, *, city as city2, *, pop as pop2 from zips where pop < 1000") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.And(
             Selector.Or(
@@ -1236,7 +1237,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sort with wildcard and expression in key" in {
       plan("select * from zips order by pop/10 desc") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("__val"), SpliceObjects(List(
@@ -1270,7 +1271,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple sort with field not in projections" in {
       plan("select name from person order by height") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "person")),
           $project(
             reshape(
@@ -1285,7 +1286,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sort with expression and alias" in {
       plan("select pop/1000 as popInK from zips order by popInK") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $project(
             reshape(
@@ -1306,7 +1307,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sort with filter" in {
       plan("select city, pop from zips where pop <= 1000 order by pop desc, city") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.And(
             Selector.Or(
@@ -1337,7 +1338,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sort with expression, alias, and filter" in {
       plan("select pop/1000 as popInK from zips where pop >= 1000 order by popInK") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.And(
             Selector.Or(
@@ -1376,7 +1377,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan multiple column sort with wildcard" in {
       plan("select * from zips order by pop, city desc") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "zips")),
          $sort(NonEmptyList(
            BsonField.Name("pop") -> SortDir.Ascending,
@@ -1385,7 +1386,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan many sort columns" in {
       plan("select * from zips order by pop, state, city, a4, a5, a6") must
-       beWorkflow(chain(
+       beWorkflow(chain[Workflow](
          $read(Collection("db", "zips")),
          $sort(NonEmptyList(
            BsonField.Name("pop") -> SortDir.Ascending,
@@ -1399,7 +1400,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan efficient count and field ref" in {
       plan("SELECT city, COUNT(*) AS cnt FROM zips ORDER BY cnt DESC") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -1414,7 +1415,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan count and js expr" in {
       plan("SELECT COUNT(*) as cnt, LENGTH(city) FROM zips") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
               "1" ->
@@ -1434,7 +1435,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan trivial group by" in {
       plan("select city from zips group by city") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(),
@@ -1446,7 +1447,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan useless group by expression" in {
       plan("select city from zips group by lower(city)") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape("city" -> $field("city")),
@@ -1455,7 +1456,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan useful group by" in {
       plan("select city || \", \" || state, sum(pop) from zips group by city, state") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(
@@ -1506,7 +1507,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan group by expression" in {
       plan("select city, sum(pop) from zips group by lower(city)") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(
@@ -1532,7 +1533,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan group by month" in {
       plan("select avg(score) as a, DATE_PART(\"month\", `date`) as m from caloriesBurnedData group by DATE_PART(\"month\", `date`)") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "caloriesBurnedData")),
           $group(
             grouped(
@@ -1572,7 +1573,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan count grouped by single field" in {
       plan("select count(*) from bar group by baz") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "bar")),
             $group(
               grouped("0" -> $sum($literal(Bson.Int32(1)))),
@@ -1583,7 +1584,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan count and sum grouped by single field" in {
       plan("select count(*) as cnt, sum(biz) as sm from bar group by baz") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "bar")),
             $group(
               grouped(
@@ -1603,7 +1604,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan sum grouped by single field with filter" in {
       plan("select sum(pop) as sm from zips where state=\"CO\" group by city") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $match(Selector.Doc(
               BsonField.Name("state") -> Selector.Eq(Bson.Text("CO")))),
@@ -1623,7 +1624,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan count and field when grouped" in {
       plan("select count(*) as cnt, city from zips group by city") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -1639,7 +1640,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "collect unaggregated fields into single doc when grouping" in {
       plan("select city, state, sum(pop) from zips") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
@@ -1673,7 +1674,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       // NB: the point being that we don't want to push $$ROOT
       plan("select max(pop)/1000, pop from zips") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -1702,7 +1703,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan double aggregation with another projection" in {
       plan("select sum(avg(pop)), min(city) from zips group by foo") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -1737,7 +1738,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan aggregation on grouped field" in {
       plan("select city, count(city) from zips group by city") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -1753,7 +1754,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan multiple expressions using same field" in {
       plan("select pop, sum(pop), pop/1000 from zips") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read (Collection("db", "zips")),
         $project(
           reshape(
@@ -1795,7 +1796,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan sum of expression in expression with another projection when grouped" in {
       plan("select city, sum(pop-1)/1000 from zips group by city") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $group(
           grouped(
@@ -1817,7 +1818,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan length of min (JS on top of reduce)" in {
       plan("select state, length(min(city)) as shortest from zips group by state") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped(
@@ -1851,7 +1852,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan js expr grouped by js expr" in {
       plan("select length(city) as len, count(*) as cnt from zips group by length(city)") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"),
@@ -1875,7 +1876,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan simple JS inside expression" in {
       plan("select length(city) + 1 from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
             "0" ->
@@ -1892,7 +1893,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan expressions with ~"in {
-      plan("select foo ~ \"bar.*\", \"abc\" ~ \"a|b\", \"baz\" ~ regex, target ~ regex from a") must beWorkflow(chain(
+      plan("select foo ~ \"bar.*\", \"abc\" ~ \"a|b\", \"baz\" ~ regex, target ~ regex from a") must beWorkflow(chain[Workflow](
         $read(Collection("db", "a")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
@@ -1929,7 +1930,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan object flatten" in {
       plan("select geo{*} from usa_factbook") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "usa_factbook")),
             $simpleMap(
               NonEmptyList(
@@ -1953,7 +1954,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan array project with concat" in {
       plan("select city, loc[0] from zips") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $simpleMap(
               NonEmptyList(
@@ -1975,7 +1976,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan array concat with filter" in {
       plan("select loc || [ pop ] from zips where city = \"BOULDER\"") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $match(Selector.Doc(
               BsonField.Name("city") -> Selector.Eq(Bson.Text("BOULDER")))),
@@ -1999,7 +2000,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan array flatten" in {
       plan("select loc[*] from zips") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -2020,7 +2021,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan array concat" in {
       plan("select loc || [ 0, 1, 2 ] from zips") must beWorkflow {
-        chain(
+        chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(NonEmptyList(
             MapExpr(JsFn(Name("x"),
@@ -2047,7 +2048,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan array flatten with unflattened field" in {
       plan("SELECT _id as zip, loc as loc, loc[*] as coord FROM zips") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -2072,7 +2073,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "unify flattened fields" in {
       plan("select loc[*] from zips where loc[*] < 0") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
@@ -2094,7 +2095,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "group by flattened field" in {
       plan("select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "slamengine_commits")),
         $project(
           reshape(
@@ -2127,7 +2128,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "unify flattened fields with unflattened field" in {
       plan("select _id as zip, loc[*] from zips order by loc[*]") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
@@ -2151,7 +2152,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "unify flattened with double-flattened" in {
       plan("select * from user_comments where (comments[*].id LIKE \"%Dr%\" OR comments[*].replyTo[*] LIKE \"%Dr%\")") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "user_comments")),
         $project(
           reshape(
@@ -2192,7 +2193,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan limit with offset" in {
       plan("SELECT * FROM zips OFFSET 100 LIMIT 5") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $limit(105),
           $skip(100)))
@@ -2201,7 +2202,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan sort and limit" in {
       plan("SELECT city, pop FROM zips ORDER BY pop DESC LIMIT 5") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -2216,7 +2217,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan simple single field selection and limit" in {
       plan("SELECT city FROM zips LIMIT 5") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $limit(5),
             $project(
@@ -2228,7 +2229,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan complex group by with sorting and limiting" in {
       plan("SELECT city, SUM(pop) AS pop FROM zips GROUP BY city ORDER BY pop") must
         beWorkflow {
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -2252,7 +2253,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan filter and expressions with IS NULL" in {
       plan("select foo is null from zips where foo is null") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Doc(
             BsonField.Name("foo") -> Selector.Eq(Bson.Null))),
@@ -2263,7 +2264,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan implicit group by with filter" in {
       plan("select avg(pop), min(city) from zips where state = \"CO\"") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.Doc(
             BsonField.Name("state") -> Selector.Eq(Bson.Text("CO")))),
@@ -2294,7 +2295,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan simple distinct" in {
       plan("select distinct city, state from zips") must
       beWorkflow(
-        chain(
+        chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped(),
@@ -2310,7 +2311,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct as expression" in {
       plan("select count(distinct(city)) from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped(),
@@ -2322,7 +2323,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct of expression as expression" in {
       plan("select count(distinct substring(city, 0, 1)) from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped(),
@@ -2344,7 +2345,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct of wildcard" in {
       plan("select distinct * from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
             obj(
@@ -2362,7 +2363,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct of wildcard as expression" in {
       plan("select count(distinct *) from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
             obj(
@@ -2381,7 +2382,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan distinct with simple order by" in {
       plan("select distinct city from zips order by city") must
         beWorkflow(
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape("city" -> $field("city")),
@@ -2399,7 +2400,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan distinct with unrelated order by" in {
       plan("select distinct city from zips order by pop desc") must
         beWorkflow(
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -2425,7 +2426,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct as function with group" in {
       plan("select state, count(distinct(city)) from zips group by state") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped("__tmp0" -> $first($$ROOT)),
@@ -2439,7 +2440,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct with sum and group" in {
       plan("SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $group(
             grouped(
@@ -2477,7 +2478,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan distinct with sum, group, and orderBy" in {
       plan("SELECT DISTINCT SUM(pop) AS totalPop, city, state FROM zips GROUP BY city ORDER BY totalPop DESC") must
         beWorkflow(
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $group(
               grouped(
@@ -2517,7 +2518,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan order by JS expr with filter" in {
       plan("select city, pop from zips where pop > 1000 order by length(city)") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $match(Selector.And(
             Selector.Or(
@@ -2555,7 +2556,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select length()" in {
       plan("select length(city) from zips") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "zips")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
             "0" ->
@@ -2571,7 +2572,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan select length() and simple field" in {
       plan("select city, length(city) from zips") must
-      beWorkflow(chain(
+      beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "city" -> Select(ident("x"), "city"),
@@ -2598,7 +2599,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       import org.threeten.bp.Instant
 
       plan("""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "days")),
           $project(
             reshape(
@@ -2648,7 +2649,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       plan("select * from logs " +
         "where ((ts > date(\"2015-01-22\") and ts <= date(\"2015-01-27\")) and ts != date(\"2015-01-25\")) " +
         "or ts = date(\"2015-01-29\")") must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "logs")),
           $match(Selector.Or(
             // TODO: Eliminate duplicates
@@ -2704,7 +2705,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       Bson.ObjectId("0123456789abcdef01234567").fold[Result](
         failure("Couldn’t create ObjectId."))(
         oid => plan("""select length(city), foo = oid("0123456789abcdef01234567") from days where _id = oid("0123456789abcdef01234567")""") must
-          beWorkflow(chain(
+          beWorkflow(chain[Workflow](
             $read(Collection("db", "days")),
             $match(Selector.Doc(
               BsonField.Name("_id") -> Selector.Eq(oid))),
@@ -2732,7 +2733,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       import org.threeten.bp.Instant
 
       plan("select to_timestamp(epoch) from foo") must beWorkflow {
-        chain(
+        chain[Workflow](
           $read(Collection("db", "foo")),
           $project(
             reshape(
@@ -2750,7 +2751,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     "plan convert to timestamp in map-reduce" in {
 
       plan("select length(name), to_timestamp(epoch) from foo") must beWorkflow {
-        chain(
+        chain[Workflow](
           $read(Collection("db", "foo")),
           $simpleMap(
             NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -2780,7 +2781,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     def joinStructure0(
       left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
       leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
-      fin: WorkflowOp,
+      fin: FixOp[WorkflowF],
       swapped: Boolean) = {
 
       val (leftLabel, rightLabel) =
@@ -2788,7 +2789,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       def initialPipeOps(
         src: Workflow, name: String, base: Expression, key: Reshape.Shape, mainLabel: String, otherLabel: String):
           Workflow =
-        chain(
+        chain[Workflow](
           src,
           $group(grouped(name -> $push(base)), key),
           $project(
@@ -2800,11 +2801,11 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       fin(
         $foldLeft(
           initialPipeOps(left, leftName, leftBase, leftKey, leftLabel, rightLabel),
-          chain(
+          chain[Workflow](
             right,
             rightKey.fold(
               rk => initialPipeOps(_, rk._1, rk._2, rk._3, rightLabel, leftLabel),
-              rk => $map($Map.mapKeyVal(("key", "value"),
+              rk => $map($MapF.mapKeyVal(("key", "value"),
                 rk.toJs,
                 Js.AnonObjDecl(List(
                   (leftLabel, Js.AnonElem(List())),
@@ -2837,9 +2838,9 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     def joinStructure(
         left: Workflow, leftName: String, leftBase: Expression, right: Workflow,
         leftKey: Reshape.Shape, rightKey: (String, Expression, Reshape.Shape) \/ JsCore,
-        fin: WorkflowOp,
+        fin: FixOp[WorkflowF],
         swapped: Boolean) =
-      crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
+      Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 
     "plan simple join" in {
       plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
@@ -2849,7 +2850,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
             $read(Collection("db", "zips2")),
             reshape("0" -> $field("_id")),
             Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
-            chain(_,
+            chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                 BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
                 BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -2875,7 +2876,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           $read(Collection("db", "zips2")),
           $literal(Bson.Null),
           jscore.Literal(Js.Null).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
               BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -2944,7 +2945,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
               BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -2978,7 +2979,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-          chain(_,
+          chain[Workflow](_,
             $project(
               reshape(
                 "left" ->
@@ -3029,7 +3030,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           $read(Collection("db", "bar")),
           reshape("0" -> $field("id")),
           Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
             $project(
@@ -3075,7 +3076,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
             $read(Collection("db", "bar")),
             reshape("0" -> $field("id")),
             Obj(ListMap(Name("0") -> Select(ident("value"), "foo_id"))).right,
-            chain(_,
+            chain[Workflow](_,
               $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                 BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
                 BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3084,7 +3085,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
             false),
           reshape("0" -> $field("bar_id")),
           Obj(ListMap(Name("0") -> Select(Select(ident("value"), "right"), "id"))).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0))))),
             $project(
@@ -3138,7 +3139,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       plan("select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth from slamengine_commits as l join slamengine_commits as r on r.sha = l.parents[0].sha and l.author.login = r.author.login") must
       beWorkflow(
         joinStructure(
-          chain(
+          chain[Workflow](
             $read(Collection("db", "slamengine_commits")),
             $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
               obj(
@@ -3154,7 +3155,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           obj(
             "0" -> Select(ident("value"), "sha"),
             "1" -> Select(Select(ident("value"), "author"), "login")).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
               BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3208,7 +3209,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       plan("select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]") must
       beWorkflow(
         joinStructure(
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -3217,7 +3218,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
               IgnoreId),
             $unwind(DocField(BsonField.Name("__tmp0")))),
           "__tmp2", $field("__tmp1"),
-          chain(
+          chain[Workflow](
             $read(Collection("db", "zips")),
             $project(
               reshape(
@@ -3227,7 +3228,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
             $unwind(DocField(BsonField.Name("__tmp3")))),
           reshape("0" -> $field("__tmp0")),
           ("__tmp5", $field("__tmp4"), reshape("0" -> $field("__tmp3")).left).left,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
               BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3275,7 +3276,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           $read(Collection("db", "zips2")),
           $literal(Bson.Null),
           jscore.Literal(Js.Null).right,
-          chain(_,
+          chain[Workflow](_,
             $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
               BsonField.Name("left") -> Selector.NotExpr(Selector.Size(0)),
               BsonField.Name("right") -> Selector.NotExpr(Selector.Size(0))))),
@@ -3339,14 +3340,14 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       wf.foldMap(op => if (p.lift(op.unFix).getOrElse(false)) 1 else 0)
     }
 
-    def countAccumOps(wf: Workflow) = countOps(wf, { case $Group(_, _, _) => true })
-    def countUnwindOps(wf: Workflow) = countOps(wf, { case $Unwind(_, _) => true })
-    def countMatchOps(wf: Workflow) = countOps(wf, { case $Match(_, _) => true })
+    def countAccumOps(wf: Workflow) = countOps(wf, { case $group(_, _, _) => true })
+    def countUnwindOps(wf: Workflow) = countOps(wf, { case $unwind(_, _) => true })
+    def countMatchOps(wf: Workflow) = countOps(wf, { case $match(_, _) => true })
 
     def noConsecutiveProjectOps(wf: Workflow) =
-      countOps(wf, { case $Project(Fix($Project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
+      countOps(wf, { case $project(Fix($project(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $project ops:" must_== 0
     def noConsecutiveSimpleMapOps(wf: Workflow) =
-      countOps(wf, { case $SimpleMap(Fix($SimpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
+      countOps(wf, { case $simpleMap(Fix($simpleMap(_, _, _)), _, _) => true }) aka "the occurrences of consecutive $simpleMap ops:" must_== 0
     def maxAccumOps(wf: Workflow, max: Int) =
       countAccumOps(wf) aka "the number of $group ops:" must beLessThanOrEqualTo(max)
     def maxUnwindOps(wf: Workflow, max: Int) =
@@ -3354,23 +3355,23 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     def maxMatchOps(wf: Workflow, max: Int) =
       countMatchOps(wf) aka "the number of $match ops:" must beLessThanOrEqualTo(max)
     def brokenProjectOps(wf: Workflow) =
-      countOps(wf, { case $Project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
+      countOps(wf, { case $project(_, Reshape(shape), _) => shape.isEmpty }) aka "$project ops with no fields"
 
     def danglingReferences(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op: SingleSourceF[Workflow] =>
+        case IsSingleSource(op) =>
           Workflow.simpleShape(op.src).map { shape =>
-            val refs = Workflow.refs(op)
+            val refs = Refs[WorkflowF].refs(op.wf)
             val missing = refs.collect { case v @ DocVar(_, Some(f)) if !shape.contains(f.flatten.head) => v }
             if (missing.isEmpty) Nil
-            else List(missing.map(_.bson).mkString(", ") + " missing in\n" + Fix[WorkflowF](op).show)
+            else List(missing.map(_.bson).mkString(", ") + " missing in\n" + Fix[WorkflowF](op.wf).show)
           }.getOrElse(Nil)
         case _ => Nil
       }) aka "dangling references"
 
     def rootPushes(wf: Workflow) =
       wf.foldMap(_.unFix match {
-        case op @ $Group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
+        case op @ $group(src, Grouped(map), _) if map.values.toList.contains($push($$ROOT)) && simpleShape(src).isEmpty => List(op)
         case _ => Nil
       }) aka "group ops pushing $$ROOT"
 
@@ -3593,7 +3594,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                 MakeArrayN(Constant(Data.Str("ASC")))),
               Free('tmp2))))
 
-      plan(lp) must beWorkflow(chain(
+      plan(lp) must beWorkflow(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(
           reshape("bar" -> $field("bar")),
@@ -3612,7 +3613,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
               Constant(Data.Dec(10.0)))),
             MakeArrayN(Constant(Data.Str("ASC")))))
 
-      plan(lp) must beWorkflow(chain(
+      plan(lp) must beWorkflow(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(
           reshape(
@@ -3641,7 +3642,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
               MakeArrayN[Fix](ObjectProject(Free('tmp1), Constant(Data.Str("bar")))),
               MakeArrayN(Constant(Data.Str("ASC"))))))
 
-      plan(lp) must beWorkflow(chain(
+      plan(lp) must beWorkflow(chain[Workflow](
         $read(Collection("db", "foo")),
         $match(Selector.Doc(
           BsonField.Name("baz") -> Selector.Eq(Bson.Int32(0)))),
@@ -3663,7 +3664,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                 Constant(Data.Dec(10.0)))),
               MakeArrayN(Constant(Data.Str("ASC"))))))
 
-      plan(lp) must beWorkflow(chain(
+      plan(lp) must beWorkflow(chain[Workflow](
         $read(Collection("db", "foo")),
         $project(
           reshape(
@@ -3678,7 +3679,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     "plan distinct on full collection" in {
       plan(s.Distinct(read("db/cities"))) must
-        beWorkflow(chain(
+        beWorkflow(chain[Workflow](
           $read(Collection("db", "cities")),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"),
             obj(
@@ -3819,7 +3820,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                       Constant(Data.Bool(false)))),
                   Constant(Data.Str("city")))))))
 
-      plan(lp) must beWorkflow(chain(
+      plan(lp) must beWorkflow(chain[Workflow](
         $read(Collection("db", "zips")),
         $project(
           reshape(
