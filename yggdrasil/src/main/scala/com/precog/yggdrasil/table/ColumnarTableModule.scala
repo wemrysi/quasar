@@ -32,7 +32,9 @@ import org.slf4j.Logger
 import org.slf4s.Logging
 import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
+import java.util.Arrays
 import java.nio.CharBuffer
+import java.nio.charset.{ Charset, CoderResult }
 
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1
@@ -307,7 +309,6 @@ object ColumnarTableModule extends Logging {
   }
 
   def byteStream[M[+ _]](blockStream: StreamT[M, Slice], mimeType: Option[MimeType])(implicit M: Monad[M]): Option[StreamT[M, Array[Byte]]] = {
-    import vfs.VFSModule.bufferOutput
     import FileContent._
 
     mimeType match {
@@ -319,6 +320,38 @@ object ColumnarTableModule extends Logging {
         None
     }
   }
+
+  private def bufferOutput[M[+_]: Monad](stream0: StreamT[M, CharBuffer]): StreamT[M, Array[Byte]] = {
+    val charset         = Utf8Charset
+    val bufferSize: Int = 64 * 1024
+    val encoder         = charset.newEncoder()
+
+    def loop(stream: StreamT[M, CharBuffer], buf: ByteBuffer, arr: Array[Byte]): StreamT[M, Array[Byte]] = {
+      StreamT[M, Array[Byte]](stream.uncons map {
+        case Some((cbuf, tail)) =>
+          val result = encoder.encode(cbuf, buf, false)
+          if (result == CoderResult.OVERFLOW) {
+            val arr2 = new Array[Byte](bufferSize)
+            StreamT.Yield(arr, loop(cbuf :: tail, ByteBufferWrap(arr2), arr2))
+          } else {
+            StreamT.Skip(loop(tail, buf, arr))
+          }
+
+        case None =>
+          val result = encoder.encode(CharBuffer.wrap(""), buf, true)
+          if (result == CoderResult.OVERFLOW) {
+            val arr2 = new Array[Byte](bufferSize)
+            StreamT.Yield(arr, loop(stream, ByteBufferWrap(arr2), arr2))
+          } else {
+            StreamT.Yield(Arrays.copyOf(arr, buf.position), StreamT.empty[M, Array[Byte]])
+          }
+      })
+    }
+
+    val arr = new Array[Byte](bufferSize)
+    loop(stream0, ByteBufferWrap(arr), arr)
+  }
+
 }
 
 trait ColumnarTableModule[M[+ _]]

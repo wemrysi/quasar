@@ -31,7 +31,7 @@ import java.util.regex._
 import scalaz._, Scalaz._
 
 trait FSLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
-  def vfs: VFSMetadata[M]
+  def vfs: VFSMetadata
 
   import trans._
 

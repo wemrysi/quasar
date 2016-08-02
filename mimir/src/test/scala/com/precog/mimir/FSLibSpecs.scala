@@ -46,7 +46,7 @@ trait FSLibSpecs extends Specification with FSLibModule[Need] with TestColumnarT
     Path("/foo2/bar1/baz/quux1" ) -> Map(ColumnRef(CPath.Identity, CString) -> 40L)
   )
 
-  val vfs = new StubVFSMetadata[Need](projectionMetadata)
+  val vfs = new VFSMetadata(projectionMetadata)
 
   def pathTable(path: String) = {
     Table.constString(Set(path)).transform(WrapObject(Leaf(Source), TransSpecModule.paths.Value.name))
