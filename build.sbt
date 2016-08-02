@@ -162,7 +162,7 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-          ejson,
+   ejson, effect, js,
 //          |
           core,
 //      / / | \ \
@@ -194,9 +194,25 @@ lazy val ejson = project
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val effect = project
+  .settings(name := "quasar-effect-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val js = project
+  .settings(name := "quasar-js-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, foundation % BothScopes)
+  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes, foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
