@@ -130,8 +130,24 @@ lazy val publishSettings = Seq(
   )
 )
 
+lazy val assemblySettings = Seq(
+  test in assembly := {},
+
+  assemblyMergeStrategy in assembly := {
+    case PathList("META-INF", "io.netty.versions.properties") =>
+      MergeStrategy.last
+    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) =>
+      MergeStrategy.last
+    case PathList("com", "google", "common", "base", xs @ _*) =>
+      MergeStrategy.last
+    case other =>
+      val defaultStrat = (assemblyMergeStrategy in assembly).value
+      defaultStrat(other)
+  }
+)
+
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings
+lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
 // Include to also publish a project's tests
 lazy val publishTestsSettings = Seq(
@@ -146,11 +162,10 @@ lazy val noPublishSettings = Seq(
   publishArtifact := false
 )
 
-lazy val oneJarSettings =
-  com.github.retronym.SbtOneJar.oneJarSettings ++
+lazy val githubReleaseSettings =
   githubSettings ++
   Seq(
-    GithubKeys.assets := { Seq(oneJar.value) },
+    GithubKeys.assets := { Seq(assembly.value) },
     GithubKeys.repoSlug := "quasar-analytics/quasar",
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
@@ -274,7 +289,7 @@ lazy val repl = project
   .dependsOn(main % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(oneJarSettings)
+  .settings(githubReleaseSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -286,7 +301,7 @@ lazy val web = project
   .dependsOn(main % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(oneJarSettings)
+  .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
