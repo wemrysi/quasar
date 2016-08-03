@@ -31,7 +31,7 @@ import SampleData._
 import quasar.precog.TestSupport._, Gen._
 
 class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
-      with TableModuleSpec[Need]
+      with TableModuleSpec
       with CogroupSpec[Need]
       with CrossSpec[Need]
       with TransformSpec[Need]
@@ -39,7 +39,7 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
       with TakeRangeSpec[Need]
       with CanonicalizeSpec[Need]
       with PartitionMergeSpec[Need]
-      with ToArraySpec[Need]
+      with ToArraySpec
       with SampleSpec[Need]
       with DistinctSpec[Need]
       with SchemasSpec[Need] {
@@ -47,7 +47,7 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
   type GroupId = Int
 
   import trans._
-  implicit def M = Need.need
+  // implicit def M: Monad[Need] with Comonad[Need] = Need.need
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement

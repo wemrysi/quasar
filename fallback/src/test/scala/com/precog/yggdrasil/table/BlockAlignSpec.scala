@@ -25,12 +25,21 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 import org.scalacheck.Gen._
-// import org.specs2.ScalaCheck
-// import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 
-trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
-  implicit def M = Need.need
+class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {
+  "align" should {
+    "a simple example" in alignSimple
+    "across slice boundaries" in alignAcrossBoundaries
+    "survive a trivial scalacheck" in checkAlign
+    "produce the same results irrespective of input order" in testAlignSymmetry(0)
+    "produce the same results irrespective of input order" in testAlignSymmetry(1)
+    "produce the same results irrespective of input order" in testAlignSymmetry(2)
+  }
+}
+
+trait BlockAlignBaseSpec extends SpecificationLike with ScalaCheck {
+  implicit def M: Monad[Need] with Comonad[Need]
   private def emptyTestModule = BlockStoreTestModule.empty[Need]
 
   def testAlign(sample: SampleData) = {
@@ -429,16 +438,5 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
       case 1 => test1
       case 2 => test2
     }
-  }
-}
-
-object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec {
-  "align" should {
-    "a simple example" in alignSimple
-    "across slice boundaries" in alignAcrossBoundaries
-    "survive a trivial scalacheck" in checkAlign
-    "produce the same results irrespective of input order" in testAlignSymmetry(0)
-    "produce the same results irrespective of input order" in testAlignSymmetry(1)
-    "produce the same results irrespective of input order" in testAlignSymmetry(2)
   }
 }

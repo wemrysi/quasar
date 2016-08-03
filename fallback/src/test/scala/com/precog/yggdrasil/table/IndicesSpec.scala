@@ -28,10 +28,8 @@ import scalaz._, Scalaz._
 
 // TODO: mix in a trait rather than defining Table directly
 
-class IndicesSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec[Need] with IndicesModule[Need] {
+class IndicesSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec with IndicesModule[Need] {
   type GroupId = Int
-
-  implicit def M = Need.need
 
   import TableModule._
   import trans._

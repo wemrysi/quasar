@@ -38,12 +38,12 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
 }
 
-trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {
+trait TableModuleSpec extends SpecificationLike with ScalaCheck {
   import SampleData._
 
-  implicit def M: Monad[M] with Comonad[M]
+  implicit def M: Monad[Need] with Comonad[Need] = Need.need
 
-  def checkMappings(testSupport: TableModuleTestSupport[M]) = {
+  def checkMappings(testSupport: TableModuleTestSupport[Need]) = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val dataset = testSupport.fromSample(sample)

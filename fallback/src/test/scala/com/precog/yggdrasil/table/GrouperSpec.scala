@@ -25,6 +25,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
+
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
 evaluated by the merge algorithm.
@@ -57,8 +58,8 @@ solve 'a, 'b
   ...
 */
 
-trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
-  implicit def M = Need.need
+class GrouperSpec extends TableModuleSpec with SpecificationLike with ScalaCheck {
+  // implicit def M: Monad[Need] with Comonad[Need] = Need.need
   private def emptyTestModule = BlockStoreTestModule.empty[Need]
 
   def tic_a = CPathField("tic_a")
@@ -1012,5 +1013,3 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
 
   "handle non-trivial group alignment with composite key" in testNonTrivial
 }
-
-object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec

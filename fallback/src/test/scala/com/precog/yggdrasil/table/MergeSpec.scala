@@ -26,8 +26,7 @@ import com.precog.bytecode.JType
 import com.precog.common.security._
 import scalaz._, Scalaz._
 
-class MergeSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec[Need] with IndicesModule[Need] {
-  implicit def M = Need.need
+class MergeSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec with IndicesModule[Need] {
   type GroupId = Int
   import trans._
   import TableModule._
@@ -229,37 +228,15 @@ class MergeSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpe
         val r2 = fromJson(JParser.parseManyFromString(r2Json).valueOr(throw _).toStream)
         val r3 = fromJson(JParser.parseManyFromString(r3Json).valueOr(throw _).toStream)
 
-        (key match {
-          case K0 => {
-            //println("key: "+keyJson+" partition(0):")
-            //partition(0).flatMap(_.toJson).copoint.foreach(println)
-            //println("key: "+keyJson+" partition(2):")
-            //partition(2).flatMap(_.toJson).copoint.foreach(println)
-            r0
+        Need {
+          key match {
+            case K0 => r0
+            case K1 => r1
+            case K2 => r2
+            case K3 => r3
+            case _  => sys.error("Unexpected group key")
           }
-          case K1 => {
-            //println("key: "+keyJson+" partition(0):")
-            //partition(0).flatMap(_.toJson).copoint.foreach(println)
-            //println("key: "+keyJson+" partition(2):")
-            //partition(2).flatMap(_.toJson).copoint.foreach(println)
-            r1
-          }
-          case K2 => {
-            //println("key: "+keyJson+" partition(0):")
-            //partition(0).flatMap(_.toJson).copoint.foreach(println)
-            //println("key: "+keyJson+" partition(2):")
-            //partition(2).flatMap(_.toJson).copoint.foreach(println)
-            r2
-          }
-          case K3 => {
-            //println("key: "+keyJson+" partition(0):")
-            //partition(0).flatMap(_.toJson).copoint.foreach(println)
-            //println("key: "+keyJson+" partition(3):")
-            //partition(3).flatMap(_.toJson).copoint.foreach(println)
-            r3
-          }
-          case _  => sys.error("Unexpected group key")
-        }).point[Need]
+        }
       }
 
       val result = Table.merge(grouping)(evaluator)

@@ -24,7 +24,7 @@ import blueeyes._
 import scalaz._
 import TableModule._
 
-trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
+class BlockStoreColumnarTableModuleSpec extends TableModuleSpec with BlockLoadSpec with BlockSortSpec with BlockAlignBaseSpec {
   type MemoId = Int
 
   "a block store columnar table" should {
@@ -55,5 +55,3 @@ trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with Block
     }
   }
 }
-
-object BlockStoreColumnarTableModuleSpec extends BlockStoreColumnarTableModuleSpec
