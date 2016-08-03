@@ -15,7 +15,8 @@ object Dependencies {
   private val scalazVersion     = "7.2.4"
   private val scodecBitsVersion = "1.1.0"
   private val slcVersion        = "0.4"
-  private val specsVersion      = "3.8.4"
+  private val scalacheckVersion = "1.12.5"
+  private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
   val core = Seq(
     "org.scalaz"        %% "scalaz-core"               % scalazVersion           % "compile, test" force(),
@@ -48,7 +49,7 @@ object Dependencies {
     // Can't upgrade scalacheck until scalaz-scalacheck-binding is upgraded to
     // latest scalacheck which looks like it may never happen:
     // https://github.com/scalaz/scalaz/issues/1096
-    "org.scalacheck"    %% "scalacheck"                % "1.12.5"                % "test" force(),
+    "org.scalacheck"    %% "scalacheck"                % scalacheckVersion       % "test" force(),
     "org.typelevel"     %% "scalaz-specs2"             % "0.4.0"                 % "test",
     "org.typelevel"     %% "shapeless-scalacheck"      % slcVersion              % "test",
     "org.scodec"        %% "scodec-bits"               % scodecBitsVersion       % "compile, test",
