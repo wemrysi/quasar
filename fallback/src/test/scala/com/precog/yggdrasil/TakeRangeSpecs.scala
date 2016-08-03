@@ -20,11 +20,11 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes.json._
-import scalaz.syntax.comonad._
+import blueeyes._, json._
+import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait TakeRangeSpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import SampleData._
 
   def checkTakeRange = {

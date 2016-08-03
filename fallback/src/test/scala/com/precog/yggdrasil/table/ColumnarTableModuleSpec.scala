@@ -32,17 +32,17 @@ import quasar.precog.TestSupport._, Gen._
 
 class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
       with TableModuleSpec
-      with CogroupSpec[Need]
-      with CrossSpec[Need]
-      with TransformSpec[Need]
-      with CompactSpec[Need]
-      with TakeRangeSpec[Need]
-      with CanonicalizeSpec[Need]
-      with PartitionMergeSpec[Need]
+      with CogroupSpec
+      with CrossSpec
+      with TransformSpec
+      with CompactSpec
+      with TakeRangeSpec
+      with CanonicalizeSpec
+      with PartitionMergeSpec
       with ToArraySpec
-      with SampleSpec[Need]
-      with DistinctSpec[Need]
-      with SchemasSpec[Need] {
+      with SampleSpec
+      with DistinctSpec
+      with SchemasSpec {
 
   type GroupId = Int
 

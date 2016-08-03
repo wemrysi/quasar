@@ -23,14 +23,12 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TestLib[M[+_]] extends TableModule[M] {
+trait TableModuleTestSupport[M[+_]] extends TableModule[M] {
+  implicit def M: MoCo[M]
+
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2
   def lookupScanner(namespace: List[String], name: String): Scanner
-}
-
-trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
-  implicit def M: Monad[M] with Comonad[M]
 
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
   def toJson(dataset: Table): M[Stream[JValue]] = dataset.toJson.map(_.toStream)
@@ -41,7 +39,7 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
 trait TableModuleSpec extends SpecificationLike with ScalaCheck {
   import SampleData._
 
-  implicit def M: Monad[Need] with Comonad[Need] = Need.need
+  implicit def M: MoCo[Need] = Need.need
 
   def checkMappings(testSupport: TableModuleTestSupport[Need]) = {
     implicit val gen = sample(schema)

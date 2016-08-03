@@ -27,7 +27,7 @@ import com.precog.bytecode._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait TransformSpec extends TableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import CValueGenerators._
   import SampleData._
   import trans._
@@ -1005,7 +1005,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
+      def isOk(results: Need[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
         case JObject(fields) => {
           val back = JObject(fields filter { case (name,value) => name == "value" && value.isInstanceOf[JObject] })
           if (back \ "value" \ "value1" == JUndefined || back \ "value" \ "value2" == JUndefined)
@@ -1040,7 +1040,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
+      def isOk(results: Need[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1109,7 +1109,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
+      def isOk(results: Need[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
         case obj @ JObject(fields) => {
           (obj \ "value") match {
             case JArray(inner) if inner.length >= 2 =>

@@ -21,14 +21,10 @@ package com.precog.yggdrasil
 package table
 
 import blueeyes._, json._
-
-import scalaz.StreamT
-import scalaz.syntax.comonad._
-
-import org.specs2.ScalaCheck
-import org.scalacheck.Gen
+import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
-trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+
+trait CanonicalizeSpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import SampleData._
 
   val table = {

@@ -19,20 +19,12 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
+import scalaz._, Scalaz._, Ordering._, Either3._
+import quasar.precog.TestSupport._, Gen._
 
-import scalaz._
-import scalaz.Ordering._
-import scalaz.Either3._
-import scalaz.std.tuple._
-import scalaz.syntax.comonad._
-
-import org.specs2._
-import org.scalacheck._, Gen._
-
-trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CogroupSpec extends TableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._

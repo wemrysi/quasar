@@ -22,10 +22,10 @@ package table
 
 import blueeyes._, json._
 import com.precog.common._
-import scalaz.syntax.comonad._
+import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait SampleSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait SampleSpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import trans._
 
   val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>

@@ -19,11 +19,11 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes.json._
-import scalaz.syntax.comonad._
+import blueeyes._, json._
+import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CrossSpec extends TableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 
@@ -48,7 +48,7 @@ trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike 
       InnerObjectConcat(WrapObject(Leaf(SourceLeft), "left"), WrapObject(Leaf(SourceRight), "right"))
     )
 
-    val jsonResult: M[Stream[JValue]] = toJson(result)
+    val jsonResult: Need[Stream[JValue]] = toJson(result)
     jsonResult.copoint must_== expected
   }
 
