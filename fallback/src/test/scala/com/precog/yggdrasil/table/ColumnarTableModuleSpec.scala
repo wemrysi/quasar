@@ -30,48 +30,45 @@ import TableModule._
 import SampleData._
 import quasar.precog.TestSupport._, Gen._
 
-trait TestColumnarTableModule[M[+_]] extends ColumnarTableModuleTestSupport[M] {
+class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
+      with TableModuleSpec[Need]
+      with CogroupSpec[Need]
+      with CrossSpec[Need]
+      with TransformSpec[Need]
+      with CompactSpec[Need]
+      with TakeRangeSpec[Need]
+      with CanonicalizeSpec[Need]
+      with PartitionMergeSpec[Need]
+      with ToArraySpec[Need]
+      with SampleSpec[Need]
+      with DistinctSpec[Need]
+      with SchemasSpec[Need] {
+
   type GroupId = Int
+
   import trans._
+  implicit def M = Need.need
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
 
-  class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Need[Seq[Table]] = sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[M, Slice], size: TableSize) = new Table(slices, size)
+    def apply(slices: StreamT[Need, Slice], size: TableSize) = new Table(slices, size)
 
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[M, Slice], ExactSize(1))
+    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)] =
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] =
       sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
-}
-
-trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
-    with TableModuleSpec[M]
-    with CogroupSpec[M]
-    with CrossSpec[M]
-    with TransformSpec[M]
-    with CompactSpec[M]
-    with TakeRangeSpec[M]
-    with CanonicalizeSpec[M]
-    with PartitionMergeSpec[M]
-    with ToArraySpec[M]
-    with SampleSpec[M]
-    with DistinctSpec[M]
-    with SchemasSpec[M]
-    { spec =>
-
-  import trans._
 
   def testConcat = {
     val json1 = """{ "a": 1, "b": "x", "c": null }"""
@@ -91,8 +88,8 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
   lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
 
-  def streamToString(stream: StreamT[M, CharBuffer]): String = {
-    def loop(stream: StreamT[M, CharBuffer], sb: StringBuilder): M[String] =
+  def streamToString(stream: StreamT[Need, CharBuffer]): String = {
+    def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
       stream.uncons.flatMap {
         case None =>
           M.point(sb.toString)
@@ -631,8 +628,4 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       testRenderCsv(input, Some(2)) must_== expected2
     }
   }
-}
-
-object ColumnarTableModuleSpec extends ColumnarTableModuleSpec[Need] {
-  implicit def M = Need.need
 }
