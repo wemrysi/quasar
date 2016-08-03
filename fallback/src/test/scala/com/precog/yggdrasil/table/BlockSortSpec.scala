@@ -33,7 +33,7 @@ import TableModule._
  */
 import PrecogJValueOrder._
 
-trait BlockSortSpec extends SpecificationLike with ScalaCheck {
+trait BlockSortSpec extends quasar.QuasarSpecification {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty
 

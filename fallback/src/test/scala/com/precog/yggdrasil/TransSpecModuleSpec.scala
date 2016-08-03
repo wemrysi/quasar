@@ -23,7 +23,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.precog.TestSupport._
 
-trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with SpecificationLike {
+trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar.QuasarSpecification {
   import trans._
   import CPath._
 

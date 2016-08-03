@@ -36,7 +36,7 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] {
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
 }
 
-trait TableModuleSpec extends SpecificationLike with ScalaCheck {
+trait TableModuleSpec extends quasar.QuasarSpecification {
   import SampleData._
 
   implicit def M: MoCo[Need] = Need.need

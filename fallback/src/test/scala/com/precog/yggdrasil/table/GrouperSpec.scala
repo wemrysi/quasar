@@ -58,7 +58,7 @@ solve 'a, 'b
   ...
 */
 
-class GrouperSpec extends TableModuleSpec with SpecificationLike with ScalaCheck {
+class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
   private def emptyTestModule = BlockStoreTestModule.empty
 
   def tic_a = CPathField("tic_a")

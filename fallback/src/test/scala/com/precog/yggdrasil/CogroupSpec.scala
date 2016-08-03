@@ -24,7 +24,7 @@ import com.precog.common._
 import scalaz._, Scalaz._, Ordering._, Either3._
 import quasar.precog.TestSupport._, Gen._
 
-trait CogroupSpec extends TableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
+trait CogroupSpec extends TableModuleTestSupport[Need] with quasar.QuasarSpecification {
   import SampleData._
   import trans._
   import trans.constants._

@@ -27,7 +27,7 @@ import com.precog.bytecode._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TransformSpec extends TableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
+trait TransformSpec extends TableModuleTestSupport[Need] with quasar.QuasarSpecification {
   import CValueGenerators._
   import SampleData._
   import trans._

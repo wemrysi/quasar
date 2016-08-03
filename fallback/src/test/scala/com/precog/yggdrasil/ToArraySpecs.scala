@@ -25,7 +25,7 @@ import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 import scalaz.Need
 
-trait ToArraySpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike {
+trait ToArraySpec extends ColumnarTableModuleTestSupport[Need] with quasar.QuasarSpecification {
   def testToArrayHomogeneous = {
     val data: Stream[JValue] =
       Stream(

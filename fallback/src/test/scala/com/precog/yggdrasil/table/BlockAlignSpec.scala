@@ -38,7 +38,7 @@ class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {
   }
 }
 
-trait BlockAlignBaseSpec extends SpecificationLike with ScalaCheck {
+trait BlockAlignBaseSpec extends quasar.QuasarSpecification {
   implicit def M: MoCo[Need]
   private def emptyTestModule = BlockStoreTestModule.empty
 

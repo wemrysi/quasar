@@ -26,7 +26,7 @@ import scala.util.Random
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait CompactSpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
+trait CompactSpec extends ColumnarTableModuleTestSupport[Need] with quasar.QuasarSpecification {
   import SampleData._
   import trans._
 

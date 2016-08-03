@@ -27,7 +27,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait PartitionMergeSpec extends ColumnarTableModuleTestSupport[Need] with SpecificationLike with ScalaCheck {
+trait PartitionMergeSpec extends ColumnarTableModuleTestSupport[Need] with quasar.QuasarSpecification {
   import trans._
 
   def testPartitionMerge = {

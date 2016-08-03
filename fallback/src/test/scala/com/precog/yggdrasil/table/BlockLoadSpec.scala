@@ -29,7 +29,7 @@ import SampleData._
 import CValueGenerators._
 import quasar.precog.TestSupport._, Gen._
 
-trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
+trait BlockLoadSpec extends quasar.QuasarSpecification {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
     val Some((idCount, schema)) = sampleData.schema
     val actualSchema            = inferSchema(sampleData.data map { _ \ "value" })
