@@ -18,7 +18,6 @@
  *
  */
 package com.precog.yggdrasil
-package vfs
 
 import blueeyes.json.serialization.Extractor
 import scalaz._

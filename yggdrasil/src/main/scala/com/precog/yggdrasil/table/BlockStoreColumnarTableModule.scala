@@ -982,7 +982,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
 
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table]
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table]
   }
 
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
@@ -1062,7 +1062,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
-    def load(apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table] = Table.load(this, apiKey, tpe)
+    def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = Table.load(this, apiKey, tpe)
 
     override def force: M[Table] = M.point(this)
 

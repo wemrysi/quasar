@@ -30,7 +30,7 @@ trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] 
   type TableCompanion <: SliceColumnarTableCompanion
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, vfs.ResourceError, Table] = EitherT.right {
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = EitherT.right {
       for {
         paths <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
