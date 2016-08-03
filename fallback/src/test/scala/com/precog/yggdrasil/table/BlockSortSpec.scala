@@ -35,7 +35,7 @@ import PrecogJValueOrder._
 
 trait BlockSortSpec extends SpecificationLike with ScalaCheck {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
-    val module = BlockStoreTestModule.empty[Need]
+    val module = BlockStoreTestModule.empty
 
     val jvalueOrdering     = ScalazOrder[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse

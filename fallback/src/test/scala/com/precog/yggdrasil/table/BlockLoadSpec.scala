@@ -30,10 +30,9 @@ import CValueGenerators._
 import quasar.precog.TestSupport._, Gen._
 
 trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
-  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[Need] {
-    val M = Need.need
+  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
     val Some((idCount, schema)) = sampleData.schema
-    val actualSchema = inferSchema(sampleData.data map { _ \ "value" })
+    val actualSchema            = inferSchema(sampleData.data map { _ \ "value" })
 
     val projections = List(actualSchema).map { subschema =>
 

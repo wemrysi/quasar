@@ -34,7 +34,8 @@ trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   }
 }
 
-trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { self: ColumnarTableModule[M] with SliceTransforms[M] =>
+trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] {
+  self: ColumnarTableModule[M] with SliceTransforms[M] =>
 
   import trans._
 

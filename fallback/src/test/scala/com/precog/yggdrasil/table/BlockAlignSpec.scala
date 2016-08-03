@@ -39,8 +39,8 @@ class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {
 }
 
 trait BlockAlignBaseSpec extends SpecificationLike with ScalaCheck {
-  implicit def M: Monad[Need] with Comonad[Need]
-  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+  implicit def M: MoCo[Need]
+  private def emptyTestModule = BlockStoreTestModule.empty
 
   def testAlign(sample: SampleData) = {
     val module = emptyTestModule

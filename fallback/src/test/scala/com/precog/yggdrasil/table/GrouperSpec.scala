@@ -59,8 +59,7 @@ solve 'a, 'b
 */
 
 class GrouperSpec extends TableModuleSpec with SpecificationLike with ScalaCheck {
-  // implicit def M: Monad[Need] with Comonad[Need] = Need.need
-  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+  private def emptyTestModule = BlockStoreTestModule.empty
 
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")

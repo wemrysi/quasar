@@ -20,13 +20,14 @@
 package com.precog.common
 package security
 
+import blueeyes._
 import accounts._
 import com.precog.common.security.service._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
 trait APIKeyManagerSpec[M[+_]] extends Specification {
-  implicit def M: Monad[M] with Comonad[M]
+  implicit def M: MoCo[M]
 
   "API Key Manager" should {
     "properly ascribe parentage for grants" in {

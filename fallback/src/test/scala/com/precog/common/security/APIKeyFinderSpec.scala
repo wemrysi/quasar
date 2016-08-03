@@ -29,7 +29,7 @@ import quasar.precog.TestSupport._
 trait APIKeyFinderSpec[M[+_]] extends Specification {
   import Permission._
 
-  implicit def M: Monad[M] with Comonad[M]
+  implicit def M: MoCo[M]
 
   def withAPIKeyFinder[A](mgr: APIKeyManager[M])(f: APIKeyFinder[M] => A): A
 

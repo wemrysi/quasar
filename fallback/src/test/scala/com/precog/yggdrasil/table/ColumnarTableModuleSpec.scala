@@ -47,7 +47,6 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
   type GroupId = Int
 
   import trans._
-  // implicit def M: Monad[Need] with Comonad[Need] = Need.need
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
