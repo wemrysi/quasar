@@ -26,33 +26,27 @@ import com.precog.bytecode.JType
 import com.precog.common.security._
 import scalaz._, Scalaz._
 
-trait MergeSpec[M[+_]] extends
-  ColumnarTableModuleTestSupport[M] with
-  TableModuleSpec[M] with
-  IndicesModule[M] {
-
+class MergeSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec[Need] with IndicesModule[Need] {
+  implicit def M = Need.need
   type GroupId = Int
   import trans._
   import TableModule._
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
-  implicit val fid = NaturalTransformation.refl[M]
+  implicit val fid = NaturalTransformation.refl[Need]
 
-  class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Need[Seq[Table]] = sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[M, Slice], size: TableSize) = new Table(slices, size)
-
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[M, Slice], ExactSize(1))
-
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1):
-        M[(Table, Table)] = sys.error("not implemented here")
+    def apply(slices: StreamT[Need, Slice], size: TableSize)                                                           = new Table(slices, size)
+    def singleton(slice: Slice)                                                                                        = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
@@ -117,7 +111,7 @@ trait MergeSpec[M[+_]] extends
           GroupingSpec.Intersection
         )
 
-      def evaluator(key: RValue, partition: GroupId => M[Table]) = {
+      def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(JParser.parseUnsafe("""{"1":0,"2":4}"""))
         val K1 = RValue.fromJValue(JParser.parseUnsafe("""{"1":1,"2":5}"""))
         val K2 = RValue.fromJValue(JParser.parseUnsafe("""{"1":2,"2":6}"""))
@@ -172,7 +166,7 @@ trait MergeSpec[M[+_]] extends
             r3
           }
           case _  => sys.error("Unexpected group key")
-        }).point[M]
+        }).point[Need]
       }
 
       val result = Table.merge(grouping)(evaluator)
@@ -233,7 +227,7 @@ trait MergeSpec[M[+_]] extends
           GroupingSpec.Intersection
         )
 
-      def evaluator(key: RValue, partition: GroupId => M[Table]) = {
+      def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"1996","extra0":true,"extra1":true}"""))
         val K1 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"2000","extra0":true,"extra1":true}"""))
         val K2 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"2004","extra0":true,"extra1":true}"""))
@@ -287,15 +281,11 @@ trait MergeSpec[M[+_]] extends
             r3
           }
           case _  => sys.error("Unexpected group key")
-        }).point[M]
+        }).point[Need]
       }
 
       val result = Table.merge(grouping)(evaluator)
       result.flatMap(_.toJson).copoint.toSet must_== resultJson.toSet
     }
   }
-}
-
-object MergeSpec extends MergeSpec[Need] {
-  implicit def M = Need.need
 }
