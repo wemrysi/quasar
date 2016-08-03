@@ -174,7 +174,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, sparkcore,
+  mongodb, skeleton, postgresql, // sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -232,7 +232,7 @@ lazy val main = project
   .dependsOn(
     mongodb    % BothScopes,
     skeleton   % BothScopes,
-    sparkcore  % BothScopes,
+//  sparkcore  % BothScopes,
     postgresql % BothScopes)
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
@@ -259,6 +259,7 @@ lazy val postgresql = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+/* FIXME: Disabled because it breaks the Travis build
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(core % BothScopes)
@@ -266,6 +267,7 @@ lazy val sparkcore = project
   .settings(libraryDependencies +=
     "org.apache.spark" % "spark-core_2.11" % "1.6.2")
   .enablePlugins(AutomateHeaderPlugin)
+*/
 
 
 // frontends
