@@ -26,9 +26,9 @@ import com.precog.common.security.APIKey
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-trait BlockStoreTestModule extends ColumnarTableModuleTestSupport[Need]
-    with SliceColumnarTableModule[Need]
-    with StubProjectionModule[Need, Slice] {
+trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
+    with SliceColumnarTableModule
+    with StubProjectionModule[Slice] {
 
   import trans._
 

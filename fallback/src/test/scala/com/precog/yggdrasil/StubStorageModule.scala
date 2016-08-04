@@ -23,12 +23,10 @@ import blueeyes._
 import com.precog.common._
 import scalaz._
 
-trait StubProjectionModule[M[+_], Block] extends ProjectionModule[M, Block] { self =>
-  implicit def M: Monad[M]
-
+trait StubProjectionModule[Block] extends ProjectionModule[Need, Block] {
   protected def projections: Map[Path, Projection]
 
-  class ProjectionCompanion extends ProjectionCompanionLike[M] {
-    def apply(path: Path) = M.point(projections.get(path))
+  class ProjectionCompanion extends ProjectionCompanionLike[Need] {
+    def apply(path: Path) = Need(projections.get(path))
   }
 }

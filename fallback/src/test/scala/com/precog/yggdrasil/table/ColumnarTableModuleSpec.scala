@@ -30,7 +30,7 @@ import TableModule._
 import SampleData._
 import quasar.precog.TestSupport._, Gen._
 
-class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport[Need]
+class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
       with TableModuleSpec
       with CogroupSpec
       with CrossSpec

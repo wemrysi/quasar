@@ -26,7 +26,7 @@ import com.precog.bytecode.JType
 import com.precog.common.security._
 import scalaz._, Scalaz._
 
-class MergeSpec extends ColumnarTableModuleTestSupport[Need] with TableModuleSpec with IndicesModule[Need] {
+class MergeSpec extends ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule[Need] {
   type GroupId = Int
   import trans._
   import TableModule._

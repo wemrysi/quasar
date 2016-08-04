@@ -25,7 +25,7 @@ import com.precog.common._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait SampleSpec extends ColumnarTableModuleTestSupport[Need] with quasar.QuasarSpecification {
+trait SampleSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   import trans._
 
   val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>

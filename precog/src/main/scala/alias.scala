@@ -52,6 +52,7 @@ trait PackageAliases {
   type SpireOrder[A]  = spire.algebra.Order[A]
   type Task[+A]       = scalaz.concurrent.Task[A]
   type MoCo[M[+_]]    = scalaz.Monad[M] with scalaz.Comonad[M]
+  type M[+A]          = scalaz.Need[A]
 
   val Future         = scalaz.concurrent.Future
   val ScalazOrder    = scalaz.Order

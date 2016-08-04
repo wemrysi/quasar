@@ -23,8 +23,8 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait TableModuleTestSupport[M[+_]] extends TableModule[M] {
-  implicit def M: MoCo[M]
+trait TableModuleTestSupport extends TableModule[Need] {
+  implicit def M: MoCo[Need]
 
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2
@@ -41,7 +41,7 @@ trait TableModuleSpec extends quasar.QuasarSpecification {
 
   implicit def M: MoCo[Need] = Need.need
 
-  def checkMappings(testSupport: TableModuleTestSupport[Need]) = {
+  def checkMappings(testSupport: TableModuleTestSupport) = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val dataset = testSupport.fromSample(sample)
