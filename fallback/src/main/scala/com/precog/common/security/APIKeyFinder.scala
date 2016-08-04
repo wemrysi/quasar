@@ -20,12 +20,10 @@
 package com.precog.common
 package security
 
+import accounts.AccountId
 import blueeyes._
 import service.v1
-import accounts.AccountId
-import accounts.AccountFinder
 import org.slf4s.Logging
-
 import scalaz._, Scalaz._
 
 trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>

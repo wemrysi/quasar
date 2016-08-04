@@ -24,7 +24,6 @@ import com.precog.common.accounts.AccountId
 import blueeyes.json._
 import blueeyes.json.serialization._
 import blueeyes.json.serialization.Extractor._
-import blueeyes.json.serialization.IsoSerialization._
 import blueeyes.json.serialization.DefaultSerialization._
 
 import scalaz._

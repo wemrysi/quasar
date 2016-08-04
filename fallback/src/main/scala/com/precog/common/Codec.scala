@@ -23,7 +23,7 @@ import quasar.precog._
 import blueeyes._
 import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer
-import java.nio.charset.{ Charset, CharsetEncoder, CoderResult }
+import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
 import scalaz._
 

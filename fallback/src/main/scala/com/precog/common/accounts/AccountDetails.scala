@@ -23,7 +23,7 @@ package accounts
 import com.precog.common.security.APIKey
 
 import blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._
+import Iso8601Serialization._, Versioned._
 
 case class AccountDetails(accountId: AccountId,
                           email: String,

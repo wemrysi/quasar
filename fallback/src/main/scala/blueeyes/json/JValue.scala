@@ -17,11 +17,10 @@
 package blueeyes
 package json
 
-import scalaz._, Scalaz._, Ordering._, Validation._, FlatMap._
+import scalaz._, Scalaz._, Validation._
 import scala.util.Sorting.quickSort
 
 import java.lang.Double.isInfinite
-import JValue.{ RenderMode, Compact, Pretty, Canonical }
 import quasar.precog._
 
 /**

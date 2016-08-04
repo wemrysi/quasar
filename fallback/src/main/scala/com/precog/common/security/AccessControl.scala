@@ -21,10 +21,7 @@ package com.precog.common
 package security
 
 import blueeyes._
-import org.slf4s.Logging
-
 import scalaz._
-import scalaz.std.option._
 import scalaz.syntax.monad._
 
 trait AccessControl[M[+ _]] {

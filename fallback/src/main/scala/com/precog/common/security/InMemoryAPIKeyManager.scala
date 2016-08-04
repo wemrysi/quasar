@@ -20,13 +20,8 @@
 package com.precog.common
 package security
 
-import accounts.AccountId
-
 import blueeyes._
 import blueeyes.util.Clock
-
-import scala.collection.mutable
-
 import scalaz._
 import scalaz.std.option._
 import scalaz.syntax.monad._

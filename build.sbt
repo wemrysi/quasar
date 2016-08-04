@@ -10,7 +10,7 @@ lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) depe
      initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
 )
 
-lazy val fallback = project.setup dependsOn (precog % BothScopes)
+lazy val fallback = project.setup.withWarnings dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
   "org.openjdk.jmh"       % "jmh-generator-annprocess" %        "1.12",

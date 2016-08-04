@@ -22,9 +22,7 @@ package security
 
 import blueeyes._
 import service.v1
-import accounts.AccountId
 import accounts.AccountFinder
-
 import scalaz._, Scalaz._
 
 object PermissionsFinder {
@@ -40,10 +38,7 @@ object PermissionsFinder {
   }
 }
 
-class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant)
-    extends org.slf4s.Logging {
-  import PermissionsFinder._
-  import Permission._
+class PermissionsFinder[M[+ _]: Monad](val apiKeyFinder: APIKeyFinder[M], val accountFinder: AccountFinder[M], timestampRequiredAfter: Instant) extends org.slf4s.Logging {
 
   private def filterWritePermissions(keyDetails: v1.APIKeyDetails, path: Path, at: Option[Instant]): Set[WritePermission] = {
     keyDetails.grants filter { g =>

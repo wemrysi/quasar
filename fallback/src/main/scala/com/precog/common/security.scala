@@ -19,12 +19,6 @@
  */
 package com.precog.common
 
-import blueeyes._, json._, serialization._
-import blueeyes.json.serialization.Extractor._
-
-import scalaz._
-import scalaz.syntax.bifunctor._
-
 package object security {
   type APIKey  = String
   type GrantId = String
