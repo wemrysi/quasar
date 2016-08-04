@@ -8,8 +8,8 @@ set -euo pipefail
 ANSI_CLEAR="\033[0K"
 
 travis_fold() {
-  local action=$1
-  local name=$2
+  local action="$1"
+  local name="$2"
   echo -en "travis_fold:${action}:${name}\r${ANSI_CLEAR}"
 }
 runSbt () {
@@ -19,5 +19,7 @@ runSbt () {
   travis_fold end $foldid
 }
 
-runSbt "sbt update" -q update
-runSbt "sbt cover" -v cover
+runSbt "sbt-update" -q update
+runSbt "sbt-compile" -v coverage compile
+runSbt "sbt-test" -v coverage test
+runSbt "sbt-coverageReport" -v coverageReport
