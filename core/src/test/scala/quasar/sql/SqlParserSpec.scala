@@ -32,6 +32,8 @@ class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with Disj
 
   implicit def stringToQuery(s: String): Query = Query(s)
 
+  implicit val sqlEqual: Equal[Fix[Sql]] = Equal.equalA
+
   def parse(query: Query): ParsingError \/ Fix[Sql] =
     fixParser.parse(query).map(_.makeTables(Nil))
 

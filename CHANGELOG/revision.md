@@ -1,1 +1,0 @@
-- Optimize LeftShift so that unused elements are removed.
