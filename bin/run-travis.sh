@@ -2,7 +2,7 @@
 #
 
 set -euo pipefail
-[[ -n $TRAVIS ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
+[[ -n ${TRAVIS:-""} ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
 : ${TRAVIS_SCALA_VERSION:=2.11.8}
 
 ANSI_CLEAR="\033[0K"
@@ -15,11 +15,11 @@ travis_fold() {
 runSbt () {
   local foldid="$1" && shift
   travis_fold start $foldid
-  sbt ++$TRAVIS_SCALA_VERSION -batch -J-Xmx2g -J-Xss2m "$@" | ts '%H:%M:%.S'
+  ./sbt ++$TRAVIS_SCALA_VERSION -batch -J-Xmx2g -J-Xss2m "$@" | ts '%H:%M:%.S'
   travis_fold end $foldid
 }
 
-runSbt "sbt-update" -q update
+runSbt "sbt-update" -v update
 runSbt "sbt-compile" -v coverage compile
 runSbt "sbt-test" -v coverage test
 runSbt "sbt-coverageReport" -v coverageReport
