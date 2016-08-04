@@ -602,6 +602,7 @@ object MongoDbPlanner {
   }
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M])
     (implicit I: WorkflowOpCoreF :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
     : LogicalPlan[
         Cofree[LogicalPlan, (
@@ -780,7 +781,10 @@ object MongoDbPlanner {
                     HasWorkflow(right) |@|
                     leftKeys.traverse(HasWorkflow) |@|
                     rightKeys.traverse(HasWorkflow))((l, r, lk, rk) =>
-                    join(l, r, func, lk, makeKeys(leftKeys, comp), rk, makeKeys(rightKeys, comp)))).join
+                    joinHandler.run(
+                      func.asInstanceOf[TernaryFunc],
+                      JoinSource(l, lk, makeKeys(leftKeys, comp)),
+                      JoinSource(r, rk, makeKeys(rightKeys, comp))))).join
                 })
           }
         case GroupBy =>
@@ -1093,7 +1097,9 @@ object MongoDbPlanner {
     }
   }
 
-  def plan0[F[_]: Functor: Coalesce: Crush: Crystallize](logical: Fix[LogicalPlan])
+  def plan0[F[_]: Functor: Coalesce: Crush: Crystallize]
+      (joinHandler: JoinHandler[F, WorkflowBuilder.M])
+      (logical: Fix[LogicalPlan])
       (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
@@ -1120,7 +1126,7 @@ object MongoDbPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.point[W]).liftM[GenT]
 
-    val wfƒ = workflowƒ[F] ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[F])))
+    val wfƒ = workflowƒ[F](joinHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[F])))
 
     (for {
       cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
@@ -1146,9 +1152,17 @@ object MongoDbPlanner {
 
     queryContext match {
       case `3.2` =>
-        plan0[Workflow3_2F](logical)
+        val pl = JoinHandler.pipeline[Workflow3_2F]
+        val mr = JoinHandler.mapReduce[Workflow3_2F]
+        val joinHandler =
+          JoinHandler[Workflow3_2F, WorkflowBuilder.M]((tpe, l, r) =>
+            pl(tpe, l, r) getOrElseF mr(tpe, l, r))
+
+        plan0[Workflow3_2F](joinHandler)(logical)
+
       case _     =>
-        plan0[Workflow2_6F](logical).map(_.inject[WorkflowF])
+        val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
+        plan0[Workflow2_6F](joinHandler)(logical).map(_.inject[WorkflowF])
     }
   }
 }

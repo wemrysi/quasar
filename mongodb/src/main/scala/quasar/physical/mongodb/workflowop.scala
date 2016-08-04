@@ -338,7 +338,7 @@ object Workflow {
     PipelineOp(I.inj(op.wf.void).run.fold(
       op => (op match {
         case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(op, prefix).pipeline
-        case op @ $SampleF(_, _)          => rewriteRefs3_2(op, prefix).pipeline
+        case op @ $SampleF(_, _)          => rewriteRefs3_2(op, prefix).shapePreserving
       }).fmap(ι, Inject[WorkflowOp3_2F, WorkflowF]),
       op => (op match {
         case op @ $MatchF(_, _)           => rewriteRefs2_6(op, prefix).shapePreserving
@@ -524,15 +524,6 @@ object Workflow {
 
   implicit val crush2_6: Crush[WorkflowOpCoreF] = Crush.crushInjected[WorkflowOpCoreF, WorkflowF]
 
-  def collectShapes[F[_]](implicit I: WorkflowOpCoreF :<: F)
-    : F[(Fix[F], (List[Reshape], Fix[F]))] => (List[Reshape], Fix[F]) =
-    I.prj(_) match {
-      case Some($ProjectF(src, shape, _)) =>
-        ((x: List[Reshape]) => shape :: x).first(src._2)
-      case Some(x)                       => (Nil, Fix(I.inj(x.map(_._1))))
-      case None                          => ???  // TODO: implement for 3.2 ops
-    }
-
   // helper for rewriteRefs
   def prefixBase(base: DocVar): PartialFunction[DocVar, DocVar] =
     PartialFunction(base \\ _)
@@ -601,19 +592,23 @@ object Workflow {
   }
 
   def rewriteRefs3_2[A <: WorkflowOp3_2F[_]]
-      (op: A, applyVar0: PartialFunction[DocVar, DocVar]): A =
-      // TODO: implement for 3.2 ops
-      op
+      (op: A, applyVar0: PartialFunction[DocVar, DocVar]): A = {
 
-  // implicit def coproductRewrite[F[_], G[_]](implicit RF: Rewrite[F], RG: Rewrite[G]): Rewrite[Coproduct[F, G, ?]] = new Rewrite[Coproduct[F, G, ?]] {
-  //   def rewriteRefsx[A](op: Coproduct[F, G, A], applyVar0: PartialFunction[DocVar, DocVar]) =
-  //     op.run.fold(
-  //       fa => Coproduct.leftc(RF.rewriteRefsx(fa, applyVar0)),
-  //       ga => Coproduct.rightc(RG.rewriteRefsx(ga, applyVar0)))
-  //
-  //   // def rewriteBase[A <: Coproduct[F, G, _]](op: A, base: DocVar) =
-  //   //   base
-  // }
+    // FIXME: copied from rewriteRefs2_6
+    val applyVar = (f: DocVar) => applyVar0.lift(f).getOrElse(f)
+
+    // FIXME: copied from rewriteRefs2_6
+    def applyFieldName(name: BsonField): BsonField = {
+      applyVar(DocField(name)).deref.getOrElse(name) // TODO: Delete field if it's transformed away to nothing???
+    }
+
+    (op match {
+      case $LookupF(src, from, lf, ff, as) =>
+        // NB: rewrite only the source reference; the foreignField is not part of
+        // the workflow at this point
+        $LookupF(src, from, applyFieldName(lf), ff, as)
+    }).asInstanceOf[A]
+  }
 
   def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: Workflow3_2F): Option[List[BsonField.Name]] = {
     I.inj(op.unFix).run.fold[Option[List[BsonField.Name]]](
@@ -729,16 +724,18 @@ object Workflow {
 
     override def singleSource[A](op: WorkflowOp3_2F[A]) = op match {
       case op @ $LookupF(_, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $SampleF(_, _)          => op.pipeline.widen[A].some
+      case op @ $SampleF(_, _)          => op.shapePreserving.widen[A].some
     }
 
     override def pipeline[A](op: WorkflowOp3_2F[A]) = op match {
       case op @ $LookupF(_, _, _, _, _) => op.pipeline.widen[A].some
-      case op @ $SampleF(_, _)          => op.pipeline.widen[A].some
+      case op @ $SampleF(_, _)          => op.shapePreserving.widen[A].some
     }
 
-    override def shapePreserving[A](op: WorkflowOp3_2F[A]) =
-      None
+    override def shapePreserving[A](op: WorkflowOp3_2F[A]) = op match {
+      case op @ $SampleF(_, _)          => op.shapePreserving.widen[A].some
+      case _ => None
+    }
   }
 
   /** Newtype for source ops (that is, ops that are themselves sources). */
@@ -1074,6 +1071,13 @@ object Workflow {
     def apply[F[_]: Coalesce](shape: Reshape, id: IdHandling)
       (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($ProjectF(src, shape, id))))
+
+    def apply[F[_]: Coalesce](shape: Reshape)
+      (implicit ev: WorkflowOpCoreF :<: F)
+      : FixOp[F] =
+      Workflow.$project[F](
+        shape,
+        shape.get(IdName).fold[IdHandling](IgnoreId)(κ(IncludeId)))
 
     def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
       : Option[(A, Reshape, IdHandling)] =
@@ -1713,9 +1717,9 @@ object Workflow {
 
   final case class $LookupF[A](
     src: A,
-    from: Collection,
-    localField: BsonField.Name,
-    foreignField: BsonField.Name,
+    from: Collection,  // FIXME: this must refer to the same DB as the source
+    localField: BsonField,
+    foreignField: BsonField,
     as: BsonField.Name)
     extends WorkflowOp3_2F[A] { self =>
     def pipeline: PipelineF[WorkflowOp3_2F, A] =
@@ -1734,16 +1738,16 @@ object Workflow {
       }
   }
   object $lookup {
-    def $loookup[F[_]: Coalesce](
+    def apply[F[_]: Coalesce](
       from: Collection,
-      localField: BsonField.Name,
-      foreignField: BsonField.Name,
+      localField: BsonField,
+      foreignField: BsonField,
       as: BsonField.Name)
       (implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
         src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
 
     def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-      : Option[(A, Collection, BsonField.Name, BsonField.Name, BsonField.Name)] =
+      : Option[(A, Collection, BsonField, BsonField, BsonField.Name)] =
       I.prj(op) collect {
         case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
       }
@@ -1751,11 +1755,11 @@ object Workflow {
 
   final case class $SampleF[A](src: A, size: Int)
     extends WorkflowOp3_2F[A] { self =>
-    def pipeline: PipelineF[WorkflowOp3_2F, A] =
-      new PipelineF[WorkflowOp3_2F, A] {
+    def shapePreserving: ShapePreservingF[WorkflowOp3_2F, A] =
+      new ShapePreservingF[WorkflowOp3_2F, A] {
         def wf = self
         def src = self.src
-        def reparent[B](newSrc: B) = copy(src = newSrc).pipeline
+        def reparent[B](newSrc: B) = copy(src = newSrc).shapePreserving
 
         def op = "$sample"
         def rhs = Bson.Int32(size)
@@ -1875,7 +1879,7 @@ object Workflow {
 
     def render(v: WorkflowOp3_2F[Unit]) = v match {
       case $LookupF(_, from, localField, foreignField, as) =>
-        Terminal("$LookupF" :: wfType, Some(s"$from with $foreignField = $localField as $as"))
+        Terminal("$LookupF" :: wfType, Some(s"$from with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}"))
       case $SampleF(_, size) =>
         Terminal("$SampleF" :: wfType, Some(size.toString))
     }
