@@ -48,9 +48,10 @@ object TestConfig {
   val POSTGRESQL = BackendName("postgresql")
   val SPARK_LOCAL = BackendName("spark_local")
   val MARKLOGIC       = BackendName("marklogic")
+  val COUCHBASE       = BackendName("couchbase")
 
   lazy val backendNames: List[BackendName] =
-    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL, MARKLOGIC)
+    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL, MARKLOGIC, COUCHBASE)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")
