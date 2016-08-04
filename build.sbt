@@ -211,7 +211,7 @@ lazy val js = project
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes)
+  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
