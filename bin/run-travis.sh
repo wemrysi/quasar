@@ -15,7 +15,7 @@ travis_fold() {
 runSbt () {
   local foldid="$1" && shift
   travis_fold start $foldid
-  ./sbt ++$TRAVIS_SCALA_VERSION -batch -J-Xmx2g -J-Xss2m "$@" | ts '%H:%M:%.S'
+  ./sbt ++$TRAVIS_SCALA_VERSION -batch "$@" | ts '%H:%M:%.S'
   travis_fold end $foldid
 }
 
