@@ -20,6 +20,9 @@ runSbt () {
 }
 
 runSbt "sbt-update" -v update
-runSbt "sbt-compile" -v coverage compile
-runSbt "sbt-test" -v coverage test
-runSbt "sbt-coverageReport" -v coverageReport
+
+if [[ $QUASAR_CODECOV == "true" ]]; then
+  runSbt "sbt-cover" -v coverage test coverageReport
+else
+  runSbt "sbt-test" -v test
+fi
