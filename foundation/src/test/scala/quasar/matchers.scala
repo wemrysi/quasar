@@ -20,22 +20,16 @@ import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp._
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._
 import org.specs2.matcher._
 import scalaz._, Scalaz._
 
-trait TermLogicalPlanMatchers {
-  case class equalToPlan(expected: Fix[LogicalPlan])
-      extends Matcher[Fix[LogicalPlan]] {
-    def apply[S <: Fix[LogicalPlan]](s: Expectable[S]) = {
-      val normed = s.value.transCata(repeatedly(Optimizer.simplifyƒ[Fix]))
-      val diff = (normed.render diff expected.render).shows
-      result(
-        expected ≟ normed,
-        "\ntrees are equal:\n" + diff,
-        "\ntrees are not equal:\n" + diff +
-          "\noriginal was:\n" + normed.render.shows,
-        s)
+trait TreeMatchers {
+  def beTree[A: RenderTree](expected: A): Matcher[A] = new Matcher[A] {
+    def apply[S <: A](s: Expectable[S]) = {
+      val v = s.value
+      val diff = (RenderTree[A].render(v) diff expected.render).shows
+      result(v == expected, s"trees match:\n$diff", s"trees do not match:\n$diff", s)
     }
   }
 }

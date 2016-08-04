@@ -162,11 +162,11 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-          ejson,
+   ejson, effect, js,
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, sparkcore, marklogic,
+  mongodb, skeleton, postgresql, marklogic, // sparkcore
 //      \ \ | / /
           main,
 //        /  \
@@ -194,9 +194,25 @@ lazy val ejson = project
   .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val effect = project
+  .settings(name := "quasar-effect-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val js = project
+  .settings(name := "quasar-js-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(oneJarSettings: _*)
+  .settings(publishSettings: _*)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, foundation % BothScopes)
+  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes, foundation % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .settings(
@@ -213,7 +229,7 @@ lazy val main = project
   .dependsOn(
     mongodb    % BothScopes,
     skeleton   % BothScopes,
-    sparkcore   % BothScopes,
+    // sparkcore   % BothScopes,
     postgresql % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
@@ -255,14 +271,15 @@ lazy val postgresql = project
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val sparkcore = project
-  .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(core % BothScopes)
-  .settings(oneJarSettings: _*)
-  .settings(publishSettings: _*)
-  .settings(libraryDependencies +=
-    "org.apache.spark"  %  "spark-core_2.11"           % "1.6.2")
-  .enablePlugins(AutomateHeaderPlugin)
+// FIXME: Disabled because it breaks the Travis build
+// lazy val sparkcore = project
+//   .settings(name := "quasar-sparkcore-internal")
+//   .dependsOn(core % BothScopes)
+//   .settings(oneJarSettings: _*)
+//   .settings(publishSettings: _*)
+//   .settings(libraryDependencies +=
+//     "org.apache.spark"  %  "spark-core_2.11"           % "1.6.2")
+//   .enablePlugins(AutomateHeaderPlugin)
 
 
 // frontends
