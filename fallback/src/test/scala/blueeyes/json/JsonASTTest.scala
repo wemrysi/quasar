@@ -21,7 +21,7 @@ import org.scalacheck._
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 
-object JsonASTSpec extends Specification with ScalaCheck {
+object JsonASTSpec extends quasar.QuasarSpecification {
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)

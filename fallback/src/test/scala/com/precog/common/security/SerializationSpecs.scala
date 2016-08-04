@@ -26,7 +26,7 @@ import blueeyes._, json._, serialization._, DefaultSerialization._
 import scalaz._, Scalaz._, Validation.FlatMap._
 import quasar.precog.TestSupport._
 
-class SerializationSpecs extends Specification {
+class SerializationSpecs extends quasar.QuasarSpecification {
   import Permission._
 
   val i0 = instant.zero

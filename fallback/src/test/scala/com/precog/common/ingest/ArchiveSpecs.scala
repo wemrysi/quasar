@@ -25,7 +25,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._
 import quasar.precog.TestSupport._
 
-class ArchiveSpecs extends Specification with ArbitraryEventMessage with ScalaCheck {
+class ArchiveSpecs extends quasar.QuasarSpecification with ArbitraryEventMessage {
   implicit val arbArchive = Arbitrary(genRandomArchive)
   "serialization of an archive" should {
     "read back the data that was written" in prop { in: Archive =>

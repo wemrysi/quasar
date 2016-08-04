@@ -4,7 +4,7 @@ import blueeyes._
 import quasar.precog._, TestSupport._
 import scalaz._
 
-class IOUtilsSpecs extends Specification {
+class IOUtilsSpecs extends quasar.QuasarSpecification {
   "IOUtils" should {
     "properly clean empty directories recursively" in {
       val tmpRoot = IOUtils.createTmpDir("IOUtilsSpecs").unsafePerformIO
@@ -54,7 +54,7 @@ class IOUtilsSpecs extends Specification {
   }
 }
 
-object MapUtilsSpecs extends Specification with ScalaCheck with MapUtils {
+object MapUtilsSpecs extends quasar.QuasarSpecification with MapUtils {
   private type Ints     = List[Int]
   private type IntsPair = Ints -> Ints
   private type IntMap   = Map[Int, Ints]
@@ -87,7 +87,7 @@ object MapUtilsSpecs extends Specification with ScalaCheck with MapUtils {
   }
 }
 
-object RingDequeSpecs extends Specification with ScalaCheck {
+object RingDequeSpecs extends quasar.QuasarSpecification {
   implicit val params = set(
     minTestsOk = 2500,
     workers = Runtime.getRuntime.availableProcessors)
@@ -153,7 +153,7 @@ object RingDequeSpecs extends Specification with ScalaCheck {
 
 
 
-object VectorClockSpec extends Specification {
+object VectorClockSpec extends quasar.QuasarSpecification {
   "vector clock" should {
     "update when key not already present" in {
       val vc = VectorClock.empty

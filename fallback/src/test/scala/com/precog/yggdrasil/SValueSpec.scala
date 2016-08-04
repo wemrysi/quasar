@@ -23,7 +23,7 @@ import blueeyes._, json._
 import com.precog.common._
 import quasar.precog.TestSupport._
 
-class SValueSpec extends Specification {
+class SValueSpec extends quasar.QuasarSpecification {
   "set" should {
     "set properties on an object" in {
       SObject(Map()).set(JPath(".foo.bar"), CString("baz")) must beSome(SObject(Map("foo" -> SObject(Map("bar" -> SString("baz"))))))

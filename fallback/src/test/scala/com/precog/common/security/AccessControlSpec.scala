@@ -25,7 +25,7 @@ import scalaz._
 import scalaz.Id._
 import quasar.precog.TestSupport._
 
-class AccessControlSpec extends Specification {
+class AccessControlSpec extends quasar.QuasarSpecification {
   import Permission._
 
   val apiKeyManager = new InMemoryAPIKeyManager[Id](blueeyes.util.Clock.System)

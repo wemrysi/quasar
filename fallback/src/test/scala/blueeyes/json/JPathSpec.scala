@@ -21,7 +21,7 @@ import org.scalacheck.Prop
 import org.scalacheck.Arbitrary, Arbitrary.arbitrary
 import quasar.precog.JsonTestSupport._
 
-object JPathSpec extends Specification with ScalaCheck {
+object JPathSpec extends quasar.QuasarSpecification {
   "Parser" should {
     "parse all valid JPath strings" in {
       prop { (jpath: JPath) =>

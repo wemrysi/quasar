@@ -3,7 +3,7 @@ package util
 
 import quasar.precog.TestSupport._
 
-class SpecialCharTranscoderSpec extends Specification {
+class SpecialCharTranscoderSpec extends quasar.QuasarSpecification {
   val transcoder = SpecialCharTranscoder.fromMap('_', Map('.' -> 'd', '@' -> 'a'))
 
   "SpecialCharTranscoder.encode" should {

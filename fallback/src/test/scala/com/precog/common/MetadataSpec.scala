@@ -24,7 +24,7 @@ import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._, Scalaz._
 import quasar.precog._, JsonTestSupport._, Gen._
 
-class MetadataSpec extends Specification with MetadataGenerators with ScalaCheck {
+class MetadataSpec extends quasar.QuasarSpecification with MetadataGenerators {
   val sampleSize = 100
 
   "simple metadata" should {

@@ -3,7 +3,7 @@ package util
 
 import quasar.precog.TestSupport._
 
-class CommandLineArgumentsSpec extends Specification {
+class CommandLineArgumentsSpec extends quasar.QuasarSpecification {
   "No parameters or values should be parsed properly" in {
     val c = CommandLineArguments()
 

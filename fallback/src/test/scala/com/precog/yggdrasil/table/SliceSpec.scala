@@ -28,7 +28,7 @@ import Gen.{ listOfN, containerOfN }, Arbitrary.arbitrary
 import quasar.precog.TestSupport._
 import ArbitrarySlice._
 
-class SliceSpec extends Specification with ScalaCheck {
+class SliceSpec extends quasar.QuasarSpecification {
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {

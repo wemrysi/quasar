@@ -19,7 +19,7 @@ package json
 
 import quasar.precog.TestSupport._
 
-class QueryExamplesSpec extends Specification {
+class QueryExamplesSpec extends quasar.QuasarSpecification {
   import JParser._
 
   "List of IPs" in {

@@ -25,7 +25,7 @@ import com.precog.yggdrasil.table._
 import com.precog.util._
 import quasar.precog._, TestSupport._
 
-class CPathTraversalSpec extends Specification {
+class CPathTraversalSpec extends quasar.QuasarSpecification {
   import CPathTraversal._
 
   sealed trait ColBuilder[@spec(Boolean, Long, Double) A] {

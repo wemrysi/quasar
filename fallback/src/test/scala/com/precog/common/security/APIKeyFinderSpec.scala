@@ -26,7 +26,7 @@ import blueeyes.util.Clock
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait APIKeyFinderSpec[M[+_]] extends Specification {
+trait APIKeyFinderSpec[M[+_]] extends quasar.QuasarSpecification {
   import Permission._
 
   implicit def M: MoCo[M]
@@ -174,7 +174,7 @@ trait APIKeyFinderSpec[M[+_]] extends Specification {
   }
 }
 
-class DirectAPIKeyFinderSpec extends Specification {
+class DirectAPIKeyFinderSpec extends quasar.QuasarSpecification {
   // include( 5 )
 
   //   new APIKeyFinderSpec[Need] {

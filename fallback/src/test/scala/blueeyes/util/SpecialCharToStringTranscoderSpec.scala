@@ -3,7 +3,7 @@ package util
 
 import quasar.precog.TestSupport._
 
-class SpecialCharToStringTranscoderSpec extends Specification {
+class SpecialCharToStringTranscoderSpec extends quasar.QuasarSpecification {
   val transcoder = SpecialCharToStringTranscoder({ case c: Char if (c == '.' | c == '@') => new String(Array('%', c, c)) }, {
     case c :: Nil if (c == '%')          => None
     case '%' :: List(c)                  => None

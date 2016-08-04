@@ -19,7 +19,7 @@ package json
 
 import quasar.precog.TestSupport._
 
-class DiffExamplesSpec extends Specification {
+class DiffExamplesSpec extends quasar.QuasarSpecification {
   import JParser._
   import MergeExamples.{ scala1, scala2, lotto1, lotto2, mergedLottoResult }
 

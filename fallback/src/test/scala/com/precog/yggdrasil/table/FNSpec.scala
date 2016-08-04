@@ -22,7 +22,7 @@ package table
 
 import quasar.precog.TestSupport._
 
-class FNSpec extends Specification {
+class FNSpec extends quasar.QuasarSpecification {
   "function implementations" should {
     "partials must work correctly" in {
       val col5 = Column.const(5L)

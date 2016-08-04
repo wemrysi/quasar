@@ -22,7 +22,7 @@ package com.precog.common.ingest
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._
 
-object EventIdSpecs extends Specification with ScalaCheck {
+object EventIdSpecs extends quasar.QuasarSpecification {
   implicit val idRange = Gen.chooseNum[Int](0, Int.MaxValue)
 
   "EventId" should {

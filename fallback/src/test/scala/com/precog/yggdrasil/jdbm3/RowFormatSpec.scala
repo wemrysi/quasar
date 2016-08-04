@@ -26,7 +26,7 @@ import com.precog.yggdrasil.table._
 import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
 
-class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
+class RowFormatSpec extends quasar.QuasarSpecification with CValueGenerators {
   import Arbitrary._
 
   // This should generate some jpath ids, then generate CTypes for these.

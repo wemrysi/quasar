@@ -26,7 +26,7 @@ import blueeyes.json.serialization.Extractor._
 import scalaz._
 import quasar.precog.TestSupport._
 
-class EventSpec extends Specification with ArbitraryEventMessage with ScalaCheck {
+class EventSpec extends quasar.QuasarSpecification with ArbitraryEventMessage {
   implicit val arbEvent = Arbitrary(genRandomIngest)
   "serialization of an event" should {
     "read back the data that was written" in prop { in: Ingest =>

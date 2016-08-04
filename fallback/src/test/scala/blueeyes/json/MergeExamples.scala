@@ -19,7 +19,7 @@ package json
 
 import quasar.precog.TestSupport._
 
-object MergeExamples extends Specification {
+object MergeExamples extends quasar.QuasarSpecification {
   import JParser._
 
   "Merge example" in {

@@ -24,7 +24,7 @@ import scala.math.min
 import scala.util.Random.nextInt
 import quasar.precog._, JsonTestSupport._
 
-class JsonParserSpec extends Specification with ScalaCheck {
+class JsonParserSpec extends quasar.QuasarSpecification {
   import JParser._
   import AsyncParser._
 
@@ -47,7 +47,7 @@ class JsonParserSpec extends Specification with ScalaCheck {
   }
 }
 
-object ParserBugsSpec extends Specification {
+object ParserBugsSpec extends quasar.QuasarSpecification {
   "Unicode ffff is a valid char in string literal" in {
     JParser.parseFromString(""" {"x":"\uffff"} """) must not(throwAn[java.lang.Exception])
   }
@@ -65,7 +65,7 @@ object ParserBugsSpec extends Specification {
   }
 }
 
-object ParsingByteBufferSpec extends Specification {
+object ParsingByteBufferSpec extends quasar.QuasarSpecification {
   "Respects current ByteBuffer's position" in {
     val bb = ByteBufferWrap(Array(54, 55, 56, 57))
     bb.remaining must_== 4
@@ -87,7 +87,7 @@ object ParsingByteBufferSpec extends Specification {
   }
 }
 
-object AsyncParserSpec extends Specification {
+object AsyncParserSpec extends quasar.QuasarSpecification {
   import AsyncParser._
 
   private def loadBytes(path: String): Array[Byte] = jPath(path).slurpBytes
@@ -282,7 +282,7 @@ xyz
   }
 }
 
-object ArrayUnwrappingSpec extends Specification {
+object ArrayUnwrappingSpec extends quasar.QuasarSpecification {
   import JParser._
   import AsyncParser._
 

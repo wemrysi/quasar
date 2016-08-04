@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.precog.TestSupport._
 
-class SchemaSpec extends Specification {
+class SchemaSpec extends quasar.QuasarSpecification {
   "cpath" should {
     "return the correct sequence of CPath" in {
       val jtype = JObjectFixedT(Map(

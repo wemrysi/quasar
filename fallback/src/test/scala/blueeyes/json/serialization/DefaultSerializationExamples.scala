@@ -20,7 +20,7 @@ package serialization
 import quasar.precog._, TestSupport._
 import DefaultSerialization._
 
-class DefaultSerializationExamplesSpec extends Specification {
+class DefaultSerializationExamplesSpec extends quasar.QuasarSpecification {
   "Primitives can be extracted from strings" in {
     IntExtractor(JString("12")) mustEqual 12
     LongExtractor(JString("12")) mustEqual 12

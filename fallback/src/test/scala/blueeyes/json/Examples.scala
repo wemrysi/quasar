@@ -20,7 +20,7 @@ package json
 import quasar.precog.TestSupport._
 import Examples._
 
-class ExamplesSpec extends Specification {
+class ExamplesSpec extends quasar.QuasarSpecification {
   import JParser._
 
   "Lotto example" in {

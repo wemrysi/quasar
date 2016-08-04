@@ -21,7 +21,7 @@ package com.precog.common
 
 import quasar.precog.TestSupport._
 
-class CPathSpec extends Specification {
+class CPathSpec extends quasar.QuasarSpecification {
   import CPath._
 
   "makeTree" should {
