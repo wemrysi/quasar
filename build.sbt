@@ -230,7 +230,8 @@ lazy val main = project
     mongodb    % BothScopes,
     skeleton   % BothScopes,
     // sparkcore   % BothScopes,
-    postgresql % BothScopes)
+    postgresql % BothScopes,
+    marklogic  % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
   .enablePlugins(AutomateHeaderPlugin)

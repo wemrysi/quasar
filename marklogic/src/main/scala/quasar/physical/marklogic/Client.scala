@@ -19,6 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.effect.Read
 import quasar.fp.free._
+import quasar.fs.ADir
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
@@ -158,5 +159,10 @@ object Client {
     S: Task :<: S
   ): Free[S, Option[WriteError]] =
     getClient.ask.flatMap(_.write(uri, content))
+
+  def execute[S[_]](xQuery: String, dst: ADir)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, Unit] = ???
 
 }
