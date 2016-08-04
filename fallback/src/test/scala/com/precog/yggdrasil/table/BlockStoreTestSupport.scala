@@ -55,7 +55,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
     }
     def structure(implicit M: Monad[Need]) = M point xyz
 
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[Need]) = Need { // (implicit M: Monad[M]) = M.point {
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[Need]) = Need {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
         blocks.filterNot(_.isEmpty) match {
           case x #:: xs =>

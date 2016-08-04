@@ -11,6 +11,7 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   val MimeTypes = quasar.precog.MimeTypes
 
   // Temporary
+  type JobId              = String
   type BitSet             = com.precog.BitSet
   type RawBitSet          = Array[Int]
   val RawBitSet           = com.precog.util.RawBitSet
