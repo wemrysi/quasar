@@ -2,7 +2,7 @@
 #
 
 set -euo pipefail
-[[ -n ${TRAVIS:-""} ]] && unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
+unset SBT_OPTS JVM_OPTS JDK_HOME JAVA_HOME
 : ${TRAVIS_SCALA_VERSION:=2.11.8}
 
 ANSI_CLEAR="\033[0K"
