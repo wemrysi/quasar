@@ -39,9 +39,10 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %       slcVersion       %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %        "0.4.0"         %     Test
   )
-
+  def effect = Seq(
+    "org.threeten"                % "threetenbp"     %    "1.3.2"
+  )
   def core = Seq(
-    "org.threeten"                % "threetenbp"     %    "1.3.2",
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
