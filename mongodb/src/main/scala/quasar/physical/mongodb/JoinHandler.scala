@@ -67,7 +67,7 @@ object JoinHandler {
         CollectionBuilder(
           chain[Fix[F]](
             left,
-            $lookup(rColl, lName \ lField, rField, rName),
+            $lookup(rColl.collection, lName \ lField, rField, rName),
             $unwind(DocField(rName))),
           Root(),
           None)

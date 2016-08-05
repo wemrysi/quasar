@@ -1262,7 +1262,7 @@ object Workflow {
    * The latter seems preferable, but currently the forking semantics are not
    * clear.
    */
-  final case class $OutF[A](src: A, collection: Collection)
+  final case class $OutF[A](src: A, collection: CollectionName)
       extends WorkflowOpCoreF[A] { self =>
     def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
       new ShapePreservingF[WorkflowOpCoreF, A] {
@@ -1272,16 +1272,16 @@ object Workflow {
           self.copy(src = newSrc).shapePreserving
 
         def op = "$out"
-        def rhs = Bson.Text(collection.collectionName)
+        def rhs = collection.bson
       }
   }
   object $out {
-    def apply[F[_]: Coalesce](collection: Collection)
+    def apply[F[_]: Coalesce](collection: CollectionName)
       (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($OutF(src, collection))))
 
     def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-      : Option[(A, Collection)] =
+      : Option[(A, CollectionName)] =
       I.prj(op) collect {
         case $OutF(src, collection) => (src, collection)
       }
@@ -1714,7 +1714,7 @@ object Workflow {
 
   final case class $LookupF[A](
     src: A,
-    from: Collection,  // FIXME: this must refer to the same DB as the source
+    from: CollectionName,
     localField: BsonField,
     foreignField: BsonField,
     as: BsonField.Name)
@@ -1727,7 +1727,7 @@ object Workflow {
 
         def op = "$lookup"
         def rhs = Bson.Doc(ListMap(
-          "from" -> Bson.Text(from.collectionName),
+          "from" -> from.bson,
           "localField" -> localField.bson,
           "foreignField" -> foreignField.bson,
           "as" -> as.bson
@@ -1736,7 +1736,7 @@ object Workflow {
   }
   object $lookup {
     def apply[F[_]: Coalesce](
-      from: Collection,
+      from: CollectionName,
       localField: BsonField,
       foreignField: BsonField,
       as: BsonField.Name)
@@ -1744,7 +1744,7 @@ object Workflow {
         src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
 
     def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-      : Option[(A, Collection, BsonField, BsonField, BsonField.Name)] =
+      : Option[(A, CollectionName, BsonField, BsonField, BsonField.Name)] =
       I.prj(op) collect {
         case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
       }
@@ -1866,7 +1866,7 @@ object Workflow {
           JSRenderTree.render(fn) ::
             Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
             Nil)
-      case $OutF(_, coll) => coll.render.copy(nodeType = "$OutF" :: wfType)
+      case $OutF(_, coll) => Terminal("$OutF" :: wfType, Some(coll.value))
       case $FoldLeftF(_, _) => Terminal("$FoldLeftF" :: wfType, None)
     }
   }

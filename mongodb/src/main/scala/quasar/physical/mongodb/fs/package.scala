@@ -39,7 +39,7 @@ package object fs {
 
   val MongoDBFsType = FileSystemType("mongodb")
 
-  final case class DefaultDb(run: String) extends scala.AnyVal
+  final case class DefaultDb(run: DatabaseName)
 
   object DefaultDb {
     def fromPath(path: APath): Option[DefaultDb] =
@@ -98,7 +98,7 @@ package object fs {
   private def findDefaultDb: MongoDbIO[Option[DefaultDb]] =
     (for {
       coll0  <- MongoDbIO.liftTask(NG.salt).liftM[OptionT]
-      coll   =  s"__${coll0}__"
+      coll   =  CollectionName(s"__${coll0}__")
       dbName <- MongoDbIO.firstWritableDb(coll)
       _      <- MongoDbIO.dropCollection(Collection(dbName, coll))
                   .attempt.void.liftM[OptionT]

@@ -27,6 +27,7 @@ import scalaz._
 class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBsonField {
   import quasar.physical.mongodb.accumulator._
   import quasar.physical.mongodb.expression._
+  import CollectionUtil._
   import Workflow._
   import ArbitraryExprOp._
 
@@ -74,7 +75,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
 
   def genOut = for {
     i <- Gen.chooseNum(1, 10)
-  } yield $OutF((), Collection("db", "result" + i))
+  } yield $OutF((), CollectionName("result" + i))
 
   def pipelineOpGens(size: Int): List[Gen[PipelineOp]] = {
     genProject(size).map(op => PipelineOp(op.pipeline)) ::
@@ -157,14 +158,14 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
 
     "remove one un-nested field" in {
       val op = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
             "b" -> Select(ident("x"), "y"))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),
@@ -174,7 +175,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
 
     "remove one nested field" in {
       val op = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -183,7 +184,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
               "d" -> Select(ident("x"), "z")))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -195,7 +196,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
 
     "remove whole nested object" in {
       val op = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"),
@@ -203,7 +204,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
               "c" -> Select(ident("x"), "y")))))),
         ListMap())
       val exp = $SimpleMapF(
-        $read[WorkflowOpCoreF](Collection("db", "foo")),
+        $read[WorkflowOpCoreF](collection("db", "foo")),
         NonEmptyList(MapExpr(JsFn(Name("x"),
           obj(
             "a" -> Select(ident("x"), "x"))))),
