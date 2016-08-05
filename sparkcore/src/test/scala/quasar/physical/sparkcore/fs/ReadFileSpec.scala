@@ -30,7 +30,6 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 
 import java.io._
-import pathy.Path.posixCodec
 
 import scalaz._, Scalaz._, concurrent.Task
 
@@ -46,8 +45,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
 
   "readfile" should {
-    // FIXME: Skipping until we can avoid the local spark emulator which appears to leak resources, even after stop()
-    "open - read chunk - close" in skipped {
+    "open - read chunk - close" in skipped("Skipped until the local spark emulator can be avoided as it appears to leak resources, even after a context.stop()")
+/*
+    "open - read chunk - close" in {
       // given
       import quasar.Data._
       implicit val sc = newSc()
@@ -69,6 +69,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       sc.stop()
       ok
     }
+*/
   }
 
   private def readOneChunk(f: AFile)
