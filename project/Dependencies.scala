@@ -58,8 +58,8 @@ object Dependencies {
     "io.netty"    % "netty-handler"        % nettyVersion
   )
   def sparkcore = Seq(
-    "io.netty"          %  "netty-all"                 % nettyVersion            % "compile",
-    ("org.apache.spark" %% "spark-core"                % "1.6.2"                 % "compile")
+    "io.netty"          %  "netty-all"  % nettyVersion,
+    ("org.apache.spark" %% "spark-core" % "1.6.2")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-collections", "commons-collections")
       .exclude("com.esotericsoftware.minlog", "minlog")
