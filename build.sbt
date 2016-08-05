@@ -3,7 +3,7 @@ import quasar.project._
 import quasar.project.build._
 
 import java.lang.Integer
-import scala.{List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
+import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
@@ -155,6 +155,8 @@ lazy val oneJarSettings =
         commitReleaseVersion,
         pushChanges))
 
+lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+
 lazy val root = project.in(file("."))
   .settings(commonSettings: _*)
   .settings(noPublishSettings)
@@ -219,7 +221,8 @@ lazy val core = project
     publishArtifact in (Test, packageBin) := true,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled),
+    isCIBuild := sys.env contains "TRAVIS",
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
     buildInfoPackage := "quasar.build")
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
