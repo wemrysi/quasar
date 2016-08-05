@@ -134,15 +134,11 @@ lazy val assemblySettings = Seq(
   test in assembly := {},
 
   assemblyMergeStrategy in assembly := {
-    case PathList("META-INF", "io.netty.versions.properties") =>
-      MergeStrategy.last
-    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) =>
-      MergeStrategy.last
-    case PathList("com", "google", "common", "base", xs @ _*) =>
-      MergeStrategy.last
-    case other =>
-      val defaultStrat = (assemblyMergeStrategy in assembly).value
-      defaultStrat(other)
+    case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
+    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
+    case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
+
+    case other => (assemblyMergeStrategy in assembly).value apply other
   }
 )
 
@@ -164,7 +160,7 @@ lazy val noPublishSettings = Seq(
 
 lazy val githubReleaseSettings =
   githubSettings ++ Seq(
-    GithubKeys.assets := { Seq(assembly.value) },
+    GithubKeys.assets := Seq(assembly.value),
     GithubKeys.repoSlug := "quasar-analytics/quasar",
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
