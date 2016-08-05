@@ -176,6 +176,7 @@ lazy val githubReleaseSettings =
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(aggregate in assembly := false)
   .aggregate(
         foundation,
 //     / / | | \ \
