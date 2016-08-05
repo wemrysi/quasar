@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.specs2
+package quasar
 
 import quasar.Predef._
 

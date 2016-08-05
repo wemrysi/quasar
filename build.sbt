@@ -185,8 +185,11 @@ lazy val foundation = project
   .settings(publishSettings: _*)
   .settings(
     libraryDependencies ++= Dependencies.foundation,
-    publishArtifact in (Test, packageBin) := true)
-  .enablePlugins(AutomateHeaderPlugin)
+    publishArtifact in (Test, packageBin) := true,
+    isCIBuild := sys.env contains "TRAVIS",
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
+    buildInfoPackage := "quasar.build")
+  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
@@ -220,11 +223,8 @@ lazy val core = project
     libraryDependencies ++= Dependencies.core,
     publishArtifact in (Test, packageBin) := true,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    isCIBuild := sys.env contains "TRAVIS",
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
-    buildInfoPackage := "quasar.build")
-  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+    ScoverageKeys.coverageFailOnMinimum := true)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val main = project
   .settings(name := "quasar-main-internal")
