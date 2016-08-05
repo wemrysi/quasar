@@ -3,7 +3,7 @@ import quasar.project._
 import quasar.project.build._
 
 import java.lang.Integer
-import scala.{List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
+import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
@@ -163,6 +163,8 @@ lazy val oneJarSettings =
       commitReleaseVersion,
       pushChanges))
 
+lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
@@ -189,8 +191,11 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(libraryDependencies ++= Dependencies.foundation)
-  .enablePlugins(AutomateHeaderPlugin)
+  .settings(libraryDependencies ++= Dependencies.foundation,
+    isCIBuild := sys.env contains "TRAVIS",
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
+    buildInfoPackage := "quasar.build")
+  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
@@ -219,10 +224,8 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
-    ScoverageKeys.coverageFailOnMinimum := true,
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled),
-    buildInfoPackage := "quasar.build")
-  .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+    ScoverageKeys.coverageFailOnMinimum := true)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val main = project
   .settings(name := "quasar-main-internal")
