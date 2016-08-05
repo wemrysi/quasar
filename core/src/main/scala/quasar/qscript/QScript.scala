@@ -897,16 +897,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     case x => SP.inj(x)
   }
 
-  def compactLeftShift[F[_]: Functor](
+  def compactLeftShift[F[_], G[_]: Functor](
     implicit SP: SourcedPathable[T, ?] :<: F):
-      SourcedPathable[T, T[F]] => F[T[F]] = {
+      SourcedPathable[T, T[G]] => F[T[G]] = {
     case x @ LeftShift(src, struct, repair) => {
       def rewrite(
-        src: T[F],
+        src: T[G],
         repair0: JoinFunc[T],
         elem: FreeMap[T],
         dup: FreeMap[T] => Unary[T, FreeMap[T]]):
-          F[T[F]] = {
+          F[T[G]] = {
         val repair: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
           repair0.toCoEnv[T]
 
@@ -1007,7 +1007,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
       liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
       liftFG(simplifySP[F, F](optionIdF[F])) ⋙
-      liftFG(compactLeftShift[F]) ⋙
+      liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
@@ -1028,7 +1028,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFG(coalesceMapShift[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
       liftFG(simplifySP[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
-      //liftFG(compactLeftShift[CoEnv[A, F, ?]]) ⋙  // TODO
+      liftFG(compactLeftShift[F, CoEnv[A, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[A, F, ?]]) ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
