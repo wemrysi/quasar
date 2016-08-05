@@ -189,34 +189,31 @@ lazy val foundation = project
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
+  .settings(libraryDependencies ++= Dependencies.foundation)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val ejson = project
   .settings(name := "quasar-ejson-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
+  .settings(libraryDependencies ++= Dependencies.effect)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
   .settings(name := "quasar-js-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.core)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, foundation % BothScopes)
-  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes, foundation % BothScopes)
+  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -235,6 +232,7 @@ lazy val main = project
 //  sparkcore  % BothScopes,
     postgresql % BothScopes)
   .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.main)
   .enablePlugins(AutomateHeaderPlugin)
 
 // filesystems (backends)
@@ -243,8 +241,7 @@ lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies +=
-    "org.mongodb" % "mongodb-driver-async" % "3.2.2")
+  .settings(libraryDependencies ++= Dependencies.mongodb)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val skeleton = project
@@ -303,9 +300,7 @@ lazy val web = project
 
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(
-    main % BothScopes,
-    web  % BothScopes)
+  .dependsOn(web % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
