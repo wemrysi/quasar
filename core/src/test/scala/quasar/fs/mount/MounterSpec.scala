@@ -19,7 +19,6 @@ package quasar.fs.mount
 import quasar.Predef._
 import quasar.effect._
 import quasar.fp._, free._
-import quasar.fs.APath
 
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -45,13 +44,12 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
 
   def interpret = {
     val mm = Mounter[Task, MEff](doMount.andThen(_.point[Task]), κ(Task.now(())))
-    val cfgRef = TaskRef(Map.empty[APath, MountConfig]).unsafePerformSync
 
     val interpEff =
       mm :+: injectFT[MountingFailure, MEff] :+: injectFT[PathMismatchFailure, MEff]
 
     val interpMnts: MountConfigs ~> Task =
-      KeyValueStore.fromTaskRef(cfgRef)
+      KeyValueStore.impl.concurrentMap.unsafePerformSync
 
     val interpMEff: MEff ~> Task =
       reflNT[Task]                                   :+:
