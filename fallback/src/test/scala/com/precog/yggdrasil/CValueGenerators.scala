@@ -19,6 +19,7 @@
  */
 package com.precog.yggdrasil
 
+import quasar.precog._
 import blueeyes._
 import com.precog.common._
 import quasar.precog.TestSupport._, Gen._

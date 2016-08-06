@@ -3,7 +3,6 @@ package quasar
 import precog._, TestSupport._
 import org.specs2.mutable._
 import org.specs2.execute.AsResult
-import scalaz._
 
 trait QuasarSpecification extends SpecificationLike with ScalaCheck {
   // Report all test timings.

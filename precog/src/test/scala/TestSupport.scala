@@ -2,9 +2,9 @@ package quasar
 package precog
 
 import scala.collection.mutable.Builder
-import scalaz._
 import java.io.File
-import quasar.precog.TestSupport._
+import TestSupport._
+// import quasar.precog._, TestSupport._
 
 object TestSupport extends TestSupport
 object TestSupportWithArb extends TestSupport with ArbitrarySupport
@@ -16,7 +16,7 @@ trait ArbitrarySupport {
 }
 
 trait SpecsSupport {
-  import org.specs2._, execute._, matcher._
+  import org.specs2._, matcher._
 
   type ScalaCheck         = org.specs2.ScalaCheck
   val SpecsFailure        = org.specs2.execute.Failure
@@ -81,7 +81,7 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
-  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary map (d => BigDecimal(d.bigDecimal, d.mc))
+  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
 
   implicit class ArbitraryOps[A](arb: Arbitrary[A]) {
     def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(arb.arbitrary map f)

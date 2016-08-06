@@ -6,7 +6,8 @@ object PlatformBuild {
   val BothScopes = "compile->compile;test->test"
 
   def envArgs     = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
-  def warningOpts = Seq("-g:vars", "-deprecation", "-unchecked", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
+  def warningArgs = Seq("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
+  def stdArgs     = Seq("-deprecation", "-unchecked", "-language:_")
 
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...
@@ -48,19 +49,20 @@ object PlatformBuild {
     def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
     def also(s: Setting[_], ss: Setting[_]*): Project = also(s :: ss.toList)
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toList)
-    def scalacArgs(args: String*): Project            = also(scalacOptions in Compile ++= args.toList, scalacOptions in Test ++= args.toList)
+    def scalacArgs(args: String*): Project            = also(scalacOptions ++= args.toList)
     def strictVersions: Project                       = also(conflictManager := ConflictManager.strict)
     def serialTests: Project                          = also(parallelExecution in Test := false)
-    def withWarnings: Project                         = scalacArgs(warningOpts: _*)
+    def allWarnings: Project                          = scalacArgs(warningArgs: _*)
+    def fatalWarnings: Project                        = scalacArgs("-Xfatal-warnings")
     def logImplicits: Project                         = scalacArgs("-Xlog-implicits")
     def crossJavaTargets: Project                     = also(inBoth(doubleCross))
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
 
     def setup: Project = (
-      serialTests scalacPlugins (kindProjector) also(
+      scalacPlugins(kindProjector).allWarnings.fatalWarnings also (
                organization :=  "com.precog",
                     version :=  "0.1",
-              scalacOptions ++= envArgs,
+              scalacOptions ++= envArgs ++ stdArgs,
                scalaVersion :=  "2.11.8",
         logBuffered in Test :=  false
       )

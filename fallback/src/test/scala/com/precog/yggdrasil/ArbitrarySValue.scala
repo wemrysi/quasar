@@ -19,9 +19,9 @@
  */
 package com.precog.yggdrasil
 
-import blueeyes._
+import quasar.precog.decimal
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._, Gen._
 

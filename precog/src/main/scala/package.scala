@@ -1,13 +1,9 @@
 package quasar
 
-import scalaz._
-import scala.collection.mutable
 import java.nio.file._
+import java.math.MathContext.UNLIMITED
 
-/** For some reason extending ScodecImplicits makes sbt recompile
- *  everything under the sun even if we never touch it.
- */
-package object precog /*extends ScodecImplicits*/ {
+package object precog {
   val Try          = scala.util.Try
   type Try[+A]     = scala.util.Try[A]
   val ScalaFailure = scala.util.Failure
@@ -27,4 +23,13 @@ package object precog /*extends ScodecImplicits*/ {
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
   }
+
+
+  def decimal(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, UNLIMITED)
+  def decimal(d: String): BigDecimal                       = BigDecimal(d, UNLIMITED)
+  def decimal(d: Int): BigDecimal                          = decimal(d.toLong)
+  def decimal(d: Long): BigDecimal                         = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(d: Double): BigDecimal                       = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(d: Float): BigDecimal                        = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, UNLIMITED)
 }

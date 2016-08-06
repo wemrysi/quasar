@@ -1,5 +1,4 @@
 import scalaz._
-import java.math.MathContext.UNLIMITED
 
 package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageAliases {
   type spec    = scala.specialized
@@ -30,14 +29,6 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
   def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
-
-  def decimal(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, UNLIMITED)
-  def decimal(d: String): BigDecimal                       = BigDecimal(d, UNLIMITED)
-  def decimal(d: Int): BigDecimal                          = decimal(d.toLong)
-  def decimal(d: Long): BigDecimal                         = BigDecimal.decimal(d, UNLIMITED)
-  def decimal(d: Double): BigDecimal                       = BigDecimal.decimal(d, UNLIMITED)
-  def decimal(d: Float): BigDecimal                        = BigDecimal.decimal(d, UNLIMITED)
-  def decimal(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, UNLIMITED)
 
   def doto[A](x: A)(f: A => Any): A = { f(x) ; x }
 

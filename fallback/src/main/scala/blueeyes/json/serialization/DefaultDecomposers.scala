@@ -1,6 +1,7 @@
 package blueeyes
 package json.serialization
 
+import quasar.precog._
 import json._
 import java.util.{ Date => JDate }
 
