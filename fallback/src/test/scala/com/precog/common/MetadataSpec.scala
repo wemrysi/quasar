@@ -104,12 +104,13 @@ trait MetadataGenerators  {
 
   val metadataGenerators = List[Gen[Metadata]](genBooleanMetadata, genLongMetadata, genDoubleMetadata, genBigDecimalMetadata, genStringMetadata)
 
+  private def upTo1K: Gen[Long]                        = choose(0L, 1000L)
   def genMetadataList: Gen[List[Metadata]]             = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l }
   def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l => Map( l.map( m => (m.metadataType, m) ): _* ) }
   def genMetadata: Gen[Metadata]                       = frequency( metadataGenerators.map { (1, _) }: _* )
-  def genBooleanMetadata: Gen[BooleanValueStats]       = for(count <- choose(0, 1000); trueCount <- choose(0, count)) yield BooleanValueStats(count, trueCount)
-  def genLongMetadata: Gen[LongValueStats]             = for(count <- choose(0, 1000); a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
-  def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- choose(0, 1000); a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
-  def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- choose(0, 1000); a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats]         = for(count <- choose(0, 1000); a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
+  def genBooleanMetadata: Gen[BooleanValueStats]       = for(count <- upTo1K; trueCount <- choose(0L, count)) yield BooleanValueStats(count, trueCount)
+  def genLongMetadata: Gen[LongValueStats]             = for(count <- upTo1K; a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
+  def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- upTo1K; a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
+  def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- upTo1K; a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
+  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
 }

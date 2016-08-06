@@ -102,13 +102,13 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testTrivialCogroup(f: Table => Table = identity[Table]) = {
-    def recl = toRecord(Array(0), JArray(JNum(12) :: Nil))
-    def recr = toRecord(Array(0), JArray(JUndefined :: JNum(13) :: Nil))
+    def recl = toRecord(Array(0L), JArray(JNum(12) :: Nil))
+    def recr = toRecord(Array(0L), JArray(JUndefined :: JNum(13) :: Nil))
 
     val ltable = fromSample(SampleData(Stream(recl)))
     val rtable = fromSample(SampleData(Stream(recr)))
 
-    val expected = Vector(toRecord(Array(0), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
+    val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
     val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
       Leaf(Source),

@@ -211,6 +211,8 @@ class AccessControlSpec extends quasar.QuasarSpecification {
         DeletePermission(Path("/other"), WrittenByAny)
       )
 
+      val _ = apiKeyManager.deriveAndAddGrant(None, None, otherAPIKey, accessOther, userAPIKey, Some(dateTime.now m inusYears 1000)).get
+
       hasCapability(userAPIKey, Set(ReadPermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beFalse
       hasCapability(userAPIKey, Set(ReducePermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beFalse
       hasCapability(userAPIKey, Set(WritePermission(Path("/other"), WriteAs(otherAccountId)))) must beFalse
@@ -238,6 +240,7 @@ class AccessControlSpec extends quasar.QuasarSpecification {
       )
 
       val user1AccessOtherGrant = apiKeyManager.deriveAndAddGrant(None, None, otherAPIKey, accessOther, user1APIKey).get
+      val _                     = apiKeyManager.deriveAndAddGrant(None, None, user1APIKey, accessOther, user2APIKey).get
 
       hasCapability(user2APIKey, Set(ReadPermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beTrue
       hasCapability(user2APIKey, Set(ReducePermission(Path("/other"), WrittenByAccount(otherAccountId)))) must beTrue
@@ -277,6 +280,9 @@ class AccessControlSpec extends quasar.QuasarSpecification {
       hasCapability(customer2APIKey, readCustomer2Customer2) must beTrue
       hasCapability(customer2APIKey, readCustomer2AddOn) must beFalse
       hasCapability(customer2APIKey, readCustomer1AddOn) must beFalse
+
+      val _ = apiKeyManager.deriveAndAddGrant(None, None, addOnAPIKey, readCustomer1AddOn, customer1APIKey).get
+      val _ = apiKeyManager.deriveAndAddGrant(None, None, addOnAPIKey, readCustomer2AddOn, customer2APIKey).get
 
       hasCapability(customer1APIKey, readCustomer1Customer1) must beTrue
       hasCapability(customer1APIKey, readCustomer1AddOn) must beTrue

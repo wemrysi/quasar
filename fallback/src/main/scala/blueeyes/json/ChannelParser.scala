@@ -47,9 +47,9 @@ private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncPar
     * clear that data and swap the buffers.
     */
   final def swap() {
-    var tmp  = curr; curr = next; next = tmp
-    var btmp = bcurr; bcurr = bnext; bnext = btmp
-    var ntmp = ncurr; ncurr = nnext; nnext = ntmp
+    val tmp  = curr; curr = next; next = tmp
+    val btmp = bcurr; bcurr = bnext; bnext = btmp
+    val ntmp = ncurr; ncurr = nnext; nnext = ntmp
   }
 
   /**
