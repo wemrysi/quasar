@@ -58,6 +58,12 @@ object Dependencies {
     "io.netty"    % "netty-buffer"         % nettyVersion,
     "io.netty"    % "netty-handler"        % nettyVersion
   )
+  def marklogic = Seq(
+    "com.marklogic"  %  "java-client-api"   % "3.0.5",
+    "com.marklogic"  %  "marklogic-xcc"     % "8.0.5",
+    "org.http4s"     %% "jawn-streamz"      % "0.8.1",
+    "org.spire-math" %% "jawn-argonaut"     % "0.8.4"
+  )
   def web = Seq(
     "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
