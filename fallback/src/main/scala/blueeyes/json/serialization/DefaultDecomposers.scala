@@ -3,7 +3,6 @@ package json.serialization
 
 import json._
 import java.util.{ Date => JDate }
-import java.math.MathContext
 
 /** Decomposers for all basic types.
   */
@@ -21,19 +20,19 @@ trait DefaultDecomposers {
   }
 
   implicit val IntDecomposer: Decomposer[Int] = new Decomposer[Int] {
-    def decompose(tvalue: Int): JValue = JNum(BigDecimal(tvalue, MathContext.UNLIMITED))
+    def decompose(tvalue: Int): JValue = JNum(decimal(tvalue))
   }
 
   implicit val LongDecomposer: Decomposer[Long] = new Decomposer[Long] {
-    def decompose(tvalue: Long): JValue = JNum(BigDecimal(tvalue, MathContext.UNLIMITED))
+    def decompose(tvalue: Long): JValue = JNum(decimal(tvalue))
   }
 
   implicit val FloatDecomposer: Decomposer[Float] = new Decomposer[Float] {
-    def decompose(tvalue: Float): JValue = JNum(BigDecimal(tvalue, MathContext.UNLIMITED))
+    def decompose(tvalue: Float): JValue = JNum(decimal(tvalue))
   }
 
   implicit val DoubleDecomposer: Decomposer[Double] = new Decomposer[Double] {
-    def decompose(tvalue: Double): JValue = JNum(BigDecimal(tvalue, MathContext.UNLIMITED))
+    def decompose(tvalue: Double): JValue = JNum(decimal(tvalue))
   }
 
   implicit val BigDecimalDecomposer: Decomposer[BigDecimal] = new Decomposer[BigDecimal] {
@@ -41,7 +40,7 @@ trait DefaultDecomposers {
   }
 
   implicit val DateDecomposer: Decomposer[JDate] = new Decomposer[JDate] {
-    def decompose(date: JDate): JValue = JNum(BigDecimal(date.getTime, MathContext.UNLIMITED))
+    def decompose(date: JDate): JValue = JNum(decimal(date.getTime))
   }
 
   implicit def OptionDecomposer[T](implicit decomposer: Decomposer[T]): Decomposer[Option[T]] = new Decomposer[Option[T]] {

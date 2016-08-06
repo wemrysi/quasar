@@ -28,8 +28,7 @@ import com.precog.util.RingDeque
 
 import TransSpecModule._
 import blueeyes._, json._
-
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Ordering._
 import java.nio.CharBuffer
 
 trait Slice { source =>

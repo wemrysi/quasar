@@ -73,8 +73,8 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
     val json1 = """{ "a": 1, "b": "x", "c": null }"""
     val json2 = """[4, "foo", null, true]"""
 
-    val data1: Stream[JValue] = Stream.fill(25)(JParser.parse(json1))
-    val data2: Stream[JValue] = Stream.fill(35)(JParser.parse(json2))
+    val data1: Stream[JValue] = Stream.fill(25)(JParser.parseFromString(json1).fold(throw _, identity))
+    val data2: Stream[JValue] = Stream.fill(35)(JParser.parseFromString(json2).fold(throw _, identity))
 
     val table1 = fromSample(SampleData(data1), Some(10))
     val table2 = fromSample(SampleData(data2), Some(10))

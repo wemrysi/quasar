@@ -1,4 +1,5 @@
 import scalaz._
+import java.math.MathContext.UNLIMITED
 
 package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageAliases {
   type spec    = scala.specialized
@@ -27,11 +28,18 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
   def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
   def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
-  def decimal(d: String): BigDecimal                                     = BigDecimal(d, java.math.MathContext.UNLIMITED)
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
   def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
 
-  def doto[A](x: A)(f: A => Unit): A = { f(x) ; x }
+  def decimal(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, UNLIMITED)
+  def decimal(d: String): BigDecimal                       = BigDecimal(d, UNLIMITED)
+  def decimal(d: Int): BigDecimal                          = decimal(d.toLong)
+  def decimal(d: Long): BigDecimal                         = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(d: Double): BigDecimal                       = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(d: Float): BigDecimal                        = BigDecimal.decimal(d, UNLIMITED)
+  def decimal(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, UNLIMITED)
+
+  def doto[A](x: A)(f: A => Any): A = { f(x) ; x }
 
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
@@ -61,6 +69,7 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
 
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
     def |>[B](f: A => B): B = f(x)
+    def unsafeTap(f: A => Any): A = doto(x)(f)
   }
 
   implicit class LazyMapValues[A, B](source: Map[A, B]) {

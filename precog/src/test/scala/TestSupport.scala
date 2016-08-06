@@ -4,7 +4,6 @@ package precog
 import scala.collection.mutable.Builder
 import scalaz._
 import java.io.File
-import java.math.MathContext, MathContext._
 import quasar.precog.TestSupport._
 
 object TestSupport extends TestSupport

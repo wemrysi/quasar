@@ -22,7 +22,6 @@ package com.precog.yggdrasil
 import blueeyes._
 import com.precog.common._
 import blueeyes.json._
-import java.math.MathContext
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._, Gen._
 
@@ -101,9 +100,9 @@ trait CValueGenerators extends ArbitraryBigDecimal {
   def jvalue(ctype: CType): Gen[JValue] = ctype match {
     case CString       => alphaStr map (JString(_))
     case CBoolean      => arbitrary[Boolean] map (JBool(_))
-    case CLong         => arbitrary[Long] map { ln => JNum(BigDecimal(ln, MathContext.UNLIMITED)) }
-    case CDouble       => arbitrary[Double] map { d => JNum(BigDecimal(d, MathContext.UNLIMITED)) }
-    case CNum          => arbitrary[BigDecimal] map { bd => JNum(bd) }
+    case CLong         => arbitrary[Long] map (ln => JNum(decimal(ln)))
+    case CDouble       => arbitrary[Double] map (d => JNum(decimal(d)))
+    case CNum          => arbitrary[BigDecimal] map (bd => JNum(bd))
     case CNull         => JNull
     case CEmptyObject  => JObject.empty
     case CEmptyArray   => JArray.empty
@@ -223,15 +222,17 @@ trait ArbitrarySValue extends SValueGenerators {
 trait ArbitraryBigDecimal {
   val MAX_EXPONENT = 50000
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(for {
-    mantissa <- arbitrary[Long]
-    exponent <- Gen.chooseNum(-MAX_EXPONENT, MAX_EXPONENT)
+  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary {
+    for {
+      mantissa <- arbitrary[Long]
+      exponent <- Gen.chooseNum(-MAX_EXPONENT, MAX_EXPONENT)
 
-    adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
-      exponent - mantissa.toString.length
-    else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
-      exponent + mantissa.toString.length
-    else
-      exponent
-  } yield BigDecimal(mantissa, adjusted, java.math.MathContext.UNLIMITED))
+      adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
+        exponent - mantissa.toString.length
+      else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
+        exponent + mantissa.toString.length
+      else
+        exponent
+    } yield decimal(mantissa, adjusted)
+  }
 }

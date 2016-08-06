@@ -28,7 +28,7 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with quasar.Quasar
   import SampleData._
 
   val table = {
-    val JArray(elements) = JParser.parse("""[
+    val JArray(elements) = JParser.parseFromString("""[
       {"foo":1},
       {"foo":2},
       {"foo":3},
@@ -43,7 +43,7 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with quasar.Quasar
       {"foo":12},
       {"foo":13},
       {"foo":14}
-    ]""")
+    ]""").fold(throw _, identity)
 
     val sample = SampleData(elements.toStream)
     fromSample(sample)
@@ -123,7 +123,7 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with quasar.Quasar
   }
 
   def testCanonicalizeEmptySlices = {
-    def tableTakeRange(table: Table, start: Int, numToTake: Long) =
+    def tableTakeRange(table: Table, start: Long, numToTake: Long) =
       table.takeRange(start, numToTake).slices.toStream.copoint
 
     val emptySlice = Slice(Map(), 0)

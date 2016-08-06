@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import org.scalacheck._
-import Gen._
 import blueeyes._, json._
+import quasar.precog.TestSupport._
+import Gen._
 
 package quasar.precog {
   object JsonTestSupport extends TestSupport with JsonGenerators {
@@ -36,7 +36,8 @@ package quasar.precog {
           exponent + mantissa.toString.length
         else
           exponent
-      } yield BigDecimal(mantissa, adjusted, java.math.MathContext.UNLIMITED))
+      } yield decimal(unscaledVal = mantissa, scale = adjusted)
+    )
   }
 }
 

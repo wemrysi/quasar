@@ -47,7 +47,8 @@ trait CValueGenerators {
     case CNum     => for {
       scale  <- genInt
       bigInt <- genBigInt
-    } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
+    } yield CNum(decimal(bigInt.bigInteger, scale - 1))
+
     case CDate                => genPosLong ^^ (n => CDate(dateTime fromMillis n))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>

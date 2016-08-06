@@ -21,18 +21,15 @@ package com.precog.common
 
 import blueeyes._
 import com.precog.util.{ ByteBufferPool, RawBitSet }
-// import org.specs2._
-import org.scalacheck.{Shrink, Arbitrary, Gen}
+import org.scalacheck.Shrink
 import quasar.precog._, TestSupportWithArb._
 
 class CodecSpec extends quasar.QuasarSpecification {
-  // import Arbitrary._
   import ByteBufferPool._
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
-    Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map (BigDecimal(_, java.math.MathContext.UNLIMITED)))
+    Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map decimal)
 
-  //implicit def arbBitSet = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map (BitSet(_: _*)))
   implicit def arbBitSet: Arbitrary[BitSet] = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
 
   implicit def arbSparseBitSet: Arbitrary[(Codec[BitSet], BitSet)] = {
@@ -68,12 +65,8 @@ class CodecSpec extends quasar.QuasarSpecification {
   implicit def arbIndexedSeq[A](implicit a: Arbitrary[A]): Arbitrary[IndexedSeq[A]] =
     Arbitrary(Gen.listOf(a.arbitrary) map (Vector(_: _*)))
 
-  implicit def arbArray[A: CTag: Gen]: Arbitrary[Array[A]] = Arbitrary(for {
-    values <- Gen.listOf(implicitly[Gen[A]])
-  } yield {
-    val array: Array[A] = values.toArray
-    array
-  })
+  implicit def arbArray[A: CTag: Gen]: Arbitrary[Array[A]] =
+    Arbitrary( Gen.listOf(implicitly[Gen[A]]) map (_.toArray) )
 
   val pool = new ByteBufferPool()
   val smallPool = new ByteBufferPool(capacity = 10)
