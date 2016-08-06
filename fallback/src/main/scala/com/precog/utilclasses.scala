@@ -6,7 +6,7 @@ import org.slf4s.Logging
 import quasar.precog._
 import scala.{ collection => sc }
 import scala.collection.JavaConverters._
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Ordering._
 import java.io.FileReader
 import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }

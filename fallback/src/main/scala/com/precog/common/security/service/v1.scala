@@ -21,8 +21,6 @@ package com.precog.common
 package security
 package service
 
-import com.precog.common.accounts._
-
 import blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._
 

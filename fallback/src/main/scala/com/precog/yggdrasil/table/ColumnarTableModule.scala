@@ -34,7 +34,7 @@ import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 import java.util.Arrays
 import java.nio.CharBuffer
-import java.nio.charset.{ Charset, CoderResult }
+import java.nio.charset.CoderResult
 
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1

@@ -24,7 +24,7 @@ import ingest._
 import service.v1
 import blueeyes._, json._, serialization._, DefaultSerialization._
 import scalaz._, Scalaz._, Validation.FlatMap._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 class SerializationSpecs extends quasar.QuasarSpecification {
   import Permission._

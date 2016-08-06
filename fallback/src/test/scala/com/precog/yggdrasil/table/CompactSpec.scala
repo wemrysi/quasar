@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   import SampleData._

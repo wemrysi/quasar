@@ -24,7 +24,7 @@ import com.precog.common.security.service._
 import blueeyes._
 import blueeyes.util.Clock
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait APIKeyFinderSpec[M[+_]] extends quasar.QuasarSpecification {
   import Permission._

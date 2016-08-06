@@ -4,7 +4,7 @@ package util
 import QueryParser._
 import java.net.URI
 import java.net.URLEncoder._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 class QueryParserSpec extends quasar.QuasarSpecification {
   val baseURI  = "http://www.socialmedia.com/test?"

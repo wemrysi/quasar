@@ -23,8 +23,7 @@ package table
 import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
-import org.scalacheck.Gen._
+// import quasar.precog.TestSupport._
 import SampleData._
 
 class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {

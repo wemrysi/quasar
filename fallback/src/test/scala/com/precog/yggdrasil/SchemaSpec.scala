@@ -20,9 +20,8 @@
 package com.precog.yggdrasil
 
 import com.precog.bytecode._
-import blueeyes._
 import com.precog.common._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 class SchemaSpec extends quasar.QuasarSpecification {
   "cpath" should {

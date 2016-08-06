@@ -23,9 +23,8 @@ package table
 import scala.util.Random
 import blueeyes._
 import com.precog.common._
-import org.scalacheck.{ Arbitrary, Gen }
-import Gen.{ listOfN, containerOfN }, Arbitrary.arbitrary
 import quasar.precog.TestSupport._
+import Gen.listOfN
 import ArbitrarySlice._
 
 class SliceSpec extends quasar.QuasarSpecification {

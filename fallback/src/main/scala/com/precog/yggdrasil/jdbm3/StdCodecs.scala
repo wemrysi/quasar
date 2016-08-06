@@ -23,7 +23,6 @@ package jdbm3
 import quasar.precog._
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 
 /**
   * Defines a base set of codecs that are often used in `RowFormat`s.

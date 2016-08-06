@@ -23,7 +23,6 @@ package table
 import com.precog.bytecode._
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
 
 trait SchemasSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   def testSingleSchema = {

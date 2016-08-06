@@ -23,10 +23,7 @@ package security
 import blueeyes._
 import service._
 import com.precog.common.accounts.{ Account, AccountId }
-
-import java.util.concurrent.TimeUnit._
 import org.slf4s.Logging
-
 import scalaz._, Scalaz._
 
 object APIKeyManager {

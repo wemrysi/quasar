@@ -23,7 +23,6 @@ package table
 import com.precog.bytecode.JType
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 
 sealed trait CFId
 case class LeafCFId(identity: String)            extends CFId

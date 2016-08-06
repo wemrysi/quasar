@@ -23,8 +23,7 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
-// import org.scalacheck._, Gen._, Arbitrary._
+// import quasar.precog.TestSupport._
 import SampleData._
 import TableModule._
 

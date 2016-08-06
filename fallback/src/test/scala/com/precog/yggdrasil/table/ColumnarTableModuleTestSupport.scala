@@ -22,7 +22,6 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 
 import blueeyes.json._
 import scalaz._

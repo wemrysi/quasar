@@ -25,7 +25,7 @@ import com.precog.common._
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait PartitionMergeSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   import trans._

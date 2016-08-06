@@ -22,8 +22,7 @@ package table
 
 import blueeyes.json._
 import scalaz.syntax.comonad._
-import quasar.precog.TestSupport._
-import scalaz.Need
+// import quasar.precog.TestSupport._
 
 trait ToArraySpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   def testToArrayHomogeneous = {

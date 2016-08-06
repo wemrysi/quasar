@@ -24,7 +24,7 @@ import blueeyes._
 import accounts._
 import com.precog.common.security.service._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait APIKeyManagerSpec[M[+_]] extends quasar.QuasarSpecification {
   implicit def M: MoCo[M]

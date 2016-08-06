@@ -20,7 +20,7 @@
 package com.precog.yggdrasil
 package table
 
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 class FNSpec extends quasar.QuasarSpecification {
   "function implementations" should {

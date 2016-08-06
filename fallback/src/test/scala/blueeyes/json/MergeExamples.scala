@@ -17,7 +17,7 @@
 package blueeyes
 package json
 
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 object MergeExamples extends quasar.QuasarSpecification {
   import JParser._

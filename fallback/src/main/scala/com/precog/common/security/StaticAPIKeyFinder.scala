@@ -27,7 +27,6 @@ import com.precog.common.security.service._
 import org.slf4s.Logging
 
 import scalaz._
-import scalaz.std.option._
 import scalaz.syntax.monad._
 import Permission._
 

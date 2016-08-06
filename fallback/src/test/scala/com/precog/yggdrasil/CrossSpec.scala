@@ -21,7 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait CrossSpec extends TableModuleTestSupport with quasar.QuasarSpecification {
   import SampleData._

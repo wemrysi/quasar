@@ -21,7 +21,7 @@ package com.precog.yggdrasil
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait TableModuleTestSupport extends TableModule[Need] {
   implicit def M: MoCo[Need]

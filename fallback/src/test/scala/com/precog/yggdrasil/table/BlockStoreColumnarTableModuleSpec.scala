@@ -20,8 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import blueeyes._
-import scalaz._
 import TableModule._
 
 class BlockStoreColumnarTableModuleSpec extends TableModuleSpec with BlockLoadSpec with BlockSortSpec with BlockAlignBaseSpec {

@@ -22,7 +22,6 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.util._
 
 import scalaz._, Scalaz._
 import scala.collection.mutable

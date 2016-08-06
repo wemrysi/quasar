@@ -39,8 +39,6 @@ trait ByteBufferMonad[M[_]] extends Monad[M] {
 }
 
 final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int = 8, direct: Boolean = false) {
-  import ByteBufferPool._
-
   private val _hits   = new AtomicLong()
   private val _misses = new AtomicLong()
 

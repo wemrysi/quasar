@@ -1,7 +1,8 @@
 package blueeyes
 package json
 
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
+
 class JNumSpec extends quasar.QuasarSpecification {
   "JNums must sort correctly" in {
     val s1: JNum = JNumStr("123.456")

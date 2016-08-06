@@ -1,7 +1,7 @@
 package blueeyes
 package json
 
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 class JObjectSpec extends quasar.QuasarSpecification {
   "JObjects equal even fields order is different" in {

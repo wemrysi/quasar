@@ -1,7 +1,8 @@
 package com.precog.util
 
 import blueeyes._
-import quasar.precog._, TestSupport._
+import quasar.precog._
+// import quasar.precog.TestSupport._
 import scalaz._
 
 class IOUtilsSpecs extends quasar.QuasarSpecification {

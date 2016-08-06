@@ -17,9 +17,8 @@
 package blueeyes
 package json
 
-import scalaz._, Scalaz._, Validation._
+import scalaz._, Scalaz._
 import scala.util.Sorting.quickSort
-
 import java.lang.Double.isInfinite
 import quasar.precog._
 

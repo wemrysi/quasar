@@ -17,8 +17,7 @@
 package blueeyes
 package json
 
-import org.scalacheck._
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Ordering._
 import quasar.precog.JsonTestSupport._
 
 object JsonASTSpec extends quasar.QuasarSpecification {
@@ -75,7 +74,7 @@ object JsonASTSpec extends quasar.QuasarSpecification {
 
   "Diff is subset of originals" in {
     val subsetProp = (x: JObject, y: JObject) => {
-      val Diff(c, a, d) = x diff y
+      val Diff(c, a, _) = x diff y
       y == (y merge (c merge a))
     }
     prop(subsetProp)

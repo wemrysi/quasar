@@ -17,7 +17,8 @@ package blueeyes
 package json
 package serialization
 
-import quasar.precog._, TestSupport._
+import quasar.precog._
+// import quasar.precog.TestSupport._
 import DefaultSerialization._
 
 class DefaultSerializationExamplesSpec extends quasar.QuasarSpecification {

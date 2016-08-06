@@ -22,7 +22,7 @@ package table
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait DistinctSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   import SampleData._
