@@ -259,8 +259,10 @@ lazy val marklogic = project
   .dependsOn(core % BothScopes)
   .settings(oneJarSettings: _*)
   .settings(publishSettings: _*)
+  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Seq(
     "com.marklogic"  %  "java-client-api"   % "3.0.5",
+    "com.marklogic"  %  "marklogic-xcc"     % "8.0.5",
     "org.http4s"     %% "jawn-streamz"      % "0.8.1",
     "org.spire-math" %% "jawn-argonaut"     % "0.8.4"))
   .enablePlugins(AutomateHeaderPlugin)

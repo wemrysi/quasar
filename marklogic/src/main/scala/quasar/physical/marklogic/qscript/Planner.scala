@@ -21,7 +21,8 @@ import quasar.Planner.PlannerError
 import quasar.qscript, qscript._, MapFuncs._
 
 import matryoshka._
-import scalaz._
+import pathy.Path._
+import scalaz._, Scalaz._
 
 object Planner {
 
@@ -62,9 +63,15 @@ object Planner {
         case qscript.Map(src, f)                           => ???
         case qscript.Reduce(src, bucket, reducers, repair) => ???
         case qscript.Sort(src, bucket, order)              => ???
-        case qscript.Filter(src, f)                        => ???
-        case qscript.Take(src, from, count)                => ???
-        case qscript.Drop(src, from, count)                => ???
+        case qscript.Filter(src, f)                        => s"cts:and-query(($src, $f))".right
+        case qscript.Take(src, from, count)                =>
+          def from0 = ""
+          def count0 = ""
+          s"fn:subsequence($src, $from0, $count0)".right
+        case qscript.Drop(src, from, count)                =>
+          def from0 = ""
+          def count0 = ""
+          s"(fn:subsequence($src, 1, $from0), fn:subsequence($src, $from0 + $count0))".right
       }
     }
 
@@ -86,7 +93,10 @@ object Planner {
   implicit def constRead: MarkLogicPlanner[Const[Read, ?]] =
     new MarkLogicPlanner[Const[Read, ?]] {
       def plan: AlgebraM[PlannerError \/ ?, Const[Read, ?], String] = {
-        case Const(Read(absFile)) => ??? // Should we use the same thing as `ReadFile`?
+        case Const(Read(absFile)) =>
+          val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
+          val dirRepr = posixCodec.printPath(asDir)
+          s"""cts:directory-query("$dirRepr","1")""".right
       }
     }
 
