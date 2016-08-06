@@ -279,13 +279,13 @@ package object optimize {
     def inlineGroupProjects[F[_]: Functor](g: $GroupF[Fix[F]])
       (implicit I: WorkflowOpCoreF :<: F)
       : Option[(Fix[F], Grouped, Reshape.Shape)] = {
-      def collectShapesƒ: F[(Fix[F], (List[Reshape], Fix[F]))] => (List[Reshape], Fix[F]) =
+      def collectShapes: GAlgebra[(Fix[F], ?), F, (List[Reshape], Fix[F])] =
         {
           case $project(src, shape, _) => ((x: List[Reshape]) => shape :: x).first(src._2)
           case x                       => (Nil, Fix(x.map(_._1)))
         }
 
-      val (rs, src) = g.src.para(collectShapesƒ)
+      val (rs, src) = g.src.para(collectShapes)
 
       if (src == g.src) None
       else {
