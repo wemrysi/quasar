@@ -90,7 +90,7 @@ object Extractor {
   def apply[A: CTag](f: PartialFunction[JValue, A]): Extractor[A] = new Extractor[A] {
     def validated(jvalue: JValue) = {
       if (f.isDefinedAt(jvalue)) Success(f(jvalue))
-      else Failure(Invalid("Extraction not defined from value " + jvalue + " to type " + implicitly[CTag[A]].erasure.getName))
+      else Failure(Invalid("Extraction not defined from value " + jvalue + " to type " + jclass[A].getName))
     }
   }
 }

@@ -121,9 +121,9 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testSimpleCogroup(f: Table => Table = identity[Table]) = {
-    def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
-    def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
-    def recBoth(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
+    def recl(i: Long)    = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
+    def recr(i: Long)    = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
+    def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(0), recl(1), recl(3), recl(3), recl(5), recl(7), recl(8), recl(8))))
     val rtable  = fromSample(SampleData(Stream(recr(0), recr(2), recr(3), recr(4), recr(5), recr(5), recr(6), recr(8), recr(8))))
@@ -156,8 +156,8 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testUnionCogroup = {
-    def recl(i: Int, j: Int) = toRecord(Array(i), JObject(List(JField("left", JNum(j)))))
-    def recr(i: Int, j: Int) = toRecord(Array(i), JObject(List(JField("right", JNum(j)))))
+    def recl(i: Long, j: Long) = toRecord(Array(i), JObject(List(JField("left", JNum(j)))))
+    def recr(i: Long, j: Long) = toRecord(Array(i), JObject(List(JField("right", JNum(j)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(0, 1), recl(1, 12), recl(3, 13), recl(4, 42), recl(5, 77))))
     val rtable  = fromSample(SampleData(Stream(recr(6, -1), recr(7, 0), recr(8, 14), recr(9, 42), recr(10, 77))))
@@ -178,9 +178,9 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testAnotherSimpleCogroup = {
-    def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
-    def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
-    def recBoth(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
+    def recl(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
+    def recr(i: Long) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
+    def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(2), recl(3), recl(4), recl(6), recl(7))))
     val rtable  = fromSample(SampleData(Stream(recr(0), recr(1), recr(5), recr(6), recr(7))))
@@ -207,9 +207,9 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testAnotherSimpleCogroupSwitched = {
-    def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
-    def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
-    def recBoth(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
+    def recl(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
+    def recr(i: Long) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
+    def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
 
     val rtable  = fromSample(SampleData(Stream(recr(2), recr(3), recr(4), recr(6), recr(7))))
     val ltable  = fromSample(SampleData(Stream(recl(0), recl(1), recl(5), recl(6), recl(7))))
@@ -236,8 +236,8 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testUnsortedInputs = {
-    def recl(i: Int) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
-    def recr(i: Int) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
+    def recl(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
+    def recr(i: Long) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
 
     val ltable  = fromSample(SampleData(Stream(recl(0), recl(1))))
     val rtable  = fromSample(SampleData(Stream(recr(1), recr(0))))

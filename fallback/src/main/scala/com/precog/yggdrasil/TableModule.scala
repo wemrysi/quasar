@@ -48,6 +48,9 @@ object TableSize {
     if (minSize != maxSize) EstimateSize(minSize, maxSize) else ExactSize(minSize)
 }
 
+object ExactSize {
+  def apply(min: Int): ExactSize = new ExactSize(min.toLong)
+}
 case class ExactSize(minSize: Long) extends TableSize {
   val maxSize = minSize
 

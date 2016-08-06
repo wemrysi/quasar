@@ -908,14 +908,14 @@ trait ColumnarTableModule[M[+ _]]
 
           for {
             pairL <- leftTransform(remappedLeft)
-            (ls0, lx) = pairL
-
             pairR <- rightTransform(remappedRight)
-            (rs0, rx) = pairR
-
             pairB <- bothTransform(remappedLeq, remappedReq)
-            (bs0, bx) = pairB
-          } yield {
+          }
+          yield {
+            val (ls0, lx) = pairL
+            val (rs0, rx) = pairR
+            val (bs0, bx) = pairB
+
             assert(lx.size == rx.size && rx.size == bx.size)
             val resultSlice = lx zip rx zip bx
 
@@ -1273,14 +1273,16 @@ trait ColumnarTableModule[M[+ _]]
             val cogroup = for {
               (leftHead, leftTail) <- leftUnconsed
               (rightHead, rightTail) <- rightUnconsed
-            } yield {
+            }
+            yield {
               for {
                 pairL <- stlk(leftHead)
-                (lkstate, lkey) = pairL
-
                 pairR <- strk(rightHead)
-                (rkstate, rkey) = pairR
-              } yield {
+              }
+              yield {
+                val (lkstate, lkey) = pairL
+                val (rkstate, rkey) = pairR
+
                 Cogroup(
                   stlr.initial,
                   strr.initial,
@@ -1288,7 +1290,8 @@ trait ColumnarTableModule[M[+ _]]
                   SlicePosition(SliceId(0), 0, lkstate, lkey, leftHead, leftTail),
                   SlicePosition(SliceId(0), 0, rkstate, rkey, rightHead, rightTail),
                   None,
-                  None)
+                  None
+                )
               }
             }
 
@@ -1498,13 +1501,13 @@ trait ColumnarTableModule[M[+ _]]
                 case (s, sx) => {
                   for {
                     pairPrev <- id.f(state._1, s)
-                    (prevFilter, cur) = pairPrev
-
                     // TODO use an Applicative
                     pairNext <- filter.f(state._2, s)
-                    (nextT, curFilter) = pairNext
-                  } yield {
-                    val next = cur.distinct(prevFilter, curFilter)
+                  }
+                  yield {
+                    val (prevFilter, cur)  = pairPrev
+                    val (nextT, curFilter) = pairNext
+                    val next               = cur.distinct(prevFilter, curFilter)
 
                     StreamT.Yield(next, stream((if (next.size > 0) Some(curFilter) else prevFilter, nextT), sx))
                   }

@@ -23,7 +23,7 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+// import quasar.precog.TestSupport._
 
 trait SampleSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
   import trans._

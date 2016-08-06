@@ -13,8 +13,10 @@ package object precog /*extends ScodecImplicits*/ {
   type jPath       = java.nio.file.Path
   type =?>[-A, +B] = scala.PartialFunction[A, B]
   type CTag[A]     = scala.reflect.ClassTag[A]
+  type jClass      = java.lang.Class[_]
 
   def ctag[A](implicit z: CTag[A]): CTag[A] = z
+  def jclass[A: CTag]: jClass               = ctag[A].runtimeClass.asInstanceOf[jClass]
 
   def jPath(path: String): jPath = Paths get path
 

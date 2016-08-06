@@ -729,18 +729,15 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
                                updatedTransforms: List[(SliceTransform1[_], String)]): M[(JDBMState, List[(SliceTransform1[_], String)])] = transforms match {
             case (keyTransform, streamId) :: tail =>
               keyTransform.advance(slice) flatMap {
-                case (nextKeyTransform, kslice) => {
-                  val (keyColumnRefs, keyColumns) = kslice.columns.toList.sortBy(_._1).unzip
-                  if (keyColumnRefs.nonEmpty) {
-                    val keyRowFormat     = RowFormat.forSortingKey(keyColumnRefs)
+                case (nextKeyTransform, kslice) =>
+                  def thing = (nextKeyTransform -> streamId) :: updatedTransforms
 
-                    writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap { newJdbmState =>
-                      storeTransformed(newJdbmState, tail, (nextKeyTransform, streamId) :: updatedTransforms)
-                    }
-                  } else {
-                    M.point((jdbmState, (nextKeyTransform, streamId) :: updatedTransforms))
+                  kslice.columns.toList.sortBy(_._1).unzip match {
+                    case (refs, _) if refs.isEmpty =>
+                      M point jdbmState -> thing
+                    case (refs, _)                 =>
+                      writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
                   }
-                }
               }
 
             case Nil =>
@@ -759,9 +756,8 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
       val dataRowFormat           = RowFormat.forValues(vColumnRefs)
       val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
-
-      val (keyColumnRefs, keyColumns) = kslice.columns.toList.sortBy(_._1).unzip
-      val keyRowFormat                = RowFormat.forSortingKey(keyColumnRefs)
+      val (keyColumnRefs, _)      = kslice.columns.toList.sortBy(_._1).unzip
+      val keyRowFormat            = RowFormat.forSortingKey(keyColumnRefs)
 
       //M.point(println("writing slice from writeAligned; key: \n" + kslice + "\nvalue\n" + vslice)) >>
       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, indexNamePrefix, jdbmState)
@@ -842,7 +838,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
 
         // TODO Materializing after a sort may help w/ cache hits when traversing a column.
         val (vslice0, kslice0) = mvslice.sortWith(mkslice, sortOrder)
-        val sortedSlice        = SortedSlice(indexName, kslice0, vslice0, vEncoder, krefs.toArray, vrefs.toArray, vslice0.size)
+        val sortedSlice        = SortedSlice(indexName, kslice0, vslice0, vEncoder, krefs.toArray, vrefs.toArray, vslice0.size.toLong)
 
         jdbmState.copy(indices = jdbmState.indices + (indexMapKey -> sortedSlice), insertCount = 0)
       }
