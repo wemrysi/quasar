@@ -99,7 +99,6 @@ package object json {
   }
 
   implicit class JPathNodeOps(private val x: JPathNode) {
-    import x._
     def optName: Option[String] = x match {
       case JPathField(x) => Some(x)
       case _             => None

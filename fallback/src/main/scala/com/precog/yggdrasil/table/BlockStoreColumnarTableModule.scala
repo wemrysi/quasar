@@ -25,7 +25,6 @@ import com.precog.common._
 import com.precog.common.security._
 import com.precog.bytecode._
 import com.precog.yggdrasil.jdbm3._
-import com.precog.util._
 
 import java.util.SortedMap
 import java.util.Comparator
@@ -218,7 +217,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
             val columns: Map[ColumnRef, Column] = {
               (completeSlices.flatMap(_.columns) ++ prefixes.flatMap(_.columns)).groupBy(_._1).map {
                 case (ref, columns) => {
-                  val cp: Pair[ColumnRef, Column] = if (columns.size == 1) {
+                  val cp: ColumnRef -> Column = if (columns.size == 1) {
                     columns.head
                   } else {
                     (ref, ArraySetColumn(ref.ctype, columns.map(_._2).toArray))

@@ -26,7 +26,6 @@ import quasar.precog._, JsonTestSupport._
 
 class JsonParserSpec extends quasar.QuasarSpecification {
   import JParser._
-  import AsyncParser._
 
   "Any valid json can be parsed" in {
     val parsing = (json: JValue) => { parseUnsafe(json.renderPretty); true }
@@ -249,8 +248,8 @@ xyz
     val bs = json.getBytes(Utf8Charset)
     val c  = chunk(bs, 0, bs.length)
 
-    var p = AsyncParser.stream()
-    val (AsyncParse(es, js), p2) = p(c)
+    val p = AsyncParser.stream()
+    val (AsyncParse(es, js), _) = p(c)
 
     // we should only have parsed 1 valid record, and seen 1 error
     json.split('\n').length must_== 14
@@ -268,8 +267,8 @@ xyz
 
     JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
     JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
-    JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
-    JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
+    JParser.parseFromString("[1, 2,\t3,\n4,\u0000 5]").toOption must_== None
+    JParser.parseManyFromString("[1,\r\n2]\u0000[3,\r\n4]\r\n").toOption must_== None
   }
 
   "Handles whitespace correctly" in {
@@ -277,13 +276,12 @@ xyz
 
     JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
     JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
-    JParser.parseFromString("[1, 2,\t3,\n4,\0 5]").toOption must_== None
+    JParser.parseFromString("[1, 2,\t3,\n4,\u0000 5]").toOption must_== None
     JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
   }
 }
 
 object ArrayUnwrappingSpec extends quasar.QuasarSpecification {
-  import JParser._
   import AsyncParser._
 
   def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))
@@ -331,9 +329,6 @@ object ArrayUnwrappingSpec extends quasar.QuasarSpecification {
   }
 
   "Unwrapping array parser performs adequately" in {
-    import scala.math.min
-    import java.nio._
-
     val num = 100 * 1000
     //val num = 1 * 1000 * 1000
     //val num = 2 * 1000 * 1000
@@ -384,7 +379,6 @@ object ArrayUnwrappingSpec extends quasar.QuasarSpecification {
       }
 
       var i      = 0
-      var offset = 0
       var p      = parser
       var done   = false
       var seen   = 0

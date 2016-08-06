@@ -22,7 +22,6 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import scala.collection.mutable
 import scalaz._, Scalaz._
 
 trait SamplableTableModule[M[+ _]] extends TableModule[M] {

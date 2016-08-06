@@ -1,5 +1,4 @@
 import scalaz._
-import java.time.ZoneOffset.UTC
 
 package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageAliases {
   type spec    = scala.specialized

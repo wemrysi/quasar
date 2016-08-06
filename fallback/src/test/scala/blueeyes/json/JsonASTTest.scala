@@ -252,9 +252,4 @@ object JsonASTSpec extends quasar.QuasarSpecification {
     case JObject(xs) => JObject(scala.collection.immutable.TreeMap(xs.toSeq: _*))
     case x           => x
   }
-
-  private def typePredicate(clazz: Class[_])(json: JValue) = json match {
-    case x if x.getClass == clazz => true
-    case _                        => false
-  }
 }
