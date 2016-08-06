@@ -18,7 +18,6 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.{TernaryFunc}
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -31,9 +30,9 @@ import WorkflowBuilder._
 import matryoshka._
 import scalaz._, Scalaz._
 
-final case class JoinHandler[F[_], G[_]](run: (TernaryFunc, JoinSource[F], JoinSource[F]) => G[WorkflowBuilder[F]]) {
+final case class JoinHandler[F[_], G[_]](run: (JoinType, JoinSource[F], JoinSource[F]) => G[WorkflowBuilder[F]]) {
 
-  def apply(tpe: TernaryFunc, left: JoinSource[F], right: JoinSource[F]): G[WorkflowBuilder[F]] =
+  def apply(tpe: JoinType, left: JoinSource[F], right: JoinSource[F]): G[WorkflowBuilder[F]] =
     run(tpe, left, right)
 }
 
@@ -191,7 +190,7 @@ object JoinHandler {
       $project[F](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
 
     // TODO exhaustive pattern match
-    def buildJoin(src: Fix[F], tpe: TernaryFunc): Fix[F] =
+    def buildJoin(src: Fix[F], tpe: JoinType): Fix[F] =
       tpe match {
         case set.FullOuterJoin =>
           chain(src,
