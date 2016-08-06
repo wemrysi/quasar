@@ -85,18 +85,8 @@ object Ingest {
     }
   }
 
-  val extractorV0 = new Extractor[Ingest] {
-    def validated(obj: JValue): Validation[Error, Ingest] = {
-      (obj.validated[String]("tokenId") |@|
-            obj.validated[Path]("path")) { (apiKey, path) =>
-        val jv = (obj \ "data")
-        Ingest(apiKey, path, None, if (jv == JUndefined) Vector() else Vector(jv), None, EventMessage.defaultTimestamp, StreamRef.Append)
-      }
-    }
-  }
-
   implicit val decomposer: Decomposer[Ingest] = decomposerV1
-  implicit val extractor: Extractor[Ingest]   = extractorV1 <+> extractorV1a <+> extractorV0
+  implicit val extractor: Extractor[Ingest]   = extractorV1 <+> extractorV1a
 }
 
 case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: Instant) extends Event {
@@ -107,24 +97,18 @@ case class Archive(apiKey: APIKey, path: Path, jobId: Option[JobId], timestamp: 
 
 object Archive {
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
-  val schemaV0 = "tokenId" :: "path" :: Omit :: ("timestamp" ||| EventMessage.defaultTimestamp) :: HNil
-
   val decomposerV1: Decomposer[Archive] = decomposerV[Archive](schemaV1, Some("1.0".v))
   val extractorV1: Extractor[Archive]   = extractorV[Archive](schemaV1, Some("1.0".v)) <+> extractorV1a
 
   // Support un-versioned V1 schemas and out-of-order fields due to an earlier bug
   val extractorV1a: Extractor[Archive] = extractorV[Archive](schemaV1, None) map {
     // FIXME: This is a complete hack to work around an accidental mis-ordering of fields for serialization
-    case Archive(apiKey, path, jobId, timestamp) if (apiKey.startsWith("/")) =>
-      Archive(path.components.head.toString, Path(apiKey), jobId, timestamp)
-
-    case ok => ok
+    case Archive(apiKey, path, jobId, timestamp) if (apiKey.startsWith("/")) => Archive(path.components.head.toString, Path(apiKey), jobId, timestamp)
+    case ok                                                                  => ok
   }
 
-  val extractorV0: Extractor[Archive] = extractorV[Archive](schemaV0, None)
-
   implicit val decomposer: Decomposer[Archive] = decomposerV1
-  implicit val extractor: Extractor[Archive]   = extractorV1 <+> extractorV0
+  implicit val extractor: Extractor[Archive]   = extractorV1
 }
 
 sealed trait StreamRef {

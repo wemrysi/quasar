@@ -34,27 +34,6 @@ class ArchiveSpec extends quasar.QuasarSpecification with ArbitraryEventMessage 
       }
     }
 
-    "read legacy archives" in {
-      val Success(JArray(input)) = JParser.parseFromString("""[
-{"path":"/test/test/php/query/T10170960455069fb56d061c690884208/","tokenId":"test1"},
-{"path":"/test/test/php/query/T9345418045069fd119e9ed256256425/","tokenId": "test1"},
-{"path":"/test/test/php/query/T1373621163506a00891eb60240629876/","tokenId":"test1"},
-{"path":"/test/test/php/query/T1564471072506a01ed32be5009280574/","tokenId":"test1"},
-{"path":"/test/test/php/query/T1172864121506c4ea9e2308492490793/","tokenId":"test1"},
-{"path":"/test/test/ttt/","tokenId":"test2"},
-{"path":"/test/nathan/politicalsentiment/twitter/test/1/","tokenId":"test3"},
-{"path":"/test/test/","tokenId":"test2"},
-{"path":"/test/foo/","tokenId":"test4"}
-]""")
-
-      val results = input.map(_.validated[Archive]).collect {
-        case Success(result) => result
-      }
-
-      results.size mustEqual 9
-      results.map(_.apiKey).toSet mustEqual Set("test1", "test2", "test3", "test4")
-    }
-
     "read new archives" in {
       val Success(JArray(input)) = JParser.parseFromString("""[
 {"apiKey":"test1","path":"/foo1/test/js/delete/"},
@@ -91,5 +70,3 @@ class ArchiveSpec extends quasar.QuasarSpecification with ArbitraryEventMessage 
 
   }
 }
-
-

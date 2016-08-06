@@ -32,34 +32,6 @@ class SerializationSpecs extends quasar.QuasarSpecification {
   val i0 = instant.zero
 
   "APIKeyRecord deserialization" should {
-    "Handle V0 formats" in {
-      val inputs = """[
-        { "tid" : "A594581E", "cid" : "A594581E", "gids" : ["4068", "f147"] },
-        { "tid" : "58340C36", "cid" : "A594581E", "gids" : ["da22", "0388"] },
-        { "tid" : "9038411C", "cid" : "A594581E", "gids" : ["5d63", "6088"] },
-        { "tid" : "14A89089", "gids" : ["b92b", "1e56"] },
-        { "tid" : "45A49AB5", "cid" : "A594581E", "gids" : ["b994", "3be3"] }
-      ]"""
-
-      val result = for {
-        jv <- JParser.parseFromString(inputs)
-        records <- jv.validated[List[APIKeyRecord]]
-      } yield records
-
-      result must beLike {
-        case Success(records) =>
-          records mustEqual List(
-            APIKeyRecord("A594581E", None, None, "A594581E", Set("4068", "f147"), false),
-            APIKeyRecord("58340C36", None, None, "A594581E", Set("da22", "0388"), false),
-            APIKeyRecord("9038411C", None, None, "A594581E", Set("5d63", "6088"), false),
-            APIKeyRecord("14A89089", None, None, "(undefined)", Set("b92b", "1e56"), false),
-            APIKeyRecord("45A49AB5", None, None, "A594581E", Set("b994", "3be3"), false)
-          )
-
-        case Failure(error) => throw new Exception(error.toString)
-      }
-    }
-
     "Handle V1 formats" in {
       val inputs = """[
         {"isRoot" : true, "name" : "root-apiKey", "description" : "The root API key", "apiKey" : "17D42117-EF8E-4F43-B833-005F4EBB262C", "grants" : ["6f89110c953940cbbccc397f68c4cc9293af764c4d034719bf35b4736ee702daaef154314d5441ba8a69ed65e4ffa581"] },
@@ -86,29 +58,6 @@ class SerializationSpecs extends quasar.QuasarSpecification {
   }
 
   "Grant deserialization" should {
-    "Handle V0 formats" in {
-      val inputs = """[
-{ "gid" : "4068840", "cid": "(undefined)", "permission" : { "type" : "owner", "path" : "/", "expirationDate" : null } },
-{ "gid" : "0d736d3", "cid": "(undefined)", "permission" : { "type" : "read", "path" : "/", "ownerAccountId" : "12345678", "expirationDate" : null } },
-{ "gid" : "91cb868", "cid": "(undefined)", "permission" : { "type" : "write", "path" : "/", "expirationDate" : null } },
-{ "gid" : "776a6b7", "cid": "(undefined)", "permission" : { "type" : "reduce", "path" : "/", "ownerAccountId" : "12345678", "expirationDate" : null } },
-{ "gid" : "da22fe7", "cid": "(undefined)", "issuer" : "91cb868", "permission" : { "type" : "write", "path" : "/test/", "expirationDate" : null } }
-]"""
-
-      (for {
-        jv <- JParser.parseFromString(inputs)
-        records <- jv.validated[List[Grant]]
-      } yield {
-        records mustEqual List(
-          Grant("4068840", None, None, "(undefined)", Set(), Set(DeletePermission(Path("/"), WrittenByAny)), i0, None),
-          Grant("0d736d3", None, None, "(undefined)", Set(), Set(ReadPermission(Path("/"), WrittenByAccount("12345678"))), i0, None),
-          Grant("91cb868", None, None, "(undefined)", Set(), Set(WritePermission(Path("/"), WriteAsAny)), i0, None),
-          Grant("776a6b7", None, None, "(undefined)", Set(), Set(ReducePermission(Path("/"), WrittenByAccount("12345678"))), i0, None),
-          Grant("da22fe7", None, None, "(undefined)", Set("91cb868"), Set(WritePermission(Path("/test/"), WriteAsAny)), i0, None)
-       )
-     }).fold({ error => throw new Exception(error.toString) }, _ => ok)
-    }
-
     "Handle V1 formats" in {
       val inputs = """[
         {
@@ -192,14 +141,6 @@ class SerializationSpecs extends quasar.QuasarSpecification {
   }
 
   "Ingest serialization" should {
-    "Handle V0 format" in {
-      (JObject("tokenId" -> JString("1234"),
-               "path"    -> JString("/test/"),
-               "data"    -> JObject("test" -> JNum(1)))).validated[Ingest] must beLike {
-        case Success(_) => ok
-      }
-    }
-
     "Handle V1 format" in {
       (JObject("apiKey" -> JString("1234"),
                "path"    -> JString("/test/"),
@@ -211,13 +152,6 @@ class SerializationSpecs extends quasar.QuasarSpecification {
   }
 
   "Archive serialization" should {
-    "Handle V0 format" in {
-      JObject("tokenId" -> JString("1234"),
-              "path"    -> JString("/test/")).validated[Archive] must beLike {
-        case Success(_) => ok
-      }
-    }
-
     "Handle V1 format" in {
       JObject("apiKey" -> JString("1234"),
               "path"   -> JString("/test/")).validated[Archive] must beLike {

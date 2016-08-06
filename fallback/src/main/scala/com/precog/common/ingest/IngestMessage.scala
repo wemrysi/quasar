@@ -24,8 +24,8 @@ import blueeyes._
 import security._
 
 import blueeyes._, json._, serialization._
-import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._
-import scalaz._, Scalaz._, Validation._
+import IsoSerialization._, Iso8601Serialization._, Versioned._
+import scalaz._, Scalaz._
 
 sealed trait EventMessage {
   def apiKey: APIKey
@@ -109,31 +109,8 @@ object IngestMessage {
     override def validated(jv: JValue) = extractor.validated(jv).map(\/.right(_))
   }
 
-  val extractorV0: Extractor[EventMessageExtraction] = new Extractor[EventMessageExtraction] {
-    override def validated(obj: JValue): Validation[Error, EventMessageExtraction] =
-      obj.validated[Ingest]("event").flatMap { ingest =>
-        (obj.validated[Int]("producerId") |@|
-              obj.validated[Int]("eventId")) { (producerId, sequenceId) =>
-          val eventRecords = ingest.data map { jv =>
-            IngestRecord(EventId(producerId, sequenceId), jv)
-          }
-          ingest.writeAs map { authorities =>
-            assert(ingest.data.size == 1)
-            \/.right(IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
-          } getOrElse {
-            \/.left(
-              (ingest.apiKey,
-               ingest.path,
-               (authorities: Authorities) =>
-                 IngestMessage(ingest.apiKey, ingest.path, authorities, eventRecords, ingest.jobId, defaultTimestamp, StreamRef.Append))
-            )
-          }
-        }
-      }
-  }
-
   implicit val Decomposer: Decomposer[IngestMessage]        = decomposerV1
-  implicit val Extractor: Extractor[EventMessageExtraction] = extractorV1 <+> extractorV0
+  implicit val Extractor: Extractor[EventMessageExtraction] = extractorV1
 }
 
 case class ArchiveMessage(apiKey: APIKey, path: Path, jobId: Option[JobId], eventId: EventId, timestamp: Instant) extends EventMessage {
@@ -141,23 +118,13 @@ case class ArchiveMessage(apiKey: APIKey, path: Path, jobId: Option[JobId], even
 }
 
 object ArchiveMessage {
-  import EventMessage._
   val schemaV1 = "apiKey" :: "path" :: "jobId" :: "eventId" :: "timestamp" :: HNil
 
   val decomposerV1: Decomposer[ArchiveMessage] = decomposerV[ArchiveMessage](schemaV1, Some("1.0".v))
   val extractorV1: Extractor[ArchiveMessage]   = extractorV[ArchiveMessage](schemaV1, Some("1.0".v))
-  val extractorV0: Extractor[ArchiveMessage] = new Extractor[ArchiveMessage] {
-    override def validated(obj: JValue): Validation[Error, ArchiveMessage] = {
-      (obj.validated[Int]("producerId") |@|
-            obj.validated[Int]("deletionId") |@|
-            obj.validated[Archive]("deletion")) { (producerId, sequenceId, archive) =>
-        ArchiveMessage(archive.apiKey, archive.path, archive.jobId, EventId(producerId, sequenceId), defaultTimestamp)
-      }
-    }
-  }
 
   implicit val Decomposer: Decomposer[ArchiveMessage] = decomposerV1
-  implicit val Extractor: Extractor[ArchiveMessage]   = extractorV1 <+> extractorV0
+  implicit val Extractor: Extractor[ArchiveMessage]   = extractorV1
 }
 
 case class StoreFileMessage(apiKey: APIKey,
@@ -176,6 +143,5 @@ object StoreFileMessage {
   val schemaV1 = "apiKey" :: "path" :: "writeAs" :: "jobId" :: "eventId" :: "content" :: "timestamp" :: "streamRef" :: HNil
 
   implicit val Decomposer: Decomposer[StoreFileMessage] = decomposerV[StoreFileMessage](schemaV1, Some("1.0".v))
-
-  implicit val Extractor: Extractor[StoreFileMessage] = extractorV[StoreFileMessage](schemaV1, Some("1.0".v))
+  implicit val Extractor: Extractor[StoreFileMessage]   = extractorV[StoreFileMessage](schemaV1, Some("1.0".v))
 }

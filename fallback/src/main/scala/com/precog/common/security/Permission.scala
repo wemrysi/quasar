@@ -187,37 +187,6 @@ object Permission {
     }
   }
 
-  val extractorV0: Extractor[Permission] = new Extractor[Permission] {
-    private def writtenByPermission(obj: JValue, pathV: Validation[Error, Path])(f: (Path, WrittenBy) => Permission): Validation[Error, Permission] = {
-      obj.validated[Option[String]]("ownerAccountId") flatMap { opt =>
-        opt map { id =>
-          pathV map { f(_: Path, WrittenByAccount(id)) }
-        } getOrElse {
-          pathV map { f(_: Path, WrittenByAny) }
-        }
-      }
-    }
-
-    override def validated(obj: JValue) = {
-      val pathV = obj.validated[Path]("path")
-      obj.validated[String]("type").map(_.toLowerCase.trim) flatMap {
-        case "write" =>
-          obj.validated[Option[String]]("ownerAccountId") flatMap { opt =>
-            opt map { id =>
-              pathV map { WritePermission(_: Path, WriteAs(Set(id))) }
-            } getOrElse {
-              pathV map { WritePermission(_: Path, WriteAsAny) }
-            }
-          }
-
-        case "read"             => writtenByPermission(obj, pathV) { ReadPermission.apply _ }
-        case "reduce"           => writtenByPermission(obj, pathV) { ReducePermission.apply _ }
-        case "owner" | "delete" => writtenByPermission(obj, pathV) { DeletePermission.apply _ }
-        case other              => failure(Invalid("Unrecognized permission type: " + other))
-      }
-    }
-  }
-
   implicit val decomposer = decomposerV1Base.versioned(Some("1.0".v))
   implicit val extractor  = extractorV1Base.versioned(Some("1.0".v)) <+> extractorV1Base
 }

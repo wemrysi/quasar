@@ -64,21 +64,8 @@ object Grant extends Logging {
   val extractorV2: Extractor[Grant]   = extractorV[Grant](schemaV1, Some("1.0".v))
   val extractorV1: Extractor[Grant]   = extractorV[Grant](schemaV1, None)
 
-  @deprecated("V0 serialization schemas should be removed when legacy data is no longer needed", "2.1.5")
-  val extractorV0: Extractor[Grant] = new Extractor[Grant] {
-    override def validated(obj: JValue) = {
-      (obj.validated[GrantId]("gid") |@|
-            obj.validated[Option[APIKey]]("cid").map(_.getOrElse("(undefined)")) |@|
-            obj.validated[Option[GrantId]]("issuer") |@|
-            obj.validated[Permission]("permission")(Permission.extractorV0) |@|
-            obj.validated[Option[DateTime]]("permission.expirationDate")).apply { (gid, cid, issuer, permission, expiration) =>
-        Grant(gid, None, None, cid, issuer.toSet, Set(permission), instant.zero, expiration)
-      }
-    }
-  }
-
   implicit val decomposer: Decomposer[Grant] = decomposerV1
-  implicit val extractor: Extractor[Grant]   = extractorV2 <+> extractorV1 <+> extractorV0
+  implicit val extractor: Extractor[Grant]   = extractorV2 <+> extractorV1
 
   def implies(grants: Set[Grant], perms: Set[Permission], at: Option[DateTime] = None) = {
     log.trace("Checking implication of %s to %s".format(grants, perms))

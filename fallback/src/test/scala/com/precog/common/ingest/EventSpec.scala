@@ -37,14 +37,6 @@ class EventSpec extends quasar.QuasarSpecification with ArbitraryEventMessage {
   }
 
   "Event serialization" should {
-    "Handle V0 format" in {
-      (JObject("tokenId" -> JString("1234"),
-               "path"    -> JString("/test/"),
-               "data"    -> JObject("test" -> JNum(1)))).validated[Ingest] must beLike {
-        case Success(_) => ok
-      }
-    }
-
     "Handle V1 format" in {
       (JObject("apiKey" -> JString("1234"),
                "path"    -> JString("/test/"),
@@ -58,13 +50,6 @@ class EventSpec extends quasar.QuasarSpecification with ArbitraryEventMessage {
   }
 
   "Archive serialization" should {
-    "Handle V0 format" in {
-      JObject("tokenId" -> JString("1234"),
-              "path"    -> JString("/test/")).validated[Archive] must beLike {
-        case Success(_) => ok
-      }
-    }
-
     "Handle V1 format" in {
       JObject("apiKey" -> JString("1234"),
               "path"   -> JString("/test/")).validated[Archive] must beLike {
