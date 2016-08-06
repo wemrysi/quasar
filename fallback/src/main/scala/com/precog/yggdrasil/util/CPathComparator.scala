@@ -265,29 +265,23 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
   * ArraySelector provides a non-boxing way of accessing the leaf elements in a
   * bunch of nested arrays.
   */
-private[yggdrasil] final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
-  private val am = m.wrap
-
+private[yggdrasil]
+final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
   def canPluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): Boolean = {
     var arr: Array[_] = a
     var i             = 0
     while (i < mask.length) {
       if (mask(i)) {
-        if (am.erasure.isInstance(arr)) {
-          return indices(i) < arr.length
-        } else {
-          if (indices(i) < arr.length) {
-            arr = arr(indices(i)).asInstanceOf[Array[_]]
-          } else {
-            return false
-          }
+        arr match {
+          case xs: Array[A]                 => return indices(i) < arr.length
+          case _ if indices(i) < arr.length => arr = arr(indices(i)).asInstanceOf[Array[_]]
+          case _                            => return false
         }
       }
-
       i += 1
     }
 
-    return false
+    false
   }
 
   def pluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): A = {
@@ -296,17 +290,13 @@ private[yggdrasil] final class ArraySelector[@spec(Boolean, Long, Double) A](imp
 
     while (i < mask.length) {
       if (mask(i)) {
-        if (am.erasure.isInstance(arr)) {
-          val sarr = arr.asInstanceOf[Array[A]]
-          return sarr(indices(i))
-        } else {
-          arr = arr(indices(i)).asInstanceOf[Array[_]]
+        arr match {
+          case xs: Array[A] => return (xs: Array[A])(indices(i))
+          case _            => arr = arr(indices(i)).asInstanceOf[Array[_]]
         }
       }
-
       i += 1
     }
-
-    sys.error("This shouldn't happens and indicates a problem with canPluck")
+    abort("This shouldn't happens and indicates a problem with canPluck")
   }
 }

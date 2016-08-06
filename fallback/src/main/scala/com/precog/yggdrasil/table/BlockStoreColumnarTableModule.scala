@@ -756,10 +756,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       val (vColumnRefs, vColumns) = vslice.columns.toList.sortBy(_._1).unzip
       val dataRowFormat           = RowFormat.forValues(vColumnRefs)
       val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
-      val (keyColumnRefs, _)      = kslice.columns.toList.sortBy(_._1).unzip
-      val keyRowFormat            = RowFormat.forSortingKey(keyColumnRefs)
 
-      //M.point(println("writing slice from writeAligned; key: \n" + kslice + "\nvalue\n" + vslice)) >>
       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, indexNamePrefix, jdbmState)
     }
 
