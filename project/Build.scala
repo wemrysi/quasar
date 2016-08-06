@@ -48,7 +48,7 @@ object PlatformBuild {
     def also(ss: Seq[Setting[_]]): Project            = p settings (ss: _*)
     def also(s: Setting[_], ss: Setting[_]*): Project = also(s :: ss.toList)
     def deps(ms: ModuleID*): Project                  = also(libraryDependencies ++= ms.toList)
-    def scalacArgs(args: String*): Project            = also(scalacOptions ++= args.toList)
+    def scalacArgs(args: String*): Project            = also(scalacOptions in Compile ++= args.toList, scalacOptions in Test ++= args.toList)
     def strictVersions: Project                       = also(conflictManager := ConflictManager.strict)
     def serialTests: Project                          = also(parallelExecution in Test := false)
     def withWarnings: Project                         = scalacArgs(warningOpts: _*)

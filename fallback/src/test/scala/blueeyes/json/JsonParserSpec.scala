@@ -97,7 +97,7 @@ object AsyncParserSpec extends quasar.QuasarSpecification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs = ArrayBuffer.empty[JValue]
+    val vs = ArrayBuffer.empty[JValue]
     val n = data.length
     var i                   = 0
     var parser: AsyncParser = async
@@ -180,7 +180,7 @@ object AsyncParserSpec extends quasar.QuasarSpecification {
 
   def run1(chunks: Seq[Input], expected: Int) = {
     var parser: AsyncParser = AsyncParser.stream()
-    var t0                  = System.nanoTime
+    val t0                  = System.nanoTime
     var count               = 0
     chunks.foreach { input =>
       val (AsyncParse(errors, results), p0) = parser(input)
@@ -277,7 +277,7 @@ xyz
     JParser.parseFromString("[1, 2,\t3,\n4,\r5]\r").toOption must_== Some(ja(1, 2, 3, 4, 5))
     JParser.parseManyFromString("[1,\r\n2]\r\n[3,\r\n4]\r\n").toOption must_== Some(Seq(ja(1, 2), ja(3, 4)))
     JParser.parseFromString("[1, 2,\t3,\n4,\u0000 5]").toOption must_== None
-    JParser.parseManyFromString("[1,\r\n2]\0[3,\r\n4]\r\n").toOption must_== None
+    JParser.parseManyFromString("[1,\r\n2]\u0000[3,\r\n4]\r\n").toOption must_== None
   }
 }
 

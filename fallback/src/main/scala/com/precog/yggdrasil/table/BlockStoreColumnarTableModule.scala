@@ -20,32 +20,36 @@
 package com.precog.yggdrasil
 package table
 
+import quasar.precog._
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
 import com.precog.bytecode._
-import com.precog.yggdrasil.jdbm3._
 
-import java.util.SortedMap
 import java.util.Comparator
+import org.mapdb._
+import JDBM._
 
-import org.apache.jdbm.DBMaker
-import org.apache.jdbm.DB
-
-import org.slf4j.LoggerFactory
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
+
+object JDBM {
+  type Bytes             = Array[Byte]
+  type BtoBEntry         = jMapEntry[Bytes, Bytes]
+  type BtoBIterator      = Iterator[BtoBEntry]
+  type BtoBMap           = java.util.SortedMap[Bytes, Bytes]
+  type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
+
+  final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
+}
 
 trait BlockStoreColumnarTableModuleConfig {
   def maxSliceSize: Int
   def hashJoins: Boolean = true
 }
 
-trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
-
-  protected lazy val blockModuleLogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.BlockStoreColumnarTableModule")
-
+trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
   import trans._
   import TransSpec.deepMap
 
@@ -228,8 +232,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
             }
           }
 
-          blockModuleLogger.trace("Emitting a new slice of size " + emission.size)
-
           val successorStatesM = expired.map(_.succ).sequence.map(_.toStream.collect({ case Some(cs) => cs }))
 
           successorStatesM map { successorStates =>
@@ -243,25 +245,25 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
   trait BlockStoreColumnarTableCompanion extends ColumnarTableCompanion {
     import SliceTransform._
 
-    type SortingKey    = Array[Byte]
-    type SortBlockData = BlockProjectionData[SortingKey, Slice]
+    type SortBlockData = BlockProjectionData[Bytes, Slice]
+    type IndexStore    = BtoBConcurrentMap
 
-    lazy val sortMergeEngine = new MergeEngine[SortingKey, SortBlockData] {}
+    lazy val sortMergeEngine = new MergeEngine[Bytes, SortBlockData] {}
 
     sealed trait SliceSorter {
       def name: String
-      // def keyComparator: Comparator[SortingKey]
+      // def keyComparator: Comparator[Bytes]
       def keyRefs: Array[ColumnRef]
       def valRefs: Array[ColumnRef]
       def count: Long
     }
 
-    type IndexStore = SortedMap[SortingKey, Array[Byte]]
+
     case class SliceIndex(name: String,
                           dbFile: File,
                           storage: IndexStore,
                           keyRowFormat: RowFormat,
-                          keyComparator: Comparator[SortingKey],
+                          keyComparator: Comparator[Bytes],
                           keyRefs: Array[ColumnRef],
                           valRefs: Array[ColumnRef],
                           count: Long = 0)
@@ -296,7 +298,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
         case None          =>
           // Open a JDBM3 DB for use in sorting under a temp directory
           val dbFile = new File(newScratchDir(), prefix)
-          val db     = DBMaker.openFile(dbFile.getCanonicalPath).make()
+          val db     = DBMaker.fileDB(dbFile.getCanonicalPath).make()
           (dbFile, db, JDBMState(prefix, Some((dbFile, db)), indices, insertCount))
       }
     }
@@ -810,7 +812,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
           val keyRowFormat                  = RowFormat.forSortingKey(krefs)
           val keyComparator                 = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
           val (dbFile, db, openedJdbmState) = jdbmState.opened()
-          val storage                       = db.createTreeMap(indexName, keyComparator, ByteArraySerializer, ByteArraySerializer)
+          val storage                       = db.hashMap(indexName, keyComparator, ByteArraySerializer).create()
           val count                         = storeRows(kslice0, vslice0, keyRowFormat, vEncoder0, storage, 0)
           val sliceIndex                    = SliceIndex(indexName, dbFile, storage, keyRowFormat, keyComparator, keyRefs, valRefs, count)
 
@@ -841,7 +843,7 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
       }
     }
 
-    def loadTable(mergeEngine: MergeEngine[SortingKey, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
+    def loadTable(mergeEngine: MergeEngine[Bytes, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
       import mergeEngine._
 
       val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
@@ -855,15 +857,15 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
           }
 
           // We can actually get the last key, but is that necessary?
-          M.point(Some(CellState(index, new Array[Byte](0), slice, (k: SortingKey) => M.point(None))))
+          M.point(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => M.point(None))))
 
         case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          val sortProjection                                       = new JDBMRawSortProjection[M](dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
-          val succ: Option[SortingKey] => M[Option[SortBlockData]] = (key: Option[SortingKey]) => sortProjection.getBlockAfter(key)
+          val sortProjection                                       = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
+          val succ: Option[Bytes] => M[Option[SortBlockData]] = (key: Option[Bytes]) => sortProjection.getBlockAfter(key)
 
           succ(None) map {
             _ map { nextBlock =>
-              CellState(index, nextBlock.maxKey, nextBlock.data, (k: SortingKey) => succ(Some(k)))
+              CellState(index, nextBlock.maxKey, nextBlock.data, (k: Bytes) => succ(Some(k)))
             }
           }
       }

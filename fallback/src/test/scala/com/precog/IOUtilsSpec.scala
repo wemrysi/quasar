@@ -1,11 +1,10 @@
 package com.precog.util
 
 import blueeyes._
-import quasar.precog._
 // import quasar.precog.TestSupport._
 import scalaz._
 
-class IOUtilsSpecs extends quasar.QuasarSpecification {
+class IOUtilsSpec extends quasar.QuasarSpecification {
   "IOUtils" should {
     "properly clean empty directories recursively" in {
       val tmpRoot = IOUtils.createTmpDir("IOUtilsSpecs").unsafePerformIO

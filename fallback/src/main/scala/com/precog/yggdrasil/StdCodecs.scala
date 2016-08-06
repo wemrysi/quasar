@@ -18,7 +18,6 @@
  *
  */
 package com.precog.yggdrasil
-package jdbm3
 
 import quasar.precog._
 import blueeyes._

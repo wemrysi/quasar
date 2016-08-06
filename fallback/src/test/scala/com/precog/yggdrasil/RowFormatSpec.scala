@@ -18,7 +18,6 @@
  *
  */
 package com.precog.yggdrasil
-package jdbm3
 
 import blueeyes._
 import com.precog.common._
@@ -26,7 +25,7 @@ import com.precog.yggdrasil.table._
 import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
 
-class RowFormatSpec extends quasar.QuasarSpecification with CValueGenerators {
+class RowFormatSpec extends quasar.QuasarSpecification with JdbmCValueGenerators {
   import Arbitrary._
 
   // This should generate some jpath ids, then generate CTypes for these.

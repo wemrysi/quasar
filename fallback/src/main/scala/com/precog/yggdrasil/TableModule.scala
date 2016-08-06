@@ -302,7 +302,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     * @param targetTrans The key which will be used by `merge` to access a particular subset of the target
     * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
     */
-  final case class GroupingSource(table: Table,
+  /*final*/ case class GroupingSource(table: Table,
                                   idTrans: trans.TransSpec1,
                                   targetTrans: Option[trans.TransSpec1],
                                   groupId: GroupId,
@@ -317,7 +317,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       }
   }
 
-  final case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
+  /*final*/ case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
                                      groupKeyRightTrans: trans.TransSpec1,
                                      left: GroupingSpec,
                                      right: GroupingSpec,

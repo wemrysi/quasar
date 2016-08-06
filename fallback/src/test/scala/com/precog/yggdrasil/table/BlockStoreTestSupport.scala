@@ -49,7 +49,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
 
     private val slices = fromJson(data).slices.toStream.copoint
 
-    val length: Long = data.length
+    val length: Long = data.length.toLong
     val xyz = slices.foldLeft(Set.empty[ColumnRef]) {
       case (acc, slice) => acc ++ slice.columns.keySet
     }

@@ -40,6 +40,7 @@ trait PackageAliases {
   type Properties           = java.util.Properties
   type PrintStream          = java.io.PrintStream
   type UUID                 = java.util.UUID
+  type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
   // other outside libs: scalaz, spire, shapeless, scodec
   type ByteVector     = scodec.bits.ByteVector

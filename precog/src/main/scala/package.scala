@@ -10,10 +10,14 @@ import java.nio.file._
 package object precog /*extends ScodecImplicits*/ {
   val Try          = scala.util.Try
   type Try[+A]     = scala.util.Try[A]
+  val ScalaFailure = scala.util.Failure
+
   type jPath       = java.nio.file.Path
   type =?>[-A, +B] = scala.PartialFunction[A, B]
   type CTag[A]     = scala.reflect.ClassTag[A]
   type jClass      = java.lang.Class[_]
+
+  type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
 
   def ctag[A](implicit z: CTag[A]): CTag[A] = z
   def jclass[A: CTag]: jClass               = ctag[A].runtimeClass.asInstanceOf[jClass]

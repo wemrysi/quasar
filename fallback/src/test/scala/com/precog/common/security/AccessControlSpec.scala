@@ -149,9 +149,7 @@ class AccessControlSpec extends quasar.QuasarSpecification {
 
     "prevent access via invalid API key" in {
       val invalidAPIKey = "not-there"
-
       val userAccountId = "user"
-      val userAPIKeyRecord = apiKeyManager.newStandardAPIKeyRecord(userAccountId)
 
       hasCapability(invalidAPIKey, Set(ReadPermission(Path("/"), WrittenByAny))) must beFalse
       hasCapability(invalidAPIKey, Set(ReducePermission(Path("/"), WrittenByAny))) must beFalse

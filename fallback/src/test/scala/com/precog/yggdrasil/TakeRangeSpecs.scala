@@ -36,7 +36,7 @@ trait TakeRangeSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpe
       val start = Gen.choose(-7, size + 7).sample.get
       val count = Gen.choose(start, size + 7).sample.get
 
-      val takeRangeTable = table.takeRange(start, count)
+      val takeRangeTable = table.takeRange(start.toLong, count.toLong)
 
       val result = toJson(takeRangeTable).copoint
       val expected =

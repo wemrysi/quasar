@@ -18,67 +18,65 @@
  *
  */
 package com.precog.yggdrasil
-package jdbm3
 
+import quasar.precog._
 import blueeyes._
 import com.precog.common._
-import org.slf4j.LoggerFactory
 import com.precog.yggdrasil.table._
+import JDBM._
+
+object JDBM {
+  type Bytes             = Array[Byte]
+  type BtoBEntry         = jMapEntry[Bytes, Bytes]
+  type BtoBIterator      = Iterator[BtoBEntry]
+  type BtoBMap           = java.util.SortedMap[Bytes, Bytes]
+  type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
+
+  final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
+}
 
 object JDBMSlice {
-  private lazy val log = LoggerFactory.getLogger("com.precog.yggdrasil.jdbm3.JDBMSlice")
-
-  def load(size: Int,
-           source: () => Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]],
-           keyDecoder: ColumnDecoder,
-           valDecoder: ColumnDecoder): (Array[Byte], Array[Byte], Int) = {
-    var firstKey: Array[Byte] = null.asInstanceOf[Array[Byte]]
-    var lastKey: Array[Byte]  = null.asInstanceOf[Array[Byte]]
+  def load(size: Int, source: () => BtoBIterator, keyDecoder: ColumnDecoder, valDecoder: ColumnDecoder): JSlice = {
+    var firstKey: Bytes = null
+    var lastKey: Bytes  = null
 
     @tailrec
-    def consumeRows(source: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]], row: Int): Int = {
-      if (source.hasNext) {
+    def consumeRows(source: BtoBIterator, row: Int): Int = (
+      if (!source.hasNext) row else {
         val entry  = source.next
         val rowKey = entry.getKey
-        if (row == 0) { firstKey = rowKey }
+        if (row == 0)
+          firstKey = rowKey
+
         lastKey = rowKey
 
         keyDecoder.decodeToRow(row, rowKey)
         valDecoder.decodeToRow(row, entry.getValue)
-
         consumeRows(source, row + 1)
-      } else {
-        row
       }
-    }
+    )
 
-    val rows = {
-      // FIXME: Looping here is a blatantly poor way to work around ConcurrentModificationExceptions
-      // From the Javadoc for CME, the exception is an indication of a bug
-      var finalCount = -1
-      var tries      = 0
-      while (tries < JDBMProjection.MAX_SPINS && finalCount == -1) {
-        try {
-          finalCount = consumeRows(source().take(size), 0)
-        } catch {
-          case t: Throwable =>
-            log.warn("Error during block read, retrying")
-            Thread.sleep(50)
+    // FIXME: Looping here is a blatantly poor way to work around ConcurrentModificationExceptions
+    // From the Javadoc for CME, the exception is an indication of a bug
+    val rows: Int = {
+      var finalCount: Try[Int] = ScalaFailure(new Exception)
+      var tries                = JDBMProjection.MAX_SPINS
+      while (tries > 0 && finalCount.isFailure) {
+        finalCount = Try(consumeRows(source().take(size), 0))
+        if (finalCount.isFailure) {
+          tries -= 1
+          Thread sleep 50
         }
-        tries += 1
       }
-      if (finalCount == -1) {
-        throw new VicciniException("Block read failed with too many concurrent mods.")
-      } else {
-        finalCount
-      }
+      finalCount getOrElse ( throw new VicciniException("Block read failed with too many concurrent mods.") )
     }
 
-    (firstKey, lastKey, rows)
+    JSlice(firstKey, lastKey, rows)
   }
 
-  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): (ColumnRef, ArrayColumn[_]) =
-    (ref.copy(selector = (prefix \ ref.selector)), ref.ctype match {
+  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): ColumnRef -> ArrayColumn[_] = ((
+    ref.copy(selector = prefix \ ref.selector),
+    ref.ctype match {
       case CString              => ArrayStrColumn.empty(sliceSize)
       case CBoolean             => ArrayBoolColumn.empty()
       case CLong                => ArrayLongColumn.empty(sliceSize)
@@ -90,6 +88,7 @@ object JDBMSlice {
       case CEmptyObject         => MutableEmptyObjectColumn.empty()
       case CEmptyArray          => MutableEmptyArrayColumn.empty()
       case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
-      case CUndefined           => sys.error("CUndefined cannot be serialized")
-    })
+      case CUndefined           => abort("CUndefined cannot be serialized")
+    }
+  ))
 }

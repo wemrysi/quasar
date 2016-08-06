@@ -18,13 +18,13 @@
  *
  */
 package com.precog.yggdrasil
-package jdbm3
 
 import table._
 import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
-import com.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._
+import com.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }
+import ByteBufferPool._
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]

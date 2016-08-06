@@ -18,13 +18,12 @@
  *
  */
 package com.precog.yggdrasil
-package jdbm3
 
 import blueeyes._
 import com.precog.common._
 import quasar.precog.TestSupport._, Gen._
 
-trait CValueGenerators {
+trait JdbmCValueGenerators {
   def maxArrayDepth = 3
 
   def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))

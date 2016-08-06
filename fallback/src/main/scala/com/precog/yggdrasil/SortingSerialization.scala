@@ -17,44 +17,15 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil.jdbm3
+package com.precog.yggdrasil
 
 import blueeyes._
-import java.io.{ DataInput, DataOutput }
-import org.apache.jdbm.Serializer
+import org.mapdb._
 
-object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
+final case class SortingKeyComparator(rowFormat: RowFormat, ascending: Boolean) extends Serializer[Array[Byte]] {
+  def deserialize(input: DataInput2, available: Int): Array[Byte] = ???
+  def serialize(out: DataOutput2, value: Array[Byte]): Unit       = ???
 
-  @tailrec
-  private def writePackedInt(out: DataOutput, n: Int): Unit =
-    if ((n & ~0x7F) != 0) {
-      out.writeByte(n & 0x7F | 0x80)
-      writePackedInt(out, n >> 7)
-    } else {
-      out.writeByte(n & 0x7F)
-    }
-
-  private def readPackedInt(in: DataInput): Int = {
-    @tailrec def loop(n: Int, offset: Int): Int = {
-      val b = in.readByte()
-      if ((b & 0x80) != 0) {
-        loop(n | ((b & 0x7F) << offset), offset + 7)
-      } else {
-        n | ((b & 0x7F) << offset)
-      }
-    }
-    loop(0, 0)
-  }
-
-  def serialize(out: DataOutput, bytes: Array[Byte]) {
-    writePackedInt(out, bytes.length)
-    out.write(bytes)
-  }
-
-  def deserialize(in: DataInput): Array[Byte] = {
-    val length = readPackedInt(in)
-    val bytes  = new Array[Byte](length)
-    in.readFully(bytes)
-    bytes
-  }
+  def compare(a: Array[Byte], b: Array[Byte]): Int =
+    rowFormat.compare(a, b) |> (n => if (ascending) n else -n)
 }

@@ -13,6 +13,8 @@ lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) depe
 lazy val fallback = project.setup.withWarnings dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
+
+  "org.mapdb"             % "mapdb"                    %        "3.0.1",
   "org.openjdk.jmh"       % "jmh-generator-annprocess" %        "1.12",
   "com.slamdata"         %% "pathy-core"               %     pathyVersion,
   "com.slamdata"         %% "pathy-argonaut"           %     pathyVersion,

@@ -26,7 +26,7 @@ import com.precog.bytecode._
 import scalaz._, Scalaz._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
-trait SliceColumnarTableModule extends BlockStoreColumnarTableModule[Need] with ProjectionModule[Need, Slice] {
+trait SliceColumnarTableModule extends BlockStoreColumnarTableModule with ProjectionModule[Need, Slice] {
   type TableCompanion <: SliceColumnarTableCompanion
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
