@@ -77,12 +77,12 @@ trait APIKeyFinderSpec[M[+_]] extends quasar.QuasarSpecification {
         DeletePermission(path, WrittenByAny)
       )
 
-      val (key0, key1, grantId, mgr) = (for {
+      val (key1, grantId, mgr) = (for {
         mgr <- M.point(emptyAPIKeyManager)
         key0 <- mgr.newStandardAPIKeyRecord("user1", None, None)
         key1 <- mgr.newStandardAPIKeyRecord("user2", None, None)
         grant <- mgr.createGrant(None, None, key0.apiKey, Set.empty, permissions, None)
-      } yield (key0.apiKey, key1.apiKey, grant.grantId, mgr)).copoint
+      } yield (key1.apiKey, grant.grantId, mgr)).copoint
 
       withAPIKeyFinder(mgr) { keyFinder =>
         keyFinder.addGrant(key1, grantId).copoint must beTrue
@@ -130,12 +130,12 @@ trait APIKeyFinderSpec[M[+_]] extends quasar.QuasarSpecification {
       val beforeExpiration = dateTime fromMillis 50
       val afterExpiration  = dateTime fromMillis 150
 
-      val (key0, key1, grantId, mgr) = (for {
+      val (key1, grantId, mgr) = (for {
         mgr <- M.point(emptyAPIKeyManager)
         key0 <- mgr.newStandardAPIKeyRecord("user1", None, None)
         key1 <- mgr.newStandardAPIKeyRecord("user2", None, None)
         grant <- mgr.createGrant(None, None, key0.apiKey, Set.empty, permissions, Some(expiration))
-      } yield (key0.apiKey, key1.apiKey, grant.grantId, mgr)).copoint
+      } yield (key1.apiKey, grant.grantId, mgr)).copoint
 
       withAPIKeyFinder(mgr) { keyFinder =>
         keyFinder.addGrant(key1, grantId).copoint must beTrue
@@ -159,12 +159,12 @@ trait APIKeyFinderSpec[M[+_]] extends quasar.QuasarSpecification {
     }
 
     "hide issuer details when a root key is not passed to findAPIKey" in {
-      val (rootKey, key0, key1, mgr) = (for {
+      val (key0, key1, mgr) = (for {
         mgr <- M.point(emptyAPIKeyManager)
         rootKey <- mgr.rootAPIKey
         key0 <- mgr.createAPIKey(Some("key0"), None, rootKey, Set.empty)
         key1 <- mgr.createAPIKey(Some("key1"), None, key0.apiKey, Set.empty)
-      } yield (rootKey, key0.apiKey, key1.apiKey, mgr)).copoint
+      } yield (key0.apiKey, key1.apiKey, mgr)).copoint
 
       withAPIKeyFinder(mgr) { keyFinder =>
         keyFinder.findAPIKey(key0, None).copoint.get.issuerChain mustEqual Nil

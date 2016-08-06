@@ -175,7 +175,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
         val histoKey = key.toJValue(tic_aj)
         val JNum(histoKey0) = histoKey
-        val histoKeyInt = histoKey0.toInt
 
         gs1Json must not(beEmpty)
         forall(gs1Json) { record =>
@@ -746,7 +745,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
     }
 
     val resultJson = result.flatMap(_.toJson).copoint
-    val elapsedOverMerge = System.currentTimeMillis - firstMerge
     //println("total elapsed in merge: " + elapsedOverMerge)
     //println("total elapsed outside of body: " + (elapsedOverMerge - elapsed))
 

@@ -2086,8 +2086,6 @@ trait TransformSpec extends TableModuleTestSupport with quasar.QuasarSpecificati
 
   def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
     data map { jv =>
-      val paths = jv.flattenWithPath.toMap.keys.toList
-
       val filtered = jv.flattenWithPath filter {
         case (JPath(JPathField("value") :: tail), leaf) =>
           included get JPath(tail) exists { ctpes =>

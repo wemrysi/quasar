@@ -35,7 +35,7 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
       cschema <- Gen.oneOf(arraySchema(depth, 2), objectSchema(depth, 2))
       (idCount, data) <- genEventColumns(cschema)
     } yield {
-      val (lschema, rschema) = Bifunctor[Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet }
+      val lschema = Bifunctor[Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet } _1
       val (l, r) =  data map {
                       case (ids, values) =>
                         val (d1, d2) = values.partition { case (cpath, _) => lschema.contains(cpath) }

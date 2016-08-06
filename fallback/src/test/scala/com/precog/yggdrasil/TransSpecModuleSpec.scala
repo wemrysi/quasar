@@ -39,8 +39,6 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar
 
       val result = TransSpec.concatChildren(tree)
 
-      def leafSpec(idx: Int) = DerefArrayStatic(Leaf(Source), CPathIndex(idx))
-
       val expected = InnerObjectConcat(
         WrapObject(
           InnerArrayConcat(

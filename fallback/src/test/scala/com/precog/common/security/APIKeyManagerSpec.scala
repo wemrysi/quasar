@@ -31,7 +31,6 @@ trait APIKeyManagerSpec[M[+_]] extends quasar.QuasarSpecification {
 
   "API Key Manager" should {
     "properly ascribe parentage for grants" in {
-      val path = Path("/user1/")
       val mgr = new InMemoryAPIKeyManager[M](blueeyes.util.Clock.System)
 
       val grantParentage = for {
@@ -47,7 +46,6 @@ trait APIKeyManagerSpec[M[+_]] extends quasar.QuasarSpecification {
 
       val (grantParents, rootGrantId) = grantParentage.copoint
 
-      val gs = grantParents collect { case gid: GrantId => gid }
       grantParents must haveSize(1)
       grantParents must contain(rootGrantId)
     }

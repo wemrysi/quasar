@@ -260,6 +260,7 @@ case object JNum {
 
   private[json] def apply(value: String): JNum = JNumStr(value)
 
+  def apply(value: Int): JNum                  = JNumLong(value.toLong)
   def apply(value: Long): JNum                 = JNumLong(value)
   def apply(value: BigDecimal): JNum           = JNumBigDec(value)
   def unapply(value: JNum): Option[BigDecimal] = Try(value.toBigDecimal).toOption

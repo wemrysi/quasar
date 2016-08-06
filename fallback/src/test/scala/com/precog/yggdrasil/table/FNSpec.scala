@@ -25,10 +25,10 @@ package table
 class FNSpec extends quasar.QuasarSpecification {
   "function implementations" should {
     "partials must work correctly" in {
-      val col5 = Column.const(5L)
+      // val col5 = Column.const(5L)
       val col4 = Column.const(4L)
       val col2 = Column.const(2L)
-      val col1 = Column.const(1L)
+      // val col1 = Column.const(1L)
       val col0 = Column.const(0L)
       val f2 = DivZeroLongP
 
