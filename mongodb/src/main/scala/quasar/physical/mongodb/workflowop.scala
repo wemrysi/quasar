@@ -337,20 +337,20 @@ object Workflow {
     val prefix = prefixBase(base)
     PipelineOp(I.inj(op.wf.void).run.fold(
       op => (op match {
-        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(op, prefix).pipeline
-        case op @ $SampleF(_, _)          => rewriteRefs3_2(op, prefix).shapePreserving
+        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(prefix)(op).pipeline
+        case op @ $SampleF(_, _)          => rewriteRefs3_2(prefix)(op).shapePreserving
       }).fmap(ι, Inject[WorkflowOp3_2F, WorkflowF]),
       op => (op match {
-        case op @ $MatchF(_, _)           => rewriteRefs2_6(op, prefix).shapePreserving
-        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(op, prefix).pipeline
-        case op @ $RedactF(_, _)          => rewriteRefs2_6(op, prefix).pipeline
-        case op @ $SkipF(_, _)            => rewriteRefs2_6(op, prefix).shapePreserving
-        case op @ $LimitF(_, _)           => rewriteRefs2_6(op, prefix).shapePreserving
-        case op @ $UnwindF(_, _)          => rewriteRefs2_6(op, prefix).pipeline
-        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(op, prefix).pipeline
-        case op @ $SortF(_, _)            => rewriteRefs2_6(op, prefix).shapePreserving
-        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(op, prefix).pipeline
-        case op @ $OutF(_, _)             => rewriteRefs2_6(op, prefix).shapePreserving
+        case op @ $MatchF(_, _)           => rewriteRefs2_6(prefix)(op).shapePreserving
+        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(prefix)(op).pipeline
+        case op @ $RedactF(_, _)          => rewriteRefs2_6(prefix)(op).pipeline
+        case op @ $SkipF(_, _)            => rewriteRefs2_6(prefix)(op).shapePreserving
+        case op @ $LimitF(_, _)           => rewriteRefs2_6(prefix)(op).shapePreserving
+        case op @ $UnwindF(_, _)          => rewriteRefs2_6(prefix)(op).pipeline
+        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(prefix)(op).pipeline
+        case op @ $SortF(_, _)            => rewriteRefs2_6(prefix)(op).shapePreserving
+        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(prefix)(op).pipeline
+        case op @ $OutF(_, _)             => rewriteRefs2_6(prefix)(op).shapePreserving
         case _ => scala.sys.error("never happens")
       }).fmap(ι, Inject[WorkflowOpCoreF, WorkflowF])))
   }
@@ -393,7 +393,7 @@ object Workflow {
                 }),
                 $ReduceF.reduceNOP,
                 // TODO: Get rid of this asInstanceOf!
-                selection = Some(rewriteRefs2_6(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[Fix[WorkflowOpCoreF]]], prefixBase(base)).selector)),
+                selection = Some(rewriteRefs2_6(prefixBase(base))(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[Fix[WorkflowOpCoreF]]]).selector)),
               None))
         }
         pipeline($MatchF[Fix[WorkflowF]](src, selector).shapePreserving.fmap(ι, I)) match {
@@ -533,11 +533,11 @@ object Workflow {
     def refs[A](op: F[A]): List[DocVar]
   }
   object Refs {
-    def fromRewrite[F[_]](rewrite: (F[_], PartialFunction[DocVar, DocVar]) => F[_]) = new Refs[F] {
+    def fromRewrite[F[_]](rewrite: PartialFunction[DocVar, DocVar] => RewriteRefs[F]) = new Refs[F] {
       def refs[A](op: F[A]): List[DocVar] = {
         // FIXME: Sorry world
         val vf = new scala.collection.mutable.ListBuffer[DocVar]
-        ignore(rewrite(op, { case v => ignore(vf += v); v }))
+        ignore(rewrite { case v => ignore(vf += v); v } (op))
         vf.toList
       }
     }
@@ -553,13 +553,7 @@ object Workflow {
   implicit val refs3_2: Refs[WorkflowOp3_2F] = Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
 
 
-  // NB: it's useful to be able to return the precise type here, so this is
-  // explicitly implemented for each version's trait.
-  // TODO: Make this a trait, and implement it for actual types, rather than all
-  //       in here (already done for ExprOp and Reshape). (#438)
-  private def rewriteRefs2_6[A <: WorkflowOpCoreF[_]](
-    op: A, applyVar0: PartialFunction[DocVar, DocVar]):
-      A = {
+  abstract class RewriteRefs[F[_]](val applyVar0: PartialFunction[DocVar, DocVar]) {
     val applyVar = (f: DocVar) => applyVar0.lift(f).getOrElse(f)
 
     def applyFieldName(name: BsonField): BsonField = {
@@ -572,42 +566,45 @@ object Workflow {
 
     def applyNel[A](m: NonEmptyList[(BsonField, A)]): NonEmptyList[(BsonField, A)] = m.map(t => applyFieldName(t._1) -> t._2)
 
-    (op match {
-      case $ProjectF(src, shape, xId) =>
-        $ProjectF(src, shape.rewriteRefs(applyVar0), xId)
-      case $GroupF(src, grouped, by)  =>
-        $GroupF(src,
-          grouped.rewriteRefs(applyVar0),
-          by.bimap(_.rewriteRefs(applyVar0), rewriteExprRefs(_)(applyVar0)))
-      case $MatchF(src, s)            => $MatchF(src, applySelector(s))
-      case $RedactF(src, e)           => $RedactF(src, rewriteExprRefs(e)(applyVar0))
-      case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
-      case $SortF(src, l)             => $SortF(src, applyNel(l))
-      case g: $GeoNearF[_]            =>
-        g.copy(
-          distanceField = applyFieldName(g.distanceField),
-          query = g.query.map(applySelector))
-      case _                          => op
-    }).asInstanceOf[A]
+    def apply[A <: F[_]](op: A): A
   }
 
-  def rewriteRefs3_2[A <: WorkflowOp3_2F[_]]
-      (op: A, applyVar0: PartialFunction[DocVar, DocVar]): A = {
-
-    // FIXME: copied from rewriteRefs2_6
-    val applyVar = (f: DocVar) => applyVar0.lift(f).getOrElse(f)
-
-    // FIXME: copied from rewriteRefs2_6
-    def applyFieldName(name: BsonField): BsonField = {
-      applyVar(DocField(name)).deref.getOrElse(name) // TODO: Delete field if it's transformed away to nothing???
+  // NB: it's useful to be able to return the precise type here, so this is
+  // explicitly implemented for each version's trait.
+  // TODO: Make this a trait, and implement it for actual types, rather than all
+  //       in here (already done for ExprOp and Reshape). (#438)
+  private def rewriteRefs2_6(f: PartialFunction[DocVar, DocVar]) = new RewriteRefs[WorkflowOpCoreF](f) {
+    def apply[A <: WorkflowOpCoreF[_]](op: A) = {
+      (op match {
+        case $ProjectF(src, shape, xId) =>
+          $ProjectF(src, shape.rewriteRefs(applyVar0), xId)
+        case $GroupF(src, grouped, by)  =>
+          $GroupF(src,
+            grouped.rewriteRefs(applyVar0),
+            by.bimap(_.rewriteRefs(applyVar0), rewriteExprRefs(_)(applyVar0)))
+        case $MatchF(src, s)            => $MatchF(src, applySelector(s))
+        case $RedactF(src, e)           => $RedactF(src, rewriteExprRefs(e)(applyVar0))
+        case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
+        case $SortF(src, l)             => $SortF(src, applyNel(l))
+        case g: $GeoNearF[_]            =>
+          g.copy(
+            distanceField = applyFieldName(g.distanceField),
+            query = g.query.map(applySelector))
+        case _                          => op
+      }).asInstanceOf[A]
     }
+  }
 
-    (op match {
-      case $LookupF(src, from, lf, ff, as) =>
-        // NB: rewrite only the source reference; the foreignField is not part of
-        // the workflow at this point
-        $LookupF(src, from, applyFieldName(lf), ff, as)
-    }).asInstanceOf[A]
+  private def rewriteRefs3_2(f: PartialFunction[DocVar, DocVar]) = new RewriteRefs[WorkflowOp3_2F](f) {
+    def apply[A <: WorkflowOp3_2F[_]](op: A) = {
+      (op match {
+        case $LookupF(src, from, lf, ff, as) =>
+          // NB: rewrite only the source reference; the foreignField is not part of
+          // the workflow at this point
+          $LookupF(src, from, applyFieldName(lf), ff, as)
+        case _ => op
+      }).asInstanceOf[A]
+    }
   }
 
   def simpleShape[F[_]](op: Fix[F])(implicit I: F :<: Workflow3_2F): Option[List[BsonField.Name]] = {
