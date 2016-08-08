@@ -153,11 +153,11 @@ package object main {
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
 
         val compFs: V ~> Free[S, ?] =
-          injectFT[Task, S].compose(KeyValueStore.fromTaskRef(viewHRef)) :+:
-          injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))    :+:
-          injectFT[Mounting, S]                                          :+:
-          injectFT[MountingFailure, S]                                   :+:
-          injectFT[PathMismatchFailure, S]                               :+:
+          injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
+          injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
+          injectFT[Mounting, S]                                               :+:
+          injectFT[MountingFailure, S]                                        :+:
+          injectFT[PathMismatchFailure, S]                                    :+:
           hierarchicalFs
 
         flatMapSNT(compFs) compose view.fileSystem[V]
@@ -185,8 +185,8 @@ package object main {
     ): HierarchicalFsEff ~> Free[S, ?] = {
       val injTask = injectFT[Task, S]
 
-      foldMapNT(liftFT compose PhysFsEff.inject[S])         :+:
-      injTask.compose(KeyValueStore.fromTaskRef(mntResRef)) :+:
+      foldMapNT(liftFT compose PhysFsEff.inject[S])              :+:
+      injTask.compose(KeyValueStore.impl.fromTaskRef(mntResRef)) :+:
       injTask.compose(MonotonicSeq.fromTaskRef(seqRef))
     }
 
@@ -292,7 +292,7 @@ package object main {
 
     def ephemeralMountConfigs[F[_]: Monad]: MountConfigs ~> F = {
       type S = Map[APath, MountConfig]
-      evalNT[F, S](Map()) compose KeyValueStore.toState[StateT[F, S, ?]](Lens.id[S])
+      evalNT[F, S](Map()) compose KeyValueStore.impl.toState[StateT[F, S, ?]](Lens.id[S])
     }
   }
 

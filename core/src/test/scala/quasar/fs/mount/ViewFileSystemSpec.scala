@@ -72,7 +72,7 @@ class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with
   type VFS[A]         = ErrsT[VSS, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
-    free.foldMapNT(KeyValueStore.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
+    free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
   def runViewFileSystem[F[_]](
     runFileSystem: FileSystem ~> F

@@ -152,7 +152,7 @@ object FileSystemTest {
 
       val mounting: Mounting ~> Task = {
         val toPhysFs = KvsMounter.interpreter[Task, PhysFsEff](
-          KeyValueStore.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+          KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
         foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
           .compose(toPhysFs)
