@@ -16,8 +16,24 @@
 
 package quasar.physical.marklogic
 
-import quasar.fs.FileSystemType
+import quasar.fs._
+import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 package object fs {
   val FsType = FileSystemType("marklogic")
+
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S)
+    : FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF {
+      case (FsType, uri) =>
+        FileSystemDef.DefinitionResult[Free[S, ?]](
+          interpretFileSystem(
+            Empty.queryFile[Free[S, ?]],
+            Empty.readFile[Free[S, ?]],
+            Empty.writeFile[Free[S, ?]],
+            Empty.manageFile[Free[S, ?]]),
+          Free.point(())).point[DefErrT[Free[S, ?], ?]]
+    }
 }
