@@ -41,7 +41,7 @@ object writefile {
    ): WriteFile ~> Free[S,?] = new (WriteFile ~> Free[S, ?]) {
     def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
       case WriteFile.Open(file) =>
-        Client.exists(posixCodec.printPath(file)).ifM(
+        Client.exists(file).ifM(
           for {
             id <- seq.next
             writeHandle = WriteFile.WriteHandle(file, id)

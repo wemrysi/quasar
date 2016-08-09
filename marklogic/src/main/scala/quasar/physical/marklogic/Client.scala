@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.effect.Read
 import quasar.fp.free._
-import quasar.fs._
+import quasar.fs._, ManageFile._
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
@@ -90,17 +90,57 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
     }
   }
 
+  def move_(scenario: MoveScenario, semantics: MoveSemantics): Task[Unit] = scenario match {
+    case MoveScenario.FileToFile(src, dst) => ???
+    case MoveScenario.DirToDir(src, dst)   => ???
+  }
+
+  def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
+    S: Task :<: S
+  ): Free[S, Unit] =
+    lift(move_(scenario, semantics)).into[S]
+
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  def exists_(uri: String): Task[Boolean] =
+  def exists_(uri: APath): Task[Boolean] =
     // I believe that if the `DocumentDescriptor` is null, that means that
     // the resource does not exist, unfortunatly this is not documented
     // properly though.
-    Task.delay(docManager.exists(uri) != null)
+    Task.delay(docManager.exists(posixCodec.printPath(uri)) != null)
 
-  def exists[S[_]](uri: String)(implicit
+  def exists[S[_]](uri: APath)(implicit
     S: Task :<: S
   ): Free[S, Boolean] =
     lift(exists_(uri)).into[S]
+
+  def deleteContent_(dir: ADir): Task[Unit] = {
+    val uri = posixCodec.printPath(dir)
+    for {
+      session <- newSession
+      request = session.newAdhocQuery(s"""fn:map(xdmp:document-delete, xdmp:directory("$uri"))""")
+      _       <- Task.delay(session.submitRequest(request))
+    } yield ()
+  }
+
+  def deleteContent[S[_]](dir: ADir)(implicit
+    S: Task :<: S
+  ): Free[S, Unit] =
+    lift(deleteContent_(dir)).into[S]
+
+  def deleteStructure_(dir: ADir): Task[Unit] = {
+    val uri = posixCodec.printPath(dir)
+    for {
+      session <- newSession
+      // `directory-delete` also deletes the "Content" (documents in the directory),
+      // which we may want to change at some point
+      request = session.newAdhocQuery(s"""xdmp:directory-delete("$uri")""")
+      _       <- Task.delay(session.submitRequest(request))
+    } yield ()
+  }
+
+  def deleteStructure[S[_]](dir: ADir)(implicit
+    S: Task :<: S
+  ): Free[S, Unit] =
+    lift(deleteStructure_(dir)).into[S]
 
   def write_(uri: String, content: String): Task[Option[WriteError]] =
     Task.delay(docManager.write(uri, new StringHandle(content)))
@@ -169,11 +209,32 @@ object Client {
   def readDirectory[S[_]](dir: ADir)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
-  ): Free[S, FileSystemError \/ Process[Task, ResultItem]] = {
-    getClient.ask.map(_.readDirectory(dir).right)
+  ): Free[S, Process[Task, ResultItem]] = {
+    getClient.ask.map(_.readDirectory(dir))
   }
 
-  def exists[S[_]](uri: String)(implicit
+  def deleteContent[S[_]](dir: ADir)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, Unit] = {
+    getClient.ask.flatMap(_.deleteContent(dir))
+  }
+
+  def deleteStructure[S[_]](dir: ADir)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, Unit] = {
+    getClient.ask.flatMap(_.deleteStructure(dir))
+  }
+
+  def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, Unit] = {
+    getClient.ask.flatMap(_.move(scenario, semantics))
+  }
+
+  def exists[S[_]](uri: APath)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
   ): Free[S, Boolean] =
