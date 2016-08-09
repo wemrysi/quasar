@@ -309,4 +309,5 @@ lazy val it = project
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := !(sys.env contains "TRAVIS"))
   .enablePlugins(AutomateHeaderPlugin)
