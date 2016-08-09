@@ -768,29 +768,44 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     }
 
   def rebaseT[F[_]: Traverse](
-    target: FreeQS[T], src: T[F])(
+    target: FreeQS[T])(
+    src: T[F])(
     implicit FI: F :<: QScriptTotal[T, ?]):
       Option[T[F]] =
-    freeCata(target.map(_ => src.transAna(FI)))(recover(_.embed))
-      .transAnaM(FI.prj)
+    freeCata[QScriptTotal[T, ?], T[QScriptTotal[T, ?]], T[QScriptTotal[T, ?]]](
+      target.map(_ => src.transAna(FI)))(recover(_.embed)).transAnaM(FI.prj)
 
-  def elideConstantJoin[F[_]: Traverse](
+  def rebaseTCo[F[_]: Traverse](
+    target: FreeQS[T])(
+    srcCo: T[CoEnv[Hole, F, ?]])(
+    implicit FI: F :<: QScriptTotal[T, ?]):
+      Option[T[CoEnv[Hole, F, ?]]] =
+    // TODO: with the right instances & types everywhere, this should look like
+    //       target.transAnaM(_.htraverse(FI.prj)) ∘ (srcCo >> _)
+    freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
+      target)(
+      coEnvHtraverse(_)(new (QScriptTotal[T, ?] ~> (Option ∘ F)#λ) {
+        def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.prj(qt)
+      })).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
+
+  def elideConstantJoin[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      ThetaJoin[T, T[F]] => F[T[F]] = {
-    case x @ ThetaJoin(src0, l, r, on, Inner, combine) if on ≟ BoolLit(true) =>
+      ThetaJoin[T, T[G]] => F[T[G]] = {
+    case x @ ThetaJoin(src, l, r, on, Inner, combine) if on ≟ BoolLit(true) =>
       (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>  // both sides are a Map
             (mf1.resume, mf2.resume) match { // if both sides are Nullary, we hit the first case
               case (-\/(Nullary(_)), _) =>
-                rebaseT(r, src0).map(tf => QC.inj(Map(tf, combine >>= {
+                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
                 }))).getOrElse(TJ.inj(x))
               case (_, -\/(Nullary(_))) =>
-                rebaseT(l, src0).map(tf => QC.inj(Map(tf, combine >>= {
+                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
                 }))).getOrElse(TJ.inj(x))
@@ -799,7 +814,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           case (Some(Map(\/-(SrcHole), mf1)), _) =>  // left side is a Map
             mf1.resume match {
               case -\/(Nullary(_)) =>
-                rebaseT(r, src0).map(tf => QC.inj(Map(tf, combine >>= {
+                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
                 }))).getOrElse(TJ.inj(x))
@@ -808,7 +823,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
           case (_, Some(Map(\/-(SrcHole), mf2))) =>  // right side is a Map
             mf2.resume match {
               case -\/(Nullary(_)) =>
-                rebaseT(l, src0).map(tf => QC.inj(Map(tf, combine >>= {
+                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
                 }))).getOrElse(TJ.inj(x))
@@ -1002,7 +1017,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      liftFG(elideConstantJoin[F]) ⋙
+      liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
       liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
       liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
       liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
@@ -1012,24 +1027,23 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] extends Helpers[T
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
 
-  // TODO all the `CoEnv` versions of optimizations should not be copy and pasted from their regular versions
-  def applyToFreeQS[F[_]: Traverse: Normalizable, A](
+  def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[A, F, ?]]])) ⋙
+      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
+    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
-      //liftFG(elideConstantJoin[CoEnv[A, F, ?]]) ⋙  // TODO
-      liftFF(repeatedly(coalesceQC[F, CoEnv[A, F, ?]](extractCoEnv[F, A], wrapCoEnv[F, A]))) ⋙
-      liftFG(coalesceMapShift[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
-      liftFG(coalesceMapJoin[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
-      liftFG(simplifySP[F, CoEnv[A, F, ?]](extractCoEnv[F, A])) ⋙
-      liftFG(compactLeftShift[F, CoEnv[A, F, ?]]) ⋙
+      liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
+      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
+      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
-      liftFF(compactReduction[CoEnv[A, F, ?]]) ⋙
-      (fa => QC.prj(fa).fold(CoEnv(fa.right[A]))(elideNopMapCo[F, A]))
+      liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
+      (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
 }
