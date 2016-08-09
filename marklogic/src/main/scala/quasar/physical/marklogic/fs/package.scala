@@ -16,24 +16,58 @@
 
 package quasar.physical.marklogic
 
+import quasar.Predef._
+import quasar.Data
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.fp._
+import quasar.fp.free._
 import quasar.fs._
-import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
+import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
+
+import com.marklogic.client._
+import com.marklogic.xcc._
+import java.net.URI
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 package object fs {
   val FsType = FileSystemType("marklogic")
 
-  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S)
-    : FileSystemDef[Free[S, ?]] = FileSystemDef.fromPF {
+  type Eff0[A] = Coproduct[
+                    KeyValueStore[ReadFile.ReadHandle, Process[Task, Vector[Data]], ?],
+                    KeyValueStore[WriteFile.WriteHandle, Unit, ?],
+                    A]
+  type Eff1[A] = Coproduct[MonotonicSeq, Eff0, A]
+  type Eff2[A] = Coproduct[Read[Client, ?], Eff1, A]
+  type Eff[A]  = Coproduct[Task, Eff2, A]
+
+  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
+    val uri = new URI(uri0.value)
+    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort)
+    val client = Client(dbClient, ContentSourceFactory.newContentSource(uri))
+    (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]                      |@|
+     KeyValueStore.impl.empty[ReadFile.ReadHandle, Process[Task, Vector[Data]]] |@|
+     MonotonicSeq.fromZero                                                                 )((a,b,c) => c :+: b :+: a).map(i =>
+       (reflNT[Task] :+: Read.constant[Task, Client](client) :+: i, Task.delay(dbClient.release)))
+  }
+
+  def definition[S[_]](implicit
+    S0: Task :<: S,
+    S1: PhysErr :<: S
+  ): FileSystemDef[Free[S, ?]] =
+    FileSystemDef.fromPF {
       case (FsType, uri) =>
-        FileSystemDef.DefinitionResult[Free[S, ?]](
-          interpretFileSystem(
-            Empty.queryFile[Free[S, ?]],
-            Empty.readFile[Free[S, ?]],
-            Empty.writeFile[Free[S, ?]],
-            Empty.manageFile[Free[S, ?]]),
-          Free.point(())).point[DefErrT[Free[S, ?], ?]]
+        lift(inter(uri).map { case (run, release) =>
+          FileSystemDef.DefinitionResult[Free[S, ?]](
+            mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
+              queryfile.interpret[Eff],
+              readfile.interpret[Eff],
+              writefile.interpret[Eff],
+              managefile.interpret[Eff]),
+            lift(release).into[S])
+        }).into[S].liftM[DefErrT]
     }
+
 }
