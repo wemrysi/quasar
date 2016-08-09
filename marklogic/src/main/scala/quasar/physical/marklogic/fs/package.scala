@@ -43,15 +43,14 @@ package object fs {
   type Eff2[A] = Coproduct[Read[Client, ?], Eff1, A]
   type Eff[A]  = Coproduct[Task, Eff2, A]
 
-  def inter(uri: ConnectionUri): Task[Eff ~> Task] = {
-    def dbClient: DatabaseClient = DatabaseClientFactory.newClient("localhost", 8000)
-    println(new URI(uri.value))
-    val uri0 = new URI("xcc://admin:admin@localhost:8000/test")
-    val client = Client(dbClient, ContentSourceFactory.newContentSource(uri0))
+  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
+    val uri = new URI(uri0.value)
+    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort)
+    val client = Client(dbClient, ContentSourceFactory.newContentSource(uri))
     (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]                      |@|
      KeyValueStore.impl.empty[ReadFile.ReadHandle, Process[Task, Vector[Data]]] |@|
      MonotonicSeq.fromZero                                                                 )((a,b,c) => c :+: b :+: a).map(i =>
-       reflNT[Task] :+: Read.constant[Task, Client](client) :+: i)
+       (reflNT[Task] :+: Read.constant[Task, Client](client) :+: i, Task.delay(dbClient.release)))
   }
 
   def definition[S[_]](implicit
@@ -60,14 +59,14 @@ package object fs {
   ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
-        lift(inter(uri).map { run =>
+        lift(inter(uri).map { case (run, release) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
               queryfile.interpret[Eff],
               readfile.interpret[Eff],
               writefile.interpret[Eff],
               managefile.interpret[Eff]),
-            Free.point(()))
+            lift(release).into[S])
         }).into[S].liftM[DefErrT]
     }
 

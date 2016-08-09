@@ -23,10 +23,9 @@ import quasar.fs._
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
-import com.marklogic.xcc.{ContentSource, ResultItem}
+import com.marklogic.xcc.{ContentSource, ResultItem, Session}
 
 import java.io.ByteArrayInputStream
-//import java.util.Iterator
 import scala.collection.JavaConverters._
 
 import argonaut._
@@ -57,6 +56,8 @@ object WriteError {
 final case class Client(client: DatabaseClient, contentSource: ContentSource) {
 
   val docManager = client.newJSONDocumentManager
+  val newSession: Task[Session] = Task.delay(contentSource.newSession)
+  def closeSession(s: Session): Task[Unit] = Task.delay(s.close)
 
   def readDocument_(doc: AFile): Task[ResourceNotFoundException \/ Process[Task, Json]] = {
     val bufferSize = 100
@@ -83,10 +84,10 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
 
   def readDirectory(dir: ADir): Process[Task, ResultItem] = {
     val uri = posixCodec.printPath(dir)
-    io.iteratorR(
-      Task.delay(contentSource.newSession()))(
-      session => Task.delay(session.close))(
-      session => Task.delay(session.submitRequest(session.newAdhocQuery(getQuery(s"""cts:directory-query("$uri")"""))).iterator.asScala))
+    io.iteratorR(newSession)(closeSession) { session =>
+      val request = session.newAdhocQuery(getQuery(s"""cts:directory-query("$uri")"""))
+      Task.delay(session.submitRequest(request).iterator.asScala)
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
