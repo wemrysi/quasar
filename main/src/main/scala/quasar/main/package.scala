@@ -42,8 +42,9 @@ package object main {
 
   /** The physical filesystems currently supported. */
   val physicalFileSystems: FileSystemDef[PhysFsEffM] =
-    quasar.physical.skeleton.fs.definition[PhysFsEff]          |+|
-    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff] |+|
+    quasar.physical.skeleton.fs.definition[PhysFsEff]                 |+|
+    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff]        |+|
+    quasar.physical.mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff] |+|
     quasar.physical.postgresql.fs.definition[PhysFsEff]
 
   /** A "terminal" effect, encompassing failures and other effects which
