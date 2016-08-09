@@ -49,7 +49,7 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
       mm :+: injectFT[MountingFailure, MEff] :+: injectFT[PathMismatchFailure, MEff]
 
     val interpMnts: MountConfigs ~> Task =
-      KeyValueStore.impl.concurrentMap.unsafePerformSync
+      KeyValueStore.impl.empty.unsafePerformSync
 
     val interpMEff: MEff ~> Task =
       reflNT[Task]                                   :+:

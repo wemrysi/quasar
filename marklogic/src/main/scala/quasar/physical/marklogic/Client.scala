@@ -19,13 +19,18 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.effect.Read
 import quasar.fp.free._
-import quasar.fs.ADir
+import quasar.fs._
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
+import com.marklogic.xcc.{ContentSource, ResultItem}
+
 import java.io.ByteArrayInputStream
+//import java.util.Iterator
+import scala.collection.JavaConverters._
 
 import argonaut._
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
@@ -44,17 +49,18 @@ object WriteError {
 
   def fromException(ex: scala.Throwable): WriteError = ex match {
     case ex: ResourceNotFoundException => ResourceNotFound(ex.getMessage)
-    case ex: ForbiddenUserException        => Forbidden(ex.getMessage)
+    case ex: ForbiddenUserException    => Forbidden(ex.getMessage)
     case ex: FailedRequestException    => FailedRequest(ex.getMessage)
   }
 }
 
-final case class Client(client: DatabaseClient) {
+final case class Client(client: DatabaseClient, contentSource: ContentSource) {
 
   val docManager = client.newJSONDocumentManager
 
-  def readDocument_[S[_]](uri: String): Task[ResourceNotFoundException \/ Process[Task, Json]] = {
+  def readDocument_(doc: AFile): Task[ResourceNotFoundException \/ Process[Task, Json]] = {
     val bufferSize = 100
+    val uri = posixCodec.printPath(doc)
     val chunkSizes: Process[Task, Int] = Process.constant(64)
     for {
       inputStream <- Task.delay{
@@ -67,10 +73,21 @@ final case class Client(client: DatabaseClient) {
     } yield exception.as(stream)
   }
 
-  def readDocument[S[_]](uri: String)(implicit
+  def readDocument[S[_]](doc: AFile)(implicit
     S: Task :<: S
   ): Free[S, ResourceNotFoundException \/ Process[Task, Json]] =
-    lift(readDocument_(uri)).into[S]
+    lift(readDocument_(doc)).into[S]
+
+  def getQuery(s: String) =
+    s"<query>$s</query>"
+
+  def readDirectory(dir: ADir): Process[Task, ResultItem] = {
+    val uri = posixCodec.printPath(dir)
+    io.iteratorR(
+      Task.delay(contentSource.newSession()))(
+      session => Task.delay(session.close))(
+      session => Task.delay(session.submitRequest(session.newAdhocQuery(getQuery(s"""cts:directory-query("$uri")"""))).iterator.asScala))
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def exists_(uri: String): Task[Boolean] =
@@ -142,11 +159,18 @@ final case class Client(client: DatabaseClient) {
 
 // Is there a better way of doing this without as much duplication?
 object Client {
-  def readDocument[S[_]](uri: String)(implicit
+  def readDocument[S[_]](doc: AFile)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
   ): Free[S, ResourceNotFoundException \/ Process[Task, Json]] =
-    getClient.ask.flatMap(_.readDocument(uri))
+    getClient.ask.flatMap(_.readDocument(doc))
+
+  def readDirectory[S[_]](dir: ADir)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, FileSystemError \/ Process[Task, ResultItem]] = {
+    getClient.ask.map(_.readDirectory(dir).right)
+  }
 
   def exists[S[_]](uri: String)(implicit
     getClient: Read.Ops[Client, S],
