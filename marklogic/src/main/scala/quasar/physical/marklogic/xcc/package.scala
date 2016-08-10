@@ -20,9 +20,22 @@ import quasar.effect.{Failure, Read}
 import quasar.Predef._
 
 import com.marklogic.xcc.Session
+import scalaz.:<:
 
 package object xcc {
   type XQuery = String
+
   type SessionR[A] = Read[Session, A]
+
+  object SessionR {
+    def Ops[S[_]](implicit S: SessionR :<: S) =
+      Read.Ops[Session, S]
+  }
+
   type XccFailure[A] = Failure[XccError, A]
+
+  object XccFailure {
+    def Ops[S[_]](implicit S: XccFailure :<: S) =
+      Failure.Ops[XccError, S]
+  }
 }

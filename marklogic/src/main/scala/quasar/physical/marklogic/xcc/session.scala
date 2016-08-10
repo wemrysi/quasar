@@ -17,14 +17,13 @@
 package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
-import quasar.effect.{Failure, Read}
 import quasar.fp.free.lift
 
 import java.lang.IllegalStateException
 
 import com.marklogic.xcc.{Session => XccSession, _}
 import com.marklogic.xcc.exceptions.RequestException
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object session {
@@ -43,7 +42,7 @@ object session {
       liftT(s => s.submitRequest(s.newAdhocQuery(query, options)))
 
     def session: F[XccSession] =
-      Read.Ops[XccSession, S].ask
+      SessionR.Ops[S].ask
 
     ////
 
@@ -54,7 +53,7 @@ object session {
           case rex: RequestException      => requestError(rex).left[A].point[Task]
         }
 
-        Failure.Ops[XccError, S].unattempt(lift(handled).into[S])
+        XccFailure.Ops[S].unattempt(lift(handled).into[S])
       }
 
     private def captured[A](f: XccSession => A): F[Task[A]] =

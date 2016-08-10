@@ -18,44 +18,56 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.Data
+import quasar.fp._
 import quasar.fp.numeric.Positive
+import quasar.fp.free.lift
 import quasar.fs.DataCursor
 
-import com.marklogic.xcc.ResultSequence
+import com.marklogic.xcc.{ResultItem, ResultSequence}
 import com.marklogic.xcc.types.XdmItem
-import scalaz.syntax.functor._
-import scalaz.std.option._
+import com.marklogic.xcc.exceptions.StreamingResultException
+import scalaz._, Scalaz._
 import scalaz.stream.Process
 import scalaz.concurrent.Task
 
-final class ChunkedResultSequence(val chunkSize: Positive, rs: ResultSequence) {
-  val close: Task[Executed] =
-    Task.delay(rs.close()).as(Executed.executed)
+final class ChunkedResultSequence[S[_]](val chunkSize: Positive, rs: ResultSequence) {
+  import XccError.streamingError
 
-  val nextChunk: Task[Vector[XdmItem]] =
-    Process.unfoldEval(())(_ => next.map(_ strengthR (())))
-      .take(chunkSize.get.toInt)
-      .runLog
+  def close(implicit S: Task :<: S): Free[S, Executed] =
+    lift(Task.delay(rs.close()).as(Executed.executed)).into[S]
 
-  // TODO: What kind of errors can happen when cache()-ing an item?
-  private val next: Task[Option[XdmItem]] =
-    Task delay {
-      if (rs.hasNext) {
-        val ritem = rs.next
-        ritem.cache()
-        Some(ritem.getItem)
-      } else None
-    }
+  def nextChunk(implicit S0: Task :<: S, S1: XccFailure :<: S): Free[S, Vector[XdmItem]] = {
+    val chunk = Process.unfoldEval(())(_ => next.map(_ strengthR (())))
+                  .take(chunkSize.get.toInt)
+                  .runLog
+
+    XccFailure.Ops[S].unattempt(lift(chunk.run).into[S])
+  }
+
+  ////
+
+  private def next: EitherT[Task, XccError, Option[XdmItem]] =
+    nextItem.liftM[EitherT[?[_], XccError, ?]] >>= (_ traverse cachedItem)
+
+  private def cachedItem(ritem: ResultItem): EitherT[Task, XccError, XdmItem] =
+    EitherT(Task.delay {
+      ritem.cache()
+      ritem.getItem.right[XccError]
+    } handle {
+      case ex: StreamingResultException => streamingError(ritem, ex).left
+    })
+
+  private def nextItem: Task[Option[ResultItem]] =
+    Task.delay(if (rs.hasNext) Some(rs.next) else None)
 }
 
 object ChunkedResultSequence {
-  implicit val dataCursor: DataCursor[Task, ChunkedResultSequence] =
-    new DataCursor[Task, ChunkedResultSequence] {
-      def close(crs: ChunkedResultSequence) =
+  implicit def dataCursor[S[_]](implicit S0: Task :<: S, S1: XccFailure :<: S): DataCursor[Free[S, ?], ChunkedResultSequence[S]] =
+    new DataCursor[Free[S, ?], ChunkedResultSequence[S]] {
+      def close(crs: ChunkedResultSequence[S]) =
         crs.close.void
 
-      // TODO: Better to just handle this in the stream?
-      def nextChunk(crs: ChunkedResultSequence) =
+      def nextChunk(crs: ChunkedResultSequence[S]) =
         crs.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
           xdmitem.toData(x).fold(ds)(ds :+ _)))
     }

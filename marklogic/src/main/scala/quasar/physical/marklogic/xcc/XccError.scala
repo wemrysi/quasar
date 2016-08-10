@@ -19,7 +19,8 @@ package quasar.physical.marklogic.xcc
 import quasar.Predef._
 import quasar.SKI.κ
 
-import com.marklogic.xcc.exceptions.RequestException
+import com.marklogic.xcc.ResultItem
+import com.marklogic.xcc.exceptions._
 import monocle.Prism
 import scalaz.{Equal, Show}
 
@@ -28,6 +29,7 @@ sealed abstract class XccError
 object XccError {
   final case class RequestError(cause: RequestException) extends XccError
   case object SessionIsClosed extends XccError
+  final case class StreamingError(ritem: ResultItem, cause: StreamingResultException) extends XccError
 
   val requestError: Prism[XccError, RequestException] =
     Prism.partial[XccError, RequestException] {
@@ -39,12 +41,18 @@ object XccError {
       case SessionIsClosed => ()
     } (κ(SessionIsClosed))
 
+  val streamingError: Prism[XccError, (ResultItem, StreamingResultException)] =
+    Prism.partial[XccError, (ResultItem, StreamingResultException)] {
+      case StreamingError(r, c) => (r, c)
+    } ((StreamingError(_, _)).tupled)
+
   implicit val equal: Equal[XccError] =
     Equal.equalA
 
   implicit val show: Show[XccError] =
     Show.shows {
-      case SessionIsClosed  => "Session is closed."
-      case RequestError(ex) => s"RequestError: ${ex.getMessage}"
+      case RequestError(ex)      => s"RequestError: ${ex.getMessage}"
+      case SessionIsClosed       => "Session is closed."
+      case StreamingError(r, ex) => s"Failed to stream request result (${r.getItemType}): ${ex.getMessage}"
     }
 }
