@@ -28,7 +28,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object session {
-  final class Ops[S[_], A](implicit S0: SessionR :<: S) {
+  final class Ops[S[_]](implicit S0: SessionR :<: S) {
     import XccError._, Executed._
 
     type F[A] = Free[S, A]
