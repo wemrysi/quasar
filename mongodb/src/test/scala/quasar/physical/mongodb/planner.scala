@@ -75,40 +75,41 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], ctx: MongoQueryModel) =
+  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel, stats: Collection => Option[CollectionStatistics]) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
         e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_, ctx).leftMap(CPlannerError(_))))
+        lp => MongoDbPlanner.plan(lp, MongoDbPlanner.QueryContext(model, stats)).leftMap(CPlannerError(_))))
 
-  def plan0(query: String, ctx: MongoQueryModel): Either[CompilationError, Crystallized[WorkflowF]] = {
+  def plan0(query: String, model: MongoQueryModel, stats: Collection => Option[CollectionStatistics])
+      : Either[CompilationError, Crystallized[WorkflowF]] = {
     fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_, ctx).run).value.toEither
+      queryPlanner(_, model, stats).run).value.toEither
   }
 
   def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`2.6`)
+    plan0(query, MongoQueryModel.`2.6`, κ(None))
 
   def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.2`)
+    plan0(query, MongoQueryModel.`3.2`, κ(CollectionStatistics(10, 100, false).some))
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, MongoQueryModel.`3.2`)
+      phys       <- MongoDbPlanner.plan(simplified, MongoDbPlanner.QueryContext(MongoQueryModel.`3.2`, κ(None)))
     } yield phys).run.value.toEither
   }
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
       expr <- fixParser.parse(Query(query))
-    } yield queryPlanner(expr, MongoQueryModel.`3.2`).run.written
+    } yield queryPlanner(expr, MongoQueryModel.`3.2`, κ(None)).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -2897,6 +2898,16 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                 $field("right", "city"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
+    }
+
+    "plan simple join with sharded inputs" in {
+      val query = "select zips2.city from zips join zips2 on zips._id = zips2._id"
+      plan0(query,
+        MongoQueryModel.`3.2`,
+        c => Map(
+          collection("db", "zips") -> CollectionStatistics(10, 100, true),
+          collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c)) must_==
+        plan2_6(query)
     }
 
     "plan non-equi join" in {

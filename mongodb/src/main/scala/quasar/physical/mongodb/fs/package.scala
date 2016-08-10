@@ -104,7 +104,7 @@ package object fs {
                   .attempt.void.liftM[OptionT]
     } yield DefaultDb(dbName)).run
 
-  private def asyncClientDef[S[_]](
+  private[fs] def asyncClientDef[S[_]](
     uri: ConnectionUri
   )(implicit
     S0: Task :<: S

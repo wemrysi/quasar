@@ -32,12 +32,18 @@ import pathy.Path.{dir => pDir, file => pFile, _}
 final case class DatabaseName(value: String) extends AnyVal {
   def bson: Bson = Bson.Text(value)
 }
+object DatabaseName {
+  implicit def equal: Equal[DatabaseName] = Equal.equalA
+}
 final case class CollectionName(value: String) extends AnyVal {
   def isDescendantOf(ancestor: CollectionName): Boolean =
     if (ancestor.value == "") true
     else value startsWith (ancestor.value + ".")
 
   def bson: Bson = Bson.Text(value)
+}
+object CollectionName {
+  implicit def equal: Equal[CollectionName] = Equal.equalA
 }
 
 /** Identifies a collection in a specific database. Sometimes referred to as a

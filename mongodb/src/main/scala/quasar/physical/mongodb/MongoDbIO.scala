@@ -31,7 +31,7 @@ import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.client.model._
 import com.mongodb.async._
 import com.mongodb.async.client._
-import org.bson.BsonDocument
+import org.bson.{BsonBoolean, BsonDocument}
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
@@ -283,6 +283,27 @@ object MongoDbIO {
       .runLog
       .map(_.toVector.separate)
       .flatMap(finalize)
+  }
+
+  def collectionStatistics(coll: Collection): MongoDbIO[CollectionStatistics] = {
+    val cmd = Bson.Doc(ListMap("collStats" -> coll.collection.bson))
+
+    def intValue(doc: BsonDocument, field: String): String \/ Long =
+      \/.fromTryCatchNonFatal(Option(doc.getInt32(field)).map(_.longValue) \/>
+        s"expected field: $field").fold(_.getMessage.left, ι)
+
+    def booleanValue(doc: BsonDocument, field: String): Boolean =
+      doc.get(field, BsonBoolean.FALSE) != BsonBoolean.FALSE
+
+    runCommand(coll.database, cmd).map(doc =>
+      (for {
+        count    <- intValue(doc, "count")
+        dataSize <- intValue(doc, "size")
+        sharded  =  booleanValue(doc, "sharded")
+      } yield CollectionStatistics(count, dataSize, sharded)))
+        .flatMap(_.fold(
+          err => fail(new MongoException("could not read collection statistics: " + err)),
+          _.point[MongoDbIO]))
   }
 
   def fail[A](t: Throwable): MongoDbIO[A] =
