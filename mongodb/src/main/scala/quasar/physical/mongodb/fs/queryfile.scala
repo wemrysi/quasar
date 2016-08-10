@@ -57,7 +57,7 @@ object queryfile {
                   (implicit C: DataCursor[MongoDbIO, C])
                   : QueryFile ~> MongoQuery[C, ?] = {
 
-    new QueryFileInterpreter(execMongo, MongoDbQScriptPlanner.plan)
+    new QueryFileInterpreter(execMongo, MongoDbQScriptPlanner.plan[Fix])
   }
 
   def run[C, S[_]](
