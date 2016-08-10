@@ -17,7 +17,8 @@ object Dependencies {
   private val scodecBitsVersion = "1.1.0"
   private val shapelessVersion  = "2.3.1"
   private val slcVersion        = "0.4"
-  private val specsVersion      = "3.8.4"
+  private val scalacheckVersion = "1.12.5"
+  private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
   def foundation = Seq(
     "org.scalaz"                 %% "scalaz-core"               % scalazVersion force(),
@@ -32,7 +33,7 @@ object Dependencies {
     "com.slamdata"               %% "pathy-core"                %     pathyVersion,
     "eu.timepit"                 %% "refined"                   %    refinedVersion,
     "com.chuusai"                %% "shapeless"                 %   shapelessVersion,
-    "org.scalacheck"             %% "scalacheck"                %        "1.12.5"        % Test force(),
+    "org.scalacheck"             %% "scalacheck"                %   scalacheckVersion    % Test force(),
     "com.github.mpilquist"       %% "simulacrum"                %        "0.7.0"         %     Test,
     "org.typelevel"              %% "discipline"                %         "0.5"          %     Test,
     "org.specs2"                 %% "specs2-core"               %      specsVersion      %     Test,
@@ -40,9 +41,10 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalacheck"      %       slcVersion       %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %        "0.4.0"         %     Test
   )
-
+  def effect = Seq(
+    "org.threeten"                % "threetenbp"     %    "1.3.2"
+  )
   def core = Seq(
-    "org.threeten"                % "threetenbp"     %    "1.3.2",
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",
     "com.github.julien-truffaut" %% "monocle-macro"  % monocleVersion,
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
