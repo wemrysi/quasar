@@ -57,21 +57,13 @@ This will lead to failures in the integration test project (`it`). The reason fo
 1. Use dockerized integration tests script
 2. Explicitly set-up infrastrucutre
 
-##### Use dockerized integration tests script
+##### Alternative: dockerized integration tests script
 
-Note: this script is using Docker which has to be installed on your system in order to use it
-
-Simply run the following script
+Docker must be installed. A container running mongodb will be started and removed on exit.
 
 ```bash
-./full-it-tests.sh 
+./bin/full-it-tests.sh
 ```
-
-This script will
-1. clean any existing docker container named some-mongo
-2. run new instance of mongodb
-3. run tests on that instance
-4. clear afterwards
 
 ##### Explicitly set-up infrastrucutre
 
