@@ -21,14 +21,17 @@ import quasar.effect.{Read, MonotonicSeq}
 import quasar.fs._
 import quasar.physical.marklogic.Client
 
-import scalaz._
+import pathy.Path._
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 object managefile {
   import ManageFile._
 
   def interpret[S[_]](implicit
     S0: MonotonicSeq :<: S,
-    S1: Read[Client, ?] :<: S
+    S1: Read[Client, ?] :<: S,
+    S2: Task :<: S
   ): ManageFile ~> Free[S, ?] = new (ManageFile ~> Free[S, ?]) {
     def apply[A](fs: ManageFile[A]) = fs match {
       case Move(scenario, semantics) => move(scenario, semantics)
@@ -38,15 +41,22 @@ object managefile {
   }
 
   def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
-    S0: Read[Client, ?] :<: S
-  ): Free[S, FileSystemError \/ Unit] = ???
+    S0: Read[Client, ?] :<: S,
+    S1: Task :<: S
+  ): Free[S, FileSystemError \/ Unit] = Client.move(scenario, semantics).map(_.right)
 
   def delete[S[_]](path: APath)(implicit
-    S0: Read[Client, ?] :<: S
-  ): Free[S, FileSystemError \/ Unit] = ???
+    S0: Read[Client, ?] :<: S,
+    S1: Task :<: S
+  ): Free[S, FileSystemError \/ Unit] = refineType(path).fold(
+    dir  => Client.deleteStructure(dir).map(_.right),
+    file => Client.deleteContent(fileParent(file) </> dir(fileName(file).value)).map(_.right))
 
   def tempFile[S[_]](path: APath)(implicit
     S0: Read[Client, ?] :<: S
-  ): Free[S, FileSystemError \/ AFile] = ???
+  ): Free[S, FileSystemError \/ AFile] = refineType(path).fold(
+                                 // TODO: Make pure
+    dir => dir </> file("temp" + scala.util.Random.nextString(10)),
+    file => file).right.pure[Free[S, ?]]
 
 }

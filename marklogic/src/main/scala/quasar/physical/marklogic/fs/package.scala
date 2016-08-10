@@ -45,11 +45,13 @@ package object fs {
 
   def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
     val uri = new URI(uri0.value)
-    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort)
+    val (user, password0) = uri.getUserInfo.span(_ ≠ ':')
+    val password = password0.drop(1)
+    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort, user, password, DatabaseClientFactory.Authentication.DIGEST)
     val client = Client(dbClient, ContentSourceFactory.newContentSource(uri))
     (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]                      |@|
      KeyValueStore.impl.empty[ReadFile.ReadHandle, Process[Task, Vector[Data]]] |@|
-     MonotonicSeq.fromZero                                                                 )((a,b,c) => c :+: b :+: a).map(i =>
+     MonotonicSeq.fromZero                                                         )((a,b,c) => c :+: b :+: a).map(i =>
        (reflNT[Task] :+: Read.constant[Task, Client](client) :+: i, Task.delay(dbClient.release)))
   }
 

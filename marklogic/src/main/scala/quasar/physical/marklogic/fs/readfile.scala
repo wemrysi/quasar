@@ -19,6 +19,8 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar._
 import quasar.fs._
+import quasar.fs.FileSystemError._
+import quasar.fs.PathError._
 import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.physical.marklogic._
 
@@ -26,7 +28,7 @@ import com.marklogic.xcc.ResultItem
 import com.marklogic.xcc.types._
 
 import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
@@ -87,7 +89,9 @@ object readfile {
   ): ReadFile ~> Free[S,?] =
     quasar.fs.impl.readFromProcess { (file, readOpts) =>
       val dirPath = fileParent(file) </> dir(fileName(file).value)
-      Client.readDirectory(dirPath).map(_.map(_.map(toData)))
+      Client.exists(dirPath).ifM(
+        Client.readDirectory(dirPath).map(_.map(toData).right[FileSystemError]),
+        pathErr(pathNotFound(file)).left[Process[Task, Vector[Data]]].pure[Free[S,?]])
     }
 
 }
