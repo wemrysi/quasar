@@ -65,7 +65,8 @@ object queryfile {
         ???
 
       case FileExists(file) =>
-        ???
+        val asDir = fileParent(file) </> dir(fileName(file).value)
+        Client.exists(asDir)
     }
   }
 }

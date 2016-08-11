@@ -24,6 +24,8 @@ import quasar.fs._, ManageFile._
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
 import com.marklogic.xcc.{ContentSource, ResultItem, Session}
+import com.marklogic.xcc.exceptions.XQueryException
+import com.marklogic.xcc.types._
 
 import java.io.ByteArrayInputStream
 import scala.collection.JavaConverters._
@@ -46,18 +48,23 @@ object WriteError {
   final case class Forbidden(message: String)        extends WriteError
   final case class FailedRequest(message: String)    extends WriteError
 
-  def fromException(ex: scala.Throwable): WriteError = ex match {
-    case ex: ResourceNotFoundException => ResourceNotFound(ex.getMessage)
-    case ex: ForbiddenUserException    => Forbidden(ex.getMessage)
-    case ex: FailedRequestException    => FailedRequest(ex.getMessage)
+  def fromException(ex: scala.Throwable): Option[WriteError] = ex match {
+    case ex: ResourceNotFoundException => ResourceNotFound(ex.getMessage).some
+    case ex: ForbiddenUserException    => Forbidden(ex.getMessage).some
+    case ex: FailedRequestException    => FailedRequest(ex.getMessage).some
+    case _                             => none
   }
 }
+
+final case class AlreadyExists(path: APath)
 
 final case class Client(client: DatabaseClient, contentSource: ContentSource) {
 
   val docManager = client.newJSONDocumentManager
   val newSession: Task[Session] = Task.delay(contentSource.newSession)
   def closeSession(s: Session): Task[Unit] = Task.delay(s.close)
+
+  def release: Task[Unit] = Task.delay(client.release)
 
   def readDocument_(doc: AFile): Task[ResourceNotFoundException \/ Process[Task, Json]] = {
     val bufferSize = 100
@@ -101,16 +108,36 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
     lift(move_(scenario, semantics)).into[S]
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  def exists_(uri: APath): Task[Boolean] =
-    // I believe that if the `DocumentDescriptor` is null, that means that
-    // the resource does not exist, unfortunatly this is not documented
-    // properly though.
-    Task.delay(docManager.exists(posixCodec.printPath(uri)) != null)
+  def exists_(path: APath): Task[Boolean] = {
+    val uri = posixCodec.printPath(path)
+    for {
+      session <- newSession
+      request = session.newAdhocQuery(s"""fn:exists(fn:filter(function ($$uri) { fn:starts-with($$uri, "$uri") }, cts:uris()))""")
+      result  <- Task.delay(scala.Boolean.unbox(session.submitRequest(request).next.getItem.asInstanceOf[XSBoolean].asBoolean))
+    } yield result
+  }
 
   def exists[S[_]](uri: APath)(implicit
     S: Task :<: S
   ): Free[S, Boolean] =
     lift(exists_(uri)).into[S]
+
+  def createDir_(dir: ADir): Task[AlreadyExists \/ Unit] = {
+    val uri = posixCodec.printPath(dir)
+    println("uri: " + uri)
+    for {
+      session <- newSession
+      request = session.newAdhocQuery(s"""xdmp:directory-create("$uri")""")
+      result  <- Task.delay(session.submitRequest(request)).as(().right[AlreadyExists]).handle {
+        case ex: XQueryException if ex.getCode == "XDMP-DIREXISTS" => AlreadyExists(dir).left
+      }
+    } yield result
+  }
+
+  def createDir[S[_]](dir: ADir)(implicit
+    S0: Task :<: S
+  ): Free[S, AlreadyExists \/ Unit] =
+    lift(createDir_(dir)).into[S]
 
   def deleteContent_(dir: ADir): Task[Unit] = {
     val uri = posixCodec.printPath(dir)
@@ -142,13 +169,16 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
   ): Free[S, Unit] =
     lift(deleteStructure_(dir)).into[S]
 
-  def write_(uri: String, content: String): Task[Option[WriteError]] =
+  def write_(uri: String, content: String): Task[WriteError \/ Unit] =
     Task.delay(docManager.write(uri, new StringHandle(content)))
-      .attempt.map(_.swap.toOption.map(WriteError.fromException))
+      .as(().right)
+      .handleWith {
+        case ex => WriteError.fromException(ex).cata(err => Task.now(err.left), Task.fail(ex))
+      }
 
   def write[S[_]](uri: String, content: String)(implicit
     S: Task :<: S
-  ): Free[S, Option[WriteError]] =
+  ): Free[S, WriteError \/ Unit] =
     lift(write_(uri, content)).into[S]
 
   //////
@@ -240,10 +270,16 @@ object Client {
   ): Free[S, Boolean] =
     getClient.ask.flatMap(_.exists(uri))
 
+  def createDir[S[_]](dir: ADir)(implicit
+    getClient: Read.Ops[Client, S],
+    S: Task :<: S
+  ): Free[S, AlreadyExists \/ Unit] =
+    getClient.ask.flatMap(_.createDir(dir))
+
   def write[S[_]](uri: String, content: String)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
-  ): Free[S, Option[WriteError]] =
+  ): Free[S, WriteError \/ Unit] =
     getClient.ask.flatMap(_.write(uri, content))
 
   def execute[S[_]](xQuery: String, dst: ADir)(implicit

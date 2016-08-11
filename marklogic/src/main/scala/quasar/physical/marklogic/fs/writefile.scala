@@ -18,6 +18,7 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar._
+import quasar.fp._
 import quasar.fs._
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
@@ -31,7 +32,9 @@ import scalaz.concurrent.Task
 
 object writefile {
 
-  def asString(data: Vector[Data]): String = ???
+  implicit val coded = DataCodec.Precise
+
+  def asString(data: Vector[Data]): String = data.map(DataCodec.render(_).toOption.getOrElse("")).mkString
 
   def interpret[S[_]](implicit
     S0:      Task :<: S,
@@ -41,23 +44,27 @@ object writefile {
    ): WriteFile ~> Free[S,?] = new (WriteFile ~> Free[S, ?]) {
     def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
       case WriteFile.Open(file) =>
-        Client.exists(file).ifM(
-          for {
-            id <- seq.next
-            writeHandle = WriteFile.WriteHandle(file, id)
-            _ <- cursors.put(writeHandle, ())
-          } yield writeHandle.right,
-          pathErr(pathNotFound(file)).left.pure[Free[S,?]])
+        val asDir = fileParent(file) </> dir(fileName(file).value)
+        (for {
+          id <- seq.next.liftM[FileSystemErrT]
+          writeHandle = WriteFile.WriteHandle(file, id)
+          _ <- cursors.put(writeHandle, ()).liftM[FileSystemErrT]
+          _ <- Client.exists(asDir).liftM[FileSystemErrT].ifM(
+            // No need to do anything if it exists
+            ().pure[Free[S,?]].liftM[FileSystemErrT],
+            // Else, create the directory
+            EitherT(Client.createDir(asDir)).leftMap(κ(pathErr(pathExists(file)))))
+        } yield writeHandle).run
 
       case WriteFile.Write(h, data) =>
         cursors.get(h).isDefined.ifM(
-          Client.write(posixCodec.printPath(h.file), asString(data)).map( errors =>
-            errors.map {
+          Client.write(posixCodec.printPath(h.file), asString(data)).map( result =>
+            result.swap.toOption.map {
               case ResourceNotFound(msg) => pathErr(pathNotFound(h.file))
               case Forbidden(msg)        => writeFailed(Data.Arr(data.toList), "Quasar is not authorized to perform this operation on the MarkLogic server")
               case FailedRequest(msg)    => writeFailed(Data.Arr(data.toList), "An unknown error occured at the MarkLogic REST API level")
             }.toList.toVector),
-          Vector.empty[FileSystemError].pure[Free[S,?]])
+          Vector(unknownWriteHandle(h)).pure[Free[S,?]])
 
       case WriteFile.Close(h) =>
         cursors.delete(h)

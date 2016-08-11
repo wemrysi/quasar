@@ -35,24 +35,35 @@ import scalaz.stream.Process
 package object fs {
   val FsType = FileSystemType("marklogic")
 
+  type DataStream = Process[Task, Vector[Data]]
+
   type Eff0[A] = Coproduct[
-                    KeyValueStore[ReadFile.ReadHandle, Process[Task, Vector[Data]], ?],
+                    KeyValueStore[ReadFile.ReadHandle, DataStream, ?],
                     KeyValueStore[WriteFile.WriteHandle, Unit, ?],
                     A]
   type Eff1[A] = Coproduct[MonotonicSeq, Eff0, A]
   type Eff2[A] = Coproduct[Read[Client, ?], Eff1, A]
   type Eff[A]  = Coproduct[Task, Eff2, A]
 
-  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
-    val uri = new URI(uri0.value)
+  def createClient(uri: URI): Task[Client] = Task.delay {
     val (user, password0) = uri.getUserInfo.span(_ ≠ ':')
     val password = password0.drop(1)
-    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort, user, password, DatabaseClientFactory.Authentication.DIGEST)
-    val client = Client(dbClient, ContentSourceFactory.newContentSource(uri))
-    (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]                      |@|
-     KeyValueStore.impl.empty[ReadFile.ReadHandle, Process[Task, Vector[Data]]] |@|
-     MonotonicSeq.fromZero                                                         )((a,b,c) => c :+: b :+: a).map(i =>
-       (reflNT[Task] :+: Read.constant[Task, Client](client) :+: i, Task.delay(dbClient.release)))
+    def dbClient = DatabaseClientFactory.newClient(
+      uri.getHost,
+      uri.getPort,
+      user,
+      password,
+      DatabaseClientFactory.Authentication.DIGEST)
+    Client(dbClient, ContentSourceFactory.newContentSource(uri))
+  }
+
+  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
+    val uri = new URI(uri0.value)
+    (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]     |@|
+     KeyValueStore.impl.empty[ReadFile.ReadHandle, DataStream] |@|
+     MonotonicSeq.fromZero                                     |@|
+     createClient(uri)                                         )((a,b,c,client) =>
+       (reflNT[Task] :+: Read.constant[Task, Client](client) :+: c :+: b :+: a, client.release))
   }
 
   def definition[S[_]](implicit
