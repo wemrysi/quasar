@@ -179,21 +179,35 @@ object MapFunc {
             Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
               ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(InjE(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
+
         case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Nullary(field))))) =>
           as.collectFirst {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
             case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Nullary(src)))), Embed(value))))) if field ≟ src =>
               value
-            case Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Map(m))))))) =>
+            case Embed(CoEnv(\/-(Nullary(Embed(InjE(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
               }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
           }
+
+        // elide Nil on the left
+        case ConcatArrays(
+          Embed(CoEnv(\/-(MakeArray(Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil))))))))))),
+          Embed(CoEnv(\/-(rhs)))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+
+        // elide Nil on the right
+        case ConcatArrays(
+          Embed(CoEnv(\/-(lhs))),
+          Embed(CoEnv(\/-(MakeArray(Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil)))))))))))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+
         case _ => None
       })
   }
