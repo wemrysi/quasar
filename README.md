@@ -51,21 +51,18 @@ To compile the project and run tests, execute the following command:
 Note: please note that we are not using here a system wide sbt, but our own copy of it (under ./sbt). This is primarily
  done for determinism. In order to have a reproducible build, the helper script needs to be part of the repo.
 
-This will lead to failures in the integration test project (`it`). The reason for the failures is the fact that there is no configured
-"backend" to connect to in order to run the integration tests. There are two ways two run the whole suite:
+This will lead to failures in the integration test project (`it`) because there is no configured "backend" available.
+Running the full test suite can be done in two ways:
 
-1. Use dockerized integration tests script
-2. Explicitly set-up infrastrucutre
+##### Testing option 1 (prerequisite: docker)
 
-##### Alternative: dockerized integration tests script
-
-Docker must be installed. A container running mongodb will be started and removed on exit.
+A docker container running mongodb operates for the duration of the test run.
 
 ```bash
 ./bin/full-it-tests.sh
 ```
 
-##### Explicitly set-up infrastrucutre
+##### Testing option 2 (prerequisite: mongodb)
 
 Currently Quasar only supports MongoDB so in order to run the integration
 tests, you will need to provide a URL to a MongoDB. If you have a hosted MongoDB instance handy, then you can simply point to it, or else
