@@ -23,7 +23,6 @@ import quasar.fs._
 import quasar.physical.postgresql.common._
 
 import doobie.imports.ConnectionIO
-import pathy.Path.{DirName, FileName}
 import scalaz._, Scalaz._
 
 object queryfile {
@@ -56,12 +55,7 @@ object queryfile {
                if (r.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
                else ().right
              ).point[Free[S, ?]])
-    } yield r
-      .map(_.stripPrefix(dt.table).stripPrefix("☠").split("☠").toList)
-      .collect {
-        case h :: Nil => FileName(h).right
-        case h :: _   => DirName(h).left
-      }.toSet).run
+    } yield pathSegmentsFromPrefix(dt.table, r)).run
 
   def fileExists[S[_]](
     file: AFile

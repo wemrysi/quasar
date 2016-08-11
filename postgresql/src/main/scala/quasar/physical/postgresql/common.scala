@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.fs._
 
 import doobie.imports._
-import pathy.Path
+import pathy.Path, Path._
 import scalaz._, Scalaz._
 import shapeless.HNil
 
@@ -34,6 +34,16 @@ object common {
       .toIList.unite.uncons(
         FileSystemError.pathErr(PathError.invalidPath(f, "no database specified")).left,
         (h, t) => DbTable(h, t.intercalate("☠")).right)
+
+  def pathSegmentsFromPrefix(
+    tableNamePathPrefix: String, tableNamePaths: List[String]
+  ): Set[PathSegment] =
+    tableNamePaths
+      .map(_.stripPrefix(tableNamePathPrefix).stripPrefix("☠").split("☠").toList)
+      .collect {
+        case h :: Nil => FileName(h).right
+        case h :: _   => DirName(h).left
+      }.toSet
 
   def tableExists[S[_]](tableName: String): ConnectionIO[Boolean] = {
     val qStr =
