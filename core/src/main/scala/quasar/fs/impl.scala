@@ -147,22 +147,23 @@ object impl {
       }
     }
 
-  def queryFileFromDataCursor[S[_], C](
+  def queryFileFromDataCursor[S[_], F[_]: Functor, C](
     execute: (Fix[LogicalPlan], AFile) => Free[S, (PhaseResults, FileSystemError \/ AFile)],
     evaluate: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ C)],
     explain: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)],
     listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
     fileExists: AFile => Free[S, Boolean]
   )(implicit
-    C:  DataCursor[Free[S, ?], C],
-    S0: KeyValueStore[QueryFile.ResultHandle, C, ?] :<: S,
-    S1: MonotonicSeq :<: S
+    C:  DataCursor[F, C],
+    S0: F :<: S,
+    S1: KeyValueStore[QueryFile.ResultHandle, C, ?] :<: S,
+    S2: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] =
     queryFile[S, C](
       execute,
       evaluate,
-      c => C.nextChunk(c).map(_.right[FileSystemError].strengthL(c)),
-      c => C.close(c),
+      c => lift(C.nextChunk(c).map(_.right[FileSystemError].strengthL(c))).into[S],
+      c => lift(C.close(c)).into[S],
       explain,
       listContents,
       fileExists)

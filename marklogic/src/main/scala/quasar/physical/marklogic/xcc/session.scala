@@ -60,5 +60,10 @@ object session {
     private def captured[A](f: XccSession => A): F[Task[A]] =
       session.map(s => Task.delay(f(s)))
   }
+
+  object Ops {
+    def apply[S[_]](implicit S0: SessionR :<: S) =
+      new Ops[S]
+  }
 }
 
