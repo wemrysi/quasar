@@ -31,7 +31,7 @@ object impl {
 
   def read[S[_], C](
     open: (AFile, ReadOpts) => Free[S,FileSystemError \/ C],
-    read: C => Free[S,FileSystemError \/ (C, Vector[Data])],
+    read: C => Free[S,FileSystemError \/ Vector[Data]],
     close: C => Free[S,Unit])(implicit
     cursors: KeyValueStore.Ops[ReadFile.ReadHandle, C, S],
     idGen: MonotonicSeq.Ops[S]
@@ -48,9 +48,7 @@ object impl {
       case ReadFile.Read(handle) =>
         (for {
           cursor <- cursors.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
-          result <- EitherT(read(cursor))
-          (newCursor, data) = result
-          _ <- cursors.put(handle, newCursor).liftM[FileSystemErrT]
+          data <- EitherT(read(cursor))
         } yield data).run
 
       case ReadFile.Close(handle) =>
