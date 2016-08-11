@@ -23,6 +23,8 @@ import quasar.fs.QueryFile
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.Workflow._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.qscript._
@@ -30,6 +32,7 @@ import quasar.std.StdLib.string._ // TODO: remove this
 import javascript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
+import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
 object MongoDbQScriptPlanner {
@@ -63,6 +66,15 @@ object MongoDbQScriptPlanner {
           })(
           Some(_))
 
+  def processMapFuncExpr[T[_[_]]: Recursive: ShowT, A](
+    fm: Free[MapFunc[T, ?],  A])(
+    recovery: A => OutputM[Expression]):
+      OutputM[Expression] =
+    freeCataM(fm)(
+      interpretM[OutputM, MapFunc[T, ?], A, Expression](
+        recovery,
+        expression))
+
   def processMapFunc[T[_[_]]: Recursive: ShowT, A](
     fm: Free[MapFunc[T, ?],  A])(
     recovery: A => JsFn):
@@ -71,6 +83,138 @@ object MongoDbQScriptPlanner {
       interpret[MapFunc[T, ?], A, OutputM[PartialJs]](
         recovery ⋙ (r => (({ case Nil => r }, List[InputFinder]()): PartialJs).right[PlannerError]),
         javascript)) >>= (_._1.lift(Nil) \/> InternalError("failed JS"))
+
+  // TODO: Should have a JsFn version of this for $reduce nodes.
+  val accumulator: ReduceFunc[Expression] => AccumOp[Expression] = {
+    import quasar.qscript.ReduceFuncs._
+
+    {
+      case Arbitrary(a)     => $first(a)
+      case Avg(a)           => $avg(a)
+      case Count(_)         => $sum($literal(Bson.Int32(1)))
+      case Max(a)           => $max(a)
+      case Min(a)           => $min(a)
+      case Sum(a)           => $sum(a)
+      case UnshiftArray(a)  => $push(a)
+      case UnshiftMap(k, v) => ???
+    }
+  }
+
+  def expression[T[_[_]]: Recursive: ShowT]:
+      AlgebraM[OutputM, MapFunc[T, ?], Expression] = {
+    import MapFuncs._
+
+    {
+      case Nullary(v1) =>
+        v1.cataM(BsonCodec.fromEJson).bimap(
+          κ(NonRepresentableEJson(v1.shows)),
+          $literal(_))
+      case Length(a1) => $size(a1).right
+      case Date(a1) => ???
+      case Time(a1) => ???
+      case Timestamp(a1) => ???
+      case Interval(a1) => ???
+      case TimeOfDay(a1) => ???
+      case ToTimestamp(a1) =>
+        $add($literal(Bson.Date(Instant.ofEpochMilli(0))), a1).right
+      case Extract(a1, a2) => a1.project match {
+        case $literalF(Bson.Text(field)) => field match {
+          case "century" => $divide($year(a2), $literal(Bson.Int32(100))).right
+          case "day" => $dayOfMonth(a2).right
+          case "decade" => $divide($year(a2), $literal(Bson.Int32(10))).right
+          case "dow" => $add($dayOfWeek(a2), $literal(Bson.Int32(-1))).right
+          case "doy" => $dayOfYear(a2).right
+          // TODO: epoch
+          case "hour" => $hour(a2).right
+          case "isodow" =>
+            $cond($eq($dayOfWeek(a2), $literal(Bson.Int32(1))),
+              $literal(Bson.Int32(7)),
+              $add($dayOfWeek(a2), $literal(Bson.Int32(-1)))).right
+          // TODO: isoyear
+          case "microseconds" =>
+            $multiply($millisecond(a2), $literal(Bson.Int32(1000))).right
+          case "millennium" =>
+            $divide($year(a2), $literal(Bson.Int32(1000))).right
+          case "milliseconds" => $millisecond(a2).right
+          case "minute"       => $minute(a2).right
+          case "month"        => $month(a2).right
+          case "quarter"      => // TODO: handle leap years
+            $add(
+              $divide($dayOfYear(a2), $literal(Bson.Int32(92))),
+              $literal(Bson.Int32(1))).right
+          case "second"       => $second(a2).right
+          // TODO: timezone, timezone_hour, timezone_minute
+          case "week"         => $week(a2).right
+          case "year"         => $year(a2).right
+          case _              =>
+            InternalError(field + " is not a valid time period").left
+        }
+        case _ => InternalError("meh").left
+      }
+      case Negate(a1)       => $multiply($literal(Bson.Int32(-1)), a1).right
+      case Add(a1, a2)      => $add(a1, a2).right
+      case Multiply(a1, a2) => $multiply(a1, a2).right
+      case Subtract(a1, a2) => $subtract(a1, a2).right
+      case Divide(a1, a2)   => $divide(a1, a2).right
+      case Modulo(a1, a2)   => $mod(a1, a2).right
+      case Power(a1, a2)    => ???
+
+      case Not(a1)     => $not(a1).right
+      case Eq(a1, a2)  => $eq(a1, a2).right
+      case Neq(a1, a2) => $neq(a1, a2).right
+      case Lt(a1, a2)  => $lt(a1, a2).right
+      case Lte(a1, a2) => $lte(a1, a2).right
+      case Gt(a1, a2)  => $gt(a1, a2).right
+      case Gte(a1, a2) => $gte(a1, a2).right
+      case IfUndefined(a1, a2) => ???
+      case And(a1, a2) => $and(a1, a2).right
+      case Or(a1, a2)  => $or(a1, a2).right
+      case Coalesce(a1, a2) => $ifNull(a1, a2).right
+      case Between(a1, a2, a3) => $and($lte(a2, a1), $lte(a1, a3)).right
+      case Cond(a1, a2, a3) => $cond(a1, a2, a3).right
+
+      case Within(a1, a2) => ???
+
+      case Lower(a1) => $toLower(a1).right
+      case Upper(a1) => $toUpper(a1).right
+      case Bool(a1) =>
+        $cond($eq(a1, $literal(Bson.Text("true"))),
+          $literal(Bson.Bool(true)),
+          $cond($eq(a1, $literal(Bson.Text("false"))),
+            $literal(Bson.Bool(false)),
+            $literal(Bson.Undefined))).right
+      case Integer(a1) => ???
+      case Decimal(a1) => ???
+      case Null(a1) =>
+        $cond($eq(a1, $literal(Bson.Text("null"))),
+          $literal(Bson.Null),
+          $literal(Bson.Undefined)).right
+      case ToString(a1) => ???
+      case Search(a1, a2, a3) => ???
+      case Substring(a1, a2, a3) => $substr(a1, a2, a3).right
+
+      case MakeArray(a1) => ???
+      case MakeMap(a1, a2) => ???
+      case ConcatArrays(a1, a2) => $concat(a1, a2).right
+      case ConcatMaps(a1, a2) => ???
+      case ProjectField($var(DocField(base)), $literal(Bson.Text(field))) =>
+        $var(DocField(base \ BsonField.Name(field))).right
+      case ProjectIndex(a1, a2)  => ???
+      case DeleteField(a1, a2)  => ???
+
+      // NB: This is maybe a NOP for Expressions, as they (all?) safely
+      //     short-circuit when given the wrong type. However, our guards may be
+      //     more restrictive than the operation, in which case we still want to
+      //     short-circuit, so …
+      case Guard(expr, typ, cont, fallback) => ???
+
+      case DupArrayIndices(_) => ???
+      case DupMapKeys(_)      => ???
+      case Range(_, _)        => ???
+      case ZipArrayIndices(_) => ???
+      case ZipMapKeys(_)      => ???
+    }
+  }
 
   def javascript[T[_[_]]: Recursive: ShowT]:
       Algebra[MapFunc[T, ?], OutputM[PartialJs]] = {
@@ -435,7 +579,18 @@ object MongoDbQScriptPlanner {
         qs match {
           case qscript.Map(src, f) =>
             (src ⊛ getJsFn(f))(WB.jsExpr1).point[State[NameGen, ?]]
-          case Reduce(src, bucket, reducers, repair) => ???
+          case Reduce(src, bucket, reducers, repair) =>
+            (src ⊛
+              getJsFn(bucket) ⊛
+              reducers.traverse(_.traverse(getExpr[T])) ⊛
+              getJsRed(repair))((wb, b, red, rep) =>
+              ExprBuilder(
+                GroupBuilder(wb,
+                  List(ExprBuilder(wb, b.left)),
+                  Contents.Doc(red.zipWithIndex.map(ai =>
+                    (BsonField.Name(ai._2.toString),
+                      accumulator(ai._1).left[Expression])).toListMap)),
+                rep.left)).point[State[NameGen, ?]]
           case Sort(src, bucket, order) =>
             val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
             (src ⊛ keys.traverse(getJsFn[T]))((wb, ks) =>
@@ -516,6 +671,9 @@ object MongoDbQScriptPlanner {
     }
   }
 
+  def getExpr[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[Expression] =
+    processMapFuncExpr(fm)(κ($field("value").right))
+
   def getJsFn[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[JsFn] =
     processMapFunc(fm)(κ(JsFn.identity))
 
@@ -525,6 +683,10 @@ object MongoDbQScriptPlanner {
       case LeftSide => JsFn(JsFn.defaultName, l(0))
       case RightSide => JsFn(JsFn.defaultName, l(1))
     }
+
+  def getJsRed[T[_[_]]: Recursive: ShowT](jr: Free[MapFunc[T, ?], ReduceIndex]):
+      OutputM[JsFn] =
+    processMapFunc(jr)(ri => JsFn.const(jscore.ident(ri.idx.toString)))
 
   def rebaseWB[T[_[_]], WF[_]: Functor: Coalesce: Crush: Crystallize](
     free: FreeQS[T], src: WorkflowBuilder[WF])(
