@@ -17,55 +17,72 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.LogicalPlan
+import quasar.PhaseResult
+import quasar.Planner.PlannerError
+import quasar.effect.MonotonicSeq
 import quasar.fs._
-import quasar.effect.Read
+import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fp.numeric.Positive
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
-import quasar.Planner.PlannerError
+import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionR, XccFailure}
 import quasar.qscript._
 
-import scala.Predef.???
-
+import com.marklogic.xcc.RequestOptions
 import matryoshka._, Recursive.ops._
-import pathy.Path._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
+  import FileSystemError._
+  import MarkLogicPlanner._
 
   def interpret[S[_]](
-    implicit
-    S0: Read[Client, ?] :<: S,
-    S1: Task :<: S
-  ): QueryFile ~> Free[S, ?] = new (QueryFile ~> Free[S, ?]) {
-    def apply[A](qf: QueryFile[A]) = qf match {
-      case ExecutePlan(lp, out) => (
-          for {
-            qs     <- EitherT(convertToQScript(lp).point[Free[S, ?]])
-            _      =  println(s"queryfile interpret qs: $qs")
-            xquery <- EitherT(qs.cataM(
-                     Planner.Planner[QScriptTotal[Fix, ?], String].plan).point[Free[S, ?]])
-            _    <- Client.execute(xquery, fileParent(out) </> dir(fileName(out).value)).liftM[EitherT[?[_], PlannerError, ?]]
-          } yield out
-        ).leftMap(FileSystemError.planningFailed(lp,_)).run.strengthL(Vector.empty)
+    resultsChunkSize: Positive
+  )(implicit
+    S0: SessionR :<: S,
+    S1: XccFailure :<: S,
+    S2: MLResultHandles :<: S,
+    S3: MonotonicSeq :<: S,
+    S4: Task :<: S,
+    S5: XccCursorM :<: S
+  ): QueryFile ~> Free[S, ?] = {
+    val session = xcc.session.Ops[S]
 
-      case EvaluatePlan(lp) =>
-        ???
-
-      case More(h) =>
-        ???
-
-      case Close(h) =>
-        ???
-
-      case Explain(lp) =>
-        ???
-
-      case ListContents(dir) =>
-        ???
-
-      case FileExists(file) =>
-        ???
+    val evalOpts = {
+      val ropts = new RequestOptions
+      ropts.setCacheResult(false)
+      ropts
     }
+
+    def planLP(lp: Fix[LogicalPlan]): PlannerError \/ XQuery =
+      convertToQScript(lp) >>= (_.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
+
+    def exec(lp: Fix[LogicalPlan], out: AFile) =
+      planLP(lp).fold(
+        err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
+        xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(out))
+      ).point[Free[S, ?]]
+
+    // TODO: PhaseResults
+    def eval(lp: Fix[LogicalPlan]) =
+      EitherT.fromDisjunction[Free[S, ?]](planLP(lp))
+        .leftMap(planningFailed(lp, _))
+        .flatMap(session.evaluateQuery(_, evalOpts).liftM[FileSystemErrT])
+        .map(new ChunkedResultSequence[XccCursor](resultsChunkSize, _))
+        .run
+        .strengthL(Vector.empty[PhaseResult])
+
+    // TODO: Eliminate duplication with exec
+    def explain(lp: Fix[LogicalPlan]) =
+      planLP(lp).fold(
+        err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
+        xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(ExecutionPlan(FsType, xqy)))
+      ).point[Free[S, ?]]
+
+    queryFileFromDataCursor[S, XccCursorM, ChunkedResultSequence[XccCursor]](exec, eval, explain,
+      dir  => Set[PathSegment]().point[FileSystemErrT[Free[S, ?], ?]].run,
+      file => false.point[Free[S, ?]])
   }
 }
