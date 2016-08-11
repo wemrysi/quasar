@@ -17,15 +17,18 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.{LogicalPlan, PhaseResults}
 import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 
+import matryoshka.Fix
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 
 object impl {
+  import FileSystemError._
 
   final case class ReadOpts(offset: Natural, limit: Option[Positive])
 
@@ -47,7 +50,7 @@ object impl {
 
       case ReadFile.Read(handle) =>
         (for {
-          cursor <- cursors.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
+          cursor <- cursors.get(handle).toRight(unknownReadHandle(handle))
           result <- EitherT(read(cursor))
           (newCursor, data) = result
           _ <- cursors.put(handle, newCursor).liftM[FileSystemErrT]
@@ -80,7 +83,7 @@ object impl {
 
         case ReadFile.Read(handle) =>
           (for {
-            stream <- state.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
+            stream <- state.get(handle).toRight(unknownReadHandle(handle))
             data   <- EitherT(lift(stream.unconsOption).into[S].flatMap {
                         case Some((value, streamTail)) =>
                           state.put(handle, streamTail).as(value.right[FileSystemError])
@@ -97,4 +100,71 @@ object impl {
           } yield ()).run.void
       }
     }
+
+  def queryFile[S[_], C](
+    execute: (Fix[LogicalPlan], AFile) => Free[S, (PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ C)],
+    more: C => Free[S, FileSystemError \/ (C, Vector[Data])],
+    close: C => Free[S, Unit],
+    explain: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => Free[S, Boolean]
+  )(implicit
+    cursors: KeyValueStore.Ops[QueryFile.ResultHandle, C, S],
+    mseq:    MonotonicSeq.Ops[S]
+  ): QueryFile ~> Free[S, ?] =
+    new (QueryFile ~> Free[S, ?]) {
+      def apply[A](qf: QueryFile[A]) = qf match {
+        case QueryFile.ExecutePlan(lp, out) => execute(lp, out)
+        case QueryFile.Explain(lp)          => explain(lp)
+        case QueryFile.ListContents(dir)    => listContents(dir)
+        case QueryFile.FileExists(file)     => fileExists(file)
+
+        case QueryFile.EvaluatePlan(lp) =>
+          evaluate(lp) flatMap { case (phaseResults, orCursor) =>
+            val handle = for {
+              cursor <- EitherT.fromDisjunction[Free[S, ?]](orCursor)
+              id     <- mseq.next.liftM[FileSystemErrT]
+              h      =  QueryFile.ResultHandle(id)
+              _      <- cursors.put(h, cursor).liftM[FileSystemErrT]
+            } yield h
+
+            handle.run strengthL phaseResults
+          }
+
+        case QueryFile.More(h) =>
+          (for {
+            cursor <- cursors.get(h).toRight(unknownResultHandle(h))
+            result <- EitherT(more(cursor))
+            (nextCursor, data) = result
+            _      <- cursors.put(h, nextCursor).liftM[FileSystemErrT]
+          } yield data).run
+
+        case QueryFile.Close(h) =>
+          cursors.get(h)
+            .flatMapF(c => close(c) *> cursors.delete(h))
+            .orZero
+      }
+    }
+
+  def queryFileFromDataCursor[S[_], F[_]: Functor, C](
+    execute: (Fix[LogicalPlan], AFile) => Free[S, (PhaseResults, FileSystemError \/ AFile)],
+    evaluate: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ C)],
+    explain: Fix[LogicalPlan] => Free[S, (PhaseResults, FileSystemError \/ ExecutionPlan)],
+    listContents: ADir => Free[S, FileSystemError \/ Set[PathSegment]],
+    fileExists: AFile => Free[S, Boolean]
+  )(implicit
+    C:  DataCursor[F, C],
+    S0: F :<: S,
+    S1: KeyValueStore[QueryFile.ResultHandle, C, ?] :<: S,
+    S2: MonotonicSeq :<: S
+  ): QueryFile ~> Free[S, ?] =
+    queryFile[S, C](
+      execute,
+      evaluate,
+      c => lift(C.nextChunk(c).map(_.right[FileSystemError].strengthL(c))).into[S],
+      c => lift(C.close(c)).into[S],
+      explain,
+      listContents,
+      fileExists)
 }

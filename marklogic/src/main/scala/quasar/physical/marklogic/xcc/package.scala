@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic
 
-import quasar.Planner.PlannerError
+import quasar.effect.{Failure, Read}
 
-import matryoshka._
-import scalaz._
+import com.marklogic.xcc.Session
+import scalaz.:<:
 
-trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
-}
+package object xcc {
+  type SessionR[A] = Read[Session, A]
 
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
+  object SessionR {
+    def Ops[S[_]](implicit S: SessionR :<: S) =
+      Read.Ops[Session, S]
+  }
 
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+  type XccFailure[A] = Failure[XccError, A]
+
+  object XccFailure {
+    def Ops[S[_]](implicit S: XccFailure :<: S) =
+      Failure.Ops[XccError, S]
+  }
 }

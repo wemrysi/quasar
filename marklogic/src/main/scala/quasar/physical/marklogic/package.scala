@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical
 
-import quasar.Planner.PlannerError
+import quasar.Predef.String
+import quasar.effect.Read
 
-import matryoshka._
-import scalaz._
+import scalaz.:<:
 
-trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
-}
+package object marklogic {
+  type XQuery = String
 
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
+  type ClientR[A] = Read[Client, A]
 
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+  object ClientR {
+    def Ops[S[_]](implicit S: ClientR :<: S) =
+      Read.Ops[Client, S]
+  }
 }

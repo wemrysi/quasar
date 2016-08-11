@@ -14,23 +14,29 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xcc
 
-import quasar.Planner.PlannerError
+import quasar.Predef.Unit
+import quasar.SKI.κ
 
-import matryoshka._
-import scalaz._
+import monocle.Iso
+import scalaz.{Show, Order}
+import scalaz.std.anyVal._
 
-trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
-}
+/** A content-free value indicating an operation was executed but does not produce
+  * any results.
+  */
+sealed abstract class Executed
 
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
+object Executed {
+  val executed: Executed = new Executed {}
 
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+  val isoUnit: Iso[Executed, Unit] =
+    Iso[Executed, Unit](κ(()))(κ(executed))
+
+  implicit val order: Order[Executed] =
+    Order.orderBy(isoUnit.get)
+
+  implicit val show: Show[Executed] =
+    Show.shows(κ("Executed"))
 }

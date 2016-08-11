@@ -18,7 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.Data
-import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
@@ -28,22 +28,32 @@ import com.marklogic.client._
 import com.marklogic.xcc._
 import java.net.URI
 
-import scalaz._, Scalaz._
+import eu.timepit.refined.auto._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 package object fs {
+  import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
+  import xcc.ChunkedResultSequence
+
   val FsType = FileSystemType("marklogic")
 
-  type DataStream = Process[Task, Vector[Data]]
+  type XccCursor[A]  = Coproduct[Task, xcc.XccFailure, A]
+  type XccCursorM[A] = Free[XccCursor, A]
 
-  type Eff0[A] = Coproduct[
-                    KeyValueStore[ReadFile.ReadHandle, DataStream, ?],
-                    KeyValueStore[WriteFile.WriteHandle, Unit, ?],
-                    A]
-  type Eff1[A] = Coproduct[MonotonicSeq, Eff0, A]
-  type Eff2[A] = Coproduct[Read[Client, ?], Eff1, A]
-  type Eff[A]  = Coproduct[Task, Eff2, A]
+  type MLReadHandles[A] = KeyValueStore[ReadHandle, Process[Task, Vector[Data]], A]
+  type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
+  type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence[XccCursor], A]
+
+  type Eff[A]  = Coproduct[Task, Eff0, A]
+  type Eff0[A] = Coproduct[ClientR, Eff1, A]
+  type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff2[A] = Coproduct[MLReadHandles, Eff3, A]
+  type Eff3[A] = Coproduct[MLWriteHandles, Eff4, A]
+  type Eff4[A] = Coproduct[MLResultHandles, Eff5, A]
+  type Eff5[A] = Coproduct[xcc.SessionR, Eff6, A]
+  type Eff6[A] = Coproduct[xcc.XccFailure, XccCursorM, A]
 
   def createClient(uri: URI): Task[Client] = Task.delay {
     val (user, password0) = uri.getUserInfo.span(_ ≠ ':')
@@ -59,11 +69,37 @@ package object fs {
 
   def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
     val uri = new URI(uri0.value)
-    (KeyValueStore.impl.empty[WriteFile.WriteHandle, Unit]     |@|
-     KeyValueStore.impl.empty[ReadFile.ReadHandle, DataStream] |@|
-     MonotonicSeq.fromZero                                     |@|
-     createClient(uri)                                         )((a,b,c,client) =>
-       (reflNT[Task] :+: Read.constant[Task, Client](client) :+: c :+: b :+: a, client.release))
+
+    val failErrs = Failure.toRuntimeError[Task, xcc.XccError]
+
+    // TODO: Define elsewhere, can probably make this another generic impl of Read
+    val newSession: xcc.SessionR ~> Task =
+    new (xcc.SessionR ~> Task) {
+      def apply[A](ra: Read[Session, A]) = ra match {
+        case Read.Ask(f) => Task.delay(f(csource.newSession))
+      }
+    }
+
+    (
+      KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
+      KeyValueStore.impl.empty[ReadHandle, Process[Task, Vector[Data]]]        |@|
+      KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence[XccCursor]] |@|
+      MonotonicSeq.fromZero                                                    |@|
+      createClient(uri)
+    ) { (whandles, rhandles, qhandles, seq, client) =>
+      val toTask =
+        reflNT[Task]                        :+:
+        Read.constant[Task, Client](client) :+:
+        seq                                 :+:
+        rhandles                            :+:
+        whandles                            :+:
+        qhandles                            :+:
+        newSession                          :+:
+        failErrs                            :+:
+        foldMapNT(reflNT[Task] :+: failErrs)
+
+      (toTask, Task.delay(dbClient.release))
+    }
   }
 
   def definition[S[_]](implicit
@@ -75,7 +111,7 @@ package object fs {
         lift(inter(uri).map { case (run, release) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
-              queryfile.interpret[Eff],
+              queryfile.interpret[Eff](100L),
               readfile.interpret[Eff],
               writefile.interpret[Eff],
               managefile.interpret[Eff]),

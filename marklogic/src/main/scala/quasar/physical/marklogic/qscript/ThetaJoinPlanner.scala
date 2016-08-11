@@ -16,21 +16,16 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.Predef.{Map => _, _}
 import quasar.Planner.PlannerError
+import quasar.physical.marklogic.XQuery
+import quasar.qscript._
 
 import matryoshka._
 import scalaz._
 
-trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
-}
-
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
-
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+private[qscript] final class ThetaJoinPlanner[T[_[_]]] extends MarkLogicPlanner[ThetaJoin[T, ?]] {
+  val plan: AlgebraM[PlannerError \/ ?, ThetaJoin[T, ?], XQuery] = {
+    case ThetaJoin(src, lBranch, rBranch, on, f, combine) => ???
+  }
 }

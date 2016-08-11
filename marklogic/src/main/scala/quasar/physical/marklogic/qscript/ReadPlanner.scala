@@ -16,21 +16,20 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.Predef._
 import quasar.Planner.PlannerError
+import quasar.physical.marklogic.XQuery
+import quasar.qscript._
 
 import matryoshka._
-import scalaz._
+import pathy.Path._
+import scalaz._, Scalaz._
 
-trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
-}
-
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
-
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
+  val plan: AlgebraM[PlannerError \/ ?, Const[Read, ?], XQuery] = {
+    case Const(Read(absFile)) =>
+      val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
+      val dirRepr = posixCodec.printPath(asDir)
+      s"""cts:directory-query("$dirRepr", "1")""".right
+  }
 }
