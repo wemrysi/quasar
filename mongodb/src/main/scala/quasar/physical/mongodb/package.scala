@@ -17,6 +17,7 @@
 package quasar.physical
 
 import quasar.Predef.Vector
+import quasar.TernaryFunc
 import quasar.javascript.Js
 import quasar.fs.PhysicalError
 import quasar.namegen._
@@ -38,6 +39,9 @@ package object mongodb {
   type JavaScriptLog[A]        = Writer[JavaScriptPrg, A]
 
   type MongoDbIOLog[A] = JavaScriptLogT[MongoDbIO, A]
+
+  // TODO: actually give these funcs their own type
+  type JoinType = TernaryFunc
 
   // TODO: parameterize over label (SD-512)
   def freshName: State[NameGen, BsonField.Name] =
