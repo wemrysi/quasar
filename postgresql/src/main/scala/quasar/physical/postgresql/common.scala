@@ -27,18 +27,17 @@ object common {
 
   final case class DbTable(db: String, table: String)
 
-  // TODO: Going with ☠ style path table names for the moment
   def dbTableFromPath(f: APath): FileSystemError \/ DbTable =
     Path.flatten(None, None, None, Some(_), Some(_), f)
       .toIList.unite.uncons(
         FileSystemError.pathErr(PathError.invalidPath(f, "no database specified")).left,
-        (h, t) => DbTable(h, t.intercalate("☠")).right)
+        (h, t) => DbTable(h, t.intercalate("/")).right)
 
   def pathSegmentsFromPrefix(
     tableNamePathPrefix: String, tableNamePaths: List[String]
   ): Set[PathSegment] =
     tableNamePaths
-      .map(_.stripPrefix(tableNamePathPrefix).stripPrefix("☠").split("☠").toList)
+      .map(_.stripPrefix(tableNamePathPrefix).stripPrefix("/").split("/").toList)
       .collect {
         case h :: Nil => FileName(h).right
         case h :: _   => DirName(h).left
