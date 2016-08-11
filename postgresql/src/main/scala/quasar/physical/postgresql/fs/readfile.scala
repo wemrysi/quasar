@@ -40,7 +40,7 @@ object readfile {
   ): ReadFile ~> Free[S, ?] =
     impl.readFromProcess[S, ConnectionIO] { (file: AFile, readOpts: impl.ReadOpts) =>
       (for {
-        dt <- dbTableFromPath(file)
+        dt <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
         _  <- EitherT(lift(tableExists(dt.table)).into.map(_
                 .either(())
                 .or(FileSystemError.pathErr(PathError.pathNotFound(file)))))

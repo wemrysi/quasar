@@ -50,7 +50,7 @@ object queryfile {
     S0: ConnectionIO :<: S
   ): Free[S, FileSystemError \/ Set[PathSegment]] =
     (for {
-      dt  <- dbTableFromPath(dir)
+      dt  <- EitherT(dbTableFromPath(dir).point[Free[S, ?]])
       r   <- lift(tablesWithPrefix(dt.table)).into.liftM[FileSystemErrT]
       _   <- EitherT((
                if (r.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(dir)).left
@@ -69,7 +69,7 @@ object queryfile {
     S0: ConnectionIO :<: S
   ): Free[S, Boolean] =
     (for {
-      dt  <- dbTableFromPath(file)
+      dt  <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
       r   <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
     } yield r).leftMap(κ(false)).merge[Boolean]
 

@@ -47,8 +47,8 @@ object managefile {
     S0: ConnectionIO :<: S
   ): Free[S, FileSystemError \/ Unit] =
     (for {
-      src       <- dbTableFromPath(scenario.src)
-      dst       <- dbTableFromPath(scenario.dst): FileSystemErrT[Free[S, ?], DbTable]
+      src       <- EitherT(dbTableFromPath(scenario.src).point[Free[S, ?]])
+      dst       <- EitherT(dbTableFromPath(scenario.dst).point[Free[S, ?]])
       _         <- EitherT((
                      if (src.db =/= dst.db) FileSystemError.pathErr(
                        PathError.invalidPath(scenario.dst, "different db from src path")).left
@@ -89,7 +89,7 @@ object managefile {
     S0: ConnectionIO :<: S
   ): Free[S, FileSystemError \/ Unit] =
     (for {
-      dt   <- dbTableFromPath(path)
+      dt   <- EitherT(dbTableFromPath(path).point[Free[S, ?]])
       tbls <- lift(tablesWithPrefix(dt.table)).into.liftM[FileSystemErrT]
       _    <- EitherT((
                 if (tbls.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(path)).left

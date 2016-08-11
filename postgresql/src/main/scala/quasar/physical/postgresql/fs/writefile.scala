@@ -61,7 +61,7 @@ object writefile {
     S3: ConnectionIO :<: S
   ): Free[S, FileSystemError \/ WriteHandle] =
     (for {
-      dt   <- dbTableFromPath(file)
+      dt   <- EitherT(dbTableFromPath(file).point[Free[S, ?]])
       tbEx <- lift(tableExists(dt.table)).into.liftM[FileSystemErrT]
       _    <- (
                 if (tbEx)

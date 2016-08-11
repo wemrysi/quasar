@@ -29,13 +29,11 @@ object common {
   final case class DbTable(db: String, table: String)
 
   // TODO: Going with ☠ style path table names for the moment
-  def dbTableFromPath[S[_]](f: APath): FileSystemErrT[Free[S, ?], DbTable] =
-    EitherT(
-      Path.flatten(None, None, None, Some(_), Some(_), f)
-        .toIList.unite.uncons(
-          FileSystemError.pathErr(PathError.invalidPath(f, "no database specified")).left,
-          (h, t) => DbTable(h, t.intercalate("☠")).right)
-        .point[Free[S, ?]])
+  def dbTableFromPath(f: APath): FileSystemError \/ DbTable =
+    Path.flatten(None, None, None, Some(_), Some(_), f)
+      .toIList.unite.uncons(
+        FileSystemError.pathErr(PathError.invalidPath(f, "no database specified")).left,
+        (h, t) => DbTable(h, t.intercalate("☠")).right)
 
   def tableExists[S[_]](tableName: String): ConnectionIO[Boolean] = {
     val qStr =
