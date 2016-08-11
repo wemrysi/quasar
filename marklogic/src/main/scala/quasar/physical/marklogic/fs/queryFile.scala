@@ -24,14 +24,13 @@ import quasar.physical.marklogic.qscript._
 import quasar.Planner.PlannerError
 import quasar.qscript._
 
-import scala.Predef.???
-
 import matryoshka._, Recursive.ops._
 import pathy.Path._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
+  import MarkLogicPlanner._
 
   def interpret[S[_]](
     implicit
@@ -43,9 +42,8 @@ object queryfile {
           for {
             qs     <- EitherT(convertToQScript(lp).point[Free[S, ?]])
             _      =  println(s"queryfile interpret qs: $qs")
-            xquery <- EitherT(qs.cataM(
-                     Planner.Planner[QScriptTotal[Fix, ?], String].plan).point[Free[S, ?]])
-            _    <- Client.execute(xquery, fileParent(out) </> dir(fileName(out).value)).liftM[EitherT[?[_], PlannerError, ?]]
+            xquery <- EitherT(qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan).point[Free[S, ?]])
+            _      <- Client.execute(xquery, fileParent(out) </> dir(fileName(out).value)).liftM[EitherT[?[_], PlannerError, ?]]
           } yield out
         ).leftMap(FileSystemError.planningFailed(lp,_)).run.strengthL(Vector.empty)
 

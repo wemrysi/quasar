@@ -14,25 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical
 
-import quasar.effect.{Failure, Read}
+import quasar.Predef.String
+import quasar.effect.Read
 
-import com.marklogic.xcc.Session
 import scalaz.:<:
 
-package object xcc {
-  type SessionR[A] = Read[Session, A]
+package object marklogic {
+  type XQuery = String
 
-  object SessionR {
-    def Ops[S[_]](implicit S: SessionR :<: S) =
-      Read.Ops[Session, S]
-  }
+  type ClientR[A] = Read[Client, A]
 
-  type XccFailure[A] = Failure[XccError, A]
-
-  object XccFailure {
-    def Ops[S[_]](implicit S: XccFailure :<: S) =
-      Failure.Ops[XccError, S]
+  object ClientR {
+    def Ops[S[_]](implicit S: ClientR :<: S) =
+      Read.Ops[Client, S]
   }
 }

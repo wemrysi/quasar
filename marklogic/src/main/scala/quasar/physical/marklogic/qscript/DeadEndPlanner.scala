@@ -14,25 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.qscript
 
-import quasar.effect.{Failure, Read}
+import quasar.Predef._
+import quasar.Planner.PlannerError
+import quasar.physical.marklogic.XQuery
+import quasar.qscript._
 
-import com.marklogic.xcc.Session
-import scalaz.:<:
+import matryoshka._
+import scalaz._
 
-package object xcc {
-  type SessionR[A] = Read[Session, A]
-
-  object SessionR {
-    def Ops[S[_]](implicit S: SessionR :<: S) =
-      Read.Ops[Session, S]
-  }
-
-  type XccFailure[A] = Failure[XccError, A]
-
-  object XccFailure {
-    def Ops[S[_]](implicit S: XccFailure :<: S) =
-      Failure.Ops[XccError, S]
+private[qscript] final class DeadEndPlanner extends MarkLogicPlanner[Const[DeadEnd, ?]] {
+  val plan: AlgebraM[PlannerError \/ ?, Const[DeadEnd, ?], XQuery] = {
+    case Const(Root) => ???
   }
 }

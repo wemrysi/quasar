@@ -14,25 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.qscript
 
-import quasar.effect.{Failure, Read}
+import quasar.Predef._
+import quasar.Planner.PlannerError
+import quasar.physical.marklogic.XQuery
+import quasar.qscript._
 
-import com.marklogic.xcc.Session
-import scalaz.:<:
+import matryoshka._
+import pathy.Path._
+import scalaz._, Scalaz._
 
-package object xcc {
-  type SessionR[A] = Read[Session, A]
-
-  object SessionR {
-    def Ops[S[_]](implicit S: SessionR :<: S) =
-      Read.Ops[Session, S]
-  }
-
-  type XccFailure[A] = Failure[XccError, A]
-
-  object XccFailure {
-    def Ops[S[_]](implicit S: XccFailure :<: S) =
-      Failure.Ops[XccError, S]
+private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
+  val plan: AlgebraM[PlannerError \/ ?, Const[Read, ?], XQuery] = {
+    case Const(Read(absFile)) =>
+      val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
+      val dirRepr = posixCodec.printPath(asDir)
+      s"""cts:directory-query("$dirRepr", "1")""".right
   }
 }

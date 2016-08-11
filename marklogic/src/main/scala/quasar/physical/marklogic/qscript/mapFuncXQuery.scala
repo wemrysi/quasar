@@ -14,25 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.qscript
 
-import quasar.effect.{Failure, Read}
+import quasar.Predef._
+import quasar.physical.marklogic.XQuery
+import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
-import com.marklogic.xcc.Session
-import scalaz.:<:
+import matryoshka.Algebra
 
-package object xcc {
-  type SessionR[A] = Read[Session, A]
-
-  object SessionR {
-    def Ops[S[_]](implicit S: SessionR :<: S) =
-      Read.Ops[Session, S]
-  }
-
-  type XccFailure[A] = Failure[XccError, A]
-
-  object XccFailure {
-    def Ops[S[_]](implicit S: XccFailure :<: S) =
-      Failure.Ops[XccError, S]
+object mapFuncXQuery {
+  def apply[T[_[_]]]: Algebra[MapFunc[T, ?], XQuery] = {
+    case v @ ToString(a1) => ???
+    case v => s" ???(MapFunc - $v)??? "
   }
 }

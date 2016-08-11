@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.qscript
 
-import quasar.effect.{Failure, Read}
+import quasar.Predef.{Map => _, _}
+import quasar.Planner.PlannerError
+import quasar.physical.marklogic.XQuery
+import quasar.qscript._
 
-import com.marklogic.xcc.Session
-import scalaz.:<:
+import matryoshka._
+import scalaz._
 
-package object xcc {
-  type SessionR[A] = Read[Session, A]
-
-  object SessionR {
-    def Ops[S[_]](implicit S: SessionR :<: S) =
-      Read.Ops[Session, S]
-  }
-
-  type XccFailure[A] = Failure[XccError, A]
-
-  object XccFailure {
-    def Ops[S[_]](implicit S: XccFailure :<: S) =
-      Failure.Ops[XccError, S]
+private[qscript] final class ProjectBucketPlanner[T[_[_]]] extends MarkLogicPlanner[ProjectBucket[T, ?]] {
+  val plan: AlgebraM[PlannerError \/ ?, ProjectBucket[T, ?], XQuery] = {
+    case BucketField(src, value, name)  => ???
+    case BucketIndex(src, value, index) => ???
   }
 }
