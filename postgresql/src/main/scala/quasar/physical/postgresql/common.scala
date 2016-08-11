@@ -22,7 +22,6 @@ import quasar.fs._
 import doobie.imports._
 import pathy.Path, Path._
 import scalaz._, Scalaz._
-import shapeless.HNil
 
 object common {
 
@@ -45,20 +44,22 @@ object common {
         case h :: _   => DirName(h).left
       }.toSet
 
-  def tableExists[S[_]](tableName: String): ConnectionIO[Boolean] = {
-    val qStr =
-      s"""select table_name from information_schema.tables
-          where table_name = '$tableName'"""
-
-     Query[HNil, String](qStr, none).toQuery0(HNil).list.map(_.nonEmpty)
-  }
+  def tableExists[S[_]](tableName: String): ConnectionIO[Boolean] =
+    sql"""select table_name from information_schema.tables
+          where table_name = $tableName"""
+          .query[String].list.map(_.nonEmpty)
 
   def tablesWithPrefix(tableNamePrefix: String): ConnectionIO[List[String]] = {
-    val qStr =
-      s"""select table_name from information_schema.tables
-          where table_name like '$tableNamePrefix%'"""
+    // NB: Order important to avoid double-escaping
+    // TODO: Duplicated from Quasar Advanced. Relocate to a common location.
+    val patternChars = List("\\\\", "_", "%")
 
-    Query[HNil, String](qStr, none).toQuery0(HNil).list
+    val patternEscaped =
+      patternChars.foldLeft(tableNamePrefix)((s, c) => s.replaceAll(c, s"\\\\$c"))
+
+    sql"""select table_name from information_schema.tables
+          where table_name like ${patternEscaped + "%"}"""
+          .query[String].list
   }
 
 }
