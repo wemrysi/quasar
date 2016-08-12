@@ -59,9 +59,7 @@ lazy val buildSettings = Seq(
   // NB: These options need scalac 2.11.7 ∴ sbt > 0.13 for meta-project
   scalacOptions ++= BuildInfo.scalacOptions ++ Seq(
     "-target:jvm-1.8",
-    // Try again once the new backend is more stable. Specifically, it would appear the Op class in Zip
-    // causes problems when recompiling code in sbt without running `clean` in between.
-    //"-Ybackend:GenBCode",
+    "-Ybackend:GenBCode",
     "-Ydelambdafy:method",
     "-Ywarn-unused-import"),
   scalacOptions in (Test, console) --= Seq(
@@ -309,4 +307,5 @@ lazy val it = project
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
+  .settings(parallelExecution in Test := false)
   .enablePlugins(AutomateHeaderPlugin)
