@@ -74,20 +74,26 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql]) =
+  def queryPlanner(expr: Fix[Sql], ctx: MongoQueryModel) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
         e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        MongoDbPlanner.plan(_, MongoQueryModel.`3.2`).leftMap(CPlannerError(_))))
+        MongoDbPlanner.plan(_, ctx).leftMap(CPlannerError(_))))
 
-  def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] = {
+  def plan0(query: String, ctx: MongoQueryModel): Either[CompilationError, Crystallized[WorkflowF]] = {
     fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_).run).value.toEither
+      queryPlanner(_, ctx).run).value.toEither
   }
+
+  def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+    plan0(query, MongoQueryModel.`2.6`)
+
+  def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
+    plan0(query, MongoQueryModel.`3.2`)
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
@@ -101,7 +107,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
       expr <- fixParser.parse(Query(query))
-    } yield queryPlanner(expr).run.written
+    } yield queryPlanner(expr, MongoQueryModel.`3.2`).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
@@ -2842,8 +2848,8 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
         swapped: Boolean) =
       Crystallize[WorkflowF].crystallize(joinStructure0(left, leftName, leftBase, right, leftKey, rightKey, fin, swapped))
 
-    "plan simple join" in {
-      plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+    "plan simple join (map-reduce)" in {
+      plan2_6("select zips2.city from zips join zips2 on zips._id = zips2._id") must
         beWorkflow(
           joinStructure(
             $read(Collection("db", "zips")), "__tmp0", $$ROOT,
@@ -2866,6 +2872,30 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                     $literal(Bson.Undefined))),
                 IgnoreId)),
             false).op)
+    }
+
+    "plan simple join ($lookup)" in {
+      plan("select zips2.city from zips join zips2 on zips._id = zips2._id") must
+        beWorkflow(chain[Workflow](
+          $read(Collection("db", "zips")),
+          $match(Selector.Doc(
+            BsonField.Name("_id") -> Selector.Neq(Bson.Null))),
+          $project(reshape("left" -> $$ROOT)),
+          $lookup(
+            Collection("db", "zips2"),
+            BsonField.Name("left") \ BsonField.Name("_id"),
+            BsonField.Name("_id"),
+            BsonField.Name("right")),
+          $unwind(DocField(BsonField.Name("right"))),
+          $project(
+            reshape("city" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                  $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $field("right", "city"),
+                $literal(Bson.Undefined))),
+            IgnoreId)))
     }
 
     "plan non-equi join" in {
@@ -2936,8 +2966,8 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           false).op)
     }
 
-    "plan simple inner equi-join" in {
-      plan(
+    "plan simple inner equi-join (map-reduce)" in {
+      plan2_6(
         "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id") must
       beWorkflow(
         joinStructure(
@@ -2969,6 +2999,38 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
                     $literal(Bson.Undefined))),
               IgnoreId)),
           false).op)
+    }
+
+    "plan simple inner equi-join ($lookup)" in {
+      plan(
+        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id") must
+      beWorkflow(chain[Workflow](
+        $read(Collection("db", "foo")),
+        $match(Selector.Doc(
+          BsonField.Name("id") -> Selector.Neq(Bson.Null))),
+        $project(reshape("left" -> $$ROOT)),
+        $lookup(
+          Collection("db", "bar"),
+          BsonField.Name("left") \ BsonField.Name("id"),
+          BsonField.Name("foo_id"),
+          BsonField.Name("right")),
+        $unwind(DocField(BsonField.Name("right"))),
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
     }
 
     "plan simple outer equi-join with wildcard" in {
@@ -3063,8 +3125,8 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           false).op)
     }
 
-    "plan 3-way right equi-join" in {
-      plan(
+    "plan 3-way right equi-join (map-reduce)" in {
+      plan2_6(
         "select foo.name, bar.address, baz.zip " +
           "from foo join bar on foo.id = bar.foo_id " +
           "right join baz on bar.id = baz.bar_id") must
@@ -3388,7 +3450,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
 
     args.report(showtimes = true)
 
-    "plan multiple reducing projections (all, distinct, orderBy)" ! Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
+    "plan multiple reducing projections (all, distinct, orderBy)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3421,7 +3483,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       }
     }
 
-    "plan multiple reducing projections (all, distinct)" ! Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (all, distinct)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3436,7 +3498,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       }
     }.set(maxSize = 10)
 
-    "plan multiple reducing projections (all)" ! Prop.forAll(select(notDistinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (all)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)
@@ -3452,7 +3514,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }.set(maxSize = 10)
 
     // NB: tighter constraint because we know there's no filter.
-    "plan multiple reducing projections (no filter)" ! Prop.forAll(select(notDistinct, maybeReducingExpr, noFilter, Gen.option(groupBySeveral), noOrderBy)) { q =>
+    "plan multiple reducing projections (no filter)" >> Prop.forAll(select(notDistinct, maybeReducingExpr, noFilter, Gen.option(groupBySeveral), noOrderBy)) { q =>
       plan(q.value) must beRight.which { fop =>
         val wf = fop.op
         noConsecutiveProjectOps(wf)

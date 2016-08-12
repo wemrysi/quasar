@@ -127,13 +127,13 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
   }) }
 
   "Project.id" should {
-    "be idempotent" ! prop { (p: $ProjectF[Unit]) =>
+    "be idempotent" >> prop { (p: $ProjectF[Unit]) =>
       p.id must_== p.id.id
     }
   }
 
   "Project.get" should {
-    "retrieve whatever value it was set to" ! prop { (p: $ProjectF[Unit], f: BsonField) =>
+    "retrieve whatever value it was set to" >> prop { (p: $ProjectF[Unit], f: BsonField) =>
       val One = $literal(Bson.Int32(1))
 
       p.set(f, \/-(One)).get(DocVar.ROOT(f)) must (beSome(\/-(One)))
@@ -141,13 +141,13 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
   }
 
   "Project.setAll" should {
-    "actually set all" ! prop { (p: $ProjectF[Unit]) =>
+    "actually set all" >> prop { (p: $ProjectF[Unit]) =>
       p.setAll(p.getAll.map(t => t._1 -> \/-(t._2))) must_== p
     }.pendingUntilFixed("result could have `_id -> _id` inserted without changing semantics")
   }
 
   "Project.deleteAll" should {
-    "return empty when everything is deleted" ! prop { (p: $ProjectF[Unit]) =>
+    "return empty when everything is deleted" >> prop { (p: $ProjectF[Unit]) =>
       p.deleteAll(p.getAll.map(_._1)) must_== p.empty
     }
   }
