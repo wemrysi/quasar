@@ -22,7 +22,6 @@ package table
 
 import com.precog.common._, security._
 import com.precog.bytecode.JType
-import org.slf4j.LoggerFactory
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
@@ -84,8 +83,6 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
 
     results.copoint must_== expected
   }
-
-  lazy val xlogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.ColumnarTableModuleSpec")
 
   def streamToString(stream: StreamT[Need, CharBuffer]): String = {
     def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
@@ -494,14 +491,6 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
 
   "partitionMerge" should {
     "concatenate reductions of subsequences" in testPartitionMerge
-  }
-
-  "logging" should {
-    "run" in {
-      testSimpleCogroup(t => t.logged(xlogger, "test-logging", "start stream", "end stream") {
-        slice => "size: " + slice.size
-      })
-    }
   }
 
   "track table metrics" in {

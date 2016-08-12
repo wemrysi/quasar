@@ -32,7 +32,6 @@ import java.util.Comparator
 import org.apache.jdbm.DBMaker
 import org.apache.jdbm.DB
 
-import org.slf4j.LoggerFactory
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
@@ -43,9 +42,6 @@ trait BlockStoreColumnarTableModuleConfig {
 }
 
 trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
-
-  protected lazy val blockModuleLogger = LoggerFactory.getLogger("com.precog.yggdrasil.table.BlockStoreColumnarTableModule")
-
   import trans._
   import TransSpec.deepMap
 
@@ -227,8 +223,6 @@ trait BlockStoreColumnarTableModule[M[+ _]] extends ColumnarTableModule[M] {
               }
             }
           }
-
-          blockModuleLogger.trace("Emitting a new slice of size " + emission.size)
 
           val successorStatesM = expired.map(_.succ).sequence.map(_.toStream.collect({ case Some(cs) => cs }))
 

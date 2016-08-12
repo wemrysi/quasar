@@ -24,13 +24,13 @@ import blueeyes._
 import com.precog.common.accounts._
 import com.precog.common.security.service._
 
-import org.slf4s.Logging
-
 import scalaz._
 import scalaz.syntax.monad._
 import Permission._
 
-class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging { self =>
+class StaticAPIKeyFinder[M[+ _]](apiKey: APIKey)(implicit val M: Monad[M]) extends APIKeyFinder[M] {
+  self =>
+
   private val permissions = Set[Permission](
     ReadPermission(Path("/"), WrittenByAny),
     WritePermission(Path("/"), WriteAs.any),

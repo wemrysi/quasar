@@ -23,10 +23,11 @@ package security
 import accounts.AccountId
 import blueeyes._
 import service.v1
-import org.slf4s.Logging
 import scalaz._, Scalaz._
 
-trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
+trait APIKeyFinder[M[+ _]] extends AccessControl[M] {
+  self =>
+
   def findAPIKey(apiKey: APIKey, rootKey: Option[APIKey]): M[Option[v1.APIKeyDetails]]
 
   def findAllAPIKeys(fromRoot: APIKey): M[Set[v1.APIKeyDetails]]
@@ -53,7 +54,7 @@ trait APIKeyFinder[M[+ _]] extends AccessControl[M] with Logging { self =>
   }
 }
 
-class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: Monad[M]) extends APIKeyFinder[M] with Logging {
+class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: Monad[M]) extends APIKeyFinder[M] {
   val grantDetails: Grant => v1.GrantDetails = {
     case Grant(gid, gname, gdesc, _, _, perms, createdAt, exp) => v1.GrantDetails(gid, gname, gdesc, perms, createdAt, exp)
   }
@@ -66,7 +67,8 @@ class DirectAPIKeyFinder[M[+ _]](underlying: APIKeyManager[M])(implicit val M: M
           val divulgedIssuers = rootKey.map { rk =>
             ancestorKeys.reverse.dropWhile(_ != rk).reverse
           }.getOrElse(Nil)
-          log.debug("Divulging issuers %s for key %s based on root key %s and ancestors %s".format(divulgedIssuers, apiKey, rootKey, ancestorKeys))
+
+          // log.debug("Divulging issuers %s for key %s based on root key %s and ancestors %s".format(divulgedIssuers, apiKey, rootKey, ancestorKeys))
           v1.APIKeyDetails(apiKey, name, description, grants.flatten.map(grantDetails)(collection.breakOut), divulgedIssuers)
         }
       }

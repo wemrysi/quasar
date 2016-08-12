@@ -20,7 +20,6 @@
 package com.precog.common
 package security
 
-import org.slf4s.Logging
 import blueeyes._, json._, serialization._
 import IsoSerialization._, Iso8601Serialization._, Versioned._
 import scalaz._, Scalaz._
@@ -57,7 +56,7 @@ case class Grant(grantId: GrantId,
   }
 }
 
-object Grant extends Logging {
+object Grant {
   val schemaV1 = "grantId" :: "name" :: "description" :: ("issuerKey" ||| "(undefined)") :: "parentIds" :: "permissions" :: ("createdAt" ||| instant.zero) :: "expirationDate" :: HNil
 
   val decomposerV1: Decomposer[Grant] = decomposerV[Grant](schemaV1, Some("1.0".v))
@@ -81,7 +80,7 @@ object Grant extends Logging {
   implicit val extractor: Extractor[Grant]   = extractorV2 <+> extractorV1 <+> extractorV0
 
   def implies(grants: Set[Grant], perms: Set[Permission], at: Option[DateTime] = None) = {
-    log.trace("Checking implication of %s to %s".format(grants, perms))
+    // log.trace("Checking implication of %s to %s".format(grants, perms))
     perms.nonEmpty && perms.forall(perm => grants.exists(_.implies(perm, at)))
   }
 

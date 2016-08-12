@@ -19,7 +19,6 @@ lazy val precog = project.setup deps (
   "io.argonaut"          %% "argonaut"                 %    argonautVersion,
   "io.argonaut"          %% "argonaut-scalaz"          %    argonautVersion,
   "com.chuusai"          %% "shapeless"                %        "2.3.1",
-  "org.slf4s"            %% "slf4s-api"                %       "1.7.13",
   "org.spire-math"       %% "spire"                    %        "0.7.4",
   "org.scodec"           %% "scodec-bits"              %        "1.1.0",
   "org.scodec"           %% "scodec-scalaz"            %       "1.3.0a",

@@ -22,12 +22,9 @@ package jdbm3
 
 import blueeyes._
 import com.precog.common._
-import org.slf4j.LoggerFactory
 import com.precog.yggdrasil.table._
 
 object JDBMSlice {
-  private lazy val log = LoggerFactory.getLogger("com.precog.yggdrasil.jdbm3.JDBMSlice")
-
   def load(size: Int,
            source: () => Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]],
            keyDecoder: ColumnDecoder,
@@ -62,7 +59,6 @@ object JDBMSlice {
           finalCount = consumeRows(source().take(size), 0)
         } catch {
           case t: Throwable =>
-            log.warn("Error during block read, retrying")
             Thread.sleep(50)
         }
         tries += 1

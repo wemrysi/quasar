@@ -25,9 +25,8 @@ import com.precog.common._
 
 import scalaz._, Scalaz._
 import scala.collection.mutable
-import org.slf4s.Logging
 
-trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
+trait IndicesModule[M[+ _]] extends TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
   self: ColumnarTableModule[M] =>
 
   // we will warn for tables with >1M rows.

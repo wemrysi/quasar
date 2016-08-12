@@ -25,7 +25,6 @@ import com.precog.common._
 import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.TableModule._
 import org.apache.jdbm._
-import org.slf4s.Logging
 import java.util.SortedMap
 import scala.collection.JavaConverters._
 import scalaz._
@@ -40,9 +39,8 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
                                                         valRefs: Seq[ColumnRef],
                                                         sortOrder: DesiredSortOrder,
                                                         sliceSize: Int,
-                                                        val length: Long)
-    extends ProjectionLike[M, Slice]
-    with Logging {
+                                                        val length: Long) extends ProjectionLike[M, Slice] {
+
   import JDBMProjection._
   type Key = Array[Byte]
 
@@ -93,11 +91,11 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
         var initial: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]] = null
         var tries                                                            = 0
         while (tries < MAX_SPINS && initial == null) {
-          try {
-            initial = iteratorSetup()
-          } catch {
-            case t: Throwable => log.warn("Failure on load iterator initialization")
-          }
+          initial = iteratorSetup()
+          // try {
+          // } catch {
+          //   case t: Throwable => log.warn("Failure on load iterator initialization")
+          // }
           tries += 1
         }
         if (initial == null) {

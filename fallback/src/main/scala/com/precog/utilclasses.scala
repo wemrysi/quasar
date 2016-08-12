@@ -2,7 +2,6 @@ package com.precog.util
 
 import blueeyes._, json._, serialization._
 import DefaultSerialization._, Extractor._
-import org.slf4s.Logging
 import quasar.precog._
 import scala.{ collection => sc }
 import scala.collection.JavaConverters._
@@ -135,7 +134,7 @@ object IntList {
 
 
 
-object IOUtils extends Logging {
+object IOUtils {
   val dotDirs = "." :: ".." :: Nil
 
   def isNormalDirectory(f: File) = f.isDirectory && !dotDirs.contains(f.getName)
@@ -204,30 +203,7 @@ object IOUtils extends Logging {
     }
   }
 
-  /** Recursively deletes empty directories, stopping at the first
-    * non-empty dir.
-    */
-  def recursiveDeleteEmptyDirs(startDir: File, upTo: File): IO[PrecogUnit] = {
-    if (startDir == upTo) {
-      IO { log.debug("Stopping recursive clean at root: " + upTo); PrecogUnit }
-    } else if (startDir.isDirectory) {
-      if (Option(startDir.list).exists(_.length == 0)) {
-        IO {
-          startDir.delete()
-        }.flatMap { _ =>
-          recursiveDeleteEmptyDirs(startDir.getParentFile, upTo)
-        }
-      } else {
-        IO { log.debug("Stopping recursive clean on non-empty directory: " + startDir); PrecogUnit }
-      }
-    } else {
-      IO { log.warn("Asked to clean a non-directory: " + startDir); PrecogUnit }
-    }
-  }
-
-  def createTmpDir(prefix: String): IO[File] = IO {
-    Files.createTempDirectory(prefix).toFile
-  }
+  def createTmpDir(prefix: String): IO[File] = IO( Files.createTempDirectory(prefix).toFile )
 
   def copyFile(src: File, dest: File): IO[PrecogUnit] = IO {
     Files.copy(src.toPath, dest.toPath)

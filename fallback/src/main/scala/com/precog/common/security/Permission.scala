@@ -25,7 +25,6 @@ import blueeyes._, json._, serialization._
 import Extractor._
 import Iso8601Serialization._
 import Versioned._
-import org.slf4s.Logging
 import scalaz._, Scalaz._, Validation._
 import Permission._
 
@@ -43,7 +42,7 @@ object AccessMode {
   case object Append  extends AccessMode with WriteMode { val name = "append" }
 }
 
-sealed trait Permission extends Logging {
+sealed trait Permission {
   def path: Path
 
   def implies(other: Permission): Boolean

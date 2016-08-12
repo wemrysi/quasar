@@ -23,7 +23,6 @@ package security
 import blueeyes._
 import service._
 import com.precog.common.accounts.{ Account, AccountId }
-import org.slf4s.Logging
 import scalaz._, Scalaz._
 
 object APIKeyManager {
@@ -36,7 +35,7 @@ object APIKeyManager {
   def newGrantId(): String = (newUUID() + newUUID() + newUUID()).toLowerCase.replace("-", "")
 }
 
-trait APIKeyManager[M[+ _]] extends Logging { self =>
+trait APIKeyManager[M[+ _]] { self =>
   implicit def M: Monad[M]
 
   def rootGrantId: M[GrantId]
@@ -121,7 +120,8 @@ trait APIKeyManager[M[+ _]] extends Logging { self =>
     }
 
   def validGrants(apiKey: APIKey, at: Option[DateTime] = None): M[Set[Grant]] = {
-    log.trace("Checking grant validity for apiKey " + apiKey)
+    // log.trace("Checking grant validity for apiKey " + apiKey)
+
     findAPIKey(apiKey) flatMap {
       _ map {
         _.grants.toList.traverse(findValidGrant(_, at)) map {

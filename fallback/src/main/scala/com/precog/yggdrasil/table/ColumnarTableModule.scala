@@ -28,8 +28,6 @@ import com.precog.yggdrasil.util._
 import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
-import org.slf4j.Logger
-import org.slf4s.Logging
 import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 import java.util.Arrays
@@ -58,7 +56,7 @@ trait ColumnarTableModuleConfig {
   def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
 }
 
-object ColumnarTableModule extends Logging {
+object ColumnarTableModule {
   def renderJson[M[+ _]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
     def wrap(stream: StreamT[M, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
@@ -303,7 +301,7 @@ object ColumnarTableModule extends Logging {
       case XJsonStream                   => ColumnarTableModule.renderJson(slices, "", "\n", "")
       case TextCSV                       => ColumnarTableModule.renderCsv(slices)
       case other                         =>
-        log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
+        // log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
         StreamT.empty[N, CharBuffer]
     }
   }
@@ -316,7 +314,7 @@ object ColumnarTableModule extends Logging {
       case Some(XJsonStream)            => Some(bufferOutput(toCharBuffers(XJsonStream, blockStream)))
       case Some(TextCSV)                => Some(bufferOutput(toCharBuffers(TextCSV, blockStream)))
       case Some(other) =>
-        log.warn("NIHDB resource cannot be rendered to a byte stream of type %s".format(other.value))
+        // log.warn("NIHDB resource cannot be rendered to a byte stream of type %s".format(other.value))
         None
     }
   }
@@ -1812,15 +1810,6 @@ trait ColumnarTableModule[M[+ _]]
           })
             .point[M]),
         size)
-    }
-
-    def logged(logger: Logger, logPrefix: String = "", prelude: String = "", appendix: String = "")(f: Slice => String): Table = {
-      val preludeEffect  = StreamT(StreamT.Skip({ logger.debug(logPrefix + " " + prelude); StreamT.empty[M, Slice] }).point[M])
-      val appendixEffect = StreamT(StreamT.Skip({ logger.debug(logPrefix + " " + appendix); StreamT.empty[M, Slice] }).point[M])
-      val sliceEffect = if (logger.isTraceEnabled) slices map { s =>
-        logger.trace(logPrefix + " " + f(s)); s
-      } else slices
-      Table(preludeEffect ++ sliceEffect ++ appendixEffect, size)
     }
 
     def printer(prelude: String = "", flag: String = ""): Table = slicePrinter(prelude)(s => s.toJsonString(flag))
