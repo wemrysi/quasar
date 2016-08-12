@@ -17,9 +17,6 @@ echo "Version:       $QUASAR_VERSION"
 echo "Web Jar:       $QUASAR_WEB_JAR"
 echo "Web Jar Dir:   $QUASAR_WEB_JAR_DIR"
 echo "Web Jar Path:  $QUASAR_WEB_JAR_PATH"
-echo "REPL Jar:      $QUASAR_REPL_JAR"
-echo "REPL Jar Dir:  $QUASAR_REPL_JAR_DIR"
-echo "REPL Jar Path: $QUASAR_REPL_JAR_PATH"
 
 QUASAR_MONGODB_TESTDB="quasar-test"
 QUASAR_MONGODB_HOST_2_6="localhost:27018"
@@ -67,7 +64,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 
   # In a fresh JVM process, re-compile without coverage in order to get a jar
   # that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} oneJar doc
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} 'web/assembly' doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
