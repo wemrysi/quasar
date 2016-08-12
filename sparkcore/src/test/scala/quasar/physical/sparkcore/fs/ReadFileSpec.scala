@@ -24,6 +24,7 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
+import quasar.physical.sparkcore.fs.readfile.{Limit, Offset}
 
 import java.io._
 import java.nio.file.{Files, Paths}
@@ -41,7 +42,6 @@ class ReadFileSpec extends Specification with ScalaCheck  {
   type Eff1[A] = Coproduct[Task, Eff0, A]
   type Eff[A] = Coproduct[MonotonicSeq, Eff1, A]
 
-
   "readfile" should {
     "open - read chunk - close" in {
       // given
@@ -52,7 +52,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       )
       val program = (f: AFile) => define { unsafe =>
         for {
-          handle   <- unsafe.open(f, Natural(0).get, None)
+          handle   <- unsafe.open(f, offset(0), None)
           readData <- unsafe.read(handle)
           _        <- unsafe.close(handle).liftM[FileSystemErrT]
         } yield readData
@@ -76,7 +76,50 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       }
       ok
     }
+
+    "open & read data with offset" in {
+      // given
+      import quasar.Data._
+      val content = List(
+        """{"line" : "0"}""",
+        """{"line" : "1"}""",
+        """{"line" : "2"}""",
+        """{"line" : "3"}""",
+        """{"line" : "4"}""",
+        """{"line" : "5"}"""
+      )
+      val program = (f: AFile) => define { unsafe =>
+        for {
+          handle   <- unsafe.open(f, offset(3), None)
+          readData <- unsafe.read(handle)
+          _        <- unsafe.close(handle).liftM[FileSystemErrT]
+        } yield readData
+      }
+
+      // when
+      withTempFile(createIt = Some(content)) { aFile =>
+        for {
+          sc <- newSc()
+          result <- execute(program(aFile), sc)
+        } yield {
+          result must beLike {
+            case \/-(results) =>
+              // then
+              results.size must be_==(3)
+              results must contain(Obj(ListMap("line" -> Str("3"))))
+              results must contain(Obj(ListMap("line" -> Str("4"))))
+              results must contain(Obj(ListMap("line" -> Str("5"))))
+          }
+          sc.stop()
+        }
+      }
+      ok
+    }
   }
+
+  private def limit(li: Long): Limit = ???
+
+  private def offset(off: Long): Offset = Natural(off).get
 
   private def define[C]
     (defined: ReadFile.Unsafe[ReadFile] => FileSystemErrT[Free[ReadFile, ?], C])

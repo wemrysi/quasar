@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.DataCodec
 import quasar.fp.ι
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
@@ -33,12 +34,15 @@ import Scalaz._
 
 final case class SparkCursor(rdd: Option[RDD[Data]])
 
-final case class Input[S[_]](
-  rddFrom: AFile => Free[S, RDD[String]],
-  fileExists: AFile => Free[S, Boolean]
-)
-
 object readfile {
+
+  type Offset = Natural
+  type Limit = Option[Positive]
+
+  final case class Input[S[_]](
+    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[String]],
+    fileExists: AFile => Free[S, Boolean]
+  )
 
   import ReadFile.ReadHandle
 
@@ -49,13 +53,13 @@ object readfile {
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
-        case ReadFile.Open(f, _, _) => open[S](f, input)
+        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
         case ReadFile.Read(h) => read[S](h)
         case ReadFile.Close(h) => close[S](h)
       }
   }
 
-  private def open[S[_]](f: AFile, input: Input[S])(implicit
+  private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
     gen: MonotonicSeq.Ops[S]
@@ -65,7 +69,7 @@ object readfile {
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f)
+      rdd <- input.rddFrom(f, offset, limit)
       cur = SparkCursor(rdd.map{ raw =>
         DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
       }.some)
