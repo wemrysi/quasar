@@ -28,7 +28,7 @@ import quasar.physical.sparkcore.fs.readfile.{Limit, Offset}
 
 import java.io._
 import java.nio.file.{Files, Paths}
-import java.lang.System
+import java.lang.{ System}
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
@@ -41,6 +41,8 @@ class ReadFileSpec extends Specification with ScalaCheck  {
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff1[A] = Coproduct[Task, Eff0, A]
   type Eff[A] = Coproduct[MonotonicSeq, Eff1, A]
+
+  sequential
 
   "readfile" should {
     "open - read chunk - close" in {
@@ -64,13 +66,12 @@ class ReadFileSpec extends Specification with ScalaCheck  {
           sc <- newSc()
           result <- execute(program(aFile), sc)
         } yield {
-          result must beLike {
-            case \/-(results) =>
-              // then
-              results.size must be_==(2)
-              results must contain(Obj(ListMap("login" -> Str("john"), "age" -> Int(28))))
-              results must contain(Obj(ListMap("login" -> Str("kate"), "age" -> Int(31))))
-          }
+          result must_== \/-(
+            List(
+              Obj(ListMap("login" -> Str("john"), "age" -> Int(28))),
+              Obj(ListMap("login" -> Str("kate"), "age" -> Int(31)))
+            )
+          )
           sc.stop()
         }
       }
@@ -102,13 +103,91 @@ class ReadFileSpec extends Specification with ScalaCheck  {
           sc <- newSc()
           result <- execute(program(aFile), sc)
         } yield {
+          result must_== \/-(
+            List(
+              Obj(ListMap("line" -> Str("3"))),
+              Obj(ListMap("line" -> Str("4"))),
+              Obj(ListMap("line" -> Str("5")))
+            )
+          )
+          sc.stop()
+        }
+      }
+      ok
+    }
+
+    "open & read data with limit" in {
+      // given
+      import quasar.Data._
+      val content = List(
+        """{"line" : "0"}""",
+        """{"line" : "1"}""",
+        """{"line" : "2"}""",
+        """{"line" : "3"}""",
+        """{"line" : "4"}""",
+        """{"line" : "5"}"""
+      )
+      val program = (f: AFile) => define { unsafe =>
+        for {
+          handle   <- unsafe.open(f, offset(0), limit(2))
+          readData <- unsafe.read(handle)
+          _        <- unsafe.close(handle).liftM[FileSystemErrT]
+        } yield readData
+      }
+
+      // when
+      withTempFile(createIt = Some(content)) { aFile =>
+        for {
+          sc <- newSc()
+          result <- execute(program(aFile), sc)
+        } yield {
+          result must_== \/-(
+            List(
+              Obj(ListMap("line" -> Str("0"))),
+              Obj(ListMap("line" -> Str("1")))
+            )
+          )
+          sc.stop()
+        }
+      }
+      ok
+    }
+
+    "open & read data with offset & limit" in {
+      // given
+      import quasar.Data._
+      val content = List(
+        """{"line" : "0"}""",
+        """{"line" : "1"}""",
+        """{"line" : "2"}""",
+        """{"line" : "3"}""",
+        """{"line" : "4"}""",
+        """{"line" : "5"}""",
+        """{"line" : "6"}""",
+        """{"line" : "7"}""",
+        """{"line" : "8"}"""
+      )
+      val program = (f: AFile) => define { unsafe =>
+        for {
+          handle   <- unsafe.open(f, offset(2), limit(3))
+          readData <- unsafe.read(handle)
+          _        <- unsafe.close(handle).liftM[FileSystemErrT]
+        } yield readData
+      }
+
+      // when
+      withTempFile(createIt = Some(content)) { aFile =>
+        for {
+          sc <- newSc()
+          result <- execute(program(aFile), sc)
+        } yield {
           result must beLike {
             case \/-(results) =>
               // then
               results.size must be_==(3)
+              results must contain(Obj(ListMap("line" -> Str("2"))))
               results must contain(Obj(ListMap("line" -> Str("3"))))
               results must contain(Obj(ListMap("line" -> Str("4"))))
-              results must contain(Obj(ListMap("line" -> Str("5"))))
           }
           sc.stop()
         }
@@ -117,7 +196,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
     }
   }
 
-  private def limit(li: Long): Limit = ???
+  private def limit(li: Long): Limit = Positive(li)
 
   private def offset(off: Long): Offset = Natural(off).get
 
@@ -147,7 +226,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
   }
 
   private def newSc(): Task[SparkContext] = Task.delay {
-    val config = new SparkConf().setMaster("local[*]").setAppName(this.getClass().getName())
+    val config = new SparkConf()
+      .setMaster("local[*]")
+      .setAppName(scala.util.Random.nextInt().toString)
     new SparkContext(config)
   }
 
