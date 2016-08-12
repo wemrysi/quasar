@@ -67,7 +67,10 @@ object TaskResource {
       */
     val awaitAcquired: Task[A] =
       // NB: something effectful is hiding in the `discrete` process
-      Task.delay(signal.discrete.collect { case Acquired(a) => Task.now(a); case Failed(t) => Task.fail(t) }.take(1).runLast).join.flatMap(orFail).join
+      Task.delay(signal.discrete.collect {
+        case Acquired(a) => Task.now(a)
+        case Failed(t)   => Task.fail(t)
+      }.take(1).runLast).join.flatMap(orFail).join
 
     new TaskResource[A] {
       def get = {
