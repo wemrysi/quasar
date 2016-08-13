@@ -19,8 +19,7 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.fp._
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.IdHandling._
-import quasar.physical.mongodb.Workflow._
+import quasar.physical.mongodb.workflow._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -80,12 +79,12 @@ package object workflowtask {
                   ExcludeId).pipeline)))
 
         case None =>
-          (Workflow.ExprVar,
+          (ExprVar,
             PipelineTask(
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape(ListMap(Workflow.ExprName -> $var(base).right)),
+                  Reshape(ListMap(ExprName -> $var(base).right)),
                   ExcludeId).pipeline)))
       }
     case _ => (base, task)

@@ -22,8 +22,11 @@ import quasar.fp._
 import quasar.namegen._
 import quasar._, Planner._
 import quasar.javascript._
-import quasar.std.StdLib._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
+import quasar.std.StdLib._
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
@@ -32,11 +35,6 @@ import scalaz._, Scalaz._
 sealed trait WorkflowBuilderF[F[_], +A]
 
 object WorkflowBuilder {
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
-  import Workflow._
-  import IdHandling._
-
   /** A partial description of a query that can be run on an instance of MongoDB */
   type WorkflowBuilder[F[_]] = Fix[WorkflowBuilderF[F, ?]]
   /** If we know what the shape is, represents the list of Fields. */

@@ -16,7 +16,7 @@
 
 package quasar.physical
 
-import quasar.Predef.Vector
+import quasar.Predef._
 import quasar.TernaryFunc
 import quasar.javascript.Js
 import quasar.fs.PhysicalError
