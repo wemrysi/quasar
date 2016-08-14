@@ -130,33 +130,30 @@ class RowFormatSpec extends quasar.QuasarSpecification with CValueGenerators {
     }
   }
 
+  private def order[A](f: (A, A) => Int): Ordering[A] = new Ordering[A] {
+    def compare(a: A, b: A): Int = f(a, b)
+  }
+  private def specFromColumnRefs[A](refs: List[ColumnRef])(mkArb: List[ColumnRef] => Gen[A])(f: A => org.specs2.execute.Result): Prop = {
+    implicit val arbThing = Arbitrary(mkArb(refs))
+    prop(f)
+  }
+
   "SortingKeyRowFormat" should {
     checkRoundTrips(RowFormat.forSortingKey(_))
 
-    "sort encoded as ValueFormat does" in {
-      prop { refs: List[ColumnRef] =>
-        val valueRowFormat = RowFormat.forValues(refs)
+    "sort encoded as ValueFormat does" in prop { (refs: List[ColumnRef]) =>
+      specFromColumnRefs(refs)(xs => Gen.listOfN(10, genCValuesForColumnRefs(xs))) { vals =>
+        val valueRowFormat      = RowFormat.forValues(refs)
         val sortingKeyRowFormat = RowFormat.forSortingKey(refs)
-        implicit val arbRows: Arbitrary[List[List[CValue]]] =
-          Arbitrary(Gen.listOfN(10, genCValuesForColumnRefs(refs)))
+        val valueEncoded        = vals map (valueRowFormat.encode(_))
+        val sortEncoded         = vals map (sortingKeyRowFormat.encode(_))
 
+        val sortedA = valueEncoded sorted order(valueRowFormat.compare) map (valueRowFormat decode _)
+        val sortedB = sortEncoded sorted order(sortingKeyRowFormat.compare) map (sortingKeyRowFormat decode _)
 
-
-        prop { (vals: List[List[CValue]]) =>
-          val valueEncoded = vals map (valueRowFormat.encode(_))
-          val sortEncoded = vals map (sortingKeyRowFormat.encode(_))
-
-          val sortedA = valueEncoded.sorted(new Ordering[Array[Byte]] {
-            def compare(a: Array[Byte], b: Array[Byte]) = valueRowFormat.compare(a, b)
-          }) map (valueRowFormat.decode(_))
-          val sortedB = sortEncoded.sorted(new Ordering[Array[Byte]] {
-            def compare(a: Array[Byte], b: Array[Byte]) = sortingKeyRowFormat.compare(a, b)
-          }) map (sortingKeyRowFormat.decode(_))
-
-          sortedA must_== sortedB
-        }
+        sortedA must_== sortedB
       }
-    }.set(minTestsOk = 500, maxDiscardRatio = 5)
+    }
   }
 
   def checkRoundTrips(toRowFormat: List[ColumnRef] => RowFormat) = {
@@ -171,7 +168,7 @@ class RowFormatSpec extends quasar.QuasarSpecification with CValueGenerators {
         }
       }
     }
-    "survive rountrip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
+    "survive round-trip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
       val size = 10
 
       prop { (refs: List[ColumnRef]) =>

@@ -56,13 +56,25 @@ object PlatformBuild {
     def crossJavaTargets: Project                     = also(inBoth(doubleCross))
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
 
+    // Without serialTests:
+    //
+    // 01:45:20.675961 [error] ! Set and retrieve an arbitrary jvalue at an arbitrary path (4 seconds, 245 ms)
+    // 01:45:20.676317 [error]  java.lang.RuntimeException: Exception raised on property evaluation.
+    // 01:45:20.676458 [error]  > Exception: java.lang.RuntimeException: JValue insert would overwrite existing data:
+    // 01:45:20.676560 [error]    "gamux" \ [0] := [-4.049360E-1250229059, false]
+    // 01:45:20.676688 [error]  Initial call was
+    // 01:45:20.676780 [error]    [-4.049360E-1250229059, false] \ [0][0] := [-4.049360E-1250229059, false] (JValue.scala:101)
+    //
+    //               fork in Test :=  true,
+    // testForkedParallel in Test :=  true,
+
     def setup: Project = (
-      serialTests scalacPlugins (kindProjector) also(
-               organization :=  "com.precog",
-                    version :=  "0.1",
-              scalacOptions ++= envArgs,
-               scalaVersion :=  "2.11.8",
-        logBuffered in Test :=  false
+      serialTests scalacPlugins (kindProjector) also (
+                      organization :=  "com.precog",
+                           version :=  "0.1",
+                     scalacOptions ++= envArgs,
+                      scalaVersion :=  "2.11.8",
+               logBuffered in Test :=  false
       )
     )
   }

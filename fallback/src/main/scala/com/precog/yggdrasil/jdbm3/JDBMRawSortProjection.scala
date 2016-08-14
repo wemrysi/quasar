@@ -91,11 +91,11 @@ class JDBMRawSortProjection[M[+ _]] private[yggdrasil] (dbFile: File,
         var initial: Iterator[java.util.Map.Entry[Array[Byte], Array[Byte]]] = null
         var tries                                                            = 0
         while (tries < MAX_SPINS && initial == null) {
-          initial = iteratorSetup()
-          // try {
-          // } catch {
-          //   case t: Throwable => log.warn("Failure on load iterator initialization")
-          // }
+          try {
+            initial = iteratorSetup()
+          } catch {
+            case t: Throwable => System.err.println("Failure on load iterator initialization")
+          }
           tries += 1
         }
         if (initial == null) {
