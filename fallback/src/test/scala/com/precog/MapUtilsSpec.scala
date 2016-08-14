@@ -4,7 +4,7 @@ import blueeyes._
 // import quasar.precog.TestSupport._
 import scalaz._
 
-object MapUtilsSpecs extends quasar.QuasarSpecification with MapUtils {
+object MapUtilsSpec extends quasar.QuasarSpecification with MapUtils {
   private type Ints     = List[Int]
   private type IntsPair = Ints -> Ints
   private type IntMap   = Map[Int, Ints]
@@ -37,7 +37,7 @@ object MapUtilsSpecs extends quasar.QuasarSpecification with MapUtils {
   }
 }
 
-object RingDequeSpecs extends quasar.QuasarSpecification {
+object RingDequeSpec extends quasar.QuasarSpecification {
   implicit val params = set(
     minTestsOk = 2500,
     workers = Runtime.getRuntime.availableProcessors)

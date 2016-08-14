@@ -17,15 +17,76 @@
 package blueeyes
 package json
 
+import MergeDiffData._
+import JParser._
 // import quasar.precog.TestSupport._
 
-object MergeExamples extends quasar.QuasarSpecification {
-  import JParser._
-
+class MergeDiffSpec extends quasar.QuasarSpecification {
   "Merge example" in {
     (scala1 merge scala2) mustEqual expectedMergeResult
   }
 
+  "Lotto example" in {
+    (lotto1 merge lotto2) mustEqual mergedLottoResult
+  }
+
+  "Diff example" in {
+    val Diff(changed, added, deleted) = scala1 diff scala2
+
+    changed mustEqual expectedChanges
+    added mustEqual expectedAdditions
+    deleted mustEqual expectedDeletions
+  }
+
+  "Lotto example" in {
+    val Diff(changed, added, deleted) = mergedLottoResult diff lotto1
+    changed mustEqual JUndefined
+    added mustEqual JUndefined
+    deleted mustEqual lotto2
+  }
+
+  "Example from http://tlrobinson.net/projects/js/jsondiff/" in {
+    val json1             = read("/diff-example-json1.json")
+    val json2             = read("/diff-example-json2.json")
+    val expectedChanges   = read("/diff-example-expected-changes.json")
+    val expectedAdditions = read("/diff-example-expected-additions.json")
+    val expectedDeletions = read("/diff-example-expected-deletions.json")
+
+    val Diff(changes, additions, deletions) = json1 diff json2
+
+    changes.renderCanonical mustEqual expectedChanges.renderCanonical
+    additions.renderCanonical mustEqual expectedAdditions.renderCanonical
+    deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
+  }
+
+  private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
+}
+
+object MergeDiffData {
+  /** Diff **/
+  def expectedChanges = parseUnsafe("""
+    {
+      "tags": ["static-typing","fp"],
+      "features": {
+        "key2":"newval2"
+      }
+    }""")
+
+  def expectedAdditions = parseUnsafe("""
+    {
+      "features": {
+        "key3":"val3"
+      },
+      "compiled": true
+    }""")
+
+  def expectedDeletions = parseUnsafe("""
+    {
+      "year":2006,
+      "features":{ "key1":"val1" }
+    }""")
+
+  /** Common **/
   def scala1 = parseUnsafe("""
     {
       "lang": "scala",
@@ -60,10 +121,6 @@ object MergeExamples extends quasar.QuasarSpecification {
       },
       "compiled": true
     }""")
-
-  "Lotto example" in {
-    (lotto1 merge lotto2) mustEqual mergedLottoResult
-  }
 
   def lotto1 = parseUnsafe("""
     {

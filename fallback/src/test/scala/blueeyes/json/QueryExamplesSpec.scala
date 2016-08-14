@@ -17,11 +17,10 @@
 package blueeyes
 package json
 
+import JParser._
 // import quasar.precog.TestSupport._
 
 class QueryExamplesSpec extends quasar.QuasarSpecification {
-  import JParser._
-
   "List of IPs" in {
     val ips = for { JString(ip) <- json \\ "ip" } yield ip
     ips mustEqual List("192.168.1.125", "192.168.1.126", "192.168.1.127", "192.168.2.125", "192.168.2.126")
