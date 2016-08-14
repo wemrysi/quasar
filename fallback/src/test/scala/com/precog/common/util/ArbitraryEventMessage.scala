@@ -21,7 +21,7 @@ package com.precog.common
 package ingest
 
 import security._
-import blueeyes._, json._
+import blueeyes._
 import quasar.precog.JsonTestSupport._, Gen._
 
 trait ArbitraryEventMessage {
@@ -86,62 +86,4 @@ trait ArbitraryEventMessage {
       (1, genRandomArchiveMessage),
       (10, genRandomIngestMessage)
     )
-}
-
-trait RealisticEventMessage extends ArbitraryEventMessage {
-  val ingestAPIKey: APIKey
-  val ingestOwnerAccountId: Authorities
-
-  lazy val producers = 4
-
-  lazy val eventIds: Map[Int, AtomicInt] = 0.until(producers).map(_ -> new AtomicInt).toMap
-
-  lazy val paths = buildBoundedPaths(3)
-  lazy val jpaths = buildBoundedJPaths(3)
-
-  def buildBoundedPaths(depth: Int): List[String] = {
-    buildChildPaths(List.empty, depth).map("/" + _.reverse.mkString("/"))
-  }
-
-  def buildBoundedJPaths(depth: Int): List[JPath] = {
-    buildChildPaths(List.empty, depth).map(_.reverse.mkString(".")).filter(_.length > 0).map(JPath(_))
-  }
-
-  def buildChildPaths(parent: List[String], depth: Int): List[List[String]] = {
-    if (depth == 0) {
-      List(parent)
-    } else {
-      parent ::
-      containerOfN[List, String](choose(2,4).sample.get, resize(10, alphaStr)).map(_.filter(_.length > 1).flatMap(child => buildChildPaths(child :: parent, depth - 1))).sample.get
-    }
-  }
-
-  def genStablePaths: Gen[Seq[String]] = lzy(paths)
-  def genStableJPaths: Gen[Seq[JPath]] = lzy(jpaths)
-
-  def genStablePath: Gen[String] = oneOf(paths)
-  def genStableJPath: Gen[JPath] = oneOf(jpaths)
-
-  def genIngestData: Gen[JValue] = for {
-    paths  <- containerOfN[Set, JPath](10, genStableJPath)
-    values <- containerOfN[Set, JValue](10, genSimple)
-  } yield {
-    (paths zip values).foldLeft[JValue](JObject(Nil)) {
-      case (obj, (path, value)) => obj.set(path, value)
-    }
-  }
-
-  def genIngest: Gen[Ingest] = for {
-    path <- genStablePath
-    ingestData <- containerOf[List, JValue](genIngestData).map(l => Vector(l: _*))
-    streamRef <- genStreamRef
-  } yield Ingest(ingestAPIKey, Path(path), Some(ingestOwnerAccountId), ingestData, None, instant.now(), streamRef)
-
-  def genIngestMessage: Gen[IngestMessage] = for {
-    producerId <- choose(0, producers-1)
-    ingest <- genIngest
-  } yield {
-    val records = ingest.data map { jv => IngestRecord(EventId(producerId, eventIds(producerId).getAndIncrement), jv) }
-    IngestMessage(ingest.apiKey, ingest.path, ingest.writeAs.get, records, ingest.jobId, ingest.timestamp, ingest.streamRef)
-  }
 }
