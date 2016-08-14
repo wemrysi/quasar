@@ -24,7 +24,6 @@ import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
 import com.precog.yggdrasil.TableModule._
-
 import org.mapdb._
 import scala.collection.JavaConverters._
 import scalaz._
@@ -40,8 +39,7 @@ class JDBMRawSortProjection private[yggdrasil](dbFile: File,
                                               valRefs: Seq[ColumnRef],
                                               sortOrder: DesiredSortOrder,
                                               sliceSize: Int,
-                                              val length: Long)
-    extends ProjectionLike[M, Slice] {
+                                              val length: Long) extends ProjectionLike[M, Slice] {
 
   type Key = Bytes
 

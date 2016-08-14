@@ -47,7 +47,6 @@ trait PackageAliases {
   type Future[+A]     = scalaz.concurrent.Future[A]
   type IO[A]          = scalaz.effect.IO[A]
   type Iso[T, L]      = shapeless.Generic.Aux[T, L]
-  type Logging        = org.slf4s.Logging
   type ScalazOrder[A] = scalaz.Order[A]
   type ScalazOrdering = scalaz.Ordering
   type SpireOrder[A]  = spire.algebra.Order[A]

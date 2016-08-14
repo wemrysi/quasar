@@ -15,6 +15,10 @@ package object precog {
 
   type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
 
+  def warn[A](msg: String)(value: => A): A = {
+    java.lang.System.err.println(msg)
+    value
+  }
   def ctag[A](implicit z: CTag[A]): CTag[A] = z
   def jclass[A: CTag]: jClass               = ctag[A].runtimeClass.asInstanceOf[jClass]
 

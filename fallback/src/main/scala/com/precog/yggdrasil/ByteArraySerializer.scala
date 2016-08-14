@@ -19,6 +19,7 @@
  */
 package com.precog.yggdrasil
 
+import quasar.precog._
 import blueeyes._
 import java.io.{ DataInput, DataOutput }
 import org.mapdb._
@@ -46,8 +47,8 @@ object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
     loop(0, 0)
   }
 
-  def deserialize(input: DataInput2, available: Int): Array[Byte] = ???
-  def serialize(out: DataOutput2, value: Array[Byte]): Unit       = ???
+  def deserialize(input: DataInput2, available: Int): Array[Byte] = warn(s"deserialize($input, $available)")(???)
+  def serialize(out: DataOutput2, value: Array[Byte]): Unit       = warn(s"serialize($out, $value)")(???)
 
   def serialize(out: DataOutput, bytes: Array[Byte]) {
     writePackedInt(out, bytes.length)
