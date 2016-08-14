@@ -13,7 +13,7 @@ trait Clock {
 
   /** Times how long the specified future takes to be delivered.
     */
-  def time[T](f: => Future[T]): Future[(Period, T)] = {
+  def time[T](f: => Future[T]): Future[Period -> T] = {
     val start = now()
 
     f.map { result =>

@@ -20,6 +20,8 @@ import Gen._
 
 package quasar.precog {
   object JsonTestSupport extends TestSupport with JsonGenerators {
+    def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
+
     implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
     implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
     implicit def arbJPath: Arbitrary[JPath]     = Arbitrary(genJPath)
@@ -42,8 +44,6 @@ package quasar.precog {
 }
 
 package blueeyes.json {
-  import quasar.precog.TestSupport._
-
   final case class JValueAndPath(jv: JValue, p: JPath)
 
   trait JsonGenerators {
@@ -57,27 +57,24 @@ package blueeyes.json {
     }
 
     def genJPathNode: Gen[JPathNode] = frequency(
-      1 -> (choose(0, 10) ^^ JPathIndex),
+      1 -> ((0 upTo 10) ^^ JPathIndex),
       9 -> (genIdent ^^ JPathField)
     )
-    def genJPath: Gen[JPath] = choose(0, 10) >> (len => listOfN(len, genJPathNode) ^^ (JPath(_)))
+    def genJPath: Gen[JPath] = genJPathNode * (0 upTo 10) ^^ (JPath(_))
     def genJValue: Gen[JValue] = frequency(
       5 -> genSimple,
       1 -> delay(genJArray),
       1 -> delay(genJObject)
     )
 
-    def genIdent: Gen[String]    = choose(3, 8) >> (len => arrayOfN(len, alphaLowerChar) ^^ (new String(_)))
+    def genIdent: Gen[String]    = alphaLowerChar * choose(3, 8) ^^ (_.mkString)
     def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
-    def genSmallInt: Gen[Int]    = choose(0, 5)
+    def genSmallInt: Gen[Int]    = 0 upTo 5
     def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
     def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
     def genJString: Gen[JString] = genIdent ^^ (s => JString(s))
-    def genJField: Gen[JField]   = genIdent >> (name => genJValue >> (value => genPosInt >> (id => JField(s"$name$id", value))))
-    def genJObject: Gen[JObject] = genSmallInt >> genJFieldList ^^ (xs => JObject(xs: _*))
-    def genJArray: Gen[JArray]   = genSmallInt >> genJList ^^ JArray
-
-    def genJList(size: Int): Gen[List[JValue]]      = listOfN(size, genJValue)
-    def genJFieldList(size: Int): Gen[List[JField]] = listOfN(size, genJField)
+    def genJField: Gen[JField]   = (genIdent, genPosInt, genJValue) >> ((name, id, value) => JField(s"$name$id", value))
+    def genJObject: Gen[JObject] = genJField * genSmallInt ^^ (xs => JObject(xs: _*))
+    def genJArray: Gen[JArray]   = genJValue * genSmallInt ^^ JArray
   }
 }

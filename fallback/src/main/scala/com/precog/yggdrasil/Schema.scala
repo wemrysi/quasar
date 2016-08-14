@@ -385,7 +385,7 @@ object Schema {
     * Tests whether the supplied sequence contains all the (CPath, CType) pairs that are
     * included by the supplied JType.
     */
-  def subsumes(ctpes: Seq[(CPath, CType)], jtpe: JType): Boolean = jtpe match {
+  def subsumes(ctpes: Seq[CPath -> CType], jtpe: JType): Boolean = jtpe match {
     case JNumberT =>
       ctpes.exists {
         case (CPath.Identity, CLong | CDouble | CNum) => true

@@ -573,7 +573,7 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
   }
 
 
-  def testCtrPartialJoinAnd(rawData1: Stream[(Int, Option[Int])], rawData2: Stream[Int]) = {
+  def testCtrPartialJoinAnd(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
     val module = emptyTestModule
     import module._
     import trans._
@@ -668,7 +668,7 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
   }
 
 
-  def testCtrPartialJoinOr(rawData1: Stream[(Int, Option[Int])], rawData2: Stream[Int]) = {
+  def testCtrPartialJoinOr(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
     val module = emptyTestModule
     import module._
     import trans._

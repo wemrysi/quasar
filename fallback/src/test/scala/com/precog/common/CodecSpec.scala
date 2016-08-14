@@ -32,7 +32,7 @@ class CodecSpec extends quasar.QuasarSpecification {
 
   implicit def arbBitSet: Arbitrary[BitSet] = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
 
-  implicit def arbSparseBitSet: Arbitrary[(Codec[BitSet], BitSet)] = {
+  implicit def arbSparseBitSet: Arbitrary[Codec[BitSet] -> BitSet] = {
     Arbitrary(Gen.chooseNum(0, 500) flatMap { size =>
       val codec = Codec.SparseBitSetCodec(size)
       if (size > 0) {
@@ -46,7 +46,7 @@ class CodecSpec extends quasar.QuasarSpecification {
     })
   }
 
-  implicit def arbSparseRawBitSet: Arbitrary[(Codec[RawBitSet], RawBitSet)] = {
+  implicit def arbSparseRawBitSet: Arbitrary[Codec[RawBitSet] -> RawBitSet] = {
     Arbitrary(Gen.chooseNum(0, 500) flatMap { size =>
       val codec = Codec.SparseRawBitSetCodec(size)
       if (size > 0) {

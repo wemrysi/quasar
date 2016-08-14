@@ -11,3 +11,8 @@ final case class JPath(nodes: List[JPathNode]) extends ToString {
 sealed abstract class JPathNode(val to_s: String) extends ToString
 final case class JPathField(name: String) extends JPathNode("." + name)
 final case class JPathIndex(index: Int) extends JPathNode(s"[$index]")
+
+object JPathNode {
+  implicit def liftString(s: String): JPathNode = JPathField(s)
+  implicit def liftIndex(i: Int): JPathNode     = JPathIndex(i)
+}

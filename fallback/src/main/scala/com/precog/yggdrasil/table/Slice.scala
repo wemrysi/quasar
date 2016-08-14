@@ -84,7 +84,7 @@ trait Slice { source =>
     val size = source.size
 
     val columns: Map[ColumnRef, Column] = {
-      val resultColumns: Seq[(ColumnRef, Column)] = for {
+      val resultColumns: Seq[ColumnRef -> Column] = for {
         (ref, col) <- source.columns.toSeq
         result <- f(col)
       } yield (ref.copy(ctype = result.tpe), result)
@@ -410,7 +410,7 @@ trait Slice { source =>
   }
 
   def typedSubsumes(jtpe: JType): Slice = {
-    val tuples: Seq[(CPath, CType)] = source.columns.map({ case (ColumnRef(path, ctpe), _) => (path, ctpe) })(collection.breakOut)
+    val tuples: Seq[CPath -> CType] = source.columns.map({ case (ColumnRef(path, ctpe), _) => (path, ctpe) })(collection.breakOut)
     val columns = if (Schema.subsumes(tuples, jtpe)) {
       source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
     } else {
@@ -429,7 +429,7 @@ trait Slice { source =>
     */
   def isType(jtpe: JType): Slice = new Slice {
     val size                               = source.size
-    val pathsAndTypes: Seq[(CPath, CType)] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
+    val pathsAndTypes: Seq[CPath -> CType] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
 
     // we cannot just use subsumes because there could be rows with undefineds in them
     val subsumes = Schema.subsumes(pathsAndTypes, jtpe)
@@ -1714,7 +1714,7 @@ object Slice {
     * concatenated in the order they appear in `slices`.
     */
   def concat(slices: Seq[Slice]): Slice = {
-    val (_columns, _size) = slices.foldLeft((Map.empty[ColumnRef, List[(Int, Column)]], 0)) {
+    val (_columns, _size) = slices.foldLeft((Map.empty[ColumnRef, List[Int -> Column]], 0)) {
       case ((cols, offset), slice) if slice.size > 0 =>
         (slice.columns.foldLeft(cols) {
           case (acc, (ref, col)) =>

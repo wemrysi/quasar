@@ -43,11 +43,11 @@ package object yggdrasil {
     }
   }
 
-  def tupledIdentitiesOrder[A](idOrder: ScalazOrder[Identities]): ScalazOrder[(Identities, A)] =
+  def tupledIdentitiesOrder[A](idOrder: ScalazOrder[Identities]): ScalazOrder[Identities -> A] =
     idOrder.contramap((_: (Identities, A))._1)
 
-  def identityValueOrder[A](idOrder: ScalazOrder[Identities])(implicit ord: ScalazOrder[A]): ScalazOrder[(Identities, A)] =
-    new ScalazOrder[(Identities, A)] {
+  def identityValueOrder[A](idOrder: ScalazOrder[Identities])(implicit ord: ScalazOrder[A]): ScalazOrder[Identities -> A] =
+    new ScalazOrder[Identities -> A] {
       type IA = (Identities, A)
       def order(x: IA, y: IA): ScalazOrdering = {
         val idComp = idOrder.order(x._1, y._1)
@@ -57,7 +57,7 @@ package object yggdrasil {
       }
     }
 
-  def valueOrder[A](implicit ord: ScalazOrder[A]): ScalazOrder[(Identities, A)] = new ScalazOrder[(Identities, A)] {
+  def valueOrder[A](implicit ord: ScalazOrder[A]): ScalazOrder[Identities -> A] = new ScalazOrder[Identities -> A] {
     type IA = (Identities, A)
     def order(x: IA, y: IA): ScalazOrdering = {
       ord.order(x._2, y._2)

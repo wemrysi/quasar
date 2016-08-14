@@ -53,7 +53,7 @@ sealed trait WrittenByPermission extends Permission {
 }
 
 object WrittenByPermission {
-  def unapply(perm: WrittenByPermission): Option[(Path, WrittenBy)] = Some((perm.path, perm.writtenBy))
+  def unapply(perm: WrittenByPermission): Option[Path -> WrittenBy] = Some((perm.path, perm.writtenBy))
 }
 
 case class WritePermission(path: Path, writeAs: WriteAs) extends Permission {

@@ -82,7 +82,7 @@ sealed trait SValue {
   def set(selector: JPath, cv: CValue): Option[SValue] =
     if (cv eq null) None else set(selector, SValue.fromCValue(cv))
 
-  def structure: Seq[(JPath, CType)] = {
+  def structure: Seq[JPath -> CType] = {
     import SValue._
     val s = this match {
       case SObject(m) =>
@@ -233,7 +233,7 @@ trait SValueInstances {
 
   implicit def scalaOrder: scala.math.Ordering[SValue] = order.toScalaOrdering
 
-  implicit val StructureOrdering: scala.math.Ordering[(JPath, CType)] = implicitly[ScalazOrder[(JPath, CType)]].toScalaOrdering
+  implicit val StructureOrdering: scala.math.Ordering[JPath -> CType] = implicitly[ScalazOrder[JPath -> CType]].toScalaOrdering
 }
 
 object SValue extends SValueInstances {

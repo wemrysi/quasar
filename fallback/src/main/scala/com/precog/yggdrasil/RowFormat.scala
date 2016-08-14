@@ -348,7 +348,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
   def ColumnDecoder(cols: Seq[ArrayColumn[_]]) = {
     require(columnRefs.size == cols.size)
 
-    //val decoders: Seq[(ColumnValueDecoder, Int)] = // Seq[((Int, ByteBuffer) => Unit, Int)] =
+    //val decoders: Seq[ColumnValueDecoder -> Int] = // Seq[((Int, ByteBuffer) => Unit, Int)] =
     //  (columnRefs zip cols map { case (ref, col) => getColumnDecoder(ref.ctype, col) }).zipWithIndex
     val decoders: List[ColumnValueDecoder] = (columnRefs zip cols).map {
       case (ref, col) => getColumnDecoder(ref.ctype, col)
@@ -479,14 +479,16 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
   abstract override implicit lazy val BigDecimalCodec: Codec[BigDecimal] =
     Codec.CompositeCodec[Double, BigDecimal, BigDecimal](Codec[Double], super.BigDecimalCodec, bd => (bd.toDouble, bd), (_, bd) => bd)
 
-  @transient lazy val selectors: List[(CPath, List[CType])] = {
+  @transient lazy val selectors: List[CPath -> List[CType]] = {
     val refs: Map[CPath, Seq[ColumnRef]] = columnRefs.groupBy(_.selector)
     (columnRefs map (_.selector)).distinct.map(selector => (selector, refs(selector).map(_.ctype).toList))(collection.breakOut)
   }
 
-  private def zipWithSelectors[A](xs: Seq[A]): List[(CPath, Seq[(A, CType)])] = {
+  type CPathTypeGroup[A] = CPath -> Seq[A -> CType]
+
+  private def zipWithSelectors[A](xs: Seq[A]): List[CPath -> Seq[A -> CType]] = {
     @tailrec
-    def zip(zipped: List[(CPath, Seq[(A, CType)])], right: Seq[A], sels: List[(CPath, List[CType])]): List[(CPath, Seq[(A, CType)])] = sels match {
+    def zip(zipped: List[CPathTypeGroup[A]], right: Seq[A], sels: List[CPath -> List[CType]]): List[CPathTypeGroup[A]]   = sels match {
       case Nil => zipped.reverse
       case (path, cTypes) :: sels =>
         val (head, tail) = right splitAt cTypes.size

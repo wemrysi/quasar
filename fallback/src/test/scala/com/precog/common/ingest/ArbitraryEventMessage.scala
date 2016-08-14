@@ -23,12 +23,12 @@ package ingest
 import security._
 import blueeyes._
 import quasar.precog.JsonTestSupport._
-import Gen.{ alphaStr, choose, containerOfN, frequency, listOfN, oneOf, delay }
+import Gen.{ alphaStr, choose, containerOfN, frequency, oneOf, delay }
 
 object ArbitraryEventMessage {
 
   def genStreamId: Gen[Option[UUID]] = delay(randomUuid).optional
-  def genPath: Gen[Path]             = listOfN(10, alphaStr) ^^ (_ mkString "/") ^^ (Path(_))
+  def genPath: Gen[Path]             = alphaStr * (1 upTo 10) ^^ (_ mkString "/") ^^ (Path(_))
   def genWriteMode: Gen[WriteMode]   = oneOf(AccessMode.Create, AccessMode.Replace, AccessMode.Append)
   def genStreamRef: Gen[StreamRef]   = (genWriteMode, genBool) >> (StreamRef.forWriteMode(_, _))
   def genEventId: Gen[EventId]       = (choose(0, 1000000), choose(0, 1000000)) >> (EventId(_, _))

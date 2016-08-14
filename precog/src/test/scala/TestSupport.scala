@@ -4,7 +4,6 @@ package precog
 import scala.collection.mutable.Builder
 import java.io.File
 import TestSupport._
-// import quasar.precog._, TestSupport._
 
 object TestSupport extends TestSupport
 object TestSupportWithArb extends TestSupport with ArbitrarySupport
@@ -83,6 +82,10 @@ trait ScalacheckSupport {
 
   def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
 
+  implicit class ScalacheckIntOps(private val n: Int) {
+    def upTo(end: Int): Gen[Int] = choose(n, end)
+  }
+
   implicit class ArbitraryOps[A](arb: Arbitrary[A]) {
     def ^^[B](f: A => B): Arbitrary[B]      = Arbitrary(arb.arbitrary map f)
     def >>[B](f: A => Gen[B]): Arbitrary[B] = Arbitrary(arb.arbitrary flatMap f)
@@ -91,14 +94,18 @@ trait ScalacheckSupport {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
 
-    def *(n: Int): Gen[List[A]]  = listOfN(n, gen)
-    def list: Gen[List[A]]       = listOf(gen)
-    def optional: Gen[Option[A]] = frequency(
+    def *(gn: Gen[Int]): Gen[List[A]] = gn >> (this * _)
+    def *(n: Int): Gen[List[A]]       = listOfN(n, gen)
+    def list: Gen[List[A]]            = listOf(gen)
+    def optional: Gen[Option[A]]      = frequency(
       1  -> None,
       10 -> (gen map (x => Some(x)))
     )
   }
   implicit class ScalacheckGen2Ops[A, B](gen: (Gen[A], Gen[B])) {
     def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1 ; b <- gen._2) yield f(a, b)
+  }
+  implicit class ScalacheckGen3Ops[A, B, C](gen: (Gen[A], Gen[B], Gen[C])) {
+    def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1 ; b <- gen._2 ; c <- gen._3) yield f(a, b, c)
   }
 }

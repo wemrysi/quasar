@@ -102,7 +102,7 @@ object util {
       bs
     }
 
-    def apply(cols: List[(Int, Column)]) = {
+    def apply(cols: List[Int -> Column]) = {
       val sortedCols             = cols.sortBy(_._1)
       val offsets: Array[Int]    = sortedCols.map(_._1)(collection.breakOut)
       val columns: Array[Column] = sortedCols.map(_._2)(collection.breakOut)

@@ -20,11 +20,11 @@
 package com.precog.yggdrasil
 package util
 
+import blueeyes._, json._
 import com.precog.common._
-import blueeyes.json._
 
 object CPathUtils {
-  def cPathToJPaths(cpath: CPath, value: CValue): List[(JPath, CValue)] = (cpath.nodes, value) match {
+  def cPathToJPaths(cpath: CPath, value: CValue): List[JPath -> CValue] = (cpath.nodes, value) match {
     case (CPathField(name) :: tail, _) => addComponent(JPathField(name), cPathToJPaths(CPath(tail), value))
     case (CPathIndex(i) :: tail, _)    => addComponent(JPathIndex(i), cPathToJPaths(CPath(tail), value))
     case (CPathArray :: tail, es: CArray[_]) =>
@@ -35,7 +35,7 @@ object CPathUtils {
     case (path, _) => sys.error("Bad news, bob! " + path)
   }
 
-  private def addComponent(c: JPathNode, xs: List[(JPath, CValue)]): List[(JPath, CValue)] = xs map {
+  private def addComponent(c: JPathNode, xs: List[JPath -> CValue]): List[JPath -> CValue] = xs map {
     case (path, value) => (JPath(c :: path.nodes), value)
   }
 

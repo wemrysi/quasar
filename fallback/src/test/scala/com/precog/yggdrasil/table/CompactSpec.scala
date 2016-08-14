@@ -30,7 +30,7 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpeci
   import SampleData._
   import trans._
 
-  def tableStats(table: Table) : List[(Int, Int)] = table match {
+  def tableStats(table: Table) : List[Int -> Int] = table match {
     case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint
       val sizes = slices.map(_.size).toList

@@ -105,7 +105,7 @@ trait MetadataGenerators  {
   val metadataGenerators = List[Gen[Metadata]](genBooleanMetadata, genLongMetadata, genDoubleMetadata, genBigDecimalMetadata, genStringMetadata)
 
   private def upTo1K: Gen[Long]                        = choose(0L, 1000L)
-  def genMetadataList: Gen[List[Metadata]]             = for(cnt <- choose(0,10); l <- listOfN(cnt, genMetadata)) yield { l }
+  def genMetadataList: Gen[List[Metadata]]             = genMetadata * (0 upTo 10)
   def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l => Map( l.map( m => (m.metadataType, m) ): _* ) }
   def genMetadata: Gen[Metadata]                       = frequency( metadataGenerators.map { (1, _) }: _* )
   def genBooleanMetadata: Gen[BooleanValueStats]       = for(count <- upTo1K; trueCount <- choose(0L, count)) yield BooleanValueStats(count, trueCount)

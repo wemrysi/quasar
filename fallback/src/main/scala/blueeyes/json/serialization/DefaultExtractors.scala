@@ -81,7 +81,7 @@ trait DefaultExtractors {
     }
   }
 
-  implicit def Tuple2Extractor[A, B](implicit ea: Extractor[A], eb: Extractor[B]): Extractor[(A, B)] = new Extractor[(A, B)] {
+  implicit def Tuple2Extractor[A, B](implicit ea: Extractor[A], eb: Extractor[B]): Extractor[A -> B] = new Extractor[A -> B] {
     def validated(jvalue: JValue) = jvalue match {
       case JArray(values) if (values.length == 2) =>
         ea.validated(values(0)) tuple eb.validated(values(1))

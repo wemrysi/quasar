@@ -51,7 +51,7 @@ trait DefaultDecomposers {
     }
   }
 
-  implicit def Tuple2Decomposer[T1, T2](implicit decomposer1: Decomposer[T1], decomposer2: Decomposer[T2]): Decomposer[(T1, T2)] = new Decomposer[(T1, T2)] {
+  implicit def Tuple2Decomposer[T1, T2](implicit decomposer1: Decomposer[T1], decomposer2: Decomposer[T2]): Decomposer[T1 -> T2] = new Decomposer[T1 -> T2] {
     def decompose(tvalue: (T1, T2)) = JArray(decomposer1(tvalue._1) :: decomposer2(tvalue._2) :: Nil)
   }
 

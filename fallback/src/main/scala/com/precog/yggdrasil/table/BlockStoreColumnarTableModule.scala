@@ -283,7 +283,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
 
     type IndexMap = Map[IndexKey, SliceSorter]
 
-    case class JDBMState(prefix: String, fdb: Option[(File, DB)], indices: IndexMap, insertCount: Long) {
+    case class JDBMState(prefix: String, fdb: Option[File -> DB], indices: IndexMap, insertCount: Long) {
       def commit() = fdb foreach { _._2.commit() }
 
       def closed(): JDBMState = fdb match {
@@ -306,7 +306,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       def empty(prefix: String) = JDBMState(prefix, None, Map(), 0l)
     }
 
-    case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[(SliceTransform1[_], String)])
+    case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
     object addGlobalIdScanner extends CScanner {
       type A = Long
@@ -330,7 +330,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
 
     def singleton(slice: Slice) = new SingletonTable(slice :: StreamT.empty[M, Slice])
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)] = {
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table] = {
       sealed trait AlignState
       case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
       case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
@@ -372,7 +372,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
                              right: StreamT[M, Slice],
                              rightKeyTrans: SliceTransform1[B],
                              leftWriteState: JDBMState,
-                             rightWriteState: JDBMState): M[(Table, Table)] = {
+                             rightWriteState: JDBMState): M[Table -> Table] = {
 
         // We will *always* have a lhead and rhead, because if at any point we
         // run out of data, we'll still be hanging on to the last slice on the
@@ -389,7 +389,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
             rstate: B,
             leftWriteState: JDBMState,
             rightWriteState: JDBMState
-        ): M[(JDBMState, JDBMState)] = {
+        ): M[JDBMState -> JDBMState] = {
 
           @tailrec
           def buildFilters(comparator: RowComparator, lidx: Int, lsize: Int, lacc: BitSet, ridx: Int, rsize: Int, racc: BitSet, span: Span): NextStep = {
@@ -486,9 +486,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
                        rstate: B,
                        rkey: Slice,
                        leftWriteState: JDBMState,
-                       rightWriteState: JDBMState): M[(JDBMState, JDBMState)] = nextStep match {
+                       rightWriteState: JDBMState): M[JDBMState -> JDBMState] = nextStep match {
             case MoreLeft(span, leq, ridx, req) =>
-              def next(lbs: JDBMState, rbs: JDBMState): M[(JDBMState, JDBMState)] = ltail.uncons flatMap {
+              def next(lbs: JDBMState, rbs: JDBMState): M[JDBMState -> JDBMState] = ltail.uncons flatMap {
                 case Some((lhead0, ltail0)) =>
                   ///println("Continuing on left; not emitting right.")
                   val nextState = (span: @unchecked) match {
@@ -525,7 +525,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
               }
 
             case MoreRight(span, lidx, leq, req) =>
-              def next(lbs: JDBMState, rbs: JDBMState): M[(JDBMState, JDBMState)] = rtail.uncons flatMap {
+              def next(lbs: JDBMState, rbs: JDBMState): M[JDBMState -> JDBMState] = rtail.uncons flatMap {
                 case Some((rhead0, rtail0)) =>
                   //println("Continuing on right.")
                   val nextState = (span: @unchecked) match {
@@ -700,8 +700,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
     def writeTables(slices: StreamT[M, Slice],
                     valueTrans: SliceTransform1[_],
                     keyTrans: Seq[SliceTransform1[_]],
-                    sortOrder: DesiredSortOrder): M[(List[String], IndexMap)] = {
-      def write0(slices: StreamT[M, Slice], state: WriteState): M[(List[String], IndexMap)] = {
+                    sortOrder: DesiredSortOrder): M[List[String] -> IndexMap] = {
+      def write0(slices: StreamT[M, Slice], state: WriteState): M[List[String] -> IndexMap] = {
         slices.uncons flatMap {
           case Some((slice, tail)) =>
             writeSlice(slice, state, sortOrder) flatMap { write0(tail, _) }
@@ -727,8 +727,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
           val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
 
           def storeTransformed(jdbmState: JDBMState,
-                               transforms: List[(SliceTransform1[_], String)],
-                               updatedTransforms: List[(SliceTransform1[_], String)]): M[(JDBMState, List[(SliceTransform1[_], String)])] = transforms match {
+                               transforms: List[SliceTransform1[_] -> String],
+                               updatedTransforms: List[SliceTransform1[_] -> String]): M[JDBMState -> List[SliceTransform1[_] -> String]] = transforms match {
             case (keyTransform, streamId) :: tail =>
               keyTransform.advance(slice) flatMap {
                 case (nextKeyTransform, kslice) =>
@@ -1133,7 +1133,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
     protected def writeSorted(groupKeys: Seq[TransSpec1],
                               valueSpec: TransSpec1,
                               sortOrder: DesiredSortOrder = SortAscending,
-                              unique: Boolean = false): M[(List[String], IndexMap)] = {
+                              unique: Boolean = false): M[List[String] -> IndexMap] = {
 
       // If we don't want unique key values (e.g. preserve duplicates), we need to add
       // in a distinct "row id" for each value to disambiguate it

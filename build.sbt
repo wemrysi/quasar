@@ -14,8 +14,10 @@ def transitiveExcludes = Seq[ExclusionRule](
 )
 def clean(m: ModuleID): ModuleID = m excludeAll (transitiveExcludes: _*)
 
-lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (precog, fallback) also (
+lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (precog % BothScopes, fallback % BothScopes) also (
+    scalacOptions in console in Compile := consoleArgs,
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
+       scalacOptions in console in Test := consoleArgs,
      initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
 )
 

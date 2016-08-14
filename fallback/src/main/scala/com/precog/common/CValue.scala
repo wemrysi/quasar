@@ -34,8 +34,8 @@ sealed trait RValue { self =>
     RValue.unsafeInsert(self, path, value)
   }
 
-  def flattenWithPath: Vector[(CPath, CValue)] = {
-    def flatten0(path: CPath)(value: RValue): Vector[(CPath, CValue)] = value match {
+  def flattenWithPath: Vector[CPath -> CValue] = {
+    def flatten0(path: CPath)(value: RValue): Vector[CPath -> CValue] = value match {
       case RObject(fields) if fields.isEmpty =>
         Vector((path, CEmptyObject))
 
@@ -43,7 +43,7 @@ sealed trait RValue { self =>
         Vector((path, CEmptyArray))
 
       case RObject(fields) =>
-        fields.foldLeft(Vector.empty[(CPath, CValue)]) {
+        fields.foldLeft(Vector.empty[CPath -> CValue]) {
           case (acc, field) =>
             acc ++ flatten0(path \ field._1)(field._2)
         }

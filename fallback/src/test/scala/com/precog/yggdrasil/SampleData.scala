@@ -33,7 +33,7 @@ import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary._
 import CValueGenerators.JSchema
 
-case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = None) {
+case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
   override def toString = {
     "SampleData: \ndata = "+data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
     "\nschema: " + schema
@@ -47,7 +47,7 @@ object SampleData extends CValueGenerators {
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
   }
 
-  implicit def keyOrder[A]: ScalaMathOrdering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
+  implicit def keyOrder[A]: ScalaMathOrdering[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
 
   def sample(schema: Int => Gen[JSchema]) = Arbitrary(
     for {

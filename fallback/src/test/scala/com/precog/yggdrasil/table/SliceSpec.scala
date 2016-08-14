@@ -44,7 +44,7 @@ class SliceSpec extends quasar.QuasarSpecification {
     byCPath.mapValues(_.map(_._2).toList)
   }
 
-  def sortableCValues(slice: Slice, cpaths: Vector[CPath]): List[(List[CValue], List[CValue])] = {
+  def sortableCValues(slice: Slice, cpaths: Vector[CPath]): List[List[CValue] -> List[CValue]] = {
     val byCPath = columnsByCPath(slice)
     (0 until slice.size).map({ row =>
       (extractCValues(cpaths.map(byCPath).toList, row), extractCValues(byCPath.values.toList, row))

@@ -26,7 +26,7 @@ import scalaz._, Scalaz._
 import quasar.precog.TestSupport._, Gen._
 
 object CValueGenerators {
-  type JSchema = Seq[(JPath, CType)]
+  type JSchema = Seq[JPath -> CType]
 
   def inferSchema(data: Seq[JValue]): JSchema = {
     if (data.isEmpty) {
@@ -112,7 +112,7 @@ trait CValueGenerators extends ArbitraryBigDecimal {
     case CPeriod       => abort("undefined")
   }
 
-  def jvalue(schema: Seq[(JPath, CType)]): Gen[JValue] = {
+  def jvalue(schema: Seq[JPath -> CType]): Gen[JValue] = {
     schema.foldLeft(Gen.const[JValue](JUndefined)) {
       case (gen, (jpath, ctype)) =>
         for {

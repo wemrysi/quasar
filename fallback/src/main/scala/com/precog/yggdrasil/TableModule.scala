@@ -155,7 +155,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
 
     def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[(Table, Table)]
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table]
 
     /**
       * Joins `left` and `right` together using their left/right key specs. The
@@ -165,7 +165,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       */
     def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                              rightKeySpec: TransSpec1,
-                                                                             joinSpec: TransSpec2): M[(JoinOrder, Table)]
+                                                                             joinSpec: TransSpec2): M[JoinOrder -> Table]
 
     /**
       * Performs a back-end specific cross. Unlike Table#cross, this does not
@@ -173,7 +173,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
       * Hints can be provided on how we'd prefer the table to be crossed, but
       * the actual cross order is returned as part of the result.
       */
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[(CrossOrder, Table)]
+    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[CrossOrder -> Table]
   }
 
   trait TableLike {

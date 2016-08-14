@@ -42,11 +42,11 @@ sealed trait CPathTraversal { self =>
   def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]] = None): SpireOrder[Int] = {
     val right = optRight getOrElse left
 
-    def plan0(t: CPathTraversal, paths: List[(List[CPathNode], List[CPathNode])], idx: Int): CPathComparator = t match {
+    def plan0(t: CPathTraversal, paths: List[List[CPathNode] -> List[CPathNode]], idx: Int): CPathComparator = t match {
       case Done =>
         val validPaths = paths map { case (_, nodes) => CPath(nodes.reverse) }
 
-        def makeCols(pathToCol: Map[CPath, Set[Column]]): Array[(CPath, Column)] = {
+        def makeCols(pathToCol: Map[CPath, Set[Column]]): Array[CPath -> Column] = {
           validPaths.flatMap({ path =>
             pathToCol.getOrElse(path, Set.empty).toList map ((path, _))
           })(collection.breakOut)
@@ -60,7 +60,7 @@ sealed trait CPathTraversal { self =>
         })(collection.breakOut)
 
         // Return the first column in the array defined at the row, or -1 if none are defined for that row
-        @inline def firstDefinedIndexFor(columns: Array[(CPath, Column)], row: Int): Int = {
+        @inline def firstDefinedIndexFor(columns: Array[CPath -> Column], row: Int): Int = {
           var i = 0
           while (i < columns.length && !columns(i)._2.isDefinedAt(row)) { i += 1 }
           if (i == columns.length) -1 else i

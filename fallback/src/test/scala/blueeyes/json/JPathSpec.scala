@@ -17,31 +17,26 @@
 package blueeyes
 package json
 
-import org.scalacheck.Prop
-import org.scalacheck.Arbitrary, Arbitrary.arbitrary
 import quasar.precog.JsonTestSupport._
 
 object JPathSpec extends quasar.QuasarSpecification {
   "Parser" should {
     "parse all valid JPath strings" in {
-      prop { (jpath: JPath) =>
-        JPath(jpath.toString) == jpath
-      }
+      prop((p: JPath) => JPath(p.toString) == p)
     }
-
     "forgivingly parse initial field name without leading dot" in {
-      JPath("foo.bar").nodes mustEqual (JPathField("foo") :: JPathField("bar") :: Nil)
+      JPath("foo.bar").nodes must_=== List[JPathNode]("foo", "bar")
     }
   }
 
   "Extractor" should {
     "extract all existing paths" in {
 
-      implicit val arb: Arbitrary[(JValue, List[(JPath, JValue)])] = Arbitrary {
+      implicit val arb: Arbitrary[JValue -> List[JPath -> JValue]] = Arbitrary {
         for (jv <- arbitrary[JObject]) yield (jv, jv.flattenWithPath)
       }
 
-      prop { (testData: (JValue, List[(JPath, JValue)])) =>
+      prop { (testData: (JValue, List[JPath -> JValue])) =>
         testData match {
           case (obj, allPathValues) =>
             val allProps = allPathValues.map {
@@ -55,7 +50,7 @@ object JPathSpec extends quasar.QuasarSpecification {
     "extract a second level node" in {
       val j = JObject(JField("address", JObject(JField("city", JString("B")) :: JField("street", JString("2")) :: Nil)) :: Nil)
 
-      JPath("address.city").extract(j) mustEqual (JString("B"))
+      JPath("address.city").extract(j) must_=== (JString("B"))
     }
   }
 
@@ -69,17 +64,17 @@ object JPathSpec extends quasar.QuasarSpecification {
     }
 
     "return None when there is no parent" in {
-      NoJPath.parent mustEqual None
+      NoJPath.parent must_=== None
     }
   }
 
   "Ancestors" should {
     "return two ancestors" in {
-      JPath(".foo.bar.baz").ancestors mustEqual List(JPath(".foo.bar"), JPath(".foo"), NoJPath)
+      JPath(".foo.bar.baz").ancestors must_=== List(JPath(".foo.bar"), JPath(".foo"), NoJPath)
     }
 
     "return empty list for identity" in {
-      NoJPath.ancestors mustEqual Nil
+      NoJPath.ancestors must_=== Nil
     }
   }
 
@@ -95,23 +90,22 @@ object JPathSpec extends quasar.QuasarSpecification {
 
   "Ordering" should {
     "sort according to nodes names/indexes" in {
-      val test = List(
-        JPath("[1]"),
-        JPath("[0]"),
-        JPath("a"),
-        JPath("a[9]"),
-        JPath("a[10]"),
-        JPath("b[10]"),
-        JPath("a[10].a[1]"),
-        JPath("b[10].a[1]"),
-        JPath("b[10].a.x"),
-        JPath("b[10].a[0]"),
-        JPath("b[10].a[0].a")
+      val test = List[JPath](
+        "[1]",
+        "[0]",
+        "a",
+        "a[9]",
+        "a[10]",
+        "b[10]",
+        "a[10].a[1]",
+        "b[10].a[1]",
+        "b[10].a.x",
+        "b[10].a[0]",
+        "b[10].a[0].a"
       )
-
       val expected = List(1, 0, 2, 3, 4, 6, 5, 9, 10, 7, 8) map test
 
-      test.sorted must_== expected
+      test.sorted must_=== expected
     }
   }
 }

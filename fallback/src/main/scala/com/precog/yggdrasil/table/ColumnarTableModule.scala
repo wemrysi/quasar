@@ -500,7 +500,7 @@ trait ColumnarTableModule[M[+ _]]
 
         val indicesGroupedBySource = sourceKeys.groupBy(_.groupId).mapValues(_.map(y => (y.index, y.keySchema)).toSeq).values.toSeq
 
-        def unionOfIntersections(indicesGroupedBySource: Seq[Seq[(TableIndex, KeySchema)]]): Set[Key] = {
+        def unionOfIntersections(indicesGroupedBySource: Seq[Seq[TableIndex -> KeySchema]]): Set[Key] = {
           def allSourceDNF[T](l: Seq[Seq[T]]): Seq[Seq[T]] = {
             l match {
               case Seq(hd) => hd.map(Seq(_))
@@ -641,7 +641,7 @@ trait ColumnarTableModule[M[+ _]]
 
     def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
                                                                              rightKeySpec: TransSpec1,
-                                                                             joinSpec: TransSpec2): M[(JoinOrder, Table)] = {
+                                                                             joinSpec: TransSpec2): M[JoinOrder -> Table] = {
       val emptySpec = trans.ConstLiteral(CEmptyArray, Leaf(Source))
       for {
         left0 <- left.sort(leftKeySpec)
@@ -652,7 +652,7 @@ trait ColumnarTableModule[M[+ _]]
       }
     }
 
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[(CrossOrder, Table)] = {
+    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[CrossOrder -> Table] = {
       import CrossOrder._
       M.point(orderHint match {
         case Some(CrossRight | CrossRightLeft) =>
@@ -722,7 +722,7 @@ trait ColumnarTableModule[M[+ _]]
     }
 
     def force: M[Table] = {
-      def loop(slices: StreamT[M, Slice], acc: List[Slice], size: Long): M[(List[Slice], Long)] = slices.uncons flatMap {
+      def loop(slices: StreamT[M, Slice], acc: List[Slice], size: Long): M[List[Slice] -> Long] = slices.uncons flatMap {
         case Some((slice, tail)) if slice.size > 0 =>
           loop(tail, slice.materialized :: acc, size + slice.size)
         case Some((_, tail)) =>
@@ -980,7 +980,7 @@ trait ColumnarTableModule[M[+ _]]
         case object CogroupDone extends CogroupState
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
-        def step(state: CogroupState): M[Option[(Slice, CogroupState)]] = {
+        def step(state: CogroupState): M[Option[Slice -> CogroupState]] = {
 
           // step0 is the inner monadic recursion needed to cross slice boundaries within the emission of a slice
           def step0(lr: LR,
@@ -990,7 +990,7 @@ trait ColumnarTableModule[M[+ _]]
                     rightPosition: SlicePosition[RK],
                     rightStart0: Option[SlicePosition[RK]],
                     rightEnd0: Option[SlicePosition[RK]])(
-              ibufs: IndexBuffers = new IndexBuffers(leftPosition.key.size, rightPosition.key.size)): M[Option[(Slice, CogroupState)]] = {
+              ibufs: IndexBuffers = new IndexBuffers(leftPosition.key.size, rightPosition.key.size)): M[Option[Slice -> CogroupState]] = {
 
             val SlicePosition(lSliceId, lpos0, lkstate, lkey, lhead, ltail) = leftPosition
             val SlicePosition(rSliceId, rpos0, rkstate, rkey, rhead, rtail) = rightPosition
@@ -1091,7 +1091,7 @@ trait ColumnarTableModule[M[+ _]]
               }
             }
 
-            def continue(nextStep: NextStep[LK, RK]): M[Option[(Slice, CogroupState)]] = nextStep match {
+            def continue(nextStep: NextStep[LK, RK]): M[Option[Slice -> CogroupState]] = nextStep match {
               case SplitLeft(lpos) =>
                 val (lpref, lsuf) = lhead.split(lpos)
                 val (_, lksuf)    = lkey.split(lpos)
@@ -1333,7 +1333,7 @@ trait ColumnarTableModule[M[+ _]]
       def cross0[A](transform: SliceTransform2[A]): M[StreamT[M, Slice]] = {
         case class CrossState(a: A, position: Int, tail: StreamT[M, Slice])
 
-        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[(A, StreamT[M, Slice])] = {
+        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[A -> StreamT[M, Slice]] = {
 
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
@@ -1381,7 +1381,7 @@ trait ColumnarTableModule[M[+ _]]
         }
 
         def crossLeftSingle(lhead: Slice, right: StreamT[M, Slice])(a0: A): StreamT[M, Slice] = {
-          def step(state: CrossState): M[Option[(Slice, CrossState)]] = {
+          def step(state: CrossState): M[Option[Slice -> CrossState]] = {
             if (state.position < lhead.size) {
               state.tail.uncons flatMap {
                 case Some((rhead, rtail0)) =>
@@ -1777,7 +1777,7 @@ trait ColumnarTableModule[M[+ _]]
             val (refs0, cols0) = slice.columns.unzip
 
             val masks                        = buildMasks(cols0.toArray, slice.size)
-            val refs: List[(ColumnRef, Int)] = refs0.zipWithIndex.toList
+            val refs: List[ColumnRef -> Int] = refs0.zipWithIndex.toList
             val next = masks flatMap { schemaMask =>
               mkSchema(refs collect { case (ref, i) if RawBitSet.get(schemaMask, i) => ref })
             }

@@ -242,7 +242,7 @@ object CPath {
     val size: Int = path.length
   }
 
-  def makeStructuredTree[A](pathsAndValues: Seq[(CPath, A)]) = {
+  def makeStructuredTree[A](pathsAndValues: Seq[CPath -> A]) = {
     def inner[A](paths: Seq[PathWithLeaf[A]]): Seq[CPathTree[A]] = {
       if (paths.size == 1 && paths.head.size == 0) {
         List(LeafNode(paths.head.value))

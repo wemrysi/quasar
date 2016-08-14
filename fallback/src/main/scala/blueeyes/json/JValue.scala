@@ -48,19 +48,19 @@ object JValue {
 
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
 
-  private def unflattenArray(elements: Seq[(JPath, JValue)]): JArray = {
+  private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
     elements.foldLeft(JArray(Nil)) { (arr, t) =>
       arr.set(t._1, t._2) --> classOf[JArray]
     }
   }
 
-  private def unflattenObject(elements: Seq[(JPath, JValue)]): JObject = {
+  private def unflattenObject(elements: Seq[JPath -> JValue]): JObject = {
     elements.foldLeft(JObject(Nil)) { (obj, t) =>
       obj.set(t._1, t._2) --> classOf[JObject]
     }
   }
 
-  def unflatten(elements: Seq[(JPath, JValue)]): JValue = {
+  def unflatten(elements: Seq[JPath -> JValue]): JValue = {
     if (elements.isEmpty) JUndefined
     else {
       val sorted = elements.sortBy(_._1)

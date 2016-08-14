@@ -131,7 +131,7 @@ trait IndicesModule[M[+ _]] extends TransSpecModule with ColumnarTableTypes[M] w
       // Filter out negative integers. This allows the caller to do
       // arbitrary remapping of their own Seq[RValue] by filtering
       // values they don't want.
-      val params: List[(Seq[Int], Seq[RValue])] = tpls.map {
+      val params: List[Seq[Int] -> Seq[RValue]] = tpls.map {
         case (index, ns, jvs) =>
           val (ns2, jvs2) = ns.zip(jvs).filter(_._1 >= 0).unzip
           (ns2, jvs2)

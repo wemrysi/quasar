@@ -636,8 +636,8 @@ package object json {
 
     /** Flattens the JValue down to a list of path to simple JValue primitive.
       */
-    def flattenWithPath: List[(JPath, JValue)] = {
-      def flatten0(path: JPath)(value: JValue): List[(JPath, JValue)] = value match {
+    def flattenWithPath: List[JPath -> JValue] = {
+      def flatten0(path: JPath)(value: JValue): List[JPath -> JValue] = value match {
         case JObject.empty | JArray.empty => List(path -> value)
         case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
         case JArray(elements)             => elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })

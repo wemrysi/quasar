@@ -97,12 +97,12 @@ class ExamplesSpec extends quasar.QuasarSpecification {
   "Example which folds up to form a flattened list" in {
     val json = parseUnsafe(person)
 
-    def form(list: JPath*): List[(JPath, JValue)] = list.toList.map { path =>
+    def form(list: JPath*): List[JPath -> JValue] = list.toList.map { path =>
       (path, json(path))
     }
 
     val folded = (json
-      .foldUpWithPath[List[(JPath, JValue)]](Nil) { (list, path, json) =>
+      .foldUpWithPath[List[JPath -> JValue]](Nil) { (list, path, json) =>
         (path, json) :: list
       })
       .sorted

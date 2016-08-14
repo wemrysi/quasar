@@ -8,6 +8,7 @@ object PlatformBuild {
   def envArgs     = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
   def warningArgs = Seq("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
   def stdArgs     = Seq("-deprecation", "-unchecked", "-language:_")
+  def consoleArgs = Seq("-language:_")
 
   // val Default = IncOptions(
   //   //    1. recompile changed sources
@@ -103,14 +104,13 @@ object PlatformBuild {
 
     def setup: Project = (
       serialTests.scalacPlugins(kindProjector).crossSourceDirs.allWarnings.fatalWarnings also (
-                   organization :=  "com.precog",
-                        version :=  "0.1",
-                  scalacOptions ++= envArgs ++ stdArgs,
-       scalacOptions in console :=  Nil,
-                   scalaVersion :=  "2.11.8",
-            logBuffered in Test :=  false,
-                    crossTarget ~=  (_ / s"java-$javaSpecVersion")
-                  // incOptions :=  mkIncOptions(crossTarget.value)
+               organization :=  "com.precog",
+                    version :=  "0.1",
+              scalacOptions ++= envArgs ++ stdArgs,
+               scalaVersion :=  "2.11.8",
+        logBuffered in Test :=  false,
+                crossTarget ~=  (_ / s"java-$javaSpecVersion")
+              // incOptions :=  mkIncOptions(crossTarget.value)
       )
     )
   }
