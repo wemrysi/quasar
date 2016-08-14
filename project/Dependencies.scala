@@ -63,6 +63,15 @@ object Dependencies {
     "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
     "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
+  def sparkcore = Seq(
+    "io.netty"          %  "netty-all"  % nettyVersion,
+    ("org.apache.spark" %% "spark-core" % "1.6.2")
+      .exclude("commons-beanutils", "commons-beanutils-core")
+      .exclude("commons-collections", "commons-collections")
+      .exclude("com.esotericsoftware.minlog", "minlog")
+      .exclude("org.spark-project.spark", "unused")
+      .exclude("io.netty", "netty-all")
+  )
   def web = Seq(
     "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
