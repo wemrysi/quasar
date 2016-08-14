@@ -25,9 +25,12 @@ import blueeyes.json.serialization.DefaultSerialization._
 import blueeyes.json.serialization.Extractor._
 import scalaz._
 import quasar.precog.TestSupport._
+import ArbitraryEventMessage._
 
-class EventSpec extends quasar.QuasarSpecification with ArbitraryEventMessage {
-  implicit val arbEvent = Arbitrary(genRandomIngest)
+class IngestSpec extends quasar.QuasarSpecification {
+  implicit val arbEvent   = Arbitrary(genRandomIngest)
+  implicit val arbArchive = Arbitrary(genRandomArchive)
+
   "serialization of an event" should {
     "read back the data that was written" in prop { in: Ingest =>
       in.serialize.validated[Ingest] must beLike {
@@ -55,6 +58,59 @@ class EventSpec extends quasar.QuasarSpecification with ArbitraryEventMessage {
               "path"   -> JString("/test/")).validated[Archive] must beLike {
         case Success(_) => ok
       }
+    }
+  }
+
+  "EventId" should {
+    implicit val idRange: Arbitrary[Int] = Arbitrary(Gen.chooseNum[Int](0, Int.MaxValue))
+
+    "support round-trip encap/decap of producer/sequence ids" in prop { (prod: Int, seq: Int) =>
+      val uid = EventId(prod, seq).uid
+
+      EventId.producerId(uid) mustEqual prod
+      EventId.sequenceId(uid) mustEqual seq
+    }
+  }
+
+  "serialization of an archive" should {
+    "read back the data that was written" in prop { in: Archive =>
+      in.serialize.validated[Archive] must beLike {
+        case Success(out) => in must_== out
+      }
+    }
+
+    "read new archives" in {
+      val Success(JArray(input)) = JParser.parseFromString("""[
+{"apiKey":"test1","path":"/foo1/test/js/delete/"},
+{"apiKey":"test2","path":"/foo2/blargh/"},
+{"apiKey":"test2","path":"/foo2/blargh/"},
+{"apiKey":"test2","path":"/foo2/testing/"},
+{"apiKey":"test2","path":"/foo2/testing/"}
+]""")
+
+      val results = input.map(_.validated[Archive]).collect {
+        case Success(result) => result
+      }
+
+      results.size mustEqual 5
+      results.map(_.apiKey).toSet mustEqual Set("test1", "test2")
+    }
+
+    "read archives with reversed fields" in {
+      val Success(JArray(input)) = JParser.parseFromString("""[
+{"path":"test1","apiKey":"/foo1/test/js/delete/"},
+{"path":"test2","apiKey":"/foo2/blargh/"},
+{"path":"test2","apiKey":"/foo2/blargh/"},
+{"path":"test2","apiKey":"/foo2/testing/"},
+{"path":"test2","apiKey":"/foo2/testing/"}
+]""")
+
+      val results = input.map(_.validated[Archive]).collect {
+        case Success(result) => result
+      }
+
+      results.size mustEqual 5
+      results.map(_.apiKey).toSet mustEqual Set("test1", "test2")
     }
   }
 }

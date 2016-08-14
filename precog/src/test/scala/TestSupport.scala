@@ -91,6 +91,7 @@ trait ScalacheckSupport {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
 
+    def *(n: Int): Gen[List[A]]  = listOfN(n, gen)
     def list: Gen[List[A]]       = listOf(gen)
     def optional: Gen[Option[A]] = frequency(
       1  -> None,

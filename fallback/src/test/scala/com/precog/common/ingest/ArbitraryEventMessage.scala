@@ -22,29 +22,16 @@ package ingest
 
 import security._
 import blueeyes._
-import quasar.precog.JsonTestSupport._, Gen._
+import quasar.precog.JsonTestSupport._
+import Gen.{ alphaStr, choose, containerOfN, frequency, listOfN, oneOf, delay }
 
-trait ArbitraryEventMessage {
-  def genStreamId: Gen[Option[UUID]] = Gen.oneOf(Gen lzy Some(randomUuid), Gen const None)
+object ArbitraryEventMessage {
 
-  def genPath: Gen[Path] = Gen.resize(10, Gen.containerOf[List, String](alphaStr)) map { elements =>
-    Path(elements.filter(_.length > 0))
-  }
-
-  def genWriteMode: Gen[WriteMode] =
-      Gen.oneOf(AccessMode.Create, AccessMode.Replace, AccessMode.Append)
-
-  def genStreamRef: Gen[StreamRef] =
-    for {
-      terminal <- arbitrary[Boolean]
-      storeMode <- genWriteMode
-    } yield StreamRef.forWriteMode(storeMode, terminal)
-
-  def genEventId: Gen[EventId] =
-    for {
-      producerId <- choose(0,1000000)
-      sequenceId <- choose(0, 1000000)
-    } yield EventId(producerId, sequenceId)
+  def genStreamId: Gen[Option[UUID]] = delay(randomUuid).optional
+  def genPath: Gen[Path]             = listOfN(10, alphaStr) ^^ (_ mkString "/") ^^ (Path(_))
+  def genWriteMode: Gen[WriteMode]   = oneOf(AccessMode.Create, AccessMode.Replace, AccessMode.Append)
+  def genStreamRef: Gen[StreamRef]   = (genWriteMode, genBool) >> (StreamRef.forWriteMode(_, _))
+  def genEventId: Gen[EventId]       = (choose(0, 1000000), choose(0, 1000000)) >> (EventId(_, _))
 
   def genRandomIngest: Gen[Ingest] =
     for {
@@ -75,11 +62,10 @@ trait ArbitraryEventMessage {
       IngestMessage(ingest.apiKey, ingest.path, ingest.writeAs.get, data, ingest.jobId, instant.now(), streamRef)
     }
 
-  def genRandomArchiveMessage: Gen[ArchiveMessage] =
-    for {
-      eventId <- genEventId
-      archive <- genRandomArchive
-    } yield ArchiveMessage(archive.apiKey, archive.path, archive.jobId, eventId, archive.timestamp)
+  def genRandomArchiveMessage: Gen[ArchiveMessage] = (
+    (genEventId, genRandomArchive) >>
+      ((eventId, archive) => ArchiveMessage(archive.apiKey, archive.path, archive.jobId, eventId, archive.timestamp))
+  )
 
   def genRandomEventMessage: Gen[EventMessage] =
     frequency(

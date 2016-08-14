@@ -103,13 +103,14 @@ object PlatformBuild {
 
     def setup: Project = (
       serialTests.scalacPlugins(kindProjector).crossSourceDirs.allWarnings.fatalWarnings also (
-              organization :=  "com.precog",
-                   version :=  "0.1",
-             scalacOptions ++= envArgs ++ stdArgs,
-              scalaVersion :=  "2.11.8",
-       logBuffered in Test :=  false,
-               crossTarget ~=  (_ / s"java-$javaSpecVersion")
-                // incOptions :=  mkIncOptions(crossTarget.value)
+                   organization :=  "com.precog",
+                        version :=  "0.1",
+                  scalacOptions ++= envArgs ++ stdArgs,
+       scalacOptions in console :=  Nil,
+                   scalaVersion :=  "2.11.8",
+            logBuffered in Test :=  false,
+                    crossTarget ~=  (_ / s"java-$javaSpecVersion")
+                  // incOptions :=  mkIncOptions(crossTarget.value)
       )
     )
   }
