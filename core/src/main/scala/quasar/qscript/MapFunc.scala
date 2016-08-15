@@ -179,7 +179,7 @@ object MapFunc {
             Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
               ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(InjE(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
@@ -190,7 +190,7 @@ object MapFunc {
             //       handled by the same case
             case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Nullary(src)))), Embed(value))))) if field ≟ src =>
               value
-            case Embed(CoEnv(\/-(Nullary(Embed(InjE(ejson.Map(m))))))) =>
+            case Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
               }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
@@ -198,26 +198,26 @@ object MapFunc {
 
         // elide Nil array on the left
         case ConcatArrays(
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil))))))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
 
         // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil)))))))) =>
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
 
         // elide Nil map on the left
         case ConcatMaps(
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjE(ejson.Map(Nil))))))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
 
         // elide Nil map on the right
         case ConcatMaps(
           Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjE(ejson.Map(Nil)))))))) =>
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
 
         case _ => None

@@ -30,6 +30,9 @@ final case class Str[A](value: String)     extends Common[A]
 final case class Dec[A](value: BigDecimal) extends Common[A]
 
 object Common {
+  def unapply[A](ej: EJson[A])(implicit C: Common :<: EJson): Option[Common[A]] =
+    C.prj(ej)
+
   implicit val traverse: Traverse[Common] = new Traverse[Common] {
     def traverseImpl[G[_], A, B](
       fa: Common[A])(
@@ -102,6 +105,9 @@ final case class Char[A](value: scala.Char)  extends Extension[A]
 final case class Int[A](value: BigInt)       extends Extension[A]
 
 object Extension {
+  def unapply[A](ej: EJson[A])(implicit E: Extension :<: EJson): Option[Extension[A]] =
+    E.prj(ej)
+
   implicit val traverse: Traverse[Extension] = new Traverse[Extension] {
     def traverseImpl[G[_], A, B](
       fa: Extension[A])(

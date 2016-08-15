@@ -40,15 +40,4 @@ package object ejson {
     def fromJsonT[T[_[_]]: FunctorT: Corecursive]: T[Json] => T[EJson] =
       _.transAna(fromJson(s => Coproduct.right[Obj](str[T[Json]](s)).embed))
   }
-
-  // these exist because `fp.Inj` cannot match multiple sides of a `Coproduct` in the same scope
-  object InjE {
-    def unapply[A](ej: EJson[A])(implicit E: Extension :<: EJson): Option[Extension[A]] =
-      E.prj(ej)
-  }
-
-  object InjC {
-    def unapply[A](ej: EJson[A])(implicit C: Common :<: EJson): Option[Common[A]] =
-      C.prj(ej)
-  }
 }
