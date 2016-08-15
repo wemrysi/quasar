@@ -20,7 +20,6 @@
 package com.precog.common
 package security
 
-import accounts.AccountId
 import blueeyes._
 import service.v1
 import scalaz._, Scalaz._

@@ -178,7 +178,15 @@ case object CPathArray extends CPathNode {
 }
 
 object CPath {
+  private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
+  private val IndexPattern = """^\[(\d+)\]$""".r
+
+  val Identity = CPath()
+
+  type AndValue = CPath -> CValue
+
   import blueeyes.json._
+
   implicit val CPathDecomposer: Decomposer[CPath] = new Decomposer[CPath] {
     def decompose(cpath: CPath): JValue = JString(cpath.toString)
   }
@@ -190,45 +198,30 @@ object CPath {
 
   private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
-  private val PathPattern  = """\.|(?=\[\d+\])|(?=\[\*\])""".r
-  private val IndexPattern = """^\[(\d+)\]$""".r
-
-  val Identity = apply()
-
-  def apply(n: CPathNode*): CPath = CompositeCPath(n.toList)
+  def apply(n: CPathNode*): CPath      = CompositeCPath(n.toList)
 
   def apply(l: List[CPathNode]): CPath = apply(l: _*)
 
-  def apply(path: JPath): CPath = {
-    val nodes2 = path.nodes map {
+  def apply(path: JPath): CPath = CPath(
+    path.nodes map {
       case JPathField(name) => CPathField(name)
       case JPathIndex(idx)  => CPathIndex(idx)
-    }
+    }: _*
+  )
 
-    CPath(nodes2: _*)
-  }
-
-  def unapplySeq(path: CPath): Option[List[CPathNode]] = Some(path.nodes)
-
+  def unapplySeq(path: CPath): Option[List[CPathNode]]  = Some(path.nodes)
   def unapplySeq(path: String): Option[List[CPathNode]] = Some(apply(path).nodes)
 
   implicit def apply(path: String): CPath = {
     def parse0(segments: List[String], acc: List[CPathNode]): List[CPathNode] = segments match {
-      case Nil => acc
-
-      case head :: tail =>
-        if (head.trim.length == 0) parse0(tail, acc)
-        else
-          parse0(tail, (head match {
-            case "[*]"               => CPathArray
-            case IndexPattern(index) => CPathIndex(index.toInt)
-
-            case name => CPathField(name)
-          }) :: acc)
+      case Nil                               => acc
+      case head :: tail if head.trim.isEmpty => parse0(tail, acc)
+      case "[*]" :: tail                     => parse0(tail, CPathArray :: acc)
+      case IndexPattern(index) :: tail       => parse0(tail, CPathIndex(index.toInt) :: acc)
+      case name :: tail                      => parse0(tail, CPathField(name) :: acc)
     }
 
     val properPath = if (path.startsWith(".")) path else "." + path
-
     apply(parse0(PathPattern.split(properPath).toList, Nil).reverse: _*)
   }
 

@@ -19,19 +19,18 @@
  */
 package com.precog.common
 
-// import quasar.precog.TestSupport._
-
 class CPathSpec extends quasar.QuasarSpecification {
   import CPath._
 
   "makeTree" should {
     "return correct tree given a sequence of CPath" in {
-      val cpaths: Seq[CPath] = Seq(
-        CPath(CPathField("foo")),
-        CPath(CPathField("bar"), CPathIndex(0)),
-        CPath(CPathField("bar"), CPathIndex(1), CPathField("baz")),
-        CPath(CPathField("bar"), CPathIndex(1), CPathField("ack")),
-        CPath(CPathField("bar"), CPathIndex(2)))
+      val cpaths = Seq[CPath](
+        "foo",
+        CPath("bar", 0),
+        CPath("bar", 1, "baz"),
+        CPath("bar", 1, "ack"),
+        CPath("bar", 2)
+      )
 
       val values: Seq[Int] = Seq(4, 6, 7, 2, 0)
 

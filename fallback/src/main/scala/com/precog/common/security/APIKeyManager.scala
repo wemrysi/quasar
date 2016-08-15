@@ -22,7 +22,7 @@ package security
 
 import blueeyes._
 import service._
-import com.precog.common.accounts.{ Account, AccountId }
+import com.precog.common.accounts.Account
 import scalaz._, Scalaz._
 
 object APIKeyManager {
