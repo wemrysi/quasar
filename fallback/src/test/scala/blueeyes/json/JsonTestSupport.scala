@@ -19,12 +19,46 @@ import quasar.precog.TestSupport._
 import Gen._
 
 package quasar.precog {
-  object JsonTestSupport extends TestSupport with JsonGenerators {
+  object TableTestSupport extends TestSupport with TableGenerators {
+  }
+
+  object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerators {
     def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
 
     implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
     implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
     implicit def arbJPath: Arbitrary[JPath]     = Arbitrary(genJPath)
+  }
+
+  trait TableGenerators {
+    import com.precog.yggdrasil.table._
+    import com.precog.common._
+
+    def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
+      def bs = BitSetUtil.range(0, size)
+      col.ctype match {
+        case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
+        case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
+        case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
+        case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
+        case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
+        case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
+        case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
+        case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
+        case CEmptyObject  => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
+        case CEmptyArray   => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
+        case CUndefined    => UndefinedColumn.raw
+        case CArrayType(_) => abort("undefined")
+      }
+    }
+
+    def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
+      val zero    = Nil: Gen[List[ColumnRef -> Column]]
+      val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
+      val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
+
+      genData ^^ (data => Slice(data.toMap, sz))
+    }
   }
 }
 

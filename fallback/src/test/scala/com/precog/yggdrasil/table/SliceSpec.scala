@@ -20,14 +20,15 @@
 package com.precog.yggdrasil
 package table
 
-import scala.util.Random
 import blueeyes._
 import com.precog.common._
-import quasar.precog.TestSupport._
-import Gen.listOfN
-import ArbitrarySlice._
+import quasar.precog.TableTestSupport._
 
 class SliceSpec extends quasar.QuasarSpecification {
+  val emptySlice: Slice = new Slice {
+    val size = 0
+    val columns: Map[ColumnRef, Column] = Map.empty
+  }
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
@@ -149,18 +150,13 @@ class SliceSpec extends quasar.QuasarSpecification {
       }
     }
 
-    val emptySlice = new Slice {
-      val size = 0
-      val columns: Map[ColumnRef, Column] = Map.empty
-    }
-
     "concat empty slices correctly" in {
       implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))
 
       prop { fullSlices: List[Slice] =>
         val slices = fullSlices collect {
-          case slice if Random.nextBoolean => slice
-          case _ => emptySlice
+          case slice if randomBool => slice
+          case _                   => emptySlice
         }
         val slice = Slice.concat(slices)
         toCValues(slice) must_== fakeConcat(slices)
@@ -168,7 +164,7 @@ class SliceSpec extends quasar.QuasarSpecification {
     }
 
     "concat heterogeneous slices" in {
-      val pds = List.fill(25)(concatProjDesc filter (_ => Random.nextBoolean))
+      val pds = List.fill(25)(concatProjDesc filter (_ => randomBool))
       val g1 :: g2 :: gs = pds.map(genSlice(_, 17))
 
       implicit val arbSlice = Arbitrary(Gen.oneOf(g1, g2, gs: _*))
@@ -180,36 +176,5 @@ class SliceSpec extends quasar.QuasarSpecification {
         toCValues(slice).map(stripUndefineds) must_== fakeConcat(slices).map(stripUndefineds)
       }
     }
-  }
-}
-
-
-object ArbitrarySlice {
-  private def genBitSet(size: Int): Gen[BitSet] = listOfN(size, genBool) ^^ (BitsetColumn bitset _)
-
-  def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
-    def bs = BitSetUtil.range(0, size)
-    col.ctype match {
-      case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
-      case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))
-      case CLong         => arrayOfN(size, genLong) ^^ (ArrayLongColumn(bs, _))
-      case CDouble       => arrayOfN(size, genDouble) ^^ (ArrayDoubleColumn(bs, _))
-      case CDate         => arrayOfN(size, genLong) ^^ (ns => ArrayDateColumn(bs, ns map dateTime.fromMillis))
-      case CPeriod       => arrayOfN(size, genLong) ^^ (ns => ArrayPeriodColumn(bs, ns map period.fromMillis))
-      case CNum          => arrayOfN(size, genDouble) ^^ (ns => ArrayNumColumn(bs, ns map (v => BigDecimal(v))))
-      case CNull         => genBitSet(size) ^^ (s => new BitsetColumn(s) with NullColumn)
-      case CEmptyObject  => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyObjectColumn)
-      case CEmptyArray   => genBitSet(size) ^^ (s => new BitsetColumn(s) with EmptyArrayColumn)
-      case CUndefined    => UndefinedColumn.raw
-      case CArrayType(_) => abort("undefined")
-    }
-  }
-
-  def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
-    val zero    = Nil: Gen[List[ColumnRef -> Column]]
-    val gs      = refs map (cr => genColumn(cr, sz) ^^ (cr -> _))
-    val genData = gs.foldLeft(zero)((res, g) => res >> (r => g ^^ (_ :: r)))
-
-    genData ^^ (data => Slice(data.toMap, sz))
   }
 }

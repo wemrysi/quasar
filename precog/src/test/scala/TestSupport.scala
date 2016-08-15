@@ -52,6 +52,17 @@ trait ScalacheckSupport {
 
   def genFile: Gen[File] = listOfN(3, identifier map (_ take 5)) map (xs => new File(xs.mkString("/", "/", ".cooked")))
 
+  def genBitSet(size: Int): Gen[BitSet] = {
+    genBool * size ^^ { bools =>
+      doto(new BitSet) { bs =>
+        bools.indices foreach { i =>
+          if (bools(i))
+            bs set i
+        }
+      }
+    }
+  }
+
   def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
     sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 

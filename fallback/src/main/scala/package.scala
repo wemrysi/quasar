@@ -4,36 +4,12 @@ import quasar.{ precog => p }
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
   // Temporary
+  type BitSet             = quasar.precog.BitSet
   type JobId              = String
-  type BitSet             = com.precog.BitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
-
-  def Utf8Charset: Charset                                               = java.nio.charset.Charset forName "UTF-8"
-  def utf8Bytes(s: String): Array[Byte]                                  = s getBytes Utf8Charset
-  def uuid(s: String): UUID                                              = java.util.UUID fromString s
-  def randomUuid(): UUID                                                 = java.util.UUID.randomUUID
-  def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
-  def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
-  def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)
-  def abort(msg: String): Nothing                                        = throw new RuntimeException(msg)
-  def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
-  def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
-
-  def doto[A](x: A)(f: A => Any): A = { f(x) ; x }
-
-  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
-    val len = a1.length
-    if (len != a2.length) return false
-    var i = 0
-    while (i < len) {
-      if (a1(i) != a2(i)) return false
-      i += 1
-    }
-    true
-  }
 
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))

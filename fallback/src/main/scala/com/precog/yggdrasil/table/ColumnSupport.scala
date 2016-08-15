@@ -34,18 +34,6 @@ class BitsetColumn(definedAt: BitSet) {
   }
 }
 
-object BitsetColumn {
-  def bitset(definedAt: Seq[Boolean]) = {
-    val bs = new BitSet
-    var i = 0
-    definedAt.foreach { v =>
-      if (v) bs.set(i)
-      i += 1
-    }
-    bs
-  }
-}
-
 class Map1Column(c: Column) {
   this: Column =>
   def isDefinedAt(row: Int) = c.isDefinedAt(row)

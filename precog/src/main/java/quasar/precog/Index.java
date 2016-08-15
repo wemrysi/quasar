@@ -1,4 +1,4 @@
-package com.precog;
+package quasar.precog;
 
 import java.io.ObjectStreamException;
 
