@@ -27,7 +27,7 @@ import blueeyes.json._
 import scalaz._
 import scalaz.syntax.std.boolean._
 
-trait ColumnarTableModuleTestSupport extends ColumnarTableModule[Need] with TableModuleTestSupport {
+trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
   def newGroupId: GroupId
 
   def defaultSliceSize = 10

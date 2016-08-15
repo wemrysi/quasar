@@ -32,11 +32,11 @@ import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 
-trait ColumnarTableTypes[M[+ _]] {
+trait ColumnarTableTypes {
   type F1         = CF1
   type F2         = CF2
   type Scanner    = CScanner
-  type Mapper     = CMapper[M]
+  type Mapper     = CMapper[Need]
   type Reducer[α] = CReducer[α]
   type RowId      = Int
 }
@@ -290,13 +290,13 @@ object ColumnarTableModule {
   }
 }
 
-trait ColumnarTableModule[M[+ _]]
-    extends TableModule[M]
-    with ColumnarTableTypes[M]
+trait ColumnarTableModule
+    extends TableModule
+    with ColumnarTableTypes
     with IdSourceScannerModule
-    with SliceTransforms[M]
-    with SamplableColumnarTableModule[M]
-    with IndicesModule[M] {
+    with SliceTransforms
+    with SamplableColumnarTableModule
+    with IndicesModule {
 
   import TableModule._
   import trans._

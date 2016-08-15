@@ -24,8 +24,8 @@ import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
 
-trait IndicesModule[M[+ _]] extends TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
-  self: ColumnarTableModule[M] =>
+trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTransforms {
+  self: ColumnarTableModule =>
 
   // we will warn for tables with >1M rows.
   final def InMemoryLimit = 1000000L

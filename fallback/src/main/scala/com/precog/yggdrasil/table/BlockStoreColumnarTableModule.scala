@@ -48,7 +48,7 @@ trait BlockStoreColumnarTableModuleConfig {
   def hashJoins: Boolean = true
 }
 
-trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
+trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   import trans._
   import TransSpec.deepMap
 

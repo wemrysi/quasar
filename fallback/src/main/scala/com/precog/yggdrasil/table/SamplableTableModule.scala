@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
 
-trait SamplableTableModule[M[+ _]] extends TableModule[M] {
+trait SamplableTableModule extends TableModule {
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>
@@ -33,8 +33,8 @@ trait SamplableTableModule[M[+ _]] extends TableModule[M] {
   }
 }
 
-trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] {
-  self: ColumnarTableModule[M] with SliceTransforms[M] =>
+trait SamplableColumnarTableModule extends SamplableTableModule {
+  self: ColumnarTableModule with SliceTransforms =>
 
   import trans._
 

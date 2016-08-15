@@ -124,7 +124,7 @@ object TableModule {
   }
 }
 
-trait TableModule[M[+ _]] extends TransSpecModule {
+trait TableModule extends TransSpecModule {
   import TableModule._
 
   implicit def M: Monad[M]

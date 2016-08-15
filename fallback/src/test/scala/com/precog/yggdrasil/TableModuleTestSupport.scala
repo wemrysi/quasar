@@ -21,9 +21,8 @@ package quasar.ygg
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-// import quasar.precog.TestSupport._
 
-trait TableModuleTestSupport extends TableModule[Need] {
+trait TableModuleTestSupport extends TableModule {
   implicit def M: MoCo[Need]
 
   def lookupF1(namespace: List[String], name: String): F1
