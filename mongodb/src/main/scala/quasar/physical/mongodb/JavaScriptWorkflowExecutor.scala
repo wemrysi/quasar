@@ -35,7 +35,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
   extends WorkflowExecutor[JavaScriptLog, Unit] {
 
   import JavaScriptWorkflowExecutor._
-  import Workflow.$SortF
+  import quasar.physical.mongodb.workflow.$SortF
 
   type ExprS[A] = State[Expr, A]
 

@@ -18,19 +18,17 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.TreeMatchers
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.optimize.pipeline._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
 
 class OptimizeSpecs extends quasar.QuasarSpecification with TreeMatchers {
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
-  import Workflow._
-  import IdHandling._
   import CollectionUtil._
-
-  import optimize.pipeline._
 
   "simplifyGroupƒ" should {
     "elide useless reduction" in {

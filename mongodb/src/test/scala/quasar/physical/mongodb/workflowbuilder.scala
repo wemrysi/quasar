@@ -17,10 +17,12 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar._, Planner._
 import quasar.fp._
-import quasar._; import Planner._
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
 import quasar.specs2._
 
@@ -31,11 +33,7 @@ class WorkflowBuilderSpec
     extends quasar.QuasarSpecification
     with DisjunctionMatchers
     with TreeMatchers {
-  import Workflow._
   import WorkflowBuilder._
-  import IdHandling._
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
   import CollectionUtil._
 
   val builder = WorkflowBuilder.Ops[WorkflowF]

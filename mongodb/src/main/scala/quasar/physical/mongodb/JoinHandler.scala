@@ -24,7 +24,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.std.StdLib._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
-import Workflow._
+import quasar.physical.mongodb.workflow._
 import WorkflowBuilder._
 
 import matryoshka._, Recursive.ops._
@@ -83,7 +83,7 @@ object JoinHandler {
       val filtered = WB.filter(left,
         List(ExprBuilder(left, \/-($var(DocField(lName \ lField))))),
         { case List(f) => Selector.Doc(f -> Selector.Neq(Bson.Null)) })
-      workflow(filtered).map { case (left, _) =>
+      generateWorkflow(filtered).map { case (left, _) =>
         CollectionBuilder(
           chain[Fix[WF]](
             left,
@@ -262,17 +262,18 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (workflow(left._1) |@| workflow(right._1)) { case ((l, _), (r, _)) =>
-      CollectionBuilder(
-        chain(
-          $foldLeft[WF](
-            left._2(l),
-            chain(r, right._2, $reduce[WF](rightReduce, ListMap()))),
-          (op: Fix[WF]) => buildJoin(op, tpe),
-          $unwind[WF](DocField(leftField)),
-          $unwind[WF](DocField(rightField))),
-        Root(),
-        None)
+    (generateWorkflow(left._1) |@| generateWorkflow(right._1)) {
+      case ((l, _), (r, _)) =>
+        CollectionBuilder(
+          chain(
+            $foldLeft[WF](
+              left._2(l),
+              chain(r, right._2, $reduce[WF](rightReduce, ListMap()))),
+            (op: Fix[WF]) => buildJoin(op, tpe),
+            $unwind[WF](DocField(leftField)),
+            $unwind[WF](DocField(rightField))),
+          Root(),
+          None)
     }
   })
 
@@ -290,7 +291,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    workflow[WF](wb).evalZero.fold(
+    generateWorkflow[WF](wb).evalZero.fold(
       κ(false),
       wf => checkTask(task(Crystallize[WF].crystallize(wf._1))))
   }

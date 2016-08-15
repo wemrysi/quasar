@@ -24,7 +24,6 @@ import quasar.fp.numeric._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.WriteFile.WriteHandle
-import quasar.fs.FileSystemError._
 import quasar.effect._
 
 import java.lang.System
@@ -42,7 +41,6 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
   type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
 
   "writefile" should {
-
 
     "open -> write chunks -> close -> assert file with results" in {
       // given
@@ -102,6 +100,60 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
         }
       }
     }
+
+    "should create dir if parent dir and file does not exist" in {
+      // given
+      val program = (path: AFile) => define { unsafe =>
+        for {
+          wh <- unsafe.open(path)
+          _ <- unsafe.close(wh).liftM[FileSystemErrT]
+        } yield ()
+      }
+      // when
+      withTempDir(createIt = false) { dirPath =>
+        for {
+          dirExisted <- exists(dirPath)
+          filePath = dirPath </> file("some_file.tmp")
+          result <- execute[Unit](program(filePath))
+          dirExists <- exists(dirPath)
+          fileExists <- exists(filePath)
+        } yield {
+          // then
+          dirExisted must_= false
+          dirExists must_= true
+          fileExists must_= true
+        }
+      }
+    }
+
+    "should create dirs if parent dirs and file does not exist" in {
+      // given
+      val program = (path: AFile) => define { unsafe =>
+        for {
+          wh <- unsafe.open(path)
+          _ <- unsafe.close(wh).liftM[FileSystemErrT]
+        } yield ()
+      }
+      // when
+      withTempDir(createIt = false, withTailDir = List("foo", "bar")) { dirPath =>
+          for {
+            dirsExisted <- exists(dirPath)
+            filePath = dirPath </> file("some_file.tmp")
+            result <- execute[Unit](program(filePath))
+            dirsExists <- exists(dirPath)
+            fileExists <- exists(filePath)
+          } yield {
+            // then
+            dirsExisted must_= false
+            dirsExists must_= true
+            fileExists must_= true
+          }
+      }
+    }
+  }
+
+  private def exists(path: APath): Task[Boolean] = Task.delay {
+    Files.exists(Paths.get(posixCodec.unsafePrintPath(path)))
   }
 
   private def execute[C](program: FileSystemErrT[Free[WriteFile, ?], C]):
@@ -120,6 +172,47 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
     innerInterpreter.map { inner =>
       local.writefile.interpret[Eff] andThen foldMapNT[Eff, Task](inner)
     }
+  }
+  
+  private def withTempDir[C](createIt: Boolean = true, withTailDir: List[String] = Nil)
+    (run: ADir => Task[C]): C = {
+
+    def genDirPath: Task[ADir] = Task.delay {
+      val root = System.getProperty("java.io.tmpdir")
+      val prefix = "tempDir"
+      val tailStr = withTailDir.mkString("/") + "/"
+      val random = scala.util.Random.nextInt().toString
+      val path = s"$root/$prefix-$random/$tailStr"
+      sandboxAbs(posixCodec.parseAbsDir(path).get)
+    }
+
+    def createDir(dirPath: ADir): Task[Unit] = Task.delay {
+      if(createIt) {
+        Files.createDirectory(Paths.get(posixCodec.unsafePrintPath(dirPath)))
+        ()
+      } else ()
+    }
+
+    def deleteDir(dirPath: ADir): Task[Unit] = for {
+      root <- Task.delay{ System.getProperty("java.io.tmpdir") }
+      _ <- {
+        if(parseDir(root) == dirPath) {
+          Task.now(())
+        } else {
+          toNioPath(dirPath).toFile.listFiles().foreach(_.delete())
+          Files.delete(toNioPath(dirPath))
+          parentDir(dirPath).fold(Task.now(()))(p => deleteDir(p))
+        }
+      }
+    } yield ()
+
+    (for {
+      dirPath <- genDirPath
+      _  <- createDir(dirPath)
+      result <- run(dirPath).onFinish {
+        _ => deleteDir(dirPath)
+      }
+    } yield result).unsafePerformSync
   }
 
   private def withTempFile[C](run: AFile => Task[C]): C = {
@@ -143,6 +236,12 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
 
     execution.unsafePerformSync
   }
+
+  private def toNioPath(path: APath) =
+    Paths.get(posixCodec.unsafePrintPath(path))
+
+  private def parseDir(dirStr: String): ADir =
+    sandboxAbs(posixCodec.parseAbsDir(dirStr).get)
 
   private def define[C]
     (defined: WriteFile.Unsafe[WriteFile] => FileSystemErrT[Free[WriteFile, ?], C])

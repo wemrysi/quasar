@@ -18,6 +18,9 @@ package quasar.physical.mongodb
 
 import quasar._
 import quasar.Predef._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import org.scalacheck._
@@ -25,10 +28,7 @@ import org.specs2.ScalaCheck
 import scalaz._
 
 class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBsonField {
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
   import CollectionUtil._
-  import Workflow._
   import ArbitraryExprOp._
 
   implicit def arbitraryOp: Arbitrary[PipelineOp] = Arbitrary { Gen.resize(5, Gen.sized { size =>
@@ -50,7 +50,7 @@ class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBs
         genProject(size - 1).map(p => -\/(p.shape)),
         genExpr.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
-    id <- Gen.oneOf(IdHandling.ExcludeId, IdHandling.IncludeId)
+    id <- Gen.oneOf(ExcludeId, IncludeId)
   } yield $ProjectF((), Reshape(ListMap(fields: _*)), id)
 
   implicit def arbProject = Arbitrary[$ProjectF[Unit]](Gen.resize(5, Gen.sized(genProject)))

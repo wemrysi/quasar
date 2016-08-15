@@ -21,19 +21,18 @@ import quasar.RenderTree
 import quasar.TreeMatchers
 import quasar.fp._
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import matryoshka.Fix
 import org.scalacheck._
-import org.scalacheck.Arbitrary
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 import shapeless.contrib.scalaz.instances._
 
 class WorkflowFSpec extends org.specs2.scalaz.Spec {
-  import Workflow._
-  import IdHandling._
-
   implicit val arbIdHandling: Arbitrary[IdHandling] =
     Arbitrary(Gen.oneOf(ExcludeId, IncludeId, IgnoreId))
 
@@ -54,10 +53,6 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
 }
 
 class WorkflowSpec extends quasar.QuasarSpecification with TreeMatchers {
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
-  import Workflow._
-  import IdHandling._
   import CollectionUtil._
 
   val readFoo = $read[WorkflowF](collection("db", "foo"))

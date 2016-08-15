@@ -23,11 +23,11 @@ import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
-import quasar.qscript.{SortDir}
+import quasar.physical.mongodb.javascript._
+import quasar.physical.mongodb.workflow._
+import quasar.qscript._
 import quasar.std.StdLib._
-import Type._
-import Workflow._
-import javascript._
+import quasar.Type._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
