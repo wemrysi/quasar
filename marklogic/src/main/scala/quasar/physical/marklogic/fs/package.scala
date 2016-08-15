@@ -55,29 +55,39 @@ package object fs {
   type Eff5[A] = Coproduct[xcc.SessionR, Eff6, A]
   type Eff6[A] = Coproduct[xcc.XccFailure, XccCursorM, A]
 
-  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
-    val uri = new URI(uri0.value)
+  def createClient(uri: URI): Task[Client] = Task.delay {
     val (user, password0) = uri.getUserInfo.span(_ ≠ ':')
     val password = password0.drop(1)
-    def dbClient: DatabaseClient = DatabaseClientFactory.newClient(uri.getHost, uri.getPort, user, password, DatabaseClientFactory.Authentication.DIGEST)
-    val csource = ContentSourceFactory.newContentSource(uri)
-    val client = Client(dbClient, csource)
-    val failErrs = Failure.toRuntimeError[Task, xcc.XccError]
+    def dbClient = DatabaseClientFactory.newClient(
+      uri.getHost,
+      uri.getPort,
+      user,
+      password,
+      DatabaseClientFactory.Authentication.DIGEST)
+    Client(dbClient, ContentSourceFactory.newContentSource(uri))
+  }
 
-    // TODO: Define elsewhere, can probably make this another generic impl of Read
-    val newSession: xcc.SessionR ~> Task =
-      new (xcc.SessionR ~> Task) {
-        def apply[A](ra: Read[Session, A]) = ra match {
-          case Read.Ask(f) => Task.delay(f(csource.newSession))
-        }
-      }
+  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
+    val uri = new URI(uri0.value)
+
+    val failErrs = Failure.toRuntimeError[Task, xcc.XccError]
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
       KeyValueStore.impl.empty[ReadHandle, Process[Task, Vector[Data]]]        |@|
       KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence[XccCursor]] |@|
-      MonotonicSeq.fromZero
-    ) { (whandles, rhandles, qhandles, seq) =>
+      MonotonicSeq.fromZero                                                    |@|
+      createClient(uri)
+    ) { (whandles, rhandles, qhandles, seq, client) =>
+
+      // TODO: Define elsewhere, can probably make this another generic impl of Read
+      val newSession: xcc.SessionR ~> Task =
+      new (xcc.SessionR ~> Task) {
+        def apply[A](ra: Read[Session, A]) = ra match {
+          case Read.Ask(f) => client.newSession.map(f)
+        }
+      }
+
       val toTask =
         reflNT[Task]                        :+:
         Read.constant[Task, Client](client) :+:
@@ -89,7 +99,7 @@ package object fs {
         failErrs                            :+:
         foldMapNT(reflNT[Task] :+: failErrs)
 
-      (toTask, Task.delay(dbClient.release))
+      (toTask, client.release)
     }
   }
 

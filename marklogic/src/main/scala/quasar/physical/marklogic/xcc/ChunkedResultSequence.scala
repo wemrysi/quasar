@@ -69,6 +69,6 @@ object ChunkedResultSequence {
 
       def nextChunk(crs: ChunkedResultSequence[S]) =
         crs.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
-          xdmitem.toData(x).fold(ds)(ds :+ _)))
+          ds :+ xdmitem.toData(x)))
     }
 }

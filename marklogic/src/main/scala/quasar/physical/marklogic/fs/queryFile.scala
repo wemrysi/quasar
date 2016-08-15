@@ -20,9 +20,10 @@ import quasar.Predef._
 import quasar.LogicalPlan
 import quasar.PhaseResult
 import quasar.Planner.PlannerError
-import quasar.effect.MonotonicSeq
+import quasar.effect.{MonotonicSeq, Read}
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fp._
 import quasar.fp.numeric.Positive
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
@@ -31,11 +32,12 @@ import quasar.qscript._
 
 import com.marklogic.xcc.RequestOptions
 import matryoshka._, Recursive.ops._
+import pathy.Path._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
-  import FileSystemError._
+  import FileSystemError._, PathError._
   import MarkLogicPlanner._
 
   def interpret[S[_]](
@@ -46,7 +48,8 @@ object queryfile {
     S2: MLResultHandles :<: S,
     S3: MonotonicSeq :<: S,
     S4: Task :<: S,
-    S5: XccCursorM :<: S
+    S5: XccCursorM :<: S,
+    S6: Read[Client, ?] :<: S
   ): QueryFile ~> Free[S, ?] = {
     val session = xcc.session.Ops[S]
 
@@ -81,8 +84,18 @@ object queryfile {
         xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(ExecutionPlan(FsType, xqy)))
       ).point[Free[S, ?]]
 
-    queryFileFromDataCursor[S, XccCursorM, ChunkedResultSequence[XccCursor]](exec, eval, explain,
-      dir  => Set[PathSegment]().point[FileSystemErrT[Free[S, ?], ?]].run,
-      file => false.point[Free[S, ?]])
+    def exists(file: AFile) = {
+      val asDir = fileParent(file) </> dir(fileName(file).value)
+      Client.exists[S](asDir)
+    }
+
+    def listContents(dir: ADir): Free[S, FileSystemError \/ Set[PathSegment]] =
+      Client.subDirs(dir).map(_.bimap(
+        κ(pathErr(pathNotFound(dir))),
+        dirs => dirs.map(SandboxedPathy.segAt(0,_)).toList.unite.toSet
+      ))
+
+    queryFileFromDataCursor[S, XccCursorM, ChunkedResultSequence[XccCursor]](
+      exec, eval, explain, listContents, exists)
   }
 }
