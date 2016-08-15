@@ -2901,6 +2901,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
     "plan simple join with sharded inputs" in {
+      // NB: cannot use $lookup, so fall back to the old approach
       val query = "select zips2.city from zips join zips2 on zips._id = zips2._id"
       plan0(query,
         MongoQueryModel.`3.2`,
@@ -2908,6 +2909,12 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
           collection("db", "zips") -> CollectionStatistics(10, 100, true),
           collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c)) must_==
         plan2_6(query)
+    }
+
+    "plan simple join with sources in different DBs" in {
+      // NB: cannot use $lookup, so fall back to the old approach
+      val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips._id = zips2._id"
+      plan(query) must_== plan2_6(query)
     }
 
     "plan non-equi join" in {
