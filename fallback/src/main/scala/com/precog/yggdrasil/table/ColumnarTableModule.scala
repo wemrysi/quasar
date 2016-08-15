@@ -28,9 +28,9 @@ import quasar.ygg.util._
 import quasar.ygg.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
-import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
+import java.nio.file.Files
 
 trait ColumnarTableTypes {
   type F1         = CF1
@@ -305,7 +305,7 @@ trait ColumnarTableModule
 
   implicit def M: Monad[M]
 
-  def newScratchDir(): File    = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
+  def newScratchDir(): File    = Files.createTempDirectory("quasar").toFile
   def jdbmCommitInterval: Long = 200000l
 
   implicit def liftF1(f: F1): F1Like = new F1Like {
