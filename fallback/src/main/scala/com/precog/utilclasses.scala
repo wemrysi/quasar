@@ -3,52 +3,9 @@ package com.precog.util
 import blueeyes._, json._, serialization._
 import DefaultSerialization._, Extractor._
 import scala.{ collection => sc }
-import scala.collection.JavaConverters._
 import scalaz._, Ordering._
-import java.io.FileReader
-import java.io.RandomAccessFile
-import java.nio.channels.{ FileChannel, FileLock => JFileLock }
-import java.nio.file.Files
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable.Builder
-
-trait FileLock {
-  def release: Unit
-}
-
-class FileLockException(message: String) extends Exception(message)
-
-object FileLock {
-  private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File]) extends FileLock {
-    def release = {
-      lock.release
-      channel.close
-
-      lockFile.foreach(_.delete)
-    }
-  }
-
-  def apply(target: File, lockPrefix: String = "LOCKFILE"): FileLock = {
-    val (lockFile, removeFile) = if (target.isDirectory) {
-      val lockFile = new File(target, lockPrefix + ".lock")
-      lockFile.createNewFile
-      (lockFile, true)
-    } else {
-      (target, false)
-    }
-
-    val channel = new RandomAccessFile(lockFile, "rw").getChannel
-    val lock    = channel.tryLock
-
-    if (lock == null) {
-      throw new FileLockException("Could not lock. Previous lock exists on " + target)
-    }
-
-    LockHolder(channel, lock, if (removeFile) Some(lockFile) else None)
-  }
-}
-
-
 
 // Once we move to 2.10, we can abstract this to a specialized-list. In 2.9,
 // specialization is just too buggy to get it working (tried).
