@@ -16,8 +16,6 @@
 
 package quasar
 
-import quasar.Predef._
-
 import java.lang.String
 
 import matryoshka._, FunctorT.ops._
