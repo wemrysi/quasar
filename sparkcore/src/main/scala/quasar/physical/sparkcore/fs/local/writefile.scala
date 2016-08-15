@@ -27,7 +27,7 @@ import quasar.effect._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 
-import pathy.Path.posixCodec
+import pathy.Path._
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -54,12 +54,33 @@ object writefile {
   ): Free[S, FileSystemError \/ WriteHandle] = {
 
     def _open: FileSystemErrT[Free[S, ?], PrintWriter] = {
-      val pwProgram: Free[S, FileSystemError \/ PrintWriter] = injectFT[Task, S].apply(Task.delay {
-        val file = new File(posixCodec.unsafePrintPath(f))
-        \/.fromTryCatchNonFatal(new PrintWriter(new FileOutputStream(file, true)))
-          .leftMap(e => pathErr(pathNotFound(f)))
+
+      def mkParents: FileSystemErrT[Task, Unit] = EitherT(Task.delay {
+        val parent = fileParent(f)
+        val dir = new File(posixCodec.unsafePrintPath(parent))
+        if(!dir.exists()) {
+          \/.fromTryCatchNonFatal(dir.mkdirs())
+            .leftMap { e =>
+            pathErr(invalidPath(parent, "Could not create directories"))
+          }.void
+        }
+        else ().right[FileSystemError]
       })
-      EitherT(pwProgram)      
+
+      def printWriter: FileSystemErrT[Task, PrintWriter] = EitherT(Task.delay {
+        val file = new File(posixCodec.unsafePrintPath(f))
+          \/.fromTryCatchNonFatal(new PrintWriter(new FileOutputStream(file, true)))
+            .leftMap(e => pathErr(pathNotFound(f)))
+      })
+
+      val pwProgram: Free[S, FileSystemError \/ PrintWriter] = injectFT[Task, S].apply{
+        (for {
+          _ <- mkParents
+          pw <- printWriter
+        } yield pw).run
+      }
+        
+      EitherT(pwProgram)
     }
 
     (for {
