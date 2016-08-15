@@ -17,7 +17,7 @@
 package blueeyes
 package json
 
-import scalaz._, Ordering._
+import scalaz._, Scalaz._, Ordering._
 import quasar.precog._, JsonTestSupport._
 
 object JsonASTSpec extends quasar.QuasarSpecification {
@@ -171,50 +171,50 @@ object JsonASTSpec extends quasar.QuasarSpecification {
   }
 
   "sort objects by key" in {
-    val v1 = JObject(
+    val v1: JValue = JObject(
       JField("a", JNum(1)) ::
         JField("b", JNum(2)) ::
           JField("c", JNum(3)) :: Nil
     )
 
-    val v2 = JObject(
+    val v2: JValue = JObject(
       JField("b", JNum(2)) ::
         JField("c", JNum(3)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== LT
+    (v1 ?|? v2) must_=== LT
   }
 
   "sort objects by key then value" in {
-    val v1 = JObject(
+    val v1: JValue = JObject(
       JField("a", JNum(1)) ::
         JField("b", JNum(2)) ::
           JField("c", JNum(3)) :: Nil
     )
 
-    val v2 = JObject(
+    val v2: JValue = JObject(
       JField("a", JNum(2)) ::
         JField("b", JNum(3)) ::
           JField("c", JNum(4)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== LT
+    (v1 ?|? v2) must_=== LT
   }
 
   "sort objects with undefined members" in {
-    val v1 = JObject(
+    val v1: JValue = JObject(
       JField("a", JUndefined) ::
         JField("b", JNum(2)) ::
           JField("c", JNum(3)) :: Nil
     )
 
-    val v2 = JObject(
+    val v2: JValue = JObject(
       JField("a", JNum(2)) ::
         JField("b", JNum(3)) ::
           JField("c", JNum(4)) :: Nil
     )
 
-    JValue.order(v1, v2) must_== GT
+    (v1 ?|? v2) must_=== GT
   }
 
   "Properly --> subclasses of JValue" in {

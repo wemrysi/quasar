@@ -24,6 +24,17 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
 
   def doto[A](x: A)(f: A => Any): A = { f(x) ; x }
 
+  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
+    val len = a1.length
+    if (len != a2.length) return false
+    var i = 0
+    while (i < len) {
+      if (a1(i) != a2(i)) return false
+      i += 1
+    }
+    true
+  }
+
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
 
@@ -36,16 +47,6 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   implicit class ScalaSeqOps[A](xs: scala.collection.Seq[A]) {
     def sortMe(implicit z: scalaz.Order[A]): Vector[A] =
       xs sortWith ((a, b) => z.order(a, b) == Ordering.LT) toVector
-  }
-  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
-    val len = a1.length
-    if (len != a2.length) return false
-    var i = 0
-    while (i < len) {
-      if (a1(i) != a2(i)) return false
-      i += 1
-    }
-    true
   }
 
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {

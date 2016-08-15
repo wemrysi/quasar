@@ -22,15 +22,12 @@ package com.precog.common
 import blueeyes._
 import com.precog.util.ByteBufferPool
 import org.scalacheck.Shrink
-import quasar.precog._, TestSupportWithArb._
+import quasar.precog._, TestSupport._
 import ByteBufferPool._
 
 class CodecSpec extends quasar.QuasarSpecification {
   val pool      = new ByteBufferPool()
   val smallPool = new ByteBufferPool(capacity = 10)
-
-  implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
-    Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map decimal)
 
   implicit def arbBitSet: Arbitrary[BitSet] = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
 
@@ -70,7 +67,6 @@ class CodecSpec extends quasar.QuasarSpecification {
     buf.flip()
     codec.read(buf) must_== a
   }
-
   def surviveHardRoundTrip[A](a: A)(implicit codec: Codec[A]) = {
     val bytes = smallPool.run(for {
       _ <- codec.write(a)
@@ -80,6 +76,11 @@ class CodecSpec extends quasar.QuasarSpecification {
     bytes.length must_== codec.encodedSize(a)
     codec.read(ByteBufferWrap(bytes)) must_== a
   }
+  def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" in {
+    "with large buffers" in { prop { (a: A) => surviveEasyRoundTrip(a)(codec) } }
+    "with small buffers" in { prop { (a: A) => surviveHardRoundTrip(a)(codec) } }
+  }
+
 
   "constant codec" should {
     "write 0 bytes" in {
@@ -90,18 +91,12 @@ class CodecSpec extends quasar.QuasarSpecification {
       ok
     }
   }
-
-  def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" in {
-    "with large buffers" in { prop { (a: A) => surviveEasyRoundTrip(a)(codec) } }
-    "with small buffers" in { prop { (a: A) => surviveHardRoundTrip(a)(codec) } }
-  }
-
   "LongCodec" should surviveRoundTrip(Codec.LongCodec)
   "PackedLongCodec" should surviveRoundTrip(Codec.PackedLongCodec)
   "BooleanCodec" should surviveRoundTrip(Codec.BooleanCodec)
   "DoubleCodec" should surviveRoundTrip(Codec.DoubleCodec)
   "Utf8Codec" should surviveRoundTrip(Codec.Utf8Codec)
-  "BigDecimalCodec" should surviveRoundTrip(Codec.BigDecimalCodec)(arbBigDecimal, implicitly)
+  "BigDecimalCodec" should surviveRoundTrip(Codec.BigDecimalCodec)
   "BitSetCodec" should surviveRoundTrip(Codec.BitSetCodec)
   "SparseBitSet" should {
     "survive round-trip" in {

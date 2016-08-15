@@ -19,7 +19,6 @@
  */
 package com.precog.yggdrasil
 
-// import quasar.precog.decimal
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._
@@ -42,17 +41,12 @@ object CValueGenerators {
   }
 }
 
-trait CValueGenerators extends ArbitraryBigDecimal {
+trait CValueGenerators {
   import CValueGenerators._
 
-  def schema(depth: Int): Gen[JSchema] = {
+  def schema(depth: Int): Gen[JSchema] =
     if (depth <= 0) leafSchema
-    else oneOf(1, 2, 3) flatMap {
-      case 1 => objectSchema(depth, choose(1, 3))
-      case 2 => arraySchema(depth, choose(1, 5))
-      case 3 => leafSchema
-    }
-  }
+    else oneOf(delay(objectSchema(depth, choose(1, 3))), delay(arraySchema(depth, choose(1, 5))), leafSchema)
 
   def objectSchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] = {
     for {
@@ -99,10 +93,10 @@ trait CValueGenerators extends ArbitraryBigDecimal {
   // FIXME: TODO Should this provide some form for CDate?
   def jvalue(ctype: CType): Gen[JValue] = ctype match {
     case CString       => alphaStr map (JString(_))
-    case CBoolean      => arbitrary[Boolean] map (JBool(_))
-    case CLong         => arbitrary[Long] map (ln => JNum(decimal(ln)))
-    case CDouble       => arbitrary[Double] map (d => JNum(decimal(d)))
-    case CNum          => arbitrary[BigDecimal] map (bd => JNum(bd))
+    case CBoolean      => genBool map (JBool(_))
+    case CLong         => genLong map (ln => JNum(decimal(ln)))
+    case CDouble       => genDouble map (d => JNum(decimal(d)))
+    case CNum          => genBigDecimal map (bd => JNum(bd))
     case CNull         => JNull
     case CEmptyObject  => JObject.empty
     case CEmptyArray   => JArray.empty
@@ -150,15 +144,10 @@ trait CValueGenerators extends ArbitraryBigDecimal {
   }
 }
 
-trait SValueGenerators extends ArbitraryBigDecimal {
-  def svalue(depth: Int): Gen[SValue] = {
+trait SValueGenerators {
+  def svalue(depth: Int): Gen[SValue] =
     if (depth <= 0) sleaf
-    else oneOf(1, 2, 3) flatMap { //it's much faster to lazily compute the subtrees
-      case 1 => sobject(depth)
-      case 2 => sarray(depth)
-      case 3 => sleaf
-    }
-  }
+    else oneOf(delay(sobject(depth)), delay(sarray(depth)), sleaf)
 
   def sobject(depth: Int): Gen[SValue] = {
     for {
@@ -179,12 +168,12 @@ trait SValueGenerators extends ArbitraryBigDecimal {
 
 
   def sleaf: Gen[SValue] = oneOf[SValue](
-    alphaStr map (SString(_: String)),
-    arbitrary[Boolean] map (SBoolean(_: Boolean)),
-    arbitrary[Long]    map (l => SDecimal(BigDecimal(l))),
-    arbitrary[Double]  map (d => SDecimal(BigDecimal(d))),
-    arbitrary[BigDecimal] map { bd => SDecimal(bd) }, //scalacheck's BigDecimal gen will overflow at random
-    const(SNull)
+    alphaStr map (x => SString(x)),
+    genBool map (x => SBoolean(x)),
+    genLong map (x => SDecimal(BigDecimal(x))),
+    genDouble map (x => SDecimal(BigDecimal(x))),
+    genBigDecimal map (x => SDecimal(x)),
+    SNull
   )
 
   def sevent(idCount: Int, vdepth: Int): Gen[SEvent] = {
@@ -198,8 +187,7 @@ trait SValueGenerators extends ArbitraryBigDecimal {
     listOfN(size, sevent(idCount, vdepth)) map { l => Vector(l: _*) }
 }
 
-case class LimitList[A](values: List[A])
-
+final case class LimitList[A](values: List[A])
 object LimitList {
   def genLimitList[A: Gen](size: Int): Gen[LimitList[A]] = for {
     i <- choose(0, size)
@@ -210,29 +198,9 @@ object LimitList {
 trait ArbitrarySValue extends SValueGenerators {
   def genChunks(size: Int): Gen[LimitList[Vector[SEvent]]] = LimitList.genLimitList[Vector[SEvent]](size)
 
-  implicit val listLongOrder = scalaz.std.list.listOrder[Long]
-
-  implicit val SEventIdentityOrder: ScalazOrder[SEvent] = ScalazOrder[List[Long]].contramap((_: SEvent)._1.toList)
-  implicit val SEventOrdering = SEventIdentityOrder.toScalaOrdering
-
-  implicit val SEventChunkGen: Gen[Vector[SEvent]] = chunk(3, 3, 2)
-  implicit val ArbitraryChunks = Arbitrary(genChunks(5))
-}
-
-trait ArbitraryBigDecimal {
-  val MAX_EXPONENT = 50000
-  // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary {
-    for {
-      mantissa <- arbitrary[Long]
-      exponent <- Gen.chooseNum(-MAX_EXPONENT, MAX_EXPONENT)
-
-      adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
-        exponent - mantissa.toString.length
-      else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
-        exponent + mantissa.toString.length
-      else
-        exponent
-    } yield decimal(mantissa, adjusted)
-  }
+  implicit lazy val listLongOrder                                         = scalaz.std.list.listOrder[Long]
+  implicit lazy val SEventIdentityOrder: ScalazOrder[SEvent]              = ScalazOrder[List[Long]].contramap((_: SEvent)._1.toList)
+  implicit lazy val SEventOrdering                                        = SEventIdentityOrder.toScalaOrdering
+  implicit lazy val SEventChunkGen: Gen[Vector[SEvent]]                   = chunk(3, 3, 2)
+  implicit lazy val ArbitraryChunks: Arbitrary[LimitList[Vector[SEvent]]] = Arbitrary(genChunks(5))
 }

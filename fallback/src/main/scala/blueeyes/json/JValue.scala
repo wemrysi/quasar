@@ -73,10 +73,6 @@ object JValue {
     }
   }
 
-  implicit final val order: Order[JValue] = new Order[JValue] {
-    def order(v1: JValue, v2: JValue) = Ordering.fromInt(v1 compare v2)
-  }
-
   def unsafeInsert(rootTarget: JValue, rootPath: JPath, rootValue: JValue): JValue = {
     // println(s"$rootTarget \\ $rootPath := $rootValue")
 
@@ -172,13 +168,16 @@ sealed trait JNum extends JValue {
   protected[json] def numCompare(other: JNum): Int
 }
 
-case class JNumStr private[json] (value: String) extends JNum {
-  private lazy val dec: BigDecimal = BigDecimal(value)
+final case class JNumStr private[json] (value: String) extends JNum {
+  private lazy val dec: BigDecimal = {
+    // println("JNumStr: " + value)
+    BigDecimal(value)
+  }
 
-  final def toBigDecimal: BigDecimal = dec
-  final def toLong: Long             = value.toDouble.toLong
-  final def toDouble: Double         = value.toDouble
-  final def toRawString: String      = value
+  def toBigDecimal: BigDecimal = dec
+  def toLong: Long             = value.toDouble.toLong
+  def toDouble: Double         = value.toDouble
+  def toRawString: String      = value
 
   override def equals(other: Any) = other match {
     case JNumLong(n) => value == n.toString
@@ -189,11 +188,11 @@ case class JNumStr private[json] (value: String) extends JNum {
   protected[json] def numCompare(other: JNum) = toBigDecimal compare other.toBigDecimal
 }
 
-case class JNumLong(value: Long) extends JNum {
-  final def toBigDecimal: BigDecimal = BigDecimal(value)
-  final def toLong: Long             = value
-  final def toDouble: Double         = value.toDouble
-  final def toRawString: String      = value.toString
+final case class JNumLong(value: Long) extends JNum {
+  def toBigDecimal: BigDecimal = BigDecimal(value)
+  def toLong: Long             = value
+  def toDouble: Double         = value.toDouble
+  def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
     case JNumLong(n)   => value == n
@@ -211,11 +210,11 @@ case class JNumLong(value: Long) extends JNum {
   }
 }
 
-case class JNumDouble private[json] (value: Double) extends JNum {
-  final def toBigDecimal: BigDecimal = BigDecimal(value)
-  final def toLong: Long             = value.toLong
-  final def toDouble: Double         = value
-  final def toRawString: String      = value.toString
+final case class JNumDouble private[json] (value: Double) extends JNum {
+  def toBigDecimal: BigDecimal = BigDecimal(value)
+  def toLong: Long             = value.toLong
+  def toDouble: Double         = value
+  def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
     case JNumLong(n)   => value == n
@@ -232,11 +231,11 @@ case class JNumDouble private[json] (value: Double) extends JNum {
   }
 }
 
-case class JNumBigDec(value: BigDecimal) extends JNum {
-  final def toBigDecimal: BigDecimal = value
-  final def toLong: Long             = value.toLong
-  final def toDouble: Double         = value.toDouble
-  final def toRawString: String      = value.toString
+final case class JNumBigDec(value: BigDecimal) extends JNum {
+  def toBigDecimal: BigDecimal = value
+  def toLong: Long             = value.toLong
+  def toDouble: Double         = value.toDouble
+  def toRawString: String      = value.toString
 
   override def equals(other: Any) = other match {
     case JNumLong(n)   => value == n
@@ -258,7 +257,10 @@ case object JNum {
   def apply(value: Double): JValue =
     if (value.isNaN || isInfinite(value)) JUndefined else JNumDouble(value)
 
-  private[json] def apply(value: String): JNum = JNumStr(value)
+  private[json] def apply(value: String): JNum = {
+    assert(value != null)
+    JNumStr(value)
+  }
 
   def apply(value: Int): JNum                  = JNumLong(value.toLong)
   def apply(value: Long): JNum                 = JNumLong(value)
@@ -312,8 +314,6 @@ final object JField {
   def apply(x: JFieldTuple): JField = JField(x._1, x._2)
 
   implicit def liftTuple(x: JFieldTuple): JField = apply(x)
-
-  implicit final val jFieldOrder: Order[JField] = Order.orderBy(x => x._1 -> x._2)
 
   def liftFilter(f: JField => Boolean): JValue => JValue = {
     case JObjectFields(fields) => JObject(fields filter f)
@@ -379,15 +379,6 @@ case class JObject(fields: Map[String, JValue]) extends JContainer {
     case _          => false
   }
 }
-
-final object JObject {
-  final val empty = JObject(Nil)
-
-  def apply(fields: Traversable[JField]): JObject      = JObject(fields.map(_.toTuple).toMap)
-  def apply(fields: JField*): JObject                  = JObject(fields.map(_.toTuple).toMap)
-  def unapplySeq(value: JObject): Some[Vector[JField]] = Some(value.sortedFields)
-}
-
 case class JArray(elements: List[JValue]) extends JContainer {
   def contained = elements
   override def compare(that: JValue): Int = that match {
@@ -396,8 +387,16 @@ case class JArray(elements: List[JValue]) extends JContainer {
   }
 }
 
-case object JArray extends (List[JValue] => JArray) {
-  final val empty = JArray(Nil)
+final object JObject {
+  val empty = JObject(Nil)
 
-  final def apply(vals: JValue*): JArray = JArray(vals.toList)
+  def apply(fields: Traversable[JField]): JObject      = JObject(fields.map(_.toTuple).toMap)
+  def apply(fields: JField*): JObject                  = JObject(fields.map(_.toTuple).toMap)
+  def unapplySeq(value: JObject): Some[Vector[JField]] = Some(value.sortedFields)
+}
+
+final object JArray extends (List[JValue] => JArray) {
+  val empty = JArray(Nil)
+
+  def apply(vals: JValue*): JArray = JArray(vals.toList)
 }

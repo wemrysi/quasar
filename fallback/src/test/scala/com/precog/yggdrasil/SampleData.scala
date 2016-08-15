@@ -21,13 +21,10 @@ package com.precog.yggdrasil
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-
+import org.scalacheck.Gen.choose
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
-
-import org.scalacheck._
-import org.scalacheck.Gen._
-import org.scalacheck.Arbitrary._
+import quasar.precog.TestSupport._
 import CValueGenerators.JSchema
 
 case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
@@ -36,7 +33,9 @@ case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = Non
     "\nschema: " + schema
   }
 
-  def sortBy[B: ScalaMathOrdering](f: JValue => B) = copy(data = data.sortBy(f))
+  def sorted(implicit z: ScalaMathOrdering[JValue]): SampleData  = transform(_.sorted)
+  def sortBy[B: ScalaMathOrdering](f: JValue => B): SampleData   = transform(_ sortBy f)
+  def transform(f: Stream[JValue] => Stream[JValue]): SampleData = copy(data = f(data))
 }
 
 object SampleData extends CValueGenerators {
@@ -89,46 +88,10 @@ object SampleData extends CValueGenerators {
     builder.result
   }
 
-  def sort(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(sampleData.data.sorted, sampleData.schema)
-      }
-    )
-  }
-
-  def shuffle(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    val gen =
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(Random.shuffle(sampleData.data), sampleData.schema)
-      }
-
-    Arbitrary(gen)
-  }
-
-  def distinct(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(sampleData.data.distinct, sampleData.schema)
-      }
-    )
-  }
-
-  def distinctKeys(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(distinctBy(sampleData.data)(_ \ "keys"), sampleData.schema)
-      }
-    )
-  }
+  def sort(sd: Arbitrary[SampleData]): Arbitrary[SampleData]          = sd ^^ (_.sorted)
+  def shuffle(sd: Arbitrary[SampleData]): Arbitrary[SampleData]       = sd ^^ (_ transform Random.shuffle)
+  def distinct(sd: Arbitrary[SampleData]) : Arbitrary[SampleData]     = sd ^^ (_ transform (_.distinct))
+  def distinctKeys(sd: Arbitrary[SampleData]) : Arbitrary[SampleData] = sd ^^ (_ transform (d => distinctBy(d)(_ \ "keys")))
 
   def distinctValues(sample: Arbitrary[SampleData]) : Arbitrary[SampleData] = {
     Arbitrary(

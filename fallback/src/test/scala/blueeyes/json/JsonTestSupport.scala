@@ -19,7 +19,7 @@ import quasar.precog.TestSupport._
 import Gen._
 
 package quasar.precog {
-  object JsonTestSupport extends TestSupport with JsonGenerators with ArbitrarySupport {
+  object JsonTestSupport extends TestSupport with JsonGenerators {
     def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
 
     implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)

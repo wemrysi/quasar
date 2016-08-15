@@ -3,14 +3,9 @@ package precog
 
 import internal._
 import scala.collection.mutable.Builder
-import TestSupport._
 
 object TestSupport extends TestSupport
-object TestSupportWithArb extends TestSupport with ArbitrarySupport
-
-trait TestSupport extends ScalacheckSupport with SpecsSupport
-
-trait ArbitrarySupport {
+trait TestSupport extends ScalacheckSupport with SpecsSupport {
   implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)
 }
 
@@ -32,10 +27,10 @@ trait SpecsSupport {
 }
 
 trait ScalacheckSupport {
-  val Arbitrary                = org.scalacheck.Arbitrary
-  val Gen                      = org.scalacheck.Gen
-  val Pretty                   = org.scalacheck.util.Pretty
-  val Prop                     = org.scalacheck.Prop
+  val Arbitrary = org.scalacheck.Arbitrary
+  val Gen       = org.scalacheck.Gen
+  val Pretty    = org.scalacheck.util.Pretty
+  val Prop      = org.scalacheck.Prop
 
   type Arbitrary[A]            = org.scalacheck.Arbitrary[A]
   type Buildable[Elem, Result] = org.scalacheck.util.Buildable[Elem, Result]
@@ -81,8 +76,11 @@ trait ScalacheckSupport {
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-  def genBigDecimal: Gen[BigDecimal] = (genLong, genInt) >> { (mantissa, exponent) =>
-    val adjusted = (
+  // (and scalacheck's BigDecimal gen will overflow at random)
+  def genBigDecimal: Gen[BigDecimal] = genBigDecimal(genExponent = genBigDecExponent)
+  def genBigDecExponent = choose(-50000, 50000)
+  def genBigDecimal(genExponent: Gen[Int]): Gen[BigDecimal] = (genLong, genExponent) >> { (mantissa, exponent) =>
+    def adjusted = (
       if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
         exponent - mantissa.toString.length
       else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)

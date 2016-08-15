@@ -195,5 +195,3 @@ class RowFormatSpec extends quasar.QuasarSpecification with JdbmCValueGenerators
     }
   }
 }
-
-

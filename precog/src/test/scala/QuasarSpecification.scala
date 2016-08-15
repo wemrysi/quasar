@@ -1,13 +1,10 @@
 package quasar
 
-// import precog._
 import org.specs2.mutable._
 import org.specs2.execute.AsResult
-// import scalaz._
 import org.scalacheck._
 import org.scalacheck.util.{FreqMap, Pretty}
 import org.specs2.scalacheck._
-// import ScalaCheckProperty._
 
 trait QuasarSpecification extends SpecificationLike
         with ScalaCheckParameters
