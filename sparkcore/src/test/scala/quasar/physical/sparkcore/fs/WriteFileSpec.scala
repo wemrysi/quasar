@@ -35,7 +35,7 @@ import pathy.Path.posixCodec
 import pathy.Path._
 import scalaz._, Scalaz._, concurrent.Task
 
-class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
+class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugars  {
 
   type Eff0[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Task, A]
   type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
@@ -151,11 +151,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
       }
     }
   }
-
-  private def exists(path: APath): Task[Boolean] = Task.delay {
-    Files.exists(Paths.get(posixCodec.unsafePrintPath(path)))
-  }
-
+  
   private def execute[C](program: FileSystemErrT[Free[WriteFile, ?], C]):
       Task[FileSystemError \/ C] = interpreter.flatMap(program.run.foldMap(_))
  
@@ -174,75 +170,6 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
     }
   }
   
-  private def withTempDir[C](createIt: Boolean = true, withTailDir: List[String] = Nil)
-    (run: ADir => Task[C]): C = {
-
-    def genDirPath: Task[ADir] = Task.delay {
-      val root = System.getProperty("java.io.tmpdir")
-      val prefix = "tempDir"
-      val tailStr = withTailDir.mkString("/") + "/"
-      val random = scala.util.Random.nextInt().toString
-      val path = s"$root/$prefix-$random/$tailStr"
-      sandboxAbs(posixCodec.parseAbsDir(path).get)
-    }
-
-    def createDir(dirPath: ADir): Task[Unit] = Task.delay {
-      if(createIt) {
-        Files.createDirectory(Paths.get(posixCodec.unsafePrintPath(dirPath)))
-        ()
-      } else ()
-    }
-
-    def deleteDir(dirPath: ADir): Task[Unit] = for {
-      root <- Task.delay{ System.getProperty("java.io.tmpdir") }
-      _ <- {
-        if(parseDir(root) == dirPath) {
-          Task.now(())
-        } else {
-          toNioPath(dirPath).toFile.listFiles().foreach(_.delete())
-          Files.delete(toNioPath(dirPath))
-          parentDir(dirPath).fold(Task.now(()))(p => deleteDir(p))
-        }
-      }
-    } yield ()
-
-    (for {
-      dirPath <- genDirPath
-      _  <- createDir(dirPath)
-      result <- run(dirPath).onFinish {
-        _ => deleteDir(dirPath)
-      }
-    } yield result).unsafePerformSync
-  }
-
-  private def withTempFile[C](run: AFile => Task[C]): C = {
-
-    def genTempFilePath: Task[AFile] = Task.delay {
-      val path = System.getProperty("java.io.tmpdir") +
-      "/" + scala.util.Random.nextInt().toString + ".tmp"
-      sandboxAbs(posixCodec.parseAbsFile(path).get)
-    }
-
-    def deleteFile(file: AFile): Task[Unit] = Task.delay {
-      Files.delete(Paths.get(posixCodec.unsafePrintPath(file)))
-    }
-
-    val execution: Task[C] = for {
-      filePath <- genTempFilePath
-      result <- run(filePath).onFinish {
-        _ => deleteFile(filePath)
-      }
-    } yield result
-
-    execution.unsafePerformSync
-  }
-
-  private def toNioPath(path: APath) =
-    Paths.get(posixCodec.unsafePrintPath(path))
-
-  private def parseDir(dirStr: String): ADir =
-    sandboxAbs(posixCodec.parseAbsDir(dirStr).get)
-
   private def define[C]
     (defined: WriteFile.Unsafe[WriteFile] => FileSystemErrT[Free[WriteFile, ?], C])
     (implicit writeUnsafe: WriteFile.Unsafe[WriteFile])
@@ -251,8 +178,4 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
   
   private def user(login: String, age: Int) =
     Data.Obj(ListMap("login" -> Data.Str(login), "age" -> Data.Int(age)))
-
-  private def getContent(f: AFile): Task[List[String]] =
-    Task.delay(scala.io.Source.fromFile(posixCodec.unsafePrintPath(f)).getLines.toList)
-
 }
