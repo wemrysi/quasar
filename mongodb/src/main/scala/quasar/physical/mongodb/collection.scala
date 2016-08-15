@@ -29,12 +29,15 @@ import scalaz._, Scalaz._
 import pathy.Path.{dir => pDir, file => pFile, _}
 
 
+// TODO: use Refined to constrain the value here
 final case class DatabaseName(value: String) extends AnyVal {
   def bson: Bson = Bson.Text(value)
 }
 object DatabaseName {
   implicit def equal: Equal[DatabaseName] = Equal.equalA
 }
+
+// TODO: use Refined to constrain the value here
 final case class CollectionName(value: String) extends AnyVal {
   def isDescendantOf(ancestor: CollectionName): Boolean =
     if (ancestor.value == "") true
