@@ -35,7 +35,7 @@ import pathy.Path._
 import scalaz._, concurrent.Task
 
 class ManageFileSpec extends QuasarSpecification with ScalaCheck with DisjunctionMatchers
-with TempFSSugars {
+    with TempFSSugars {
 
   type Eff[A] = Task[A]
 
@@ -264,7 +264,7 @@ with TempFSSugars {
               } yield {
                 // then
                 result must_== -\/((PathErr(
-                  InvalidPath(src,
+                  InvalidPath(dst,
                     "Can not move to destination that already exists if semnatics == failIfExists")))
                 )
                 srcExists must_== true
@@ -323,7 +323,7 @@ with TempFSSugars {
               } yield {
                 // then
                 result must_== -\/((PathErr(
-                  InvalidPath(src,
+                  InvalidPath(dst,
                     "Can not move to destination that does not exists if semnatics == failIfMissing")))
                 )
                 srcExists must_== true
