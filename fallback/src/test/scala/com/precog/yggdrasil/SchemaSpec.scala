@@ -19,9 +19,9 @@
  */
 package quasar.ygg
 
+import blueeyes._
 import com.precog.bytecode._
 import com.precog.common._
-// import quasar.precog.TestSupport._
 
 class SchemaSpec extends quasar.QuasarSpecification {
   "cpath" should {

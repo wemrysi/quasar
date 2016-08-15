@@ -23,38 +23,28 @@ import blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz._, Scalaz._, Ordering._
 
-sealed trait CPath { self =>
+sealed trait CPath {
   def nodes: List[CPathNode]
 
-  def parent: Option[CPath] = if (nodes.isEmpty) None else Some(CPath(nodes.take(nodes.length - 1): _*))
+  def parent: Option[CPath] = if (nodes.isEmpty) None else Some(CPath(nodes.init))
 
   def ancestors: List[CPath] = {
-    def ancestors0(path: CPath, acc: List[CPath]): List[CPath] = {
-      path.parent match {
-        case None => acc
-
-        case Some(parent) => ancestors0(parent, parent :: acc)
-      }
-    }
-
+    def ancestors0(path: CPath, acc: List[CPath]): List[CPath] = path.parent.fold(acc)(p => ancestors0(p, p :: acc))
     ancestors0(this, Nil).reverse
   }
 
-  def combine(paths: Seq[CPath]): Seq[CPath] = {
+  def combine(paths: Seq[CPath]): Seq[CPath] = (
     if (paths.isEmpty) Seq(this)
-    else
-      paths map { path =>
-        CPath(this.nodes ++ path.nodes)
-      }
-  }
+    else paths map (p => CPath(nodes ++ p.nodes))
+  )
 
-  def \(that: CPath): CPath  = CPath(self.nodes ++ that.nodes)
-  def \(that: String): CPath = CPath(self.nodes :+ CPathField(that))
-  def \(that: Int): CPath    = CPath(self.nodes :+ CPathIndex(that))
+  def \(that: CPath): CPath  = CPath(nodes ++ that.nodes)
+  def \(that: String): CPath = CPath(nodes :+ CPathField(that))
+  def \(that: Int): CPath    = CPath(nodes :+ CPathIndex(that))
 
-  def \:(that: CPath): CPath  = CPath(that.nodes ++ self.nodes)
-  def \:(that: String): CPath = CPath(CPathField(that) +: self.nodes)
-  def \:(that: Int): CPath    = CPath(CPathIndex(that) +: self.nodes)
+  def \:(that: CPath): CPath  = CPath(that.nodes ++ nodes)
+  def \:(that: String): CPath = CPath(CPathField(that) +: nodes)
+  def \:(that: Int): CPath    = CPath(CPathIndex(that) +: nodes)
 
   def hasPrefix(p: CPath): Boolean = nodes.startsWith(p.nodes)
   def hasSuffix(p: CPath): Boolean = nodes.endsWith(p.nodes)
@@ -95,8 +85,7 @@ sealed trait CPath { self =>
   }
 
   def head: Option[CPathNode] = nodes.headOption
-
-  def tail: CPath = CPath(nodes.tail: _*)
+  def tail: CPath             = CPath(nodes.tail: _*)
 
   def expand(jvalue: JValue): List[CPath] = {
     def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
@@ -181,7 +170,7 @@ object CPath {
 
   type AndValue = CPath -> CValue
 
-  import blueeyes.json._
+  // import blueeyes.json._
 
   implicit val CPathDecomposer: Decomposer[CPath] = new Decomposer[CPath] {
     def decompose(cpath: CPath): JValue = JString(cpath.toString)
@@ -271,9 +260,9 @@ object CPath {
       RootNode(Seq.empty[CPathTree[A]])
   }
 
-  implicit def singleNodePath(node: CPathNode) = CPath(node)
+  implicit def singleNodePath(node: CPathNode): CPath = CPath(node)
 
-  implicit object CPathOrder extends Ord[CPath] {
+  implicit val CPathOrder: Ord[CPath] = new Ord[CPath] {
     def order(v1: CPath, v2: CPath): Cmp = {
       def compare0(n1: List[CPathNode], n2: List[CPathNode]): Cmp = (n1, n2) match {
         case (Nil, Nil) => EQ
@@ -287,6 +276,4 @@ object CPath {
       compare0(v1.nodes, v2.nodes)
     }
   }
-
-  implicit val CPathOrdering = CPathOrder.toScalaOrdering
 }
