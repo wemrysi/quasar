@@ -30,7 +30,7 @@ JOB_NUM=${TRAVIS_JOB_NUMBER:="1"}
 if [[ "$#" == "1" ]]; then
   QUASAR_MONGODB_RELEASE="$1"
 else
-  QUASAR_MONGODB_RELEASE="ALL"
+  QUASAR_MONGODB_RELEASE="NONE"
 fi
 
 # Perform setup for integration tests:
