@@ -25,6 +25,9 @@ import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
 import quasar.physical.sparkcore.fs.readfile.{Limit, Offset}
+import quasar.Data._
+import quasar.DataCodec
+import quasar.console
 
 import java.io._
 import java.nio.file.{Files, Paths}
@@ -62,9 +65,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
       // when
       withTempFile(createIt = Some(content)) { aFile =>
-        for {
+        (for {
           sc <- newSc()
-          result <- execute(program(aFile), sc)
+          result <- liftToOptionT(execute(program(aFile), sc))
         } yield {
           result must_== \/-(
             List(
@@ -73,7 +76,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
             )
           )
           sc.stop()
-        }
+        }).run
       }
       ok
     }
@@ -99,9 +102,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
       // when
       withTempFile(createIt = Some(content)) { aFile =>
-        for {
+        (for {
           sc <- newSc()
-          result <- execute(program(aFile), sc)
+          result <- liftToOptionT(execute(program(aFile), sc))
         } yield {
           result must_== \/-(
             List(
@@ -111,7 +114,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
             )
           )
           sc.stop()
-        }
+        }).run
       }
       ok
     }
@@ -137,9 +140,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
       // when
       withTempFile(createIt = Some(content)) { aFile =>
-        for {
+        (for {
           sc <- newSc()
-          result <- execute(program(aFile), sc)
+          result <- liftToOptionT(execute(program(aFile), sc))
         } yield {
           result must_== \/-(
             List(
@@ -148,7 +151,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
             )
           )
           sc.stop()
-        }
+        }).run
       }
       ok
     }
@@ -177,9 +180,9 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
       // when
       withTempFile(createIt = Some(content)) { aFile =>
-        for {
+        (for {
           sc <- newSc()
-          result <- execute(program(aFile), sc)
+          result <- liftToOptionT(execute(program(aFile), sc))
         } yield {
           result must beLike {
             case \/-(results) =>
@@ -190,7 +193,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
               results must contain(Obj(ListMap("line" -> Str("4"))))
           }
           sc.stop()
-        }
+        }).run
       }
       ok
     }
@@ -225,10 +228,18 @@ class ReadFileSpec extends Specification with ScalaCheck  {
     }
   }
 
-  private def newSc(): Task[SparkContext] = Task.delay {
-    val config = new SparkConf()
-      .setMaster("local[*]")
-      .setAppName(scala.util.Random.nextInt().toString)
+
+  private def liftToOptionT[A](v: Task[A]) =
+    OptionT[Task, A](v.map(_.some))
+
+  private def newSc(): OptionT[Task, SparkContext] = for {
+    uriStr <- console.readEnv("QUASAR_SPARK_LOCAL")
+    uriData <- OptionT(Task.now(DataCodec.parse(uriStr)(DataCodec.Precise).toOption))
+    slData <- OptionT(Task.now(uriData.asInstanceOf[Obj].value.get("sparklocal")))
+    uri <- OptionT(Task.now(slData.asInstanceOf[Obj].value.get("connectionUri")))
+  } yield {
+    val master = uri.asInstanceOf[Str].value
+    val config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
     new SparkContext(config)
   }
 
