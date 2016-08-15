@@ -12,6 +12,8 @@ trait QuasarSpecification extends SpecificationLike
         with ScalaCheckPropertyDsl
         with GenInstances
 {
+  sequential
+
   // Report all test timings.
   args.report(showtimes=true)
 
