@@ -72,14 +72,6 @@ package object fs {
 
     val failErrs = Failure.toRuntimeError[Task, xcc.XccError]
 
-    // TODO: Define elsewhere, can probably make this another generic impl of Read
-    val newSession: xcc.SessionR ~> Task =
-    new (xcc.SessionR ~> Task) {
-      def apply[A](ra: Read[Session, A]) = ra match {
-        case Read.Ask(f) => Task.delay(f(csource.newSession))
-      }
-    }
-
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
       KeyValueStore.impl.empty[ReadHandle, Process[Task, Vector[Data]]]        |@|
@@ -87,6 +79,15 @@ package object fs {
       MonotonicSeq.fromZero                                                    |@|
       createClient(uri)
     ) { (whandles, rhandles, qhandles, seq, client) =>
+
+      // TODO: Define elsewhere, can probably make this another generic impl of Read
+      val newSession: xcc.SessionR ~> Task =
+      new (xcc.SessionR ~> Task) {
+        def apply[A](ra: Read[Session, A]) = ra match {
+          case Read.Ask(f) => client.newSession.map(f)
+        }
+      }
+
       val toTask =
         reflNT[Task]                        :+:
         Read.constant[Task, Client](client) :+:
@@ -98,7 +99,7 @@ package object fs {
         failErrs                            :+:
         foldMapNT(reflNT[Task] :+: failErrs)
 
-      (toTask, Task.delay(dbClient.release))
+      (toTask, client.release)
     }
   }
 

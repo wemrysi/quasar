@@ -24,7 +24,6 @@ import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
 import quasar.effect.{Read, KeyValueStore, MonotonicSeq}
 import quasar.physical.marklogic._
-import quasar.physical.marklogic.WriteError._
 
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -34,7 +33,7 @@ object writefile {
 
   implicit val coded = DataCodec.Precise
 
-  def asString(data: Vector[Data]): String = data.map(DataCodec.render(_).toOption.getOrElse("")).mkString
+  def asString(data: Vector[Data]): Vector[String] = data.map(DataCodec.render(_).toOption).unite
 
   def interpret[S[_]](implicit
     S0:      Task :<: S,
@@ -57,12 +56,14 @@ object writefile {
         } yield writeHandle).run
 
       case WriteFile.Write(h, data) =>
+        val asDir = fileParent(h.file) </> dir(fileName(h.file).value)
         cursors.get(h).isDefined.ifM(
-          Client.write(posixCodec.printPath(h.file), asString(data)).map( result =>
+          Client.writeInDir(asDir, asString(data)).map( result =>
             result.swap.toOption.map {
               case ResourceNotFound(msg) => pathErr(pathNotFound(h.file))
               case Forbidden(msg)        => writeFailed(Data.Arr(data.toList), "Quasar is not authorized to perform this operation on the MarkLogic server")
               case FailedRequest(msg)    => writeFailed(Data.Arr(data.toList), "An unknown error occured at the MarkLogic REST API level")
+              case AlreadyExists(_)         => ??? // TODO: Make it typesafe that this error is not possible here
             }.toList.toVector),
           Vector(unknownWriteHandle(h)).pure[Free[S,?]])
 
