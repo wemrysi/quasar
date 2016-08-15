@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 
 object JDBMProjection {
   final val MAX_SPINS = 20 // FIXME: This is related to the JDBM ConcurrentMod exception, and should be removed when that's cleaned up

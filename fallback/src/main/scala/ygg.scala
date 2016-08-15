@@ -1,9 +1,9 @@
-package com.precog
+package quasar
 
 import blueeyes._
 import scalaz._, Scalaz._, Ordering._
 
-package object yggdrasil {
+package object ygg {
   // only usage of commons-primitives
   type ArrayIntList = org.apache.commons.collections.primitives.ArrayIntList
 

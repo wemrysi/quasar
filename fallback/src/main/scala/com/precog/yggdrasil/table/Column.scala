@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 package table
 
 import blueeyes._, json._
@@ -43,7 +43,7 @@ sealed trait Column {
   def rowCompare(row1: Int, row2: Int): Int
 }
 
-private[yggdrasil] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
+private[ygg] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
 
 trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]

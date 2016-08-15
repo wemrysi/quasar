@@ -17,12 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.table._
-import com.precog.yggdrasil.TableModule._
+import quasar.ygg.table._
+import quasar.ygg.TableModule._
 import org.mapdb._
 import scala.collection.JavaConverters._
 import scalaz._
@@ -32,7 +32,7 @@ import JDBM._
   * A Projection wrapping a raw JDBM TreeMap index used for sorting. It's assumed that
   * the index has been created and filled prior to creating this wrapper.
   */
-class JDBMRawSortProjection private[yggdrasil](dbFile: File,
+class JDBMRawSortProjection private[ygg](dbFile: File,
                                               indexName: String,
                                               sortKeyRefs: Seq[ColumnRef],
                                               valRefs: Seq[ColumnRef],

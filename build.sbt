@@ -18,7 +18,7 @@ lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) depe
     scalacOptions in console in Compile := consoleArgs,
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
        scalacOptions in console in Test := consoleArgs,
-     initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, yggdrasil._"
+     initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, bytecode._, common._, ygg._"
 )
 
 lazy val fallback = project.setup dependsOn (precog % BothScopes)

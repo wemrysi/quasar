@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 package table
 
 import blueeyes._
@@ -1105,7 +1105,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       * Sorts the KV table by ascending or descending order of a transformation
       * applied to the rows.
       *
-      * @see com.precog.yggdrasil.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
+      * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = {
       for {
@@ -1117,7 +1117,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       * Sorts the KV table by ascending or descending order based on a seq of transformations
       * applied to the rows.
       *
-      * @see com.precog.yggdrasil.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
+      * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {

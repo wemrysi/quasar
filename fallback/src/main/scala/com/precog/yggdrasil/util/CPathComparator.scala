@@ -17,12 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 package util
 
 import blueeyes._
 import com.precog.common._
-import com.precog.yggdrasil.table._
+import quasar.ygg.table._
 import scalaz._, Scalaz._
 
 /**
@@ -165,7 +165,7 @@ object CPathComparator {
   }
 }
 
-private[yggdrasil] trait ArrayCPathComparatorSupport {
+private[ygg] trait ArrayCPathComparatorSupport {
   final def makeMask(path: CPath): Array[Boolean] = {
     val indexNodes = path.nodes filter {
       case CPathIndex(_) => true
@@ -186,7 +186,7 @@ private[yggdrasil] trait ArrayCPathComparatorSupport {
   * A non-boxing CPathComparator where the left-side is a homogeneous array and
   * the right side is not.
   */
-private[yggdrasil] final class HalfArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
+private[ygg] final class HalfArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
     rCol: Int => B)(implicit ma: CTag[A], ho: HetOrder[A, B])
@@ -217,7 +217,7 @@ private[yggdrasil] final class HalfArrayCPathComparator[@spec(Boolean, Long, Dou
 /**
   * A non-boxing CPathComparator for homogeneous arrays.
   */
-private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
+private[ygg] final class ArrayCPathComparator[@spec(Boolean, Long, Double) A, @spec(Boolean, Long, Double) B](
     lPath: CPath,
     lCol: HomogeneousArrayColumn[_],
     rPath: CPath,
@@ -264,7 +264,7 @@ private[yggdrasil] final class ArrayCPathComparator[@spec(Boolean, Long, Double)
   * ArraySelector provides a non-boxing way of accessing the leaf elements in a
   * bunch of nested arrays.
   */
-private[yggdrasil]
+private[ygg]
 final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
   def canPluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): Boolean = {
     var arr: Array[_] = a

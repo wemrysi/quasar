@@ -31,7 +31,7 @@ package quasar.precog {
   }
 
   trait TableGenerators {
-    import com.precog.yggdrasil.table._
+    import quasar.ygg.table._
     import com.precog.common._
 
     def genColumn(col: ColumnRef, size: Int): Gen[Column] = {

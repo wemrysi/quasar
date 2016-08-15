@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 package table
 
 import quasar.precog._
@@ -25,8 +25,8 @@ import blueeyes._, json._
 import com.precog.common._
 import com.precog.common.ingest.FileContent
 import com.precog.bytecode._
-import com.precog.yggdrasil.util._
-import com.precog.yggdrasil.table.cf.util.{ Remap, Empty }
+import quasar.ygg.util._
+import quasar.ygg.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
 import com.precog.util.IOUtils

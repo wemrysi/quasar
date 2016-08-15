@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.yggdrasil
+package quasar.ygg
 
 case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
   override def getMessage =
