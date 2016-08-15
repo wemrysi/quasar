@@ -241,6 +241,7 @@ lazy val main = project
   .dependsOn(
     mongodb    % BothScopes,
     skeleton   % BothScopes,
+    sparkcore  % BothScopes,
     postgresql % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
