@@ -11,6 +11,9 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
 
+  implicit def implicitScalaMapOps[A, B, CC[B] <: Traversable[B]](x: scMap[A, CC[B]]): ScalaMapOps[A, B, CC] =
+    new ScalaMapOps(x)
+
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
 

@@ -1,10 +1,9 @@
 package com.precog.util
 
 import blueeyes._
-// import quasar.precog.TestSupport._
 import scalaz._
 
-object MapUtilsSpec extends quasar.QuasarSpecification with MapUtils {
+class MapUtilsSpec extends quasar.QuasarSpecification {
   private type Ints     = List[Int]
   private type IntsPair = Ints -> Ints
   private type IntMap   = Map[Int, Ints]
@@ -37,7 +36,7 @@ object MapUtilsSpec extends quasar.QuasarSpecification with MapUtils {
   }
 }
 
-object RingDequeSpec extends quasar.QuasarSpecification {
+class RingDequeSpec extends quasar.QuasarSpecification {
   implicit val params = set(
     minTestsOk = 2500,
     workers = Runtime.getRuntime.availableProcessors)
@@ -101,9 +100,7 @@ object RingDequeSpec extends quasar.QuasarSpecification {
     xs.foldLeft(new RingDeque[Int](bound)) { (deque, x) => deque pushBack x; deque }
 }
 
-
-
-object VectorClockSpec extends quasar.QuasarSpecification {
+class VectorClockSpec extends quasar.QuasarSpecification {
   "vector clock" should {
     "update when key not already present" in {
       val vc = VectorClock.empty

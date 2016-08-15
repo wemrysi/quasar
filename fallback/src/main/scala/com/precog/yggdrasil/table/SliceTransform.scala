@@ -23,14 +23,9 @@ package table
 import blueeyes._
 import com.precog.common._
 import com.precog.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
-import com.precog.util._
+import scalaz._, Scalaz._
 
-import scalaz._
-import scalaz.std.tuple._
-import scalaz.syntax.monad._
-import scalaz.syntax.bifunctor._
-
-trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectConcatHelpers with ArrayConcatHelpers with MapUtils {
+trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHelpers {
 
   import trans._
 
@@ -1086,9 +1081,7 @@ trait ConcatHelpers {
     val nonemptyBits = leftDefinedBits & rightDefinedBits
     (emptyBits, nonemptyBits)
   }
-}
 
-trait ArrayConcatHelpers extends ConcatHelpers {
   def filterArrays(columns: Map[ColumnRef, Column]) = columns.filter {
     case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
     case (ColumnRef(CPath.Identity, CEmptyArray), _)     => true
@@ -1116,9 +1109,7 @@ trait ArrayConcatHelpers extends ConcatHelpers {
 
     newCols.toMap
   }
-}
 
-trait ObjectConcatHelpers extends ConcatHelpers {
   def filterObjects(columns: Map[ColumnRef, Column]) = columns.filter {
     case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
     case (ColumnRef(CPath.Identity, CEmptyObject), _)    => true

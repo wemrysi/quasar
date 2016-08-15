@@ -87,48 +87,6 @@ object IntList {
   }
 }
 
-/**
-  * Implicit container trait
-  */
-trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: Traversable[B]](self: scMap[A, CC[B]]): MapPimp[A, B, CC] =
-    new MapPimp(self)
-}
-
-class MapPimp[A, B, CC[B] <: Traversable[B]](left: scMap[A, CC[B]]) {
-  def cogroup[C, CC2[C] <: Traversable[C], Result](right: scMap[A, CC2[C]])(
-      implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
-      cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
-      cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
-    val resultBuilder = cbf()
-
-    left foreach {
-      case (key, leftValues) => {
-        right get key map { rightValues =>
-          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
-        } getOrElse {
-          leftValues foreach { b =>
-            resultBuilder += (key -> Either3.left3[B, (CC[B], CC2[C]), C](b))
-          }
-        }
-      }
-    }
-
-    right foreach {
-      case (key, rightValues) => {
-        if (!(left get key isDefined)) {
-          rightValues foreach { c =>
-            resultBuilder += (key -> Either3.right3[B, (CC[B], CC2[C]), C](c))
-          }
-        }
-      }
-    }
-
-    resultBuilder.result()
-  }
-}
-
-
 
 object NumericComparisons {
 
@@ -293,9 +251,6 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
     back = rotate(back, delta)
   }
 }
-
-
-
 
 case class VectorClock(map: Map[Int, Int]) {
   def get(producerId: Int): Option[Int] = map.get(producerId)
