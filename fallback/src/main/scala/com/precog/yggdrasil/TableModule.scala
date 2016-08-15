@@ -26,8 +26,6 @@ import com.precog.common.security._
 
 import blueeyes.json._
 
-import collection.Set
-
 import scalaz._
 import scalaz.syntax.monad._
 
@@ -141,12 +139,12 @@ trait TableModule extends TransSpecModule {
     import trans._
     def empty: Table
 
-    def constString(v: Set[String]): Table
-    def constLong(v: Set[Long]): Table
-    def constDouble(v: Set[Double]): Table
-    def constDecimal(v: Set[BigDecimal]): Table
-    def constDate(v: Set[DateTime]): Table
-    def constBoolean(v: Set[Boolean]): Table
+    def constString(v: scSet[String]): Table
+    def constLong(v: scSet[Long]): Table
+    def constDouble(v: scSet[Double]): Table
+    def constDecimal(v: scSet[BigDecimal]): Table
+    def constDate(v: scSet[DateTime]): Table
+    def constBoolean(v: scSet[Boolean]): Table
     def constNull: Table
 
     def constEmptyObject: Table
@@ -270,7 +268,7 @@ trait TableModule extends TransSpecModule {
 
     def canonicalize(length: Int, maxLength0: Option[Int] = None): Table
 
-    def schemas: M[Set[JType]]
+    def schemas: M[scSet[JType]]
 
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
 

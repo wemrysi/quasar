@@ -109,8 +109,6 @@ object ColumnarTableModule {
     * "the fox said: ""hello, my name is fred."""
     */
   def renderCsv[M[+ _]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
-    import scala.collection.{ Map => GenMap }
-
     /**
       * Represents the column headers we have. We track three things:
       *
@@ -122,7 +120,7 @@ object ColumnarTableModule {
       * new instances. If this proves to be a problem we could easily
       * make a mutable version.
       */
-    class Indices(n: Int, m: GenMap[String, Int], a: Array[String]) {
+    class Indices(n: Int, m: scMap[String, Int], a: Array[String]) {
       def size                        = n
       def getPaths: Array[String]     = a
       def columnForPath(path: String) = m(path)
@@ -354,15 +352,15 @@ trait ColumnarTableModule
       ExactSize(1)
     )
 
-    def constBoolean(v: collection.Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
-    def constLong(v: collection.Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
-    def constDouble(v: collection.Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
-    def constDecimal(v: collection.Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
-    def constString(v: collection.Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
-    def constDate(v: collection.Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
-    def constNull: Table                                   = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
-    def constEmptyObject: Table                            = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
-    def constEmptyArray: Table                             = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
+    def constBoolean(v: scSet[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+    def constLong(v: scSet[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+    def constDouble(v: scSet[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+    def constDecimal(v: scSet[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+    def constString(v: scSet[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+    def constDate(v: scSet[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+    def constNull: Table                          = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
+    def constEmptyObject: Table                   = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
+    def constEmptyArray: Table                    = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
 
     def transformStream[A](sliceTransform: SliceTransform1[A], slices: StreamT[M, Slice]): StreamT[M, Slice] = {
       def stream(state: A, slices: StreamT[M, Slice]): StreamT[M, Slice] = StreamT(
@@ -433,13 +431,13 @@ trait ColumnarTableModule
             }
           }
 
-          def normalizedKeys(index: TableIndex, keySchema: KeySchema): collection.Set[Key] = {
+          def normalizedKeys(index: TableIndex, keySchema: KeySchema): scSet[Key] = {
             val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
             for (key <- index.getUniqueKeys)
               yield for (k <- schemaMap) yield if (k == -1) CUndefined else key(k)
           }
 
-          def intersect(keys0: collection.Set[Key], keys1: collection.Set[Key]): collection.Set[Key] = {
+          def intersect(keys0: scSet[Key], keys1: scSet[Key]): scSet[Key] = {
             def consistent(key0: Key, key1: Key): Boolean =
               (key0 zip key1).forall {
                 case (k0, k1) => k0 == k1 || k0 == CUndefined || k1 == CUndefined

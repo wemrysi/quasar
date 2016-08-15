@@ -356,7 +356,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     )
   }
 
-  def deleteFields(prefixes: scala.collection.Set[CPathField]): Slice = {
+  def deleteFields(prefixes: scSet[CPathField]): Slice = {
     val (removed, withoutPrefixes) = source.columns partition {
       case (ColumnRef(CPath(head @ CPathField(_), _ @_ *), _), _) => prefixes contains head
       case _                                                      => false

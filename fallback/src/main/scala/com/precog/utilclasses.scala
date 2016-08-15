@@ -216,12 +216,12 @@ object IOUtils {
   * Implicit container trait
   */
 trait MapUtils {
-  implicit def pimpMapUtils[A, B, CC[B] <: sc.GenTraversable[B]](self: sc.GenMap[A, CC[B]]): MapPimp[A, B, CC] =
+  implicit def pimpMapUtils[A, B, CC[B] <: Traversable[B]](self: scMap[A, CC[B]]): MapPimp[A, B, CC] =
     new MapPimp(self)
 }
 
-class MapPimp[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
-  def cogroup[C, CC2[C] <: sc.GenTraversable[C], Result](right: sc.GenMap[A, CC2[C]])(
+class MapPimp[A, B, CC[B] <: Traversable[B]](left: scMap[A, CC[B]]) {
+  def cogroup[C, CC2[C] <: Traversable[C], Result](right: scMap[A, CC2[C]])(
       implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
       cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
       cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
@@ -297,8 +297,6 @@ object NumericComparisons {
     val bError = eps(b)
     if (a + aError < b - bError) -1 else if (a - aError > b + bError) 1 else 0
   }
-
-  import scalaz.Ordering.{ LT, GT, EQ }
 
   @inline def order(a: Long, b: Long): scalaz.Ordering =
     if (a < b) LT else if (a == b) EQ else GT

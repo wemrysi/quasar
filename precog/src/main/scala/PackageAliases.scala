@@ -13,6 +13,7 @@ trait PackageAliases {
   type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
   type jPath                = java.nio.file.Path
   type scSet[A]             = scala.collection.Set[A]
+  type scMap[K, V]          = scala.collection.Map[K, V]
   type sciQueue[+A]         = sci.Queue[A]
   type sciTreeMap[K, +V]    = scala.collection.immutable.TreeMap[K, V]
   type scmPriQueue[A]       = scm.PriorityQueue[A]

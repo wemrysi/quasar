@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.ygg.util._
 import scala.collection.mutable
-import scalaz._, Scalaz._
+import scalaz._, Scalaz._, Ordering._
 
 /**
   * Represents a way to traverse a list of CPaths in sorted order. This takes
@@ -259,29 +259,18 @@ object CPathTraversal {
     }
 
     implicit object CPathPositionOrder extends ScalazOrder[CPathPosition] {
-      import scalaz.Ordering._
-
-      private val nodeOrder = implicitly[ScalazOrder[CPathNode]]
-
       def order(p1: CPathPosition, p2: CPathPosition): scalaz.Ordering = (p1, p2) match {
-        case (CPathPoint(CPathIndex(i)), CPathRange(_, l, r)) =>
-          if (i < l) LT else if (i > l) GT else EQ //if (r map (_ == i) getOrElse false) EQ else GT
-        case (CPathRange(_, l, r), CPathPoint(CPathIndex(i))) =>
-          if (i < l) GT else if (i > l) LT else EQ //if (r map (_ == i) getOrElse false) EQ else LT
-        case (CPathRange(_, l1, r1), CPathRange(_, l2, r2)) =>
-          if (l1 < l2) LT
-          else if (l2 < l1) GT
-          else {
-            (r1, r2) match {
-              case (Some(r1), Some(r2)) => implicitly[ScalazOrder[Int]].order(r1, r2)
-              case (None, None)         => EQ
-              case (_, None)            => LT
-              case (None, _)            => GT
-            }
-          }
-        case (CPathPoint(a), CPathPoint(b))       => nodeOrder.order(a, b)
-        case (CPathPoint(a), CPathRange(_, i, _)) => nodeOrder.order(a, CPathIndex(i))
-        case (CPathRange(_, i, _), CPathPoint(a)) => nodeOrder.order(CPathIndex(i), a)
+        case (CPathPoint(CPathIndex(i)), CPathRange(_, l, r)) => i ?|? l
+        case (CPathRange(_, l, r), CPathPoint(CPathIndex(i))) => l ?|? i
+        case (CPathRange(_, l1, r1), CPathRange(_, l2, r2))   =>
+          (l1 ?|? l2) |+| ((r1, r2) match {
+            case (Some(r1), Some(r2)) => r1 ?|? r2
+            case _                    => r2 ?|? r1 // it was like this when I got here
+          })
+
+        case (CPathPoint(a), CPathPoint(b))       => a ?|? b
+        case (CPathPoint(a), CPathRange(_, i, _)) => a ?|? CPathIndex(i)
+        case (CPathRange(_, i, _), CPathPoint(a)) => (CPathIndex(i): CPathNode) ?|? a
       }
     }
 
