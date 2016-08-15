@@ -1,4 +1,4 @@
-import scalaz._
+import scalaz._, Ordering._
 
 import quasar.{ precog => p }
 
@@ -16,6 +16,15 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
 
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
+
+  implicit class ScalazOrderOps[A](private val ord: ScalazOrder[A]) {
+    def eqv(x: A, y: A): Boolean  = ord.order(x, y) == EQ
+    def lt(x: A, y: A): Boolean   = ord.order(x, y) == LT
+    def gt(x: A, y: A): Boolean   = ord.order(x, y) == GT
+    def lte(x: A, y: A): Boolean  = !gt(x, y)
+    def gte(x: A, y: A): Boolean  = !lt(x, y)
+    def neqv(x: A, y: A): Boolean = !eqv(x, y)
+  }
 
   implicit def ValidationFlatMapRequested[E, A](d: Validation[E, A]): ValidationFlatMap[E, A] =
     Validation.FlatMap.ValidationFlatMapRequested[E, A](d)

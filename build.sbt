@@ -36,7 +36,6 @@ lazy val precog = project.setup deps (
   "io.argonaut"             %% "argonaut"                     % argonautVersion,
   "io.argonaut"             %% "argonaut-scalaz"              % argonautVersion,
   "com.chuusai"             %% "shapeless"                    % "2.3.1",
-  "org.spire-math"          %% "spire"                        % "0.7.4",
   "org.scalaz"              %% "scalaz-core"                  % scalazVersion force(),
   "org.scalaz"              %% "scalaz-effect"                % scalazVersion,
   "org.scalaz"              %% "scalaz-concurrent"            % scalazVersion,

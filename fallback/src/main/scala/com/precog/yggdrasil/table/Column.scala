@@ -22,7 +22,7 @@ package table
 
 import blueeyes._, json._
 import com.precog.common._
-import scalaz.Semigroup
+import scalaz.{ Semigroup, Ordering }, Ordering._
 
 trait Column {
   val tpe: CType
@@ -345,15 +345,11 @@ case class MmixPrng(_seed: Long) {
 }
 
 object Column {
-  def rowOrder(col: Column): SpireOrder[Int] = new SpireOrder[Int] {
-    def compare(i: Int, j: Int): Int = {
-      if (col.isDefinedAt(i)) {
-        if (col.isDefinedAt(j)) {
-          col.rowCompare(i, j)
-        } else 1
-      } else if (col.isDefinedAt(j)) -1
-      else 0
-    }
+  def rowOrder(col: Column): ScalazOrder[Int] = scalaz.Order.order[Int] {
+    case (i, j) if (col isDefinedAt i) && (col isDefinedAt j) => ScalazOrdering fromInt col.rowCompare(i, j)
+    case (i, _) if (col isDefinedAt i)                        => GT
+    case (_, j) if (col isDefinedAt j)                        => LT
+    case _                                                    => EQ
   }
 
   @inline def const(cv: CValue): Column = cv match {

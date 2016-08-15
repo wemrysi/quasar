@@ -86,9 +86,14 @@ class CPathTraversalSpec extends quasar.QuasarSpecification {
       )
       val allPaths = cols.keys.toList
       val order = CPathTraversal(allPaths).rowOrder(allPaths, cols)
+
       order.eqv(0, 0) must beTrue
       order.gt(0, 1) must beTrue
       order.lt(0, 1) must beFalse
+
+      // order.order(0, 0) must_=== EQ
+      // order.order(0, 1) must_=== LT
+      // order.order(1, 0) must_=== GT
 
       val subPaths = List(CPath("b[0]"), CPath("b[1]"))
       val order2 = CPathTraversal(subPaths).rowOrder(allPaths, cols)

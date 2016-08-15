@@ -34,12 +34,15 @@ sealed trait CPathTraversal { self =>
   import MaybeOrdering._
   import CPathTraversal._
 
+  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]]): ScalazOrder[Int] =
+    rowOrder(cpaths, left, None)
+
   /**
     * Creates an order on rows in a set of columns. You can also optionally use
-    * 2 column sets for the 1st and 2nd paramters of the SpireOrder. This order will
+    * 2 column sets for the 1st and 2nd paramters of the Order. This order will
     * not allocate any objects or arrays, but it is also not threadsafe.
     */
-  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]] = None): SpireOrder[Int] = {
+  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]]): ScalazOrder[Int] = {
     val right = optRight getOrElse left
 
     def plan0(t: CPathTraversal, paths: List[List[CPathNode] -> List[CPathNode]], idx: Int): CPathComparator = t match {
@@ -150,14 +153,10 @@ sealed trait CPathTraversal { self =>
         }
     }
 
-    new SpireOrder[Int] {
-      private val indices  = new Array[Int](self.arrayDepth)
-      private val pathComp = plan0(self, cpaths map (_.nodes -> Nil), 0)
+    val indices  = new Array[Int](self.arrayDepth)
+    val pathComp = plan0(self, cpaths map (_.nodes -> Nil), 0)
 
-      def compare(row1: Int, row2: Int) = {
-        pathComp.compare(row1, row2, indices).toInt
-      }
-    }
+    scalaz.Order.order[Int]((row1, row2) => Ordering fromInt pathComp.compare(row1, row2, indices).toInt)
   }
 
   /**

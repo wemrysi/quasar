@@ -61,9 +61,7 @@ trait CPathComparator { self =>
 object CPathComparator {
   import MaybeOrdering._
 
-  implicit object DateTimeOrder extends SpireOrder[DateTime] {
-    def compare(a: DateTime, b: DateTime) = a compareTo b
-  }
+  implicit val DateTimeOrder: ScalazOrder[DateTime] = scalaz.Order.order((x, y) => Ordering fromInt (x compareTo y))
 
   def apply[@spec(Boolean, Long, Double, AnyRef) A, @spec(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
     new CPathComparator {

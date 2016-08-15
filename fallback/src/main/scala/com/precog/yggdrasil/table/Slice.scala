@@ -614,7 +614,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(retained.size, source.columns lazyMapValues (_ |> cf.util.RemapIndices(retained) get))
   }
 
-  def order: SpireOrder[Int] =
+  def order: ScalazOrder[Int] =
     if (columns.size == 1) {
       val col = columns.head._2
       Column.rowOrder(col)
@@ -651,18 +651,17 @@ class SliceOps(private val source: Slice) extends AnyVal {
             }
             .toArray
 
-          new SpireOrder[Int] {
-            def compare(i: Int, j: Int): Int = {
-              var k = 0
-              while (k < cols.length) {
-                val cmp = cols(k).compare(i, j)
-                if (cmp != 0)
-                  return cmp
-                k += 1
+          def cmp(i: Int, j: Int): Ordering = {
+            var k = 0
+            while (k < cols.length) {
+              Order(cols(k)).order(i, j) match {
+                case EQ  => k += 1
+                case cmp => return cmp
               }
-              0
             }
+            EQ
           }
+          scalaz.Order.order(cmp _)
 
         case Right(cols) =>
           val paths     = cols.keys.toList
@@ -677,8 +676,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val order: Array[Int] = Array.range(0, source.size) filter { row =>
       keySlice.isDefinedAt(row) && source.isDefinedAt(row)
     }
-    val rowOrder = if (sortOrder == SortAscending) keySlice.order else keySlice.order.reverse
-    spire.math.MergeSort.sort(order)(rowOrder, implicitly)
+    val rowOrder = if (sortOrder == SortAscending) keySlice.order else keySlice.order.reverseOrder
+    quasar.precog.MergeSort.sort(order)(rowOrder, implicitly)
 
     val remapOrder = new ArrayIntList(order.size)
     var i = 0
@@ -1646,7 +1645,7 @@ object Slice {
     val allPaths  = (lCols.keys ++ rCols.keys).toList
     val order     = traversal.rowOrder(allPaths, lCols, Some(rCols))
     new RowComparator {
-      def compare(r1: Int, r2: Int): Ordering = scalaz.Ordering.fromInt(order.compare(r1, r2))
+      def compare(r1: Int, r2: Int): Ordering = order.order(r1, r2)
     }
   }
 
