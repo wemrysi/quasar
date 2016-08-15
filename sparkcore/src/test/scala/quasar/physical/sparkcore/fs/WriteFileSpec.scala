@@ -164,7 +164,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
     def innerInterpreter: Task[Eff ~> Task] =  {
       (TaskRef(0L) |@| TaskRef(Map.empty[WriteHandle, PrintWriter])) { (genState, kvsState) =>
         MonotonicSeq.fromTaskRef(genState) :+:
-        KeyValueStore.fromTaskRef[WriteHandle, PrintWriter](kvsState) :+:
+        KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](kvsState) :+:
         NaturalTransformation.refl[Task]
       }
     }

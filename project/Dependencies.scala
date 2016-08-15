@@ -7,6 +7,7 @@ import sbt._, Keys._
 object Dependencies {
   private val argonautVersion   = "6.2-M3"
   private val http4sVersion     = "0.14.1a"
+  private val jawnVersion       = "0.8.4"
   private val monocleVersion    = "1.2.2"
   private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.1"
@@ -66,6 +67,13 @@ object Dependencies {
       .exclude("com.esotericsoftware.minlog", "minlog")
       .exclude("org.spark-project.spark", "unused")
       .exclude("io.netty", "netty-all")
+  )
+  def marklogic = Seq(
+    "com.marklogic"  %  "java-client-api"   % "3.0.5",
+    "com.marklogic"  %  "marklogic-xcc"     % "8.0.5",
+    "org.spire-math" %% "jawn-argonaut"     % jawnVersion,
+    "org.spire-math" %% "jawn-parser"       % jawnVersion,
+    "org.http4s"     %% "jawn-streamz"      % "0.8.1"
   )
   def web = Seq(
     "ch.qos.logback"  % "logback-classic"     %      "1.1.7",

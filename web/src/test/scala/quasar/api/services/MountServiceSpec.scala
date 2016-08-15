@@ -80,7 +80,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
       )
 
       val meff: MEff ~> Task =
-        reflNT[Task] :+: KeyValueStore.fromTaskRef(configsRef)
+        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
 
       val effR: Eff ~> ResponseOr =
         liftMT[Task, ResponseT]              :+:
