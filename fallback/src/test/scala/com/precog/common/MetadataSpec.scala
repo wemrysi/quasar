@@ -113,5 +113,5 @@ trait MetadataGenerators  {
   def genLongMetadata: Gen[LongValueStats]             = for(count <- upTo1K; a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
   def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- upTo1K; a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
   def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- upTo1K; a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, ScalazOrder[String].min(a,b), ScalazOrder[String].max(a,b))
+  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, Ord[String].min(a,b), ScalazOrder[String].max(a,b))
 }

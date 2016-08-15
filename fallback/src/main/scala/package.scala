@@ -14,10 +14,12 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   implicit def implicitScalaMapOps[A, B, CC[B] <: Traversable[B]](x: scMap[A, CC[B]]): ScalaMapOps[A, B, CC] =
     new ScalaMapOps(x)
 
-  implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
+  implicit def comparableOrder[A <: Comparable[A]] : Ord[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
 
-  implicit class ScalazOrderOps[A](private val ord: ScalazOrder[A]) {
+  implicit def translateToScalaOrdering[A](implicit z: Ord[A]): scala.math.Ordering[A] = z.toScalaOrdering
+
+  implicit class ScalazOrderOps[A](private val ord: Ord[A]) {
     def eqv(x: A, y: A): Boolean  = ord.order(x, y) == EQ
     def lt(x: A, y: A): Boolean   = ord.order(x, y) == LT
     def gt(x: A, y: A): Boolean   = ord.order(x, y) == GT

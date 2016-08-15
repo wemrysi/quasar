@@ -34,7 +34,7 @@ sealed trait CPathTraversal { self =>
   import MaybeOrdering._
   import CPathTraversal._
 
-  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]]): ScalazOrder[Int] =
+  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]]): Ord[Int] =
     rowOrder(cpaths, left, None)
 
   /**
@@ -42,7 +42,7 @@ sealed trait CPathTraversal { self =>
     * 2 column sets for the 1st and 2nd paramters of the Order. This order will
     * not allocate any objects or arrays, but it is also not threadsafe.
     */
-  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]]): ScalazOrder[Int] = {
+  def rowOrder(cpaths: List[CPath], left: Map[CPath, Set[Column]], optRight: Option[Map[CPath, Set[Column]]]): Ord[Int] = {
     val right = optRight getOrElse left
 
     def plan0(t: CPathTraversal, paths: List[List[CPathNode] -> List[CPathNode]], idx: Int): CPathComparator = t match {
@@ -167,7 +167,7 @@ sealed trait CPathTraversal { self =>
     case Select(CPathArray, tail)    => 1 + tail.arrayDepth
     case Select(CPathIndex(_), tail) => 1 + tail.arrayDepth
     case Select(_, tail)             => tail.arrayDepth
-    case Sequence(ts)                => ts.map(_.arrayDepth).max
+    case Sequence(ts)                => ts.maxBy(_.arrayDepth).arrayDepth
     case Loop(_, _, tail)            => 1 + tail.arrayDepth
   }
 }

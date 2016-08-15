@@ -153,7 +153,7 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 }
 
 object CValue {
-  implicit val CValueOrder: ScalazOrder[CValue] = Order order {
+  implicit val CValueOrder: Ord[CValue] = Ord order {
     case (CString(as), CString(bs))                                                   => as ?|? bs
     case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
     case (CLong(al), CLong(bl))                                                       => al ?|? bl
@@ -195,7 +195,7 @@ sealed abstract class CValueType[A: CTag] extends CType {
 
   def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
-  def order(a: A, b: A): ScalazOrdering
+  def order(a: A, b: A): Cmp
   def jValueFor(a: A): JValue
 }
 
@@ -314,7 +314,7 @@ object CType {
     case _             => None
   }
 
-  implicit val CTypeOrder: ScalazOrder[CType] = Order order {
+  implicit val CTypeOrder: Ord[CType] = Order order {
     case (CArrayType(t1), CArrayType(t2)) => (t1: CType) ?|? t2
     case (x, y)                           => x.typeIndex ?|? y.typeIndex
   }

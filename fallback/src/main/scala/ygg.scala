@@ -9,58 +9,38 @@ package object ygg {
 
   type Identity   = Long
   type Identities = Array[Identity]
-  object Identities {
-    val Empty = Vector.empty[Identity]
-  }
+  type SEvent     = Identities -> SValue
 
-  type SEvent = (Identities, SValue)
-
-  object SEvent {
-    @inline
-    def apply(id: Identities, sv: SValue): SEvent = (id, sv)
-  }
-
-  def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): ScalazOrdering = {
-    var result: ScalazOrdering = EQ
-    var i                      = 0
-    while (i < prefixLength && (result eq EQ)) {
-      result = longInstance.order(ids1(i), ids2(i))
-      i += 1
-    }
-
-    result
-  }
-
-  def fullIdentityOrdering(ids1: Identities, ids2: Identities) = prefixIdentityOrdering(ids1, ids2, ids1.length min ids2.length)
-
-  object IdentitiesOrder extends ScalazOrder[Identities] {
-    def order(ids1: Identities, ids2: Identities) = fullIdentityOrdering(ids1, ids2)
-  }
-
-  def prefixIdentityOrder(prefixLength: Int): ScalazOrder[Identities] = {
-    new ScalazOrder[Identities] {
-      def order(ids1: Identities, ids2: Identities) = prefixIdentityOrdering(ids1, ids2, prefixLength)
-    }
-  }
-
-  def tupledIdentitiesOrder[A](idOrder: ScalazOrder[Identities]): ScalazOrder[Identities -> A] =
-    idOrder.contramap((_: (Identities, A))._1)
-
-  def identityValueOrder[A](idOrder: ScalazOrder[Identities])(implicit ord: ScalazOrder[A]): ScalazOrder[Identities -> A] =
-    new ScalazOrder[Identities -> A] {
-      type IA = (Identities, A)
-      def order(x: IA, y: IA): ScalazOrdering = {
-        val idComp = idOrder.order(x._1, y._1)
-        if (idComp == EQ) {
-          ord.order(x._2, y._2)
-        } else idComp
+  def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
+    var i = 0
+    while (i < prefixLength) {
+      longInstance.order(ids1(i), ids2(i)) match {
+        case EQ  => i += 1
+        case cmp => return cmp
       }
     }
+    EQ
+  }
 
-  def valueOrder[A](implicit ord: ScalazOrder[A]): ScalazOrder[Identities -> A] = new ScalazOrder[Identities -> A] {
-    type IA = (Identities, A)
-    def order(x: IA, y: IA): ScalazOrdering = {
-      ord.order(x._2, y._2)
-    }
+  object IdentitiesOrder extends Ord[Identities] {
+    def order(ids1: Identities, ids2: Identities): Cmp = fullIdentityOrdering(ids1, ids2)
+  }
+
+  def fullIdentityOrdering(ids1: Identities, ids2: Identities): Cmp =
+    prefixIdentityOrdering(ids1, ids2, ids1.length min ids2.length)
+
+  def prefixIdentityOrder(prefixLength: Int): Ord[Identities] =
+    Ord order ((ids1, ids2) => prefixIdentityOrdering(ids1, ids2, prefixLength))
+
+  def identityValueOrder[A](idOrder: Ord[Identities])(implicit ord: Ord[A]): Ord[Identities -> A] =
+    Ord order ((x, y) => idOrder.order(x._1, y._1) |+| (x._2 ?|? y._2))
+
+  def tupledIdentitiesOrder[A](ord: Ord[Identities]): Ord[Identities -> A] = ord contramap (_._1)
+  def valueOrder[A](ord: Ord[A]): Ord[Identities -> A]                     = ord contramap (_._2)
+}
+
+package ygg {
+  object SEvent {
+    def apply(id: Identities, sv: SValue): SEvent = id -> sv
   }
 }

@@ -27,13 +27,16 @@ import scalaz.syntax.order._
 case class ColumnRef(selector: CPath, ctype: CType)
 
 object ColumnRef {
-  def identity(ctype: CType) = ColumnRef(CPath.Identity, ctype)
+  def identity(ctype: CType): ColumnRef = ColumnRef(CPath.Identity, ctype)
 
-  implicit object order extends ScalazOrder[ColumnRef] {
-    def order(r1: ColumnRef, r2: ColumnRef): ScalazOrdering = {
-      (r1.selector ?|? r2.selector) |+| (r1.ctype ?|? r2.ctype)
+  object id {
+    def apply(ctype: CType): ColumnRef = ColumnRef(CPath.Identity, ctype)
+    def unapply(x: ColumnRef): Option[CType] = x match {
+      case ColumnRef(CPath.Identity, tp) => Some(tp)
+      case _                             => None
     }
   }
 
-  implicit val ordering: ScalaMathOrdering[ColumnRef] = order.toScalaOrdering
+  implicit val columnRefOrder: Ord[ColumnRef] =
+    Ord.order[ColumnRef]((r1, r2) => (r1.selector ?|? r2.selector) |+| (r1.ctype ?|? r2.ctype))
 }

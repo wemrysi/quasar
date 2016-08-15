@@ -81,7 +81,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     } yield result
 
     resultColumns.groupBy(_.tpe) map {
-      case (tpe, cols) => (ColumnRef(CPath.Identity, tpe), cols.reduceLeft((c1, c2) => Column.unionRightSemigroup.append(c1, c2)))
+      case (tpe, cols) => (ColumnRef.id(tpe), cols.reduceLeft((c1, c2) => Column.unionRightSemigroup.append(c1, c2)))
     }
   })
 
@@ -175,56 +175,56 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def definedConst(value: CValue): Slice = Slice(source.size,
     Map(value match {
       case CString(s) =>
-        (ColumnRef(CPath.Identity, CString), new StrColumn {
+        (ColumnRef.id(CString), new StrColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = s
         })
       case CBoolean(b) =>
-        (ColumnRef(CPath.Identity, CBoolean), new BoolColumn {
+        (ColumnRef.id(CBoolean), new BoolColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = b
         })
       case CLong(l) =>
-        (ColumnRef(CPath.Identity, CLong), new LongColumn {
+        (ColumnRef.id(CLong), new LongColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = l
         })
       case CDouble(d) =>
-        (ColumnRef(CPath.Identity, CDouble), new DoubleColumn {
+        (ColumnRef.id(CDouble), new DoubleColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = d
         })
       case CNum(n) =>
-        (ColumnRef(CPath.Identity, CNum), new NumColumn {
+        (ColumnRef.id(CNum), new NumColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = n
         })
       case CDate(d) =>
-        (ColumnRef(CPath.Identity, CDate), new DateColumn {
+        (ColumnRef.id(CDate), new DateColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = d
         })
       case CPeriod(p) =>
-        (ColumnRef(CPath.Identity, CPeriod), new PeriodColumn {
+        (ColumnRef.id(CPeriod), new PeriodColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = p
         })
       case value: CArray[a] =>
-        (ColumnRef(CPath.Identity, value.cType), new HomogeneousArrayColumn[a] {
+        (ColumnRef.id(value.cType), new HomogeneousArrayColumn[a] {
           val tpe = value.cType
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
           def apply(row: Int)       = value.value
         })
       case CNull =>
-        (ColumnRef(CPath.Identity, CNull), new NullColumn {
+        (ColumnRef.id(CNull), new NullColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
         })
       case CEmptyObject =>
-        (ColumnRef(CPath.Identity, CEmptyObject), new EmptyObjectColumn {
+        (ColumnRef.id(CEmptyObject), new EmptyObjectColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
         })
       case CEmptyArray =>
-        (ColumnRef(CPath.Identity, CEmptyArray), new EmptyArrayColumn {
+        (ColumnRef.id(CEmptyArray), new EmptyArrayColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
         })
       case CUndefined => sys.error("Cannot define a constant undefined value")
@@ -366,7 +366,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       Column.isDefinedAt(removed.values.toArray, i) && !Column.isDefinedAt(withoutPrefixes.values.toArray, i)
     }
 
-    val ref = ColumnRef(CPath.Identity, CEmptyObject)
+    val ref = ColumnRef.id(CEmptyObject)
 
     // The object might have become empty. Make the
     // EmptyObjectColumn defined at the row position.
@@ -424,7 +424,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       else BoolColumn.False(definedBits)
     )
 
-    Slice(source.size, Map(ColumnRef(CPath.Identity, CBoolean) ->  mapValue))
+    Slice(source.size, Map(ColumnRef.id(CBoolean) ->  mapValue))
   }
 
   def arraySwap(index: Int): Slice = Slice(source.size,

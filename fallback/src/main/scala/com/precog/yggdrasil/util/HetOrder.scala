@@ -39,13 +39,13 @@ trait HetOrderLow {
       }
     }
 
-  implicit def fromOrder[@spec(Boolean, Long, Double, AnyRef) A](implicit o: ScalazOrder[A]) = new HetOrder[A, A] {
+  implicit def fromOrder[@spec(Boolean, Long, Double, AnyRef) A](implicit o: Ord[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A) = o.order(a, b).toInt
   }
 }
 
 object HetOrder extends HetOrderLow {
-  implicit def fromScalazOrder[A](implicit z: ScalazOrder[A]) = new HetOrder[A, A] {
+  implicit def fromScalazOrder[A](implicit z: Ord[A]) = new HetOrder[A, A] {
     def compare(a: A, b: A): Int = z.order(a, b).toInt
   }
 

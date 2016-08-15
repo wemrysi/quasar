@@ -33,8 +33,8 @@ case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = Non
     "\nschema: " + schema
   }
 
-  def sorted(implicit z: ScalaMathOrdering[JValue]): SampleData  = transform(_.sorted)
-  def sortBy[B: ScalaMathOrdering](f: JValue => B): SampleData   = transform(_ sortBy f)
+  def sorted(implicit z: Ord[JValue]): SampleData                = transform(_.sorted)
+  def sortBy[B: Ord](f: JValue => B): SampleData                 = transform(_ sortBy f)
   def transform(f: Stream[JValue] => Stream[JValue]): SampleData = copy(data = f(data))
 }
 
@@ -43,7 +43,7 @@ object SampleData extends CValueGenerators {
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
   }
 
-  implicit def keyOrder[A]: ScalaMathOrdering[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
+  implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
 
   def sample(schema: Int => Gen[JSchema]) = Arbitrary(
     for {

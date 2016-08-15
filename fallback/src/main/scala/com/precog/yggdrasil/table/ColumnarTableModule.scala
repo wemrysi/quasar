@@ -333,7 +333,7 @@ trait ColumnarTableModule
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[M, Slice] = StreamT.unfoldM[M, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        Some((Slice(yggConfig.maxSliceSize, Map(ColumnRef(CPath.Identity, CDouble) -> column)), nextGen)).point[M]
+        Some((Slice(yggConfig.maxSliceSize, Map(ColumnRef.id(CDouble) -> column)), nextGen)).point[M]
       }
 
       Table(gen, InfiniteSize)
@@ -342,12 +342,12 @@ trait ColumnarTableModule
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
       Slice(
         vs.length,
-        Map(ColumnRef(CPath.Identity, CValueType[A]) -> mkColumn(vs))
+        Map(ColumnRef.id(CValueType[A]) -> mkColumn(vs))
       ) :: StreamT.empty[M, Slice],
       ExactSize(vs.length)
     )
     def constSingletonTable(singleType: CType, column: Column): Table = Table(
-      Slice(1, Map(ColumnRef(CPath.Identity, singleType) -> column)) :: StreamT.empty[M, Slice],
+      Slice(1, Map(ColumnRef.id(singleType) -> column)) :: StreamT.empty[M, Slice],
       ExactSize(1)
     )
 

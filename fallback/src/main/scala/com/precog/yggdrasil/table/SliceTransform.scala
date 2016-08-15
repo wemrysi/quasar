@@ -85,7 +85,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                   val col = cols reduceLeft { (c1, c2) =>
                     Column.unionRightSemigroup.append(c1, c2)
                   }
-                  (ColumnRef(CPath.Identity, tpe), col)
+                  (ColumnRef.id(tpe), col)
               }
             })
           }
@@ -237,7 +237,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                 def apply(row: Int)       = unified(row)
               }
 
-              Map(ColumnRef(CPath.Identity, CBoolean) -> column)
+              Map(ColumnRef.id(CBoolean) -> column)
             })
           }
 
@@ -254,8 +254,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           sourceSlice map { ss =>
             Slice(ss.size, {
               val (comparable0, other0) = ss.columns.toList.partition {
-                case (ref @ ColumnRef(CPath.Identity, tpe), col) if CType.canCompare(CType.of(value), tpe) => true
-                case _                                                                                     => false
+                case (ref @ ColumnRef.id(tpe), col) if CType.canCompare(CType.of(value), tpe) => true
+                case _                                                                        => false
               }
 
               val comparable = comparable0.map(_._2).flatMap { col =>
@@ -273,7 +273,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                 }
               }
 
-              Map(ColumnRef(CPath.Identity, CBoolean) -> (if (invert) complement(aggregate) else aggregate))
+              Map(ColumnRef.id(CBoolean) -> (if (invert) complement(aggregate) else aggregate))
             })
           }
         }
@@ -493,8 +493,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           l0.zip(r0) { (slice, derefBy) =>
             assert(derefBy.columns.size <= 1)
             derefBy.columns.headOption collect {
-              case (ColumnRef(CPath.Identity, CString), c: StrColumn)       =>
-                new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathField(c(row)) })
+              case (ColumnRef.id(CString), c: StrColumn) => new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathField(c(row)) })
             } getOrElse {
               slice
             }
@@ -512,13 +511,13 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           l0.zip(r0) { (slice, derefBy) =>
             assert(derefBy.columns.size <= 1)
             derefBy.columns.headOption collect {
-              case (ColumnRef(CPath.Identity, CLong), c: LongColumn)        =>
+              case (ColumnRef.id(CLong), c: LongColumn)        =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
-              case (ColumnRef(CPath.Identity, CDouble), c: DoubleColumn)    =>
+              case (ColumnRef.id(CDouble), c: DoubleColumn)    =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
-              case (ColumnRef(CPath.Identity, CNum), c: NumColumn)          =>
+              case (ColumnRef.id(CNum), c: NumColumn)          =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
             } getOrElse {
               slice
@@ -546,7 +545,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           predTransform.zip2(leftTransform, rightTransform) { (predS, leftS, rightS) =>
             val size = predS.size
             Slice(size, {
-              predS.columns get ColumnRef(CPath.Identity, CBoolean) map { predC =>
+              predS.columns get ColumnRef.id(CBoolean) map { predC =>
                 val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
 
                 val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
@@ -1084,20 +1083,20 @@ trait ConcatHelpers {
 
   def filterArrays(columns: Map[ColumnRef, Column]) = columns.filter {
     case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
-    case (ColumnRef(CPath.Identity, CEmptyArray), _)     => true
+    case (ColumnRef.id(CEmptyArray), _)                  => true
     case _                                               => false
   }
 
   def filterEmptyArrays(columns: Map[ColumnRef, Column]) = columns.filter {
-    case (ColumnRef(CPath.Identity, CEmptyArray), _) => true
-    case _                                           => false
+    case (ColumnRef.id(CEmptyArray), _) => true
+    case _                              => false
   }
 
   def collectIndices(columns: Map[ColumnRef, Column]) = columns.collect {
     case (ref @ ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => (i, xs, ref, col)
   }
 
-  def buildEmptyArrays(emptyBits: BitSet) = Map(ColumnRef(CPath.Identity, CEmptyArray) -> EmptyArrayColumn(emptyBits))
+  def buildEmptyArrays(emptyBits: BitSet) = Map(ColumnRef.id(CEmptyArray) -> EmptyArrayColumn(emptyBits))
 
   def buildNonemptyArrays(left: Map[ColumnRef, Column], right: Map[ColumnRef, Column]) = {
     val leftIndices  = collectIndices(left)
@@ -1112,13 +1111,13 @@ trait ConcatHelpers {
 
   def filterObjects(columns: Map[ColumnRef, Column]) = columns.filter {
     case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
-    case (ColumnRef(CPath.Identity, CEmptyObject), _)    => true
+    case (ColumnRef.id(CEmptyObject), _)                 => true
     case _                                               => false
   }
 
   def filterEmptyObjects(columns: Map[ColumnRef, Column]) = columns.filter {
-    case (ColumnRef(CPath.Identity, CEmptyObject), _) => true
-    case _                                            => false
+    case (ColumnRef.id(CEmptyObject), _) => true
+    case _                               => false
   }
 
   def filterFields(columns: Map[ColumnRef, Column]) = columns.filter {
@@ -1129,10 +1128,10 @@ trait ConcatHelpers {
   def buildFields(leftColumns: Map[ColumnRef, Column], rightColumns: Map[ColumnRef, Column]) =
     (filterFields(leftColumns), filterFields(rightColumns))
 
-  def buildEmptyObjects(emptyBits: BitSet) = {
-    if (emptyBits.isEmpty) Map.empty[ColumnRef, Column]
-    else Map(ColumnRef(CPath.Identity, CEmptyObject) -> EmptyObjectColumn(emptyBits))
-  }
+  def buildEmptyObjects(emptyBits: BitSet) = (
+    if (emptyBits.isEmpty) Map()
+    else Map(ColumnRef.id(CEmptyObject) -> EmptyObjectColumn(emptyBits))
+  )
 
   def buildNonemptyObjects(leftFields: Map[ColumnRef, Column], rightFields: Map[ColumnRef, Column]) = {
     val (leftInner, leftOuter) = leftFields partition {

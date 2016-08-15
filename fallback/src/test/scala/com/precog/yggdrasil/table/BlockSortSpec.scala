@@ -34,8 +34,8 @@ import TableModule._
  *
  * XXX FIXME
  */
-trait PrecogJValueOrder extends ScalazOrder[JValue] {
-  def order(a: JValue, b: JValue): Ordering = {
+trait PrecogJValueOrder extends Ord[JValue] {
+  def order(a: JValue, b: JValue): ScalazOrdering = {
     val prims0 = a.flattenWithPath.toMap
     val prims1 = b.flattenWithPath.toMap
     val cols0  = (prims1.mapValues { _ => JUndefined } ++ prims0).toList.sortMe
@@ -47,7 +47,6 @@ trait PrecogJValueOrder extends ScalazOrder[JValue] {
 
 object PrecogJValueOrder {
   implicit object order extends PrecogJValueOrder
-  implicit def ordering: ScalaMathOrdering[JValue] = order.toScalaOrdering
 }
 
 /** Ugh, without this import it still compiles but the tests
