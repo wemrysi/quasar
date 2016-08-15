@@ -82,7 +82,7 @@ object WorkflowBuilder {
           case (_, index) => BsonField.Name("_" + index)
         })(
         // Nb. This read is an arbitrary value that allows us to compare the partial function
-        $read[F](Collection("", "")))
+        $read[F](Collection(DatabaseName(""), CollectionName(""))))
   }
   object ShapePreservingBuilder {
     def apply[F[_]: Coalesce](

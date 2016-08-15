@@ -105,6 +105,7 @@ class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck wit
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
           .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+        .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
       "and mounts when any children happen to be mount points" >> prop { (
         fName: FileName,
