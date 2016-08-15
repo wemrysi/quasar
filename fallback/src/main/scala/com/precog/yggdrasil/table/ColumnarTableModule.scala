@@ -23,7 +23,6 @@ package table
 import quasar.precog._
 import blueeyes._, json._
 import com.precog.common._
-import com.precog.common.ingest.FileContent
 import com.precog.bytecode._
 import quasar.ygg.util._
 import quasar.ygg.table.cf.util.{ Remap, Empty }
@@ -31,9 +30,7 @@ import quasar.ygg.table.cf.util.{ Remap, Empty }
 import TransSpecModule._
 import com.precog.util.IOUtils
 import scalaz._, Scalaz._, Ordering._
-import java.util.Arrays
 import java.nio.CharBuffer
-import java.nio.charset.CoderResult
 
 trait ColumnarTableTypes[M[+ _]] {
   type F1         = CF1
@@ -291,66 +288,6 @@ object ColumnarTableModule {
         }
     }
   }
-
-  def toCharBuffers[N[+ _]: Monad](output: MimeType, slices: StreamT[N, Slice]): StreamT[N, CharBuffer] = {
-    import FileContent._
-    import MimeTypes._
-    val AnyMimeType = anymaintype / anysubtype
-
-    output match {
-      case ApplicationJson | AnyMimeType => ColumnarTableModule.renderJson(slices, "[", ",", "]")
-      case XJsonStream                   => ColumnarTableModule.renderJson(slices, "", "\n", "")
-      case TextCSV                       => ColumnarTableModule.renderCsv(slices)
-      case other                         =>
-        // log.warn("Unrecognized output type requested for conversion of slice stream to char buffers: %s".format(output))
-        StreamT.empty[N, CharBuffer]
-    }
-  }
-
-  def byteStream[M[+ _]](blockStream: StreamT[M, Slice], mimeType: Option[MimeType])(implicit M: Monad[M]): Option[StreamT[M, Array[Byte]]] = {
-    import FileContent._
-
-    mimeType match {
-      case Some(ApplicationJson) | None => Some(bufferOutput(toCharBuffers(ApplicationJson, blockStream)))
-      case Some(XJsonStream)            => Some(bufferOutput(toCharBuffers(XJsonStream, blockStream)))
-      case Some(TextCSV)                => Some(bufferOutput(toCharBuffers(TextCSV, blockStream)))
-      case Some(other) =>
-        // log.warn("NIHDB resource cannot be rendered to a byte stream of type %s".format(other.value))
-        None
-    }
-  }
-
-  private def bufferOutput[M[+_]: Monad](stream0: StreamT[M, CharBuffer]): StreamT[M, Array[Byte]] = {
-    val charset         = Utf8Charset
-    val bufferSize: Int = 64 * 1024
-    val encoder         = charset.newEncoder()
-
-    def loop(stream: StreamT[M, CharBuffer], buf: ByteBuffer, arr: Array[Byte]): StreamT[M, Array[Byte]] = {
-      StreamT[M, Array[Byte]](stream.uncons map {
-        case Some((cbuf, tail)) =>
-          val result = encoder.encode(cbuf, buf, false)
-          if (result == CoderResult.OVERFLOW) {
-            val arr2 = new Array[Byte](bufferSize)
-            StreamT.Yield(arr, loop(cbuf :: tail, ByteBufferWrap(arr2), arr2))
-          } else {
-            StreamT.Skip(loop(tail, buf, arr))
-          }
-
-        case None =>
-          val result = encoder.encode(CharBuffer.wrap(""), buf, true)
-          if (result == CoderResult.OVERFLOW) {
-            val arr2 = new Array[Byte](bufferSize)
-            StreamT.Yield(arr, loop(stream, ByteBufferWrap(arr2), arr2))
-          } else {
-            StreamT.Yield(Arrays.copyOf(arr, buf.position), StreamT.empty[M, Array[Byte]])
-          }
-      })
-    }
-
-    val arr = new Array[Byte](bufferSize)
-    loop(stream0, ByteBufferWrap(arr), arr)
-  }
-
 }
 
 trait ColumnarTableModule[M[+ _]]
@@ -373,7 +310,7 @@ trait ColumnarTableModule[M[+ _]]
   def newScratchDir(): File    = IOUtils.createTmpDir("ctmscratch").unsafePerformIO
   def jdbmCommitInterval: Long = 200000l
 
-  implicit def liftF1(f: F1) = new F1Like {
+  implicit def liftF1(f: F1): F1Like = new F1Like {
     def compose(f1: F1) = f compose f1
     def andThen(f1: F1) = f andThen f1
   }
@@ -465,9 +402,7 @@ trait ColumnarTableModule[M[+ _]]
       }
 
       def mkProjections(spec: GroupKeySpec) =
-        toVector(dnf(spec)).map(sources(_).map { s =>
-          (s.key, s.spec)
-        })
+        toVector(dnf(spec)) map (sources(_) map (s => s.key -> s.spec))
 
       case class IndexedSource(groupId: GroupId, index: TableIndex, keySchema: KeySchema)
 
@@ -672,16 +607,8 @@ trait ColumnarTableModule[M[+ _]]
           case None               => M.point(acc)
         }
       }
-
       rec(
-        slices map { s =>
-          val schema = new CSchema {
-            val columnRefs = s.columns.keySet
-            def columns(jtype: JType) = s.logicalColumns(jtype)
-          }
-
-          reducer.reduce(schema, 0 until s.size)
-        },
+        slices map (s => reducer.reduce(new CSchema(s.columns.keySet, s logicalColumns _), 0 until s.size)),
         monoid.zero
       )
     }

@@ -24,26 +24,22 @@ import blueeyes._, json._
 import com.precog.common._
 import scalaz.Semigroup
 
-sealed trait Column {
-  def isDefinedAt(row: Int): Boolean
-  def |>(f1: CF1): Option[Column] = f1(this)
-
+trait Column {
   val tpe: CType
+
+  def isDefinedAt(row: Int): Boolean
+
   def jValue(row: Int): JValue
   def cValue(row: Int): CValue
   def strValue(row: Int): String
-
-  def toString(row: Int): String     = if (isDefinedAt(row)) strValue(row) else "(undefined)"
-  def toString(range: Range): String = range.map(toString(_: Int)).mkString("(", ",", ")")
-
-  def definedAt(from: Int, to: Int): BitSet =
-    BitSetUtil.filteredRange(from, to)(isDefinedAt)
-
   def rowEq(row1: Int, row2: Int): Boolean
   def rowCompare(row1: Int, row2: Int): Int
-}
 
-private[ygg] trait ExtensibleColumn extends Column // TODO: or should we just unseal Column?
+  def |>(f1: CF1): Option[Column]           = f1(this)
+  def toString(row: Int): String            = if (isDefinedAt(row)) strValue(row) else "(undefined)"
+  def toString(range: Range): String        = range map (this toString _) mkString ("(", ",", ")")
+  def definedAt(from: Int, to: Int): BitSet = BitSetUtil.filteredRange(from, to)(isDefinedAt)
+}
 
 trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>
   val tpe: CArrayType[A]

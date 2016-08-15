@@ -28,7 +28,7 @@ trait DefinedAtIndex {
   def isDefinedAt(row: Int) = defined(row)
 }
 
-trait ArrayColumn[@spec(Boolean, Long, Double) A] extends DefinedAtIndex with ExtensibleColumn {
+trait ArrayColumn[@spec(Boolean, Long, Double) A] extends DefinedAtIndex with Column {
   def update(row: Int, value: A): Unit
 }
 

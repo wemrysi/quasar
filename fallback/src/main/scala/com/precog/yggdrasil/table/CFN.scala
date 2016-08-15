@@ -152,10 +152,7 @@ trait CMapperM[M[+ _]] extends CMapper[M] {
   def map(cols: Map[ColumnRef, Column], range: Range): M[Map[ColumnRef, Column]]
 }
 
-trait CSchema {
-  def columnRefs: Set[ColumnRef]
-  def columns(jtype: JType): Set[Column]
-}
+class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])
 
 trait CReducer[A] {
   def reduce(schema: CSchema, range: Range): A
