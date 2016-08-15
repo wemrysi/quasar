@@ -76,7 +76,7 @@ private final class QueryFileInterpreter[C](
 
   import QueryFile._
   import Planner.{PlannerError => PPlannerError}
-  import Workflow._
+  import quasar.physical.mongodb.workflow._
   import FileSystemError._, fsops._
   import Recursive.ops._
   import queryfile._

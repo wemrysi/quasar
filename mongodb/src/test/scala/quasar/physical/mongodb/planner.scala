@@ -20,10 +20,10 @@ import quasar.Predef._
 import quasar._, RenderTree.ops._
 import quasar.fp._
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
-import quasar.sql.{ParsingError, Query}
-import quasar.std._
-
 import quasar.sql.{fixpoint => sql, _}
 import quasar.std._
 
@@ -46,10 +46,6 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
   import LogicalPlan._
   import Grouped.grouped
   import Reshape.reshape
-  import Workflow._
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
-  import IdHandling._
   import jscore._
   import Planner._
 
@@ -3422,7 +3418,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     def danglingReferences(wf: Workflow) =
       wf.foldMap(_.unFix match {
         case IsSingleSource(op) =>
-          Workflow.simpleShape(op.src).map { shape =>
+          simpleShape(op.src).map { shape =>
             val refs = Refs[WorkflowF].refs(op.wf)
             val missing = refs.collect { case v @ DocVar(_, Some(f)) if !shape.contains(f.flatten.head) => v }
             if (missing.isEmpty) Nil
@@ -3543,7 +3539,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
     }
 
   def fieldNames(wf: Workflow): Option[List[String]] =
-    Workflow.simpleShape(wf).map(_.map(_.asText))
+    simpleShape(wf).map(_.map(_.asText))
 
   val notDistinct = Gen.const(SelectAll)
   val distinct = Gen.const(SelectDistinct)

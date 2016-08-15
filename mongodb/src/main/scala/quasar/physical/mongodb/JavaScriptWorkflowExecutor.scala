@@ -36,7 +36,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
 
   import JavaScriptWorkflowExecutor._
   import MapReduce.OutputCollection
-  import Workflow.$SortF
+  import quasar.physical.mongodb.workflow.$SortF
 
   type ExprS[A] = State[Expr, A]
 
