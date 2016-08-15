@@ -557,7 +557,7 @@ object WorkflowBuilder {
                 None)
           })
       case DocBuilderF(src, shape) =>
-        workflow(src).flatMap { case (wf, base) =>
+        generateWorkflow(src).flatMap { case (wf, base) =>
           commonShape(rewriteDocPrefix(shape, base)).fold(
             fail(_),
             s => shape.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
@@ -576,7 +576,7 @@ object WorkflowBuilder {
                 fields.some))))
         }
       case ArrayBuilderF(src, shape) =>
-        workflow(src).flatMap { case (wf, base) =>
+        generateWorkflow(src).flatMap { case (wf, base) =>
           lift(shape.traverse(exprToJs).map(jsExprs =>
             CollectionBuilderF(
               chain(wf,
@@ -645,7 +645,7 @@ object WorkflowBuilder {
               else
                 obj.keys.toList.toNel.fold[M[CollectionBuilderF[F]]](
                   fail(InternalError("A shape with no fields does not make sense")))(
-                  fields => workflow(wb).flatMap { case (wf, base0) =>
+                  fields => generateWorkflow(wb).flatMap { case (wf, base0) =>
                     emitSt(ungrouped.size match {
                       case 0 =>
                         state[NameGen, Fix[F]](chain(wf,
@@ -697,7 +697,7 @@ object WorkflowBuilder {
             }, base, struct)
         }
       case sb @ SpliceBuilderF(_, _) =>
-        workflow(sb.src).flatMap { case (wf, base) =>
+        generateWorkflow(sb.src).flatMap { case (wf, base) =>
           lift(
             sb.toJs.map { splice =>
               CollectionBuilderF(
@@ -708,7 +708,7 @@ object WorkflowBuilder {
             })
         }
       case sb @ ArraySpliceBuilderF(_, _) =>
-        workflow(sb.src).flatMap { case (wf, base) =>
+        generateWorkflow(sb.src).flatMap { case (wf, base) =>
           lift(
             sb.toJs.map { splice =>
               CollectionBuilderF(
@@ -720,7 +720,7 @@ object WorkflowBuilder {
         }
     }
 
-  def workflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
+  def generateWorkflow[F[_]: Coalesce](wb: WorkflowBuilder[F])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]])
     : M[(Fix[F], Base)] =
     toCollectionBuilder(wb).map(x => (x.src, x.base))
@@ -1103,7 +1103,7 @@ object WorkflowBuilder {
 
       case (ArrayBuilderF(src, shape), _) =>
         merge(src, right).flatMap { case (lbase, rbase, wb) =>
-          workflow(ArrayBuilder(wb, shape.map(rewriteExprPrefix(_, lbase)))).flatMap { case (wf, base) =>
+          generateWorkflow(ArrayBuilder(wb, shape.map(rewriteExprPrefix(_, lbase)))).flatMap { case (wf, base) =>
             I.prj(wf.unFix).cata(
               {
                 case $ProjectF(psrc, Reshape(shape), idx) =>

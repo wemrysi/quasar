@@ -359,28 +359,6 @@ package object workflow {
     override def widen[B >: A]: PipelineF[F, B] = reparent(src)
   }
 
-  object PipelineF {
-    // implicit def traverse[F[_]]: Traverse[PipelineF[F, ?]] =
-    //   new Traverse[PipelineF[F, ?]] {
-    //     def traverseImpl[G[_]: Applicative, A, B](
-    //       fa: PipelineF[F, A])(
-    //       f: A => G[B]) =
-    //       fa match {
-    //         case $MatchF(src, sel)         => f(src) ∘ ($MatchF(_, sel))
-    //         case $ProjectF(src, shape, id) => f(src) ∘ ($ProjectF(_, shape, id))
-    //         case $RedactF(src, value)      => f(src) ∘ ($RedactF(_, value))
-    //         case $LimitF(src, count)       => f(src) ∘ ($LimitF(_, count))
-    //         case $SkipF(src, count)        => f(src) ∘ ($SkipF(_, count))
-    //         case $UnwindF(src, field)      => f(src) ∘ ($UnwindF(_, field))
-    //         case $GroupF(src, grouped, by) => f(src) ∘ ($GroupF(_, grouped, by))
-    //         case $SortF(src, value)        => f(src) ∘ ($SortF(_, value))
-    //         case $GeoNearF(src, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
-    //           f(src) ∘ ($GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs))
-    //         case $OutF(src, col)           => f(src) ∘ ($OutF(_, col))
-    //       }
-    //   }
-  }
-
   object IsPipeline {
     def unapply[F[_], A](op: F[A])(implicit F: Classify[F]): Option[PipelineF[F, A]] =
       F.pipeline(op)

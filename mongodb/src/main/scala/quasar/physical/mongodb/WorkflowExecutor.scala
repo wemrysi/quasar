@@ -327,8 +327,6 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
 }
 
 object WorkflowExecutor {
-  import quasar.physical.mongodb.workflow.{Crystallized, WorkflowF}
-
   /** A cursor to the result of evaluating a `Workflow`, optionally paired with
     * the cursor's temporary source that should be dropped once the cursor is
     * closed.

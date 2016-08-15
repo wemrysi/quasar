@@ -63,7 +63,7 @@ object JoinHandler {
       val filtered = WB.filter(left,
         List(ExprBuilder(left, \/-($var(DocField(lName \ lField))))),
         { case List(f) => Selector.Doc(f -> Selector.Neq(Bson.Null)) })
-      WorkflowBuilder.workflow(filtered).map { case (left, _) =>
+      generateWorkflow(filtered).map { case (left, _) =>
         CollectionBuilder(
           chain[Fix[F]](
             left,
@@ -240,7 +240,7 @@ object JoinHandler {
           Return(Ident("result"))))
     }
 
-    (WorkflowBuilder.workflow(left._1) |@| WorkflowBuilder.workflow(right._1)) {
+    (generateWorkflow(left._1) |@| generateWorkflow(right._1)) {
       case ((l, _), (r, _)) =>
         CollectionBuilder(
           chain(
@@ -269,7 +269,7 @@ object JoinHandler {
       case _                                   => false
     }
 
-    WorkflowBuilder.workflow[F](wb).evalZero.fold(
+    generateWorkflow[F](wb).evalZero.fold(
       κ(false),
       wf => checkTask(task(Crystallize[F].crystallize(wf._1))))
   }
