@@ -79,6 +79,7 @@ object writefile {
 
   def escape(json: String) = json.replace("'", "''")
 
+  // TODO: https://github.com/quasar-analytics/quasar/issues/1363
   def insertQueryStr(table: String)(json: String) =
     s"""insert into "$table"
        |  select * from
