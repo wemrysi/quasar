@@ -58,8 +58,7 @@ trait PackageAliases {
   type UUID                 = java.util.UUID
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
-  // other outside libs: scalaz, spire, shapeless, scodec
-  type ByteVector     = scodec.bits.ByteVector
+  // other outside libs: scalaz, spire, shapeless
   type Future[+A]     = scalaz.concurrent.Future[A]
   type IO[A]          = scalaz.effect.IO[A]
   type Iso[T, L]      = shapeless.Generic.Aux[T, L]
