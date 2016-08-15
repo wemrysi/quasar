@@ -50,7 +50,7 @@ abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[FileSystemUT[S]]]
 ) extends quasar.QuasarSpecification {
 
-  args.report(showtimes = true)
+  sequential
 
   type F[A]      = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]

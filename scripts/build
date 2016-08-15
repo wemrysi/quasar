@@ -17,9 +17,6 @@ echo "Version:       $QUASAR_VERSION"
 echo "Web Jar:       $QUASAR_WEB_JAR"
 echo "Web Jar Dir:   $QUASAR_WEB_JAR_DIR"
 echo "Web Jar Path:  $QUASAR_WEB_JAR_PATH"
-echo "REPL Jar:      $QUASAR_REPL_JAR"
-echo "REPL Jar Dir:  $QUASAR_REPL_JAR_DIR"
-echo "REPL Jar Path: $QUASAR_REPL_JAR_PATH"
 
 QUASAR_MONGODB_TESTDB="quasar-test"
 QUASAR_MONGODB_HOST_2_6="localhost:27018"
@@ -62,9 +59,12 @@ fi
 
 if [[ "${JOB_NUM##*.}" == "1" ]]; then
   # Require that all header comments are present before proceeding, then
-  # build and run all tests everywhere (including integration) and then re-compile without coverage
-  # in order to get a jar that does not contain instrumentation. Generate doc.
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean checkHeaders coverage test exclusive:test coverageReport "set coverageEnabled := false" oneJar doc
+  # build and run all tests everywhere (including integration)
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} clean checkHeaders coverage test exclusive:test coverageReport
+
+  # In a fresh JVM process, re-compile without coverage in order to get a jar
+  # that does not contain instrumentation. Generate doc.
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} 'web/assembly' doc
 
   # Test to ensure the JAR file is valid:
   "$SCRIPT_DIR/testJar"
@@ -74,6 +74,7 @@ if [[ "${JOB_NUM##*.}" == "1" ]]; then
 
   exit $TEST_STATUS
 else
-  # Not the first job in Travis (no sense generating a jar and doc on all of them)
-  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} test exclusive:test
+  # Not the first job in Travis; run only integration tests (no sense
+  # re-doing work that isn't affected by the available backends)
+  "$SBT" -DisIsolatedEnv=${ISOLATED_ENV:=false} it/test it/exclusive:test
 fi

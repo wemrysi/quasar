@@ -31,12 +31,13 @@ import java.nio.file.{Files, Paths}
 import java.lang.{ System}
 
 import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
-import pathy.Path.posixCodec
+
+import java.io._
+
 import scalaz._, Scalaz._, concurrent.Task
 import org.apache.spark._
 
-class ReadFileSpec extends Specification with ScalaCheck  {
+class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck  {
 
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff1[A] = Coproduct[Task, Eff0, A]
@@ -45,6 +46,8 @@ class ReadFileSpec extends Specification with ScalaCheck  {
   sequential
 
   "readfile" should {
+    "open - read chunk - close" in skipped("Skipped until the local spark emulator can be avoided as it appears to leak resources, even after a context.stop()")
+/*
     "open - read chunk - close" in {
       // given
       import quasar.Data._
@@ -152,6 +155,8 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       }
       ok
     }
+*/
+  }
 
     "open & read data with offset & limit" in {
       // given
@@ -195,6 +200,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       ok
     }
   }
+
 
   private def limit(li: Long): Limit = Positive(li)
 
