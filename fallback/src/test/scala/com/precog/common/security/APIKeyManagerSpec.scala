@@ -26,8 +26,8 @@ import com.precog.common.security.service._
 import scalaz._, Scalaz._
 // import quasar.precog.TestSupport._
 
-trait APIKeyManagerSpec[M[+_]] extends quasar.QuasarSpecification {
-  implicit def M: MoCo[M]
+class APIKeyManagerSpec extends quasar.QuasarSpecification {
+  implicit def M: MoCo[M] = Need.need
 
   "API Key Manager" should {
     "properly ascribe parentage for grants" in {
@@ -51,8 +51,3 @@ trait APIKeyManagerSpec[M[+_]] extends quasar.QuasarSpecification {
     }
   }
 }
-
-object APIKeyManagerSpec extends APIKeyManagerSpec[Need] {
-  val M = Need.need
-}
-
