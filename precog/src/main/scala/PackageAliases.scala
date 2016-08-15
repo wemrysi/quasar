@@ -1,10 +1,24 @@
-package blueeyes
+package quasar
+package precog
 
-// package precog
-
-import scala.collection.{ mutable => scm }
+import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
+  type RawBitSet = Array[Int]
+
+  type =?>[-A, +B]          = scala.PartialFunction[A, B]
+  type CTag[A]              = scala.reflect.ClassTag[A]
+  type Try[+A]              = scala.util.Try[A]
+  type jClass               = java.lang.Class[_]
+  type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
+  type jPath                = java.nio.file.Path
+  type sciQueue[+A]         = sci.Queue[A]
+  type sciTreeMap[K, +V]    = scala.collection.immutable.TreeMap[K, V]
+  type scmPriQueue[A]       = scm.PriorityQueue[A]
+  type spec                 = scala.specialized
+  type switch               = scala.annotation.switch
+  type tailrec              = scala.annotation.tailrec
+
   // scala stdlib
   type ->[+A, +B]           = (A, B)
   type ArrayBuffer[A]       = scm.ArrayBuffer[A]
@@ -58,4 +72,6 @@ trait PackageAliases {
   val ScalazOrder    = scalaz.Order
   val ScalazOrdering = scalaz.Ordering
   val IO             = scalaz.effect.IO
+  val Try            = scala.util.Try
+  val ScalaFailure   = scala.util.Failure
 }

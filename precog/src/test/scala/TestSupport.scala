@@ -1,8 +1,8 @@
 package quasar
 package precog
 
+import internal._
 import scala.collection.mutable.Builder
-import java.io.File
 import TestSupport._
 
 object TestSupport extends TestSupport
@@ -80,7 +80,18 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 
-  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
+  // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
+  def genBigDecimal: Gen[BigDecimal] = (genLong, genInt) >> { (mantissa, exponent) =>
+    val adjusted = (
+      if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
+        exponent - mantissa.toString.length
+      else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
+        exponent + mantissa.toString.length
+      else
+        exponent
+    )
+    decimal(unscaledVal = mantissa, scale = adjusted)
+  }
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)

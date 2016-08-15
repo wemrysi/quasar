@@ -20,7 +20,6 @@
 package com.precog
 package common
 
-import quasar.precog._
 import blueeyes._, json._, serialization._
 import DefaultSerialization._
 import scalaz._, Scalaz._, Ordering._

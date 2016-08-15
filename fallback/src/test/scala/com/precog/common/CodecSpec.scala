@@ -20,12 +20,14 @@
 package com.precog.common
 
 import blueeyes._
-import com.precog.util.{ ByteBufferPool, RawBitSet }
+import com.precog.util.ByteBufferPool
 import org.scalacheck.Shrink
 import quasar.precog._, TestSupportWithArb._
+import ByteBufferPool._
 
 class CodecSpec extends quasar.QuasarSpecification {
-  import ByteBufferPool._
+  val pool      = new ByteBufferPool()
+  val smallPool = new ByteBufferPool(capacity = 10)
 
   implicit lazy val arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(
     Gen.chooseNum(Double.MinValue / 2, Double.MaxValue / 2) map decimal)
@@ -61,15 +63,6 @@ class CodecSpec extends quasar.QuasarSpecification {
       }
     })
   }
-
-  implicit def arbIndexedSeq[A](implicit a: Arbitrary[A]): Arbitrary[IndexedSeq[A]] =
-    Arbitrary(Gen.listOf(a.arbitrary) map (Vector(_: _*)))
-
-  implicit def arbArray[A: CTag: Gen]: Arbitrary[Array[A]] =
-    Arbitrary( Gen.listOf(implicitly[Gen[A]]) map (_.toArray) )
-
-  val pool = new ByteBufferPool()
-  val smallPool = new ByteBufferPool(capacity = 10)
 
   def surviveEasyRoundTrip[A](a: A)(implicit codec: Codec[A]) = {
     val buf = pool.acquire

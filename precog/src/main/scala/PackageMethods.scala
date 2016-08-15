@@ -1,19 +1,16 @@
 package quasar
+package precog
 
 import java.nio.file._
 import java.math.MathContext.UNLIMITED
+import scala.collection.{ mutable => scm, immutable => sci }
 
-package object precog {
-  val Try          = scala.util.Try
-  type Try[+A]     = scala.util.Try[A]
-  val ScalaFailure = scala.util.Failure
+trait PackageMethods {
+  self: PackageAliases =>
 
-  type jPath       = java.nio.file.Path
-  type =?>[-A, +B] = scala.PartialFunction[A, B]
-  type CTag[A]     = scala.reflect.ClassTag[A]
-  type jClass      = java.lang.Class[_]
-
-  type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
+  def scmSet[A](): scmSet[A]                                    = scm.HashSet[A]()
+  def sciQueue[A](): sciQueue[A]                                = sci.Queue[A]()
+  def sciTreeMap[K: Ordering, V](xs: (K, V)*): sciTreeMap[K, V] = sci.TreeMap[K, V](xs: _*)
 
   def warn[A](msg: String)(value: => A): A = {
     java.lang.System.err.println(msg)

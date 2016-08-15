@@ -18,7 +18,7 @@ package blueeyes
 package json
 
 import scalaz._, Ordering._
-import quasar.precog.JsonTestSupport._
+import quasar.precog._, JsonTestSupport._
 
 object JsonASTSpec extends quasar.QuasarSpecification {
   "Functor identity" in {
@@ -248,7 +248,7 @@ object JsonASTSpec extends quasar.QuasarSpecification {
   }
 
   private def reorderFields(json: JValue) = json mapUp {
-    case JObject(xs) => JObject(scala.collection.immutable.TreeMap(xs.toSeq: _*))
+    case JObject(xs) => JObject(sciTreeMap(xs.toSeq: _*))
     case x           => x
   }
 }

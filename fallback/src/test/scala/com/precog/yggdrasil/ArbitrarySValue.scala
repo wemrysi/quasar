@@ -19,7 +19,7 @@
  */
 package com.precog.yggdrasil
 
-import quasar.precog.decimal
+// import quasar.precog.decimal
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._

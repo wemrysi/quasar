@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import quasar.precog._
 import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._

@@ -1,7 +1,7 @@
 package blueeyes
 package json
 
-import scala.annotation.{ switch, tailrec }
+// import scala.annotation.{ switch, tailrec }
 import java.lang.Integer.parseInt
 
 // underlying parser code adapted from jawn under MIT license.

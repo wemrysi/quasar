@@ -277,9 +277,7 @@ package object json {
       * with this one.
       */
     def breadthFirst: List[JValue] = {
-      import scala.collection.immutable.Queue
-
-      def breadthFirst0(cur: List[JValue], queue: Queue[JValue]): List[JValue] = {
+      def breadthFirst0(cur: List[JValue], queue: sciQueue[JValue]): List[JValue] = {
         if (queue.isEmpty) cur
         else {
           val (head, nextQueue) = queue.dequeue
@@ -296,7 +294,7 @@ package object json {
         }
       }
 
-      breadthFirst0(Nil, Queue.empty.enqueue(self)).reverse
+      breadthFirst0(Nil, sciQueue[JValue]() enqueue self).reverse
     }
 
     /** XPath-like expression to query JSON fields by name. Returns all matching fields.

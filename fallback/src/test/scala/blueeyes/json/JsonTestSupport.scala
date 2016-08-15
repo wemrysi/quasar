@@ -19,27 +19,12 @@ import quasar.precog.TestSupport._
 import Gen._
 
 package quasar.precog {
-  object JsonTestSupport extends TestSupport with JsonGenerators {
+  object JsonTestSupport extends TestSupport with JsonGenerators with ArbitrarySupport {
     def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
 
     implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
     implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
     implicit def arbJPath: Arbitrary[JPath]     = Arbitrary(genJPath)
-
-    // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
-    implicit def arbBigDecimal: Arbitrary[BigDecimal] =
-      Arbitrary(for {
-        mantissa <- arbitrary[Long]
-        exponent <- arbitrary[Int]
-
-        adjusted = if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
-          exponent - mantissa.toString.length
-        else if (exponent.toLong - mantissa.toString.length <= Int.MinValue.toLong)
-          exponent + mantissa.toString.length
-        else
-          exponent
-      } yield decimal(unscaledVal = mantissa, scale = adjusted)
-    )
   }
 }
 
@@ -57,10 +42,14 @@ package blueeyes.json {
     }
 
     def genJPathNode: Gen[JPathNode] = frequency(
-      1 -> ((0 upTo 10) ^^ JPathIndex),
+      1 -> (choose(0, 10) ^^ JPathIndex),
       9 -> (genIdent ^^ JPathField)
     )
-    def genJPath: Gen[JPath] = genJPathNode * (0 upTo 10) ^^ (JPath(_))
+    def genJPath: Gen[JPath] = genJPathNode * choose(0, 10) ^^ (JPath(_))
+
+    /** The delay wrappers are needed because we generate
+     *  JValues recursively.
+     */
     def genJValue: Gen[JValue] = frequency(
       5 -> genSimple,
       1 -> delay(genJArray),
@@ -69,7 +58,7 @@ package blueeyes.json {
 
     def genIdent: Gen[String]    = alphaLowerChar * choose(3, 8) ^^ (_.mkString)
     def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
-    def genSmallInt: Gen[Int]    = 0 upTo 5
+    def genSmallInt: Gen[Int]    = choose(0, 5)
     def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
     def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
     def genJString: Gen[JString] = genIdent ^^ (s => JString(s))

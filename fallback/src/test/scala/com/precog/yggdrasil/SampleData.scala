@@ -20,14 +20,11 @@
 package com.precog.yggdrasil
 
 import blueeyes._, json._
-
 import scalaz._, Scalaz._
 
-import scala.collection.mutable
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 
-import org.specs2._
 import org.scalacheck._
 import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary._
@@ -70,7 +67,7 @@ object SampleData extends CValueGenerators {
 
   def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
-    val seen = mutable.HashSet[S]()
+    val seen = scmSet[S]()
 
     for (t <- c) {
       if (!seen(key(t))) {

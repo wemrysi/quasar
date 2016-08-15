@@ -2,7 +2,6 @@ package blueeyes
 package json
 package serialization
 
-import quasar.precog._
 import scalaz._, Scalaz._, Validation._
 
 /** Extracts the value from a JSON object. You must implement either validated or extract.

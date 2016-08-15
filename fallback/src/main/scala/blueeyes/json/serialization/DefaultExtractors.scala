@@ -1,7 +1,6 @@
 package blueeyes
 package json.serialization
 
-import quasar.precog._
 import blueeyes.json._
 import Extractor._
 import scalaz._, Scalaz._

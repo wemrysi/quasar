@@ -19,7 +19,6 @@
  */
 package com.precog.yggdrasil
 
-import quasar.precog._
 import blueeyes._
 import org.mapdb._
 

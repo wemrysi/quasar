@@ -21,7 +21,6 @@ package com.precog.yggdrasil
 package table
 package cf
 
-import quasar.precog._
 import blueeyes._
 
 object util {

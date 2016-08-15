@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import quasar.precog._
 import blueeyes._
 import com.precog.common._
 

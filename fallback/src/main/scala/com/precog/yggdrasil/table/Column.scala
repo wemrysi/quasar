@@ -23,7 +23,6 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import scalaz.Semigroup
-import quasar.precog._
 
 sealed trait Column {
   def isDefinedAt(row: Int): Boolean

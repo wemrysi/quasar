@@ -21,7 +21,6 @@ import java.net.URLDecoder
 import scala.util.control.Exception._
 import scalaz._
 import scala.math.min
-import scala.util.Random.nextInt
 import quasar.precog._, JsonTestSupport._
 
 class JsonParserSpec extends quasar.QuasarSpecification {
@@ -165,14 +164,14 @@ object AsyncParserSpec extends quasar.QuasarSpecification {
   }
 
   "Async parser works on chunks of sizes 10B-1K" in {
-    val f  = () => nextInt(1014) + 10
+    val f  = () => randomInt(1014) + 10
     val vs = runTestRandomStep("fallback/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
     (0 until 1000).forall { _.toOption must beSome }
   }
 
   "Async parser works on chunks of sizes 1k-10K" in {
-    val f  = () => nextInt(9 * 1024) + 1024
+    val f  = () => randomInt(9 * 1024) + 1024
     val vs = runTestRandomStep("fallback/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
     (0 until 1000).forall { _.toOption must beSome }

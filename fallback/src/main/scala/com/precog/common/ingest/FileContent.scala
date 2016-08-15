@@ -26,6 +26,7 @@ import Versioned._
 import Extractor._
 import java.util.Base64
 import scalaz._, Scalaz._
+import quasar.precog._
 
 sealed trait ContentEncoding {
   def id: String

@@ -20,7 +20,6 @@
 package com.precog.yggdrasil
 package table
 
-import quasar.precog._
 import blueeyes._
 import com.precog.common._
 import com.precog.common.security._
@@ -155,7 +154,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       @inline
       @tailrec
       def dequeueEqual(
-          queue: mutable.PriorityQueue[Cell],
+          queue: scmPriQueue[Cell],
           cellMatrix: CellMatrix,
           cells: List[Cell]
       ): List[Cell] =
@@ -171,7 +170,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       @inline
       @tailrec
       def consumeToBoundary(
-          queue: mutable.PriorityQueue[Cell],
+          queue: scmPriQueue[Cell],
           cellMatrix: CellMatrix,
           idx: Int
       ): (Int, List[Cell]) = {

@@ -1,19 +1,11 @@
 import scalaz._
 
-package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageAliases {
-  type spec    = scala.specialized
-  type switch  = scala.annotation.switch
-  type tailrec = scala.annotation.tailrec
+import quasar.{ precog => p }
 
-  type MimeType = quasar.precog.MimeType
-  val MimeType  = quasar.precog.MimeType
-  val MimeTypes = quasar.precog.MimeTypes
-
+package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
   // Temporary
   type JobId              = String
   type BitSet             = com.precog.BitSet
-  type RawBitSet          = Array[Int]
-  val RawBitSet           = com.precog.util.RawBitSet
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
 
   val HNil = shapeless.HNil
@@ -35,10 +27,8 @@ package object blueeyes extends quasar.precog.PackageTime with blueeyes.PackageA
   implicit def comparableOrder[A <: Comparable[A]] : ScalazOrder[A] =
     scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
 
-  @inline implicit def ValidationFlatMapRequested[E, A](d: scalaz.Validation[E, A]): scalaz.ValidationFlatMap[E, A] =
-    scalaz.Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
-
-  def futureMonad(ec: ExecutionContext): Monad[Future] = implicitly
+  implicit def ValidationFlatMapRequested[E, A](d: Validation[E, A]): ValidationFlatMap[E, A] =
+    Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
   implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
     scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))

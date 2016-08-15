@@ -130,19 +130,6 @@ object BitSetUtil {
   @inline final def filteredRange(r: Range)(pred: Int => Boolean): BitSet =
     filteredRange(r.start, r.end)(pred)
 
-  def filteredSeq[A](as: List[A])(pred: A => Boolean): BitSet = {
-    val bs = new BitSet
-    @inline
-    @tailrec def loop(lst: List[A], i: Int): Unit = lst match {
-      case h :: t =>
-        if (pred(h)) bs.set(i)
-        loop(t, i + 1)
-      case Nil =>
-    }
-    loop(as, 0)
-    bs
-  }
-
   def bitSetToList(bs: BitSet): List[Int] = {
     @tailrec
     def loopBits(long: Long, bit: Int, base: Int, sofar: List[Int]): List[Int] = {

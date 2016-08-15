@@ -22,7 +22,6 @@ package com.precog.yggdrasil
 import blueeyes._
 import com.precog.common._
 import com.precog.yggdrasil.table._
-import quasar.precog._
 
 class CPathTraversalSpec extends quasar.QuasarSpecification {
   import CPathTraversal._

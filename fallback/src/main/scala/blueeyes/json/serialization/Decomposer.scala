@@ -4,6 +4,7 @@ package serialization
 
 import scalaz._, Scalaz._
 import ExtractorDecomposer.by
+import quasar.precog.{ MimeType, MimeTypes }
 
 /** Decomposes the value into a JSON object.
   */
