@@ -257,8 +257,8 @@ object CPathTraversal {
       loop(ps, path.nodes)
     }
 
-    implicit object CPathPositionOrder extends ScalazOrder[CPathPosition] {
-      def order(p1: CPathPosition, p2: CPathPosition): scalaz.Ordering = (p1, p2) match {
+    implicit object CPathPositionOrder extends Ord[CPathPosition] {
+      def order(p1: CPathPosition, p2: CPathPosition): Cmp = (p1, p2) match {
         case (CPathPoint(CPathIndex(i)), CPathRange(_, l, r)) => i ?|? l
         case (CPathRange(_, l, r), CPathPoint(CPathIndex(i))) => l ?|? i
         case (CPathRange(_, l1, r1), CPathRange(_, l2, r2))   =>
@@ -375,7 +375,7 @@ object CPathTraversal {
       import scalaz.std.list._
 
       val pq = mutable.PriorityQueue[List[CPathPosition]](paths map (position(_)): _*) {
-        implicitly[ScalazOrder[List[CPathPosition]]].reverseOrder.toScalaOrdering
+        Ord[List[CPathPosition]].reverseOrder.toScalaOrdering
       }
 
       @tailrec

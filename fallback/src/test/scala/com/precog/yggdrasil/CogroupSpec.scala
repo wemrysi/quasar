@@ -48,7 +48,7 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
 
-  @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: ScalazOrder[A]): CogroupResult[A] = {
+  @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Ord[A]): CogroupResult[A] = {
     (l, r) match {
       case (lh #:: lt, rh #:: rt) => ord.order(lh, rh) match {
         case EQ => {
@@ -76,10 +76,9 @@ trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification
   }
 
   def testCogroup(l: SampleData, r: SampleData) = {
-    val ltable = fromSample(l)
-    val rtable = fromSample(r)
-
-    val keyOrder = ScalazOrder[JValue].contramap((_: JValue) \ "key")
+    val ltable   = fromSample(l)
+    val rtable   = fromSample(r)
+    val keyOrder = Ord[JValue].contramap((_: JValue) \ "key")
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
       case Left3(jv) => jv

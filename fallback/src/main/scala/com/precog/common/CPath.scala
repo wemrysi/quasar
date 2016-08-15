@@ -21,8 +21,7 @@ package com.precog.common
 
 import blueeyes._, json._, serialization._
 import DefaultSerialization._
-import scalaz.Ordering._
-import scalaz.syntax.std.boolean._
+import scalaz._, Scalaz._, Ordering._
 
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
@@ -140,21 +139,18 @@ object CPathNode {
   implicit def s2PathNode(name: String): CPathNode = CPathField(name)
   implicit def i2PathNode(index: Int): CPathNode   = CPathIndex(index)
 
-  implicit object CPathNodeOrder extends ScalazOrder[CPathNode] {
-    def order(n1: CPathNode, n2: CPathNode): ScalazOrdering = (n1, n2) match {
-      case (CPathField(s1), CPathField(s2)) => ScalazOrdering.fromInt(s1.compare(s2))
+  implicit object CPathNodeOrder extends Ord[CPathNode] {
+    def order(n1: CPathNode, n2: CPathNode): Cmp = (n1, n2) match {
+      case (CPathField(s1), CPathField(s2)) => Cmp(s1 compare s2)
       case (CPathField(_), _)               => GT
       case (_, CPathField(_))               => LT
-
-      case (CPathArray, CPathArray) => EQ
-      case (CPathArray, _)          => GT
-      case (_, CPathArray)          => LT
-
-      case (CPathIndex(i1), CPathIndex(i2)) => if (i1 < i2) LT else if (i1 == i2) EQ else GT
+      case (CPathArray, CPathArray)         => EQ
+      case (CPathArray, _)                  => GT
+      case (_, CPathArray)                  => LT
+      case (CPathIndex(i1), CPathIndex(i2)) => i1 ?|? i2
       case (CPathIndex(_), _)               => GT
       case (_, CPathIndex(_))               => LT
-
-      case (CPathMeta(m1), CPathMeta(m2)) => ScalazOrdering.fromInt(m1.compare(m2))
+      case (CPathMeta(m1), CPathMeta(m2))   => Cmp(m1 compare m2)
     }
   }
 
@@ -277,14 +273,14 @@ object CPath {
 
   implicit def singleNodePath(node: CPathNode) = CPath(node)
 
-  implicit object CPathOrder extends ScalazOrder[CPath] {
-    def order(v1: CPath, v2: CPath): ScalazOrdering = {
-      def compare0(n1: List[CPathNode], n2: List[CPathNode]): ScalazOrdering = (n1, n2) match {
+  implicit object CPathOrder extends Ord[CPath] {
+    def order(v1: CPath, v2: CPath): Cmp = {
+      def compare0(n1: List[CPathNode], n2: List[CPathNode]): Cmp = (n1, n2) match {
         case (Nil, Nil) => EQ
         case (Nil, _)   => LT
         case (_, Nil)   => GT
         case (n1 :: ns1, n2 :: ns2) =>
-          val ncomp = ScalazOrder[CPathNode].order(n1, n2)
+          val ncomp = Ord[CPathNode].order(n1, n2)
           if (ncomp != EQ) ncomp else compare0(ns1, ns2)
       }
 

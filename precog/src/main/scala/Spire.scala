@@ -14,7 +14,7 @@ object MergeSort {
   @inline final def startWidth: Int = 8
   @inline final def startStep: Int  = 16
 
-  final def sort[@spec A : ScalazOrder : CTag](data: Array[A]): Unit = {
+  final def sort[@spec A : Ord : CTag](data: Array[A]): Unit = {
     val len = data.length
 
     if (len <= startStep) return InsertionSort.sort(data)
@@ -55,7 +55,7 @@ object MergeSort {
    * left and right ranges of the input to merge, as well as the area of the
    * ouput to write to.
    */
-  @inline final def merge[@spec A: ScalazOrder](in:Array[A], out:Array[A], start:Int, mid:Int, end:Int): Unit = {
+  @inline final def merge[@spec A: Ord](in:Array[A], out:Array[A], start:Int, mid:Int, end:Int): Unit = {
     var ii = start
     var jj = mid
     var kk = start
@@ -71,8 +71,8 @@ object MergeSort {
 }
 
 object InsertionSort {
-  final def sort[@spec A : ScalazOrder : CTag](data:Array[A]): Unit = sort(data, 0, data.length)
-  final def sort[@spec A : ScalazOrder : CTag](data:Array[A], start:Int, end:Int): Unit = {
+  final def sort[@spec A : Ord : CTag](data:Array[A]): Unit = sort(data, 0, data.length)
+  final def sort[@spec A : Ord : CTag](data:Array[A], start:Int, end:Int): Unit = {
     var i = start + 1
     while (i < end) {
       val item = data(i)

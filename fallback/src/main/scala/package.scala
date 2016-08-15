@@ -15,7 +15,7 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
     new ScalaMapOps(x)
 
   implicit def comparableOrder[A <: Comparable[A]] : Ord[A] =
-    scalaz.Order.order[A]((x, y) => ScalazOrdering.fromInt(x compareTo y))
+    Ord.order[A]((x, y) => Cmp(x compareTo y))
 
   implicit def translateToScalaOrdering[A](implicit z: Ord[A]): scala.math.Ordering[A] = z.toScalaOrdering
 
@@ -31,12 +31,10 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   implicit def ValidationFlatMapRequested[E, A](d: Validation[E, A]): ValidationFlatMap[E, A] =
     Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  implicit def bigDecimalOrder: scalaz.Order[blueeyes.BigDecimal] =
-    scalaz.Order.order((x, y) => Ordering.fromInt(x compare y))
+  implicit def bigDecimalOrder: Ord[BigDecimal] = Ord.order[BigDecimal]((x, y) => Cmp(x compare y))
 
-  implicit class ScalaSeqOps[A](xs: scala.collection.Seq[A]) {
-    def sortMe(implicit z: scalaz.Order[A]): Vector[A] =
-      xs sortWith ((a, b) => z.order(a, b) == Ordering.LT) toVector
+  implicit class ScalaSeqOps[A](xs: scSeq[A]) {
+    def sortMe(implicit z: Ord[A]): Vector[A] = xs sortWith z.lt toVector
   }
 
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {

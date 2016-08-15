@@ -12,6 +12,7 @@ trait PackageAliases {
   type jClass               = java.lang.Class[_]
   type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
   type jPath                = java.nio.file.Path
+  type scSeq[A]             = scala.collection.Seq[A]
   type scSet[A]             = scala.collection.Set[A]
   type scMap[K, V]          = scala.collection.Map[K, V]
   type sciQueue[+A]         = sci.Queue[A]
@@ -58,23 +59,21 @@ trait PackageAliases {
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
   // other outside libs: scalaz, spire, shapeless
-  type Future[+A]     = scalaz.concurrent.Future[A]
-  type IO[A]          = scalaz.effect.IO[A]
-  type Iso[T, L]      = shapeless.Generic.Aux[T, L]
-  type ScalazOrder[A] = scalaz.Order[A]
-  type ScalazOrdering = scalaz.Ordering
-  type Task[+A]       = scalaz.concurrent.Task[A]
-  type MoCo[M[+_]]    = scalaz.Monad[M] with scalaz.Comonad[M]
-  type M[+A]          = scalaz.Need[A]
+  type Future[+A]  = scalaz.concurrent.Future[A]
+  type IO[A]       = scalaz.effect.IO[A]
+  type Iso[T, L]   = shapeless.Generic.Aux[T, L]
+  type Task[+A]    = scalaz.concurrent.Task[A]
+  type MoCo[M[+_]] = scalaz.Monad[M] with scalaz.Comonad[M]
+  type M[+A]       = scalaz.Need[A]
 
-  val Future         = scalaz.concurrent.Future
-  val ScalazOrder    = scalaz.Order
-  val ScalazOrdering = scalaz.Ordering
-  val IO             = scalaz.effect.IO
-  val Try            = scala.util.Try
-  val ScalaFailure   = scala.util.Failure
+  val Future       = scalaz.concurrent.Future
+  val IO           = scalaz.effect.IO
+  val Try          = scala.util.Try
+  val ScalaFailure = scala.util.Failure
 
   val Ord     = scalaz.Order
   type Ord[A] = scalaz.Order[A]
   type Cmp    = scalaz.Ordering
+
+  def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 }

@@ -614,7 +614,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(retained.size, source.columns lazyMapValues (_ |> cf.util.RemapIndices(retained) get))
   }
 
-  def order: ScalazOrder[Int] =
+  def order: Ord[Int] =
     if (columns.size == 1) {
       val col = columns.head._2
       Column.rowOrder(col)

@@ -177,7 +177,7 @@ case class StringValueStats(count: Long, min: String, max: String) extends Metad
 
   def merge(that: Metadata) = that match {
     case StringValueStats(count, min, max) =>
-      Some(StringValueStats(this.count + count, ScalazOrder[String].min(this.min, min), ScalazOrder[String].max(this.max, max)))
+      Some(StringValueStats(this.count + count, Ord[String].min(this.min, min), Ord[String].max(this.max, max)))
     case _ => None
   }
 }

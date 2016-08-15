@@ -345,8 +345,8 @@ case class MmixPrng(_seed: Long) {
 }
 
 object Column {
-  def rowOrder(col: Column): ScalazOrder[Int] = scalaz.Order.order[Int] {
-    case (i, j) if (col isDefinedAt i) && (col isDefinedAt j) => ScalazOrdering fromInt col.rowCompare(i, j)
+  def rowOrder(col: Column): Ord[Int] = Ord.order[Int] {
+    case (i, j) if (col isDefinedAt i) && (col isDefinedAt j) => Cmp(col.rowCompare(i, j))
     case (i, _) if (col isDefinedAt i)                        => GT
     case (_, j) if (col isDefinedAt j)                        => LT
     case _                                                    => EQ

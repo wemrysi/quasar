@@ -23,7 +23,6 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._
-// import quasar.precog.TestSupport._
 import SampleData._
 import TableModule._
 
@@ -35,13 +34,13 @@ import TableModule._
  * XXX FIXME
  */
 trait PrecogJValueOrder extends Ord[JValue] {
-  def order(a: JValue, b: JValue): ScalazOrdering = {
+  def order(a: JValue, b: JValue): Cmp = {
     val prims0 = a.flattenWithPath.toMap
     val prims1 = b.flattenWithPath.toMap
     val cols0  = (prims1.mapValues { _ => JUndefined } ++ prims0).toList.sortMe
     val cols1  = (prims0.mapValues { _ => JUndefined } ++ prims1).toList.sortMe
 
-    ScalazOrder[Vector[JPath -> JValue]].order(cols0, cols1)
+    cols0 ?|? cols1
   }
 }
 
@@ -58,7 +57,7 @@ trait BlockSortSpec extends quasar.QuasarSpecification {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty
 
-    val jvalueOrdering     = ScalazOrder[JValue].toScalaOrdering
+    val jvalueOrdering     = Ord[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 
     val globalIdPath = JPath(".globalId")

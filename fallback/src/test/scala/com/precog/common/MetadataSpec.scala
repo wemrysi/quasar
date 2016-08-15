@@ -62,8 +62,8 @@ class MetadataSpec extends quasar.QuasarSpecification with MetadataGenerators {
         }
         case (StringValueStats(c1, mn1, mx1), StringValueStats(c2, mn2, mx2), Some(StringValueStats(c3, mn3, mx3))) => {
           c3 must_== c1 + c2
-          mn3 must_== ScalazOrder[String].min(mn1, mn2)
-          mx3 must_== ScalazOrder[String].max(mx1, mx2)
+          mn3 must_== Ord[String].min(mn1, mn2)
+          mx3 must_== Ord[String].max(mx1, mx2)
         }
         case (e1, e2, r) => r must beNone
       }
@@ -113,5 +113,5 @@ trait MetadataGenerators  {
   def genLongMetadata: Gen[LongValueStats]             = for(count <- upTo1K; a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
   def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- upTo1K; a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
   def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- upTo1K; a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, Ord[String].min(a,b), ScalazOrder[String].max(a,b))
+  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, Ord[String].min(a,b), Ord[String].max(a,b))
 }
