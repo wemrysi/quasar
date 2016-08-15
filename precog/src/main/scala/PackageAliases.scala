@@ -15,6 +15,7 @@ trait PackageAliases {
   type scSeq[A]             = scala.collection.Seq[A]
   type scSet[A]             = scala.collection.Set[A]
   type scMap[K, V]          = scala.collection.Map[K, V]
+  type sciMap[K, +V]        = scala.collection.immutable.Map[K, V]
   type sciQueue[+A]         = sci.Queue[A]
   type sciTreeMap[K, +V]    = scala.collection.immutable.TreeMap[K, V]
   type scmPriQueue[A]       = scm.PriorityQueue[A]
@@ -58,7 +59,7 @@ trait PackageAliases {
   type UUID                 = java.util.UUID
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
-  // other outside libs: scalaz, spire, shapeless
+  // other outside libs: scalaz, shapeless
   type Future[+A]  = scalaz.concurrent.Future[A]
   type IO[A]       = scalaz.effect.IO[A]
   type Iso[T, L]   = shapeless.Generic.Aux[T, L]

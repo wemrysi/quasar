@@ -20,9 +20,8 @@
 package quasar.ygg
 
 import com.precog.common._
-// import quasar.precog.TestSupport._
 
-trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar.QuasarSpecification {
+class TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar.QuasarSpecification {
   import trans._
   import CPath._
 
@@ -52,5 +51,3 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar
     }
   }
 }
-
-object TransSpecModuleSpec extends TransSpecModuleSpec

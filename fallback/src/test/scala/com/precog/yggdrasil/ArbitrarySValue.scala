@@ -28,17 +28,11 @@ import Gen.{ alphaStr, listOfN, containerOfN, identifier, posNum, oneOf, delay }
 object CValueGenerators {
   type JSchema = Seq[JPath -> CType]
 
-  def inferSchema(data: Seq[JValue]): JSchema = {
-    if (data.isEmpty) {
-      Seq.empty
-    } else {
-      val current = data.head.flattenWithPath flatMap {
-        case (path, jv) =>
-          CType.forJValue(jv) map { ct => (path, ct) }
-      }
-
-      (current ++ inferSchema(data.tail)).distinct
-    }
+  def inferSchema(data: Seq[JValue]): JSchema = data match {
+    case Seq()    => Seq()
+    case hd +: tl =>
+      val current = hd.flattenWithPath flatMap { case (path, jv) => CType.forJValue(jv) map (path -> _) }
+      current ++ inferSchema(tl) distinct
   }
 }
 
@@ -64,19 +58,16 @@ trait CValueGenerators {
     }
   }
 
-  def arraySchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] = {
-    for {
-      size <- sizeGen
-      subschemas <- listOfN(size, schema(depth - 1))
-    } yield {
-      for {
-        (idx, subschema) <- (0 until size) zip subschemas
-        (jpath, ctype)   <- subschema
-      } yield {
-        (JPathIndex(idx) \ jpath, ctype)
+  def arraySchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] =
+    sizeGen >> { size =>
+      schema(depth - 1) * size ^^ { subschemas =>
+        0 until size zip subschemas flatMap { case (idx, pairs) =>
+          pairs map { case (jpath, ctype) =>
+            (JPathIndex(idx) \ jpath) -> ctype
+          }
+        }
       }
     }
-  }
 
   def leafSchema: Gen[JSchema] = ctype map { t => (NoJPath -> t) :: Nil }
 
@@ -146,27 +137,17 @@ trait CValueGenerators {
 }
 
 trait SValueGenerators {
+  private def groupSize = choose(0, 3)
+
   def svalue(depth: Int): Gen[SValue] =
     if (depth <= 0) sleaf
     else oneOf(delay(sobject(depth)), delay(sarray(depth)), sleaf)
 
-  def sobject(depth: Int): Gen[SValue] = {
-    for {
-      size <- choose(0, 3)
-      names <- containerOfN[Set, String](size, identifier)
-      values <- listOfN(size, svalue(depth - 1))
-    } yield {
-      SObject((names zip values).toMap)
-    }
-  }
+  def sobject(depth: Int): Gen[SValue] =
+    groupSize >> (sz => mapOfN(sz, identifier, svalue(depth - 1)) ^^ (SObject(_)))
 
-  def sarray(depth: Int): Gen[SValue] = {
-    for {
-      size <- choose(0, 3)
-      l <- listOfN(size, svalue(depth - 1))
-    } yield SArray(Vector(l: _*))
-  }
-
+  def sarray(depth: Int): Gen[SValue] =
+    groupSize >> (sz => vectorOfN(sz, svalue(depth - 1)) ^^ (SArray(_)))
 
   def sleaf: Gen[SValue] = oneOf[SValue](
     alphaStr map (x => SString(x)),
@@ -177,31 +158,19 @@ trait SValueGenerators {
     SNull
   )
 
-  def sevent(idCount: Int, vdepth: Int): Gen[SEvent] = {
-    for {
-      ids <- containerOfN[Set, Long](idCount, posNum[Long])
-      value <- svalue(vdepth)
-    } yield (ids.toArray, value)
-  }
+  def sevent(idCount: Int, vdepth: Int): Gen[SEvent] =
+    (arrayOfN(idCount, posNum[Long]), svalue(vdepth)).zip
 
   def chunk(size: Int, idCount: Int, vdepth: Int): Gen[Vector[SEvent]] =
-    listOfN(size, sevent(idCount, vdepth)) map { l => Vector(l: _*) }
+    vectorOfN(size, sevent(idCount, vdepth))
 }
 
 final case class LimitList[A](values: List[A])
-object LimitList {
-  def genLimitList[A: Gen](size: Int): Gen[LimitList[A]] = for {
-    i <- choose(0, size)
-    l <- listOfN(i, implicitly[Gen[A]])
-  } yield LimitList(l)
-}
 
 trait ArbitrarySValue extends SValueGenerators {
-  def genChunks(size: Int): Gen[LimitList[Vector[SEvent]]] = LimitList.genLimitList[Vector[SEvent]](size)
+  def genSEventChunk: Gen[Vector[SEvent]]                  = chunk(3, 3, 2)
+  def genChunks(size: Int): Gen[LimitList[Vector[SEvent]]] = genSEventChunk * choose(0, size) ^^ (LimitList(_))
 
-  implicit lazy val listLongOrder                                         = Ord[List[Long]]
-  implicit lazy val SEventIdentityOrder: Ord[SEvent]                      = listLongOrder.contramap(_._1.toList)
-  implicit lazy val SEventOrdering                                        = SEventIdentityOrder.toScalaOrdering
-  implicit lazy val SEventChunkGen: Gen[Vector[SEvent]]                   = chunk(3, 3, 2)
   implicit lazy val ArbitraryChunks: Arbitrary[LimitList[Vector[SEvent]]] = Arbitrary(genChunks(5))
+  implicit lazy val SEventIdentityOrder: Ord[SEvent]                      = Ord[List[Long]] contramap (_._1.toList)
 }

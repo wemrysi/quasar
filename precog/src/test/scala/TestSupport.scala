@@ -70,13 +70,17 @@ trait ScalacheckSupport {
     sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
-  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]              = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
-  def listOf[A](gen: Gen[A]): Gen[List[A]]                  = containerOfAtMostN[List, A](maxSequenceLength, gen)
-  def setOf[A](gen: Gen[A]): Gen[Set[A]]                    = containerOfAtMostN[Set, A](maxSequenceLength, gen)
+  def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]     = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
+  def listOf[A](gen: Gen[A]): Gen[List[A]]         = containerOfAtMostN[List, A](maxSequenceLength, gen)
+  def setOf[A](gen: Gen[A]): Gen[Set[A]]           = containerOfAtMostN[Set, A](maxSequenceLength, gen)
 
   def arrayOfN[A: CTag](len: Int, gen: Gen[A]): Gen[Array[A]] = vectorOfN(len, gen) ^^ (_.toArray)
-  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]              = containerOfN[Vector, A](len, gen)
-  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]                    = containerOfN[Set, A](len, gen)
+  def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]     = containerOfN[Vector, A](len, gen)
+  def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]           = containerOfN[Set, A](len, gen)
+
+  // !!! Should take an Eq[K].
+  def mapOfN[K, V](len: Int, k: Gen[K], v: Gen[V]): Gen[sciMap[K, V]] =
+    (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
   def genIndex(size: Int): Gen[Int] = choose(0, size - 1)
   def genBool: Gen[Boolean]         = oneOf(true, false)
@@ -105,6 +109,7 @@ trait ScalacheckSupport {
     decimal(unscaledVal = mantissa, scale = adjusted)
   }
 
+
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)
   }
@@ -127,8 +132,10 @@ trait ScalacheckSupport {
   }
   implicit class ScalacheckGen2Ops[A, B](gen: (Gen[A], Gen[B])) {
     def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1 ; b <- gen._2) yield f(a, b)
+    def zip: Gen[A -> B]              = >> (scala.Tuple2(_, _))
   }
   implicit class ScalacheckGen3Ops[A, B, C](gen: (Gen[A], Gen[B], Gen[C])) {
     def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1 ; b <- gen._2 ; c <- gen._3) yield f(a, b, c)
+    def zip: Gen[(A, B, C)]              = >> (scala.Tuple3(_, _, _))
   }
 }
