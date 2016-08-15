@@ -78,24 +78,21 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           val r0 = composeSliceTransform2(right)
 
           l0.zip(r0) { (sl, sr) =>
-            new Slice {
-              val size = sl.size
-              val columns: Map[ColumnRef, Column] = {
-                val resultColumns = for {
-                  cl <- sl.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
-                  cr <- sr.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
-                  result <- f(cl, cr)
-                } yield result
+            Slice(sl.size, {
+              val resultColumns = for {
+                cl <- sl.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
+                cr <- sr.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
+                result <- f(cl, cr)
+              } yield result
 
-                resultColumns.groupBy(_.tpe) map {
-                  case (tpe, cols) =>
-                    val col = cols reduceLeft { (c1, c2) =>
-                      Column.unionRightSemigroup.append(c1, c2)
-                    }
-                    (ColumnRef(CPath.Identity, tpe), col)
-                }
+              resultColumns.groupBy(_.tpe) map {
+                case (tpe, cols) =>
+                  val col = cols reduceLeft { (c1, c2) =>
+                    Column.unionRightSemigroup.append(c1, c2)
+                  }
+                  (ColumnRef(CPath.Identity, tpe), col)
               }
-            }
+            })
           }
 
         case Filter(source, predicate) =>
@@ -152,104 +149,101 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
            */
 
           l0.zip(r0) { (sl, sr) =>
-            new Slice {
-              val size = sl.size
-              val columns: Map[ColumnRef, Column] = {
-                val (leftNonNum, leftNum) = sl.columns partition {
-                  case (ColumnRef(_, CLong | CDouble | CNum), _) => false
-                  case _                                         => true
-                }
-
-                val (rightNonNum, rightNum) = sr.columns partition {
-                  case (ColumnRef(_, CLong | CDouble | CNum), _) => false
-                  case _                                         => true
-                }
-
-                val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
-
-                val simplifiedGroupNonNum = groupedNonNum map {
-                  case (_, Left3(column))                        => Left(column)
-                  case (_, Right3(column))                       => Left(column)
-                  case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
-                  case (_, x)                                    => abort("Unexpected: " + x)
-                }
-
-                class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
-                  val equality = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
-                  def isDefinedAt(row: Int) = (left isDefinedAt row) || (right isDefinedAt row)
-                  def apply(row: Int)       = equality.isDefinedAt(row) && equality(row)
-                }
-
-                val testedNonNum: Array[BoolColumn] = simplifiedGroupNonNum.map({
-                  case Left(column) =>
-                    new BoolColumn {
-                      def isDefinedAt(row: Int) = column.isDefinedAt(row)
-                      def apply(row: Int)       = false
-                    }
-
-                  case Right((left, right)) =>
-                    new FuzzyEqColumn(left, right)
-
-                })(collection.breakOut)
-
-                // numeric stuff
-
-                def stripTypes(cols: Map[ColumnRef, Column]) = {
-                  cols.foldLeft(Map[CPath, Set[Column]]()) {
-                    case (acc, (ColumnRef(path, _), column)) => {
-                      val set = acc get path map { _ + column } getOrElse Set(column)
-                      acc.updated(path, set)
-                    }
-                  }
-                }
-
-                val leftNumMulti  = stripTypes(leftNum)
-                val rightNumMulti = stripTypes(rightNum)
-
-                val groupedNum = leftNumMulti cogroup rightNumMulti
-
-                val simplifiedGroupedNum = groupedNum map {
-                  case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
-                  case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
-
-                  case (_, Middle3((left, right))) =>
-                    Right((left, right)): Either[Column, (Set[Column], Set[Column])]
-                }
-
-                val testedNum: Array[BoolColumn] = simplifiedGroupedNum.map({
-                  case Left(column) =>
-                    new BoolColumn {
-                      def isDefinedAt(row: Int) = column.isDefinedAt(row)
-                      def apply(row: Int)       = false
-                    }
-
-                  case Right((left, right)) =>
-                    val tests: Array[BoolColumn] = (for (l <- left; r <- right) yield {
-                      new FuzzyEqColumn(l, r)
-                    }).toArray
-                    new OrLotsColumn(tests)
-                })(collection.breakOut)
-
-                val unifiedNonNum = new AndLotsColumn(testedNonNum)
-                val unifiedNum    = new AndLotsColumn(testedNum)
-                val unified = new BoolColumn {
-                  def isDefinedAt(row: Int): Boolean = unifiedNonNum.isDefinedAt(row) || unifiedNum.isDefinedAt(row)
-                  def apply(row: Int): Boolean = {
-                    val left  = !unifiedNonNum.isDefinedAt(row) || unifiedNonNum(row)
-                    val right = !unifiedNum.isDefinedAt(row) || unifiedNum(row)
-                    left && right
-                  }
-                }
-
-                val mask = sl.definedAt & sr.definedAt
-                val column = new BoolColumn {
-                  def isDefinedAt(row: Int) = mask(row) && unified.isDefinedAt(row)
-                  def apply(row: Int)       = unified(row)
-                }
-
-                Map(ColumnRef(CPath.Identity, CBoolean) -> column)
+            Slice(sl.size, {
+              val (leftNonNum, leftNum) = sl.columns partition {
+                case (ColumnRef(_, CLong | CDouble | CNum), _) => false
+                case _                                         => true
               }
-            }
+
+              val (rightNonNum, rightNum) = sr.columns partition {
+                case (ColumnRef(_, CLong | CDouble | CNum), _) => false
+                case _                                         => true
+              }
+
+              val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
+
+              val simplifiedGroupNonNum = groupedNonNum map {
+                case (_, Left3(column))                        => Left(column)
+                case (_, Right3(column))                       => Left(column)
+                case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
+                case (_, x)                                    => abort("Unexpected: " + x)
+              }
+
+              class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
+                val equality = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
+                def isDefinedAt(row: Int) = (left isDefinedAt row) || (right isDefinedAt row)
+                def apply(row: Int)       = equality.isDefinedAt(row) && equality(row)
+              }
+
+              val testedNonNum: Array[BoolColumn] = simplifiedGroupNonNum.map({
+                case Left(column) =>
+                  new BoolColumn {
+                    def isDefinedAt(row: Int) = column.isDefinedAt(row)
+                    def apply(row: Int)       = false
+                  }
+
+                case Right((left, right)) =>
+                  new FuzzyEqColumn(left, right)
+
+              })(collection.breakOut)
+
+              // numeric stuff
+
+              def stripTypes(cols: Map[ColumnRef, Column]) = {
+                cols.foldLeft(Map[CPath, Set[Column]]()) {
+                  case (acc, (ColumnRef(path, _), column)) => {
+                    val set = acc get path map { _ + column } getOrElse Set(column)
+                    acc.updated(path, set)
+                  }
+                }
+              }
+
+              val leftNumMulti  = stripTypes(leftNum)
+              val rightNumMulti = stripTypes(rightNum)
+
+              val groupedNum = leftNumMulti cogroup rightNumMulti
+
+              val simplifiedGroupedNum = groupedNum map {
+                case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
+                case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
+
+                case (_, Middle3((left, right))) =>
+                  Right((left, right)): Either[Column, (Set[Column], Set[Column])]
+              }
+
+              val testedNum: Array[BoolColumn] = simplifiedGroupedNum.map({
+                case Left(column) =>
+                  new BoolColumn {
+                    def isDefinedAt(row: Int) = column.isDefinedAt(row)
+                    def apply(row: Int)       = false
+                  }
+
+                case Right((left, right)) =>
+                  val tests: Array[BoolColumn] = (for (l <- left; r <- right) yield {
+                    new FuzzyEqColumn(l, r)
+                  }).toArray
+                  new OrLotsColumn(tests)
+              })(collection.breakOut)
+
+              val unifiedNonNum = new AndLotsColumn(testedNonNum)
+              val unifiedNum    = new AndLotsColumn(testedNum)
+              val unified = new BoolColumn {
+                def isDefinedAt(row: Int): Boolean = unifiedNonNum.isDefinedAt(row) || unifiedNum.isDefinedAt(row)
+                def apply(row: Int): Boolean = {
+                  val left  = !unifiedNonNum.isDefinedAt(row) || unifiedNonNum(row)
+                  val right = !unifiedNum.isDefinedAt(row) || unifiedNum(row)
+                  left && right
+                }
+              }
+
+              val mask = sl.definedAt & sr.definedAt
+              val column = new BoolColumn {
+                def isDefinedAt(row: Int) = mask(row) && unified.isDefinedAt(row)
+                def apply(row: Int)       = unified(row)
+              }
+
+              Map(ColumnRef(CPath.Identity, CBoolean) -> column)
+            })
           }
 
         case EqualLiteral(source, value, invert) => {
@@ -263,32 +257,29 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           }
 
           sourceSlice map { ss =>
-            new Slice {
-              val size = ss.size
-              val columns = {
-                val (comparable0, other0) = ss.columns.toList.partition {
-                  case (ref @ ColumnRef(CPath.Identity, tpe), col) if CType.canCompare(CType.of(value), tpe) => true
-                  case _                                                                                     => false
-                }
-
-                val comparable = comparable0.map(_._2).flatMap { col =>
-                  Eq.partialRight(value)(col).map(_.asInstanceOf[BoolColumn])
-                }
-                val other = other0.map(_._2).map { col =>
-                  new Map1Column(col) with BoolColumn { def apply(row: Int) = false }
-                }
-
-                val columns = comparable ++ other
-                val aggregate = new BoolColumn {
-                  def isDefinedAt(row: Int) = columns.exists { _.isDefinedAt(row) }
-                  def apply(row: Int) = columns.exists { col =>
-                    col.isDefinedAt(row) && col(row)
-                  }
-                }
-
-                Map(ColumnRef(CPath.Identity, CBoolean) -> (if (invert) complement(aggregate) else aggregate))
+            Slice(ss.size, {
+              val (comparable0, other0) = ss.columns.toList.partition {
+                case (ref @ ColumnRef(CPath.Identity, tpe), col) if CType.canCompare(CType.of(value), tpe) => true
+                case _                                                                                     => false
               }
-            }
+
+              val comparable = comparable0.map(_._2).flatMap { col =>
+                Eq.partialRight(value)(col).map(_.asInstanceOf[BoolColumn])
+              }
+              val other = other0.map(_._2).map { col =>
+                new Map1Column(col) with BoolColumn { def apply(row: Int) = false }
+              }
+
+              val columns = comparable ++ other
+              val aggregate = new BoolColumn {
+                def isDefinedAt(row: Int) = columns.exists { _.isDefinedAt(row) }
+                def apply(row: Int) = columns.exists { col =>
+                  col.isDefinedAt(row) && col(row)
+                }
+              }
+
+              Map(ColumnRef(CPath.Identity, CBoolean) -> (if (invert) complement(aggregate) else aggregate))
+            })
           }
         }
 
@@ -309,26 +300,20 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           if (objects.size == 1) {
             val typed = Typed(objects.head, JObjectUnfixedT)
             composeSliceTransform2(typed)
-          } else {
+          }
+          else {
             objects.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
+                Slice(sl.size, {
+                  val (leftObjectBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterObjects, filterEmptyObjects)
+                  val (rightObjectBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterObjects, filterEmptyObjects)
+                  val (leftFields, rightFields)         = buildFields(sl.columns, sr.columns)
+                  val emptyBits                         = buildOuterBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
+                  val emptyObjects                      = buildEmptyObjects(emptyBits)
+                  val nonemptyObjects                   = buildNonemptyObjects(leftFields, rightFields)
 
-                  val columns: Map[ColumnRef, Column] = {
-                    val (leftObjectBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterObjects, filterEmptyObjects)
-                    val (rightObjectBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterObjects, filterEmptyObjects)
-
-                    val (leftFields, rightFields) = buildFields(sl.columns, sr.columns)
-
-                    val emptyBits = buildOuterBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
-
-                    val emptyObjects    = buildEmptyObjects(emptyBits)
-                    val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields)
-
-                    emptyObjects ++ nonemptyObjects
-                  }
-                }
+                  emptyObjects ++ nonemptyObjects
+                })
               }
             }
           }
@@ -366,36 +351,32 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
                 val sl = sl0.typed(JObjectUnfixedT) // Help out the special cases.
                 val sr = sr0.typed(JObjectUnfixedT)
 
-                new Slice {
-                  val size = sl.size
+                Slice(sl.size, {
+                  if (sl.columns.isEmpty || sr.columns.isEmpty) {
+                    Map.empty[ColumnRef, Column]
+                  } else if (isDisjoint(sl, sr)) {
+                    // If we know sl & sr are disjoint, which is often the
+                    // case for queries where objects are constructed
+                    // manually, then we can do a lot less work.
+                    sl.columns ++ sr.columns
+                  } else {
+                    val (leftObjectBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterObjects, filterEmptyObjects)
+                    val (rightObjectBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterObjects, filterEmptyObjects)
 
-                  val columns: Map[ColumnRef, Column] = {
-                    if (sl.columns.isEmpty || sr.columns.isEmpty) {
-                      Map.empty[ColumnRef, Column]
-                    } else if (isDisjoint(sl, sr)) {
-                      // If we know sl & sr are disjoint, which is often the
-                      // case for queries where objects are constructed
-                      // manually, then we can do a lot less work.
-                      sl.columns ++ sr.columns
-                    } else {
-                      val (leftObjectBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterObjects, filterEmptyObjects)
-                      val (rightObjectBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterObjects, filterEmptyObjects)
+                    val (leftFields, rightFields) = buildFields(sl.columns, sr.columns)
 
-                      val (leftFields, rightFields) = buildFields(sl.columns, sr.columns)
+                    val (emptyBits, nonemptyBits) = buildInnerBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
 
-                      val (emptyBits, nonemptyBits) = buildInnerBits(leftEmptyBits, rightEmptyBits, leftObjectBits, rightObjectBits)
+                    val emptyObjects    = buildEmptyObjects(emptyBits)
+                    val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields)
 
-                      val emptyObjects    = buildEmptyObjects(emptyBits)
-                      val nonemptyObjects = buildNonemptyObjects(leftFields, rightFields)
+                    val result = emptyObjects ++ nonemptyObjects
 
-                      val result = emptyObjects ++ nonemptyObjects
-
-                      result lazyMapValues { col =>
-                        cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
-                      }
+                    result lazyMapValues { col =>
+                      cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                     }
                   }
-                }
+                })
               }
             }
           }
@@ -407,21 +388,17 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           } else {
             elements.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
+                Slice(sl.size, {
+                  val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
+                  val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
 
-                  val columns: Map[ColumnRef, Column] = {
-                    val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
-                    val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
+                  val emptyBits = buildOuterBits(leftEmptyBits, rightEmptyBits, leftArrayBits, rightArrayBits)
 
-                    val emptyBits = buildOuterBits(leftEmptyBits, rightEmptyBits, leftArrayBits, rightArrayBits)
+                  val emptyArrays    = buildEmptyArrays(emptyBits)
+                  val nonemptyArrays = buildNonemptyArrays(sl.columns, sr.columns)
 
-                    val emptyArrays    = buildEmptyArrays(emptyBits)
-                    val nonemptyArrays = buildNonemptyArrays(sl.columns, sr.columns)
-
-                    emptyArrays ++ nonemptyArrays
-                  }
-                }
+                  emptyArrays ++ nonemptyArrays
+                })
               }
             }
           }
@@ -430,32 +407,29 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           if (elements.size == 1) {
             val typed = Typed(elements.head, JArrayUnfixedT)
             composeSliceTransform2(typed)
-          } else {
+          }
+          else {
             elements.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
-                new Slice {
-                  val size = sl.size
+                Slice(sl.size, {
+                  if (sl.columns.isEmpty || sr.columns.isEmpty) {
+                    Map.empty[ColumnRef, Column]
+                  } else {
+                    val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
+                    val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
 
-                  val columns: Map[ColumnRef, Column] = {
-                    if (sl.columns.isEmpty || sr.columns.isEmpty) {
-                      Map.empty[ColumnRef, Column]
-                    } else {
-                      val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
-                      val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
+                    val (emptyBits, nonemptyBits) = buildInnerBits(leftEmptyBits, rightEmptyBits, leftArrayBits, rightArrayBits)
 
-                      val (emptyBits, nonemptyBits) = buildInnerBits(leftEmptyBits, rightEmptyBits, leftArrayBits, rightArrayBits)
+                    val emptyArrays    = buildEmptyArrays(emptyBits)
+                    val nonemptyArrays = buildNonemptyArrays(sl.columns, sr.columns)
 
-                      val emptyArrays    = buildEmptyArrays(emptyBits)
-                      val nonemptyArrays = buildNonemptyArrays(sl.columns, sr.columns)
+                    val result = emptyArrays ++ nonemptyArrays
 
-                      val result = emptyArrays ++ nonemptyArrays
-
-                      result lazyMapValues { col =>
-                        cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
-                      }
+                    result lazyMapValues { col =>
+                      cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                     }
                   }
-                }
+                })
               }
             }
           }
@@ -486,12 +460,7 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
               scanner.init, { (state: scanner.A, slice: Slice) =>
                 val (newState, newCols) = scanner.scan(state, slice.columns, 0 until slice.size)
 
-                val newSlice = new Slice {
-                  val size    = slice.size
-                  val columns = newCols
-                }
-
-                (newState, newSlice)
+                newState -> Slice(slice.size, newCols)
               }
             )
           }
@@ -501,12 +470,12 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
             mapper0.fold({ mapper =>
               SliceTransform1.liftM[Unit]((), { (_: Unit, slice: Slice) =>
                 val cols = mapper.map(slice.columns, 0 until slice.size)
-                ((), Slice(cols, slice.size))
+                ((), Slice(slice.size, cols))
               })
             }, { mapper =>
               SliceTransform1[Unit]((), { (_: Unit, slice: Slice) =>
                 mapper.map(slice.columns, 0 until slice.size) map { cols =>
-                  ((), Slice(cols, slice.size))
+                  ((), Slice(slice.size, cols))
                 }
               })
             })
@@ -580,34 +549,31 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
           val rightTransform = composeSliceTransform2(right)
 
           predTransform.zip2(leftTransform, rightTransform) { (predS, leftS, rightS) =>
-            new Slice {
-              val size = predS.size
+            val size = predS.size
+            Slice(size, {
+              predS.columns get ColumnRef(CPath.Identity, CBoolean) map { predC =>
+                val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
 
-              val columns: Map[ColumnRef, Column] = {
-                predS.columns get ColumnRef(CPath.Identity, CBoolean) map { predC =>
-                  val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
+                val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
+                rightMask.flip(0, size)
 
-                  val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
-                  rightMask.flip(0, size)
+                val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
 
-                  val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
+                val joined: Map[ColumnRef, Column] = grouped.map({
+                  case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
+                  case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
+                  case (ref, Middle3((left :: Nil, right :: Nil))) => {
+                    val left2  = cf.util.filter(0, size, leftMask)(left).get
+                    val right2 = cf.util.filter(0, size, rightMask)(right).get
 
-                  val joined: Map[ColumnRef, Column] = grouped.map({
-                    case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
-                    case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
-                    case (ref, Middle3((left :: Nil, right :: Nil))) => {
-                      val left2  = cf.util.filter(0, size, leftMask)(left).get
-                      val right2 = cf.util.filter(0, size, rightMask)(right).get
+                    ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
+                  }
+                  case (_, x) => abort("Unexpected: " + x)
+                })(collection.breakOut)
 
-                      ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
-                    }
-                    case (_, x) => abort("Unexpected: " + x)
-                  })(collection.breakOut)
-
-                  joined
-                } getOrElse Map[ColumnRef, Column]()
-              }
-            }
+                joined
+              } getOrElse Map[ColumnRef, Column]()
+            })
           }
         }
       }

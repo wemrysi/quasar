@@ -68,9 +68,8 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
       val slice = id map (findBlockAfter(_, slices)) getOrElse slices.headOption
 
       slice map { s =>
-        val s0 = new Slice {
-          val size = s.size
-          val columns = colSelection.map { reqCols =>
+        val s0 = Slice(s.size, {
+          colSelection.map { reqCols =>
             s.columns.filter {
               case (ref @ ColumnRef(jpath, ctype), _) =>
                 jpath.nodes.head == CPathField("key") || reqCols.exists { ref =>
@@ -78,7 +77,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
                 }
             }
           }.getOrElse(s.columns)
-        }
+        })
 
         BlockProjectionData[JArray, Slice](s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0)
       }

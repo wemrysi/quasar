@@ -126,12 +126,11 @@ trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with quasar.Quasar
     def tableTakeRange(table: Table, start: Long, numToTake: Long) =
       table.takeRange(start, numToTake).slices.toStream.copoint
 
-    val emptySlice = Slice(Map(), 0)
     val slices =
-      Stream(emptySlice) ++ tableTakeRange(table, 0, 5) ++
-      Stream(emptySlice) ++ tableTakeRange(table, 5, 4) ++
-      Stream(emptySlice) ++ tableTakeRange(table, 9, 5) ++
-      Stream(emptySlice)
+      Stream(Slice.empty) ++ tableTakeRange(table, 0, 5) ++
+      Stream(Slice.empty) ++ tableTakeRange(table, 5, 4) ++
+      Stream(Slice.empty) ++ tableTakeRange(table, 9, 5) ++
+      Stream(Slice.empty)
 
     val newTable     = Table(StreamT.fromStream(M.point(slices)), table.size)
     val result       = newTable.canonicalize(4)

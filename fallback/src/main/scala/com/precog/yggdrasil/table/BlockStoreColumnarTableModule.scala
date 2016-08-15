@@ -215,21 +215,18 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
 
           val (prefixes, suffixes) = queue.dequeueAll.map(_.split).unzip
 
-          val emission = new Slice {
-            val size = finishedSize
-            val columns: Map[ColumnRef, Column] = {
-              (completeSlices.flatMap(_.columns) ++ prefixes.flatMap(_.columns)).groupBy(_._1).map {
-                case (ref, columns) => {
-                  val cp: ColumnRef -> Column = if (columns.size == 1) {
-                    columns.head
-                  } else {
-                    (ref, ArraySetColumn(ref.ctype, columns.map(_._2).toArray))
-                  }
-                  cp
+          val emission = Slice(finishedSize, {
+            (completeSlices.flatMap(_.columns) ++ prefixes.flatMap(_.columns)).groupBy(_._1).map {
+              case (ref, columns) => {
+                val cp: ColumnRef -> Column = if (columns.size == 1) {
+                  columns.head
+                } else {
+                  (ref, ArraySetColumn(ref.ctype, columns.map(_._2).toArray))
                 }
+                cp
               }
             }
-          }
+          })
 
           val successorStatesM = expired.map(_.succ).sequence.map(_.toStream.collect({ case Some(cs) => cs }))
 
@@ -850,10 +847,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule[Need] {
       // Map the distinct indices into SortProjections/Cells, then merge them
       def cellsMs: Stream[M[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
         case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
-          val slice = new Slice {
-            val size    = kslice.size
-            val columns = kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns
-          }
+          val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
 
           // We can actually get the last key, but is that necessary?
           M.point(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => M.point(None))))

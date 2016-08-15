@@ -25,6 +25,7 @@ trait PackageMethods {
   def uuid(s: String): UUID                                              = java.util.UUID fromString s
   def randomUuid(): UUID                                                 = java.util.UUID.randomUUID
   def randomInt(end: Int): Int                                           = scala.util.Random.nextInt(end)
+  def randomDouble(): Double                                             = scala.util.Random.nextDouble
   def randomBool(): Boolean                                              = scala.util.Random.nextBoolean
   def ByteBufferWrap(xs: Array[Byte]): ByteBuffer                        = java.nio.ByteBuffer.wrap(xs)
   def ByteBufferWrap(xs: Array[Byte], offset: Int, len: Int): ByteBuffer = java.nio.ByteBuffer.wrap(xs, offset, len)

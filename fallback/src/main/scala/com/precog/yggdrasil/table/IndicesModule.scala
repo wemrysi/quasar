@@ -243,18 +243,12 @@ trait IndicesModule[M[+ _]] extends TransSpecModule with ColumnarTableTypes[M] w
       Table(slices, ExactSize(rows.size))
     }
 
-    // we can use this to avoid allocating/remapping empty slices
-    private val emptySlice = new Slice {
-      val size    = 0
-      val columns = Map.empty[ColumnRef, Column]
-    }
-
     /**
       * Given a set of rows, builds the appropriate slice.
       */
     private[table] def buildSubSlice(rows: ArrayIntList): Slice =
       if (rows.isEmpty)
-        emptySlice
+        Slice.empty
       else
         valueSlice.remap(rows)
   }
@@ -268,10 +262,7 @@ trait IndicesModule[M[+ _]] extends TransSpecModule with ColumnarTableTypes[M] w
       scmMap[Int, scmSet[RValue]](),
       scmMap[(Int, RValue), ArrayIntList](),
       scmSet[Seq[RValue]](),
-      new Slice {
-        def size    = 0
-        def columns = Map.empty[ColumnRef, Column]
-      }
+      Slice.empty
     )
 
     /**

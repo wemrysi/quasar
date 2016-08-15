@@ -25,11 +25,6 @@ import com.precog.common._
 import quasar.precog.TableTestSupport._
 
 class SliceSpec extends quasar.QuasarSpecification {
-  val emptySlice: Slice = new Slice {
-    val size = 0
-    val columns: Map[ColumnRef, Column] = Map.empty
-  }
-
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
     def compare(a: List[A], b: List[A]): Int =
@@ -154,11 +149,9 @@ class SliceSpec extends quasar.QuasarSpecification {
       implicit def arbSlice = Arbitrary(genSlice(concatProjDesc, 23))
 
       prop { fullSlices: List[Slice] =>
-        val slices = fullSlices collect {
-          case slice if randomBool => slice
-          case _                   => emptySlice
-        }
-        val slice = Slice.concat(slices)
+        val slices = fullSlices map (s => if (randomBool) s else Slice.empty)
+        val slice  = Slice.concat(slices)
+
         toCValues(slice) must_== fakeConcat(slices)
       }
     }

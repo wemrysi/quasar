@@ -106,10 +106,7 @@ class JDBMRawSortProjection private[ygg](dbFile: File,
 
         val j = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
 
-        val slice = new Slice {
-          val size    = j.rows
-          val columns = keyColumns.toMap ++ valColumns
-        }
+        val slice = Slice(j.rows, keyColumns.toMap ++ valColumns)
 
         Some(BlockProjectionData(j.firstKey, j.lastKey, slice))
       }

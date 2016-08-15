@@ -71,28 +71,19 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpeci
 
   def undefineTable(fullTable: Table): Table = fullTable match {
     case cTable: ColumnarTable =>
-      val slices = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
+      val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
 
-      val maskedSlices = slices.map { slice =>
-        if(numSlices > 1 && Random.nextDouble < 0.25) {
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.mapValues { col => (col |> cf.util.filter(0, slice.size, new BitSet)).get }
-          }
-        } else {
-          val retained = (0 until slice.size).flatMap {
-            x => if (scala.util.Random.nextDouble < 0.75) Some(x) else None
-          }
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.mapValues {
-              col => (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
-            }
-          }
-        }
+      val maskedSlices = slices map { slice =>
+        val sz = slice.size
+        val bs = (
+          if (numSlices > 1 && Random.nextDouble < 0.25)
+            new BitSet
+          else
+            BitSetUtil create (0 until sz filter (_ => randomDouble < 0.75))
+        )
+        Slice(sz, slice.columns mapValues (_ |> cf.util.filter(0, sz, bs) get))
       }
-
       Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
   }
 
@@ -112,10 +103,8 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpeci
               val retained = (0 until slice.size).map { (x : Int) => if(scala.util.Random.nextDouble < 0.75) Some(x) else None }.flatten
               (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
-          new Slice {
-            val size = slice.size
-            val columns = slice.columns.updated(colRef, maskedCol)
-          }
+
+          Slice(slice.size, slice.columns.updated(colRef, maskedCol))
         }
         maskedSlice.getOrElse(slice)
       }

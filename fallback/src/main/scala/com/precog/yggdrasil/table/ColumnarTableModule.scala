@@ -399,50 +399,33 @@ trait ColumnarTableModule[M[+ _]]
     def uniformDistribution(init: MmixPrng): Table = {
       val gen: StreamT[M, Slice] = StreamT.unfoldM[M, Slice, MmixPrng](init) { prng =>
         val (column, nextGen) = Column.uniformDistribution(prng)
-        Some((Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), yggConfig.maxSliceSize), nextGen)).point[M]
+        Some((Slice(yggConfig.maxSliceSize, Map(ColumnRef(CPath.Identity, CDouble) -> column)), nextGen)).point[M]
       }
 
       Table(gen, InfiniteSize)
     }
 
-    def constBoolean(v: collection.Set[Boolean]): Table = {
-      val column = ArrayBoolColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CBoolean) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
+    def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
+      Slice(
+        vs.length,
+        Map(ColumnRef(CPath.Identity, CValueType[A]) -> mkColumn(vs))
+      ) :: StreamT.empty[M, Slice],
+      ExactSize(vs.length)
+    )
+    def constSingletonTable(singleType: CType, column: Column): Table = Table(
+      Slice(1, Map(ColumnRef(CPath.Identity, singleType) -> column)) :: StreamT.empty[M, Slice],
+      ExactSize(1)
+    )
 
-    def constLong(v: collection.Set[Long]): Table = {
-      val column = ArrayLongColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CLong) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
-
-    def constDouble(v: collection.Set[Double]): Table = {
-      val column = ArrayDoubleColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CDouble) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
-
-    def constDecimal(v: collection.Set[BigDecimal]): Table = {
-      val column = ArrayNumColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CNum) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
-
-    def constString(v: collection.Set[String]): Table = {
-      val column = ArrayStrColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
-
-    def constDate(v: collection.Set[DateTime]): Table = {
-      val column = ArrayDateColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
-    }
-
-    def constNull: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CNull) -> new InfiniteColumn with NullColumn), 1) :: StreamT.empty[M, Slice], ExactSize(1))
-
-    def constEmptyObject: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CEmptyObject) -> new InfiniteColumn with EmptyObjectColumn), 1) :: StreamT.empty[M, Slice], ExactSize(1))
-
-    def constEmptyArray: Table =
-      Table(Slice(Map(ColumnRef(CPath.Identity, CEmptyArray) -> new InfiniteColumn with EmptyArrayColumn), 1) :: StreamT.empty[M, Slice], ExactSize(1))
+    def constBoolean(v: collection.Set[Boolean]): Table    = constSliceTable[Boolean](v.toArray, ArrayBoolColumn(_))
+    def constLong(v: collection.Set[Long]): Table          = constSliceTable[Long](v.toArray, ArrayLongColumn(_))
+    def constDouble(v: collection.Set[Double]): Table      = constSliceTable[Double](v.toArray, ArrayDoubleColumn(_))
+    def constDecimal(v: collection.Set[BigDecimal]): Table = constSliceTable[BigDecimal](v.toArray, ArrayNumColumn(_))
+    def constString(v: collection.Set[String]): Table      = constSliceTable[String](v.toArray, ArrayStrColumn(_))
+    def constDate(v: collection.Set[DateTime]): Table      = constSliceTable[DateTime](v.toArray, ArrayDateColumn(_))
+    def constNull: Table                                   = constSingletonTable(CNull, new InfiniteColumn with NullColumn)
+    def constEmptyObject: Table                            = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
+    def constEmptyArray: Table                             = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
 
     def transformStream[A](sliceTransform: SliceTransform1[A], slices: StreamT[M, Slice]): StreamT[M, Slice] = {
       def stream(state: A, slices: StreamT[M, Slice]): StreamT[M, Slice] = StreamT(
@@ -809,7 +792,7 @@ trait ColumnarTableModule[M[+ _]]
       require(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
       def concat(rslices: List[Slice]): Slice = rslices.reverse match {
-        case Nil          => Slice(Map.empty, 0)
+        case Nil          => Slice.empty
         case slice :: Nil => slice
         case slices =>
           val slice = Slice.concat(slices)
@@ -1351,21 +1334,18 @@ trait ColumnarTableModule[M[+ _]]
                 case (a, acc) =>
                   val rows = math.min(sliceSize, (lhead.size - offset) * rhead.size)
 
-                  val lslice = new Slice {
-                    val size = rows
-                    val columns = lhead.columns.lazyMapValues(Remap({ i =>
-                      offset + (i / rhead.size)
-                    })(_).get)
-                  }
+                  val lslice = Slice(
+                    rows,
+                    lhead.columns.lazyMapValues(Remap({ i => offset + (i / rhead.size) })(_).get)
+                  )
 
-                  val rslice = new Slice {
-                    val size = rows
-                    val columns =
-                      if (rhead.size == 0)
-                        rhead.columns.lazyMapValues(Empty(_).get)
-                      else
-                        rhead.columns.lazyMapValues(Remap(_ % rhead.size)(_).get)
-                  }
+                  val rslice = Slice(
+                    rows,
+                    if (rhead.size == 0)
+                      rhead.columns.lazyMapValues(Empty(_).get)
+                    else
+                      rhead.columns.lazyMapValues(Remap(_ % rhead.size)(_).get)
+                  )
 
                   transform.f(a, lslice, rslice) map {
                     case (b, resultSlice) =>
@@ -1386,10 +1366,7 @@ trait ColumnarTableModule[M[+ _]]
             if (state.position < lhead.size) {
               state.tail.uncons flatMap {
                 case Some((rhead, rtail0)) =>
-                  val lslice = new Slice {
-                    val size    = rhead.size
-                    val columns = lhead.columns.lazyMapValues(Remap(i => state.position)(_).get)
-                  }
+                  val lslice = Slice(rhead.size, lhead.columns.lazyMapValues(Remap(i => state.position)(_).get))
 
                   transform.f(state.a, lslice, rhead) map {
                     case (a0, resultSlice) =>
