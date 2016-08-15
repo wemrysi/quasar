@@ -21,7 +21,7 @@ package quasar.ygg
 package table
 
 import com.precog.bytecode.JType
-import blueeyes._
+// import blueeyes._
 import com.precog.common._
 
 sealed trait CFId
@@ -40,9 +40,7 @@ trait CF {
     case cf: CF => identity == cf.identity
     case _      => false
   }
-
   override final def hashCode: Int = identity.hashCode
-
   override def toString() = identity.toString
 }
 
@@ -115,41 +113,10 @@ object CF2P {
   }
 }
 
-object CF2Array {
-  def apply[A, M[+ _]](name: String)(pf: PartialFunction[(Column, Column, Range), (CType, Array[Array[A]], BitSet)]): CMapper[M] = new ArrayMapperS[M] {
-    def apply(columns0: Map[ColumnRef, Column], range: Range) = {
-      for {
-        (ColumnRef(CPath(CPathIndex(0)), _), col1) <- columns0
-        (ColumnRef(CPath(CPathIndex(1)), _), col2) <- columns0
-        if pf isDefinedAt (col1, col2, range)
-      } yield {
-        val (tpe, cols, defined) = pf((col1, col2, range))
-        tpe -> (cols.asInstanceOf[Array[Array[_]]], defined)
-      }
-    }
-  }
-}
-
 trait CScanner {
   type A
   def init: A
   def scan(a: A, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column])
-}
-
-sealed trait CMapper[M[+ _]] {
-  def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A
-}
-
-trait CMapperS[M[+ _]] extends CMapper[M] {
-  final def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A = f(this)
-
-  def map(cols: Map[ColumnRef, Column], range: Range): Map[ColumnRef, Column]
-}
-
-trait CMapperM[M[+ _]] extends CMapper[M] {
-  final def fold[A](f: CMapperS[M] => A, g: CMapperM[M] => A): A = g(this)
-
-  def map(cols: Map[ColumnRef, Column], range: Range): M[Map[ColumnRef, Column]]
 }
 
 class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])
@@ -157,166 +124,3 @@ class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])
 trait CReducer[A] {
   def reduce(schema: CSchema, range: Range): A
 }
-
-trait ArrayMapperS[M[+ _]] extends CMapperS[M] {
-  def map(columns0: Map[ColumnRef, Column], range: Range): Map[ColumnRef, Column] = {
-    val results = this(columns0, range)
-
-    val columns = results flatMap {
-      case (tpe @ CString, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[String]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new StrColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CBoolean, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Boolean]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new BoolColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CLong, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Long]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new LongColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CDouble, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Double]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new DoubleColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CNum, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[BigDecimal]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new NumColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CNull, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Unit]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new NullColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CEmptyObject, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Unit]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new EmptyObjectColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CEmptyArray, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Unit]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new EmptyArrayColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CDate, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[DateTime]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new DateColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe @ CPeriod, (cols0, defined)) => {
-        val max  = maxIds(cols0, defined)
-        val cols = cols0.asInstanceOf[Array[Array[Period]]]
-
-        val columns: Map[ColumnRef, Column] = (0 until max).map({ i =>
-          ColumnRef(CPath(CPathIndex(i)), tpe) -> new PeriodColumn {
-            def isDefinedAt(row: Int) = defined.get(row) && i < cols(row).length
-            def apply(row: Int)       = cols(row)(i)
-          }
-        })(collection.breakOut)
-
-        columns
-      }
-
-      case (tpe, _) => sys.error("Unsupported CFArray type: " + tpe)
-    }
-
-    columns
-  }
-
-  def apply(columns0: Map[ColumnRef, Column], range: Range): Map[CType, (Array[Array[_]], BitSet)]
-
-  private[this] def maxIds(arr: Array[Array[_]], mask: BitSet): Int = {
-    var back = -1
-    0 until arr.length foreach { i =>
-      if (mask get i) {
-        back = back max arr(i).length
-      }
-    }
-    back
-  }
-}
-/* ctags
-type FN */
