@@ -22,7 +22,7 @@ package quasar.ygg
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._, Either3._
-import quasar.precog.TestSupport._, Gen._
+import quasar.precog.TestSupport._
 
 trait CogroupSpec extends TableModuleTestSupport with quasar.QuasarSpecification {
   import SampleData._

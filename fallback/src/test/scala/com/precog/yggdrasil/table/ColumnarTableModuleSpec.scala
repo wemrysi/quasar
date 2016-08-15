@@ -27,7 +27,6 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import TableModule._
 import SampleData._
-import quasar.precog.TestSupport._, Gen._
 
 class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
       with TableModuleSpec

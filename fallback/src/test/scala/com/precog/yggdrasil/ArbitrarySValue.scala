@@ -22,7 +22,8 @@ package quasar.ygg
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._, Gen._
+import quasar.precog.TestSupport._
+import Gen.{ alphaStr, listOfN, containerOfN, identifier, posNum, oneOf, delay }
 
 object CValueGenerators {
   type JSchema = Seq[JPath -> CType]

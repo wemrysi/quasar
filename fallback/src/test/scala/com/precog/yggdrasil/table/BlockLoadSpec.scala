@@ -27,7 +27,6 @@ import scalaz.syntax.comonad._
 import scalaz.syntax.std.boolean._
 import SampleData._
 import CValueGenerators._
-import quasar.precog.TestSupport._, Gen._
 
 trait BlockLoadSpec extends quasar.QuasarSpecification {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {

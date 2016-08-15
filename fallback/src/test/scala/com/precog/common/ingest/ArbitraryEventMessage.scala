@@ -23,7 +23,7 @@ package ingest
 import security._
 import blueeyes._
 import quasar.precog.JsonTestSupport._
-import Gen.{ alphaStr, choose, containerOfN, frequency, oneOf, delay }
+import Gen.{ alphaStr, containerOfN, frequency, oneOf, delay }
 
 object ArbitraryEventMessage {
 

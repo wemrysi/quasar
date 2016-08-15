@@ -21,7 +21,8 @@ package quasar.ygg
 
 import blueeyes._
 import com.precog.common._
-import quasar.precog.TestSupport._, Gen._
+import quasar.precog.TestSupport._
+import Gen.{ containerOfN, frequency }
 
 trait JdbmCValueGenerators {
   def maxArrayDepth = 3

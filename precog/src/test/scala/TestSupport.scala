@@ -38,7 +38,10 @@ trait ScalacheckSupport {
   type Pretty                  = org.scalacheck.util.Pretty
   type Prop                    = org.scalacheck.Prop
 
-  import Gen._
+  import Gen.{ listOfN, containerOfN, identifier, sized, oneOf, frequency }
+
+  def choose(lo: Int, hi: Int): Gen[Int]    = Gen.choose(lo, hi)
+  def choose(lo: Long, hi: Long): Gen[Long] = Gen.choose(lo, hi)
 
   def arbitrary[A](implicit z: Arbitrary[A]): Gen[A] = z.arbitrary
 
@@ -75,14 +78,14 @@ trait ScalacheckSupport {
   def vectorOfN[A](len: Int, gen: Gen[A]): Gen[Vector[A]]              = containerOfN[Vector, A](len, gen)
   def setOfN[A](len: Int, gen: Gen[A]): Gen[Set[A]]                    = containerOfN[Set, A](len, gen)
 
-  def genIndex(size: Int): Gen[Int] = Gen.choose(0, size - 1)
-  def genBool: Gen[Boolean]         = Arbitrary.arbBool.arbitrary
-  def genInt: Gen[Int]              = Arbitrary.arbInt.arbitrary
-  def genLong: Gen[Long]            = Arbitrary.arbLong.arbitrary
+  def genIndex(size: Int): Gen[Int] = choose(0, size - 1)
+  def genBool: Gen[Boolean]         = oneOf(true, false)
+  def genInt: Gen[Int]              = choose(Int.MinValue, Int.MaxValue)
+  def genLong: Gen[Long]            = choose(Long.MinValue, Long.MaxValue)
   def genDouble: Gen[Double]        = Arbitrary.arbDouble.arbitrary
   def genBigInt: Gen[BigInt]        = Arbitrary.arbBigInt.arbitrary
   def genString: Gen[String]        = Arbitrary.arbString.arbitrary
-  def genIdentifier: Gen[String]    = Gen.identifier filter (_ != null)
+  def genIdentifier: Gen[String]    = identifier filter (_ != null)
   def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
   def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
 

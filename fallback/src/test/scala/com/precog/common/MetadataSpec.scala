@@ -22,7 +22,8 @@ package com.precog.common
 import blueeyes._
 import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._, Scalaz._
-import quasar.precog._, JsonTestSupport._, Gen._
+import quasar.precog._, JsonTestSupport._
+import Gen.frequency
 
 class MetadataSpec extends quasar.QuasarSpecification with MetadataGenerators {
   val sampleSize = 100

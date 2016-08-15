@@ -16,7 +16,7 @@
 
 import blueeyes._, json._
 import quasar.precog.TestSupport._
-import Gen._
+import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 
 package quasar.precog {
   object TableTestSupport extends TestSupport with TableGenerators {
