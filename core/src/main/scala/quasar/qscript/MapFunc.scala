@@ -196,16 +196,28 @@ object MapFunc {
               }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
           }
 
-        // elide Nil on the left
+        // elide Nil array on the left
         case ConcatArrays(
-          Embed(CoEnv(\/-(MakeArray(Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil))))))))))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
 
-        // elide Nil on the right
+        // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(MakeArray(Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil)))))))))))) =>
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjC(ejson.Arr(Nil)))))))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+
+        // elide Nil map on the left
+        case ConcatMaps(
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjE(ejson.Map(Nil))))))),
+          Embed(CoEnv(\/-(rhs)))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+
+        // elide Nil map on the right
+        case ConcatMaps(
+          Embed(CoEnv(\/-(lhs))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.InjE(ejson.Map(Nil)))))))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
 
         case _ => None
