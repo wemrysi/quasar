@@ -21,6 +21,7 @@ import quasar.fs._
 
 import java.lang.System
 import java.nio.file._
+import java.io.{PrintWriter, File}
 
 import pathy.Path.posixCodec
 import pathy.Path._
@@ -77,12 +78,33 @@ trait TempFSSugars {
     } yield result).unsafePerformSync
   }
 
-  def withTempFile[C](run: AFile => Task[C]): C = {
+  def createFile(in: ADir, name: String) = Task.delay {
+    val path = in </> file(name)
+    toNioPath(path).toFile().createNewFile()
+  }
+
+  type Content = List[String]
+
+  def withNoContent: Option[Content] = Some(List.empty[String])
+
+  def withTempFile[C](createIt: Option[Content] = None)(run: AFile => Task[C]): C = {
 
     def genTempFilePath: Task[AFile] = Task.delay {
       val path = System.getProperty("java.io.tmpdir") +
       "/" + scala.util.Random.nextInt().toString + ".tmp"
       sandboxAbs(posixCodec.parseAbsFile(path).get)
+    }
+
+    def createFile(filePath: AFile): Task[Unit] = Task.delay {
+      createIt.foreach { content =>
+        val file = toNioPath(filePath).toFile()
+        val writer = new PrintWriter(file)
+        content.foreach {
+          line => writer.write(line + "\n")
+        }
+        writer.flush()
+        writer.close()
+      }
     }
 
     def deleteFile(file: AFile): Task[Unit] = Task.delay {
@@ -91,6 +113,7 @@ trait TempFSSugars {
 
     val execution: Task[C] = for {
       filePath <- genTempFilePath
+      _ <- createFile(filePath)
       result <- run(filePath).onFinish {
         _ => deleteFile(filePath)
       }
@@ -98,6 +121,12 @@ trait TempFSSugars {
 
     execution.unsafePerformSync
   }
+
+  def getChildren(dir: ADir): Task[List[AFile]] = Task.delay {
+    val dirFile = new File(posixCodec.unsafePrintPath(dir))
+    dirFile.listFiles.toList.map(f => sandboxAbs(posixCodec.parseAbsFile(f.getAbsolutePath).get))
+  }
+
 
   def toNioPath(path: APath) =
     Paths.get(posixCodec.unsafePrintPath(path))

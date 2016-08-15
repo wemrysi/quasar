@@ -50,7 +50,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugar
         } yield (errors)
       }
       // when
-      withTempFile { path =>
+      withTempFile(createIt = None) { path =>
         for {
           result <- execute[Vector[FileSystemError]](program(path))
           content <- getContent(path)
@@ -82,7 +82,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugar
         } yield (errors1 ++ errors2)
       }
       // when
-      withTempFile { path =>
+      withTempFile() { path =>
         for {
           result <- execute[Vector[FileSystemError]](program(path))
           content <- getContent(path)
