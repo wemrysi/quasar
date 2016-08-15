@@ -26,13 +26,10 @@ import quasar.fs._
 import quasar.fs.WriteFile.WriteHandle
 import quasar.effect._
 
-import java.lang.System
 import java.io._
-import java.nio.file._
 
-import org.specs2.ScalaCheck
-import pathy.Path.posixCodec
 import pathy.Path._
+import org.specs2.ScalaCheck
 import scalaz._, Scalaz._, concurrent.Task
 
 class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugars  {
