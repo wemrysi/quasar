@@ -26,8 +26,17 @@ import com.precog.bytecode._
 import scalaz._, Scalaz._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
-trait SliceColumnarTableModule extends BlockStoreColumnarTableModule with ProjectionModule[Need, Slice] {
+trait SliceColumnarTableModule extends BlockStoreColumnarTableModule {
+  type Projection <: ProjectionLike
+  type ProjectionCompanion <: ProjectionCompanionLike
   type TableCompanion <: SliceColumnarTableCompanion
+
+  def projections: Map[Path, Projection]
+  def Projection: ProjectionCompanion
+
+  trait ProjectionCompanionLike { self =>
+    def apply(path: Path): Need[Option[Projection]]
+  }
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = EitherT.right {

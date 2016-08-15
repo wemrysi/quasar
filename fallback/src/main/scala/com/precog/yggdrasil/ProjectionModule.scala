@@ -21,28 +21,14 @@ package quasar.ygg
 
 import com.precog.common._
 import scalaz._, Scalaz._
+import table.Slice
 
-trait ProjectionModule[M[+ _], Block] {
-  type Projection <: ProjectionLike[M, Block]
-  type ProjectionCompanion <: ProjectionCompanionLike[M]
+case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 
-  def Projection: ProjectionCompanion
-
-  trait ProjectionCompanionLike[M0[+ _]] { self =>
-    def apply(path: Path): M0[Option[Projection]]
-
-    def liftM[T[_ [+ _], + _]](implicit T: Hoist[T], M0: Monad[M0]) = new ProjectionCompanionLike[({ type λ[+α] = T[M0, α] })#λ] {
-      def apply(path: Path) = self.apply(path).liftM[T]
-    }
-  }
-}
-
-case class BlockProjectionData[Key, Block](minKey: Key, maxKey: Key, data: Block)
-
-trait ProjectionLike[M[+ _], Block] {
+trait ProjectionLike {
   type Key
 
-  def structure(implicit M: Monad[M]): M[Set[ColumnRef]]
+  def structure: Need[Set[ColumnRef]]
   def length: Long
 
   /**
@@ -51,10 +37,10 @@ trait ProjectionLike[M[+ _], Block] {
     * key. Each resulting block should contain only the columns specified in the
     * column set; if the set of columns is empty, return all columns.
     */
-  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None)(implicit M: Monad[M]): M[Option[BlockProjectionData[Key, Block]]]
+  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None): Need[Option[BlockProjectionData[Key]]]
 
-  def getBlockStream(columns: Option[Set[ColumnRef]])(implicit M: Monad[M]): StreamT[M, Block] = {
-    StreamT.unfoldM[M, Block, Option[Key]](None) { key =>
+  def getBlockStream(columns: Option[Set[ColumnRef]]): StreamT[Need, Slice] = {
+    StreamT.unfoldM[Need, Slice, Option[Key]](None) { key =>
       getBlockAfter(key, columns) map {
         _ map { case BlockProjectionData(_, maxKey, block) => (block, Some(maxKey)) }
       }

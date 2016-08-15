@@ -54,7 +54,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
-  protected class MergeEngine[KeyType, BlockData <: BlockProjectionData[KeyType, Slice]] {
+  protected class MergeEngine[KeyType, BlockData <: BlockProjectionData[KeyType]] {
     case class CellState(index: Int, maxKey: KeyType, slice0: Slice, succf: KeyType => M[Option[BlockData]], remap: Array[Int], position: Int) {
       def toCell = {
         new Cell(index, maxKey, slice0)(succf, remap.clone, position)
@@ -241,7 +241,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   trait BlockStoreColumnarTableCompanion extends ColumnarTableCompanion {
     import SliceTransform._
 
-    type SortBlockData = BlockProjectionData[Bytes, Slice]
+    type SortBlockData = BlockProjectionData[Bytes]
     type IndexStore    = BtoBConcurrentMap
 
     lazy val sortMergeEngine = new MergeEngine[Bytes, SortBlockData] {}
@@ -845,7 +845,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
 
       // Map the distinct indices into SortProjections/Cells, then merge them
-      def cellsMs: Stream[M[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
+      def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
         case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
           val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
 

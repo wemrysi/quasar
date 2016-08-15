@@ -26,11 +26,12 @@ import com.precog.common.security.APIKey
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
-    with SliceColumnarTableModule
-    with StubProjectionModule[Slice] {
-
+trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with SliceColumnarTableModule {
   import trans._
+
+  class ProjectionCompanion extends ProjectionCompanionLike {
+    def apply(path: Path) = Need(projections.get(path))
+  }
 
   implicit def M = Need.need
 
@@ -44,7 +45,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
 
   object Projection extends ProjectionCompanion
 
-  case class Projection(data: Stream[JValue]) extends ProjectionLike[Need, Slice] {
+  case class Projection(data: Stream[JValue]) extends ProjectionLike {
     type Key = JArray
 
     private val slices = fromJson(data).slices.toStream.copoint
@@ -53,15 +54,13 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
     val xyz = slices.foldLeft(Set.empty[ColumnRef]) {
       case (acc, slice) => acc ++ slice.columns.keySet
     }
-    def structure(implicit M: Monad[Need]) = M point xyz
+    def structure = Need(xyz)
 
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[Need]) = Need {
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
         blocks.filterNot(_.isEmpty) match {
-          case x #:: xs =>
-            if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
-
-          case _ => None
+          case x #:: xs => if ((x.toJson(x.size - 1).getOrElse(JUndefined) \ "key") > id) Some(x) else findBlockAfter(id, xs)
+          case _        => None
         }
       }
 
@@ -79,7 +78,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport
           }.getOrElse(s.columns)
         })
 
-        BlockProjectionData[JArray, Slice](s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0)
+        BlockProjectionData[JArray](s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0)
       }
     }
   }

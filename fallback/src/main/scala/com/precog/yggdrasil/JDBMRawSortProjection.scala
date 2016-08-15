@@ -38,11 +38,11 @@ class JDBMRawSortProjection private[ygg](dbFile: File,
                                               valRefs: Seq[ColumnRef],
                                               sortOrder: DesiredSortOrder,
                                               sliceSize: Int,
-                                              val length: Long) extends ProjectionLike[M, Slice] {
+                                              val length: Long) extends ProjectionLike {
 
   type Key = Bytes
 
-  def structure(implicit M: Monad[M]) = M.point((sortKeyRefs ++ valRefs).toSet)
+  def structure = Need((sortKeyRefs ++ valRefs).toSet)
 
   def foreach(f: BtoBEntry => Unit): Unit = {
     val DB             = DBMaker.fileDB(dbFile.getCanonicalPath).make()
@@ -56,8 +56,7 @@ class JDBMRawSortProjection private[ygg](dbFile: File,
   val rowFormat = RowFormat.forValues(valRefs)
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
-  override def getBlockAfter(id: Option[Bytes], columns: Option[Set[ColumnRef]])(
-      implicit M: Monad[M]): M[Option[BlockProjectionData[Bytes, Slice]]] = M.point {
+  override def getBlockAfter(id: Option[Bytes], columns: Option[Set[ColumnRef]]): Need[Option[BlockProjectionData[Bytes]]] = Need {
 
     // TODO: Make this far, far less ugly
     if (columns.nonEmpty) {

@@ -355,13 +355,13 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
       * data store is column-oriented but the associations we want to
       * perform are row-oriented.
       */
-    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
+    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): Need[Array[Array[RValue]]] = {
       val n       = slice.size
       val numKeys = sts.length
-      val keys    = new ArrayBuffer[M[Array[RValue]]](numKeys)
+      val keys    = new ArrayBuffer[Need[Array[RValue]]](numKeys)
 
       (0 until numKeys) foreach { _ =>
-        keys += null.asInstanceOf[M[Array[RValue]]]
+        keys += null.asInstanceOf[Need[Array[RValue]]]
       }
 
       var k = 0
