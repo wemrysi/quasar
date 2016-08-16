@@ -375,6 +375,9 @@ object MongoDbFileSystemSpec {
     (Functor[Task] compose Functor[IList])
       .map(
         TestConfig.externalFileSystems(
-          FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef))
+          FileSystemTest.fsTestConfig(MongoDBFsType, mongoDbFileSystemDef)
+        ).handleWith[IList[FileSystemUT[FileSystem]]] {
+          case _: TestConfig.UnsupportedFileSystemConfig => Task.now(IList.empty)
+        }
       )(_.liftIO)
 }

@@ -576,6 +576,8 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
         response.status must_== Status.NoContent
         ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+       .flakyTest("scalacheck: 'Gave up after only 1 passed tests. 11 tests were discarded.'")
+
       "be 404 with missing file" >> prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
         val response = service(emptyMem)(request).unsafePerformSync
