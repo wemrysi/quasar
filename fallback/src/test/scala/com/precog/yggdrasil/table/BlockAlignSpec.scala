@@ -23,10 +23,13 @@ package table
 import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
-// import quasar.precog.TestSupport._
 import SampleData._
+import TableModule._
+import BlockStoreTestModule.{ empty => module }
 
-class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {
+class BlockAlignSpec extends TableModuleSpec with BlockLoadSpec with BlockSortSpec {
+  type MemoId = Int
+
   "align" should {
     "a simple example" in alignSimple
     "across slice boundaries" in alignAcrossBoundaries
@@ -35,21 +38,41 @@ class BlockAlignSpec extends TableModuleSpec with BlockAlignBaseSpec {
     "produce the same results irrespective of input order" in testAlignSymmetry(1)
     "produce the same results irrespective of input order" in testAlignSymmetry(2)
   }
-}
 
-trait BlockAlignBaseSpec extends quasar.QuasarSpecification {
-  implicit def M: MoCo[Need]
-  private def emptyTestModule = BlockStoreTestModule.empty
+  "a block store columnar table" should {
+    "load" >> {
+      "a problem sample1" in testLoadSample1
+      "a problem sample2" in testLoadSample2
+      "a problem sample3" in testLoadSample3
+      "a problem sample4" in testLoadSample4
+      //"a problem sample5" in testLoadSample5 //pathological sample in the case of duplicated ids.
+      //"a dense dataset" in checkLoadDense //scalacheck + numeric columns = pain
+    }
+    "sort" >> {
+      "fully homogeneous data"             in homogeneousSortSample
+      "fully homogeneous data with object" in homogeneousSortSampleWithNonexistentSortKey
+      "data with undefined sort keys"      in partiallyUndefinedSortSample
+      "heterogeneous sort keys"            in heterogeneousSortSample
+      "heterogeneous sort keys case 2"     in heterogeneousSortSample2
+      "heterogeneous sort keys ascending"  in heterogeneousSortSampleAscending
+      "heterogeneous sort keys descending" in heterogeneousSortSampleDescending
+      "top-level hetereogeneous values"    in heterogeneousBaseValueTypeSample
+      "sort with a bad schema"             in badSchemaSortSample
+      "merges over three cells"            in threeCellMerge
+      "empty input"                        in emptySort
+      "with uniqueness for keys"           in uniqueSort
+
+      "arbitrary datasets"                 in checkSortDense(SortAscending)
+      "arbitrary datasets descending"      in checkSortDense(SortDescending)
+    }
+  }
 
   def testAlign(sample: SampleData) = {
-    val module = emptyTestModule
-
     import module._
     import module.trans.constants._
 
-    val lstream = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
-    val rstream = sample.data.zipWithIndex collect { case (v, i) if i % 3 == 0 => v }
-
+    val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
+    val rstream  = sample.data.zipWithIndex collect { case (v, i) if i % 3 == 0 => v }
     val expected = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 && i % 3 == 0 => v }
 
     val finalResults = for {
@@ -63,9 +86,10 @@ trait BlockAlignBaseSpec extends quasar.QuasarSpecification {
 
     val (leftResult, rightResult, leftResult2) = finalResults.copoint
 
-    leftResult must_== expected
-    rightResult must_== expected
-    leftResult must_== leftResult2
+    (    (leftResult must_=== expected)
+      && (rightResult must_=== expected)
+      && (leftResult must_=== leftResult2)
+    )
   }
 
   def checkAlign = {
@@ -296,8 +320,6 @@ trait BlockAlignBaseSpec extends quasar.QuasarSpecification {
 
 
   def testAlignSymmetry(i: Int) = {
-    val module = emptyTestModule
-
     import module._
     import module.trans._
 

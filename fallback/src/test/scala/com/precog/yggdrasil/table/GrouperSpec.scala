@@ -24,7 +24,7 @@ import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
-
+import BlockStoreTestModule.{ empty => module }
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -59,8 +59,6 @@ solve 'a, 'b
 */
 
 class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
-  private def emptyTestModule = BlockStoreTestModule.empty
-
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")
 
@@ -87,14 +85,12 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramByValue(set: Stream[Int]) = {
-    val module = emptyTestModule
-
     import module._
     import trans._
     import constants._
 
     val data = augmentWithIdentities(set.map(JNum(_)))
-    val groupId = module.newGroupId
+    val groupId = newGroupId
 
     val spec = GroupingSource(
       fromJson(data),
@@ -138,7 +134,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramByValueMapped(set: Stream[Int]) = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -151,7 +146,7 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
       }
     }
 
-    val groupId = module.newGroupId
+    val groupId = newGroupId
 
     val valueTrans = InnerObjectConcat(
       WrapObject(SourceKey.Single, TableModule.paths.Key.name),
@@ -197,7 +192,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramEvenOdd(set: Stream[Int]) = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -210,7 +204,7 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
       }
     }
 
-    val groupId = module.newGroupId
+    val groupId = newGroupId
 
     val spec = GroupingSource(
       fromJson(data),
@@ -269,7 +263,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramTwoKeysAnd = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -329,7 +322,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramTwoKeysOr = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -405,7 +397,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramExtraAnd = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -448,7 +439,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testHistogramExtraOr = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -503,7 +493,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testCtr(rawData1: Stream[Int], rawData2: Stream[Int]) = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -574,7 +563,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testCtrPartialJoinAnd(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -669,7 +657,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
 
 
   def testCtrPartialJoinOr(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._
@@ -774,7 +761,6 @@ class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
     //   { a: 'a, b: 'b, foo: count(foo'), bar: count(bar'), baz: count(baz') }
     //
 
-    val module = emptyTestModule
     import module._
     import trans._
     import constants._

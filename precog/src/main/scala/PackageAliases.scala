@@ -36,6 +36,8 @@ trait PackageAliases {
   val ListBuffer      = scm.ListBuffer
   val scmMap          = scm.HashMap
   val scmSet          = scm.HashSet
+  val Try             = scala.util.Try
+  val ScalaFailure    = scala.util.Failure
 
   // java stdlib
   type AtomicInt            = java.util.concurrent.atomic.AtomicInteger
@@ -59,22 +61,13 @@ trait PackageAliases {
   type UUID                 = java.util.UUID
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
-  // other outside libs: scalaz, shapeless
-  type Future[+A]  = scalaz.concurrent.Future[A]
-  type IO[A]       = scalaz.effect.IO[A]
+  // other outside libs
   type Iso[T, L]   = shapeless.Generic.Aux[T, L]
-  type Task[+A]    = scalaz.concurrent.Task[A]
   type MoCo[M[+_]] = scalaz.Monad[M] with scalaz.Comonad[M]
   type M[+A]       = scalaz.Need[A]
-
-  val Future       = scalaz.concurrent.Future
-  val IO           = scalaz.effect.IO
-  val Try          = scala.util.Try
-  val ScalaFailure = scala.util.Failure
-
-  val Ord     = scalaz.Order
-  type Ord[A] = scalaz.Order[A]
-  type Cmp    = scalaz.Ordering
+  type Ord[A]      = scalaz.Order[A]
+  type Cmp         = scalaz.Ordering
+  val Ord          = scalaz.Order
 
   def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 }
