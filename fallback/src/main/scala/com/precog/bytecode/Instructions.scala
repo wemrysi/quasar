@@ -30,19 +30,6 @@ class InstructionSet[Lib <: Library](val library: Lib) {
 
   sealed trait Instruction
 
-  object RootInstr {
-    def unapply(in: Instruction): Boolean = in match {
-      case _: PushString => true
-      case _: PushNum    => true
-      case PushTrue      => true
-      case PushFalse     => true
-      case PushNull      => true
-      case PushObject    => true
-      case PushArray     => true
-      case _             => false
-    }
-  }
-
   sealed trait JoinInstr                          extends Instruction
   /*final*/ case class Map2Cross(op: BinaryOperation) extends JoinInstr
   /*final*/ case class Map2Match(op: BinaryOperation) extends JoinInstr

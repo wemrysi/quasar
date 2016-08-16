@@ -41,6 +41,37 @@ object JDBM {
   type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
 
   final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
+
+  type IndexStore    = BtoBConcurrentMap
+  type IndexMap      = Map[IndexKey, SliceSorter]
+
+  sealed trait SliceSorter {
+    def name: String
+    def keyRefs: Array[ColumnRef]
+    def valRefs: Array[ColumnRef]
+    def count: Long
+  }
+
+  case class SliceIndex(name: String,
+                        dbFile: File,
+                        storage: IndexStore,
+                        keyRowFormat: RowFormat,
+                        keyComparator: Comparator[Bytes],
+                        keyRefs: Array[ColumnRef],
+                        valRefs: Array[ColumnRef],
+                        count: Long = 0) extends SliceSorter { }
+
+  case class SortedSlice(name: String,
+                         kslice: Slice,
+                         vslice: Slice,
+                         valEncoder: ColumnEncoder,
+                         keyRefs: Array[ColumnRef],
+                         valRefs: Array[ColumnRef],
+                         count: Long = 0) extends SliceSorter { }
+
+  case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
+    val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
+  }
 }
 
 trait BlockStoreColumnarTableModuleConfig {
@@ -242,42 +273,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     import SliceTransform._
 
     type SortBlockData = BlockProjectionData[Bytes]
-    type IndexStore    = BtoBConcurrentMap
 
     lazy val sortMergeEngine = new MergeEngine[Bytes, SortBlockData] {}
-
-    sealed trait SliceSorter {
-      def name: String
-      // def keyComparator: Comparator[Bytes]
-      def keyRefs: Array[ColumnRef]
-      def valRefs: Array[ColumnRef]
-      def count: Long
-    }
-
-
-    case class SliceIndex(name: String,
-                          dbFile: File,
-                          storage: IndexStore,
-                          keyRowFormat: RowFormat,
-                          keyComparator: Comparator[Bytes],
-                          keyRefs: Array[ColumnRef],
-                          valRefs: Array[ColumnRef],
-                          count: Long = 0)
-        extends SliceSorter
-    case class SortedSlice(name: String,
-                           kslice: Slice,
-                           vslice: Slice,
-                           valEncoder: ColumnEncoder,
-                           keyRefs: Array[ColumnRef],
-                           valRefs: Array[ColumnRef],
-                           count: Long = 0)
-        extends SliceSorter
-
-    case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
-      val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
-    }
-
-    type IndexMap = Map[IndexKey, SliceSorter]
 
     case class JDBMState(prefix: String, fdb: Option[File -> DB], indices: IndexMap, insertCount: Long) {
       def commit() = fdb foreach { _._2.commit() }
@@ -801,7 +798,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       //     index and update the SliceIndex entry.
 
       jdbmState.indices.get(indexMapKey) map {
-        case sliceIndex: SliceIndex =>
+        case sliceIndex: JDBM.SliceIndex =>
           (sliceIndex, jdbmState)
 
         case SortedSlice(indexName, kslice0, vslice0, vEncoder0, keyRefs, valRefs, count) =>
@@ -810,7 +807,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
           val (dbFile, db, openedJdbmState) = jdbmState.opened()
           val storage                       = db.hashMap(indexName, keyComparator, ByteArraySerializer).create()
           val count                         = storeRows(kslice0, vslice0, keyRowFormat, vEncoder0, storage, 0)
-          val sliceIndex                    = SliceIndex(indexName, dbFile, storage, keyRowFormat, keyComparator, keyRefs, valRefs, count)
+          val sliceIndex                    = JDBM.SliceIndex(indexName, dbFile, storage, keyRowFormat, keyComparator, keyRefs, valRefs, count)
 
           (sliceIndex, openedJdbmState.copy(indices = openedJdbmState.indices + (indexMapKey -> sliceIndex), insertCount = count))
 
@@ -841,26 +838,18 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     def loadTable(mergeEngine: MergeEngine[Bytes, SortBlockData], indices: IndexMap, sortOrder: DesiredSortOrder): Table = {
       import mergeEngine._
-
       val totalCount = indices.toList.map { case (_, sliceIndex) => sliceIndex.count }.sum
 
       // Map the distinct indices into SortProjections/Cells, then merge them
       def cellsMs: Stream[Need[Option[CellState]]] = indices.values.toStream.zipWithIndex map {
         case (SortedSlice(name, kslice, vslice, _, _, _, _), index) =>
           val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
-
           // We can actually get the last key, but is that necessary?
           Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
 
-        case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
-          val sortProjection                                       = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
-          val succ: Option[Bytes] => M[Option[SortBlockData]] = (key: Option[Bytes]) => sortProjection.getBlockAfter(key)
-
-          succ(None) map {
-            _ map { nextBlock =>
-              CellState(index, nextBlock.maxKey, nextBlock.data, (k: Bytes) => succ(Some(k)))
-            }
-          }
+        case (JDBM.SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
+          // Elided untested code.
+          ???
       }
 
       val head = StreamT.Skip(
