@@ -79,7 +79,7 @@ package object local {
           FileSystemDef.DefinitionResult[Free[S, ?]]({
 
           val interpreter: FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-            Empty.queryFile[Free[Eff, ?]],
+            queryfile.interperter[Eff],
             corereadfile.interpret(readfile.input[Eff]),
             writefile.interpret[Eff],
             managefile.interpret[Eff])
