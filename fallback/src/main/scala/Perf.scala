@@ -42,21 +42,13 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
   def -(a: A): Map[A, C]                  = iterator.toMap - a
 }
 
-final class FreshAtomicIdSource {
-  private val source = new AtomicLong
-  def nextId() = source.getAndIncrement
-  def nextIdBlock(n: Int): Long = {
-    var nextId = source.get()
-    while (!source.compareAndSet(nextId, nextId + n)) {
-      nextId = source.get()
-    }
-    nextId
-  }
+final class AtomicIdSource {
+  private val source             = new AtomicLong
+  def nextId(): Long             = source.getAndIncrement
+  def nextIdBlock(n: Long): Long = source.getAndAdd(n + 1) - n
 }
 
 object yggConfig {
-  val idSource = new FreshAtomicIdSource
-
   def hashJoins         = true
   def sortBufferSize    = 1000
   def maxSliceSize: Int = 10

@@ -24,7 +24,6 @@ import quasar.precog._
 import blueeyes._, json._
 import com.precog.common._
 import com.precog.bytecode._
-import quasar.ygg.util._
 import quasar.ygg.table.cf.util.{ Remap, Empty }
 
 import TransSpecModule._
@@ -290,7 +289,6 @@ object ColumnarTableModule {
 trait ColumnarTableModule
     extends TableModule
     with ColumnarTableTypes
-    with IdSourceScannerModule
     with SliceTransforms
     with SamplableColumnarTableModule
     with IndicesModule {

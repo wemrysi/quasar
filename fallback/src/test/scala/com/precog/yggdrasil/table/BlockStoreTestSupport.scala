@@ -36,8 +36,8 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[M, Slice] = {
-          StreamT.unfoldM[M, Slice, Option[proj.Key]](None) { key =>
+        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[Need, Slice] = {
+          StreamT.unfoldM[Need, Slice, Option[proj.Key]](None) { key =>
             proj.getBlockAfter(key, constraints).map { b =>
               b.map {
                 case BlockProjectionData(_, maxKey, slice) =>
@@ -47,7 +47,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
           }
         }
 
-        val stream = projections.foldLeft(StreamT.empty[M, Slice]) { (acc, proj) =>
+        val stream = projections.foldLeft(StreamT.empty[Need, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
           val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
             Some(Schema.flatten(tpe, struct.toList).toSet)
@@ -63,8 +63,6 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
     }
   }
   import trans._
-
-  implicit def M = Need.need
 
   type GroupId = String
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
