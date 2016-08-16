@@ -59,19 +59,27 @@ object managefile {
     maybeUnboxed.map(sandboxAbs(_))
   }
 
+  private def ispathExists: APath => Task[Boolean] = path => Task.delay {
+    Files.exists(toNioPath(path))
+  }
+
   def interpret[S[_]](implicit
     s0: Task :<: S
   ): ManageFile ~> Free[S, ?] =
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
-        case Move(FileToFile(sf, df), semantics) => moveIt(sf, df, semantics)(moveFile _)
-        case Move(DirToDir(sd, dd), semantics) => moveIt(sd, dd,semantics)(moveDir _)
+        case Move(FileToFile(sf, df), semantics) =>
+          injectFT[Task, S].apply(ensureMoveSemantics(df, ispathExists, semantics)
+            .fold(fse => fse.left, moveFile(sf, df)))
+        case Move(DirToDir(sd, dd), semantics) =>
+          injectFT[Task, S].apply(ensureMoveSemantics(dd, ispathExists, semantics)
+            .fold(fse => fse.left, moveDir(sd, dd)))
         case Delete(path) => delete(path)
         case TempFile(near) => tempFile(near)
       }
     }
 
-  def moveFile(src: APath, dst: APath):FileSystemError \/ Unit =
+  def moveFile(src: APath, dst: APath): FileSystemError \/ Unit =
     \/.fromTryCatchNonFatal(
       Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
     ) .leftMap {
@@ -87,26 +95,25 @@ object managefile {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
 
-  private def moveIt[S[_]](src: APath, dst: APath, semantics: MoveSemantics)
-  (makeMove: (APath, APath) => FileSystemError \/ Unit)
-    (implicit
-    s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = {
+  private def ensureMoveSemantics[S[_]](dst: APath, dstExists: APath => Task[Boolean], semantics: MoveSemantics): OptionT[Task, FileSystemError] = {
 
     def failBecauseExists = PathErr(InvalidPath(dst,
       "Can not move to destination that already exists if semnatics == failIfExists"))
     def failBecauseMissing = PathErr(InvalidPath(dst,
       "Can not move to destination that does not exists if semnatics == failIfMissing"))
     
-    injectFT[Task, S].apply{
-      Task.delay {
-        semantics match {
-          case Overwrite => makeMove(src, dst)
-          case FailIfExists => if(Files.exists(toNioPath(dst))) -\/(failBecauseExists) else makeMove(src, dst)
-          case FailIfMissing => if(Files.notExists(toNioPath(dst))) -\/(failBecauseMissing) else makeMove(src, dst)
+    OptionT[Task, FileSystemError](semantics match {
+      case Overwrite => Task.now(None)
+      case FailIfExists =>
+        dstExists(dst).map { dstExists =>
+          if(dstExists) Some(failBecauseExists) else None
         }
-      }
-    }}
+      case FailIfMissing =>
+        dstExists(dst).map { dstExists =>
+          if(!dstExists) Some(failBecauseMissing) else None
+        }
+      })
+    }
 
 
   private def delete[S[_]](path: APath)(implicit
