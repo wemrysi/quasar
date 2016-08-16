@@ -9,7 +9,6 @@ package object ygg {
 
   type Identity   = Long
   type Identities = Array[Identity]
-  type SEvent     = Identities -> SValue
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
     var i = 0
@@ -37,10 +36,4 @@ package object ygg {
 
   def tupledIdentitiesOrder[A](ord: Ord[Identities]): Ord[Identities -> A] = ord contramap (_._1)
   def valueOrder[A](ord: Ord[A]): Ord[Identities -> A]                     = ord contramap (_._2)
-}
-
-package ygg {
-  object SEvent {
-    def apply(id: Identities, sv: SValue): SEvent = id -> sv
-  }
 }
