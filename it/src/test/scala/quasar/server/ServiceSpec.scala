@@ -21,7 +21,7 @@ import quasar.{TestConfig, Variables}
 import quasar.config.{ConfigOps, FsPath, WebConfig}
 import quasar.main.MainErrT
 import quasar.api.UriPathCodec
-import quasar.api.services.MountServiceSpec
+import quasar.internal.MountServiceConfig
 import quasar.fs._, mount._
 import quasar.server.Server.QuasarConfig
 import quasar.sql.{fixParser, Query}
@@ -36,7 +36,7 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class ServiceSpec extends quasar.QuasarSpecification {
+class ServiceSpec extends quasar.Qspec {
   val configOps = ConfigOps[WebConfig]
 
   val client = org.http4s.client.blaze.defaultClient
@@ -142,7 +142,7 @@ class ServiceSpec extends quasar.QuasarSpecification {
 
       val srcPath = rootDir </> dir("view") </> file("a")
       val dstPath = rootDir </> dir("view") </> file("b")
-      val viewConfig = MountConfig.viewConfig(MountServiceSpec.unsafeViewCfg("select * from zips"))
+      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select * from zips"))
 
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(srcPath -> viewConfig)))(
@@ -179,7 +179,7 @@ class ServiceSpec extends quasar.QuasarSpecification {
           .toMap[APath, MountConfig])
         .unsafePerformSync
 
-      "fileSystemConfigs empty" <==> (fsCfgs must not be empty)
+      "fileSystemConfigs empty" <==> (fsCfgs must not(beEmpty))
 
       fsCfgs
     }
@@ -190,7 +190,7 @@ class ServiceSpec extends quasar.QuasarSpecification {
       val srcPath = rootDir </> dir("view") </> file("a")
       val dstPath = rootDir </> dir("view") </> file("b")
 
-      val viewConfig = MountConfig.viewConfig(MountServiceSpec.unsafeViewCfg("select 42"))
+      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
 
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(
@@ -220,7 +220,7 @@ class ServiceSpec extends quasar.QuasarSpecification {
       val srcPath = rootDir </> dir("a")
       val dstPath = rootDir </> dir("b")
 
-      val viewConfig = MountConfig.viewConfig(MountServiceSpec.unsafeViewCfg("select 42"))
+      val viewConfig = MountConfig.viewConfig(MountServiceConfig.unsafeViewCfg("select 42"))
 
       val webConfig = WebConfig.mountings.set(
         MountingsConfig(Map(

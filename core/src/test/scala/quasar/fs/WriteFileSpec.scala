@@ -19,22 +19,21 @@ package quasar.fs
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.fp._
-import quasar.specs2.DisjunctionMatchers
 
-import org.specs2.ScalaCheck
-import org.specs2.specification.core.Fragments
+import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._
 import scalaz.std.vector._
 import scalaz.syntax.monad._
 import scalaz.stream._
 
-class WriteFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with DisjunctionMatchers {
+/** FIXME: couldn't make this one work with Qspec. */
+class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with FileSystemFixture {
   import DataArbitrary._, FileSystemError._, PathError._
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
 
-  def withDataWriters(
+  private def withDataWriters(
     streaming: (String, (AFile, Process[write.F, Data]) => Process[write.M, FileSystemError]),
     nonStreaming: (String, (AFile, Vector[Data]) => write.M[Vector[FileSystemError]])
   )(f: (String, DataWriter) => Fragments): Fragments = {

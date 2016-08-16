@@ -22,11 +22,10 @@ import quasar.sql
 import quasar.sql.fixpoint._
 
 import argonaut._, Argonaut._, JsonScalaz._
-import org.specs2.scalaz._
 import scalaz.Scalaz._
 import pathy.Path._
 
-class MountConfigSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
+class MountConfigSpec extends quasar.Qspec {
   import MountConfig._
 
   "View config codec" should {

@@ -20,13 +20,12 @@ import quasar.Predef._
 import quasar.fs.mount._
 import quasar.physical.mongodb.fs.MongoDBFsType
 
-import org.specs2.ScalaCheck
 import pathy.Path._
 
 /** This tests a component of the “core” subproject, but it relies on something
   * from the “mongodb” subproject, so we’re testing it in “main”.
   */
-class CoreConfigSpec extends ConfigSpec[CoreConfig] with ScalaCheck {
+class CoreConfigSpec extends ConfigSpec[CoreConfig] {
   import CoreConfigArbitrary._
 
   def sampleConfig(uri: ConnectionUri): CoreConfig = {

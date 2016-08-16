@@ -17,8 +17,8 @@
 package quasar
 
 import quasar.Predef._
-
 import org.specs2.execute._
+import quasar.build.BuildInfo._
 
 /**
  Allows the body of an example to be marked as pending when the specification
@@ -26,40 +26,18 @@ import org.specs2.execute._
  it purports to test will not be erroneously flagged as covered.
  */
 trait PendingWithAccurateCoverage extends PendingUntilFixed {
-  def isCoverageRun: Boolean = quasar.build.BuildInfo.coverageEnabled
-  def isCIBuild: Boolean = quasar.build.BuildInfo.isCIBuild
+  outer =>
 
-  /** Overrides the standard specs2 implicit. */
-  implicit def toPendingWithAccurateCoverage[T: AsResult](t: => T) = new PendingWithAccurateCoverage(t)
-
-  class PendingWithAccurateCoverage[T: AsResult](t: => T) {
+  implicit class QuasarOpsForAsResultable[T: AsResult](t: => T) {
+    /** Steps in front of the standard specs2 implicit. */
     def pendingUntilFixed: Result = pendingUntilFixed("")
-
-    def pendingUntilFixed(m: String): Result =
-      if (isCoverageRun) Skipped(m + " (pending example skipped during coverage run)")
+    def pendingUntilFixed(m: String): Result = (
+      if (coverageEnabled) Skipped(m + " (pending example skipped during coverage run)")
       else if (isCIBuild) Skipped(m + " (pending example skipped during CI build)")
-      else toPendingUntilFixed(t).pendingUntilFixed(m)
+      else outer.toPendingUntilFixed(t).pendingUntilFixed(m)
+    )
+
+    def skippedOnUserEnv: Result            = skippedOnUserEnv("")
+    def skippedOnUserEnv(m: String): Result = if (isIsolatedEnv) AsResult(t) else Skipped(m)
   }
 }
-
-object PendingWithAccurateCoverage extends PendingWithAccurateCoverage
-
-/** Only runs the test in isolated environments, to avoid affecting data that
-  * isn’t ours.
-  */
-trait SkippedOnUserEnv extends PendingUntilFixed {
-  def isIsolatedEnv: Boolean =
-    java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv"))
-
-  implicit def toSkippedOnUserEnv[T: AsResult](t: => T) =
-    new SkippedOnUserEnv(t)
-
-  class SkippedOnUserEnv[T: AsResult](t: => T) {
-    def skippedOnUserEnv: Result = skippedOnUserEnv("")
-
-    def skippedOnUserEnv(m: String): Result =
-      if (isIsolatedEnv) AsResult(t) else Skipped(m)
-  }
-}
-
-object SkippedOnUserEnv extends SkippedOnUserEnv

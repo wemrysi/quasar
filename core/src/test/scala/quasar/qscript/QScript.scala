@@ -22,13 +22,13 @@ import quasar.ejson
 import quasar.fp._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
+import quasar.std.StdLib
 import quasar.std.StdLib._
 
 import matryoshka._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
-class QScriptSpec extends CompilerHelpers with QScriptHelpers with ScalazMatchers {
+class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
@@ -260,7 +260,7 @@ class QScriptSpec extends CompilerHelpers with QScriptHelpers with ScalazMatcher
     "convert a filter" in pending {
       // "select * from foo where bar between 1 and 10"
       QueryFile.convertToQScript(
-        set.Filter[FLP](
+        StdLib.set.Filter[FLP](
           lpRead("/foo"),
           relations.Between[FLP](
             structural.ObjectProject(lpRead("/foo"), LP.Constant(Data.Str("bar"))),
@@ -283,7 +283,7 @@ class QScriptSpec extends CompilerHelpers with QScriptHelpers with ScalazMatcher
       // "select * from person, car",
       QueryFile.convertToQScript(
         LP.Let('__tmp0,
-          set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
+          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
           identity.Squash[FLP](
             structural.ObjectConcat[FLP](
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
@@ -297,7 +297,7 @@ class QScriptSpec extends CompilerHelpers with QScriptHelpers with ScalazMatcher
       val lp = LP.Let('__tmp0, lpRead("/foo"),
         LP.Let('__tmp1, lpRead("/bar"),
           LP.Let('__tmp2,
-            set.InnerJoin[FLP](LP.Free('__tmp0), LP.Free('__tmp1),
+            StdLib.set.InnerJoin[FLP](LP.Free('__tmp0), LP.Free('__tmp1),
               relations.Eq[FLP](
                 structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("id"))),
                 structural.ObjectProject(LP.Free('__tmp1), LP.Constant(Data.Str("foo_id"))))),

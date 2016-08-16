@@ -19,15 +19,14 @@ package quasar.sql
 import quasar.Predef._
 import quasar.RenderTree.ops._
 import quasar.fp._
-import quasar.specs2._
 import quasar.sql.fixpoint._
 
 import matryoshka._
-import org.specs2.ScalaCheck
 import scalaz._, Scalaz._
 import pathy.Path._
+import quasar.specs2.QuasarMatchers._
 
-class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
+class SQLParserSpec extends quasar.Qspec {
   import SqlQueries._, ExprArbitrary._
 
   implicit def stringToQuery(s: String): Query = Query(s)
@@ -356,7 +355,7 @@ class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with Disj
       )
     }
 
-    "parse limit" in {
+    "parse limit" should {
       "normal" in {
         val q = s"$selectString limit 6"
         parse(q) must beRightDisjunction(
@@ -375,7 +374,7 @@ class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with Disj
       }
     }
 
-    "parse limit and offset" in {
+    "parse limit and offset" should {
       "limit before" in {
         val q = s"$selectString limit 6 offset 3"
         parse(q) must beRightDisjunction(
@@ -542,10 +541,11 @@ class SQLParserSpec extends quasar.QuasarSpecification with ScalaCheck with Disj
       parse(q).map(pprint[Fix]) must beRightDisjunction(q)
     }
 
-    "should not parse query with a single backslash in an identifier" >> {
+    "should not parse query with a single backslash in an identifier" should {
       "in table relation" in {
         parse(raw"select * from `\bar`") should beLeftDisjunction
       }.pendingUntilFixed("SD-1536")
+
       "in identifier" in {
         parse(raw"`\bar`") should beLeftDisjunction
       }.pendingUntilFixed("SD-1536")

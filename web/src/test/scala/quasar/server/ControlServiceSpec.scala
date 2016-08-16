@@ -30,7 +30,7 @@ import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 import shapeless.nat._
 
-class ControlServiceSpec extends quasar.QuasarSpecification {
+class ControlServiceSpec extends quasar.Qspec {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 

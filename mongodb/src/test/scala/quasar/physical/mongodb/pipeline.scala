@@ -24,10 +24,9 @@ import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import scalaz._
 
-class PipelineSpec extends quasar.QuasarSpecification with ScalaCheck with ArbBsonField {
+class PipelineSpec extends quasar.Qspec with ArbBsonField {
   import CollectionUtil._
   import ArbitraryExprOp._
 
