@@ -42,40 +42,35 @@ class JDBMRawSortProjection private[ygg](dbFile: File,
 
   type Key = Bytes
 
-  def structure = Need((sortKeyRefs ++ valRefs).toSet)
+  def structure = Need(sortKeyRefs ++ valRefs toSet)
 
   def foreach(f: BtoBEntry => Unit): Unit = {
-    val DB             = DBMaker.fileDB(dbFile.getCanonicalPath).make()
-    val index: BtoBMap = DB.get(indexName)
+    val DB = DBMaker.fileDB(dbFile.getCanonicalPath).make()
 
-    index.entrySet().iterator().asScala.foreach(f)
-
-    DB.close()
+    try DB.get[BtoBMap](indexName).entrySet().iterator().asScala foreach f
+    finally DB.close()
   }
 
   val rowFormat = RowFormat.forValues(valRefs)
   val keyFormat = RowFormat.forSortingKey(sortKeyRefs)
 
   override def getBlockAfter(id: Option[Bytes], columns: Option[Set[ColumnRef]]): Need[Option[BlockProjectionData[Bytes]]] = Need {
-
     // TODO: Make this far, far less ugly
-    if (columns.nonEmpty) {
+    if (columns.nonEmpty)
       throw new IllegalArgumentException("JDBM Sort Projections may not be constrained by column descriptor")
-    }
 
-    // At this point we have completed all valid writes, so we open readonly + no locks, allowing for concurrent use of sorted data
-    //println("opening: " + dbFile.getCanonicalPath)
+    // At this point we have completed all valid writes, so we open readonly + no locks,
+    // allowing for concurrent use of sorted data
     val db = DBMaker.fileDB(dbFile.getCanonicalPath).readOnly().fileLockDisable().make()
     try {
-      val index: BtoBMap = db.get(indexName)
-
-      if (index == null) {
+      val index = Option(db.get[BtoBMap](indexName)) getOrElse {
         throw new IllegalArgumentException("No such index in DB: %s:%s".format(dbFile, indexName))
       }
 
       val constrainedMap = id.map { idKey =>
         index.tailMap(idKey)
       }.getOrElse(index)
+
       val iteratorSetup = () => {
         val rawIterator = constrainedMap.entrySet.iterator.asScala
         // Since our key to retrieve after was the last key we retrieved, we know it exists,
@@ -102,14 +97,13 @@ class JDBMRawSortProjection private[ygg](dbFile: File,
         val valColumns       = valRefs.map(JDBMSlice.columnFor(CPath("[1]"), sliceSize))
         val keyColumnDecoder = keyFormat.ColumnDecoder(keyColumns.map(_._2)(collection.breakOut))
         val valColumnDecoder = rowFormat.ColumnDecoder(valColumns.map(_._2)(collection.breakOut))
-
-        val j = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
-
-        val slice = Slice(j.rows, keyColumns.toMap ++ valColumns)
+        val j                = JDBMSlice.load(sliceSize, iteratorSetup, keyColumnDecoder, valColumnDecoder)
+        val slice            = Slice(j.rows, keyColumns.toMap ++ valColumns)
 
         Some(BlockProjectionData(j.firstKey, j.lastKey, slice))
       }
-    } finally {
+    }
+    finally {
       db.close() // creating the slice should have already read contents into memory
     }
   }
