@@ -104,7 +104,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
     }
 
     "tempFile" should {
-      "create temp file neear existing path" in {
+      "create temp file near existing path" in {
         // given
         val program = (nearDir: ADir) => define { unsafe =>
           for {
