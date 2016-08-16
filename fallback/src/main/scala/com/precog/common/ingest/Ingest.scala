@@ -117,12 +117,6 @@ sealed trait StreamRef {
 }
 
 object StreamRef {
-  def forWriteMode(mode: WriteMode, terminal: Boolean): StreamRef = mode match {
-    case AccessMode.Create  => StreamRef.Create(randomUuid, terminal)
-    case AccessMode.Replace => StreamRef.Replace(randomUuid, terminal)
-    case AccessMode.Append  => StreamRef.Append
-  }
-
   case class Create(streamId: UUID, terminal: Boolean) extends StreamRef {
     def terminate                     = copy(terminal = true)
     def split(n: Int): Seq[StreamRef] = Vector.fill(n - 1) { copy(terminal = false) } :+ this
