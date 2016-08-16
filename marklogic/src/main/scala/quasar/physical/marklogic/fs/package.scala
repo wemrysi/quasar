@@ -112,8 +112,8 @@ package object fs {
         lift(inter(uri).map { case (run, release) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
-              queryfile.interpret[Eff](100L),
-              readfile.interpret[Eff],
+              queryfile.interpret[Eff](10000L),
+              readfile.interpret[Eff](10000L),
               writefile.interpret[Eff],
               managefile.interpret[Eff]),
             lift(release).into[S])

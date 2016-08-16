@@ -18,10 +18,11 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar._
+import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.FileSystemError._
 import quasar.fs.PathError._
-import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
+import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.physical.marklogic._
 
 import pathy.Path._
@@ -31,11 +32,14 @@ import scalaz.stream.Process
 
 object readfile {
 
-  def interpret[S[_]](implicit
-    S0:           Task :<: S,
-    S1:           Read[Client, ?] :<: S,
-    state:        KeyValueStore.Ops[ReadFile.ReadHandle, Process[Task, Vector[Data]], S],
-    seq:          MonotonicSeq.Ops[S]
+  def interpret[S[_]](
+    chunkSize: Positive
+  )(
+    implicit
+    S0:    Task :<: S,
+    S1:    ClientR :<: S,
+    state: KeyValueStore.Ops[ReadFile.ReadHandle, Process[Task, Vector[Data]], S],
+    seq:   MonotonicSeq.Ops[S]
   ): ReadFile ~> Free[S,?] =
     quasar.fs.impl.readFromProcess { (file, readOpts) =>
       val dirPath = fileParent(file) </> dir(fileName(file).value)
@@ -44,8 +48,10 @@ object readfile {
         // This is due to a very shady pattern that was used in marklogic xcc java driver where
         // ResultItem extends XdmItem in order to "forward calls" but that messes up
         // pattern matching, we want the "actual" XdmItem
-        Client.readDirectory(dirPath).map(_.map(item => Vector(xcc.xdmitem.toData(item.getItem))).right[FileSystemError]),
-        pathErr(pathNotFound(file)).left[Process[Task, Vector[Data]]].pure[Free[S,?]])
+        Client.readDirectory(dirPath).map(
+          _.map(item => xcc.xdmitem.toData(item.getItem))
+            .chunk(chunkSize.get.toInt)
+            .right[FileSystemError]),
+        pathErr(pathNotFound(file)).left[Process[Task, Vector[Data]]].pure[Free[S, ?]])
     }
-
 }

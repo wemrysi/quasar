@@ -28,6 +28,7 @@ import com.marklogic.xcc.exceptions.XQueryException
 import com.marklogic.xcc.types._
 
 import java.io.ByteArrayInputStream
+import java.util.UUID
 import scala.collection.JavaConverters._
 
 import argonaut._
@@ -92,9 +93,14 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
     s"<query>$s</query>"
 
   def readDirectory(dir: ADir): Process[Task, ResultItem] = {
+    val qopts = {
+      val opts = new RequestOptions
+      opts.setCacheResult(false)
+      opts
+    }
     val uri = posixCodec.printPath(dir)
     io.iteratorR(newSession)(closeSession) { session =>
-      val request = session.newAdhocQuery(s"""cts:search(fn:doc(), cts:directory-query("$uri"))""")
+      val request = session.newAdhocQuery(s"""cts:search(fn:doc(), cts:directory-query("$uri"))""", qopts)
       Task.delay(session.submitRequest(request).iterator.asScala)
     }
   }
@@ -194,17 +200,25 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
   ): Free[S, Error \/ Unit] =
     lift(write_(uri, content)).into[S]
 
-  def writeInDir_(dir: ADir, contents: Vector[String]): Task[Error \/ Unit] =
-    doInSession( session =>
-      Task.gatherUnordered(contents.map { content =>
-        // TODO: Make pure
-        val docPath = dir </> file(scala.util.Random.alphanumeric.take(10).mkString)
-        val uri = posixCodec.printPath(docPath)
-        val createOptions = new ContentCreateOptions()
-        createOptions.setFormatJson()
-        val toInsert = ContentFactory.newContent(uri, content, createOptions)
-        Task.delay(session.insertContent(toInsert))
-      }).void.map(_.right))
+  def writeInDir_(dir: ADir, contents: Vector[String]): Task[Error \/ Unit] = {
+    val createOptions = {
+      val copts = new ContentCreateOptions()
+      copts.setFormatJson()
+      copts
+    }
+
+    def mkContent(str: String): Task[Content] =
+      randomFileName map { fn =>
+        val uri = posixCodec.printPath(dir </> file1(fn))
+        ContentFactory.newContent(uri, str, createOptions)
+      }
+
+    doInSession { session =>
+      contents.traverse(mkContent)
+        .flatMap(cs => Task.delay(session.insertContent(cs.toArray)))
+        .map(_.right)
+    }
+  }
 
   def writeInDir[S[_]](dir: ADir, content: Vector[String])(implicit
     S: Task :<: S
@@ -212,6 +226,9 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
     lift(writeInDir_(dir, content)).into[S]
 
   //////
+
+  private def randomFileName: Task[FileName] =
+    Task.delay(FileName(UUID.randomUUID.toString))
 
   /* Temporary parser until jawn-argonaut supports 6.2.x. */
   @SuppressWarnings(Array(
