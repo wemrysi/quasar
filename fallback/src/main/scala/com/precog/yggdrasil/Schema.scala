@@ -20,7 +20,6 @@
 package quasar.ygg
 
 import blueeyes._
-import table._
 import com.precog.common._
 import com.precog.bytecode._
 
@@ -177,8 +176,8 @@ object Schema {
     * returns a function that, for a given (row: Int), produces a Boolean
     * value is true if the given row subsumes the provided `jtpe`
     */
-  def findTypes(jtpe: JType, seenPath: CPath, cols: Map[ColumnRef, Column], size: Int): Int => Boolean = {
-    def handleRoot(providedCTypes: Seq[CType], cols: Map[ColumnRef, Column]) = {
+  def findTypes(jtpe: JType, seenPath: CPath, cols: ColumnMap, size: Int): Int => Boolean = {
+    def handleRoot(providedCTypes: Seq[CType], cols: ColumnMap) = {
       val filteredCols = cols filter {
         case (ColumnRef(path, ctpe), _) =>
           path == seenPath && providedCTypes.contains(ctpe)
@@ -191,7 +190,7 @@ object Schema {
         bits(row)
     }
 
-    def handleUnfixed(emptyCType: CType, checkNode: CPathNode => Boolean, cols: Map[ColumnRef, Column]) = {
+    def handleUnfixed(emptyCType: CType, checkNode: CPathNode => Boolean, cols: ColumnMap) = {
       val objCols = cols filter {
         case (ColumnRef(path, ctpe), _) =>
           val emptyCrit = path == seenPath && ctpe == emptyCType
@@ -216,7 +215,7 @@ object Schema {
         objBits(row)
     }
 
-    def handleEmpty(emptyCType: CType, cols: Map[ColumnRef, Column]) = {
+    def handleEmpty(emptyCType: CType, cols: ColumnMap) = {
       val emptyCols = cols filter {
         case (ColumnRef(path, ctpe), _) =>
           path == seenPath && ctpe == emptyCType
@@ -290,11 +289,11 @@ object Schema {
   def mkType(ctpes: Seq[ColumnRef]): Option[JType] = {
 
     val primitives = ctpes flatMap {
-      case ColumnRef(CPath.Identity, t: CValueType[_]) => fromCValueType(t)
-      case ColumnRef(CPath.Identity, CNull)            => Some(JNullT)
-      case ColumnRef(CPath.Identity, CEmptyArray)      => Some(JArrayFixedT(Map()))
-      case ColumnRef(CPath.Identity, CEmptyObject)     => Some(JObjectFixedT(Map()))
-      case _                                           => None
+      case ColumnRef.id(t: CValueType[_]) => fromCValueType(t)
+      case ColumnRef.id(CNull)            => Some(JNullT)
+      case ColumnRef.id(CEmptyArray)      => Some(JArrayFixedT(Map()))
+      case ColumnRef.id(CEmptyObject)     => Some(JObjectFixedT(Map()))
+      case _                              => None
     }
 
     val elements = ctpes.collect {

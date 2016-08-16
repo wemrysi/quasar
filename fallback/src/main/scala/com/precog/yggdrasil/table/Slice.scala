@@ -32,11 +32,11 @@ import java.nio.CharBuffer
 
 sealed trait Slice {
   def size: Int
-  def columns: Map[ColumnRef, Column]
+  def columns: ColumnMap
 }
 final class DirectSlice(
   val size: Int,
-  val columns: Map[ColumnRef, Column]
+  val columns: ColumnMap
 ) extends Slice
 
 final class DerefSlice(
@@ -52,10 +52,10 @@ class SliceOps(private val source: Slice) extends AnyVal {
   import Slice._
   import TableModule._
 
-  def size: Int                       = source.size
-  def isEmpty: Boolean                = size == 0
-  def nonEmpty                        = !isEmpty
-  def columns: Map[ColumnRef, Column] = source.columns
+  def size: Int          = source.size
+  def isEmpty: Boolean   = size == 0
+  def nonEmpty           = !isEmpty
+  def columns: ColumnMap = source.columns
 
   def logicalColumns: JType => Set[Column] = { jtpe =>
     // TODO Use a flatMap and:
@@ -279,7 +279,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   // this operation.
   //
   def delete(jtype: JType): Slice = {
-    def fixArrays(columns: Map[ColumnRef, Column]): Map[ColumnRef, Column] = {
+    def fixArrays(columns: ColumnMap): ColumnMap = {
       columns.toSeq
         .sortBy(_._1)
         .foldLeft((Map.empty[Vector[CPathNode], Int], Map.empty[ColumnRef, Column])) {
@@ -479,7 +479,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       result <- f(col)
     } yield result
 
-    val columns: Map[ColumnRef, Column] = {
+    val columns: ColumnMap = {
       resultColumns.groupBy(_.tpe) map {
         case (tpe, cols) => (ColumnRef(to, tpe), cols.reduceLeft((c1, c2) => Column.unionRightSemigroup.append(c1, c2)))
       }
@@ -1528,9 +1528,9 @@ object Slice {
   implicit def sliceOps(s: Slice): SliceOps           = new SliceOps(s)
   implicit def derefSliceOps(s: Slice): DerefSliceOps = new DerefSliceOps(s)
 
-  def empty: Slice                                             = apply(0, Map())
-  def apply(size: Int, columns: Map[ColumnRef, Column]): Slice = new DirectSlice(size, columns)
-  def apply(pair: Map[ColumnRef, Column] -> Int): Slice        = apply(pair._2, pair._1)
+  def empty: Slice                                = apply(0, Map())
+  def apply(size: Int, columns: ColumnMap): Slice = new DirectSlice(size, columns)
+  def apply(pair: ColumnMap -> Int): Slice        = apply(pair._2, pair._1)
 
   def updateRefs(rv: RValue, into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
     rv.flattenWithPath.foldLeft(into) {

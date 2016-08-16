@@ -20,8 +20,8 @@
 package quasar.ygg
 package table
 
+import blueeyes._
 import com.precog.bytecode.JType
-// import blueeyes._
 import com.precog.common._
 
 sealed trait CFId
@@ -116,7 +116,7 @@ object CF2P {
 trait CScanner {
   type A
   def init: A
-  def scan(a: A, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column])
+  def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
 }
 
 class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])

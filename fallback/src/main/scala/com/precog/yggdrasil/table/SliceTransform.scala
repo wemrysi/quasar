@@ -184,7 +184,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
 
               // numeric stuff
 
-              def stripTypes(cols: Map[ColumnRef, Column]) = {
+              def stripTypes(cols: ColumnMap) = {
                 cols.foldLeft(Map[CPath, Set[Column]]()) {
                   case (acc, (ColumnRef(path, _), column)) => {
                     val set = acc get path map { _ + column } getOrElse Set(column)
@@ -460,22 +460,6 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
             )
           }
 
-        // case MapWith(source, mapper0) =>
-        //   composeSliceTransform2(source) andThen {
-        //     mapper0.fold({ mapper =>
-        //       SliceTransform1.liftM[Unit]((), { (_: Unit, slice: Slice) =>
-        //         val cols = mapper.map(slice.columns, 0 until slice.size)
-        //         ((), Slice(slice.size, cols))
-        //       })
-        //     }, { mapper =>
-        //       SliceTransform1[Unit]((), { (_: Unit, slice: Slice) =>
-        //         mapper.map(slice.columns, 0 until slice.size) map { cols =>
-        //           ((), Slice(slice.size, cols))
-        //         }
-        //       })
-        //     })
-        //   }
-
         case DerefMetadataStatic(source, field) =>
           composeSliceTransform2(source) map {
             _ deref field
@@ -553,7 +537,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
 
                 val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
 
-                val joined: Map[ColumnRef, Column] = grouped.map({
+                val joined: ColumnMap = grouped.map({
                   case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
                   case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
                   case (ref, Middle3((left :: Nil, right :: Nil))) => {
@@ -566,7 +550,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                 })(collection.breakOut)
 
                 joined
-              } getOrElse Map[ColumnRef, Column]()
+              } getOrElse Map()
             })
           }
         }
@@ -580,12 +564,12 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     import SliceTransform1._
 
     def initial: A
-    def f: (A, Slice) => M[A -> Slice]
-    def advance(slice: Slice): M[SliceTransform1[A] -> Slice]
+    def f: (A, Slice) => Need[A -> Slice]
+    def advance(slice: Slice): Need[SliceTransform1[A] -> Slice]
 
     def unlift: Option[(A, Slice) => (A, Slice)] = None
 
-    def apply(slice: Slice): M[A -> Slice] = f(initial, slice)
+    def apply(slice: Slice): Need[A -> Slice] = f(initial, slice)
 
     def mapState[B](f: A => B, g: B => A): SliceTransform1[B] =
       MappedState1[A, B](this, f, g)
@@ -678,7 +662,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     def liftM[A](init: A, f: (A, Slice) => (A, Slice)): SliceTransform1[A] =
       SliceTransform1S(init, f)
 
-    def apply[A](init: A, f: (A, Slice) => M[A -> Slice]): SliceTransform1[A] =
+    def apply[A](init: A, f: (A, Slice) => Need[A -> Slice]): SliceTransform1[A] =
       SliceTransform1M(init, f)
 
     private[table] val Identity: SliceTransform1S[Unit] = SliceTransform1S[Unit]((), { (u, s) =>
@@ -689,7 +673,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
       SliceTransform1S(st.initial, { case (a, s) => st.f0(a, s) :-> f })
 
     private def map[A](st: SliceTransform1[A])(f: Slice => Slice): SliceTransform1[A] = st match {
-      case (st: SliceTransform1S[_])         => mapS(st)(f)
+
+      case st: SliceTransform1S[_]           => mapS(st)(f)
       case SliceTransform1M(i, g)            => SliceTransform1M(i, { case (a, s) => g(a, s) map (_ :-> f) })
       case SliceTransform1SMS(sta, stb, stc) => SliceTransform1SMS(sta, stb, mapS(stc)(f))
       case MappedState1(sta, to, from)       => MappedState1(map(sta)(f), to, from)
@@ -963,17 +948,10 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
 
     private def chain[A, B](st0: SliceTransform2[A], st1: SliceTransform1[B]): SliceTransform2[A -> B] = {
       (st0, st1) match {
-        case (sta, MappedState1(stb, f, g)) =>
-          chain(sta, stb).mapState(_ :-> f, _ :-> g)
-
-        case (sta: SliceTransform2S[_], stb: SliceTransform1S[_]) =>
-          chainS(sta, stb)
-
-        case (sta: SliceTransform2S[_], stb: SliceTransform1[_]) =>
-          SliceTransform2SM(sta, stb)
-
-        case (sta: SliceTransform2M[_], stb: SliceTransform1S[_]) =>
-          SliceTransform2MS(sta, stb)
+        case (sta, MappedState1(stb, f, g))                       => chain(sta, stb).mapState(_ :-> f, _ :-> g)
+        case (sta: SliceTransform2S[_], stb: SliceTransform1S[_]) => chainS(sta, stb)
+        case (sta: SliceTransform2S[_], stb: SliceTransform1[_])  => SliceTransform2SM(sta, stb)
+        case (sta: SliceTransform2M[_], stb: SliceTransform1S[_]) => SliceTransform2MS(sta, stb)
 
         case (sta: SliceTransform2M[_], stb: SliceTransform1[_]) =>
           SliceTransform2M((sta.initial, stb.initial), {
@@ -1060,10 +1038,10 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
 }
 
 trait ConcatHelpers {
-  def buildFilters(columns: Map[ColumnRef, Column],
+  def buildFilters(columns: ColumnMap,
                    size: Int,
-                   filter: Map[ColumnRef, Column] => Map[ColumnRef, Column],
-                   filterEmpty: Map[ColumnRef, Column] => Map[ColumnRef, Column]) = {
+                   filter: ColumnMap => ColumnMap,
+                   filterEmpty: ColumnMap => ColumnMap) = {
     val definedBits = filter(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
     val emptyBits   = filterEmpty(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
     (definedBits, emptyBits)
@@ -1081,24 +1059,24 @@ trait ConcatHelpers {
     (emptyBits, nonemptyBits)
   }
 
-  def filterArrays(columns: Map[ColumnRef, Column]) = columns.filter {
+  def filterArrays(columns: ColumnMap) = columns filter {
     case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
     case (ColumnRef.id(CEmptyArray), _)                  => true
     case _                                               => false
   }
 
-  def filterEmptyArrays(columns: Map[ColumnRef, Column]) = columns.filter {
+  def filterEmptyArrays(columns: ColumnMap) = columns filter {
     case (ColumnRef.id(CEmptyArray), _) => true
     case _                              => false
   }
 
-  def collectIndices(columns: Map[ColumnRef, Column]) = columns.collect {
+  def collectIndices(columns: ColumnMap) = columns.collect {
     case (ref @ ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => (i, xs, ref, col)
   }
 
   def buildEmptyArrays(emptyBits: BitSet) = Map(ColumnRef.id(CEmptyArray) -> EmptyArrayColumn(emptyBits))
 
-  def buildNonemptyArrays(left: Map[ColumnRef, Column], right: Map[ColumnRef, Column]) = {
+  def buildNonemptyArrays(left: ColumnMap, right: ColumnMap) = {
     val leftIndices  = collectIndices(left)
     val rightIndices = collectIndices(right)
 
@@ -1109,23 +1087,23 @@ trait ConcatHelpers {
     newCols.toMap
   }
 
-  def filterObjects(columns: Map[ColumnRef, Column]) = columns.filter {
+  def filterObjects(columns: ColumnMap) = columns.filter {
     case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
     case (ColumnRef.id(CEmptyObject), _)                 => true
     case _                                               => false
   }
 
-  def filterEmptyObjects(columns: Map[ColumnRef, Column]) = columns.filter {
+  def filterEmptyObjects(columns: ColumnMap) = columns.filter {
     case (ColumnRef.id(CEmptyObject), _) => true
     case _                               => false
   }
 
-  def filterFields(columns: Map[ColumnRef, Column]) = columns.filter {
+  def filterFields(columns: ColumnMap) = columns.filter {
     case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
     case _                                               => false
   }
 
-  def buildFields(leftColumns: Map[ColumnRef, Column], rightColumns: Map[ColumnRef, Column]) =
+  def buildFields(leftColumns: ColumnMap, rightColumns: ColumnMap) =
     (filterFields(leftColumns), filterFields(rightColumns))
 
   def buildEmptyObjects(emptyBits: BitSet) = (
@@ -1133,7 +1111,7 @@ trait ConcatHelpers {
     else Map(ColumnRef.id(CEmptyObject) -> EmptyObjectColumn(emptyBits))
   )
 
-  def buildNonemptyObjects(leftFields: Map[ColumnRef, Column], rightFields: Map[ColumnRef, Column]) = {
+  def buildNonemptyObjects(leftFields: ColumnMap, rightFields: ColumnMap) = {
     val (leftInner, leftOuter) = leftFields partition {
       case (ColumnRef(path, _), _)                         =>
         rightFields exists { case (ColumnRef(path2, _), _) => path == path2 }

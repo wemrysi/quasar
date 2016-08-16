@@ -29,7 +29,6 @@ case object JNumberT  extends JPrimitiveType
 case object JTextT    extends JPrimitiveType
 case object JBooleanT extends JPrimitiveType
 case object JNullT    extends JPrimitiveType
-
 case object JDateT   extends JPrimitiveType
 case object JPeriodT extends JPrimitiveType
 

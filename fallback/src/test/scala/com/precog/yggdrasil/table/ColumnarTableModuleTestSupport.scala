@@ -20,10 +20,8 @@
 package quasar.ygg
 package table
 
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-
-import blueeyes.json._
 import scalaz._
 import scalaz.syntax.std.boolean._
 
@@ -94,7 +92,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
         type A = BigDecimal
         val init = BigDecimal(0)
         def scan(a: BigDecimal, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
-          val identityPath = cols collect { case c @ (ColumnRef(CPath.Identity, _), _) => c }
+          val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
           val prioritized = identityPath.values filter {
             case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
             case _ => false
@@ -121,7 +119,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
             }
           }
 
-          (a2, Map(ColumnRef(CPath.Identity, CNum) -> ArrayNumColumn(mask, arr)))
+          (a2, Map(ColumnRef.id(CNum) -> ArrayNumColumn(mask, arr)))
         }
       }
     )

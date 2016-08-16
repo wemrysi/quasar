@@ -1,12 +1,10 @@
 import precogbuild.PlatformBuild._
 
-def scalazVersion   = "7.2.4"
-def specsVersion    = "3.8.4-scalacheck-1.12.5"
-def pathyVersion    = "0.2.1"
-def argonautVersion = "6.2-M3"
-def eclipseVersion  = "7.1.0"
+def scalazVersion     = "7.2.4"
+def specsVersion      = "3.8.4-scalacheck-1.12.5"
+def scalacheckVersion = "1.12.5"
 
-lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (precog % BothScopes, fallback % BothScopes) also (
+lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (fallback) also (
     scalacOptions in console in Compile := consoleArgs,
   initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
        scalacOptions in console in Test := consoleArgs,
@@ -17,12 +15,12 @@ lazy val fallback = project.setup dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
 
-  ("org.mapdb"     %  "mapdb"             % "3.0.1").exclude("org.scalaz", "scalaz-core_2.11"),
+  "org.mapdb"      %  "mapdb"             % "3.0.1",
   "com.chuusai"    %% "shapeless"         % "2.3.1",
   "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),
-  "org.scalacheck" %% "scalacheck"        % "1.12.5"                                            % Test force(),
-  "org.specs2"     %% "specs2-scalacheck" % specsVersion                                        % Test,
-  "org.specs2"     %% "specs2-core"       % specsVersion                                        % Test
+  "org.scalacheck" %% "scalacheck"        % scalacheckVersion      % Test force(),
+  "org.specs2"     %% "specs2-scalacheck" % specsVersion           % Test,
+  "org.specs2"     %% "specs2-core"       % specsVersion           % Test
 )
 
 lazy val benchmark = project.setup dependsOn (fallback % BothScopes) enablePlugins JmhPlugin also (

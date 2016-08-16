@@ -21,14 +21,11 @@ package com.precog
 package common
 
 import blueeyes._
-import scalaz.syntax.semigroup._
-import scalaz.syntax.order._
+import scalaz.Scalaz._
 
 case class ColumnRef(selector: CPath, ctype: CType)
 
 object ColumnRef {
-  def identity(ctype: CType): ColumnRef = ColumnRef(CPath.Identity, ctype)
-
   object id {
     def apply(ctype: CType): ColumnRef = ColumnRef(CPath.Identity, ctype)
     def unapply(x: ColumnRef): Option[CType] = x match {
@@ -37,6 +34,5 @@ object ColumnRef {
     }
   }
 
-  implicit val columnRefOrder: Ord[ColumnRef] =
-    Ord.order[ColumnRef]((r1, r2) => (r1.selector ?|? r2.selector) |+| (r1.ctype ?|? r2.ctype))
+  implicit val columnRefOrder: Ord[ColumnRef] = Ord.orderBy(r => r.selector -> r.ctype)
 }
