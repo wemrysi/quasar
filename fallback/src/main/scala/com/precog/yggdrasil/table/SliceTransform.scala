@@ -567,8 +567,6 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     def f: (A, Slice) => Need[A -> Slice]
     def advance(slice: Slice): Need[SliceTransform1[A] -> Slice]
 
-    def unlift: Option[(A, Slice) => (A, Slice)] = None
-
     def apply(slice: Slice): Need[A -> Slice] = f(initial, slice)
 
     def mapState[B](f: A => B, g: B => A): SliceTransform1[B] =
@@ -754,7 +752,6 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     }
 
     private[table] case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
-      override def unlift = Some(f0)
       val f: (A, Slice) => M[A -> Slice] = { case (a, s) => M point f0(a, s) }
       def advance(s: Slice): M[SliceTransform1[A] -> Slice] =
         M point ({ (a: A) =>
@@ -806,8 +803,6 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     def initial: A
     def f: (A, Slice, Slice) => M[A -> Slice]
     def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice]
-
-    def unlift: Option[(A, Slice, Slice) => (A, Slice)] = None
 
     def apply(sl: Slice, sr: Slice): M[A -> Slice] = f(initial, sl, sr)
 
@@ -976,7 +971,6 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     }
 
     private case class SliceTransform2S[A](initial: A, f0: (A, Slice, Slice) => (A, Slice)) extends SliceTransform2[A] {
-      override def unlift = Some(f0)
       val f: (A, Slice, Slice) => M[A -> Slice] = { case (a, sl, sr) => M point f0(a, sl, sr) }
       def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice] =
         M point ({ (a: A) =>
