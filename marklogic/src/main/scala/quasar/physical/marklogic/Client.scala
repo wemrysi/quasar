@@ -123,20 +123,24 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
   ): Free[S, Boolean] =
     lift(exists_(uri)).into[S]
 
-  def subDirs_(dir: ADir): Task[ResourceNotFound \/ Set[ADir]] = {
+  def subDirs_(dir: ADir): Task[ResourceNotFound \/ Set[RDir]] = {
     val uri = posixCodec.printPath(dir)
     doInSession { session =>
       val request = session.newAdhocQuery(
         s"""for $$uri-prop in xdmp:document-properties(cts:uris("$uri"))[.//prop:directory]
               return base-uri($$uri-prop)""")
       val result = Task.delay(session.submitRequest(request).toResultItemArray)
-      result.map(_.map(resultItem => posixCodec.parseAbsDir(resultItem.getItem.asString)).toList.unite.map(sandboxAbs).toSet.right[ResourceNotFound])
+      result.map { resultItems =>
+        val absDirs = resultItems.map(i => posixCodec.parseAbsDir(i.getItem.asString)).toList.unite.map(sandboxAbs)
+        val relDirs = absDirs.map(_.relativeTo(dir)).unite
+        relDirs.toSet.right[ResourceNotFound]
+      }
     }
   }
 
   def subDirs[S[_]](dir: ADir)(implicit
     S: Task :<: S
-  ): Free[S, ResourceNotFound \/ Set[ADir]] =
+  ): Free[S, ResourceNotFound \/ Set[RDir]] =
     lift(subDirs_(dir)).into[S]
 
   def createDir_(dir: ADir): Task[AlreadyExists \/ Unit] = {
@@ -303,7 +307,7 @@ object Client {
   def subDirs[S[_]](dir: ADir)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
-  ): Free[S, ResourceNotFound \/ Set[ADir]] =
+  ): Free[S, ResourceNotFound \/ Set[RDir]] =
     getClient.asksM(_.subDirs(dir))
 
   def createDir[S[_]](dir: ADir)(implicit
