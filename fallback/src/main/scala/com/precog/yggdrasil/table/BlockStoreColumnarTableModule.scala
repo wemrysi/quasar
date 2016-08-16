@@ -1007,12 +1007,12 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = Need(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] = Need(this)
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
@@ -1039,10 +1039,10 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
       EitherT[M, ExternalTable, InternalTable](Need(\/-(this)))
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] =
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] =
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
     def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = Table.load(this, apiKey, tpe)
@@ -1101,7 +1101,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = {
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] = {
       for {
         tables <- groupByN(Seq(sortKey), Leaf(Source), sortOrder, unique)
       } yield (tables.headOption getOrElse Table.empty)
@@ -1113,7 +1113,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
@@ -1126,7 +1126,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     protected def writeSorted(groupKeys: Seq[TransSpec1],
                               valueSpec: TransSpec1,
                               sortOrder: DesiredSortOrder = SortAscending,
-                              unique: Boolean = false): M[List[String] -> IndexMap] = {
+                              unique: Boolean): M[List[String] -> IndexMap] = {
 
       // If we don't want unique key values (e.g. preserve duplicates), we need to add
       // in a distinct "row id" for each value to disambiguate it

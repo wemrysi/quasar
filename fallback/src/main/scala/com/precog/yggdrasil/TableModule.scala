@@ -237,7 +237,10 @@ trait TableModule extends TransSpecModule {
       * we assign a unique row ID as part of the key so that multiple equal values are
       * preserved
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Table]
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table]
+
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): M[Table] = sort(sortKey, sortOrder, unique = false)
+    def sort(sortKey: TransSpec1): M[Table]                              = sort(sortKey, SortAscending)
 
     def distinct(spec: TransSpec1): Table
 
@@ -258,7 +261,7 @@ trait TableModule extends TransSpecModule {
       * we assign a unique row ID as part of the key so that multiple equal values are
       * preserved
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]]
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
 

@@ -66,7 +66,7 @@ trait RowFormat {
 }
 
 object RowFormat {
-  val byteBufferPool = new ByteBufferPool()
+  val byteBufferPool = ByteBufferPool()
 
   def forSortingKey(columnRefs: Seq[ColumnRef]): RowFormat = SortingKeyRowFormatV1(columnRefs)
 

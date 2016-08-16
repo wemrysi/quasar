@@ -38,9 +38,10 @@ trait ByteBufferMonad[M[_]] extends Monad[M] {
   def getBuffer(min: Int): M[ByteBuffer]
 }
 
-final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int = 8, direct: Boolean = false) {
-  private val _hits   = new AtomicLong()
-  private val _misses = new AtomicLong()
+final class ByteBufferPool(val capacity: Int) {
+  private val fixedBufferCount = 8
+  private val _hits            = new AtomicLong()
+  private val _misses          = new AtomicLong()
 
   val fixedBufferQueue: BlockingQueue[ByteBuffer]               = new ArrayBlockingQueue(fixedBufferCount)
   val flexBufferQueue: BlockingQueue[SoftReference[ByteBuffer]] = new LinkedBlockingQueue()
@@ -65,7 +66,7 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
 
     if (buffer == null) {
       _misses.incrementAndGet()
-      buffer = if (direct) ByteBuffer.allocateDirect(capacity) else ByteBuffer.allocate(capacity)
+      buffer = ByteBuffer.allocate(capacity)
     } else {
       _hits.incrementAndGet()
     }
@@ -75,9 +76,7 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
   }
 
   /**
-    * Releases a `ByteBuffer` back into the pool for re-use later on. This isn't
-    * strictly required, but if `direct` is `true`, then you most certainly
-    * should.
+    * Releases a `ByteBuffer` back into the pool for re-use later on.
     */
   def release(buffer: ByteBuffer): Unit = {
     if (!(fixedBufferQueue offer buffer)) {
@@ -91,6 +90,8 @@ final class ByteBufferPool(val capacity: Int = 16 * 1024, fixedBufferCount: Int 
 }
 
 object ByteBufferPool {
+  def apply(): ByteBufferPool = new ByteBufferPool(16 * 1024)
+
   implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
 
     def point[A](a: => A): ByteBufferPoolS[A] = State.state(a)

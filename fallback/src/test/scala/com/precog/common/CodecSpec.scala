@@ -26,8 +26,8 @@ import quasar.precog._, TestSupport._
 import ByteBufferPool._
 
 class CodecSpec extends quasar.QuasarSpecification {
-  val pool      = new ByteBufferPool()
-  val smallPool = new ByteBufferPool(capacity = 10)
+  val pool      = ByteBufferPool()
+  val smallPool = new ByteBufferPool(10)
 
   implicit def arbBitSet: Arbitrary[BitSet] = Arbitrary(Gen.listOf(Gen.choose(0, 500)) map BitSetUtil.create)
 

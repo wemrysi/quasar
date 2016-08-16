@@ -149,7 +149,7 @@ object Codec {
 
   @inline final def apply[A](implicit codec: Codec[A]): Codec[A] = codec
 
-  private val byteBufferPool = new ByteBufferPool()
+  private val byteBufferPool = ByteBufferPool()
 
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]) = new IndexedSeqCodec(elemCodec)
 
