@@ -1,5 +1,4 @@
 import scalaz._, Ordering._
-
 import quasar.{ precog => p }
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {

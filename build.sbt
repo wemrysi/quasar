@@ -17,6 +17,7 @@ lazy val precog = project.setup deps (
 
   "org.mapdb"      %  "mapdb"             % "3.0.1",
   "com.chuusai"    %% "shapeless"         % "2.3.1",
+  "org.spire-math" %% "spire-macros"      % "0.11.0",
   "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),
   "org.scalacheck" %% "scalacheck"        % scalacheckVersion      % Test force(),
   "org.specs2"     %% "specs2-scalacheck" % specsVersion           % Test,

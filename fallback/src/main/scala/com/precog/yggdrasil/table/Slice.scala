@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import quasar.macros.Spire._
 import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._
@@ -525,9 +526,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val retained = definedness match {
       case AnyDefined =>
         doto(new ArrayIntList) { acc =>
-          Loop.range(0, filter.size) { i =>
-            if (cols.values.toArray.exists(_.isDefinedAt(i))) acc.add(i)
-          }
+          cforRange(0 until filter.size)(i =>
+            if (cols.values exists (_ isDefinedAt i)) acc.add(i)
+          )
         }
 
       case AllDefined =>
@@ -539,7 +540,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
           val grouped = numCols groupBy { case (ColumnRef(cpath, _), _) => cpath }
 
-          Loop.range(0, filter.size) { i =>
+          cforRange(0 until filter.size) { i =>
             def numBools  = grouped.values map (_.values.toArray exists (_ isDefinedAt i))
             def numBool   = numBools reduce (_ && _)
             def otherBool = otherCols.values.toArray forall (_ isDefinedAt i)

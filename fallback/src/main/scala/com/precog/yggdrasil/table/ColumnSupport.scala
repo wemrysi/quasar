@@ -39,6 +39,13 @@ class Map1Column(c: Column) {
   def isDefinedAt(row: Int) = c.isDefinedAt(row)
 }
 
+class Map2ColumnZZZ(c1: BoolColumn, c2: BoolColumn, f: (Boolean, Boolean) => Boolean)
+  extends Map2Column(c1, c2)
+     with BoolColumn
+{
+  def apply(row: Int): Boolean = f(c1(row), c2(row))
+}
+
 class Map2Column(c1: Column, c2: Column) {
   this: Column =>
   def isDefinedAt(row: Int) = c1.isDefinedAt(row) && c2.isDefinedAt(row)
