@@ -14,18 +14,12 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
-import scalaz._
-import scalaz.std.string._
-import scalaz.syntax.foldable._
-
-package object xquery {
-  // TODO: Make a value class at least
-  type XQuery = String
-
-  def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    s"(${fa.intercalate(", ")})"
+object syntax {
+  final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
+    def xs: XQuery = expr.string(str)
+  }
 }

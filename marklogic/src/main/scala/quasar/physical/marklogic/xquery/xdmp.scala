@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic
+package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
-import scalaz._
-import scalaz.std.string._
-import scalaz.syntax.foldable._
+import java.lang.SuppressWarnings
 
-package object xquery {
-  // TODO: Make a value class at least
-  type XQuery = String
+@SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
+object xdmp {
+  def documentGetProperties(uri: XQuery, property: XQuery): XQuery =
+    s"xdmp:document-get-properties($uri, $property)"
 
-  def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
-    s"(${fa.intercalate(", ")})"
+  def nodeUri(node: XQuery): XQuery =
+    s"xdmp:node-uri($node)"
 }
