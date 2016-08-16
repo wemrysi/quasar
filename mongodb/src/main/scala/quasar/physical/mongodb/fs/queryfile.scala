@@ -82,13 +82,13 @@ object queryfile {
 
 private final class QueryFileInterpreter[C](
   execMongo: WorkflowExecutor[MongoDbIO, C],
-  plan: (Fix[LogicalPlan], MongoQueryModel) => EitherT[Writer[PhaseResults, ?], Planner.PlannerError, Workflow.Crystallized[Workflow.WorkflowF]])(
+  plan: (Fix[LogicalPlan], MongoQueryModel) => EitherT[Writer[PhaseResults, ?], Planner.PlannerError, workflow.Crystallized[workflow.WorkflowF]])(
   implicit C: DataCursor[MongoDbIO, C]
 ) extends (QueryFile ~> queryfileTypes.MongoQuery[C, ?]) {
 
   import QueryFile._
   import Planner.{PlannerError => PPlannerError}
-  import Workflow._
+  import quasar.physical.mongodb.workflow._
   import FileSystemError._, fsops._
   import Recursive.ops._
   import queryfileTypes._

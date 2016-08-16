@@ -30,7 +30,6 @@ import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 
 import java.io._
-import pathy.Path.posixCodec
 
 import scalaz._, Scalaz._, concurrent.Task
 
@@ -46,6 +45,8 @@ class ReadFileSpec extends Specification with ScalaCheck  {
 
 
   "readfile" should {
+    "open - read chunk - close" in skipped("Skipped until the local spark emulator can be avoided as it appears to leak resources, even after a context.stop()")
+/*
     "open - read chunk - close" in {
       // given
       import quasar.Data._
@@ -68,6 +69,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
       sc.stop()
       ok
     }
+*/
   }
 
   private def readOneChunk(f: AFile)
@@ -90,7 +92,7 @@ class ReadFileSpec extends Specification with ScalaCheck  {
     
 
   private def inter(implicit sc: SparkContext): ReadFile ~> Task =
-    readfile.interpret[Eff](local_readfile.input[Eff]) andThen foldMapNT[Eff, Task](run)
+    readfile.interpret[Eff](local.readfile.input[Eff]) andThen foldMapNT[Eff, Task](run)
 
   private def newSc(): SparkContext = {
     val config = new SparkConf().setMaster("local[*]").setAppName(this.getClass().getName())

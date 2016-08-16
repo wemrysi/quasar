@@ -27,8 +27,7 @@ package object optimize {
   object pipeline {
     import quasar.physical.mongodb.accumulator._
     import quasar.physical.mongodb.expression._
-    import Workflow._
-    import IdHandling._
+    import quasar.physical.mongodb.workflow._
 
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {
@@ -212,7 +211,7 @@ package object optimize {
       }
 
     private def inlineProject0(r: Reshape, rs: List[Reshape]): Option[Reshape] =
-      inlineProject($ProjectF((), r, IdHandling.IgnoreId), rs)
+      inlineProject($ProjectF((), r, IgnoreId), rs)
 
     def inlineProject[A](p: $ProjectF[A], rs: List[Reshape]): Option[Reshape] = {
       val map = p.getAll.map { case (k, v) =>

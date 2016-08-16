@@ -23,10 +23,10 @@ import quasar.fs.QueryFile
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
+import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
-import quasar.physical.mongodb.Workflow._
-import quasar.physical.mongodb.WorkflowBuilder._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._, string._ // TODO: remove this
 import javascript._

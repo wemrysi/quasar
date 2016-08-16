@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import scala.collection.immutable.ListMap
@@ -29,7 +30,6 @@ import scalaz.syntax.either._
 import org.specs2.scalaz._
 
 class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
-  import Workflow._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =
     WorkflowExecutor.toJS(Crystallize[WorkflowF].crystallize(wf))
@@ -84,7 +84,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with Di
         $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("city") -> $include().right)),
-          IdHandling.ExcludeId))
+          ExcludeId))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find({ "city": true, "_id": false }).limit(10);
@@ -100,7 +100,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with Di
         $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("city") -> $include().right)),
-          IdHandling.ExcludeId))
+          ExcludeId))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.find(
@@ -135,7 +135,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with Di
         $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("c") -> $field("_id", "0").right)),
-          IdHandling.ExcludeId))
+          ExcludeId))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.distinct("city").map(function (elem) { return { "c": elem } });
@@ -154,7 +154,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.QuasarSpecification with Di
         $project[WorkflowF](
           Reshape(ListMap(
             BsonField.Name("c") -> $field("_id", "0").right)),
-          IdHandling.ExcludeId))
+          ExcludeId))
 
       toJS(wf) must beRightDisjunction(
         """db.zips.distinct("city").filter({ "pop": { "$gte": NumberLong("1000") } }).map(
