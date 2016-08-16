@@ -27,7 +27,6 @@ case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 
 trait ProjectionLike {
   type Key
-
   def structure: Need[Set[ColumnRef]]
   def length: Long
 

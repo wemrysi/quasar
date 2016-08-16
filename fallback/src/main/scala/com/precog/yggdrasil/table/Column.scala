@@ -383,23 +383,6 @@ object Column {
     def apply(row: Int) = v
   }
 
-  // def lift(col: Column): HomogeneousArrayColumn[_] = col match {
-  //   case col: BoolColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: LongColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: DoubleColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: NumColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: StrColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: DateColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: PeriodColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-  //   case col: HomogeneousArrayColumn[a] =>
-  //     new HomogeneousArrayColumn[Array[a]] {
-  //       val tpe = CArrayType(col.tpe)
-  //       def isDefinedAt(row: Int)            = col.isDefinedAt(row)
-  //       def apply(row: Int): Array[Array[a]] = Array(col(row))(col.tpe.classTag)
-  //     }
-  //   case _ => sys.error("Cannot lift non-value column.")
-  // }
-
   object unionRightSemigroup extends Semigroup[Column] {
     def append(c1: Column, c2: => Column): Column = {
       cf.util.UnionRight(c1, c2) getOrElse {

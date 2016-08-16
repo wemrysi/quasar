@@ -22,16 +22,47 @@ package table
 
 import com.precog.common._
 import com.precog.common.security.APIKey
-
 import blueeyes._, json._
 import scalaz._, Scalaz._
+import com.precog.bytecode.JType
 
-trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with SliceColumnarTableModule {
-  import trans._
+trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStoreColumnarTableModule {
+  def projections: Map[Path, Projection]
 
-  class ProjectionCompanion extends ProjectionCompanionLike {
-    def apply(path: Path) = Need(projections.get(path))
+  trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
+    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Need, ResourceError, Table] = EitherT.right {
+      for {
+        paths <- pathsM(table)
+        projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
+        totalLength = projections.map(_.length).sum
+      } yield {
+        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[M, Slice] = {
+          StreamT.unfoldM[M, Slice, Option[proj.Key]](None) { key =>
+            proj.getBlockAfter(key, constraints).map { b =>
+              b.map {
+                case BlockProjectionData(_, maxKey, slice) =>
+                  (slice, Some(maxKey))
+              }
+            }
+          }
+        }
+
+        val stream = projections.foldLeft(StreamT.empty[M, Slice]) { (acc, proj) =>
+          // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
+          val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
+            Some(Schema.flatten(tpe, struct.toList).toSet)
+          }
+
+          acc ++ StreamT.wrapEffect(constraints map { c =>
+            slices(proj, c)
+          })
+        }
+
+        Table(stream, ExactSize(totalLength))
+      }
+    }
   }
+  import trans._
 
   implicit def M = Need.need
 
@@ -43,17 +74,16 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with SliceColu
 
   object Table extends TableCompanion
 
-  object Projection extends ProjectionCompanion
-
-  case class Projection(data: Stream[JValue]) extends ProjectionLike {
+  object Projection {
+    def apply(path: Path): Need[Option[Projection]] = Need(projections get path)
+  }
+  case class Projection(val data: Stream[JValue]) extends ProjectionLike {
     type Key = JArray
 
-    private val slices = fromJson(data).slices.toStream.copoint
+    private val slices      = fromJson(data).slices.toStream.copoint
+    val length: Long        = data.length.toLong
+    val xyz: Set[ColumnRef] = slices.foldLeft(Set[ColumnRef]())(_ ++ _.columns.keySet)
 
-    val length: Long = data.length.toLong
-    val xyz = slices.foldLeft(Set.empty[ColumnRef]) {
-      case (acc, slice) => acc ++ slice.columns.keySet
-    }
     def structure = Need(xyz)
 
     def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = Need {
@@ -115,3 +145,4 @@ object BlockStoreTestModule {
     val projections = Map[Path, Projection]()
   }
 }
+
