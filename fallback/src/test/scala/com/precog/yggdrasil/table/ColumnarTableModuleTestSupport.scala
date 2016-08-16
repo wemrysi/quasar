@@ -54,7 +54,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
     Table(
       StreamT.unfoldM(values) { events =>
-        M.point {
+        Need {
           (!events.isEmpty) option {
             makeSlice(events.toStream, sliceSize)
           }

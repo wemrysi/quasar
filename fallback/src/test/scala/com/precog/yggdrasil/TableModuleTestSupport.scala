@@ -23,7 +23,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 
 trait TableModuleTestSupport extends TableModule {
-  implicit def M: MoCo[Need]
+  // implicit def M: MoCo[Need]
 
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2

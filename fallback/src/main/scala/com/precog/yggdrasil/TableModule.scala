@@ -125,8 +125,6 @@ object TableModule {
 trait TableModule extends TransSpecModule {
   import TableModule._
 
-  implicit def M: Monad[M]
-
   type Reducer[α]
   type TableMetrics
 

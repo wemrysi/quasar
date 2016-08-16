@@ -72,7 +72,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
       //   log.warn("indexing large table (%s rows > %s)" format (size, InMemoryLimit))
       // }
 
-      Table(StreamT.fromStream(M.point(slices.toStream)), ExactSize(size))
+      Table(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
     }
   }
 
@@ -95,7 +95,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
 
       def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
         stream.uncons flatMap {
-          case None             => M.point(new TableIndex(buf.toList))
+          case None             => Need(new TableIndex(buf.toList))
           case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
         }
 
@@ -149,7 +149,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
 //        log.warn("indexing large table (%s rows > %s)" format (size, InMemoryLimit))
 //      }
 
-      Table(StreamT.fromStream(M.point(slices.toStream)), ExactSize(size))
+      Table(StreamT.fromStream(Need(slices.toStream)), ExactSize(size))
     }
   }
 
@@ -280,7 +280,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
 
       table.slices.uncons flatMap {
         case Some((slice, _)) => createFromSlice(slice, sts, vt)
-        case None             => M.point(SliceIndex.empty)
+        case None             => Need(SliceIndex.empty)
       }
     }
 
@@ -389,11 +389,11 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
         k += 1
       }
 
-      val back = (0 until keys.length).foldLeft(M.point(Vector.fill[Array[RValue]](numKeys)(null))) {
+      val back = (0 until keys.length).foldLeft(Need(Vector.fill[Array[RValue]](numKeys)(null))) {
         case (accM, i) => {
           val arrM = keys(i)
 
-          M.apply2(accM, arrM) { (acc, arr) =>
+          Need.need.apply2(accM, arrM) { (acc, arr) =>
             acc.updated(i, arr)
           }
         }

@@ -209,7 +209,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
         val (finishedSize, expired) = consumeToBoundary(queue, cellMatrix, 0)
         if (expired.isEmpty) {
-          M.point(None)
+          Need(None)
         } else {
           val completeSlices = expired.map(_.slice)
 
@@ -703,7 +703,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
             writeSlice(slice, state, sortOrder) flatMap { write0(tail, _) }
 
           case None =>
-            M.point {
+            Need {
               val closedJDBMState = state.jdbmState.closed()
               (state.keyTransformsWithIds map (_._2), closedJDBMState.indices)
             }
@@ -732,14 +732,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
                   kslice.columns.toList.sortBy(_._1).unzip match {
                     case (refs, _) if refs.isEmpty =>
-                      M point jdbmState -> thing
+                      Need(jdbmState -> thing)
                     case (refs, _)                 =>
                       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
                   }
               }
 
             case Nil =>
-              M.point((jdbmState, updatedTransforms.reverse))
+              Need((jdbmState, updatedTransforms.reverse))
           }
 
           storeTransformed(jdbmState, keyTrans, Nil) map {
@@ -764,7 +764,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                                  vrefs: List[ColumnRef],
                                  vEncoder: ColumnEncoder,
                                  indexNamePrefix: String,
-                                 jdbmState: JDBMState): M[JDBMState] = M.point {
+                                 jdbmState: JDBMState): M[JDBMState] = Need {
       // Iterate over the slice, storing each row
       // FIXME: Determine whether undefined sort keys are valid
       def storeRows(kslice: Slice, vslice: Slice, keyRowFormat: RowFormat, vEncoder: ColumnEncoder, storage: IndexStore, insertCount: Long): Long = {
@@ -850,7 +850,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
           val slice = Slice(kslice.size, kslice.wrap(CPathIndex(0)).columns ++ vslice.wrap(CPathIndex(1)).columns)
 
           // We can actually get the last key, but is that necessary?
-          M.point(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => M.point(None))))
+          Need(Some(CellState(index, new Array[Byte](0), slice, (k: Bytes) => Need(None))))
 
         case (SliceIndex(name, dbFile, _, _, _, keyColumns, valColumns, count), index) =>
           val sortProjection                                       = new JDBMRawSortProjection(dbFile, name, keyColumns, valColumns, sortOrder, yggConfig.maxSliceSize, count)
@@ -874,7 +874,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         )
       )
 
-      Table(StreamT(M.point(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
+      Table(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
 
     override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
@@ -921,7 +921,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
               }
 
             case None =>
-              M.point(StreamT.Done)
+              Need(StreamT.Done)
           })
         }
 
@@ -999,9 +999,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     def toRValue: M[RValue] = {
       def loop(stream: StreamT[M, Slice]): M[RValue] = stream.uncons flatMap {
-        case Some((head, tail)) if head.size > 0 => M point head.toRValue(0)
+        case Some((head, tail)) if head.size > 0 => Need(head.toRValue(0))
         case Some((_, tail))                     => loop(tail)
-        case None                                => M point CUndefined
+        case None                                => Need(CUndefined)
       }
 
       loop(slices)
@@ -1009,16 +1009,16 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = {
       val xform = transform(valueSpec)
-      M.point(List.fill(groupKeys.size)(xform))
+      Need(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = M.point(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false): M[Table] = Need(this)
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
     override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
 
-    override def force: M[Table] = M.point(this)
+    override def force: M[Table] = Need(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1037,7 +1037,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     import TableModule._
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
-      EitherT[M, ExternalTable, InternalTable](M point \/-(this))
+      EitherT[M, ExternalTable, InternalTable](Need(\/-(this)))
 
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
@@ -1047,7 +1047,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = Table.load(this, apiKey, tpe)
 
-    override def force: M[Table] = M.point(this)
+    override def force: M[Table] = Need(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1082,13 +1082,13 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                 case EstimateSize(min, max) if min < size0 => EstimateSize(size0, max)
                 case tableSize0                            => tableSize0
               }
-              M.point(-\/(new ExternalTable(slices0, tableSize)))
+              Need(-\/(new ExternalTable(slices0, tableSize)))
             } else {
               acc(tail, head :: buffer, head.size + size)
             }
 
           case None =>
-            M.point(\/-(new InternalTable(Slice.concat(buffer.reverse))))
+            Need(\/-(new InternalTable(Slice.concat(buffer.reverse))))
         }
       }
 

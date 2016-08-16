@@ -84,7 +84,7 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpeci
         )
         Slice(sz, slice.columns mapValues (_ |> cf.util.filter(0, sz, bs) get))
       }
-      Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
+      Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
   }
 
   def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
@@ -109,7 +109,7 @@ trait CompactSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpeci
         maskedSlice.getOrElse(slice)
       }
 
-      Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
+      Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
   }
 
   def testCompactIdentity = {

@@ -96,7 +96,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule {
             Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
 
           case None =>
-            M.point {
+            Need {
               states map {
                 case SampleState(inserter, length, _) =>
                   val len = length min sampleSize

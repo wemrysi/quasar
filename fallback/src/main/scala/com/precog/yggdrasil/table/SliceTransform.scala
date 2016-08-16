@@ -752,9 +752,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     }
 
     private[table] case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
-      val f: (A, Slice) => M[A -> Slice] = { case (a, s) => M point f0(a, s) }
+      val f: (A, Slice) => M[A -> Slice] = { case (a, s) => Need(f0(a, s)) }
       def advance(s: Slice): M[SliceTransform1[A] -> Slice] =
-        M point ({ (a: A) =>
+        Need ({ (a: A) =>
           SliceTransform1S[A](a, f0)
         } <-: f0(initial, s))
     }
@@ -971,9 +971,9 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     }
 
     private case class SliceTransform2S[A](initial: A, f0: (A, Slice, Slice) => (A, Slice)) extends SliceTransform2[A] {
-      val f: (A, Slice, Slice) => M[A -> Slice] = { case (a, sl, sr) => M point f0(a, sl, sr) }
+      val f: (A, Slice, Slice) => M[A -> Slice] = { case (a, sl, sr) => Need(f0(a, sl, sr)) }
       def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice] =
-        M point ({ (a: A) =>
+        Need({ (a: A) =>
           SliceTransform2S[A](a, f0)
         } <-: f0(initial, sl, sr))
     }
