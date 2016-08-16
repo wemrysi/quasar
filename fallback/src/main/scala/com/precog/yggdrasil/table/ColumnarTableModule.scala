@@ -330,15 +330,6 @@ trait ColumnarTableModule
 
     def empty: Table = Table(StreamT.empty[M, Slice], ExactSize(0))
 
-    def uniformDistribution(init: MmixPrng): Table = {
-      val gen: StreamT[M, Slice] = StreamT.unfoldM[M, Slice, MmixPrng](init) { prng =>
-        val (column, nextGen) = Column.uniformDistribution(prng)
-        Some((Slice(yggConfig.maxSliceSize, Map(ColumnRef.id(CDouble) -> column)), nextGen)).point[M]
-      }
-
-      Table(gen, InfiniteSize)
-    }
-
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
       Slice(
         vs.length,
