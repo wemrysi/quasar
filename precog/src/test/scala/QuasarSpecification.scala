@@ -1,19 +1,28 @@
 package quasar
 
-import org.specs2.mutable._
-import org.specs2.execute.AsResult
-import org.scalacheck._
+import org.specs2._
+import org.specs2.matcher._
+import org.specs2.control._
+import org.specs2.execute._
+import org.specs2.specification.dsl._
+import org.scalacheck.Arbitrary
 import org.scalacheck.util.{FreqMap, Pretty}
 import org.specs2.scalacheck._
 
-trait QuasarSpecification extends SpecificationLike
+trait QuasarSpecification extends org.specs2.mutable.SpecLike
         with ScalaCheckParameters
-        with AsResultProp
         with ScalaCheckPropertyDsl
-        with GenInstances
+        with Properties
+        with MatchersImplicits
+        with AnyMatchers
+        with MapMatchers
+        with TraversableMatchers
+        with PendingUntilFixed
+        with ExampleDsl
+        with ValueChecks
 {
   // Report all test timings.
-  args.report(showtimes=true)
+  args.report(showtimes = main.ArgProperty(true))
 
   /** Allows marking non-deterministically failing tests as such,
    *  in the manner of pendingUntilFixed but such that it will not

@@ -492,7 +492,7 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
     "concatenate reductions of subsequences" in testPartitionMerge
   }
 
-  "track table metrics" in {
+  "track table metrics" should {
     "single traversal" >> {
       implicit val gen = sample(objectSchema(_, 3))
       prop { (sample: SampleData) =>

@@ -76,7 +76,7 @@ class CodecSpec extends quasar.QuasarSpecification {
     bytes.length must_== codec.encodedSize(a)
     codec.read(ByteBufferWrap(bytes)) must_== a
   }
-  def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" in {
+  def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" should {
     "with large buffers" in { prop { (a: A) => surviveEasyRoundTrip(a)(codec) } }
     "with small buffers" in { prop { (a: A) => surviveHardRoundTrip(a)(codec) } }
   }
@@ -99,7 +99,7 @@ class CodecSpec extends quasar.QuasarSpecification {
   "BigDecimalCodec" should surviveRoundTrip(Codec.BigDecimalCodec)
   "BitSetCodec" should surviveRoundTrip(Codec.BitSetCodec)
   "SparseBitSet" should {
-    "survive round-trip" in {
+    "survive round-trip" should {
       "with large buffers" in {
         prop { (sparse: (Codec[BitSet], BitSet)) =>
           surviveEasyRoundTrip(sparse._2)(sparse._1)
@@ -113,7 +113,7 @@ class CodecSpec extends quasar.QuasarSpecification {
     }
   }
   "SparseRawBitSet" should {
-    "survive round-trip" in {
+    "survive round-trip" should {
       "with large buffers" in {
         prop { (sparse: (Codec[RawBitSet], RawBitSet)) =>
           surviveEasyRoundTrip(sparse._2)(sparse._1)
@@ -127,7 +127,7 @@ class CodecSpec extends quasar.QuasarSpecification {
     }
   }
   "IndexedSeqCodec" should {
-    "survive round-trip" in {
+    "survive round-trip" should {
       "with large buffers" in {
         prop { (xs: IndexedSeq[Long]) => surviveEasyRoundTrip(xs) }
         prop { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveEasyRoundTrip(xs) }
@@ -141,7 +141,7 @@ class CodecSpec extends quasar.QuasarSpecification {
     }
   }
   "ArrayCodec" should {
-    "survive round-trip" in {
+    "survive round-trip" should {
       "with large buffers" in {
         prop { (xs: Array[Long]) => surviveEasyRoundTrip(xs) }
         prop { (xs: Array[Array[Long]]) => surviveEasyRoundTrip(xs) }
