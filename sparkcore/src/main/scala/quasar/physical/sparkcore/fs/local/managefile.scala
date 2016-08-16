@@ -51,18 +51,6 @@ import scalaz.concurrent.Task
 
 object managefile {
 
-  private def toNioPath(path: APath): Path =
-    Paths.get(posixCodec.unsafePrintPath(path))
-
-  private def toAFile(path: Path): Option[AFile] = {
-    val maybeUnboxed = posixCodec.parseAbsFile(path.toString)
-    maybeUnboxed.map(sandboxAbs(_))
-  }
-
-  private def ispathExists: APath => Task[Boolean] = path => Task.delay {
-    Files.exists(toNioPath(path))
-  }
-
   def interpret[S[_]](implicit
     s0: Task :<: S
   ): ManageFile ~> Free[S, ?] =
@@ -79,14 +67,26 @@ object managefile {
       }
     }
 
-  def moveFile(src: APath, dst: APath): FileSystemError \/ Unit =
+  private def toNioPath(path: APath): Path =
+    Paths.get(posixCodec.unsafePrintPath(path))
+
+  private def toAFile(path: Path): Option[AFile] = {
+    val maybeUnboxed = posixCodec.parseAbsFile(path.toString)
+    maybeUnboxed.map(sandboxAbs(_))
+  }
+
+  private def ispathExists: APath => Task[Boolean] = path => Task.delay {
+    Files.exists(toNioPath(path))
+  }
+
+  private def moveFile(src: AFile, dst: AFile): FileSystemError \/ Unit =
     \/.fromTryCatchNonFatal(
       Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
     ) .leftMap {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
 
-  def moveDir(src: APath, dst: APath) =
+  private def moveDir(src: ADir, dst: ADir) =
     \/.fromTryCatchNonFatal{
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
