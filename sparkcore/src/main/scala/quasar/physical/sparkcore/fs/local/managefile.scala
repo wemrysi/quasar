@@ -115,8 +115,8 @@ object managefile {
     val task: Task[FileSystemError \/ Unit] = Task.delay {
       \/.fromTryCatchNonFatal(Files.delete(toNioPath(path)))
         .leftMap {
-        case e: NoSuchFileException => pathErr(invalidPath(path, "File does not exist"))
-        case e: DirectoryNotEmptyException => pathErr(invalidPath(path, "Directory is not empty"))
+        case e: NoSuchFileException => pathErr(pathNotFound(path))
+        case e: DirectoryNotEmptyException => pathErr(pathNotFound(path))
         case e => pathErr(invalidPath(path, e.getMessage()))
       }
     }
@@ -128,12 +128,8 @@ object managefile {
   ): Free[S, FileSystemError \/ AFile] = {
 
     def handleCreationError: Throwable => FileSystemError = {
-      case e: NoSuchFileException => pathErr(invalidPath(
-        near,
-        s"Could not create temp file in dir $near"))
-      case e: FileAlreadyExistsException => pathErr(invalidPath(
-        near,
-        s"File with the same name already exists: $e.getFile"))
+      case e: NoSuchFileException => pathErr(pathNotFound(near))
+      case e: FileAlreadyExistsException => pathErr(pathExists(near))
       case e: FileSystemException if e.getMessage.contains("Not a directory") => pathErr(invalidPath(
         near,
         s"Provided $near is not a directory"))

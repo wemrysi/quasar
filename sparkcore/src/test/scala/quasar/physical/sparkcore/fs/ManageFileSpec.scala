@@ -79,7 +79,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
           } yield {
             // then
             existed must_== false
-            result must_== -\/((PathErr(InvalidPath(path, "File does not exist"))))
+            result must_== -\/((PathErr(PathNotFound(path))))
           }
         }
       }
@@ -97,7 +97,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             filePath <- createFile(dirPath, "temp.tmp")
             result <- execute(program(dirPath))
           } yield {
-            result must_== -\/((PathErr(InvalidPath(dirPath, "Directory is not empty"))))
+            result must_== -\/((PathErr(PathNotFound(dirPath))))
           }
         }
       }
@@ -137,7 +137,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
         // when
         val result = execute(program).unsafePerformSync
         // then
-        result must_== -\/((PathErr(InvalidPath(nearDir, s"Could not create temp file in dir $nearDir"))))
+        result must_== -\/((PathErr(PathNotFound(nearDir))))
         ok
       }
       
