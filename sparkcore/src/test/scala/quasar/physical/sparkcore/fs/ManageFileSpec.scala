@@ -32,7 +32,7 @@ import java.lang.System
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 import pathy.Path._
-import scalaz._, concurrent.Task
+import scalaz._, Scalaz._, concurrent.Task
 
 class ManageFileSpec extends QuasarSpecification with ScalaCheck with DisjunctionMatchers
     with TempFSSugars {
@@ -57,9 +57,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             existsAfter <- exists(path)
           } yield {
             // then
-            result  must_== \/-(())
-            existed must_== true
-            existsAfter must_== false
+            result  must_= \/-(())
+            existed must_= true
+            existsAfter must_= false
           }
         }
       }
@@ -78,8 +78,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result <- execute(program(path))
           } yield {
             // then
-            existed must_== false
-            result must_== -\/((PathErr(PathNotFound(path))))
+            existed must_= false
+            result must_= -\/((PathErr(PathNotFound(path))))
           }
         }
       }
@@ -97,7 +97,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             filePath <- createFile(dirPath, "temp.tmp")
             result <- execute(program(dirPath))
           } yield {
-            result must_== -\/((PathErr(PathNotFound(dirPath))))
+            result must_= -\/((PathErr(PathNotFound(dirPath))))
           }
         }
       }
@@ -120,7 +120,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result must beRightDisjunction.like {
               case path =>
                 posixCodec.unsafePrintPath(path)
-                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must_== true
+                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must_= true
             }
           }
         }
@@ -137,7 +137,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
         // when
         val result = execute(program).unsafePerformSync
         // then
-        result must_== -\/((PathErr(PathNotFound(nearDir))))
+        result must_= -\/((PathErr(PathNotFound(nearDir))))
         ok
       }
       
@@ -154,7 +154,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result <- execute(program(filePath))
           } yield {
             // then
-            result must_== -\/((PathErr(
+            result must_= -\/((PathErr(
               InvalidPath(filePath, s"Provided $filePath is not a directory"))))
           }
         }
@@ -181,9 +181,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_== false
-                dstExists must_== true
-                dstContent must_== List("some content")
+                srcExists must_= false
+                dstExists must_= true
+                dstContent must_= List("some content")
               }
             }
           }
@@ -208,9 +208,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_== false
-                dstExists must_== true
-                dstContent must_== List("src content")
+                srcExists must_= false
+                dstExists must_= true
+                dstContent must_= List("src content")
               }
             }
           }
@@ -235,9 +235,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_== false
-                dstExists must_== true
-                dstContent must_== List("some content")
+                srcExists must_= false
+                dstExists must_= true
+                dstContent must_= List("some content")
               }
             }
           }
@@ -263,14 +263,14 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                result must_== -\/((PathErr(
+                result must_= -\/((PathErr(
                   InvalidPath(dst,
                     "Can not move to destination that already exists if semnatics == failIfExists")))
                 )
-                srcExists must_== true
-                dstExists must_== true
-                srcContent must_== List("src content")
-                dstContent must_== List("dst content")
+                srcExists must_= true
+                dstExists must_= true
+                srcContent must_= List("src content")
+                dstContent must_= List("dst content")
               }
             }
           }
@@ -295,9 +295,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_== false
-                dstExists must_== true
-                dstContent must_== List("src content")
+                srcExists must_= false
+                dstExists must_= true
+                dstContent must_= List("src content")
               }
             }
           }
@@ -322,11 +322,11 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
 
               } yield {
                 // then
-                result must_== -\/((PathErr(
+                result must_= -\/((PathErr(
                   InvalidPath(dst,
                     "Can not move to destination that does not exists if semnatics == failIfMissing")))
                 )
-                srcExists must_== true
+                srcExists must_= true
               }
             }
           }
@@ -351,9 +351,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_== false
-                dstExists must_== true
-                children must_== List(
+                srcExists must_= false
+                dstExists must_= true
+                children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
                 )
@@ -383,9 +383,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_== false
-                dstExists must_== true
-                children must_== List(
+                srcExists must_= false
+                dstExists must_= true
+                children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
                 )
@@ -413,9 +413,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_== false
-                dstExists must_== true
-                children must_== List(
+                srcExists must_= false
+                dstExists must_= true
+                children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
                 )
@@ -444,7 +444,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 result <- execute(program(src, dst))
               } yield {
                 // then
-                result must_== -\/((PathErr(
+                result must_= -\/((PathErr(
                   InvalidPath(dst,
                     "Can not move to destination that already exists if semnatics == failIfExists")))
                 )
@@ -471,7 +471,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 result <- execute(program(src, dst))
               } yield {
                 // then
-                result must_== -\/((PathErr(
+                result must_= -\/((PathErr(
                   InvalidPath(dst,
                     "Can not move to destination that does not exists if semnatics == failIfMissing")))
                 )
@@ -503,9 +503,9 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 children <- getChildren(dst)
               } yield {
                 // then
-                srcExists must_== false
-                dstExists must_== true
-                children must_== List(
+                srcExists must_= false
+                dstExists must_= true
+                children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
                 )
