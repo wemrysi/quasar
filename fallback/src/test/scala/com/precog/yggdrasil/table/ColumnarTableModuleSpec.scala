@@ -52,7 +52,7 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = M.point(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): Need[Seq[Table]] = sys.error("todo")
   }
 
@@ -87,7 +87,7 @@ class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
     def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
       stream.uncons.flatMap {
         case None =>
-          M.point(sb.toString)
+          Need(sb.toString)
         case Some((cb, tail)) =>
           sb.append(cb)
           loop(tail, sb)

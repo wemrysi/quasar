@@ -62,12 +62,11 @@ trait PackageAliases {
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
   // other outside libs
-  type Iso[T, L]   = shapeless.Generic.Aux[T, L]
-  type MoCo[M[+_]] = scalaz.Monad[M] with scalaz.Comonad[M]
-  type M[+A]       = scalaz.Need[A]
-  type Ord[A]      = scalaz.Order[A]
-  type Cmp         = scalaz.Ordering
-  val Ord          = scalaz.Order
+  type Iso[T, L] = shapeless.Generic.Aux[T, L]
+  type M[+A]     = scalaz.Need[A]
+  type Ord[A]    = scalaz.Order[A]
+  type Cmp       = scalaz.Ordering
+  val Ord        = scalaz.Order
 
   def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 }
