@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.fp.free.lift
-import quasar.physical.marklogic.XQuery
+import quasar.physical.marklogic.xquery.XQuery
 
 import java.lang.IllegalStateException
 

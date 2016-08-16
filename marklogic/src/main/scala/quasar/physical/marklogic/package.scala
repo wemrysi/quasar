@@ -16,14 +16,11 @@
 
 package quasar.physical
 
-import quasar.Predef.String
 import quasar.effect.Read
 
 import scalaz.:<:
 
 package object marklogic {
-  type XQuery = String
-
   type ClientR[A] = Read[Client, A]
 
   object ClientR {

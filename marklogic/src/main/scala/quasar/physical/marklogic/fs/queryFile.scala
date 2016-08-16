@@ -28,6 +28,7 @@ import quasar.fp.numeric.Positive
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionR, XccFailure}
+import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
 import com.marklogic.xcc.RequestOptions

@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic
 
-import quasar.Predef._
-import quasar.physical.marklogic.xquery.XQuery
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import quasar.Predef.String
 
-import matryoshka.Algebra
-
-object mapFuncXQuery {
-  def apply[T[_[_]]]: Algebra[MapFunc[T, ?], XQuery] = {
-    case v @ ToString(a1) => ???
-    case v => s" ???(MapFunc - $v)??? "
-  }
+package object xquery {
+  type XQuery = String
 }
