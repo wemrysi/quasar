@@ -28,6 +28,8 @@ import scalaz.concurrent.Task
 object managefile {
   import ManageFile._
 
+  def asDir(file: AFile): ADir = fileParent(file) </> dir(fileName(file).value)
+
   def interpret[S[_]](implicit
     S0: MonotonicSeq :<: S,
     S1: Read[Client, ?] :<: S,
@@ -43,14 +45,18 @@ object managefile {
   def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
     S0: Read[Client, ?] :<: S,
     S1: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = Client.move(scenario, semantics).map(_.right)
+  ): Free[S, FileSystemError \/ Unit] = scenario match {
+    case MoveScenario.FileToFile(src, dst) =>
+      Client.moveDocuments(asDir(src), asDir(dst)).map(_.right)
+    case MoveScenario.DirToDir(src, dst) => ???
+  }
 
   def delete[S[_]](path: APath)(implicit
     S0: Read[Client, ?] :<: S,
     S1: Task :<: S
   ): Free[S, FileSystemError \/ Unit] = refineType(path).fold(
     dir  => Client.deleteStructure(dir).map(_.right),
-    file => Client.deleteContent(fileParent(file) </> dir(fileName(file).value)).map(_.right))
+    file => Client.deleteContent(asDir(file)).map(_.right))
 
   def tempFile[S[_]](path: APath)(implicit
     S0: Read[Client, ?] :<: S

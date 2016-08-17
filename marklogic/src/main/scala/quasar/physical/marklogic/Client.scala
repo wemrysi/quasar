@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.effect.Read
 import quasar.fp.free._
-import quasar.fs._, ManageFile._
+import quasar.fs._
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
@@ -105,15 +105,28 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
     }
   }
 
-  def move_(scenario: MoveScenario, semantics: MoveSemantics): Task[Unit] = scenario match {
-    case MoveScenario.FileToFile(src, dst) => ???
-    case MoveScenario.DirToDir(src, dst)   => ???
+  def moveDocuments_(src: ADir, dst: ADir): Task[Unit] = {
+    if (src === dst) Task.now(())
+    else {
+      val srcUri = posixCodec.printPath(src)
+      val dstUri = posixCodec.printPath(dst)
+      doInSession { session =>
+        val request = session.newAdhocQuery(
+          s"""for $$d in xdmp:directory("$dstUri", "1")
+              return xdmp:document-delete(xdmp:node-uri($$d)),
+              for $$d in xdmp:directory("$srcUri","1")
+              let $$oldName := xdmp:node-uri($$d)
+              let $$newName := fn:concat("$dstUri", fn:tokenize($$oldName, "/")[last()])
+              return (xdmp:document-insert($$newName, doc($$oldName)), xdmp:document-delete($$oldName))""")
+        Task.delay(session.submitRequest(request)).void
+      }
+    }
   }
 
-  def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
+  def moveDocuments[S[_]](src: ADir, dst: ADir)(implicit
     S: Task :<: S
   ): Free[S, Unit] =
-    lift(move_(scenario, semantics)).into[S]
+    lift(moveDocuments_(src, dst)).into[S]
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def exists_(path: APath): Task[Boolean] = {
@@ -129,20 +142,24 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
   ): Free[S, Boolean] =
     lift(exists_(uri)).into[S]
 
-  def subDirs_(dir: ADir): Task[ResourceNotFound \/ Set[ADir]] = {
+  def subDirs_(dir: ADir): Task[ResourceNotFound \/ Set[RDir]] = {
     val uri = posixCodec.printPath(dir)
     doInSession { session =>
       val request = session.newAdhocQuery(
         s"""for $$uri-prop in xdmp:document-properties(cts:uris("$uri"))[.//prop:directory]
               return base-uri($$uri-prop)""")
       val result = Task.delay(session.submitRequest(request).toResultItemArray)
-      result.map(_.map(resultItem => posixCodec.parseAbsDir(resultItem.getItem.asString)).toList.unite.map(sandboxAbs).toSet.right[ResourceNotFound])
+      result.map { resultItems =>
+        val absDirs = resultItems.map(i => posixCodec.parseAbsDir(i.getItem.asString)).toList.unite.map(sandboxAbs)
+        val relDirs = absDirs.map(_.relativeTo(dir)).unite
+        relDirs.toSet.right[ResourceNotFound]
+      }
     }
   }
 
   def subDirs[S[_]](dir: ADir)(implicit
     S: Task :<: S
-  ): Free[S, ResourceNotFound \/ Set[ADir]] =
+  ): Free[S, ResourceNotFound \/ Set[RDir]] =
     lift(subDirs_(dir)).into[S]
 
   def createDir_(dir: ADir): Task[AlreadyExists \/ Unit] = {
@@ -304,11 +321,11 @@ object Client {
     getClient.asksM(_.deleteStructure(dir))
   }
 
-  def move[S[_]](scenario: MoveScenario, semantics: MoveSemantics)(implicit
+  def moveDocuments[S[_]](src: ADir, dst: ADir)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
   ): Free[S, Unit] = {
-    getClient.asksM(_.move(scenario, semantics))
+    getClient.asksM(_.moveDocuments(src, dst))
   }
 
   def exists[S[_]](uri: APath)(implicit
@@ -320,7 +337,7 @@ object Client {
   def subDirs[S[_]](dir: ADir)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
-  ): Free[S, ResourceNotFound \/ Set[ADir]] =
+  ): Free[S, ResourceNotFound \/ Set[RDir]] =
     getClient.asksM(_.subDirs(dir))
 
   def createDir[S[_]](dir: ADir)(implicit
