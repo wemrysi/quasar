@@ -17,11 +17,11 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.Data
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
+import quasar.fs.impl.ReadStream
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 
 import com.marklogic.client._
@@ -31,7 +31,6 @@ import java.net.URI
 import eu.timepit.refined.auto._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
@@ -42,7 +41,7 @@ package object fs {
   type XccCursor[A]  = Coproduct[Task, xcc.XccFailure, A]
   type XccCursorM[A] = Free[XccCursor, A]
 
-  type MLReadHandles[A] = KeyValueStore[ReadHandle, Process[Task, Vector[Data]], A]
+  type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[Task], A]
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
   type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence[XccCursor], A]
 
@@ -74,7 +73,7 @@ package object fs {
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
-      KeyValueStore.impl.empty[ReadHandle, Process[Task, Vector[Data]]]        |@|
+      KeyValueStore.impl.empty[ReadHandle, ReadStream[Task]]        |@|
       KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence[XccCursor]] |@|
       MonotonicSeq.fromZero                                                    |@|
       createClient(uri)

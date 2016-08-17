@@ -17,18 +17,17 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar._
 import quasar.fp.numeric.Positive
 import quasar.fs._
-import quasar.fs.FileSystemError._
-import quasar.fs.PathError._
+import quasar.fs.impl._
+import quasar.fs.FileSystemError.pathErr
+import quasar.fs.PathError.pathNotFound
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.physical.marklogic._
 
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.Process
 
 object readfile {
 
@@ -38,10 +37,10 @@ object readfile {
     implicit
     S0:    Task :<: S,
     S1:    ClientR :<: S,
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, Process[Task, Vector[Data]], S],
+    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[Task], S],
     seq:   MonotonicSeq.Ops[S]
   ): ReadFile ~> Free[S,?] =
-    quasar.fs.impl.readFromProcess { (file, readOpts) =>
+    readFromProcess { (file, readOpts) =>
       val dirPath = fileParent(file) </> dir(fileName(file).value)
       Client.exists(dirPath).ifM(
         // Do not remove call to `getItem`. It will still compile and do the wrong thing.
@@ -51,7 +50,8 @@ object readfile {
         Client.readDirectory(dirPath).map(
           _.map(item => xcc.xdmitem.toData(item.getItem))
             .chunk(chunkSize.get.toInt)
+            .map(_.right[FileSystemError])
             .right[FileSystemError]),
-        pathErr(pathNotFound(file)).left[Process[Task, Vector[Data]]].pure[Free[S, ?]])
+        pathErr(pathNotFound(file)).left[ReadStream[Task]].pure[Free[S, ?]])
     }
 }

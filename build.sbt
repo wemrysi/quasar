@@ -274,6 +274,7 @@ lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sparkcore = project

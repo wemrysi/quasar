@@ -6,6 +6,7 @@ import sbt._, Keys._
 
 object Dependencies {
   private val argonautVersion   = "6.2-M3"
+  private val doobieVersion     = "0.3.0"
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
   private val monocleVersion    = "1.2.2"
@@ -58,6 +59,10 @@ object Dependencies {
     "org.mongodb" % "mongodb-driver-async" %   "3.2.2",
     "io.netty"    % "netty-buffer"         % nettyVersion,
     "io.netty"    % "netty-handler"        % nettyVersion
+  )
+  val postgresql = Seq(
+    "org.tpolecat" %% "doobie-core"               % doobieVersion % "compile, test",
+    "org.tpolecat" %% "doobie-contrib-postgresql" % doobieVersion % "compile, test"
   )
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion,
