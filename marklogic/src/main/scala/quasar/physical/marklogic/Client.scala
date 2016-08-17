@@ -20,6 +20,8 @@ import quasar.Predef._
 import quasar.effect.Read
 import quasar.fp.free._
 import quasar.fs._
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 
 import com.marklogic.client._
 import com.marklogic.client.io.{InputStreamHandle, StringHandle}
@@ -28,17 +30,18 @@ import com.marklogic.xcc.exceptions.XQueryException
 import com.marklogic.xcc.types._
 
 import java.io.ByteArrayInputStream
-import java.util.UUID
 import scala.collection.JavaConverters._
+import scala.math.{ceil, log}
 
 import argonaut._
+import com.fasterxml.uuid.impl.TimeBasedGenerator
+import jawn._
+import jawnstreamz._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scalaz.stream.io
-import jawn._
-import jawnstreamz._
 
 sealed trait Error
 
@@ -56,11 +59,16 @@ final case class ResourceNotFound(message: String) extends Error
 final case class Forbidden(message: String) extends Error
 final case class FailedRequest(message: String) extends Error
 
-final case class Client(client: DatabaseClient, contentSource: ContentSource) {
+final case class Client(
+  client: DatabaseClient,
+  contentSource: ContentSource,
+  uuidGenerator: TimeBasedGenerator
+) {
 
   val docManager = client.newJSONDocumentManager
   val newSession: Task[Session] = Task.delay(contentSource.newSession)
   def closeSession(s: Session): Task[Unit] = Task.delay(s.close)
+
   def doInSession[A](f: Session => Task[A]): Task[A] = for {
     session <- newSession
     result  <- f(session)
@@ -98,9 +106,16 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
       opts.setCacheResult(false)
       opts
     }
+
     val uri = posixCodec.printPath(dir)
+
+    val xqy = cts.search(
+      fn.doc(),
+      cts.directoryQuery(uri.xs),
+      IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
+
     io.iteratorR(newSession)(closeSession) { session =>
-      val request = session.newAdhocQuery(s"""cts:search(fn:doc(), cts:directory-query("$uri"))""", qopts)
+      val request = session.newAdhocQuery(xqy, qopts)
       Task.delay(session.submitRequest(request).iterator.asScala)
     }
   }
@@ -224,16 +239,23 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
       copts
     }
 
-    def mkContent(str: String): Task[Content] =
-      randomFileName map { fn =>
-        val uri = posixCodec.printPath(dir </> file1(fn))
-        ContentFactory.newContent(uri, str, createOptions)
-      }
+    val seqFmt = {
+      val width = ceil(log(contents.size.toDouble) / log(16)).toInt
+      if (width === 0) "" else s"%0${width}x"
+    }
+
+    def mkContent(cid: String, seqNum: Int, str: String): Content = {
+      val fname = cid + seqFmt.format(seqNum)
+      val uri = posixCodec.printPath(dir </> file(fname))
+      ContentFactory.newContent(uri, str, createOptions)
+    }
 
     doInSession { session =>
-      contents.traverse(mkContent)
-        .flatMap(cs => Task.delay(session.insertContent(cs.toArray)))
-        .map(_.right)
+      for {
+        cid <- chunkId
+        cs  =  contents.zipWithIndex map { case (s, i) => mkContent(cid, i, s) }
+        _   <- Task.delay(session.insertContent(cs.toArray))
+      } yield ().right
     }
   }
 
@@ -244,8 +266,9 @@ final case class Client(client: DatabaseClient, contentSource: ContentSource) {
 
   //////
 
-  private def randomFileName: Task[FileName] =
-    Task.delay(FileName(UUID.randomUUID.toString))
+  private def chunkId: Task[String] =
+    Task.delay(uuidGenerator.generate)
+      .map(id => uuid.toSequentialString(id) getOrElse uuid.toOpaqueString(id))
 
   /* Temporary parser until jawn-argonaut supports 6.2.x. */
   @SuppressWarnings(Array(

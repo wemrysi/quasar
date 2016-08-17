@@ -47,11 +47,15 @@ object readfile {
         // This is due to a very shady pattern that was used in marklogic xcc java driver where
         // ResultItem extends XdmItem in order to "forward calls" but that messes up
         // pattern matching, we want the "actual" XdmItem
-        Client.readDirectory(dirPath).map(
-          _.map(item => xcc.xdmitem.toData(item.getItem))
+        Client.readDirectory(dirPath) map { p =>
+          val ltd = p.map(item => xcc.xdmitem.toData(item.getItem))
+                     .drop(readOpts.offset.get.toInt)
+
+          readOpts.limit.fold(ltd)(l => ltd.take(l.get.toInt))
             .chunk(chunkSize.get.toInt)
             .map(_.right[FileSystemError])
-            .right[FileSystemError]),
+            .right[FileSystemError]
+        },
         pathErr(pathNotFound(file)).left[ReadStream[Task]].pure[Free[S, ?]])
     }
 }

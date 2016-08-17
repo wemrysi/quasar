@@ -24,10 +24,11 @@ import quasar.fs._
 import quasar.fs.impl.ReadStream
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 
-import com.marklogic.client._
-import com.marklogic.xcc._
 import java.net.URI
 
+import com.fasterxml.uuid._
+import com.marklogic.client._
+import com.marklogic.xcc._
 import eu.timepit.refined.auto._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
@@ -63,7 +64,9 @@ package object fs {
       user,
       password,
       DatabaseClientFactory.Authentication.DIGEST)
-    Client(dbClient, ContentSourceFactory.newContentSource(uri))
+    val ifaceAddr = Option(EthernetAddress.fromInterface)
+    val uuidGen = ifaceAddr.fold(Generators.timeBasedGenerator)(Generators.timeBasedGenerator)
+    Client(dbClient, ContentSourceFactory.newContentSource(uri), uuidGen)
   }
 
   def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
@@ -73,7 +76,7 @@ package object fs {
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
-      KeyValueStore.impl.empty[ReadHandle, ReadStream[Task]]        |@|
+      KeyValueStore.impl.empty[ReadHandle, ReadStream[Task]]                   |@|
       KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence[XccCursor]] |@|
       MonotonicSeq.fromZero                                                    |@|
       createClient(uri)

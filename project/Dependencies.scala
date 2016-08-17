@@ -74,11 +74,12 @@ object Dependencies {
       .exclude("io.netty", "netty-all")
   )
   def marklogic = Seq(
-    "com.marklogic"  %  "java-client-api"   % "3.0.5",
-    "com.marklogic"  %  "marklogic-xcc"     % "8.0.5",
-    "org.spire-math" %% "jawn-argonaut"     % jawnVersion,
-    "org.spire-math" %% "jawn-parser"       % jawnVersion,
-    "org.http4s"     %% "jawn-streamz"      % "0.8.1"
+    "com.fasterxml.uuid" %  "java-uuid-generator" % "3.1.4",
+    "com.marklogic"      %  "java-client-api"     % "3.0.5",
+    "com.marklogic"      %  "marklogic-xcc"       % "8.0.5",
+    "org.spire-math"     %% "jawn-argonaut"       % jawnVersion,
+    "org.spire-math"     %% "jawn-parser"         % jawnVersion,
+    "org.http4s"         %% "jawn-streamz"        % "0.8.1"
   )
   def web = Seq(
     "ch.qos.logback"  % "logback-classic"     %      "1.1.7",

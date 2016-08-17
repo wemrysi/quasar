@@ -21,20 +21,18 @@ import quasar.Predef._
 import java.lang.SuppressWarnings
 
 import scalaz.{Order => _, _}
+import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object cts {
-  def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery = {
-    val rest = if (urisOrDepth.isEmpty)
-      ""
-    else
-      s", ${urisOrDepth.mkString(", ")}"
-
-    s"cts:directory-query(${uri}${rest})"
-  }
+  def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
+    s"cts:directory-query($uri, ${mkSeq(urisOrDepth)})"
 
   def documentOrder(direction: XQuery): XQuery =
     s"cts:document-order($direction)"
+
+  def indexOrder(index: XQuery, options: XQuery*) =
+    s"cts:index-order($index, ${mkSeq(options)})"
 
   def search(
     expr: XQuery,
@@ -44,4 +42,7 @@ object cts {
     forestIds: IList[XQuery] = IList.empty
   ): XQuery =
     s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0"}, ${mkSeq(forestIds)})"
+
+  val uriReference: XQuery =
+    "cts:uri-reference()"
 }
