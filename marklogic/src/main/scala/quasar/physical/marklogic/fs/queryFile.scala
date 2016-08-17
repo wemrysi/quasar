@@ -20,7 +20,7 @@ import quasar.Predef._
 import quasar.LogicalPlan
 import quasar.PhaseResult
 import quasar.Planner.PlannerError
-import quasar.effect.{MonotonicSeq, Read}
+import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.fp._
@@ -50,7 +50,7 @@ object queryfile {
     S3: MonotonicSeq :<: S,
     S4: Task :<: S,
     S5: XccCursorM :<: S,
-    S6: Read[Client, ?] :<: S
+    S6: ClientR :<: S
   ): QueryFile ~> Free[S, ?] = {
     val session = xcc.session.Ops[S]
 

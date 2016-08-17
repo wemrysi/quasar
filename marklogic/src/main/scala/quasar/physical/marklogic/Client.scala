@@ -23,20 +23,14 @@ import quasar.fs._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
-import com.marklogic.client._
-import com.marklogic.client.io.{InputStreamHandle, StringHandle}
 import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions.XQueryException
 import com.marklogic.xcc.types._
 
-import java.io.ByteArrayInputStream
 import scala.collection.JavaConverters._
 import scala.math.{ceil, log}
 
-import argonaut._
 import com.fasterxml.uuid.impl.TimeBasedGenerator
-import jawn._
-import jawnstreamz._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -44,28 +38,16 @@ import scalaz.stream.Process
 import scalaz.stream.io
 
 sealed trait Error
-
-object Error {
-  def fromException(ex: scala.Throwable): Option[Error] = ex match {
-    case ex: ResourceNotFoundException => ResourceNotFound(ex.getMessage).some
-    case ex: ForbiddenUserException    => Forbidden(ex.getMessage).some
-    case ex: FailedRequestException    => FailedRequest(ex.getMessage).some
-    case _                             => none
-  }
-}
-
 final case class AlreadyExists(path: APath) extends Error
 final case class ResourceNotFound(message: String) extends Error
 final case class Forbidden(message: String) extends Error
 final case class FailedRequest(message: String) extends Error
 
 final case class Client(
-  client: DatabaseClient,
   contentSource: ContentSource,
   uuidGenerator: TimeBasedGenerator
 ) {
 
-  val docManager = client.newJSONDocumentManager
   val newSession: Task[Session] = Task.delay(contentSource.newSession)
   def closeSession(s: Session): Task[Unit] = Task.delay(s.close)
 
@@ -74,31 +56,6 @@ final case class Client(
     result  <- f(session)
     _       <- closeSession(session)
   } yield result
-
-  def release: Task[Unit] = Task.delay(client.release)
-
-  def readDocument_(doc: AFile): Task[ResourceNotFoundException \/ Process[Task, Json]] = {
-    val bufferSize = 100
-    val uri = posixCodec.printPath(doc)
-    val chunkSizes: Process[Task, Int] = Process.constant(64)
-    for {
-      inputStream <- Task.delay{
-                       val buffer = Array.ofDim[Byte](bufferSize)
-                       new ByteArrayInputStream(buffer)
-                     }
-      handle      = new InputStreamHandle(inputStream)
-      stream      = chunkSizes.through(io.chunkR(inputStream)).unwrapJsonArray
-      exception   <- Task.delay(\/.fromTryCatchThrowable[InputStreamHandle, ResourceNotFoundException](docManager.read(uri, handle)))
-    } yield exception.as(stream)
-  }
-
-  def readDocument[S[_]](doc: AFile)(implicit
-    S: Task :<: S
-  ): Free[S, ResourceNotFoundException \/ Process[Task, Json]] =
-    lift(readDocument_(doc)).into[S]
-
-  def getQuery(s: String) =
-    s"<query>$s</query>"
 
   def readDirectory(dir: ADir): Process[Task, ResultItem] = {
     val qopts = {
@@ -220,19 +177,7 @@ final case class Client(
   ): Free[S, Unit] =
     lift(deleteStructure_(dir)).into[S]
 
-  def write_(uri: String, content: String): Task[Error \/ Unit] =
-    Task.delay(docManager.write(uri, new StringHandle(content)))
-      .as(().right)
-      .handleWith {
-        case ex => Error.fromException(ex).cata(err => Task.now(err.left), Task.fail(ex))
-      }
-
-  def write[S[_]](uri: String, content: String)(implicit
-    S: Task :<: S
-  ): Free[S, Error \/ Unit] =
-    lift(write_(uri, content)).into[S]
-
-  def writeInDir_(dir: ADir, contents: Vector[String]): Task[Error \/ Unit] = {
+  def writeInDir_(dir: ADir, contents: Vector[String]): Task[Unit] = {
     val createOptions = {
       val copts = new ContentCreateOptions()
       copts.setFormatJson()
@@ -255,13 +200,13 @@ final case class Client(
         cid <- chunkId
         cs  =  contents.zipWithIndex map { case (s, i) => mkContent(cid, i, s) }
         _   <- Task.delay(session.insertContent(cs.toArray))
-      } yield ().right
+      } yield ()
     }
   }
 
   def writeInDir[S[_]](dir: ADir, content: Vector[String])(implicit
     S: Task :<: S
-  ): Free[S, Error \/ Unit] =
+  ): Free[S, Unit] =
     lift(writeInDir_(dir, content)).into[S]
 
   //////
@@ -269,60 +214,10 @@ final case class Client(
   private def chunkId: Task[String] =
     Task.delay(uuidGenerator.generate)
       .map(id => uuid.toSequentialString(id) getOrElse uuid.toOpaqueString(id))
-
-  /* Temporary parser until jawn-argonaut supports 6.2.x. */
-  @SuppressWarnings(Array(
-    "org.wartremover.warts.NonUnitStatements",
-    "org.wartremover.warts.MutableDataStructures",
-    "org.wartremover.warts.Null",
-    "org.wartremover.warts.Var"))
-  private implicit val facade: Facade[Json] = {
-    new Facade[Json] {
-      def jnull() = Json.jNull
-      def jfalse() = Json.jFalse
-      def jtrue() = Json.jTrue
-      def jnum(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jint(s: String) = Json.jNumber(JsonNumber.unsafeDecimal(s))
-      def jstring(s: String) = Json.jString(s)
-
-      def singleContext() = new FContext[Json] {
-        var value: Json = null
-        def add(s: String) = { value = jstring(s) }
-        def add(v: Json) = { value = v }
-        def finish: Json = value
-        def isObj: Boolean = false
-      }
-
-      def arrayContext() = new FContext[Json] {
-        val vs = scala.collection.mutable.ListBuffer.empty[Json]
-        def add(s: String) = { vs += jstring(s); () }
-        def add(v: Json) = { vs += v; () }
-        def finish: Json = Json.jArray(vs.toList)
-        def isObj: Boolean = false
-      }
-
-      def objectContext() = new FContext[Json] {
-        var key: String = null
-        var vs = JsonObject.empty
-        def add(s: String): Unit =
-          if (key == null) { key = s } else { vs = vs + (key, jstring(s)); key = null }
-        def add(v: Json): Unit =
-        { vs = vs + (key, v); key = null }
-        def finish = Json.jObject(vs)
-        def isObj = true
-      }
-    }
-  }
 }
 
 // Is there a better way of doing this without as much duplication?
 object Client {
-  def readDocument[S[_]](doc: AFile)(implicit
-    getClient: Read.Ops[Client, S],
-    S: Task :<: S
-  ): Free[S, ResourceNotFoundException \/ Process[Task, Json]] =
-    getClient.asksM(_.readDocument(doc))
-
   def readDirectory[S[_]](dir: ADir)(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
@@ -369,21 +264,9 @@ object Client {
   ): Free[S, AlreadyExists \/ Unit] =
     getClient.asksM(_.createDir(dir))
 
-  def write[S[_]](uri: String, content: String)(implicit
-    getClient: Read.Ops[Client, S],
-    S: Task :<: S
-  ): Free[S, Error \/ Unit] =
-    getClient.asksM(_.write(uri, content))
-
   def writeInDir[S[_]](dir: ADir, content: Vector[String])(implicit
     getClient: Read.Ops[Client, S],
     S: Task :<: S
-  ): Free[S, Error \/ Unit] =
+  ): Free[S, Unit] =
     getClient.asksM(_.writeInDir(dir, content))
-
-  def execute[S[_]](xQuery: String, dst: ADir)(implicit
-    getClient: Read.Ops[Client, S],
-    S: Task :<: S
-  ): Free[S, Unit] = ???
-
 }

@@ -58,13 +58,7 @@ object writefile {
       case WriteFile.Write(h, data) =>
         val asDir = fileParent(h.file) </> dir(fileName(h.file).value)
         cursors.get(h).isDefined.ifM(
-          Client.writeInDir(asDir, asString(data)).map( result =>
-            result.swap.toOption.map {
-              case ResourceNotFound(msg) => pathErr(pathNotFound(h.file))
-              case Forbidden(msg)        => writeFailed(Data.Arr(data.toList), "Quasar is not authorized to perform this operation on the MarkLogic server")
-              case FailedRequest(msg)    => writeFailed(Data.Arr(data.toList), "An unknown error occured at the MarkLogic REST API level")
-              case AlreadyExists(_)         => ??? // TODO: Make it typesafe that this error is not possible here
-            }.toList.toVector),
+          Client.writeInDir(asDir, asString(data)).as(Vector[FileSystemError]()),
           Vector(unknownWriteHandle(h)).pure[Free[S,?]])
 
       case WriteFile.Close(h) =>

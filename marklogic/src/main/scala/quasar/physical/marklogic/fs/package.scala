@@ -27,7 +27,6 @@ import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 import java.net.URI
 
 import com.fasterxml.uuid._
-import com.marklogic.client._
 import com.marklogic.xcc._
 import eu.timepit.refined.auto._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -56,17 +55,9 @@ package object fs {
   type Eff6[A] = Coproduct[xcc.XccFailure, XccCursorM, A]
 
   def createClient(uri: URI): Task[Client] = Task.delay {
-    val (user, password0) = uri.getUserInfo.span(_ ≠ ':')
-    val password = password0.drop(1)
-    def dbClient = DatabaseClientFactory.newClient(
-      uri.getHost,
-      uri.getPort,
-      user,
-      password,
-      DatabaseClientFactory.Authentication.DIGEST)
     val ifaceAddr = Option(EthernetAddress.fromInterface)
     val uuidGen = ifaceAddr.fold(Generators.timeBasedGenerator)(Generators.timeBasedGenerator)
-    Client(dbClient, ContentSourceFactory.newContentSource(uri), uuidGen)
+    Client(ContentSourceFactory.newContentSource(uri), uuidGen)
   }
 
   def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
@@ -101,7 +92,7 @@ package object fs {
         failErrs                            :+:
         foldMapNT(reflNT[Task] :+: failErrs)
 
-      (toTask, client.release)
+      (toTask, ().point[Task])
     }
   }
 
