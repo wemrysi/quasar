@@ -38,8 +38,8 @@ import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.fs.ManageFile._
-import quasar.fs.ManageFile.MoveSemantics._
 import quasar.fs.ManageFile.MoveScenario._
+import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
 
@@ -51,6 +51,26 @@ import scalaz.concurrent.Task
 
 object managefile {
 
+  def interpret[S[_]](implicit
+    s0: Task :<: S
+  ): ManageFile ~> Free[S, ?] =
+    new (ManageFile ~> Free[S, ?]) {
+      def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
+        case Move(FileToFile(sf, df), semantics) =>
+          injectFT[Task, S].apply{
+            ensureMoveSemantics(df, doesPathExist, semantics)
+              .fold(fse => Task.now(fse.left), moveFile(sf, df)).join
+          }
+        case Move(DirToDir(sd, dd), semantics) =>
+          injectFT[Task, S].apply{
+            ensureMoveSemantics(dd, doesPathExist, semantics)
+              .fold(fse => Task.now(fse.left), moveDir(sd, dd)).join
+          }
+        case Delete(path) => delete(path)
+        case TempFile(near) => tempFile(near)
+      }
+    }
+
   private def toNioPath(path: APath): Path =
     Paths.get(posixCodec.unsafePrintPath(path))
 
@@ -59,81 +79,36 @@ object managefile {
     maybeUnboxed.map(sandboxAbs(_))
   }
 
-  def interpret[S[_]](implicit
-    s0: Task :<: S
-  ): ManageFile ~> Free[S, ?] =
-    new (ManageFile ~> Free[S, ?]) {
-      def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
-        case Move(FileToFile(sf, df), semantics) => moveFile(sf, df, semantics)
-        case Move(DirToDir(sd, dd), semantics) => moveDir(sd, dd, semantics)
-        case Delete(path) => delete(path)
-        case TempFile(near) => tempFile(near)
-      }
-    }
-
-  private def moveFile[S[_]](src: AFile, dst: AFile, semantics: MoveSemantics)(implicit
-    s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = {
-
-    def makeMove:FileSystemError \/ Unit =
-      \/.fromTryCatchNonFatal(
-        Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
-      ) .leftMap {
-        case e => pathErr(invalidPath(dst, e.getMessage()))
-      }.void
-
-    def failBecauseExists = PathErr(InvalidPath(src,
-      "Can not move to destination that already exists if semnatics == failIfExists"))
-    def failBecauseMissing = PathErr(InvalidPath(src,
-      "Can not move to destination that does not exists if semnatics == failIfMissing"))
-
-    injectFT[Task, S].apply{
-      Task.delay {
-        semantics match {
-          case Overwrite => makeMove
-          case FailIfExists => if(Files.exists(toNioPath(dst))) -\/(failBecauseExists) else makeMove
-          case FailIfMissing => if(Files.notExists(toNioPath(dst))) -\/(failBecauseMissing) else makeMove
-        }
-      }
-    }
+  private def doesPathExist: APath => Task[Boolean] = path => Task.delay {
+    Files.exists(toNioPath(path))
   }
 
-  private def moveDir[S[_]](src: ADir, dst: ADir, semantics: MoveSemantics)(implicit
-    s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = {
+  private def moveFile(src: AFile, dst: AFile): Task[FileSystemError \/ Unit] = Task.delay {
+    \/.fromTryCatchNonFatal(
+      Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
+    ) .leftMap {
+      case e => pathErr(invalidPath(dst, e.getMessage()))
+    }.void
+  }
 
-    def failBecauseExists = PathErr(InvalidPath(dst,
-      "Can not move to destination that already exists if semnatics == failIfExists"))
-    def failBecauseMissing = PathErr(InvalidPath(dst,
-      "Can not move to destination that does not exists if semnatics == failIfMissing"))
-
-
-    def makeMove =  \/.fromTryCatchNonFatal{
+  private def moveDir(src: ADir, dst: ADir): Task[FileSystemError \/ Unit] = Task.delay {
+    \/.fromTryCatchNonFatal{
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
     }
       .leftMap {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
+  }
 
-    injectFT[Task, S].apply{
-      Task.delay {
-        semantics match {
-          case Overwrite => makeMove
-          case FailIfExists => if(Files.exists(toNioPath(dst))) -\/(failBecauseExists) else makeMove
-          case FailIfMissing => if(Files.notExists(toNioPath(dst))) -\/(failBecauseMissing) else makeMove
-        }
-      }
-    }}
-  
   private def delete[S[_]](path: APath)(implicit
     s0: Task :<: S
   ): Free[S, FileSystemError \/ Unit] = {
     val task: Task[FileSystemError \/ Unit] = Task.delay {
       \/.fromTryCatchNonFatal(Files.delete(toNioPath(path)))
         .leftMap {
-        case e: NoSuchFileException => pathErr(invalidPath(path, "File does not exist"))
-        case e: DirectoryNotEmptyException => pathErr(invalidPath(path, "Directory is not empty"))
+        case e: NoSuchFileException => pathErr(pathNotFound(path))
+        case e: DirectoryNotEmptyException => pathErr(pathNotFound(path))
         case e => pathErr(invalidPath(path, e.getMessage()))
       }
     }
@@ -145,12 +120,8 @@ object managefile {
   ): Free[S, FileSystemError \/ AFile] = {
 
     def handleCreationError: Throwable => FileSystemError = {
-      case e: NoSuchFileException => pathErr(invalidPath(
-        near,
-        s"Could not create temp file in dir $near"))
-      case e: FileAlreadyExistsException => pathErr(invalidPath(
-        near,
-        s"File with the same name already exists: $e.getFile"))
+      case e: NoSuchFileException => pathErr(pathNotFound(near))
+      case e: FileAlreadyExistsException => pathErr(pathExists(near))
       case e: FileSystemException if e.getMessage.contains("Not a directory") => pathErr(invalidPath(
         near,
         s"Provided $near is not a directory"))

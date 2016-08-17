@@ -95,12 +95,12 @@ object QueryFile {
     * information to the user about how a given query would be evaluated on
     * this filesystem implementation.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class Explain(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ExecutionPlan)]
 
-  /** This operation lists the names of all the immidiate children of the supplied directory
+  /** This operation lists the names of all the immediate children of the supplied directory
     * in the filesystem.
     */
     /* TODO: While this is a bit better in one dimension here in `QueryFile`,
