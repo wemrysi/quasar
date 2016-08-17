@@ -131,15 +131,17 @@ object WorkflowOp3_2F {
       }
     }
 
-  implicit def renderTree: RenderTree[WorkflowOp3_2F[Unit]] =
-    new RenderTree[WorkflowOp3_2F[Unit]] {
-      val wfType = "Workflow3.2" :: Nil
+  implicit def renderTree: Delay[RenderTree, WorkflowOp3_2F] =
+    new Delay[RenderTree, WorkflowOp3_2F] {
+      def apply[A](fa: RenderTree[A]) = new RenderTree[WorkflowOp3_2F[A]] {
+        val wfType = "Workflow3.2" :: Nil
 
-      def render(v: WorkflowOp3_2F[Unit]) = v match {
-        case $LookupF(_, from, localField, foreignField, as) =>
-          Terminal("$LookupF" :: wfType, s"$from with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
-        case $SampleF(_, size) =>
-          Terminal("$SampleF" :: wfType, size.toString.some)
+        def render(v: WorkflowOp3_2F[A]) = v match {
+          case $LookupF(_, from, localField, foreignField, as) =>
+            Terminal("$LookupF" :: wfType, s"$from with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
+          case $SampleF(_, size) =>
+            Terminal("$SampleF" :: wfType, size.toString.some)
+        }
       }
     }
 }

@@ -164,6 +164,26 @@ object RenderTree extends RenderTreeInstances {
     def render(v: A) = Terminal(nodeType, Some(v.toString))
   }
 
+  def fromShow[A: Show](simpleType: String) = new RenderTree[A] {
+    def render(v: A) = Terminal(List(simpleType), Some(v.shows))
+  }
+
+  def delayFromShow[F[_]: Functor: Foldable](implicit F: Delay[Show, F]) =
+    new Delay[RenderTree, F] {
+      def apply[A](a: RenderTree[A]) = new RenderTree[F[A]] {
+        def render(v: F[A]) =
+          NonTerminal(List(v.void.shows), None, v.toList.map(a.render))
+      }
+    }
+
+  implicit def const[A: RenderTree]: Delay[RenderTree, Const[A, ?]] =
+    new Delay[RenderTree, Const[A, ?]] {
+      def apply[B](a: RenderTree[B]) = new RenderTree[Const[A, B]] {
+        def render(v: Const[A, B]) =
+          v.getConst.render
+      }
+    }
+
   /** For use with `<|`, mostly. */
   def print[A: RenderTree](label: String, a: A): Unit = println(label + ":\n" + a.show)
 

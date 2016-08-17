@@ -527,9 +527,20 @@ object MapFuncs {
   @Lenses final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // helpers & QScript-specific
+  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
+    * `{ k1: k1, k2: k2, ...}`.
+    */
   @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns an array of `[v1, v2, ...]` into an array of `[0, 1, ...]`.
+    */
   @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
+    * `{ k1: [k1, v1], k2: [k2, v2], ...}`.
+    */
   @Lenses final case class ZipMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns an array of `[v1, v2, ...]` into an array of
+    * `[[0, v1], [1, v2], ...]`.
+    */
   @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 

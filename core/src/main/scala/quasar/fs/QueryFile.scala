@@ -47,21 +47,25 @@ object QueryFile {
     */
   def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
     lp: T[LogicalPlan]):
-      PlannerError \/ T[QScriptTotal[T, ?]] = {
+      EitherT[Writer[PhaseResults, ?], PlannerError, T[QScriptTotal[T, ?]]] = {
     val qscript = new Transform[T, QScriptTotal[T, ?]]
     val optimize = new Optimize[T]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    lp.transCata(orOriginal(Optimizer.elideLets[T]))
+    val qs = lp.transCata(orOriginal(Optimizer.elideLets[T]))
       .transCataM(qscript.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[T], Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[T], QScriptTotal[T, ?], T[QScriptTotal[T, ?]]]).lower) ⋙ optimize.applyAll)
-        // TODO: Rather than explicitly applying multiple times, we should apply
-        //       repeatedly until unchanged.
-        .transCata(optimize.applyAll)
-        .transCata(optimize.applyAll))
-    }
+        EnvT((EmptyAnn[T], Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+          .transCata(((_: EnvT[Ann[T], QScriptTotal[T, ?], T[QScriptTotal[T, ?]]]).lower) ⋙ optimize.applyAll)
+          // TODO: Rather than explicitly applying multiple times, we should
+          //       apply repeatedly until unchanged.
+          .transCata(optimize.applyAll)
+          .transCata(optimize.applyAll))
+
+    EitherT(Writer(
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qs))
+  }
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.

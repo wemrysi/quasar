@@ -749,10 +749,14 @@ object MongoDbQScriptPlanner {
 
   type GenT[X[_], A]  = StateT[X, NameGen, A]
 
-  def plan0[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, WF[_]: Functor: Coalesce: Crush: Crystallize](joinHandler: JoinHandler[WF, WorkflowBuilder.M])(lp: T[LogicalPlan])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]):
+  def plan0[T[_[_]]: Recursive: Corecursive: EqualT: ShowT,
+            WF[_]: Functor: Coalesce: Crush: Crystallize](
+    joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+    lp: T[LogicalPlan])(
+    implicit I: WorkflowOpCoreF :<: WF,
+             ev: Show[WorkflowBuilder[WF]],
+             WB: WorkflowBuilder.Ops[WF],
+             R: Delay[RenderTree, WF]):
       EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WF]] = {
     val optimize = new Optimize[T]
 
@@ -784,22 +788,19 @@ object MongoDbQScriptPlanner {
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
-      qs  <- liftError[T[QScriptTotal[T, ?]]](QueryFile.convertToQScript(lp))
-      // opt <- log("QScript (Mongo-specific)")(liftError(
-      //   qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](
-      //     (optimize.assumeReadType(Type.Obj(ListMap(), Some(Type.Top))) ⋘ optimize.simplifyJoins) ∘
-      //       repeatedly(optimize.normalize))))
-      // wb  <- log("Workflow Builder")(swizzle(swapM(qs.gcataM[Cofree[QScriptTotal[T, ?], ?], State[NameGen, ?], OutputM[WorkflowBuilder[WF]]](distHisto, P.plan  ⋙ (_ ∘ (_ ∘ (_ ∘ normalize)))))))
-      // wf1  <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
-      // wf2  <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
-      wb  <- swizzle(qs.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) // ∘ (_ ∘ (_ ∘ normalize))
-      ))
-      wf1  <- swizzle(WorkflowBuilder.build(wb))
-      wf2  <- Crystallize[WF].crystallize(wf1).point[M]
+      qs  <- QueryFile.convertToQScript(lp).liftM[StateT[?[_], NameGen, ?]]
+      opt <- log("QScript (Mongo-specific)")(liftError(
+        qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
+          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) // ⋘ optimize.simplifyJoins
+          ).apply(tf) ∘
+            Normalizable[QScriptTotal[T, ?]].normalize)))
+      wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
+      wf1  <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
+      wf2  <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
   }
 
-  /** Translate the high-level "logical" plan to an executable MongoDB "physical"
+  /** Translate the QScript plan to an executable MongoDB "physical"
     * plan, taking into account the current runtime environment as captured by
     * the given context (which is for the time being just the "query model"
     * associated with the backend version.)
