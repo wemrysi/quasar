@@ -21,7 +21,7 @@ import quasar.{RenderTree, NonTerminal, Terminal}, RenderTree.ops._
 import quasar.fp._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.{Bson, BsonField, Collection, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
+import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
   MapReduce.Scope
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -356,7 +356,7 @@ object $sort {
  * The latter seems preferable, but currently the forking semantics are not
  * clear.
  */
-final case class $OutF[A](src: A, collection: Collection)
+final case class $OutF[A](src: A, collection: CollectionName)
     extends WorkflowOpCoreF[A] { self =>
   def shapePreserving: ShapePreservingF[WorkflowOpCoreF, A] =
     new ShapePreservingF[WorkflowOpCoreF, A] {
@@ -366,16 +366,16 @@ final case class $OutF[A](src: A, collection: Collection)
         self.copy(src = newSrc).shapePreserving
 
       def op = "$out"
-      def rhs = Bson.Text(collection.collectionName)
+      def rhs = collection.bson
     }
 }
 object $out {
-  def apply[F[_]: Coalesce](collection: Collection)
+  def apply[F[_]: Coalesce](collection: CollectionName)
     (implicit I: WorkflowOpCoreF :<: F): FixOp[F] =
     src => Fix(Coalesce[F].coalesce(I.inj($OutF(src, collection))))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOpCoreF :<: F)
-    : Option[(A, Collection)] =
+    : Option[(A, CollectionName)] =
     I.prj(op) collect {
       case $OutF(src, collection) => (src, collection)
     }
@@ -992,7 +992,7 @@ object WorkflowOpCoreF {
               JSRenderTree.render(fn) ::
                 Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
                 Nil)
-          case $OutF(_, coll) => coll.render.copy(nodeType = "$OutF" :: wfType)
+          case $OutF(_, coll) => Terminal("$OutF" :: wfType, Some(coll.value))
           case $FoldLeftF(_, _) => Terminal("$FoldLeftF" :: wfType, None)
         }
       }

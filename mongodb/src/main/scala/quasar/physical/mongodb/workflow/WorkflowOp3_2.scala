@@ -18,7 +18,7 @@ package quasar.physical.mongodb.workflow
 
 import quasar.Predef._
 import quasar.{RenderTree, Terminal}
-import quasar.physical.mongodb.{Bson, BsonField, Collection}
+import quasar.physical.mongodb.{Bson, BsonField, CollectionName}
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -28,7 +28,7 @@ sealed abstract class WorkflowOp3_2F[+A]
 
 final case class $LookupF[A](
   src: A,
-  from: Collection,  // FIXME: this must refer to the same DB as the source
+  from: CollectionName,
   localField: BsonField,
   foreignField: BsonField,
   as: BsonField.Name)
@@ -41,7 +41,7 @@ final case class $LookupF[A](
 
       def op = "$lookup"
       def rhs = Bson.Doc(ListMap(
-        "from" -> Bson.Text(from.collectionName),
+        "from" -> from.bson,
         "localField" -> localField.bson,
         "foreignField" -> foreignField.bson,
         "as" -> as.bson
@@ -50,7 +50,7 @@ final case class $LookupF[A](
 }
 object $lookup {
   def apply[F[_]: Coalesce](
-    from: Collection,
+    from: CollectionName,
     localField: BsonField,
     foreignField: BsonField,
     as: BsonField.Name)
@@ -58,7 +58,7 @@ object $lookup {
       src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, Collection, BsonField, BsonField, BsonField.Name)] =
+    : Option[(A, CollectionName, BsonField, BsonField, BsonField.Name)] =
     I.prj(op) collect {
       case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
     }
@@ -138,7 +138,7 @@ object WorkflowOp3_2F {
 
         def render(v: WorkflowOp3_2F[A]) = v match {
           case $LookupF(_, from, localField, foreignField, as) =>
-            Terminal("$LookupF" :: wfType, s"$from with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
+            Terminal("$LookupF" :: wfType, s"from ${from.value} with (this).${localField.asText} = (that).${foreignField.asText} as ${as.asText}".some)
           case $SampleF(_, size) =>
             Terminal("$SampleF" :: wfType, size.toString.some)
         }

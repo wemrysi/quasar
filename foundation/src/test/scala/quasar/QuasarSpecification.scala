@@ -24,6 +24,12 @@ import org.specs2.execute.AsResult
 import scalaz._
 
 trait QuasarSpecification extends SpecificationLike with ScalazMatchers with PendingWithAccurateCoverage {
+  // Fail fast and repot all timings when running on CI.
+  if (scala.sys.env contains "TRAVIS") {
+    args(stopOnFail=true)
+    args.report(showtimes = true)
+  }
+
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
     def must_=(rhs: A) = lhs must equal(rhs)
   }

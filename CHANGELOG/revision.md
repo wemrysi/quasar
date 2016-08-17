@@ -1,2 +1,1 @@
-- Move some classes outside of method body.
-- Enable -Ybackend:GenBCode to scalac.
+- initial implementation of QScript-based MongoDB filesystem

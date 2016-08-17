@@ -785,10 +785,10 @@ object MongoDbQScriptPlanner {
     val P = scala.Predef.implicitly[Planner.Aux[T, QScriptTotal[T, ?]]]
 
     (for {
+      qs  <- QueryFile.convertToQScript(lp).liftM[StateT[?[_], NameGen, ?]]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
-      qs  <- QueryFile.convertToQScript(lp).liftM[StateT[?[_], NameGen, ?]]
       opt <- log("QScript (Mongo-specific)")(liftError(
         qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
           (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) // ⋘ optimize.simplifyJoins
@@ -809,13 +809,13 @@ object MongoDbQScriptPlanner {
     * callers don't need to worry about it.
     */
   def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
-    logical: T[LogicalPlan], queryContext: MongoQueryModel):
+    logical: T[LogicalPlan], queryContext: fs.QueryContext):
       EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
-    queryContext match {
+    queryContext.model match {
       case `3.2` =>
-        val pl = JoinHandler.pipeline[Workflow3_2F]
+        val pl = JoinHandler.pipeline[Workflow3_2F](queryContext.statistics)
         val mr = JoinHandler.mapReduce[Workflow3_2F]
         val joinHandler =
           JoinHandler[Workflow3_2F, WorkflowBuilder.M]((tpe, l, r) =>
