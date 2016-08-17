@@ -42,23 +42,30 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix, QScriptTotal[Fix, ?]]
+  type QS[A] = QScriptTotal[Fix, A]
+
+  val transform = new Transform[Fix, QS]
   val optimize = new Optimize[Fix]
+
+  def optimizeEval(
+    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
+    //       so we don’t duplicate work.
+    eval: QS[Fix[QS]] => QS[Fix[QS]]):
+      Fix[LogicalPlan] => PlannerError \/ Fix[QS] =
+    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
+      .transCataM(transform.lpToQScript).map(qs =>
+      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QS].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[Fix], QS, Fix[QS]]).lower) ⋙ eval))
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptTotal[Fix, ?]] =
-    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
-    //       so we don’t duplicate work.
-    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
-      .transCataM(qscript.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QScriptTotal[Fix, ?], Fix[QScriptTotal[Fix, ?]]]).lower) ⋙ optimize.applyAll)
-        // TODO: Rather than explicitly applying multiple times, we should apply
-        //       repeatedly until unchanged.
-        .transCata(optimize.applyAll)
-        .transCata(optimize.applyAll))
+  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QS] = { lp =>
+    // TODO: Rather than explicitly applying multiple times, we should apply
+    //       repeatedly until unchanged.
+    optimizeEval(optimize.applyAll)(lp).map(
+      _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+  }
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.
