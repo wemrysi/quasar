@@ -20,11 +20,10 @@ import quasar.Predef._
 import quasar.{Data, DataArbitrary}
 import quasar.fp._
 
-import org.specs2.ScalaCheck
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
-class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture {
+class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
   import DataArbitrary._, FileSystemError._, PathError._
 
   "ReadFile" should {
