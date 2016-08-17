@@ -38,8 +38,8 @@ import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.fs.ManageFile._
-import quasar.fs.ManageFile.MoveSemantics._
 import quasar.fs.ManageFile.MoveScenario._
+import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
 
@@ -100,27 +100,6 @@ object managefile {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
   }
-
-  private def ensureMoveSemantics[S[_]](dst: APath, dstExists: APath => Task[Boolean], semantics: MoveSemantics): OptionT[Task, FileSystemError] = {
-
-    def failBecauseExists = PathErr(InvalidPath(dst,
-      "Can not move to destination that already exists if semnatics == failIfExists"))
-    def failBecauseMissing = PathErr(InvalidPath(dst,
-      "Can not move to destination that does not exists if semnatics == failIfMissing"))
-    
-    OptionT[Task, FileSystemError](semantics match {
-      case Overwrite => Task.now(None)
-      case FailIfExists =>
-        dstExists(dst).map { dstExists =>
-          if(dstExists) Some(failBecauseExists) else None
-        }
-      case FailIfMissing =>
-        dstExists(dst).map { dstExists =>
-          if(!dstExists) Some(failBecauseMissing) else None
-        }
-      })
-    }
-
 
   private def delete[S[_]](path: APath)(implicit
     s0: Task :<: S
