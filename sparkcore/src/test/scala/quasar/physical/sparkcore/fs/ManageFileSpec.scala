@@ -104,7 +104,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
     }
 
     "tempFile" should {
-      "create temp file near existing path" in {
+      "create temp file near existing dir path" in {
         // given
         val program = (nearDir: ADir) => define { unsafe =>
           for {
@@ -141,21 +141,25 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
         ok
       }
       
-      "fail if near is a file (not a directory)" in {
+      "create temp file near existing file path" in {
         // given
-        val program = (nearDir: APath) => define { unsafe =>
+        val program = (nearFile: APath) => define { unsafe =>
           for {
-            filePath <- unsafe.tempFile(nearDir)
+            filePath <- unsafe.tempFile(nearFile)
           } yield (filePath)
         }
         // when
-        withTempFile(createIt = withNoContent) { filePath =>
+        withTempFile(createIt = withNoContent) { nearFile =>
           for {
-            result <- execute(program(filePath))
+            result <- execute(program(nearFile))
           } yield {
             // then
-            result must_= -\/((PathErr(
-              InvalidPath(filePath, s"Provided $filePath is not a directory"))))
+            result must beRightDisjunction.like {
+              case path =>
+                posixCodec.unsafePrintPath(path)
+                  .startsWith(posixCodec.unsafePrintPath(parentDir(nearFile).get)) must_= true
+            }
+
           }
         }
       }

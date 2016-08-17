@@ -42,6 +42,7 @@ import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
+import java.io.File
 
 import org.apache.commons.io.FileUtils
 import pathy.Path.posixCodec
@@ -133,12 +134,18 @@ object managefile {
         toAFile(f) \/> (pathErr(invalidPath(near, s"Could not create temp file in dir $near")))
     
     val task: Task[FileSystemError \/ AFile] = Task.delay {
-      val posix = posixCodec.unsafePrintPath(near) + "/"
-      val prefix = "quasar"
-      val suffix = ".tmp"
-      \/.fromTryCatchNonFatal(Files.createTempFile(Paths.get(posix), prefix, suffix))
-        .leftMap(handleCreationError)
-        .flatMap(fileToMaybeAFile)        
+      val posix = posixCodec.unsafePrintPath(near)
+      val file = new File(posix)
+
+      if(file.exists()) {
+        val parent = if(file.isDirectory()){ posix + "/"} else {file.getParent()}
+        val prefix = "quasar"
+        val suffix = ".tmp"
+
+        \/.fromTryCatchNonFatal(Files.createTempFile(Paths.get(parent), prefix, suffix))
+          .leftMap(handleCreationError)
+          .flatMap(fileToMaybeAFile)
+      } else pathErr(pathNotFound(near)).left
     }
     injectFT[Task, S].apply(task)
   }
