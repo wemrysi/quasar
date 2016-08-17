@@ -56,7 +56,7 @@ abstract class FileSystemTest[S[_]](
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit = (
+  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
       s"${fs.name.name} FileSystem" should examples(fs)
 
@@ -64,7 +64,6 @@ abstract class FileSystemTest[S[_]](
 
       ()
     }).unsafePerformSync
-  )
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
