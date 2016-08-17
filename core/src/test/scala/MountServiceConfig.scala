@@ -25,6 +25,11 @@ import quasar.sql.{ Sql, nullLiteral }
  *  depend on web's test configuration - which makes the
  *  dependency chain linear. Placing it here allows
  *  it to be independent of web.
+ *
+ *  TODO:
+ *   - move to MountConfig
+ *   - don't explode on error, e.g. return SomeError \/ (Fix[Sql], Variables) instead
+ *   - implement as viewConfigFromQuery, and call it from viewConfigFromUri
  */
 object MountServiceConfig {
   def unsafeViewCfg(q: String, vars: (String, String)*): (Fix[Sql], Variables) =
