@@ -17,15 +17,18 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.fp.numeric._
 import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fs.ManageFile._
 import quasar.fs.ManageFile.MoveSemantics._
+import quasar.fp.free._
+import quasar.fp.numeric._
 
-import scalaz._, Scalaz._, scalaz.concurrent.Task
+import scalaz._, Scalaz._
+import scalaz.concurrent.Task
+import scalaz.stream.Process
 
 object impl {
 
@@ -85,4 +88,43 @@ object impl {
     })
   }
 
+  type ReadStream[F[_]] = Process[F, FileSystemError \/ Vector[Data]]
+
+  def readFromProcess[S[_], F[_]: Monad: Catchable](
+    f: (AFile, ReadOpts) => Free[S, FileSystemError \/ ReadStream[F]]
+  )(
+    implicit
+      state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[F], S],
+      idGen: MonotonicSeq.Ops[S],
+      S0: F :<: S
+  ): ReadFile ~> Free[S, ?] =
+    new (ReadFile ~> Free[S, ?]) {
+      def apply[A](fa: ReadFile[A]): Free[S, A] = fa match {
+        case ReadFile.Open(file, offset, limit) =>
+          (for {
+            readStream <- EitherT(f(file, ReadOpts(offset, limit)))
+            id <- idGen.next.liftM[FileSystemErrT]
+            handle = ReadFile.ReadHandle(file, id)
+            _ <- state.put(handle, readStream).liftM[FileSystemErrT]
+          } yield handle).run
+
+        case ReadFile.Read(handle) =>
+          (for {
+            stream <- state.get(handle).toRight(FileSystemError.unknownReadHandle(handle))
+            data   <- EitherT(lift(stream.unconsOption).into[S].flatMap {
+                        case Some((value, streamTail)) =>
+                          state.put(handle, streamTail).as(value)
+                        case None                      =>
+                          state.delete(handle).as(Vector.empty[Data].right[FileSystemError])
+                      })
+          } yield data).run
+
+        case ReadFile.Close(handle) =>
+          (for {
+            stream <- state.get(handle)
+            _      <- lift(stream.kill.run).into.liftM[OptionT]
+            _      <- state.delete(handle).liftM[OptionT]
+          } yield ()).run.void
+      }
+    }
 }

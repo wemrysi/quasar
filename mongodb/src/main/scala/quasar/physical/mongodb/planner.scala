@@ -23,11 +23,11 @@ import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
+import quasar.physical.mongodb.javascript._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._
-import Type._
-import Workflow._
-import javascript._
+import quasar.Type._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
@@ -1138,21 +1138,24 @@ object MongoDbPlanner {
     } yield wf2).evalZero
   }
 
+  final case class QueryContext(
+    model: MongoQueryModel,
+    statistics: Collection => Option[CollectionStatistics])
+
   /** Translate the high-level "logical" plan to an executable MongoDB "physical"
     * plan, taking into account the current runtime environment as captured by
-    * the given context (which is for the time being just the "query model"
-    * associated with the backend version.)
+    * the given context.
     * Internally, the type of the plan being built constrains which operators
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan(logical: Fix[LogicalPlan], queryContext: MongoQueryModel)
+  def plan(logical: Fix[LogicalPlan], queryContext: QueryContext)
     : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
-    queryContext match {
+    queryContext.model match {
       case `3.2` =>
-        val pl = JoinHandler.pipeline[Workflow3_2F]
+        val pl = JoinHandler.pipeline[Workflow3_2F](queryContext.statistics)
         val mr = JoinHandler.mapReduce[Workflow3_2F]
         val joinHandler =
           JoinHandler[Workflow3_2F, WorkflowBuilder.M]((tpe, l, r) =>

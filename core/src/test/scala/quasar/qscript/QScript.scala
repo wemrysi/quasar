@@ -221,13 +221,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       QueryFile.convertToQScript(
-        LP.Let('x, lpRead("/foo/bar"),
+        identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
-                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
-              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))).toOption must
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(1))),
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(2)))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))).toOption must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -237,6 +237,18 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
           Free.point(RightSide))).embed.some)
+    }
+
+    "convert a read shift array" in pending {
+      QueryFile.convertToQScript(
+        LP.Let('x, lpRead("/foo/bar"),
+          structural.ShiftArray[FLP](
+            structural.ArrayConcat[FLP](
+              structural.ArrayConcat[FLP](
+                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
+                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
+              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))).toOption must
+      equal(RootR.some) // TODO incorrect expectation
     }
 
     "convert a shift/unshift array" in pending {
