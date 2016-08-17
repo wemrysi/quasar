@@ -57,11 +57,15 @@ object managefile {
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
         case Move(FileToFile(sf, df), semantics) =>
-          injectFT[Task, S].apply(ensureMoveSemantics(df, ispathExists, semantics)
-            .fold(fse => fse.left, moveFile(sf, df)))
+          injectFT[Task, S].apply{
+            ensureMoveSemantics(df, doesPathExist, semantics)
+              .fold(fse => Task.now(fse.left), moveFile(sf, df)).join
+          }
         case Move(DirToDir(sd, dd), semantics) =>
-          injectFT[Task, S].apply(ensureMoveSemantics(dd, ispathExists, semantics)
-            .fold(fse => fse.left, moveDir(sd, dd)))
+          injectFT[Task, S].apply{
+            ensureMoveSemantics(dd, doesPathExist, semantics)
+              .fold(fse => Task.now(fse.left), moveDir(sd, dd)).join
+          }
         case Delete(path) => delete(path)
         case TempFile(near) => tempFile(near)
       }
@@ -75,18 +79,19 @@ object managefile {
     maybeUnboxed.map(sandboxAbs(_))
   }
 
-  private def ispathExists: APath => Task[Boolean] = path => Task.delay {
+  private def doesPathExist: APath => Task[Boolean] = path => Task.delay {
     Files.exists(toNioPath(path))
   }
 
-  private def moveFile(src: AFile, dst: AFile): FileSystemError \/ Unit =
+  private def moveFile(src: AFile, dst: AFile): Task[FileSystemError \/ Unit] = Task.delay {
     \/.fromTryCatchNonFatal(
       Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
     ) .leftMap {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
+  }
 
-  private def moveDir(src: ADir, dst: ADir) =
+  private def moveDir(src: ADir, dst: ADir): Task[FileSystemError \/ Unit] = Task.delay {
     \/.fromTryCatchNonFatal{
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
@@ -94,6 +99,7 @@ object managefile {
       .leftMap {
       case e => pathErr(invalidPath(dst, e.getMessage()))
     }.void
+  }
 
   private def ensureMoveSemantics[S[_]](dst: APath, dstExists: APath => Task[Boolean], semantics: MoveSemantics): OptionT[Task, FileSystemError] = {
 
