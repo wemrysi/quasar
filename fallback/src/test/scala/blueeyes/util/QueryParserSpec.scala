@@ -6,7 +6,7 @@ import java.net.URI
 import java.net.URLEncoder._
 // import quasar.precog.TestSupport._
 
-class QueryParserSpec extends quasar.QuasarSpecification {
+class QueryParserSpec extends quasar.Qspec {
   val baseURI  = "http://www.socialmedia.com/test?"
   val encoding = "UTF-8"
 

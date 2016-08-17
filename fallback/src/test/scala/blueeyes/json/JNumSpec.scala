@@ -3,7 +3,7 @@ package json
 
 // import quasar.precog.TestSupport._
 
-class JNumSpec extends quasar.QuasarSpecification {
+class JNumSpec extends quasar.Qspec {
   "JNums must sort correctly" in {
     val s1: JNum = JNumStr("123.456")
     val s2: JNum = JNumStr("-1.0")

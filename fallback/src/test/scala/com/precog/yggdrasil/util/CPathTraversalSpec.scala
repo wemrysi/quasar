@@ -23,7 +23,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.ygg.table._
 
-class CPathTraversalSpec extends quasar.QuasarSpecification {
+class CPathTraversalSpec extends quasar.Qspec {
   import CPathTraversal._
 
   sealed trait ColBuilder[@spec(Boolean, Long, Double) A] {

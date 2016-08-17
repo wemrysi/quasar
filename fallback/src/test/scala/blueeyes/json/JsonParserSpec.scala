@@ -23,7 +23,7 @@ import scalaz._
 import scala.math.min
 import quasar.precog._, JsonTestSupport._
 
-class JsonParserSpec extends quasar.QuasarSpecification {
+class JsonParserSpec extends quasar.Qspec {
   import JParser._
 
   "Any valid json can be parsed" in {
@@ -45,7 +45,7 @@ class JsonParserSpec extends quasar.QuasarSpecification {
   }
 }
 
-object ParserBugsSpec extends quasar.QuasarSpecification {
+object ParserBugsSpec extends quasar.Qspec {
   "Unicode ffff is a valid char in string literal" in {
     JParser.parseFromString(""" {"x":"\uffff"} """) must not(throwAn[java.lang.Exception])
   }
@@ -63,7 +63,7 @@ object ParserBugsSpec extends quasar.QuasarSpecification {
   }
 }
 
-object ParsingByteBufferSpec extends quasar.QuasarSpecification {
+object ParsingByteBufferSpec extends quasar.Qspec {
   "Respects current ByteBuffer's position" in {
     val bb = ByteBufferWrap(Array(54, 55, 56, 57))
     bb.remaining must_== 4
@@ -85,7 +85,7 @@ object ParsingByteBufferSpec extends quasar.QuasarSpecification {
   }
 }
 
-object AsyncParserSpec extends quasar.QuasarSpecification {
+object AsyncParserSpec extends quasar.Qspec {
   import AsyncParser._
 
   private def loadBytes(path: String): Array[Byte] = jPath(path).slurpBytes
@@ -280,7 +280,7 @@ xyz
   }
 }
 
-object ArrayUnwrappingSpec extends quasar.QuasarSpecification {
+object ArrayUnwrappingSpec extends quasar.Qspec {
   import AsyncParser._
 
   def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))

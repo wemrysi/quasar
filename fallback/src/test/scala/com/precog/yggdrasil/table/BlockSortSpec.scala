@@ -53,7 +53,7 @@ object PrecogJValueOrder {
  */
 import PrecogJValueOrder._
 
-trait BlockSortSpec extends quasar.QuasarSpecification {
+trait BlockSortSpec extends quasar.Qspec {
   def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val module = BlockStoreTestModule.empty
 

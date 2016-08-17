@@ -26,7 +26,7 @@ import com.precog.bytecode.JType
 import com.precog.common.security._
 import scalaz._, Scalaz._
 
-class MergeSpec extends ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
+class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
   type GroupId = Int
   import trans._
   import TableModule._

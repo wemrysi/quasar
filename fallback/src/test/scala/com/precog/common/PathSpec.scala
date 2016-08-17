@@ -21,7 +21,7 @@ package com.precog.common
 
 // import quasar.precog.TestSupport._
 
-class PathSpec extends quasar.QuasarSpecification {
+class PathSpec extends quasar.Qspec {
   "rollups for a path" should {
     "not roll up when flag is false" in {
       val sample = Path("/my/fancy/path")

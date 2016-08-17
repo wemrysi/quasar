@@ -25,7 +25,7 @@ import quasar.ygg.table._
 import org.scalacheck.Shrink
 import quasar.precog.TestSupport._
 
-class RowFormatSpec extends quasar.QuasarSpecification with JdbmCValueGenerators {
+class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   import Arbitrary._
 
   // This should generate some jpath ids, then generate CTypes for these.

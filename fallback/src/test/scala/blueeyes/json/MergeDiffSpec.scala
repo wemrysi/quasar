@@ -21,7 +21,7 @@ import MergeDiffData._
 import JParser._
 // import quasar.precog.TestSupport._
 
-class MergeDiffSpec extends quasar.QuasarSpecification {
+class MergeDiffSpec extends quasar.Qspec {
   "Merge example" in {
     (scala1 merge scala2) mustEqual expectedMergeResult
   }

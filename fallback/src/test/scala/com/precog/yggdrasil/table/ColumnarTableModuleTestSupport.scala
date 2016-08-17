@@ -25,6 +25,8 @@ import com.precog.common._
 import scalaz._
 import scalaz.syntax.std.boolean._
 
+abstract class ColumnarTableQspec extends quasar.Qspec with ColumnarTableModuleTestSupport
+
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
   def newGroupId: GroupId
 

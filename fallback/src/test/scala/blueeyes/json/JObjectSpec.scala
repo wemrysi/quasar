@@ -3,7 +3,7 @@ package json
 
 // import quasar.precog.TestSupport._
 
-class JObjectSpec extends quasar.QuasarSpecification {
+class JObjectSpec extends quasar.Qspec {
   "JObjects equal even fields order is different" in {
     JParser.parseUnsafe(j1) mustEqual (JParser.parseUnsafe(j2))
   }

@@ -29,7 +29,7 @@ object IsoSerializationSpec {
   val bazSchema = "s" :: "l" :: HNil
 }
 
-class IsoSerializationSpec extends quasar.QuasarSpecification {
+class IsoSerializationSpec extends quasar.Qspec {
   import IsoSerializationSpec._
   "serialization" should {
     "serialize a simple case class" in {

@@ -28,7 +28,7 @@ import scalaz.syntax.std.boolean._
 import SampleData._
 import CValueGenerators._
 
-trait BlockLoadSpec extends quasar.QuasarSpecification {
+trait BlockLoadSpec extends quasar.Qspec {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
     val Some((idCount, schema)) = sampleData.schema
     val actualSchema            = inferSchema(sampleData.data map { _ \ "value" })

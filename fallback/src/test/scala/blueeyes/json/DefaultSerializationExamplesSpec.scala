@@ -19,7 +19,7 @@ package serialization
 
 import DefaultSerialization._
 
-class DefaultSerializationExamplesSpec extends quasar.QuasarSpecification {
+class DefaultSerializationExamplesSpec extends quasar.Qspec {
   "Primitives can be extracted from strings" in {
     IntExtractor(JString("12")) mustEqual 12
     LongExtractor(JString("12")) mustEqual 12

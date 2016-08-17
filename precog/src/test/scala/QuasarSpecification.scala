@@ -9,6 +9,8 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.util.{FreqMap, Pretty}
 import org.specs2.scalacheck._
 
+abstract class Qspec extends QuasarSpecification
+
 trait QuasarSpecification extends org.specs2.mutable.SpecLike
         with ScalaCheckParameters
         with ScalaCheckPropertyDsl

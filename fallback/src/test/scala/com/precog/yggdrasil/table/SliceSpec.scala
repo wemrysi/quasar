@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.precog.TableTestSupport._
 
-class SliceSpec extends quasar.QuasarSpecification {
+class SliceSpec extends quasar.Qspec {
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
   implicit def listOrdering[A](implicit ord0: Ordering[A]) = new Ordering[List[A]] {
     def compare(a: List[A], b: List[A]): Int =

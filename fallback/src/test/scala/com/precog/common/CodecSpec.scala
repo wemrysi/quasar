@@ -25,7 +25,7 @@ import org.scalacheck.Shrink
 import quasar.precog._, TestSupport._
 import ByteBufferPool._
 
-class CodecSpec extends quasar.QuasarSpecification {
+class CodecSpec extends quasar.Qspec {
   val pool      = ByteBufferPool()
   val smallPool = new ByteBufferPool(10)
 

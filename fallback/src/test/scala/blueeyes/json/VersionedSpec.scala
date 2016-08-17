@@ -7,7 +7,7 @@ import Extractor.Invalid
 import scalaz._
 // import quasar.precog.JsonTestSupport._
 
-object VersionedSpec extends quasar.QuasarSpecification {
+object VersionedSpec extends quasar.Qspec {
   import IsoSerializationSpec._
   import Versioned._
 

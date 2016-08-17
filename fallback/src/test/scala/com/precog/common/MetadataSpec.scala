@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 import quasar.precog._, JsonTestSupport._
 import Gen.frequency
 
-class MetadataSpec extends quasar.QuasarSpecification with MetadataGenerators {
+class MetadataSpec extends quasar.Qspec with MetadataGenerators {
   val sampleSize = 100
 
   "simple metadata" should {

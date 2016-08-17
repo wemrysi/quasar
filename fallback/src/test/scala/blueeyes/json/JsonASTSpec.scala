@@ -20,7 +20,7 @@ package json
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog._, JsonTestSupport._
 
-class JsonASTSpec extends quasar.QuasarSpecification {
+class JsonASTSpec extends quasar.Qspec {
   sequential
 
   "Functor identity" in {

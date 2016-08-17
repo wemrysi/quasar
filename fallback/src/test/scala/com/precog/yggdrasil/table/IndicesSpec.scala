@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 // TODO: mix in a trait rather than defining Table directly
 
-class IndicesSpec extends ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
+class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
   type GroupId = Int
 
   import TableModule._

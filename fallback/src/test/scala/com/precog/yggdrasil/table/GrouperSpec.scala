@@ -58,7 +58,7 @@ solve 'a, 'b
   ...
 */
 
-class GrouperSpec extends TableModuleSpec with quasar.QuasarSpecification {
+class GrouperSpec extends quasar.Qspec with TableModuleSpec {
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")
 

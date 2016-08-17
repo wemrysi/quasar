@@ -28,19 +28,21 @@ import scalaz._, Scalaz._
 import TableModule._
 import SampleData._
 
-class ColumnarTableModuleSpec extends ColumnarTableModuleTestSupport
-      with TableModuleSpec
-      with CogroupSpec
-      with CrossSpec
-      with TransformSpec
-      with CompactSpec
-      with TakeRangeSpec
-      with CanonicalizeSpec
-      with PartitionMergeSpec
-      with ToArraySpec
-      with SampleSpec
-      with DistinctSpec
-      with SchemasSpec {
+class ColumnarTableModuleSpec
+      extends quasar.Qspec
+         with ColumnarTableModuleTestSupport
+         with TableModuleSpec
+         with CogroupSpec
+         with CrossSpec
+         with TransformSpec
+         with CompactSpec
+         with TakeRangeSpec
+         with CanonicalizeSpec
+         with PartitionMergeSpec
+         with ToArraySpec
+         with SampleSpec
+         with DistinctSpec
+         with SchemasSpec {
 
   type GroupId = Int
 
