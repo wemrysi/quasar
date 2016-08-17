@@ -24,7 +24,7 @@ import com.precog.bytecode._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-trait SchemasSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
+trait SchemasSpec extends ColumnarTableQspec {
   def testSingleSchema = {
     val expected = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
     val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))

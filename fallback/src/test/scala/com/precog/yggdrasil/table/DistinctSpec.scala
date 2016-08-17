@@ -24,7 +24,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 // import quasar.precog.TestSupport._
 
-trait DistinctSpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
+trait DistinctSpec extends ColumnarTableQspec {
   import SampleData._
   import trans._
 

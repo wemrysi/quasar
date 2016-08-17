@@ -22,6 +22,9 @@ package quasar.ygg
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
+abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport
+abstract class ColumnarTableQspec extends TableQspec with table.ColumnarTableModuleTestSupport
+
 trait TableModuleTestSupport extends TableModule {
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2

@@ -29,8 +29,7 @@ import TableModule._
 import SampleData._
 
 class ColumnarTableModuleSpec
-      extends quasar.Qspec
-         with ColumnarTableModuleTestSupport
+      extends ColumnarTableQspec
          with TableModuleSpec
          with CogroupSpec
          with CrossSpec

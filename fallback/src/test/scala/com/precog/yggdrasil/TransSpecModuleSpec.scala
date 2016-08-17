@@ -21,7 +21,7 @@ package quasar.ygg
 
 import com.precog.common._
 
-class TransSpecModuleSpec extends TransSpecModule with FNDummyModule with quasar.QuasarSpecification {
+class TransSpecModuleSpec extends quasar.Qspec with TransSpecModule with FNDummyModule {
   import trans._
   import CPath._
 

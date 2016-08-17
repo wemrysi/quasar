@@ -24,7 +24,7 @@ import blueeyes.json._
 import scalaz.syntax.comonad._
 // import quasar.precog.TestSupport._
 
-trait ToArraySpec extends ColumnarTableModuleTestSupport with quasar.QuasarSpecification {
+trait ToArraySpec extends ColumnarTableQspec {
   def testToArrayHomogeneous = {
     val data: Stream[JValue] =
       Stream(
