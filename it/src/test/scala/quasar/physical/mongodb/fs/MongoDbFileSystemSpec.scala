@@ -25,10 +25,8 @@ import quasar.main.FilesystemQueries
 import quasar.regression._
 import quasar.sql, sql.Sql
 
-// Accompany the commented out test.
-// import quasar.physical.mongodb.Collection
-// import org.specs2.specification.core._
-
+import quasar.physical.mongodb.Collection
+import org.specs2.specification.core._
 import com.mongodb.MongoException
 import matryoshka.Fix
 import monocle.Prism
@@ -335,12 +333,8 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
         }
       }
 
-      /***
-
-      I can't figure out how to get this test compiling.
-
       "Temp files" >> {
-        Fragments.foreach(Collection.DatabaseNameEscapes) { case (esc, _) =>
+        Fragments.foreach(Collection.DatabaseNameEscapes) { case (esc, _) => Fragments(
           s"be in the same database when db name contains '$esc'" >> {
             val pdir = rootDir </> dir(s"db${esc}name")
 
@@ -349,11 +343,10 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
               dbName <- EitherT.fromDisjunction[manage.F](
                           Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
             } yield dbName).runEither must_== Collection.dbNameFromPath(pdir).toEither
-          }
+          })
         }
+        ok
       }
-
-      ***/
     }
   }
 
