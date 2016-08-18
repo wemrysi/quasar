@@ -111,15 +111,14 @@ object PlatformBuild {
 
     def setup: Project = (
       serialTests.stdPlugins.crossSourceDirs.allWarnings.fatalWarnings.fixConsole also (
-             skip in update :=  true,
-                 exportJars :=  false,
-               organization :=  "com.precog",
-                    version :=  "0.1",
-              scalacOptions ++= stdArgs,
-               scalaVersion :=  "2.11.8",
-        logBuffered in Test :=  false,
-                crossTarget ~=  (_ / s"java-$javaSpecVersion")
-              // incOptions :=  mkIncOptions(crossTarget.value)
+               exportJars :=  false,
+             organization :=  "com.precog",
+                  version :=  "0.1",
+            scalacOptions ++= stdArgs,
+             scalaVersion :=  "2.11.8",
+      logBuffered in Test :=  false,
+              crossTarget ~=  (_ / s"java-$javaSpecVersion")
+            // incOptions :=  mkIncOptions(crossTarget.value)
       )
     )
   }
