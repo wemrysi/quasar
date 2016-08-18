@@ -21,6 +21,7 @@ import scalaz._, Scalaz._
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
 import quasar.precog._
+import io.circe._
 
 /**
   * Data type for Json AST.

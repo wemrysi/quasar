@@ -67,7 +67,9 @@ object PlatformBuild {
 
   def javaSpecVersion: String                       = sys.props("java.specification.version")
   def inBoth[A](f: Configuration => Seq[A]): Seq[A] = List(Test, Compile) flatMap f
-  def kindProjector                                 = "org.spire-math" % "kind-projector" % "0.8.0" cross CrossVersion.binary
+
+  def kindProjector = "org.spire-math"  % "kind-projector" % "0.8.0" cross CrossVersion.binary
+  def macroParadise = "org.scalamacros" % "paradise"       % "2.1.0" cross CrossVersion.full
 
   implicit class ProjectOps(val p: sbt.Project) {
     def noArtifacts: Project = also(
@@ -103,7 +105,7 @@ object PlatformBuild {
     // testForkedParallel in Test :=  true,
 
     def setup: Project = (
-      serialTests.scalacPlugins(kindProjector).crossSourceDirs.allWarnings.fatalWarnings also (
+      serialTests.scalacPlugins(kindProjector, macroParadise).crossSourceDirs.allWarnings.fatalWarnings also (
                     exportJars :=  false,
                   organization :=  "com.precog",
                        version :=  "0.1",

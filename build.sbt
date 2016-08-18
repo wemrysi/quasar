@@ -3,18 +3,21 @@ import precogbuild.PlatformBuild._
 def scalazVersion     = "7.2.4"
 def specsVersion      = "3.8.4-scalacheck-1.12.5"
 def scalacheckVersion = "1.12.5"
+def circeVersion      = "0.4.1"
 
 lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (fallback) also (
     scalacOptions in console in Compile := consoleArgs,
-  initialCommands in console in Compile := "import quasar.precog._, blueeyes._, json._",
+  initialCommands in console in Compile := "import quasar._, precog._, blueeyes._, json._",
        scalacOptions in console in Test := consoleArgs,
-     initialCommands in console in Test := "import quasar.precog._, blueeyes._, json._, com.precog._, common._, ygg._"
+     initialCommands in console in Test := "import quasar._, precog._, blueeyes._, json._, com.precog._, common._, ygg._"
 )
 
 lazy val fallback = project.setup dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
 
+  "org.spire-math" %% "jawn-ast"          % "0.9.0",
+  "io.circe"       %% "circe-literal"     % circeVersion,
   "org.mapdb"      %  "mapdb"             % "3.0.1",
   "com.chuusai"    %% "shapeless"         % "2.3.1",
   "org.spire-math" %% "spire-macros"      % "0.11.0",
@@ -37,4 +40,6 @@ addCommandAlias("bench", "benchmark/jmh:run -f1 -t1")
 addCommandAlias("cc", "test:compile")
 addCommandAlias("tt", "test")
 addCommandAlias("ttq", "testQuick")
+addCommandAlias("tcon", "test:console")
+addCommandAlias("tconq", "test:consoleQuick")
 addCommandAlias("cover", "; coverage ; test ; coverageReport")
