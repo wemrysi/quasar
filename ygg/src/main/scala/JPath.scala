@@ -17,3 +17,19 @@ object JPathNode {
   implicit def liftString(s: String): JPathNode = JPathField(s)
   implicit def liftIndex(i: Int): JPathNode     = JPathIndex(i)
 }
+
+object JPath {
+  def apply(n: JPathNode*): JPath = new JPath(n.toList)
+  def apply(path: String): JPath = {
+    val PathPattern      = """[.]|(?=\[\d+\])""".r
+    val IndexPattern     = """^\[(\d+)\]$""".r
+    def ppath(p: String) = if (p startsWith ".") p else "." + p
+    JPath(
+      PathPattern split ppath(path) map (_.trim) flatMap {
+        case ""                  => None
+        case IndexPattern(index) => Some(JPathIndex(index.toInt))
+        case name                => Some(JPathField(name))
+      } toList
+    )
+  }
+}

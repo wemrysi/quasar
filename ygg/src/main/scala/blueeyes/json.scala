@@ -27,13 +27,15 @@ package object json {
     def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
   }
 
-  val NoJPath     = JPath()
   type JPath      = ygg.json.JPath
+  val JPath       = ygg.json.JPath
   type JPathNode  = ygg.json.JPathNode
   type JPathField = ygg.json.JPathField
   val JPathField  = ygg.json.JPathField
   type JPathIndex = ygg.json.JPathIndex
   val JPathIndex  = ygg.json.JPathIndex
+
+  val NoJPath     = ygg.json.JPath()
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
     val sb = new StringBuilder
@@ -678,25 +680,5 @@ package object json {
         case value                 => Some(value)
       }
     }
-  }
-}
-
-package json {
-  object JPath {
-    def apply(path: String): JPath = {
-      val PathPattern      = """[.]|(?=\[\d+\])""".r
-      val IndexPattern     = """^\[(\d+)\]$""".r
-      def ppath(p: String) = if (p startsWith ".") p else "." + p
-      JPath(
-        PathPattern split ppath(path) map (_.trim) flatMap {
-          case ""                  => None
-          case IndexPattern(index) => Some(JPathIndex(index.toInt))
-          case name                => Some(JPathField(name))
-        } toList
-      )
-    }
-    def apply(n: JPathNode*): JPath                 = new JPath(n.toList)
-    def apply(n: List[JPathNode]): JPath            = new JPath(n)
-    def unapply(path: JPath): Some[List[JPathNode]] = Some(path.nodes)
   }
 }
