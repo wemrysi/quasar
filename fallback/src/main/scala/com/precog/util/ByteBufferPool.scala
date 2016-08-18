@@ -86,29 +86,31 @@ final class ByteBufferPool(val capacity: Int) {
 
   def toStream: Stream[ByteBuffer] = Stream.continually(acquire)
 
-  def run[A](a: ByteBufferPoolS[A]): A = a.eval((this, Nil))
+  def run[A](a: ByteBufferPool.State[A]): A = a.eval((this, Nil))
 }
 
 object ByteBufferPool {
+  type State[A] = scalaz.State[ByteBufferPool -> List[ByteBuffer], A]
+
   def apply(): ByteBufferPool = new ByteBufferPool(16 * 1024)
 
-  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPoolS] with Monad[ByteBufferPoolS] {
+  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPool.State] with Monad[ByteBufferPool.State] {
 
-    def point[A](a: => A): ByteBufferPoolS[A] = State.state(a)
+    def point[A](a: => A): ByteBufferPool.State[A] = State.state(a)
 
-    def bind[A, B](fa: ByteBufferPoolS[A])(f: A => ByteBufferPoolS[B]): ByteBufferPoolS[B] =
+    def bind[A, B](fa: ByteBufferPool.State[A])(f: A => ByteBufferPool.State[B]): ByteBufferPool.State[B] =
       State(s =>
         fa(s) match {
           case (s, a) => f(a)(s)
       })
 
-    def getBuffer(min: Int): ByteBufferPoolS[ByteBuffer] = ByteBufferPool.acquire(min)
+    def getBuffer(min: Int): ByteBufferPool.State[ByteBuffer] = ByteBufferPool.acquire(min)
   }
 
   /**
     * Acquire a `ByteBuffer` and add it to the state.
     */
-  def acquire(min: Int): ByteBufferPoolS[ByteBuffer] = State {
+  def acquire(min: Int): ByteBufferPool.State[ByteBuffer] = State {
     case (pool, buffers @ (buf :: _)) if buf.remaining() >= min =>
       ((pool, buffers), buf)
 
@@ -117,13 +119,13 @@ object ByteBufferPool {
       ((pool, buf :: buffers), buf)
   }
 
-  def acquire: ByteBufferPoolS[ByteBuffer] = acquire(512)
+  def acquire: ByteBufferPool.State[ByteBuffer] = acquire(512)
 
   /**
     * Reverses the state (list of `ByteBuffer`s) and returns an `Array[Byte]` of
     * the contiguous bytes in all the buffers.
     */
-  def flipBytes: ByteBufferPoolS[Array[Byte]] = State {
+  def flipBytes: ByteBufferPool.State[Array[Byte]] = State {
     case (pool, sreffub) =>
       val buffers = sreffub.reverse
       ((pool, buffers), getBytesFrom(buffers))
@@ -132,7 +134,7 @@ object ByteBufferPool {
   /**
     * Removes and releases all `ByteBuffer`s in the state to the pool.
     */
-  def release: ByteBufferPoolS[Unit] = State {
+  def release: ByteBufferPool.State[Unit] = State {
     case (pool, buffers) =>
       buffers foreach (pool.release(_))
       ((pool, Nil), ())

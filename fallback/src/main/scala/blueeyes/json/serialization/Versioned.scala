@@ -2,11 +2,9 @@ package blueeyes
 package json
 package serialization
 
-import IsoSerialization._
 import Extractor._
 import DefaultSerialization._
 
-import shapeless._
 import scalaz._, Scalaz._, Validation._, FlatMap._
 
 case class Version(major: Int, minor: Int, micro: Option[Int] = None, classifier: Option[String] = None) {
@@ -54,10 +52,6 @@ object Version {
 object Versioned {
   val defaultVersionProperty = JPath(".schemaVersion")
 
-  def extractorV[T]     = new MkExtractorV[T]
-  def decomposerV[T]    = new MkDecomposerV[T]
-  def serializationV[T] = new MkSerializationV[T]
-
   implicit def toToVersion(s: String): ToVersion = new ToVersion(s)
   class ToVersion(s: String) {
     def v: Version = (s: @unchecked) match { case SVersion(v) => v }
@@ -100,28 +94,5 @@ object Versioned {
         }
       }
     }
-  }
-
-  class MkDecomposerV[T] {
-    def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
-        decomposer: DecomposerAux[F, L]): Decomposer[T] =
-      new IsoDecomposer(fields, iso, decomposer).versioned(version, versionProperty)
-  }
-
-  class MkExtractorV[T] {
-    def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
-        extractor: ExtractorAux[F, L]): Extractor[T] =
-      new IsoExtractor(fields, iso, extractor).versioned(version, versionProperty)
-  }
-
-  class MkSerializationV[T] {
-    def apply[F <: HList, L <: HList](fields: F, version: Option[Version], versionProperty: JPath = defaultVersionProperty)(
-        implicit iso: Iso[T, L],
-        decomposer: DecomposerAux[F, L],
-        extractor: ExtractorAux[F, L]): (Decomposer[T], Extractor[T]) =
-      (new IsoDecomposer(fields, iso, decomposer).versioned(version, versionProperty),
-       new IsoExtractor(fields, iso, extractor).versioned(version, versionProperty))
   }
 }

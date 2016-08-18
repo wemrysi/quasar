@@ -25,7 +25,6 @@ import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer
 import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
-import scalaz._
 
 /**
   * Codecs allow a writer to deal with the case where we have a buffer overflow
@@ -163,7 +162,7 @@ object Codec {
     import ByteBufferPool._
 
     byteBufferPool.run(for {
-      _     <- codec.write[ByteBufferPoolS](a)
+      _     <- codec.write[ByteBufferPool.State](a)
       bytes <- flipBytes
       _     <- release
     } yield bytes)

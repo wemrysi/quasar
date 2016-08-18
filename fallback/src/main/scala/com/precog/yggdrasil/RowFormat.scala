@@ -587,16 +587,16 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
       case (_, cvals) => cvals map (_._1) find (_ != CUndefined) getOrElse CUndefined
     }
 
-    val writes: ByteBufferPoolS[List[Unit]] = cvals.map {
+    val writes: ByteBufferPool.State[List[Unit]] = cvals.map {
       case v: CNullValue =>
-        writeFlagFor[ByteBufferPoolS](v.cType)
+        writeFlagFor[ByteBufferPool.State](v.cType)
 
       case v: CWrappedValue[_] =>
         for {
-          _ <- writeFlagFor[ByteBufferPoolS](v.cType)
+          _ <- writeFlagFor[ByteBufferPool.State](v.cType)
           _ <- codecForCValueType(v.cType).write(v.value)
         } yield ()
-    }.sequence[ByteBufferPoolS, Unit]
+    }.sequence[ByteBufferPool.State, Unit]
 
     pool.run(for {
       _     <- writes

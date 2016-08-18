@@ -4,11 +4,7 @@ import java.nio.file._
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
   // Temporary
-  type JobId              = String
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
-
-  val HNil = shapeless.HNil
-  val Iso  = shapeless.Generic
 
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
