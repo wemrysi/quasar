@@ -6,18 +6,15 @@ def scalacheckVersion = "1.12.5"
 def circeVersion      = "0.4.1"
 
 def repl = """
-  |import quasar._, precog._, blueeyes._, json._
-  |import com.precog._, common._, ygg._
+  |import ygg._, blueeyes._, json._
   |import io.circe._, literal._
 """.stripMargin.trim
 
-lazy val root = project.root.setup.noArtifacts aggregate (precog, ygg) dependsOn (precog, ygg) also (
+lazy val root = project.root.setup.noArtifacts aggregate ygg dependsOn ygg also (
   initialCommands in console := repl
 )
 
-lazy val ygg = project.setup dependsOn (precog % BothScopes)
-
-lazy val precog = project.setup deps (
+lazy val ygg = project.setup deps (
   "org.spire-math" %% "jawn-ast"          % "0.9.0",
   "io.circe"       %% "circe-literal"     % circeVersion,
   "org.mapdb"      %  "mapdb"             % "3.0.1",
