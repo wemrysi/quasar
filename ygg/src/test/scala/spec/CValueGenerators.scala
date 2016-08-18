@@ -17,11 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._
 import com.precog.common._
 import blueeyes._, json._
-import ygg.tests.TestSupport._
+import TestSupport._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
 
 object CValueGenerators {

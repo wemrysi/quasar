@@ -17,14 +17,15 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import org.scalacheck.Gen.choose
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
-import ygg.tests.TestSupport._
+import TestSupport._
 import CValueGenerators.JSchema
 
 case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {

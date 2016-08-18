@@ -17,13 +17,13 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._, table._
 import blueeyes._
 import com.precog.common._
-import quasar.ygg.table._
 import org.scalacheck.Shrink
-import ygg.tests.TestSupport._
+import TestSupport._
 
 class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   import Arbitrary._

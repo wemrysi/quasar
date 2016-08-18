@@ -17,12 +17,10 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
-package table
+package ygg.tests
 
 import blueeyes.json._
 import scalaz.syntax.comonad._
-// import ygg.tests.TestSupport._
 
 trait ToArraySpec extends ColumnarTableQspec {
   def testToArrayHomogeneous = {

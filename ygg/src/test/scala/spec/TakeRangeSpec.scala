@@ -17,12 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
-package table
+package ygg.tests
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import ygg.tests.TestSupport._
+import TestSupport._
 
 trait TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._

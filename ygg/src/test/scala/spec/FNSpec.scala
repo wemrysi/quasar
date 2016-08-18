@@ -17,9 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
-package table
+package ygg.tests
 
+import quasar.ygg._, table._
 // import ygg.tests.TestSupport._
 
 class FNSpec extends quasar.Qspec {

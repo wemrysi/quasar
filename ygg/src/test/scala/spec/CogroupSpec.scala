@@ -17,12 +17,12 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._, Either3._
-import ygg.tests.TestSupport._
+import TestSupport._
 
 trait CogroupSpec extends TableQspec {
   import SampleData._

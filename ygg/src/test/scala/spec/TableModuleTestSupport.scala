@@ -17,13 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
 abstract class TableQspec         extends quasar.Qspec with TableModuleTestSupport
-abstract class ColumnarTableQspec extends TableQspec with table.ColumnarTableModuleTestSupport
+abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTestSupport
 
 trait TableModuleTestSupport extends TableModule {
   def lookupF1(namespace: List[String], name: String): F1

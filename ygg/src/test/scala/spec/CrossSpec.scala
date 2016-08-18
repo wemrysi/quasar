@@ -17,7 +17,7 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
 import blueeyes._, json._
 import scalaz._, Scalaz._

@@ -17,8 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._
 import com.precog.common._
 import blueeyes._, json.{ JPath => _, JPathField => _, JPathIndex => _, _ }
 import scala.util.Random
