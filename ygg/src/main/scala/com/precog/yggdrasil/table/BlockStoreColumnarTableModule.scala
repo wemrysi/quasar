@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.data._
 import blueeyes._
 import com.precog.common._
 import com.precog.bytecode._

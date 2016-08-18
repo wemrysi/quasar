@@ -22,6 +22,7 @@ package table
 
 import blueeyes._
 import com.precog.common._
+import ygg.data._
 
 class BitsetColumn(definedAt: BitSet) { this: Column =>
   def isDefinedAt(row: Int): Boolean = definedAt(row)

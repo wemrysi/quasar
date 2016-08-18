@@ -25,11 +25,13 @@ import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._
 import com.precog.util.RingDeque
+import ygg.data._
 
 import TransSpecModule._
 import blueeyes._, json._
 import scalaz.{ =?> => _, _ }, Ordering._
 import java.nio.CharBuffer
+import ygg.data._
 
 sealed trait Slice {
   def size: Int

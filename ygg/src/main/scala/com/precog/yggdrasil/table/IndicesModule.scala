@@ -23,6 +23,7 @@ package table
 import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
+import ygg.data._
 
 trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTransforms { self: ColumnarTableModule =>
 

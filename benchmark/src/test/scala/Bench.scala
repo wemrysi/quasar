@@ -1,4 +1,4 @@
-package quasarbench
+package ygg.bench
 
 import blueeyes._
 import java.util.concurrent.TimeUnit

@@ -22,6 +22,7 @@ package table
 package cf
 
 import blueeyes._
+import ygg.data._
 
 object util {
 
