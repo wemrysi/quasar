@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.cf
 import blueeyes._
 import com.precog.common._
 import java.util.Comparator
@@ -500,14 +501,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                   //println("No more data on left; emitting right based on bitset " + req.toList.mkString("[", ",", "]"))
                   // done on left, and we're not in an equal span on the right (since LeftSpan can only
                   // be emitted if we're not in a right span) so we're entirely done.
-                  val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req)))
+                  val remission = req.nonEmpty.option(rhead.mapColumns(cf.filter(0, rhead.size, req)))
                   (remission map { e =>
                     writeAlignedSlices(rkey, e, rbs, "alignRight", SortAscending)
                   } getOrElse rbs.point[M]) map { (lbs, _) }
               }
 
               //println("Requested more left; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
-              val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.util.filter(0, lhead.size, leq)))
+              val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.filter(0, lhead.size, leq)))
               lemission map { e =>
                 for {
                   nextLeftWriteState <- writeAlignedSlices(lkey, e, leftWriteState, "alignLeft", SortAscending)
@@ -534,7 +535,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                     case NoSpan =>
                       //println("No more data on right and not in a span; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
                       // entirely done; just emit both
-                      val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.util.filter(0, lhead.size, leq)))
+                      val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.filter(0, lhead.size, leq)))
                       (lemission map { e =>
                         writeAlignedSlices(lkey, e, lbs, "alignLeft", SortAscending)
                       } getOrElse lbs.point[M]) map { (_, rbs) }
@@ -548,7 +549,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
               }
 
               //println("Requested more right; emitting right based on bitset " + req.toList.mkString("[", ",", "]"))
-              val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req)))
+              val remission = req.nonEmpty.option(rhead.mapColumns(cf.filter(0, rhead.size, req)))
               remission map { e =>
                 for {
                   nextRightWriteState <- writeAlignedSlices(rkey, e, rightWriteState, "alignRight", SortAscending)

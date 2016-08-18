@@ -22,7 +22,7 @@ package table
 
 import blueeyes._, json._
 import com.precog.common._
-import quasar.ygg.table.cf.util.{ Remap, Empty }
+import ygg.cf.{ Remap, Empty }
 import TransSpecModule._
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer

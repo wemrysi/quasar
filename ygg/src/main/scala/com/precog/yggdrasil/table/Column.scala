@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.cf
 import blueeyes._, json._
 import com.precog.common._
 import scalaz.{ Semigroup, Ordering }, Ordering._
@@ -385,7 +386,7 @@ object Column {
 
   object unionRightSemigroup extends Semigroup[Column] {
     def append(c1: Column, c2: => Column): Column = {
-      cf.util.UnionRight(c1, c2) getOrElse {
+      cf.UnionRight(c1, c2) getOrElse {
         sys.error("Illgal attempt to merge columns of dissimilar type: " + c1.tpe + "," + c2.tpe)
       }
     }

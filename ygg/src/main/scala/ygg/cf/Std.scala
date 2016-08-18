@@ -17,10 +17,9 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
-package table
-package cf
+package ygg.cf
 
+import quasar.ygg._, table._
 import blueeyes._
 import com.precog.util.NumericComparisons
 

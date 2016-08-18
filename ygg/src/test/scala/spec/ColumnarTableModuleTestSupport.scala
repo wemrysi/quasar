@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.cf
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._
@@ -70,7 +71,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
   def lookupF1(namespace: List[String], name: String): F1 = {
     val lib = Map[String, CF1](
       "negate"         -> cf.math.Negate,
-      "coerceToDouble" -> cf.util.CoerceToDouble,
+      "coerceToDouble" -> cf.CoerceToDouble,
       "true" -> CF1("testing::true") { _ =>
         Some(Column.const(true))
       }

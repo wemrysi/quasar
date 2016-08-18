@@ -1,31 +1,10 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
-package quasar.ygg
-package table
-package cf
+package ygg
 
 import blueeyes._
 import ygg.data._
+import quasar.ygg._, table._
 
-object util {
-
+package object cf {
   /**
     * Right-biased column union
     */
@@ -93,99 +72,12 @@ object util {
     case (c1: NullColumn, c2: NullColumn)               => new UnionColumn(c1, c2) with NullColumn
   }
 
-  case object NConcat {
-
-    // Closest thing we can get to casting an array. This is completely unsafe.
-    private def copyCastArray[A: CTag](as: Array[_]): Array[A] = {
-      val bs = new Array[A](as.length)
-      System.arraycopy(as, 0, bs, 0, as.length)
-      bs
-    }
-
-    def apply(cols: List[Int -> Column]) = {
-      val sortedCols             = cols.sortBy(_._1)
-      val offsets: Array[Int]    = sortedCols.map(_._1)(collection.breakOut)
-      val columns: Array[Column] = sortedCols.map(_._2)(collection.breakOut)
-
-      cols match {
-        case (_, _: BoolColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[BoolColumn]) =>
-          val boolColumns = copyCastArray[BoolColumn](columns)
-          Some(new NConcatColumn(offsets, boolColumns) with BoolColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              boolColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: LongColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[LongColumn]) =>
-          val longColumns = copyCastArray[LongColumn](columns)
-          Some(new NConcatColumn(offsets, longColumns) with LongColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              longColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: DoubleColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DoubleColumn]) =>
-          val doubleColumns = copyCastArray[DoubleColumn](columns)
-          Some(new NConcatColumn(offsets, doubleColumns) with DoubleColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              doubleColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: NumColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[NumColumn]) =>
-          val numColumns = copyCastArray[NumColumn](columns)
-          Some(new NConcatColumn(offsets, numColumns) with NumColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              numColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: StrColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[StrColumn]) =>
-          val strColumns = copyCastArray[StrColumn](columns)
-          Some(new NConcatColumn(offsets, strColumns) with StrColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              strColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: DateColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DateColumn]) =>
-          val dateColumns = copyCastArray[DateColumn](columns)
-          Some(new NConcatColumn(offsets, dateColumns) with DateColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              dateColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: PeriodColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[PeriodColumn]) =>
-          val periodColumns = copyCastArray[PeriodColumn](columns)
-          Some(new NConcatColumn(offsets, periodColumns) with PeriodColumn {
-            def apply(row: Int) = {
-              val i = indexOf(row)
-              periodColumns(i)(row - offsets(i))
-            }
-          })
-
-        case (_, _: EmptyArrayColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[EmptyArrayColumn]) =>
-          val emptyArrayColumns = copyCastArray[EmptyArrayColumn](columns)
-          Some(new NConcatColumn(offsets, emptyArrayColumns) with EmptyArrayColumn)
-
-        case (_, _: EmptyObjectColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[EmptyObjectColumn]) =>
-          val emptyObjectColumns = copyCastArray[EmptyObjectColumn](columns)
-          Some(new NConcatColumn(offsets, emptyObjectColumns) with EmptyObjectColumn)
-
-        case (_, _: NullColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[NullColumn]) =>
-          val nullColumns = copyCastArray[NullColumn](columns)
-          Some(new NConcatColumn(offsets, nullColumns) with NullColumn)
-
-        case _ => None
+  val isSatisfied = CF1P("builtin::ct::isSatisfied") {
+    case c: BoolColumn =>
+      new BoolColumn {
+        def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row)
+        def apply(row: Int)       = isDefinedAt(row)
       }
-    }
   }
 
   //it would be nice to generalize these to `CoerceTo[A]`
@@ -358,14 +250,6 @@ object util {
     case c: NullColumn        => new BitsetColumn(definedAt & c.definedAt(from, to)) with NullColumn
   }
 
-  val isSatisfied = CF1P("builtin::ct::isSatisfied") {
-    case c: BoolColumn =>
-      new BoolColumn {
-        def isDefinedAt(row: Int) = c.isDefinedAt(row) && c(row)
-        def apply(row: Int)       = isDefinedAt(row)
-      }
-  }
-
   def MaskedUnion(leftMask: BitSet) = CF2P("builtin::ct::maskedUnion") {
     case (left: BoolColumn, right: BoolColumn) =>
       new UnionColumn(left, right) with BoolColumn {
@@ -411,5 +295,101 @@ object util {
     case (left: EmptyArrayColumn, right: EmptyArrayColumn)   => new UnionColumn(left, right) with EmptyArrayColumn
     case (left: EmptyObjectColumn, right: EmptyObjectColumn) => new UnionColumn(left, right) with EmptyObjectColumn
     case (left: NullColumn, right: NullColumn)               => new UnionColumn(left, right) with NullColumn
+  }
+}
+
+package cf {
+  case object NConcat {
+    // Closest thing we can get to casting an array. This is completely unsafe.
+    private def copyCastArray[A: CTag](as: Array[_]): Array[A] = {
+      val bs = new Array[A](as.length)
+      System.arraycopy(as, 0, bs, 0, as.length)
+      bs
+    }
+
+    def apply(cols: List[Int -> Column]) = {
+      val sortedCols             = cols.sortBy(_._1)
+      val offsets: Array[Int]    = sortedCols.map(_._1)(collection.breakOut)
+      val columns: Array[Column] = sortedCols.map(_._2)(collection.breakOut)
+
+      cols match {
+        case (_, _: BoolColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[BoolColumn]) =>
+          val boolColumns = copyCastArray[BoolColumn](columns)
+          Some(new NConcatColumn(offsets, boolColumns) with BoolColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              boolColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: LongColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[LongColumn]) =>
+          val longColumns = copyCastArray[LongColumn](columns)
+          Some(new NConcatColumn(offsets, longColumns) with LongColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              longColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: DoubleColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DoubleColumn]) =>
+          val doubleColumns = copyCastArray[DoubleColumn](columns)
+          Some(new NConcatColumn(offsets, doubleColumns) with DoubleColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              doubleColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: NumColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[NumColumn]) =>
+          val numColumns = copyCastArray[NumColumn](columns)
+          Some(new NConcatColumn(offsets, numColumns) with NumColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              numColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: StrColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[StrColumn]) =>
+          val strColumns = copyCastArray[StrColumn](columns)
+          Some(new NConcatColumn(offsets, strColumns) with StrColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              strColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: DateColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[DateColumn]) =>
+          val dateColumns = copyCastArray[DateColumn](columns)
+          Some(new NConcatColumn(offsets, dateColumns) with DateColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              dateColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: PeriodColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[PeriodColumn]) =>
+          val periodColumns = copyCastArray[PeriodColumn](columns)
+          Some(new NConcatColumn(offsets, periodColumns) with PeriodColumn {
+            def apply(row: Int) = {
+              val i = indexOf(row)
+              periodColumns(i)(row - offsets(i))
+            }
+          })
+
+        case (_, _: EmptyArrayColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[EmptyArrayColumn]) =>
+          val emptyArrayColumns = copyCastArray[EmptyArrayColumn](columns)
+          Some(new NConcatColumn(offsets, emptyArrayColumns) with EmptyArrayColumn)
+
+        case (_, _: EmptyObjectColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[EmptyObjectColumn]) =>
+          val emptyObjectColumns = copyCastArray[EmptyObjectColumn](columns)
+          Some(new NConcatColumn(offsets, emptyObjectColumns) with EmptyObjectColumn)
+
+        case (_, _: NullColumn) :: _ if Loop.forall(columns)(_.isInstanceOf[NullColumn]) =>
+          val nullColumns = copyCastArray[NullColumn](columns)
+          Some(new NConcatColumn(offsets, nullColumns) with NullColumn)
+
+        case _ => None
+      }
+    }
   }
 }

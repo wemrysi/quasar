@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.cf
 import util.CPathUtils
 import com.precog.common._
 import com.precog.util.RingDeque
@@ -171,7 +172,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     * Transform this slice such that its columns are only defined for row indices
     * in the given BitSet.
     */
-  def redefineWith(s: BitSet): Slice = mapColumns(cf.util.filter(0, size, s))
+  def redefineWith(s: BitSet): Slice = mapColumns(cf.filter(0, size, s))
 
   def definedConst(value: CValue): Slice =
     Slice(source.size, Map(value match {
@@ -463,11 +464,11 @@ class SliceOps(private val source: Slice) extends AnyVal {
   // and the values give the indices in the sparsened slice.
   def sparsen(index: Array[Int], toSize: Int): Slice = Slice(
     toSize,
-    source.columns lazyMapValues (col => cf.util.Sparsen(index, toSize)(col).get) //sparsen is total
+    source.columns lazyMapValues (col => cf.Sparsen(index, toSize)(col).get) //sparsen is total
   )
   def remap(indices: ArrayIntList): Slice = Slice(
     indices.size,
-    source.columns lazyMapValues (col => cf.util.RemapIndices(indices).apply(col).get)
+    source.columns lazyMapValues (col => cf.RemapIndices(indices).apply(col).get)
   )
 
   def map(from: CPath, to: CPath)(f: CF1): Slice = {
@@ -514,7 +515,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
           }
     }
 
-    Slice(source.size, source.columns lazyMapValues (col => cf.util.filter(0, source.size, defined)(col).get))
+    Slice(source.size, source.columns lazyMapValues (col => cf.filter(0, source.size, defined)(col).get))
   }
 
   def compact(filter: Slice, definedness: Definedness): Slice = {
@@ -544,7 +545,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         }
     }
 
-    Slice(retained.size, source.columns lazyMapValues (_ |> cf.util.RemapIndices(retained) get))
+    Slice(retained.size, source.columns lazyMapValues (_ |> cf.RemapIndices(retained) get))
   }
 
   def retain(refs: Set[ColumnRef]): Slice = Slice(source.size, source.columns filterKeys refs) // !!! filterKeys is on-demand
@@ -606,7 +607,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       }
     }
 
-    Slice(retained.size, source.columns lazyMapValues (_ |> cf.util.RemapIndices(retained) get))
+    Slice(retained.size, source.columns lazyMapValues (_ |> cf.RemapIndices(retained) get))
   }
 
   def order: Ord[Int] =
@@ -712,23 +713,23 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def take(sz: Int): Slice = (
     if (sz >= source.size) source
-    else Slice(sz, source.columns lazyMapValues (_ |> cf.util.RemapFilter(_ < sz, 0) get))
+    else Slice(sz, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < sz, 0) get))
   )
 
   def drop(sz: Int): Slice = (
     if (sz <= 0) source
-    else Slice(source.size - sz, source.columns lazyMapValues (_ |> cf.util.RemapFilter(_ < size, sz) get))
+    else Slice(source.size - sz, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < size, sz) get))
   )
 
   def takeRange(start: Int, len: Int): Slice = {
     val take = math.min(size, start + len) - start
-    Slice(take, source.columns lazyMapValues (_ |> cf.util.RemapFilter(_ < take, start) get))
+    Slice(take, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < take, start) get))
   }
 
   def zip(other: Slice): Slice = Slice(
     source.size min other.size,
     other.columns.foldLeft(source.columns) {
-      case (acc, (ref, col)) => acc.updated(ref, acc get ref flatMap (c => cf.util.UnionRight(c, col)) getOrElse col)
+      case (acc, (ref, col)) => acc.updated(ref, acc get ref flatMap (c => cf.UnionRight(c, col)) getOrElse col)
     }
   )
 
@@ -1626,7 +1627,7 @@ object Slice {
       case ((cols, offset), _) => (cols, offset)
     }
 
-    Slice(_size, _columns flatMap { case (ref, parts) => cf.util.NConcat(parts) map (ref -> _) })
+    Slice(_size, _columns flatMap { case (ref, parts) => cf.NConcat(parts) map (ref -> _) })
   }
 
   def rowComparatorFor(s1: Slice, s2: Slice)(keyf: Slice => Iterable[CPath]): RowComparator = {

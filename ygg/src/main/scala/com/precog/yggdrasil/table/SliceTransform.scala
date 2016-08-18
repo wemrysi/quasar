@@ -20,6 +20,7 @@
 package quasar.ygg
 package table
 
+import ygg.cf
 import blueeyes._
 import com.precog.common._
 import ygg.json._
@@ -100,10 +101,10 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
             } else {
               val definedAt = new BitSet
               filter.columns.values foreach {
-                case col: BoolColumn => cf.util.isSatisfied(col) foreach (c => definedAt or c.definedAt(0, s.size))
+                case col: BoolColumn => cf.isSatisfied(col) foreach (c => definedAt or c.definedAt(0, s.size))
                 case x               => abort("Unexpected: " + x)
               }
-              s mapColumns { cf.util.filter(0, s.size, definedAt) }
+              s mapColumns { cf.filter(0, s.size, definedAt) }
             }
           }
 
@@ -367,7 +368,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                     val result = emptyObjects ++ nonemptyObjects
 
                     result lazyMapValues { col =>
-                      cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
+                      cf.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                     }
                   }
                 })
@@ -419,7 +420,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                     val result = emptyArrays ++ nonemptyArrays
 
                     result lazyMapValues { col =>
-                      cf.util.filter(0, sl.size max sr.size, nonemptyBits)(col).get
+                      cf.filter(0, sl.size max sr.size, nonemptyBits)(col).get
                     }
                   }
                 })
@@ -537,13 +538,13 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
                   val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
 
                   val joined: ColumnMap = grouped.map({
-                    case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
-                    case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
+                    case (ref, Left3(col))  => ref -> cf.filter(0, size, leftMask)(col).get
+                    case (ref, Right3(col)) => ref -> cf.filter(0, size, rightMask)(col).get
                     case (ref, Middle3((left :: Nil, right :: Nil))) => {
-                      val left2  = cf.util.filter(0, size, leftMask)(left).get
-                      val right2 = cf.util.filter(0, size, rightMask)(right).get
+                      val left2  = cf.filter(0, size, leftMask)(left).get
+                      val right2 = cf.filter(0, size, rightMask)(right).get
 
-                      ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
+                      ref -> cf.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
                     }
                     case (_, x) => abort("Unexpected: " + x)
                   })(collection.breakOut)
@@ -1127,7 +1128,7 @@ trait ConcatHelpers {
       val rightMerged = rightSelection map {
         case (ref, col) => {
           if (leftInner contains ref)
-            ref -> cf.util.UnionRight(leftInner(ref), col).get
+            ref -> cf.UnionRight(leftInner(ref), col).get
           else
             ref -> col
         }

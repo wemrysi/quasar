@@ -1,30 +1,11 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package quasar.ygg
 package table
 
+import ygg.cf
 import blueeyes._
 import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._
-// import ygg.tests.TestSupport._
 
 trait CompactSpec extends ColumnarTableQspec {
   import SampleData._
@@ -83,7 +64,7 @@ trait CompactSpec extends ColumnarTableQspec {
             else
               BitSetUtil create (0 until sz filter (_ => randomDouble < 0.75))
           )
-        Slice(sz, slice.columns mapValues (_ |> cf.util.filter(0, sz, bs) get))
+        Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
       }
       Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
   }
@@ -99,12 +80,12 @@ trait CompactSpec extends ColumnarTableQspec {
           val col = slice.columns(colRef)
           val maskedCol =
             if (numSlices > 1 && Random.nextDouble < 0.25)
-              (col |> cf.util.filter(0, slice.size, new BitSet)).get
+              (col |> cf.filter(0, slice.size, new BitSet)).get
             else {
               val retained = (0 until slice.size).map { (x: Int) =>
                 if (scala.util.Random.nextDouble < 0.75) Some(x) else None
               }.flatten
-              (col |> cf.util.filter(0, slice.size, BitSetUtil.create(retained))).get
+              (col |> cf.filter(0, slice.size, BitSetUtil.create(retained))).get
             }
 
           Slice(slice.size, slice.columns.updated(colRef, maskedCol))
