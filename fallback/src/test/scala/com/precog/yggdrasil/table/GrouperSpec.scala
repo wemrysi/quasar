@@ -24,7 +24,7 @@ import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
-import BlockStoreTestModule.{ empty => module }
+import BlockStoreTestModule.module
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be

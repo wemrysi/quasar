@@ -25,6 +25,7 @@ import com.precog.common._
 import scalaz._, Scalaz._
 import SampleData._
 import TableModule._
+import BlockStoreTestModule.module
 
 /**
   * This provides an ordering on JValue that mimics how we'd order them as
@@ -33,34 +34,22 @@ import TableModule._
   *
   * XXX FIXME
   */
-trait PrecogJValueOrder extends Ord[JValue] {
-  def order(a: JValue, b: JValue): Cmp = {
+
+private object JValueInColumnOrder {
+  def columnOrder: Ord[JValue] = Ord.order[JValue] { (a, b) =>
     val prims0 = a.flattenWithPath.toMap
     val prims1 = b.flattenWithPath.toMap
-    val cols0 = (prims1.mapValues { _ =>
-      JUndefined
-    } ++ prims0).toList.sortMe
-    val cols1 = (prims0.mapValues { _ =>
-      JUndefined
-    } ++ prims1).toList.sortMe
+    val cols0  = (prims1.mapValues(_ => JUndefined) ++ prims0).toList.sorted
+    val cols1  = (prims0.mapValues(_ => JUndefined) ++ prims1).toList.sorted
 
     cols0 ?|? cols1
   }
 }
 
-object PrecogJValueOrder {
-  implicit object order extends PrecogJValueOrder
-}
-
-/** Ugh, without this import it still compiles but the tests
-  *  no longer pass (specifically "heterogeneous sort keys case 2")
-  */
-import PrecogJValueOrder._
-
 trait BlockSortSpec extends quasar.Qspec {
-  def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
-    val module = BlockStoreTestModule.empty
+  implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
+  def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val jvalueOrdering     = Ord[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 

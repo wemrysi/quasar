@@ -5,11 +5,10 @@ package serialization
 import DefaultSerialization._
 import Extractor.Invalid
 import scalaz._
-// import quasar.precog.JsonTestSupport._
+import IsoSerializationData._
+import Versioned._
 
-object VersionedSpec extends quasar.Qspec {
-  import IsoSerializationSpec._
-  import Versioned._
+class VersionedSpec extends quasar.Qspec {
 
   "versioned serialization" should {
     "serialize a simple case class" in {

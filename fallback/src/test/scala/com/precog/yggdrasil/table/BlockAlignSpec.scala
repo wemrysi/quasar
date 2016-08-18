@@ -25,7 +25,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import SampleData._
 import TableModule._
-import BlockStoreTestModule.{ empty => module }
+import BlockStoreTestModule.module
 
 class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpec with BlockSortSpec {
   type MemoId = Int

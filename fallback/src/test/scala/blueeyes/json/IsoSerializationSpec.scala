@@ -5,9 +5,9 @@ package serialization
 import DefaultSerialization._
 import IsoSerialization._
 import shapeless._
-// import quasar.precog.TestSupport._
+import IsoSerializationData._
 
-object IsoSerializationSpec {
+object IsoSerializationData {
   case class Foo(s: String, i: Option[Int], b: Boolean)
   val foo                    = Foo("Hello world", Some(23), true)
   val foo2                   = Foo("Hello world", None, true)
@@ -30,7 +30,6 @@ object IsoSerializationSpec {
 }
 
 class IsoSerializationSpec extends quasar.Qspec {
-  import IsoSerializationSpec._
   "serialization" should {
     "serialize a simple case class" in {
       val fooDecomp = decomposer[Foo](fooSchema)

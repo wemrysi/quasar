@@ -104,14 +104,15 @@ object PlatformBuild {
 
     def setup: Project = (
       serialTests.scalacPlugins(kindProjector).crossSourceDirs.allWarnings.fatalWarnings also (
-                 organization :=  "com.precog",
-                      version :=  "0.1",
-        // scalacOptions in Test +=  "-Xprint:typer",
-                scalacOptions ++= envArgs ++ stdArgs,
-                 scalaVersion :=  "2.11.8",
-          logBuffered in Test :=  false,
-                  crossTarget ~=  (_ / s"java-$javaSpecVersion")
-                // incOptions :=  mkIncOptions(crossTarget.value)
+                    exportJars :=  false,
+                  organization :=  "com.precog",
+                       version :=  "0.1",
+      // scalacOptions in Test +=  "-Xprint:typer",
+                 scalacOptions ++= envArgs ++ stdArgs,
+                  scalaVersion :=  "2.11.8",
+           logBuffered in Test :=  false,
+                   crossTarget ~=  (_ / s"java-$javaSpecVersion")
+                 // incOptions :=  mkIncOptions(crossTarget.value)
       )
     )
   }

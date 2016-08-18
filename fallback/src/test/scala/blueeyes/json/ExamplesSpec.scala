@@ -133,6 +133,9 @@ class ExamplesSpec extends quasar.Qspec {
 }
 
 object Examples {
+  val quoted  = """["foo \" \n \t \r bar"]"""
+  val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
+
   def lotto = """
 {
   "lotto":{
@@ -202,7 +205,4 @@ object Examples {
   ]
 }
 """
-
-  val quoted  = """["foo \" \n \t \r bar"]"""
-  val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
 }

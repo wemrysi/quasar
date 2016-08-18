@@ -144,7 +144,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
 }
 
 object BlockStoreTestModule {
-  object empty extends BlockStoreTestModule {
+  object module extends BlockStoreTestModule {
     val projections = Map[Path, Projection]()
   }
 }

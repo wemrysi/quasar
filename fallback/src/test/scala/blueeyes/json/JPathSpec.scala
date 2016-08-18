@@ -19,7 +19,7 @@ package json
 
 import quasar.precog.JsonTestSupport._
 
-object JPathSpec extends quasar.Qspec {
+class JPathSpec extends quasar.Qspec {
   "Parser" should {
     "parse all valid JPath strings" in {
       prop((p: JPath) => JPath(p.toString) == p)

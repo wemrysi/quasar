@@ -45,7 +45,7 @@ class JsonParserSpec extends quasar.Qspec {
   }
 }
 
-object ParserBugsSpec extends quasar.Qspec {
+class ParserBugsSpec extends quasar.Qspec {
   "Unicode ffff is a valid char in string literal" in {
     JParser.parseFromString(""" {"x":"\uffff"} """) must not(throwAn[java.lang.Exception])
   }
@@ -63,7 +63,7 @@ object ParserBugsSpec extends quasar.Qspec {
   }
 }
 
-object ParsingByteBufferSpec extends quasar.Qspec {
+class ParsingByteBufferSpec extends quasar.Qspec {
   "Respects current ByteBuffer's position" in {
     val bb = ByteBufferWrap(Array(54, 55, 56, 57))
     bb.remaining must_== 4
@@ -85,7 +85,7 @@ object ParsingByteBufferSpec extends quasar.Qspec {
   }
 }
 
-object AsyncParserSpec extends quasar.Qspec {
+class AsyncParserSpec extends quasar.Qspec {
   import AsyncParser._
 
   private def loadBytes(path: String): Array[Byte] = jPath(path).slurpBytes
@@ -280,7 +280,7 @@ xyz
   }
 }
 
-object ArrayUnwrappingSpec extends quasar.Qspec {
+class ArrayUnwrappingSpec extends quasar.Qspec {
   import AsyncParser._
 
   def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))

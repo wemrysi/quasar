@@ -20,9 +20,7 @@ package json
 import scalaz._, Scalaz._, Ordering._
 import quasar.precog._, JsonTestSupport._
 
-class JsonASTSpec extends quasar.Qspec {
-  sequential
-
+class JsonASTSpec extends quasar.SequentialQspec {
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)

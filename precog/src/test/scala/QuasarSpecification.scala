@@ -8,6 +8,10 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.util.{ FreqMap, Pretty }
 import org.specs2.scalacheck._
 
+abstract class SequentialQspec extends Qspec {
+  sequential
+
+}
 abstract class Qspec extends QuasarSpecification
 
 trait QuasarSpecification
