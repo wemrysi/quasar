@@ -2,7 +2,6 @@ package quasar
 
 import org.specs2._
 import org.specs2.matcher._
-import org.specs2.control._
 import org.specs2.execute._
 import org.specs2.specification.dsl._
 import org.scalacheck.Arbitrary
@@ -14,7 +13,6 @@ abstract class Qspec extends QuasarSpecification
 trait QuasarSpecification extends org.specs2.mutable.SpecLike
         with ScalaCheckParameters
         with ScalaCheckPropertyDsl
-        with Properties
         with MatchersImplicits
         with AnyMatchers
         with MapMatchers

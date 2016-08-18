@@ -1,5 +1,6 @@
-package com.precog.util
+package quasar.precog.tests
 
+import com.precog.util._
 import blueeyes._
 import scalaz._
 
@@ -46,39 +47,39 @@ class RingDequeSpec extends quasar.Qspec {
       val result = fromList(xs, xs.length + 1)
       result.pushFront(x)
 
-      result.toList mustEqual (x +: xs)
+      result.toList must_=== (x +: xs)
     }
 
     "implement append" in prop { (xs: List[Int], x: Int) =>
       val result = fromList(xs, xs.length + 1)
       result.pushBack(x)
 
-      result.toList mustEqual (xs :+ x)
+      result.toList must_=== (xs :+ x)
     }
 
     "implement popFront" in prop { (xs: List[Int], x: Int) =>
       val result = fromList(xs, xs.length + 1)
       result.pushFront(x)
 
-      result.popFront() mustEqual x
-      result.toList mustEqual xs
+      result.popFront() must_=== x
+      result.toList must_=== xs
     }
 
     "implement popBack" in prop { (xs: List[Int], x: Int) =>
       val result = fromList(xs, xs.length + 1)
       result.pushBack(x)
 
-      result.popBack() mustEqual x
-      result.toList mustEqual xs
+      result.popBack() must_=== x
+      result.toList must_=== xs
     }
 
     "implement length" in prop { xs: List[Int] =>
-      fromList(xs, xs.length + 10).length mustEqual xs.length
-      fromList(xs, xs.length).length mustEqual xs.length
+      fromList(xs, xs.length + 10).length must_=== xs.length
+      fromList(xs, xs.length).length must_=== xs.length
     }
 
     "satisfy identity" in prop { xs: List[Int] =>
-      fromList(xs, xs.length).toList mustEqual xs
+      fromList(xs, xs.length).toList must_=== xs
     }
 
     "append a full list following a half-appending" in prop { xs: List[Int] =>
@@ -86,13 +87,13 @@ class RingDequeSpec extends quasar.Qspec {
       xs take (xs.length / 2) foreach deque.pushBack
       (0 until (xs.length / 2)) foreach { _ => deque.popFront() }
       xs foreach deque.pushBack
-      deque.toList mustEqual xs
+      deque.toList must_=== xs
     }
 
     "reverse a list by prepending" in prop { xs: List[Int] =>
       val deque = new RingDeque[Int](xs.length)
       xs foreach deque.pushFront
-      deque.toList mustEqual xs.reverse
+      deque.toList must_=== xs.reverse
     }
   }
 

@@ -46,11 +46,6 @@ trait PackageMethods {
     true
   }
 
-  implicit class jPathOps(private val p: jPath) {
-    def slurpBytes(): Array[Byte] = Files readAllBytes p
-  }
-
-
   def decimal(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, UNLIMITED)
   def decimal(d: String): BigDecimal                       = BigDecimal(d, UNLIMITED)
   def decimal(d: Int): BigDecimal                          = decimal(d.toLong)

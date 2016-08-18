@@ -1,5 +1,6 @@
 import scalaz._, Ordering._
 import quasar.{ precog => p }
+import java.nio.file._
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
   // Temporary
@@ -9,6 +10,10 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
 
   val HNil = shapeless.HNil
   val Iso  = shapeless.Generic
+
+  implicit class jPathOps(private val p: jPath) {
+    def slurpBytes(): Array[Byte] = Files readAllBytes p
+  }
 
   implicit def implicitScalaMapOps[A, B, CC[B] <: Traversable[B]](x: scMap[A, CC[B]]): ScalaMapOps[A, B, CC] =
     new ScalaMapOps(x)
