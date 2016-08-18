@@ -23,7 +23,6 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._
-import scalaz.syntax.comonad._
 import scalaz.syntax.std.boolean._
 import SampleData._
 import CValueGenerators._
@@ -81,8 +80,14 @@ trait BlockLoadSpec extends quasar.Qspec {
 
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
-    val result = module.Table.constString(Set("/test")).load("dummyAPIKey", Schema.mkType(cschema).get).flatMap(t => EitherT.right(t.toJson)).run.copoint
-    result.map(_.toList) must_== \/.right(expected.toList)
+    val result: Need[Iterable[JValue]] = {
+      import module.Table
+      val t: Table      = Table constString Set("/test")
+      val loaded: Table = t.load("dummyAPIKey", Schema.mkType(cschema).get).value
+      loaded.toJson
+    }
+
+    result.value.toList must_=== expected.toList
   }
 
   def checkLoadDense = {

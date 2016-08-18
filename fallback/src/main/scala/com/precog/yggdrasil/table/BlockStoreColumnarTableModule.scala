@@ -955,7 +955,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
 
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table]
+    def load(table: Table, apiKey: APIKey, tpe: JType): Need[Table]
   }
 
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
@@ -997,12 +997,12 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] = Need(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Table] = Need(this)
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
@@ -1035,7 +1035,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
-    def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table] = Table.load(this, apiKey, tpe)
+    def load(apiKey: APIKey, tpe: JType): Need[Table] = Table.load(this, apiKey, tpe)
 
     override def force: M[Table] = Need(this)
 

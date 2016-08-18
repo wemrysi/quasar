@@ -31,7 +31,7 @@ trait TableModuleTestSupport extends TableModule {
   def lookupScanner(namespace: List[String], name: String): Scanner
 
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
-  def toJson(dataset: Table): M[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
 
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
 }

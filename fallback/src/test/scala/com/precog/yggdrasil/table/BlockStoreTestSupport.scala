@@ -30,7 +30,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
   def projections: Map[Path, Projection]
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Need, ResourceError, Table] = EitherT.right {
+    def load(table: Table, apiKey: APIKey, tpe: JType): Need[Table] = {
       for {
         paths       <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)

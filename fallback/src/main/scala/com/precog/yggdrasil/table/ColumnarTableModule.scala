@@ -1703,7 +1703,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
       }
     }
 
-    def toJson: M[Iterable[JValue]] = {
+    def toJson: Need[Iterable[JValue]] = {
       toEvents { (slice, row) =>
         slice.toJson(row)
       }

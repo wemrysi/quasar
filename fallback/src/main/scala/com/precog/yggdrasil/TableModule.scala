@@ -185,7 +185,7 @@ trait TableModule extends TransSpecModule {
       * For each distinct path in the table, load all columns identified by the specified
       * jtype and concatenate the resulting slices into a new table.
       */
-    def load(apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table]
+    def load(apiKey: APIKey, tpe: JType): Need[Table]
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
@@ -275,7 +275,7 @@ trait TableModule extends TransSpecModule {
     def renderCsv(): StreamT[M, CharBuffer]
 
     // for debugging only!!
-    def toJson: M[Iterable[JValue]]
+    def toJson: Need[Iterable[JValue]]
 
     def printer(prelude: String = "", flag: String = ""): Table
 
