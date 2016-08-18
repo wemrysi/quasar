@@ -11,11 +11,11 @@ def repl = """
   |import io.circe._, literal._
 """.stripMargin.trim
 
-lazy val root = project.root.setup.noArtifacts aggregate (precog, fallback) dependsOn (precog, fallback) also (
+lazy val root = project.root.setup.noArtifacts aggregate (precog, ygg) dependsOn (precog, ygg) also (
   initialCommands in console := repl
 )
 
-lazy val fallback = project.setup dependsOn (precog % BothScopes)
+lazy val ygg = project.setup dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
   "org.spire-math" %% "jawn-ast"          % "0.9.0",
@@ -29,7 +29,7 @@ lazy val precog = project.setup deps (
   "org.specs2"     %% "specs2-core"       % specsVersion           % Test
 )
 
-lazy val benchmark = project.setup dependsOn (fallback % BothScopes) enablePlugins JmhPlugin also (
+lazy val benchmark = project.setup dependsOn (ygg % BothScopes) enablePlugins JmhPlugin also (
                 fork in Test :=  true,
       sourceDirectory in Jmh <<= sourceDirectory in Test,
        classDirectory in Jmh <<= classDirectory in Test,

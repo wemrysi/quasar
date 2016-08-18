@@ -122,57 +122,57 @@ class AsyncParserSpec extends quasar.Qspec {
   }
 
   "Async parser works on one 1M chunk" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 1024 * 1024)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1024 * 1024)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 100K" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 100 * 1024)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 100 * 1024)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 10K" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 10 * 1024)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 10 * 1024)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 1K" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 1024)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1024)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 100B" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 100)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 100)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 10B" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 10)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 10)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of 1B" in {
-    val vs = runTest("fallback/src/test/resources/z1k_nl.json", 1)
+    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of sizes 10B-1K" in {
     val f  = () => randomInt(1014) + 10
-    val vs = runTestRandomStep("fallback/src/test/resources/z1k_nl.json", f)
+    val vs = runTestRandomStep("ygg/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
 
   "Async parser works on chunks of sizes 1k-10K" in {
     val f  = () => randomInt(9 * 1024) + 1024
-    val vs = runTestRandomStep("fallback/src/test/resources/z1k_nl.json", f)
+    val vs = runTestRandomStep("ygg/src/test/resources/z1k_nl.json", f)
     vs.length must_== 1000
     0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
   }
@@ -203,7 +203,7 @@ class AsyncParserSpec extends quasar.Qspec {
 
   "Async parser performs adequately" in {
     val n    = 1 * 1000
-    val data = loadBytes("fallback/src/test/resources/z1k_nl.json")
+    val data = loadBytes("ygg/src/test/resources/z1k_nl.json")
 
     val step = 100000
     println("parsing %d bytes with %d-byte chunks" format (data.length, step))
