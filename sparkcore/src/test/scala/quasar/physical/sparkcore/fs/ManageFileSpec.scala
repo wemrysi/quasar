@@ -182,7 +182,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
           } yield (filePath)
         }
         // then
-        withTempFile(createIt = Some(List("some content"))) { src =>
+        withTempFile(createIt = Some(List("some content")), withTailDir = List("foo")) { src =>
           Task.delay {
             withTempFile(createIt = None) { dst =>
               for {
@@ -192,8 +192,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must_== false
+                dstExists must_== true
                 dstContent must_= List("some content")
               }
             }

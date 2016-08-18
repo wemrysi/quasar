@@ -87,17 +87,25 @@ trait TempFSSugars {
 
   def withNoContent: Option[Content] = Some(List.empty[String])
 
-  def withTempFile[C](createIt: Option[Content] = None)(run: AFile => Task[C]): C = {
+  def withTempFile[C](createIt: Option[Content] = None, withTailDir: List[String] = Nil)
+    (run: AFile => Task[C]): C = {
 
     def genTempFilePath: Task[AFile] = Task.delay {
-      val path = System.getProperty("java.io.tmpdir") +
-      "/" + scala.util.Random.nextInt().toString + ".tmp"
+      val root = System.getProperty("java.io.tmpdir")
+      val prefix = "tempDir"
+      val tailStr = withTailDir.map(_ + "/")
+      val random = scala.util.Random.nextInt().toString
+      val fileName = scala.util.Random.nextInt().toString + ".tmp"
+      val path = s"$root/$prefix-$random/$tailStr$fileName"
+
+
       sandboxAbs(posixCodec.parseAbsFile(path).get)
     }
 
     def createFile(filePath: AFile): Task[Unit] = Task.delay {
       createIt.foreach { content =>
         val file = toNioPath(filePath).toFile()
+        file.getParentFile().mkdirs()
         val writer = new PrintWriter(file)
         content.foreach {
           line => writer.write(line + "\n")

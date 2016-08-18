@@ -85,10 +85,12 @@ object managefile {
   }
 
   private def moveFile(src: AFile, dst: AFile): Task[FileSystemError \/ Unit] = Task.delay {
-    \/.fromTryCatchNonFatal(
-      Files.move(toNioPath(src), toNioPath(dst), StandardCopyOption.REPLACE_EXISTING)
-    ) .leftMap {
-      case e => pathErr(invalidPath(dst, e.getMessage()))
+    \/.fromTryCatchNonFatal {
+      val deleted = FileUtils.deleteQuietly(toNioPath(dst).toFile())
+      FileUtils.moveFile(toNioPath(src).toFile(), toNioPath(dst).toFile)
+    } .leftMap {
+      case e =>
+        pathErr(invalidPath(dst, e.getMessage()))
     }.void
   }
 
