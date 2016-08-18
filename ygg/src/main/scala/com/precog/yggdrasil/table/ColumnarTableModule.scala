@@ -20,16 +20,15 @@
 package quasar.ygg
 package table
 
-import _root_.ygg.data._
 import blueeyes._, json._
 import com.precog.common._
-import com.precog.bytecode._
 import quasar.ygg.table.cf.util.{ Remap, Empty }
-
 import TransSpecModule._
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 import java.nio.file.Files
+import ygg.data._
+import ygg.json._
 
 trait ColumnarTableTypes {
   type F1         = CF1

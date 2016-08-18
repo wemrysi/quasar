@@ -22,7 +22,7 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
+import ygg.json._
 import scalaz._, Scalaz._
 
 trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHelpers {

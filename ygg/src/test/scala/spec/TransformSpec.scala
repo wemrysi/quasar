@@ -20,12 +20,12 @@
 package quasar.ygg
 
 import com.precog.common._
-import blueeyes._, json._
+import blueeyes._, json.{ JPath => _, JPathField => _, JPathIndex => _, _ }
 import scala.util.Random
 import org.scalacheck.{ Gen, Arbitrary }
-import com.precog.bytecode._
 import scalaz._, Scalaz._
 import ygg.tests.TestSupport._
+import ygg.json._
 
 trait TransformSpec extends TableQspec {
   import CValueGenerators._

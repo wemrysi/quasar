@@ -20,17 +20,16 @@
 package quasar.ygg
 package table
 
-import _root_.ygg.macros.Spire._
 import util.CPathUtils
 import com.precog.common._
-import com.precog.bytecode._
 import com.precog.util.RingDeque
-import ygg.data._
-
 import TransSpecModule._
 import blueeyes._, json._
 import scalaz.{ =?> => _, _ }, Ordering._
 import java.nio.CharBuffer
+
+import ygg.macros.Spire._
+import ygg.json._
 import ygg.data._
 
 sealed trait Slice {

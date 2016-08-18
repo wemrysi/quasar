@@ -21,12 +21,11 @@ package quasar.ygg
 package table
 
 import com.precog.common._
-import com.precog.bytecode.JType
-
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import TableModule._
 import SampleData._
+import ygg.json.JType
 
 class ColumnarTableModuleSpec
       extends ColumnarTableQspec

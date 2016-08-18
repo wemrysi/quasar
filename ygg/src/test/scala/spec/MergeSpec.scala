@@ -22,8 +22,8 @@ package table
 
 import blueeyes._, json._
 import com.precog.common._
-import com.precog.bytecode.JType
 import scalaz._, Scalaz._
+import ygg.json._
 
 class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
   type GroupId = Int

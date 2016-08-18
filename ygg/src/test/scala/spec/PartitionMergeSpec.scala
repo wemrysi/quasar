@@ -20,11 +20,11 @@
 package quasar.ygg
 package table
 
-import com.precog.bytecode._
 import com.precog.common._
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
+import ygg.json._
 // import ygg.tests.TestSupport._
 
 trait PartitionMergeSpec extends ColumnarTableQspec {

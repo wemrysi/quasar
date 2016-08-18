@@ -19,12 +19,12 @@
  */
 package quasar.ygg
 
-import com.precog.bytecode.JType
 import blueeyes._, json._
 import com.precog.common._
 import scalaz._
 import scalaz.syntax.monad._
 import java.nio.CharBuffer
+import ygg.json._
 
 final case class APIKey(value: String) extends AnyVal
 

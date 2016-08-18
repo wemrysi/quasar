@@ -21,7 +21,7 @@ package quasar.ygg
 
 import ygg.api._
 import com.precog.common._
-import com.precog.bytecode.JType
+import ygg.json._
 
 object TransSpecModule {
   object paths {

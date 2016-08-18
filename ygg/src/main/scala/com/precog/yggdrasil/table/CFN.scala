@@ -21,8 +21,8 @@ package quasar.ygg
 package table
 
 import blueeyes._
-import com.precog.bytecode.JType
 import com.precog.common._
+import ygg.json._
 
 sealed trait CFId
 case class LeafCFId(identity: String)            extends CFId

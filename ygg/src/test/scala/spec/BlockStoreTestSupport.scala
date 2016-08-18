@@ -23,7 +23,7 @@ package table
 import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import com.precog.bytecode.JType
+import ygg.json._
 
 trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStoreColumnarTableModule {
   def projections: Map[Path, Projection]

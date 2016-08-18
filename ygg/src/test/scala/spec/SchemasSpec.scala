@@ -20,9 +20,9 @@
 package quasar.ygg
 package table
 
-import com.precog.bytecode._
 import blueeyes._, json._
 import scalaz._, Scalaz._
+import ygg.json._
 
 trait SchemasSpec extends ColumnarTableQspec {
   def testSingleSchema = {

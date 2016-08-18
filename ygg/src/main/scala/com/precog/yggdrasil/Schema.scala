@@ -21,7 +21,7 @@ package quasar.ygg
 
 import blueeyes._
 import com.precog.common._
-import com.precog.bytecode._
+import ygg.json._
 
 object Schema {
   def ctypes(jtype: JType): Set[CType] = jtype match {

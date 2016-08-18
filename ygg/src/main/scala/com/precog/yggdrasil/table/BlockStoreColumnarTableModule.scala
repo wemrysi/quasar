@@ -20,17 +20,16 @@
 package quasar.ygg
 package table
 
-import ygg.data._
 import blueeyes._
 import com.precog.common._
-import com.precog.bytecode._
 import java.util.Comparator
 import org.mapdb._
 import JDBM._
-
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
 import TableModule._
+import ygg.data._
+import ygg.json._
 
 object JDBM {
   type Bytes             = Array[Byte]
