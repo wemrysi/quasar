@@ -78,10 +78,22 @@ trait TempFSSugars {
     } yield result).unsafePerformSync
   }
 
-  def createFile(in: ADir, name: String) = Task.delay {
-    val path = in </> file(name)
-    toNioPath(path).toFile().createNewFile()
-  }
+  def createFile(in: ADir, name: String, createIt: Option[Content] = None): Task[AFile] =
+    Task.delay {
+      val path = in </> file(name)
+      val theFile = toNioPath(path).toFile()
+      val dirsMade = theFile.getParentFile().mkdirs()
+      val created = theFile.createNewFile()
+      createIt.foreach { content =>
+        val writer = new PrintWriter(theFile)
+        content.foreach {
+          line => writer.write(line + "\n")
+        }
+        writer.flush()
+        writer.close()
+      }
+      path
+    }
 
   type Content = List[String]
 

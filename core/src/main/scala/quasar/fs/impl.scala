@@ -66,26 +66,29 @@ object impl {
   }
 
   def ensureMoveSemantics[S[_]](
+    src: APath,
     dst: APath,
-    dstExists: APath => Task[Boolean],
+    fExists: APath => Task[Boolean],
     semantics: MoveSemantics): OptionT[Task, FileSystemError] = {
 
-    def failBecauseExists = PathErr(InvalidPath(dst,
-      "Can not move to destination that already exists if semnatics == failIfExists"))
-    def failBecauseMissing = PathErr(InvalidPath(dst,
-      "Can not move to destination that does not exists if semnatics == failIfMissing"))
-    
-    OptionT[Task, FileSystemError](semantics match {
-      case Overwrite => Task.now(None)
-      case FailIfExists =>
-        dstExists(dst).map { dstExists =>
-          if(dstExists) Some(failBecauseExists) else None
+    OptionT[Task, FileSystemError](
+      fExists(src).flatMap { srcExists =>
+        if(srcExists) {
+          semantics match {
+            case Overwrite => Task.now(None)
+            case FailIfExists =>
+              fExists(dst).map { dstExists =>
+                if(dstExists) Some(PathErr(pathExists(dst))) else None
+              }
+            case FailIfMissing =>
+              fExists(dst).map { dstExists =>
+                if(!dstExists) Some(PathErr(pathNotFound(dst))) else None
+              }
+          }
         }
-      case FailIfMissing =>
-        dstExists(dst).map { dstExists =>
-          if(!dstExists) Some(failBecauseMissing) else None
-        }
-    })
+        else Task.now(Some(PathErr(pathNotFound(src))))
+      }
+    )
   }
 
   type ReadStream[F[_]] = Process[F, FileSystemError \/ Vector[Data]]

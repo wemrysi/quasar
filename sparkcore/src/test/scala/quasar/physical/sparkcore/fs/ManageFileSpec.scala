@@ -25,10 +25,6 @@ import quasar.fs.FileSystemError._
 import quasar.fs._
 import quasar.fs.ManageFile.MoveSemantics
 
-import java.io.{File, PrintWriter}
-import java.nio.file.{Files, Paths}
-import java.lang.System
-
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 import pathy.Path._
@@ -184,7 +180,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
         // then
         withTempFile(createIt = Some(List("some content")), withTailDir = List("foo")) { src =>
           Task.delay {
-            withTempFile(createIt = None) { dst =>
+            withTempFile(createIt = None, withTailDir = List("bar")) { dst =>
               for {
                 result <- execute(program(src, dst))
                 srcExists <- exists(src)
@@ -534,41 +530,6 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
 
   private def interpreter: ManageFile ~> Task =
     local.managefile.interpret[Eff] andThen foldMapNT(NaturalTransformation.refl[Task])
-
-  private def tempFile(createFile: Boolean = true, maybeContent: Option[String] = None): AFile = {
-    val pathStr = s"""${System.getProperty("java.io.tmpdir")}/${scala.util.Random.nextInt().toString}.tmp"""
-    val extensin = ".tmp"
-
-    if(createFile) {
-      val file = new File(pathStr)
-      file.createNewFile()
-
-      maybeContent.foreach { content =>
-        val pw = new PrintWriter(file)
-        pw.write(content)
-        pw.flush
-        pw.close
-      }
-    }
-
-    sandboxAbs(posixCodec.parseAbsFile(pathStr).get)
-  }
-
-  private def tempDir(createDir: Boolean = true, withFiles: List[String] = List()): ADir = {
-    val root = Paths.get(System.getProperty("java.io.tmpdir"))
-    val prefix = "tempDir"
-    val dirName = prefix + scala.util.Random.nextInt().toString
-    val path = s"$root/$dirName/"
-
-    if(createDir) {
-      Files.createDirectory(Paths.get(path))
-      withFiles.foreach { fileName =>
-        new File(path + fileName).createNewFile()
-      }
-    }
-    sandboxAbs(posixCodec.parseAbsDir(path).get)
-  }
-
 
   private def define[C]
     (defined: ManageFile.Ops[ManageFile] => FileSystemErrT[Free[ManageFile, ?], C])

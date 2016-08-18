@@ -59,12 +59,12 @@ object managefile {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
         case Move(FileToFile(sf, df), semantics) =>
           injectFT[Task, S].apply{
-            ensureMoveSemantics(df, doesPathExist, semantics)
+            ensureMoveSemantics(sf, df, doesPathExist, semantics)
               .fold(fse => Task.now(fse.left), moveFile(sf, df)).join
           }
         case Move(DirToDir(sd, dd), semantics) =>
           injectFT[Task, S].apply{
-            ensureMoveSemantics(dd, doesPathExist, semantics)
+            ensureMoveSemantics(sd, dd, doesPathExist, semantics)
               .fold(fse => Task.now(fse.left), moveDir(sd, dd)).join
           }
         case Delete(path) => delete(path)
