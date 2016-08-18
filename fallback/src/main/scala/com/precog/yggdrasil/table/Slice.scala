@@ -20,7 +20,7 @@
 package quasar.ygg
 package table
 
-import quasar.macros.Spire._
+import _root_.ygg.macros.Spire._
 import util.CPathUtils
 import com.precog.common._
 import com.precog.bytecode._

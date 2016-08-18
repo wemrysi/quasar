@@ -4,7 +4,7 @@ package precog
 import internal._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
-import quasar.macros.Spire._
+import _root_.ygg.macros.Spire._
 
 object RawBitSet {
   final def create(size: Int): RawBitSet = new Array[Int]((size >>> 5) + 1)

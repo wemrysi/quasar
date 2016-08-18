@@ -1,5 +1,4 @@
-package quasar
-package macros
+package ygg.macros
 
 import spire.macros.Syntax
 
