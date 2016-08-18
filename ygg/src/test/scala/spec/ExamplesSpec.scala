@@ -1,24 +1,8 @@
-/*
- * Copyright 2009-2010 WorldWide Conferencing, LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+package ygg.tests
 
-package blueeyes
-package json
-
-// import ygg.tests.TestSupport._
+import blueeyes._, json._
 import Examples._
+// import ygg.json.JNum
 
 class ExamplesSpec extends quasar.Qspec {
   import JParser._
@@ -129,80 +113,4 @@ class ExamplesSpec extends quasar.Qspec {
   //  output.contains("\"winning-numbers\",JArray(JNumStr(2)::JNumStr(45)::JNumStr(34)::JNumStr(23)::JNumStr(7)::JNumStr(5)::JNumStr(3)::Nil)") mustEqual true
   //  //output mustEqual """JObject("lotto",JObject("lotto-id",JNum(5)::"winning-numbers",JArray(JNum(2)::JNum(45)::JNum(34)::JNum(23)::JNum(7)::JNum(5)::JNum(3)::Nil)::"winners",JArray(JObject("winner-id",JNum(23)::"numbers",JArray(JNum(2)::JNum(45)::JNum(34)::JNum(23)::JNum(3)::JNum(5)::Nil)::Nil)::JObject("winner-id",JNum(54)::"numbers",JArray(JNum(52)::JNum(3)::JNum(12)::JNum(11)::JNum(18)::JNum(22)::Nil)::Nil)::Nil)::Nil)::Nil)"""
   //}
-
-}
-
-object Examples {
-  val quoted  = """["foo \" \n \t \r bar"]"""
-  val symbols = JObject(JField("f1", JString("foo")) :: JField("f2", JString("bar")) :: Nil)
-
-  def lotto = """
-{
-  "lotto":{
-    "lotto-id":5,
-    "winning-numbers":[2,45,34,23,7,5,3],
-    "winners":[ {
-      "winner-id":23,
-      "numbers":[2,45,34,23,3, 5]
-    },{
-      "winner-id" : 54 ,
-      "numbers":[ 52,3, 12,11,18,22 ]
-    }]
-  }
-}
-"""
-
-  def person = """
-{
-  "person": {
-    "name": "Joe",
-    "age": 35.0,
-    "spouse": {
-      "person": {
-        "name": "Marilyn",
-        "age": 33.0
-      }
-    }
-  }
-}
-"""
-
-  def personDSL =
-    JObject(
-      JField(
-        "person",
-        JObject(
-          JField("name", JString("Joe")) ::
-            JField("age", JNum(35)) ::
-              JField(
-                "spouse",
-                JObject(
-                  JField(
-                    "person",
-                    JObject(
-                      JField("name", JString("Marilyn")) ::
-                        JField("age", JNum(33)) :: Nil
-                    )) :: Nil
-                )) :: Nil
-        )) :: Nil
-    )
-
-  val objArray = """
-{ "name": "joe",
-  "address": {
-    "street": "Bulevard",
-    "city": "Helsinki"
-  },
-  "children": [
-    {
-      "name": "Mary",
-      "age": 5.0
-    },
-    {
-      "name": "Mazy",
-      "age": 3.0
-    }
-  ]
-}
-"""
 }

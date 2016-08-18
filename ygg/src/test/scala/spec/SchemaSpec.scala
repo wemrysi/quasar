@@ -1,5 +1,6 @@
-package quasar.ygg
+package ygg.tests
 
+import quasar.ygg._
 import com.precog.common._
 import ygg.json._
 import blueeyes._

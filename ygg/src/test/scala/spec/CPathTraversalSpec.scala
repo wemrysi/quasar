@@ -17,11 +17,11 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package quasar.ygg
+package ygg.tests
 
 import blueeyes._
 import com.precog.common._
-import quasar.ygg.table._
+import quasar.ygg._, table._
 
 class CPathTraversalSpec extends quasar.Qspec {
   import CPathTraversal._

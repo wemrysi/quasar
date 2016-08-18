@@ -165,7 +165,7 @@ sealed trait JNum extends JValue {
     case _         => super.compare(that)
   }
 
-  protected[json] def numCompare(other: JNum): Int
+  /*protected[json]*/ def numCompare(other: JNum): Int
 }
 
 final case class JNumStr private[json] (value: String) extends JNum {
@@ -185,7 +185,7 @@ final case class JNumStr private[json] (value: String) extends JNum {
     case _           => false
   }
 
-  protected[json] def numCompare(other: JNum) = toBigDecimal compare other.toBigDecimal
+  /*protected[json]*/ def numCompare(other: JNum) = toBigDecimal compare other.toBigDecimal
 }
 
 final case class JNumLong(value: Long) extends JNum {
@@ -202,7 +202,7 @@ final case class JNumLong(value: Long) extends JNum {
     case _             => false
   }
 
-  protected[json] def numCompare(other: JNum) = other match {
+  /*protected[json]*/ def numCompare(other: JNum) = other match {
     case JNumLong(n)   => value compare n
     case JNumDouble(n) => value.toDouble compare n
     case JNumBigDec(n) => BigDecimal(value) compare n
@@ -223,7 +223,7 @@ final case class JNumDouble private[json] (value: Double) extends JNum {
     case _             => false
   }
 
-  protected[json] def numCompare(other: JNum) = other match {
+  /*protected[json]*/ def numCompare(other: JNum) = other match {
     case JNumLong(n)   => value compare n.toDouble
     case JNumDouble(n) => value compare n
     case JNumBigDec(n) => BigDecimal(value) compare n
@@ -245,7 +245,7 @@ final case class JNumBigDec(value: BigDecimal) extends JNum {
     case _             => false
   }
 
-  protected[json] def numCompare(other: JNum) = other match {
+  /*protected[json]*/ def numCompare(other: JNum) = other match {
     case JNumLong(n)   => value compare n
     case JNumDouble(n) => value compare n
     case JNumBigDec(n) => value compare n
@@ -257,7 +257,7 @@ case object JNum {
   def apply(value: Double): JValue =
     if (value.isNaN || isInfinite(value)) JUndefined else JNumDouble(value)
 
-  private[json] def apply(value: String): JNum = {
+  /** XXX private */ def apply(value: String): JNum = {
     assert(value != null)
     JNumStr(value)
   }
@@ -278,7 +278,7 @@ case class JString(value: String) extends JValue {
 object JString {
   final def escape(s: String): String = buildString(internalEscape(_, s))
 
-  protected[json] final def internalEscape(sb: StringBuilder, s: String) {
+  /*protected[json]*/ final def internalEscape(sb: StringBuilder, s: String) {
     sb.append('"')
     var i   = 0
     val len = s.length

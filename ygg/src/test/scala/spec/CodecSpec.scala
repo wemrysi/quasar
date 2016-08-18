@@ -17,13 +17,14 @@
  * program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.precog.common
+package ygg.tests
 
 import blueeyes._
+import com.precog.common._
 import com.precog.util.ByteBufferPool
 import org.scalacheck.Shrink
 import ygg.data._
-import ygg.tests._, TestSupport._
+import TestSupport._
 import ByteBufferPool._
 
 class CodecSpec extends quasar.Qspec {
