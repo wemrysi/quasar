@@ -22,7 +22,8 @@ package com.precog.common
 import blueeyes._
 import com.precog.util.ByteBufferPool
 import org.scalacheck.Shrink
-import quasar.precog._, TestSupport._
+import ygg.data._
+import ygg.tests._, TestSupport._
 import ByteBufferPool._
 
 class CodecSpec extends quasar.Qspec {

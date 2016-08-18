@@ -22,7 +22,7 @@ package table
 
 import blueeyes.json._
 import scalaz.syntax.comonad._
-// import quasar.precog.TestSupport._
+// import ygg.tests.TestSupport._
 
 trait ToArraySpec extends ColumnarTableQspec {
   def testToArrayHomogeneous = {

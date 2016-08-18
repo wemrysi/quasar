@@ -17,7 +17,7 @@
 package blueeyes
 package json
 
-import quasar.precog.JsonTestSupport._
+import ygg.tests.JsonTestSupport._
 
 class JPathSpec extends quasar.Qspec {
   "Parser" should {

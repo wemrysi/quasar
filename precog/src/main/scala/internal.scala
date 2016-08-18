@@ -1,4 +1,3 @@
-package quasar
-package precog
+package ygg
 
-object internal extends PackageAliases with PackageMethods {}
+object internal extends pkg.PackageAliases with pkg.PackageMethods {}

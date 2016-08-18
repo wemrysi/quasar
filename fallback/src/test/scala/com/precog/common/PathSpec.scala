@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-// import quasar.precog.TestSupport._
+// import ygg.tests.TestSupport._
 
 class PathSpec extends quasar.Qspec {
   "rollups for a path" should {

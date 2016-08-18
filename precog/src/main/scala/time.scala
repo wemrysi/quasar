@@ -1,5 +1,4 @@
-package quasar
-package precog
+package ygg.pkg
 
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter.ISO_DATE_TIME

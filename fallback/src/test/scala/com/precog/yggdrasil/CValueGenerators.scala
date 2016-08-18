@@ -21,7 +21,7 @@ package quasar.ygg
 
 import com.precog.common._
 import blueeyes._, json._
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
 
 object CValueGenerators {

@@ -1,5 +1,4 @@
-package quasar
-package precog
+package ygg.pkg
 
 import java.nio.file._
 import java.math.MathContext.UNLIMITED

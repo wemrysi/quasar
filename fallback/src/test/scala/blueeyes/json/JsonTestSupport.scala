@@ -15,10 +15,10 @@
  */
 
 import blueeyes._, json._
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 
-package quasar.precog {
+package ygg.tests {
   object TableTestSupport extends TestSupport with TableGenerators {}
 
   object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerators {

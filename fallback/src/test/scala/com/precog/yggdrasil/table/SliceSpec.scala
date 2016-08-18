@@ -22,7 +22,7 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import quasar.precog.TableTestSupport._
+import ygg.tests.TableTestSupport._
 
 class SliceSpec extends quasar.Qspec {
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering

@@ -19,13 +19,13 @@
  */
 package quasar.ygg
 
+import _root_.ygg.data._
 import table._
 import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
 import com.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }
 import ByteBufferPool._
-import quasar.precog._
 
 trait ColumnEncoder {
   def encodeFromRow(row: Int): Array[Byte]

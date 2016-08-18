@@ -1,7 +1,6 @@
-package quasar
-package precog
+package ygg.external
 
-import internal._
+import ygg.internal._
 import scalaz._, Scalaz._
 
 /**

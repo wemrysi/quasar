@@ -23,7 +23,7 @@ package table
 import com.precog.common._
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 import BlockStoreTestModule.module
 
 /*

@@ -25,7 +25,7 @@ import scala.util.Random
 import org.scalacheck.{ Gen, Arbitrary }
 import com.precog.bytecode._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 
 trait TransformSpec extends TableQspec {
   import CValueGenerators._

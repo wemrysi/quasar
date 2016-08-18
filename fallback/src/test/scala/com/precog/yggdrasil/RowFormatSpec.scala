@@ -23,7 +23,7 @@ import blueeyes._
 import com.precog.common._
 import quasar.ygg.table._
 import org.scalacheck.Shrink
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 
 class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   import Arbitrary._

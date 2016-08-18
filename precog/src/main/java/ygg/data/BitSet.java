@@ -9,7 +9,7 @@
  * 20-sep-2012:
  * copied to com.precog.util.BitSet to allow some small additions to the API.
  */
-package quasar.precog;
+package ygg.data;
 
 import java.util.Collection;
 import java.util.Set;

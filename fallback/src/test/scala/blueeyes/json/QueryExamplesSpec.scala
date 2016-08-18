@@ -18,7 +18,7 @@ package blueeyes
 package json
 
 import JParser._
-// import quasar.precog.TestSupport._
+// import ygg.tests.TestSupport._
 
 class QueryExamplesSpec extends quasar.Qspec {
   "List of IPs" in {

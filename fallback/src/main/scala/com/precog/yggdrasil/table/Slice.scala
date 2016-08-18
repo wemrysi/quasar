@@ -671,7 +671,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       keySlice.isDefinedAt(row) && source.isDefinedAt(row)
     }
     val rowOrder = if (sortOrder == SortAscending) keySlice.order else keySlice.order.reverseOrder
-    quasar.precog.MergeSort.sort(order)(rowOrder, implicitly)
+    ygg.external.MergeSort.sort(order)(rowOrder, implicitly)
 
     val remapOrder = new ArrayIntList(order.size)
     var i          = 0

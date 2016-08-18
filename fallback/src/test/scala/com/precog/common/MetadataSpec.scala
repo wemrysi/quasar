@@ -22,7 +22,7 @@ package com.precog.common
 import blueeyes._
 import blueeyes.json.serialization.DefaultSerialization._
 import scalaz._, Scalaz._
-import quasar.precog._, JsonTestSupport._
+import ygg.tests._, JsonTestSupport._
 import Gen.frequency
 
 class MetadataSpec extends quasar.Qspec with MetadataGenerators {

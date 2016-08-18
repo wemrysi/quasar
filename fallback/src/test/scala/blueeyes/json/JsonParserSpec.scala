@@ -21,7 +21,7 @@ import java.net.URLDecoder
 import scala.util.control.Exception._
 import scalaz._
 import scala.math.min
-import quasar.precog._, JsonTestSupport._
+import ygg.tests._, JsonTestSupport._
 
 class JsonParserSpec extends quasar.Qspec {
   import JParser._

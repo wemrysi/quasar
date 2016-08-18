@@ -1,9 +1,9 @@
-package quasar
-package precog
+package ygg.pkg
 
 import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
+  type BitSet    = ygg.data.BitSet
   type RawBitSet = Array[Int]
 
   type =?>[-A, +B]          = scala.PartialFunction[A, B]

@@ -24,7 +24,7 @@ import blueeyes._
 import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._
-// import quasar.precog.TestSupport._
+// import ygg.tests.TestSupport._
 
 trait CompactSpec extends ColumnarTableQspec {
   import SampleData._

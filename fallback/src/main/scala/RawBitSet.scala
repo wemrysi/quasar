@@ -1,7 +1,6 @@
-package quasar
-package precog
+package ygg.data
 
-import internal._
+import ygg.internal._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
 import _root_.ygg.macros.Spire._

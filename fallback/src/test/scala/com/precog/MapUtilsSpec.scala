@@ -1,4 +1,4 @@
-package quasar.precog.tests
+package ygg.tests
 
 import com.precog.util._
 import blueeyes._

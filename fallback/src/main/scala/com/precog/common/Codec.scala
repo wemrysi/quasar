@@ -19,7 +19,7 @@
  */
 package com.precog.common
 
-import quasar.precog._
+import _root_.ygg.data._
 import blueeyes._
 import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
 import java.nio.CharBuffer

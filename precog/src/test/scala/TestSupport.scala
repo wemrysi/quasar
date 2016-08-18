@@ -1,7 +1,6 @@
-package quasar
-package precog
+package ygg.tests
 
-import internal._
+import ygg.internal._
 import scala.collection.mutable.Builder
 
 object TestSupport extends TestSupport

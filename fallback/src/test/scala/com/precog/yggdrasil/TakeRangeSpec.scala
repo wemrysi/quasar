@@ -22,7 +22,7 @@ package table
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 
 trait TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._

@@ -19,7 +19,7 @@ package json
 
 import MergeDiffData._
 import JParser._
-// import quasar.precog.TestSupport._
+// import ygg.tests.TestSupport._
 
 class MergeDiffSpec extends quasar.Qspec {
   "Merge example" in {

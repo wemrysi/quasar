@@ -24,7 +24,7 @@ import scalaz._, Scalaz._
 import org.scalacheck.Gen.choose
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
-import quasar.precog.TestSupport._
+import ygg.tests.TestSupport._
 import CValueGenerators.JSchema
 
 case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {

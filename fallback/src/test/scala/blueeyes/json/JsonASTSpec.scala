@@ -18,7 +18,7 @@ package blueeyes
 package json
 
 import scalaz._, Scalaz._, Ordering._
-import quasar.precog._, JsonTestSupport._
+import ygg.tests._, JsonTestSupport._
 
 class JsonASTSpec extends quasar.SequentialQspec {
   "Functor identity" in {

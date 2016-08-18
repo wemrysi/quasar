@@ -1,10 +1,9 @@
 import scalaz._, Ordering._
-import quasar.{ precog => p }
+import ygg.{ pkg => p }
 import java.nio.file._
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
   // Temporary
-  type BitSet             = quasar.precog.BitSet
   type JobId              = String
   type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
 
