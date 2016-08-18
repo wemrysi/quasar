@@ -21,7 +21,6 @@ package quasar.ygg
 package table
 
 import com.precog.common._
-import com.precog.common.security.APIKey
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import com.precog.bytecode.JType

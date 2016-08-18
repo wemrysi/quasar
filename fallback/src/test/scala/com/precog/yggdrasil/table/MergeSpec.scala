@@ -23,7 +23,6 @@ package table
 import blueeyes._, json._
 import com.precog.common._
 import com.precog.bytecode.JType
-import com.precog.common.security._
 import scalaz._, Scalaz._
 
 class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {

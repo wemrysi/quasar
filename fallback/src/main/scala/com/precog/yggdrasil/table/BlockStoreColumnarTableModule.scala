@@ -22,9 +22,7 @@ package table
 
 import blueeyes._
 import com.precog.common._
-import com.precog.common.security._
 import com.precog.bytecode._
-
 import java.util.Comparator
 import org.mapdb._
 import JDBM._

@@ -20,16 +20,13 @@
 package quasar.ygg
 
 import com.precog.bytecode.JType
-import blueeyes._
+import blueeyes._, json._
 import com.precog.common._
-import com.precog.common.security._
-
-import blueeyes.json._
-
 import scalaz._
 import scalaz.syntax.monad._
-
 import java.nio.CharBuffer
+
+final case class APIKey(value: String) extends AnyVal
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!

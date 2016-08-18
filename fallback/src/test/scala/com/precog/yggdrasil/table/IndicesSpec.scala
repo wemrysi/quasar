@@ -20,7 +20,7 @@
 package quasar.ygg
 package table
 
-import com.precog.common._, security._
+import com.precog.common._
 import com.precog.bytecode.JType
 import blueeyes._, json._
 import scalaz._, Scalaz._
