@@ -20,8 +20,7 @@
 package com.precog
 package common
 
-import blueeyes._, json._, serialization._
-import DefaultSerialization._
+import blueeyes._, json._
 import scalaz._, Scalaz._, Ordering._
 
 sealed trait RValue { self =>
@@ -236,19 +235,6 @@ object CType {
     case "Period"        => Some(CPeriod)
     case ArrayName(elem) => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
     case _               => None
-  }
-
-  implicit val decomposer: Decomposer[CType] = new Decomposer[CType] {
-    def decompose(ctype: CType): JValue = JString(nameOf(ctype))
-  }
-
-  implicit val extractor: Extractor[CType] = new Extractor[CType] {
-    def validated(obj: JValue): Validation[Extractor.Error, CType] =
-      obj.validated[String].map(fromName _) match {
-        case Success(Some(t)) => Success(t)
-        case Success(None)    => Failure(Extractor.Invalid("Unknown type."))
-        case Failure(f)       => Failure(f)
-      }
   }
 
   def readResolve() = CType

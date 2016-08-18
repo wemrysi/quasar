@@ -19,7 +19,6 @@
  */
 package com.precog.common
 
-import blueeyes._, json._, serialization._, DefaultSerialization._
 import scalaz._, Scalaz._
 
 class Path private (val elements: String*) {
@@ -63,9 +62,6 @@ class Path private (val elements: String*) {
 }
 
 object Path {
-  implicit val PathDecomposer: Decomposer[Path] = StringDecomposer contramap { (_: Path).toString }
-  implicit val PathExtractor: Extractor[Path]   = StringExtractor map { Path(_) }
-
   val Root = new Path()
 
   private def cleanPath(string: String): String = string.replaceAll("^/|/$", "").replaceAll("/+", "/")
