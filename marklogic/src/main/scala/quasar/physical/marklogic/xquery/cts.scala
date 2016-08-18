@@ -45,4 +45,19 @@ object cts {
 
   val uriReference: XQuery =
     "cts:uri-reference()"
+
+  val uris: XQuery =
+    "cts:uris()"
+
+  def uris(start: XQuery, options: IList[XQuery]): XQuery =
+    s"cts:uris($start, ${mkSeq(options)})"
+
+  def uris(
+    start: XQuery,
+    options: IList[XQuery] = IList.empty,
+    query: XQuery,
+    qualityWeight: Option[XQuery] = None,
+    forestIds: IList[XQuery] = IList.empty
+  ): XQuery =
+    s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0"}, ${mkSeq(forestIds)})"
 }

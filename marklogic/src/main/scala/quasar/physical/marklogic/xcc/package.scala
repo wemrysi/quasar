@@ -16,18 +16,40 @@
 
 package quasar.physical.marklogic
 
+import quasar.Predef.{Option, Some, None}
 import quasar.SKI._
 
-import com.marklogic.xcc.ContentSource
+import com.marklogic.xcc.{ContentSource, RequestOptions, Session}
 import scalaz.~>
 import scalaz.concurrent.Task
 
 package object xcc {
-  def runSessionIO(contentSource: ContentSource): SessionIO ~> Task =
+
+  def runSessionIO(
+    contentSource: ContentSource,
+    defaultRequestOptions: RequestOptions
+  ): SessionIO ~> Task =
+    runSessionIO0(contentSource, Some(defaultRequestOptions))
+
+  def runSessionIO_(contentSource: ContentSource): SessionIO ~> Task =
+    runSessionIO0(contentSource, None)
+
+  ////
+
+  private def runSessionIO0(
+    contentSource: ContentSource,
+    defaultRequestOptions: Option[RequestOptions]
+  ): SessionIO ~> Task =
     new (SessionIO ~> Task) {
       def apply[A](sio: SessionIO[A]) =
-        Task.delay(contentSource.newSession) flatMap { session =>
+        newSession flatMap { session =>
           sio.run(session).onFinish(κ(Task.delay(session.close)))
         }
+
+      def newSession: Task[Session] = Task.delay {
+        val session = contentSource.newSession
+        defaultRequestOptions foreach session.setDefaultRequestOptions
+        session
+      }
     }
 }

@@ -26,6 +26,7 @@ import quasar.fs.impl.ReadStream
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 
 import java.net.URI
+import java.util.UUID
 
 import com.fasterxml.uuid._
 import com.marklogic.xcc._
@@ -37,18 +38,25 @@ package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
   import xcc.ChunkedResultSequence
 
-  val FsType = FileSystemType("marklogic")
+  type GenUUID[A] = Read[UUID, A]
+
+  object GenUUID {
+    def Ops[S[_]](implicit S: GenUUID :<: S) =
+      Read.Ops[UUID, S]
+  }
 
   type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[Task], A]
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
   type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence, A]
 
-  type Eff[A]  = Coproduct[Task, Eff0, A]
-  type Eff0[A] = Coproduct[ClientR, Eff1, A]
-  type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
-  type Eff2[A] = Coproduct[MLReadHandles, Eff3, A]
-  type Eff3[A] = Coproduct[MLWriteHandles, Eff4, A]
-  type Eff4[A] = Coproduct[MLResultHandles, xcc.SessionIO, A]
+  type MarkLogicFs[A]  = Coproduct[Task, MarkLogicFs0, A]
+  type MarkLogicFs0[A] = Coproduct[ClientR, MarkLogicFs1, A]
+  type MarkLogicFs1[A] = Coproduct[MonotonicSeq, MarkLogicFs2, A]
+  type MarkLogicFs2[A] = Coproduct[MLReadHandles, MarkLogicFs3, A]
+  type MarkLogicFs3[A] = Coproduct[MLWriteHandles, MarkLogicFs4, A]
+  type MarkLogicFs4[A] = Coproduct[MLResultHandles, xcc.SessionIO, A]
+
+  val FsType = FileSystemType("marklogic")
 
   def createClient(uri: URI): Task[Client] = Task.delay {
     val ifaceAddr = Option(EthernetAddress.fromInterface)
@@ -56,8 +64,14 @@ package object fs {
     Client(ContentSourceFactory.newContentSource(uri), uuidGen)
   }
 
-  def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
+  def inter(uri0: ConnectionUri): Task[(MarkLogicFs ~> Task, Task[Unit])] = {
     val uri = new URI(uri0.value)
+
+    val defaultRequestOpts = {
+      val opts = new RequestOptions
+      opts.setCacheResult(false)
+      opts
+    }
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                   |@|
@@ -67,14 +81,17 @@ package object fs {
       createClient(uri)
     ) { (whandles, rhandles, qhandles, seq, client) =>
 
+      val sessIOToTask =
+        xcc.runSessionIO(client.contentSource, defaultRequestOpts)
+
       val toTask =
-        reflNT[Task]                           :+:
-        Read.constant[Task, Client](client)    :+:
-        seq                                    :+:
-        rhandles                               :+:
-        whandles                               :+:
-        qhandles                               :+:
-        xcc.runSessionIO(client.contentSource)
+        reflNT[Task]                        :+:
+        Read.constant[Task, Client](client) :+:
+        seq                                 :+:
+        rhandles                            :+:
+        whandles                            :+:
+        qhandles                            :+:
+        sessIOToTask
 
       (toTask, ().point[Task])
     }
@@ -89,10 +106,10 @@ package object fs {
         lift(inter(uri).map { case (run, release) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
-              queryfile.interpret[Eff](10000L),
-              readfile.interpret[Eff](10000L),
-              writefile.interpret[Eff],
-              managefile.interpret[Eff]),
+              queryfile.interpret[MarkLogicFs](10000L),
+              readfile.interpret[MarkLogicFs](10000L),
+              writefile.interpret[MarkLogicFs],
+              managefile.interpret[MarkLogicFs]),
             lift(release).into[S])
         }).into[S].liftM[DefErrT]
     }

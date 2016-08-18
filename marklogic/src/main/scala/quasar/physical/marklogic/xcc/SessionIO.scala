@@ -22,9 +22,10 @@ import quasar.fp.numeric.Positive
 import quasar.physical.marklogic.xquery.XQuery
 
 import java.net.URI
+import scala.collection.JavaConverters._
 
 import com.marklogic.xcc._
-import com.marklogic.xcc.exceptions.XccException
+import com.marklogic.xcc.exceptions.{XccException, RequestException}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -45,6 +46,15 @@ final class SessionIO[A] private (protected val k: Kleisli[Task, Session, A]) {
       case \/-(a)                => a.right.point[SessionIO]
     }
 
+  def handleXcc[B >: A](pf: PartialFunction[XccException, B]): SessionIO[B] =
+    handleXccWith(pf andThen (_.point[SessionIO]))
+
+  def handleXccWith[B >: A](pf: PartialFunction[XccException, SessionIO[B]]): SessionIO[B] =
+    attemptXcc flatMap {
+      case -\/(e) => pf.lift(e) getOrElse SessionIO.fail(e)
+      case \/-(a) => (a: B).point[SessionIO]
+    }
+
   def run(s: Session): Task[A] =
     k.run(s)
 }
@@ -61,12 +71,24 @@ object SessionIO {
   def evaluateQuery(query: XQuery, options: RequestOptions): SessionIO[ResultSequence] =
     SessionIO(s => s.submitRequest(s.newAdhocQuery(query, options)))
 
+  def evaluateQuery_(query: XQuery): SessionIO[ResultSequence] =
+    SessionIO(s => s.submitRequest(s.newAdhocQuery(query)))
+
   def evaluateQueryChunked(
     query: XQuery,
     options: RequestOptions,
     chunkSize: Positive
   ): SessionIO[ChunkedResultSequence] =
     evaluateQuery(query, options) map (new ChunkedResultSequence(chunkSize, _))
+
+  def evaluateQueryChunked_(query: XQuery, chunkSize: Positive): SessionIO[ChunkedResultSequence] =
+    evaluateQuery_(query) map (new ChunkedResultSequence(chunkSize, _))
+
+  def insertContent[F[_]: Foldable](content: F[Content]): SessionIO[Executed] =
+    SessionIO(_.insertContent(content.to[Array])).as(executed)
+
+  def insertContentCollectErrors[F[_]: Foldable](content: F[Content]): SessionIO[List[RequestException]] =
+    SessionIO(_.insertContentCollectErrors(content.to[Array])).map(_.asScala.toList)
 
   def isClosed: SessionIO[Boolean] =
     SessionIO(_.isClosed)

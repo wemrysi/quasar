@@ -20,10 +20,33 @@ import quasar.Predef._
 
 import java.lang.SuppressWarnings
 
+import scalaz.std.iterable._
+
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object xdmp {
+  def directory(uri: XQuery, depth: XQuery): XQuery =
+    s"xdmp:directory($uri, $depth)"
+
+  def directoryCreate(uri: XQuery): XQuery =
+    s"xdmp:directory-create($uri)"
+
+  def directoryDelete(uri: XQuery): XQuery =
+    s"xdmp:directory-delete($uri)"
+
+  def directoryProperties(uri: XQuery, depth: XQuery): XQuery =
+    s"xdmp:directory-properties($uri, $depth)"
+
+  def documentDelete(uri: XQuery): XQuery =
+    s"xdmp:document-delete($uri)"
+
   def documentGetProperties(uri: XQuery, property: XQuery): XQuery =
     s"xdmp:document-get-properties($uri, $property)"
+
+  def documentInsert(uri: XQuery, root: XQuery): XQuery =
+    s"xdmp:document-insert($uri, $root)"
+
+  def documentProperties(uris: XQuery*): XQuery =
+    s"xdmp:document-properties${mkSeq(uris)}"
 
   def nodeUri(node: XQuery): XQuery =
     s"xdmp:node-uri($node)"

@@ -25,17 +25,41 @@ object fn {
   def baseUri(node: XQuery): XQuery =
     s"fn:base-uri($node)"
 
+  def concat(x: XQuery, xs: XQuery*): XQuery =
+    s"fn:concat${mkSeq_(x, xs: _*)}"
+
   def doc(uri: XQuery = ""): XQuery =
     s"fn:doc($uri)"
 
+  def exists(seq: XQuery): XQuery =
+    s"fn:exists($seq)"
+
   val False: XQuery =
     "fn:false()"
+
+  def filter(p: XQuery, seq: XQuery): XQuery =
+    s"fn:filter($p, $seq)"
+
+  val last: XQuery =
+    "fn:last()"
+
+  def map(f: XQuery, seq: XQuery): XQuery =
+    s"fn:map($f, $seq)"
+
+  def not(bool: XQuery): XQuery =
+    s"fn:not($bool)"
 
   def QName(localPart: XQuery): XQuery =
     s"fn:QName($localPart)"
 
   def QName(namespace: XQuery, localPart: XQuery): XQuery =
     s"fn:QName($namespace, $localPart)"
+
+  def startsWith(str: XQuery, prefix: XQuery, collation: Option[XQuery] = None): XQuery =
+    s"fn:starts-with($str, ${prefix}${asArg(collation)})"
+
+  def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
+    s"fn:tokenize($input, ${pattern}${asArg(flags)})"
 
   val True: XQuery =
     "fn:true()"
