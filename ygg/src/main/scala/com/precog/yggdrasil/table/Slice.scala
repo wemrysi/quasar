@@ -21,7 +21,6 @@ package quasar.ygg
 package table
 
 import ygg.cf
-import util.CPathUtils
 import com.precog.common._
 import TransSpecModule._
 import blueeyes._, json._
@@ -1476,7 +1475,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   def toJValue(row: Int) = {
     columns.foldLeft[JValue](JUndefined) {
       case (jv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
-        CPathUtils.cPathToJPaths(selector, col.cValue(row)).foldLeft(jv) {
+        cPathToJPaths(selector, col.cValue(row)).foldLeft(jv) {
           case (jv, (path, value)) => jv.unsafeInsert(path, value.toJValue)
         }
 
@@ -1511,6 +1510,23 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def toJsonString(prefix: String = ""): String = {
     (0 until size).map(i => prefix + " " + toJson(i)).mkString("\n")
+  }
+
+  def cPathToJPaths(cpath: CPath, value: CValue): List[JPath -> CValue] = {
+    import ygg.json._
+
+    def add(c: JPathNode, xs: List[JPath -> CValue]): List[JPath -> CValue] =
+      xs map { case (path, value) => (JPath(c :: path.nodes), value) }
+
+    (cpath.nodes, value) match {
+      case (Nil, _)                            => List(NoJPath -> value)
+      case (CPathField(name) :: tail, _)       => add(JPathField(name), cPathToJPaths(CPath(tail), value))
+      case (CPathIndex(i) :: tail, _)          => add(JPathIndex(i), cPathToJPaths(CPath(tail), value))
+      case (CPathArray :: tail, es: CArray[_]) =>
+        val CArrayType(elemType) = es.cType
+        es.value.toList.zipWithIndex flatMap { case (e, i) => add(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
+      case (path, _) => abort("Bad news, bob! " + path)
+    }
   }
 
   override def toString = (0 until size).map(toString(_).getOrElse("")).mkString("\n")
