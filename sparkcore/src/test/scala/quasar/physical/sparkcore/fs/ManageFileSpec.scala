@@ -104,6 +104,28 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
     }
 
     "tempFile" should {
+      "create temp file near non existing dir path" in {
+        // given
+        val program = (nearDir: ADir) => define { unsafe =>
+          for {
+            filePath <- unsafe.tempFile(nearDir)
+          } yield (filePath)
+        }
+        // when
+        withTempDir(createIt = false, withTailDir = List("foo", "bar")) { nearDir =>
+          for {
+            result <- execute(program(nearDir))
+          } yield {
+            // then
+            result must beRightDisjunction.like {
+              case path =>
+                posixCodec.unsafePrintPath(path)
+                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must_= true
+            }
+          }
+        }
+      }
+
       "create temp file near existing dir path" in {
         // given
         val program = (nearDir: ADir) => define { unsafe =>
@@ -125,22 +147,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
           }
         }
       }
-      
-      "fail if near is a non existing directory" in {
-        // given
-        val nearDir = rootDir </> dir("nonexisting")
-        val program = define { unsafe =>
-          for {
-            filePath <- unsafe.tempFile(nearDir)
-          } yield (filePath)
-        }
-        // when
-        val result = execute(program).unsafePerformSync
-        // then
-        result must_= -\/((PathErr(PathNotFound(nearDir))))
-        ok
-      }
-      
+
       "create temp file near existing file path" in {
         // given
         val program = (nearFile: APath) => define { unsafe =>
@@ -149,7 +156,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
           } yield (filePath)
         }
         // when
-        withTempFile(createIt = withNoContent) { nearFile =>
+        withTempFile(createIt = None) { nearFile =>
           for {
             result <- execute(program(nearFile))
           } yield {
@@ -162,7 +169,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
 
           }
         }
-      }
+      }      
     }
 
     "move" should {

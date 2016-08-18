@@ -51,7 +51,7 @@ trait TempFSSugars {
 
     def createDir(dirPath: ADir): Task[Unit] = Task.delay {
       if(createIt) {
-        Files.createDirectory(Paths.get(posixCodec.unsafePrintPath(dirPath)))
+        Paths.get(posixCodec.unsafePrintPath(dirPath)).toFile().mkdirs()
         ()
       } else ()
     }

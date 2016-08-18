@@ -42,10 +42,10 @@ import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
-import java.io.File
+
 
 import org.apache.commons.io.FileUtils
-import pathy.Path.posixCodec
+import pathy.Path._
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
@@ -120,34 +120,15 @@ object managefile {
     s0: Task :<: S
   ): Free[S, FileSystemError \/ AFile] = {
 
-    def handleCreationError: Throwable => FileSystemError = {
-      case e: NoSuchFileException => pathErr(pathNotFound(near))
-      case e: FileAlreadyExistsException => pathErr(pathExists(near))
-      case e: FileSystemException if e.getMessage.contains("Not a directory") => pathErr(invalidPath(
-        near,
-        s"Provided $near is not a directory"))
-
-      case e => pathErr(invalidPath(near, e.getMessage()))
+    injectFT[Task, S].apply{
+      Task.delay {
+        val random = scala.util.Random.nextInt().toString
+        val parent = maybeFile(near)
+          .map(fileParent(_))
+          .fold(near.asInstanceOf[ADir])(parent => parent)
+        (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
+      }
     }
-
-    def fileToMaybeAFile: Path => FileSystemError \/ AFile = f =>
-        toAFile(f) \/> (pathErr(invalidPath(near, s"Could not create temp file in dir $near")))
-    
-    val task: Task[FileSystemError \/ AFile] = Task.delay {
-      val posix = posixCodec.unsafePrintPath(near)
-      val file = new File(posix)
-
-      if(file.exists()) {
-        val parent = if(file.isDirectory()){ posix + "/"} else {file.getParent()}
-        val prefix = "quasar"
-        val suffix = ".tmp"
-
-        \/.fromTryCatchNonFatal(Files.createTempFile(Paths.get(parent), prefix, suffix))
-          .leftMap(handleCreationError)
-          .flatMap(fileToMaybeAFile)
-      } else pathErr(pathNotFound(near)).left
-    }
-    injectFT[Task, S].apply(task)
   }
 
 }
