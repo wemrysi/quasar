@@ -60,10 +60,12 @@ object QueryFile {
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QS] = { lp =>
+  def convertToQScript(f: Option[StaticPathTransformation[Fix, QS]]):
+      Fix[LogicalPlan] => PlannerError \/ Fix[QS] = { lp =>
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
-    optimizeEval(optimize.applyAll)(lp).map(
+    (optimizeEval(optimize.applyAll)(lp) >>=
+      optimize.eliminateProjections(f)).map(
       _.transCata(optimize.applyAll).transCata(optimize.applyAll))
   }
 

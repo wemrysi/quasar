@@ -16,12 +16,16 @@
 
 package quasar.qscript
 
+import quasar.Planner.PlannerError
 import quasar.fp._
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 import quasar.Predef._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
+import matryoshka._,
+  Recursive.ops._,
+  FunctorT.ops._,
+  TraverseT.nonInheritedOps._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
 
@@ -180,7 +184,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     FtoG: F ~> G)(
     implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
       QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
-        case Map(Embed(src), mf) => GtoF(src) >>= QC.prj >>= {
+    case Map(Embed(src), mf) => GtoF(src) >>= QC.prj >>= {
       case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
       case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
       case _ => None
@@ -196,6 +200,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
         case _ => None
       }
+    case Filter(Embed(src), cond) => GtoF(src) >>= QC.prj >>= {
+      case Filter(srcInner, condInner) =>
+        Filter(srcInner, Free.roll[MapFunc[T, ?], Hole](And(condInner, cond))).some
+      case _ => None
+    }
     case _ => None
   }
 
@@ -329,6 +338,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
     }
 
+  // TODO: add reordering
+  // - Filter can be moved ahead of Sort
+  // - Take/Drop can have a normalized order _if_ their counts are constant
+  //   (maybe in some additional cases)
+  // - Take/Drop can be moved ahead of Map
+
   // The order of optimizations is roughly this:
   // - elide NOPs
   // - read conversion given to us by the filesystem
@@ -341,9 +356,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      F[T[F]] => F[T[F]] = //scala.Predef.identity[F[T[F]]]
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[F]])) ⋙
-      Normalizable[F].normalize ⋙
+      F[T[F]] => F[T[F]] =
+    (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
       liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
@@ -361,7 +375,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
-      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] = //thing => CoEnv(thing.right[Hole])
+      F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
+    // FIXME: only apply simplifyProjections after pathify
     (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -374,4 +389,34 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
+
+  /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
+    * `Root` (and projections, etc.) into `Read`, so then we can handle exposing
+    * only “true” joins and converting intra-data joins to map operations.
+    *
+    * `f` takes QScript representing a _potential_ path to a file, converts
+    * `Root` and its children to path, with the operations post-file remaining.
+    */
+  def pathify[F[_]: Traverse](
+    f: StaticPathTransformation[T, F])(
+    implicit FS: StaticPath.Aux[T, F],
+             DE: Const[DeadEnd, ?] :<: F,
+             F: Pathable[T, ?] :<: F,
+             FI: F :<: QScriptTotal[T, ?]):
+      T[F] => PlannerError \/ T[QScriptTotal[T, ?]] =
+    _.cataM[PlannerError \/ ?, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[F](f)).flatMap(_.fold(_.right, FS.toRead[F, QScriptTotal[T, ?]](f)))
+
+  def eliminateProjections[F[_]: Traverse](
+    f: Option[StaticPathTransformation[T, F]])(
+    implicit FS: StaticPath.Aux[T, F],
+             DE: Const[DeadEnd, ?] :<: F,
+             F: Pathable[T, ?] :<: F,
+             FI: F :<: QScriptTotal[T, ?]):
+      T[F] => PlannerError \/ T[QScriptTotal[T, ?]] = qs => {
+    val res = f.fold(qs.transAna(FI.inj).right[PlannerError])(pathify(_).apply(qs))
+
+    res.map(
+      _.transAna(
+        quasar.fp.free.injectedNT[QScriptTotal[T, ?]](simplifyProjections).apply(_: QScriptTotal[T, ?][T[QScriptTotal[T, ?]]])))
+  }
 }
