@@ -188,7 +188,7 @@ package object json {
         }
 
         if (mode == Canonical)
-          fields.toSeq.sortMe.foreach(handlePair)
+          fields.toSeq.sorted.foreach(handlePair)
         else
           fields.foreach(handlePair)
 

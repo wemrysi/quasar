@@ -37,10 +37,6 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
 
   implicit def bigDecimalOrder: Ord[BigDecimal] = Ord.order[BigDecimal]((x, y) => Cmp(x compare y))
 
-  implicit class ScalaSeqOps[A](xs: scSeq[A]) {
-    def sortMe(implicit z: Ord[A]): Vector[A] = xs sortWith z.lt toVector
-  }
-
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
     def |>[B](f: A => B): B       = f(x)
     def unsafeTap(f: A => Any): A = doto(x)(f)
