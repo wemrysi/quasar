@@ -56,18 +56,19 @@ object queryfile {
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
     injectFT[Task, S].apply {
       Task.delay {
-        def segments: Set[PathSegment] =
-          new File(posixCodec.unsafePrintPath(d)).listFiles.toSet[File].map {
-            case file if file.isFile() => FileName(file.getName()).right[DirName]
-            case directory => DirName(directory.getName()).left[FileName]
+        val directory = new File(posixCodec.unsafePrintPath(d))
+        if(directory.exists()) {
+          \/.fromTryCatchNonFatal{
+            directory.listFiles.toSet[File].map {
+              case file if file.isFile() => FileName(file.getName()).right[DirName]
+              case directory => DirName(directory.getName()).left[FileName]
+            }
           }
-        \/.fromTryCatchNonFatal(segments)
-          .leftMap {
-          case e => pathErr(invalidPath(d, e.getMessage()))
-        }
+            .leftMap {
+            case e =>
+              pathErr(invalidPath(d, e.getMessage()))
+          }
+        } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
       }
     }
- 
-
-
 }
