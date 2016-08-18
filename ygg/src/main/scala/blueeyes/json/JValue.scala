@@ -20,7 +20,7 @@ package json
 import scalaz._, Scalaz._
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
-import quasar.precog._
+import ygg.api._
 
 /**
   * Data type for Json AST.

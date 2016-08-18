@@ -1,5 +1,4 @@
-package quasar
-package precog
+package ygg.api
 
 trait ToString {
   def to_s: String

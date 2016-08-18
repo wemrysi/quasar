@@ -4,7 +4,6 @@ package serialization
 
 import scalaz._, Scalaz._
 import ExtractorDecomposer.by
-import quasar.precog.{ MimeType, MimeTypes }
 
 /** Decomposes the value into a JSON object.
   */
@@ -62,11 +61,6 @@ trait MiscSerializers {
   implicit val InstantExtractorDecomposer  = by[Instant](_.getMillis)(instant fromMillis _)
   implicit val DurationExtractorDecomposer = by[Duration](_.getMillis)(duration fromMillis _)
   implicit val UuidExtractorDecomposer     = by[UUID](_.toString)(uuid)
-  implicit val MimeTypeExtractorDecomposer = by[MimeType].opt(x => JString(x.toString): JValue)(jv =>
-    StringExtractor validated jv map (MimeTypes parseMimeTypes _ toList) flatMap {
-      case Nil        => Failure(Extractor.Error.invalid("No mime types found in " + jv.renderCompact))
-      case first :: _ => Success(first)
-  })
 }
 
 /** Serialization implicits allow a convenient syntax for serialization and

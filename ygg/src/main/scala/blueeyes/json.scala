@@ -27,13 +27,13 @@ package object json {
     def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
   }
 
-  val NoJPath = JPath()
-  type JPath      = quasar.precog.JPath
-  type JPathNode  = quasar.precog.JPathNode
-  type JPathField = quasar.precog.JPathField
-  val JPathField = quasar.precog.JPathField
-  type JPathIndex = quasar.precog.JPathIndex
-  val JPathIndex = quasar.precog.JPathIndex
+  val NoJPath     = JPath()
+  type JPath      = ygg.json.JPath
+  type JPathNode  = ygg.json.JPathNode
+  type JPathField = ygg.json.JPathField
+  val JPathField  = ygg.json.JPathField
+  type JPathIndex = ygg.json.JPathIndex
+  val JPathIndex  = ygg.json.JPathIndex
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
     val sb = new StringBuilder

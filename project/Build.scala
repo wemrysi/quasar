@@ -1,8 +1,8 @@
-package precogbuild
+package yggbuild
 
 import sbt._, Keys._
 
-object PlatformBuild {
+object Build {
   val BothScopes = "compile->compile;test->test"
 
   // Careful, this makes sbt recompile everything whenever anything

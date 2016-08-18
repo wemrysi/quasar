@@ -1,5 +1,6 @@
-package quasar
-package precog
+package ygg.json
+
+import ygg.api.ToString
 
 final case class JPath(nodes: List[JPathNode]) extends ToString {
   def to_s: String = nodes match {
