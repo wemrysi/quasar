@@ -161,7 +161,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
 
   "Set and retrieve an arbitrary jvalue at an arbitrary path" in {
     runArbitraryPathSpec
-  }
+  }.flakyTest
 
   "sort arrays" in {
     val v1 = JParser.parseUnsafe("""[1, 1, 1]""")
