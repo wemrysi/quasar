@@ -19,6 +19,7 @@
  */
 package quasar.ygg
 
+import ygg.api._
 import com.precog.common._
 
 class TransSpecModuleSpec extends quasar.Qspec with TransSpecModule with FNDummyModule {
