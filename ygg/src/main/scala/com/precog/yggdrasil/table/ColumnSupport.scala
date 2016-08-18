@@ -143,10 +143,6 @@ class NConcatColumn[T <: Column](offsets: Array[Int], columns: Array[T]) { this:
   }
 }
 
-class ShiftColumn[T <: Column](by: Int, c1: T) { this: T =>
-  def isDefinedAt(row: Int) = c1.isDefinedAt(row - by)
-}
-
 class RemapColumn[T <: Column](delegate: T, f: Int => Int) { this: T =>
   def isDefinedAt(row: Int) = delegate.isDefinedAt(f(row))
 }

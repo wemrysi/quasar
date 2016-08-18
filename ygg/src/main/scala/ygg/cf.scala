@@ -80,6 +80,23 @@ package object cf {
       }
   }
 
+  val Empty = CF1P("builtin::ct::empty") {
+    case c: BoolColumn   => new EmptyColumn[BoolColumn] with BoolColumn
+    case c: LongColumn   => new EmptyColumn[LongColumn] with LongColumn
+    case c: DoubleColumn => new EmptyColumn[DoubleColumn] with DoubleColumn
+    case c: NumColumn    => new EmptyColumn[NumColumn] with NumColumn
+    case c: StrColumn    => new EmptyColumn[StrColumn] with StrColumn
+    case c: DateColumn   => new EmptyColumn[DateColumn] with DateColumn
+    case c: PeriodColumn => new EmptyColumn[PeriodColumn] with PeriodColumn
+    case c: HomogeneousArrayColumn[a] =>
+      new EmptyColumn[HomogeneousArrayColumn[a]] with HomogeneousArrayColumn[a] {
+        val tpe = c.tpe
+      }
+    case c: EmptyArrayColumn  => new EmptyColumn[EmptyArrayColumn] with EmptyArrayColumn
+    case c: EmptyObjectColumn => new EmptyColumn[EmptyObjectColumn] with EmptyObjectColumn
+    case c: NullColumn        => new EmptyColumn[NullColumn] with NullColumn
+  }
+
   //it would be nice to generalize these to `CoerceTo[A]`
   def CoerceToDouble = CF1P("builtin:ct:coerceToDouble") {
     case (c: DoubleColumn) => c
@@ -93,53 +110,6 @@ package object cf {
       new Map1Column(c) with DoubleColumn {
         def apply(row: Int) = c(row).toDouble
       }
-  }
-
-  def Shift(by: Int) = CF1P("builtin::ct::shift") {
-    case c: BoolColumn =>
-      new ShiftColumn(by, c) with BoolColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: LongColumn =>
-      new ShiftColumn(by, c) with LongColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: DoubleColumn =>
-      new ShiftColumn(by, c) with DoubleColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: NumColumn =>
-      new ShiftColumn(by, c) with NumColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: StrColumn =>
-      new ShiftColumn(by, c) with StrColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: DateColumn =>
-      new ShiftColumn(by, c) with DateColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: PeriodColumn =>
-      new ShiftColumn(by, c) with PeriodColumn {
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: HomogeneousArrayColumn[a] =>
-      new ShiftColumn(by, c) with HomogeneousArrayColumn[a] {
-        val tpe             = c.tpe
-        def apply(row: Int) = c(row - by)
-      }
-
-    case c: EmptyArrayColumn  => new ShiftColumn(by, c) with EmptyArrayColumn
-    case c: EmptyObjectColumn => new ShiftColumn(by, c) with EmptyObjectColumn
-    case c: NullColumn        => new ShiftColumn(by, c) with NullColumn
   }
 
   def Sparsen(idx: Array[Int], toSize: Int) = CF1P("builtin::ct::sparsen") {
@@ -161,22 +131,6 @@ package object cf {
     case c: NullColumn        => new SparsenColumn(c, idx, toSize) with NullColumn
   }
 
-  val Empty = CF1P("builtin::ct::empty") {
-    case c: BoolColumn   => new EmptyColumn[BoolColumn] with BoolColumn
-    case c: LongColumn   => new EmptyColumn[LongColumn] with LongColumn
-    case c: DoubleColumn => new EmptyColumn[DoubleColumn] with DoubleColumn
-    case c: NumColumn    => new EmptyColumn[NumColumn] with NumColumn
-    case c: StrColumn    => new EmptyColumn[StrColumn] with StrColumn
-    case c: DateColumn   => new EmptyColumn[DateColumn] with DateColumn
-    case c: PeriodColumn => new EmptyColumn[PeriodColumn] with PeriodColumn
-    case c: HomogeneousArrayColumn[a] =>
-      new EmptyColumn[HomogeneousArrayColumn[a]] with HomogeneousArrayColumn[a] {
-        val tpe = c.tpe
-      }
-    case c: EmptyArrayColumn  => new EmptyColumn[EmptyArrayColumn] with EmptyArrayColumn
-    case c: EmptyObjectColumn => new EmptyColumn[EmptyObjectColumn] with EmptyObjectColumn
-    case c: NullColumn        => new EmptyColumn[NullColumn] with NullColumn
-  }
 
   def Remap(f: Int => Int) = CF1P("builtin::ct::remap") {
     case c: BoolColumn   => new RemapColumn(c, f) with BoolColumn   { def apply(row: Int) = c(f(row)) }
