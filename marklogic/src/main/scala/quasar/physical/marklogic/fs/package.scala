@@ -17,7 +17,8 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
+import quasar.Data
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
@@ -29,7 +30,7 @@ import java.net.URI
 import com.fasterxml.uuid._
 import com.marklogic.xcc._
 import eu.timepit.refined.auto._
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 package object fs {
@@ -38,21 +39,16 @@ package object fs {
 
   val FsType = FileSystemType("marklogic")
 
-  type XccCursor[A]  = Coproduct[Task, xcc.XccFailure, A]
-  type XccCursorM[A] = Free[XccCursor, A]
-
   type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[Task], A]
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
-  type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence[XccCursor], A]
+  type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence, A]
 
   type Eff[A]  = Coproduct[Task, Eff0, A]
   type Eff0[A] = Coproduct[ClientR, Eff1, A]
   type Eff1[A] = Coproduct[MonotonicSeq, Eff2, A]
   type Eff2[A] = Coproduct[MLReadHandles, Eff3, A]
   type Eff3[A] = Coproduct[MLWriteHandles, Eff4, A]
-  type Eff4[A] = Coproduct[MLResultHandles, Eff5, A]
-  type Eff5[A] = Coproduct[xcc.SessionR, Eff6, A]
-  type Eff6[A] = Coproduct[xcc.XccFailure, XccCursorM, A]
+  type Eff4[A] = Coproduct[MLResultHandles, xcc.SessionIO, A]
 
   def createClient(uri: URI): Task[Client] = Task.delay {
     val ifaceAddr = Option(EthernetAddress.fromInterface)
@@ -63,34 +59,22 @@ package object fs {
   def inter(uri0: ConnectionUri): Task[(Eff ~> Task, Task[Unit])] = {
     val uri = new URI(uri0.value)
 
-    val failErrs = Failure.toRuntimeError[Task, xcc.XccError]
-
     (
-      KeyValueStore.impl.empty[WriteHandle, Unit]                              |@|
-      KeyValueStore.impl.empty[ReadHandle, ReadStream[Task]]                   |@|
-      KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence[XccCursor]] |@|
-      MonotonicSeq.fromZero                                                    |@|
+      KeyValueStore.impl.empty[WriteHandle, Unit]                   |@|
+      KeyValueStore.impl.empty[ReadHandle, ReadStream[Task]]        |@|
+      KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence] |@|
+      MonotonicSeq.fromZero                                         |@|
       createClient(uri)
     ) { (whandles, rhandles, qhandles, seq, client) =>
 
-      // TODO: Define elsewhere, can probably make this another generic impl of Read
-      val newSession: xcc.SessionR ~> Task =
-      new (xcc.SessionR ~> Task) {
-        def apply[A](ra: Read[Session, A]) = ra match {
-          case Read.Ask(f) => client.newSession.map(f)
-        }
-      }
-
       val toTask =
-        reflNT[Task]                        :+:
-        Read.constant[Task, Client](client) :+:
-        seq                                 :+:
-        rhandles                            :+:
-        whandles                            :+:
-        qhandles                            :+:
-        newSession                          :+:
-        failErrs                            :+:
-        foldMapNT(reflNT[Task] :+: failErrs)
+        reflNT[Task]                           :+:
+        Read.constant[Task, Client](client)    :+:
+        seq                                    :+:
+        rhandles                               :+:
+        whandles                               :+:
+        qhandles                               :+:
+        xcc.runSessionIO(client.contentSource)
 
       (toTask, ().point[Task])
     }
@@ -113,4 +97,13 @@ package object fs {
         }).into[S].liftM[DefErrT]
     }
 
+  implicit val chunkedResultSequenceDataCursor: DataCursor[Task, ChunkedResultSequence] =
+    new DataCursor[Task, ChunkedResultSequence] {
+      def close(crs: ChunkedResultSequence) =
+        crs.close.void
+
+      def nextChunk(crs: ChunkedResultSequence) =
+        crs.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
+          ds :+ xdmitem.toData(x)))
+    }
 }

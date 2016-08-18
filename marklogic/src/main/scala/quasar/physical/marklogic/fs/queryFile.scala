@@ -24,10 +24,11 @@ import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.fp._
+import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionR, XccFailure}
+import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionIO}
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
@@ -44,16 +45,12 @@ object queryfile {
   def interpret[S[_]](
     resultsChunkSize: Positive
   )(implicit
-    S0: SessionR :<: S,
-    S1: XccFailure :<: S,
-    S2: MLResultHandles :<: S,
-    S3: MonotonicSeq :<: S,
-    S4: Task :<: S,
-    S5: XccCursorM :<: S,
-    S6: ClientR :<: S
+    S0: SessionIO :<: S,
+    S1: MLResultHandles :<: S,
+    S2: MonotonicSeq :<: S,
+    S3: Task :<: S,
+    S4: ClientR :<: S
   ): QueryFile ~> Free[S, ?] = {
-    val session = xcc.session.Ops[S]
-
     val evalOpts = {
       val ropts = new RequestOptions
       ropts.setCacheResult(false)
@@ -73,8 +70,9 @@ object queryfile {
     def eval(lp: Fix[LogicalPlan]) =
       EitherT.fromDisjunction[Free[S, ?]](planLP(lp))
         .leftMap(planningFailed(lp, _))
-        .flatMap(session.evaluateQuery(_, evalOpts).liftM[FileSystemErrT])
-        .map(new ChunkedResultSequence[XccCursor](resultsChunkSize, _))
+        .flatMap(xqy => lift(
+          SessionIO.evaluateQueryChunked(xqy, evalOpts, resultsChunkSize)
+        ).into[S].liftM[FileSystemErrT])
         .run
         .strengthL(Vector.empty[PhaseResult])
 
@@ -96,7 +94,7 @@ object queryfile {
         dirs => dirs.map(SandboxedPathy.segAt(0,_)).toList.unite.toSet
       ))
 
-    queryFileFromDataCursor[S, XccCursorM, ChunkedResultSequence[XccCursor]](
+    queryFileFromDataCursor[S, Task, ChunkedResultSequence](
       exec, eval, explain, listContents, exists)
   }
 }

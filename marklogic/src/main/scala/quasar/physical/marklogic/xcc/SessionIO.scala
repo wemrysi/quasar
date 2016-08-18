@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xcc
 
 import quasar.Predef._
 import quasar.SKI._
+import quasar.fp.numeric.Positive
 import quasar.physical.marklogic.xquery.XQuery
 
 import java.net.URI
@@ -59,6 +60,13 @@ object SessionIO {
 
   def evaluateQuery(query: XQuery, options: RequestOptions): SessionIO[ResultSequence] =
     SessionIO(s => s.submitRequest(s.newAdhocQuery(query, options)))
+
+  def evaluateQueryChunked(
+    query: XQuery,
+    options: RequestOptions,
+    chunkSize: Positive
+  ): SessionIO[ChunkedResultSequence] =
+    evaluateQuery(query, options) map (new ChunkedResultSequence(chunkSize, _))
 
   def isClosed: SessionIO[Boolean] =
     SessionIO(_.isClosed)

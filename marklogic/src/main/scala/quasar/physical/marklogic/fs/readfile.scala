@@ -48,7 +48,7 @@ object readfile {
         // ResultItem extends XdmItem in order to "forward calls" but that messes up
         // pattern matching, we want the "actual" XdmItem
         Client.readDirectory(dirPath) map { p =>
-          val ltd = p.map(item => xcc.xdmitem.toData(item.getItem))
+          val ltd = p.map(item => xdmitem.toData(item.getItem))
                      .drop(readOpts.offset.get.toInt)
 
           readOpts.limit.fold(ltd)(l => ltd.take(l.get.toInt))
