@@ -1,4 +1,4 @@
-import ygg.build.Build._
+import xygg.build.Build._
 
 def scalazVersion     = "7.2.4"
 def specsVersion      = "3.8.4-scalacheck-1.12.5"
