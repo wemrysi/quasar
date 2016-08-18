@@ -37,3 +37,26 @@ class ArrayIntList(initialCapacity: Int) {
     }
   }
 }
+
+sealed trait IntList {
+  def head: Int
+  def tail: IntList
+}
+final case class IntCons(head: Int, tail: IntList) extends IntList
+final case object IntNil extends IntList {
+  def head = Nil.head
+  def tail = this
+}
+
+object IntList {
+  def empty: IntList           = IntNil
+  def apply(xs: Int*): IntList = xs.foldRight(empty)(_ :: _)
+
+  implicit class IntListOps(private val xs: IntList) extends AnyVal {
+    def ::(head: Int): IntCons = IntCons(head, xs)
+    @tailrec final def foreach(f: Int => Any): Unit = xs match {
+      case IntCons(hd, tl) => f(hd); tl foreach f
+      case _               =>
+    }
+  }
+}

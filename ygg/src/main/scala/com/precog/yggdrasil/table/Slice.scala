@@ -23,7 +23,6 @@ package table
 import ygg.cf
 import util.CPathUtils
 import com.precog.common._
-import com.precog.util.RingDeque
 import TransSpecModule._
 import blueeyes._, json._
 import scalaz.{ =?> => _, _ }, Ordering._

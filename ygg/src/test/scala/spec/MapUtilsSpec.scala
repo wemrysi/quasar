@@ -1,6 +1,6 @@
 package ygg.tests
 
-import com.precog.util._
+import ygg.data._
 import blueeyes._
 import scalaz._, Either3._
 

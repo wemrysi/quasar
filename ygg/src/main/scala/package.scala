@@ -1,5 +1,6 @@
 import scalaz._, Ordering._
 import ygg.{ pkg => p }
+import ygg.data._
 import java.nio.file._
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {

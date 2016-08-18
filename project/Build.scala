@@ -1,4 +1,4 @@
-package yggbuild
+package ygg.build
 
 import sbt._, Keys._
 
