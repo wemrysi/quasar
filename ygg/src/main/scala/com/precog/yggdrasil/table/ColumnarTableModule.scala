@@ -1,22 +1,3 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package quasar.ygg
 package table
 
@@ -50,6 +31,8 @@ trait ColumnarTableModuleConfig {
 
   def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
 }
+
+final case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
 object ColumnarTableModule {
   def renderJson[M[+ _]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
@@ -293,7 +276,6 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
 
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
-  case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
   def newScratchDir(): File    = Files.createTempDirectory("quasar").toFile
   def jdbmCommitInterval: Long = 200000l

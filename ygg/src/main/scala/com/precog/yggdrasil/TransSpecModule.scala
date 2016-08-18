@@ -19,8 +19,8 @@
  */
 package quasar.ygg
 
-import ygg.api._
 import com.precog.common._
+import ygg.api._
 import ygg.json._
 
 object TransSpecModule {
@@ -39,9 +39,8 @@ object TransSpecModule {
 trait TransSpecModule extends FNModule {
   import TransSpecModule._
 
-  type GroupId
   type Scanner
-  // type Mapper
+  type GroupId
 
   object trans {
     sealed trait TransSpec[+A <: SourceType]

@@ -123,8 +123,6 @@ trait TableModule extends TransSpecModule {
   import TableModule._
 
   type Reducer[α]
-  type TableMetrics
-
   type Table <: TableLike
   type TableCompanion <: TableCompanionLike
 
@@ -275,8 +273,6 @@ trait TableModule extends TransSpecModule {
     def toJson: Need[Iterable[JValue]]
 
     def printer(prelude: String = "", flag: String = ""): Table
-
-    def metrics: TableMetrics
   }
 
   sealed trait GroupingSpec {
