@@ -5,17 +5,19 @@ def specsVersion      = "3.8.4-scalacheck-1.12.5"
 def scalacheckVersion = "1.12.5"
 def circeVersion      = "0.4.1"
 
-lazy val root = project.setup.root.noArtifacts aggregate (precog, fallback) dependsOn (fallback) also (
-    scalacOptions in console in Compile := consoleArgs,
-  initialCommands in console in Compile := "import quasar._, precog._, blueeyes._, json._",
-       scalacOptions in console in Test := consoleArgs,
-     initialCommands in console in Test := "import quasar._, precog._, blueeyes._, json._, com.precog._, common._, ygg._"
+def repl = """
+  |import quasar._, precog._, blueeyes._, json._
+  |import com.precog._, common._, ygg._
+  |import io.circe._, literal._
+""".stripMargin.trim
+
+lazy val root = project.root.setup.noArtifacts aggregate (precog, fallback) dependsOn (precog, fallback) also (
+  initialCommands in console := repl
 )
 
 lazy val fallback = project.setup dependsOn (precog % BothScopes)
 
 lazy val precog = project.setup deps (
-
   "org.spire-math" %% "jawn-ast"          % "0.9.0",
   "io.circe"       %% "circe-literal"     % circeVersion,
   "org.mapdb"      %  "mapdb"             % "3.0.1",

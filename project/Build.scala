@@ -5,10 +5,13 @@ import sbt._, Keys._
 object PlatformBuild {
   val BothScopes = "compile->compile;test->test"
 
-  def envArgs     = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
-  def warningArgs = Seq("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
-  def stdArgs     = Seq("-deprecation", "-unchecked", "-language:_")
-  def consoleArgs = Seq("-language:_")
+  // Careful, this makes sbt recompile everything whenever anything
+  // in the build definition changes.
+  //
+  // def envArgs = sys.env.getOrElse("ARGS", "").trim split "\\s+" toList
+  val warningArgs = Seq("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
+  val stdArgs     = Seq("-deprecation", "-unchecked", "-language:_")
+  val consoleArgs = Seq("-language:_")
 
   // val Default = IncOptions(
   //   //    1. recompile changed sources
@@ -88,9 +91,11 @@ object PlatformBuild {
     def serialTests: Project                          = also(parallelExecution in Test := false)
     def allWarnings: Project                          = scalacArgs(warningArgs: _*)
     def fatalWarnings: Project                        = scalacArgs("-Xfatal-warnings")
-    def logImplicits: Project                         = scalacArgs("-Xlog-implicits")
+    def logImplicits: Project                         = scalacArgs("-Xlog-implicits", "-Xprint:typer")
     def crossSourceDirs: Project                      = also(inBoth(doubleCrossSrc))
+    def fixConsole: Project                           = also(inBoth(scalacOptions in console in _ := consoleArgs))
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
+    def stdPlugins: Project                           = scalacPlugins(kindProjector, macroParadise)
 
     // Without serialTests:
     //
@@ -105,16 +110,16 @@ object PlatformBuild {
     // testForkedParallel in Test :=  true,
 
     def setup: Project = (
-      serialTests.scalacPlugins(kindProjector, macroParadise).crossSourceDirs.allWarnings.fatalWarnings also (
-                    exportJars :=  false,
-                  organization :=  "com.precog",
-                       version :=  "0.1",
-      // scalacOptions in Test +=  "-Xprint:typer",
-                 scalacOptions ++= envArgs ++ stdArgs,
-                  scalaVersion :=  "2.11.8",
-           logBuffered in Test :=  false,
-                   crossTarget ~=  (_ / s"java-$javaSpecVersion")
-                 // incOptions :=  mkIncOptions(crossTarget.value)
+      serialTests.stdPlugins.crossSourceDirs.allWarnings.fatalWarnings.fixConsole also (
+             skip in update :=  true,
+                 exportJars :=  false,
+               organization :=  "com.precog",
+                    version :=  "0.1",
+              scalacOptions ++= stdArgs,
+               scalaVersion :=  "2.11.8",
+        logBuffered in Test :=  false,
+                crossTarget ~=  (_ / s"java-$javaSpecVersion")
+              // incOptions :=  mkIncOptions(crossTarget.value)
       )
     )
   }
