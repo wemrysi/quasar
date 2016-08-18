@@ -25,6 +25,7 @@ lazy val precog = project.setup deps (
   "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),
   "org.scalacheck" %% "scalacheck"        % scalacheckVersion      % Test force(),
   "org.specs2"     %% "specs2-scalacheck" % specsVersion           % Test,
+  "org.typelevel"  %% "scalaz-specs2"     % "0.4.0"                % Test,
   "org.specs2"     %% "specs2-core"       % specsVersion           % Test
 )
 

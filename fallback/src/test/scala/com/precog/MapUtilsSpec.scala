@@ -2,7 +2,7 @@ package ygg.tests
 
 import com.precog.util._
 import blueeyes._
-import scalaz._
+import scalaz._, Either3._
 
 class MapUtilsSpec extends quasar.Qspec {
   private type Ints     = List[Int]
@@ -10,29 +10,24 @@ class MapUtilsSpec extends quasar.Qspec {
   private type IntMap   = Map[Int, Ints]
 
   "cogroup" should {
-    "produce left, right and middle cases" in skipped(prop { (left: IntMap, right: IntMap) =>
+    "produce left, right and middle cases" in prop { (left: IntMap, right: IntMap) =>
       val result     = left cogroup right
       val leftKeys   = left.keySet -- right.keySet
       val rightKeys  = right.keySet -- left.keySet
       val middleKeys = left.keySet & right.keySet
 
       val leftContrib = leftKeys.toSeq flatMap { key =>
-        left(key) map { key -> Either3.left3[Int, IntsPair, Int](_) }
+        left(key) map { key -> left3[Int, IntsPair, Int](_) }
       }
-
       val rightContrib = rightKeys.toSeq flatMap { key =>
-        right(key) map { key -> Either3.right3[Int, IntsPair, Int](_) }
+        right(key) map { key -> right3[Int, IntsPair, Int](_) }
       }
-
       val middleContrib = middleKeys.toSeq map { key =>
-        key -> Either3.middle3[Int, IntsPair, Int]((left(key), right(key)))
+        key -> middle3[Int, IntsPair, Int]((left(key), right(key)))
       }
 
-      result must containAllOf(leftContrib)
-      result must containAllOf(rightContrib)
-      result must containAllOf(middleContrib)
       result must haveSize(leftContrib.length + rightContrib.length + middleContrib.length)
-    })
+    }
   }
 }
 

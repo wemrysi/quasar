@@ -3,15 +3,17 @@ import ygg.{ pkg => p }
 import java.nio.file._
 
 package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
-  // Temporary
-  type ByteBufferPoolS[A] = State[com.precog.util.ByteBufferPool -> List[ByteBuffer], A]
+  type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
 
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
   }
 
-  implicit def implicitScalaMapOps[A, B, CC[B] <: Traversable[B]](x: scMap[A, CC[B]]): ScalaMapOps[A, B, CC] =
-    new ScalaMapOps(x)
+  implicit class ScalaMapOps[K, V, CC[B] <: Traversable[B]](left: scMap[K, CC[V]]) {
+    def cogroup[V1, That](right: scMap[K, CC[V1]])(implicit cbf: CBF[_, K -> Either3[V, CC[V] -> CC[V1], V1], That]): That = (
+      new Cogrouped(left, right) build
+    )
+  }
 
   implicit def comparableOrder[A <: Comparable[A]]: Ord[A] =
     Ord.order[A]((x, y) => Cmp(x compareTo y))

@@ -1,36 +1,19 @@
 package blueeyes
 
-import scala.collection.generic.CanBuildFrom
-import scalaz._
+import scalaz.Either3, Either3._
 
-class ScalaMapOps[A, B, CC[B] <: Traversable[B]](left: scMap[A, CC[B]]) {
-  def cogroup[C, CC2[C] <: Traversable[C], Result](right: scMap[A, CC2[C]])(implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
-                                                                            cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
-                                                                            cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
-    val resultBuilder = cbf()
+final case class Cogrouped[K, V, V1, CC[X] <: Traversable[X]](lmap: scMap[K, CC[V]], rmap: scMap[K, CC[V1]]) {
+  lazy val leftKeys   = lmap.keySet -- rmap.keySet
+  lazy val middleKeys = lmap.keySet & rmap.keySet
+  lazy val rightKeys  = rmap.keySet -- lmap.keySet
 
-    left foreach {
-      case (key, leftValues) => {
-        right get key map { rightValues =>
-          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
-        } getOrElse {
-          leftValues foreach { b =>
-            resultBuilder += (key -> Either3.left3[B, (CC[B], CC2[C]), C](b))
-          }
-        }
-      }
-    }
+  def build[That](implicit cbf: CBF[_, K -> Either3[V, CC[V] -> CC[V1], V1], That]): That = {
+    val buf = cbf()
 
-    right foreach {
-      case (key, rightValues) => {
-        if (!(left get key isDefined)) {
-          rightValues foreach { c =>
-            resultBuilder += (key -> Either3.right3[B, (CC[B], CC2[C]), C](c))
-          }
-        }
-      }
-    }
+    for (k <- leftKeys ; v <- lmap(k)) buf += (k -> left3(v))
+    for (k <- rightKeys ; v <- rmap(k)) buf += (k -> right3(v))
+    for (k <- middleKeys) buf += (k -> middle3(lmap(k) -> rmap(k)))
 
-    resultBuilder.result()
+    buf.result()
   }
 }
