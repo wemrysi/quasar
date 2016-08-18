@@ -100,7 +100,7 @@ class SliceSpec extends quasar.Qspec {
     }
 
     "concat heterogeneous slices" in {
-      val pds = List.fill(25)(concatProjDesc filter (_ => randomBool))
+      val pds            = List.fill(25)(concatProjDesc filter (_ => randomBool))
       val g1 :: g2 :: gs = pds.map(genSlice(_, 17))
 
       implicit val arbSlice = Arbitrary(Gen.oneOf(g1, g2, gs: _*))

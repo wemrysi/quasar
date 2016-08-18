@@ -12,8 +12,8 @@ trait TestSupport extends ScalacheckSupport with SpecsSupport {
 trait SpecsSupport {
   import org.specs2._, matcher._
 
-  type ScalaCheck         = org.specs2.ScalaCheck
-  val SpecsFailure        = org.specs2.execute.Failure
+  type ScalaCheck = org.specs2.ScalaCheck
+  val SpecsFailure = org.specs2.execute.Failure
   type MatchResult[+A]    = org.specs2.matcher.MatchResult[A]
   type SpecsFailure       = org.specs2.execute.Failure
   type SpecsResult        = org.specs2.execute.Result
@@ -49,7 +49,7 @@ trait ScalacheckSupport {
 
   implicit def liftGenerator[A](g: Gen[A]): Arbitrary[A] = Arbitrary(g)
 
-  implicit def buildableVector[A] : Buildable[A, Vector[A]] = new Buildable[A, Vector[A]] {
+  implicit def buildableVector[A]: Buildable[A, Vector[A]] = new Buildable[A, Vector[A]] {
     def builder: Builder[A, Vector[A]] = Vector.newBuilder[A]
   }
 
@@ -67,7 +67,7 @@ trait ScalacheckSupport {
   }
 
   def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
-    sized(size => for(n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
+    sized(size => for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)
   def vectorOf[A](gen: Gen[A]): Gen[Vector[A]]     = containerOfAtMostN[Vector, A](maxSequenceLength, gen)
@@ -96,7 +96,7 @@ trait ScalacheckSupport {
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
   // (and scalacheck's BigDecimal gen will overflow at random)
   def genBigDecimal: Gen[BigDecimal] = genBigDecimal(genExponent = genBigDecExponent)
-  def genBigDecExponent = choose(-50000, 50000)
+  def genBigDecExponent              = choose(-50000, 50000)
   def genBigDecimal(genExponent: Gen[Int]): Gen[BigDecimal] = (genLong, genExponent) >> { (mantissa, exponent) =>
     def adjusted = (
       if (exponent.toLong + mantissa.toString.length >= Int.MaxValue.toLong)
@@ -108,7 +108,6 @@ trait ScalacheckSupport {
     )
     decimal(unscaledVal = mantissa, scale = adjusted)
   }
-
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)
@@ -125,17 +124,17 @@ trait ScalacheckSupport {
     def *(gn: Gen[Int]): Gen[List[A]] = gn >> (this * _)
     def *(n: Int): Gen[List[A]]       = listOfN(n, gen)
     def list: Gen[List[A]]            = listOf(gen)
-    def optional: Gen[Option[A]]      = frequency(
+    def optional: Gen[Option[A]] = frequency(
       1  -> None,
       10 -> (gen map (x => Some(x)))
     )
   }
   implicit class ScalacheckGen2Ops[A, B](gen: (Gen[A], Gen[B])) {
-    def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1 ; b <- gen._2) yield f(a, b)
-    def zip: Gen[A -> B]              = >> (scala.Tuple2(_, _))
+    def >>[C](f: (A, B) => C): Gen[C] = for (a <- gen._1; b <- gen._2) yield f(a, b)
+    def zip: Gen[A -> B]              = >>(scala.Tuple2(_, _))
   }
   implicit class ScalacheckGen3Ops[A, B, C](gen: (Gen[A], Gen[B], Gen[C])) {
-    def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1 ; b <- gen._2 ; c <- gen._3) yield f(a, b, c)
-    def zip: Gen[(A, B, C)]              = >> (scala.Tuple3(_, _, _))
+    def >>[D](f: (A, B, C) => D): Gen[D] = for (a <- gen._1; b <- gen._2; c <- gen._3) yield f(a, b, c)
+    def zip: Gen[(A, B, C)]              = >>(scala.Tuple3(_, _, _))
   }
 }

@@ -69,16 +69,18 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
   def lookupF1(namespace: List[String], name: String): F1 = {
     val lib = Map[String, CF1](
-      "negate" -> cf.math.Negate,
+      "negate"         -> cf.math.Negate,
       "coerceToDouble" -> cf.util.CoerceToDouble,
-      "true" -> CF1("testing::true") { _ => Some(Column.const(true)) }
+      "true" -> CF1("testing::true") { _ =>
+        Some(Column.const(true))
+      }
     )
 
     lib(name)
   }
 
   def lookupF2(namespace: List[String], name: String): F2 = {
-    val lib  = Map[String, CF2](
+    val lib = Map[String, CF2](
       "add" -> cf.math.Add,
       "mod" -> cf.math.Mod,
       "eq"  -> cf.std.Eq
@@ -95,11 +97,11 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
           val identityPath = cols collect { case c @ (ColumnRef.id(_), _) => c }
           val prioritized = identityPath.values filter {
             case (_: LongColumn | _: DoubleColumn | _: NumColumn) => true
-            case _ => false
+            case _                                                => false
           }
 
-          val mask = BitSetUtil.filteredRange(range.start, range.end) {
-            i => prioritized exists { _ isDefinedAt i }
+          val mask = BitSetUtil.filteredRange(range.start, range.end) { i =>
+            prioritized exists { _ isDefinedAt i }
           }
 
           val (a2, arr) = mask.toList.foldLeft((a, new Array[BigDecimal](range.end))) {

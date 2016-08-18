@@ -42,8 +42,8 @@ object JDBM {
 
   final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
 
-  type IndexStore    = BtoBConcurrentMap
-  type IndexMap      = Map[IndexKey, SliceSorter]
+  type IndexStore = BtoBConcurrentMap
+  type IndexMap   = Map[IndexKey, SliceSorter]
 
   sealed trait SliceSorter {
     def name: String
@@ -59,7 +59,8 @@ object JDBM {
                         keyComparator: Comparator[Bytes],
                         keyRefs: Array[ColumnRef],
                         valRefs: Array[ColumnRef],
-                        count: Long = 0) extends SliceSorter { }
+                        count: Long = 0)
+      extends SliceSorter {}
 
   case class SortedSlice(name: String,
                          kslice: Slice,
@@ -67,7 +68,8 @@ object JDBM {
                          valEncoder: ColumnEncoder,
                          keyRefs: Array[ColumnRef],
                          valRefs: Array[ColumnRef],
-                         count: Long = 0) extends SliceSorter { }
+                         count: Long = 0)
+      extends SliceSorter {}
 
   case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
     val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
@@ -168,7 +170,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
         new CellMatrix {
           private[this] val allCells: scmMap[Int, Cell] = initialCells.map(c => (c.index, c))(collection.breakOut)
-          private[this] val comparatorMatrix                 = fillMatrix(initialCells)
+          private[this] val comparatorMatrix            = fillMatrix(initialCells)
 
           def cells = allCells.values
 
@@ -502,8 +504,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                   // be emitted if we're not in a right span) so we're entirely done.
                   val remission = req.nonEmpty.option(rhead.mapColumns(cf.util.filter(0, rhead.size, req)))
                   (remission map { e =>
-                        writeAlignedSlices(rkey, e, rbs, "alignRight", SortAscending)
-                      } getOrElse rbs.point[M]) map { (lbs, _) }
+                    writeAlignedSlices(rkey, e, rbs, "alignRight", SortAscending)
+                  } getOrElse rbs.point[M]) map { (lbs, _) }
               }
 
               //println("Requested more left; emitting left based on bitset " + leq.toList.mkString("[", ",", "]"))
@@ -511,7 +513,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
               lemission map { e =>
                 for {
                   nextLeftWriteState <- writeAlignedSlices(lkey, e, leftWriteState, "alignLeft", SortAscending)
-                  resultWriteStates <- next(nextLeftWriteState, rightWriteState)
+                  resultWriteStates  <- next(nextLeftWriteState, rightWriteState)
                 } yield resultWriteStates
               } getOrElse {
                 next(leftWriteState, rightWriteState)
@@ -536,8 +538,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                       // entirely done; just emit both
                       val lemission = leq.nonEmpty.option(lhead.mapColumns(cf.util.filter(0, lhead.size, leq)))
                       (lemission map { e =>
-                            writeAlignedSlices(lkey, e, lbs, "alignLeft", SortAscending)
-                          } getOrElse lbs.point[M]) map { (_, rbs) }
+                        writeAlignedSlices(lkey, e, lbs, "alignLeft", SortAscending)
+                      } getOrElse lbs.point[M]) map { (_, rbs) }
 
                     case RightSpan =>
                       //println("No more data on right, but in a span so continuing on left.")
@@ -552,7 +554,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
               remission map { e =>
                 for {
                   nextRightWriteState <- writeAlignedSlices(rkey, e, rightWriteState, "alignRight", SortAscending)
-                  resultWriteStates <- next(leftWriteState, nextRightWriteState)
+                  resultWriteStates   <- next(leftWriteState, nextRightWriteState)
                 } yield resultWriteStates
               } getOrElse {
                 next(leftWriteState, rightWriteState)
@@ -730,7 +732,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                   kslice.columns.toList.sortBy(_._1).unzip match {
                     case (refs, _) if refs.isEmpty =>
                       Need(jdbmState -> thing)
-                    case (refs, _)                 =>
+                    case (refs, _) =>
                       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap (storeTransformed(_, tail, thing))
                   }
               }
@@ -950,8 +952,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
             val (left, right) = (leftE.fold(idT, idT), rightE.fold(idT, idT))
             super.join(left, right, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
         }
-      }
-      else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
+      } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
 
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[M, ResourceError, Table]

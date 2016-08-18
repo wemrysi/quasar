@@ -50,9 +50,9 @@ trait TransSpecModule extends FNModule {
     sealed trait ArraySpec[+A <: SourceType]  extends TransSpec[A]
 
     sealed trait Source1 extends SourceType
-    case object Source extends Source1
+    case object Source   extends Source1
 
-    sealed trait Source2 extends SourceType
+    sealed trait Source2    extends SourceType
     case object SourceLeft  extends Source2
     case object SourceRight extends Source2
 
@@ -170,7 +170,7 @@ trait TransSpecModule extends FNModule {
           case trans.FilterDefined(source, definedFor, definedness) =>
             trans.FilterDefined(mapSources(source)(f), mapSources(definedFor)(f), definedness)
 
-          case Scan(source, scanner)   => Scan(mapSources(source)(f), scanner)
+          case Scan(source, scanner) => Scan(mapSources(source)(f), scanner)
           // case MapWith(source, mapper) => MapWith(mapSources(source)(f), mapper)
 
           case trans.Map1(source, f1)      => trans.Map1(mapSources(source)(f), f1)
@@ -217,7 +217,7 @@ trait TransSpecModule extends FNModule {
         case trans.FilterDefined(source, definedFor, definedness) =>
           trans.FilterDefined(deepMap(source)(f), deepMap(definedFor)(f), definedness)
 
-        case Scan(source, scanner)   => Scan(deepMap(source)(f), scanner)
+        case Scan(source, scanner) => Scan(deepMap(source)(f), scanner)
         // case MapWith(source, mapper) => MapWith(deepMap(source)(f), mapper)
 
         case trans.Map1(source, f1)      => trans.Map1(deepMap(source)(f), f1)

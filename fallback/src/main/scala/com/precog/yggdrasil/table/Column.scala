@@ -152,7 +152,7 @@ trait BoolColumn extends Column with (Int => Boolean) {
 
   def asBitSet(undefinedVal: Boolean, size: Int): BitSet = {
     val back = new BitSet(size)
-    var i = 0
+    var i    = 0
     while (i < size) {
       val b =
         if (!isDefinedAt(i))
@@ -166,7 +166,7 @@ trait BoolColumn extends Column with (Int => Boolean) {
     back
   }
 
-  override val tpe = CBoolean
+  override val tpe                        = CBoolean
   override def jValue(row: Int)           = JBool(this(row))
   override def cValue(row: Int)           = CBoolean(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -192,7 +192,7 @@ trait LongColumn extends Column with (Int => Long) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe = CLong
+  override val tpe                        = CLong
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CLong(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -204,7 +204,7 @@ trait DoubleColumn extends Column with (Int => Double) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe = CDouble
+  override val tpe                        = CDouble
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CDouble(this(row))
   override def strValue(row: Int): String = String.valueOf(this(row))
@@ -216,7 +216,7 @@ trait NumColumn extends Column with (Int => BigDecimal) {
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
-  override val tpe = CNum
+  override val tpe                        = CNum
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CNum(this(row))
   override def strValue(row: Int): String = this(row).toString
@@ -229,7 +229,7 @@ trait StrColumn extends Column with (Int => String) {
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
 
-  override val tpe = CString
+  override val tpe                        = CString
   override def jValue(row: Int)           = JString(this(row))
   override def cValue(row: Int)           = CString(this(row))
   override def strValue(row: Int): String = this(row)
@@ -277,11 +277,11 @@ object EmptyArrayColumn {
 trait EmptyObjectColumn extends Column {
   def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
-  override val tpe = CEmptyObject
-  override def jValue(row: Int)           = JObject(Nil)
-  override def cValue(row: Int)           = CEmptyObject
-  override def strValue(row: Int): String = "{}"
-  override def toString                   = "EmptyObjectColumn"
+  override val tpe                          = CEmptyObject
+  override def jValue(row: Int)             = JObject(Nil)
+  override def cValue(row: Int)             = CEmptyObject
+  override def strValue(row: Int): String   = "{}"
+  override def toString                     = "EmptyObjectColumn"
 }
 
 object EmptyObjectColumn {
@@ -291,11 +291,11 @@ object EmptyObjectColumn {
 trait NullColumn extends Column {
   def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
-  override val tpe = CNull
-  override def jValue(row: Int)           = JNull
-  override def cValue(row: Int)           = CNull
-  override def strValue(row: Int): String = "null"
-  override def toString                   = "NullColumn"
+  override val tpe                          = CNull
+  override def jValue(row: Int)             = JNull
+  override def cValue(row: Int)             = CNull
+  override def strValue(row: Int): String   = "null"
+  override def toString                     = "NullColumn"
 }
 object NullColumn {
   def apply(definedAt: BitSet) = {
@@ -379,7 +379,7 @@ object Column {
   }
 
   @inline def const[@spec(Boolean, Long, Double) A: CValueType](v: Array[A]) = new InfiniteColumn with HomogeneousArrayColumn[A] {
-    val tpe = CArrayType(CValueType[A])
+    val tpe             = CArrayType(CValueType[A])
     def apply(row: Int) = v
   }
 

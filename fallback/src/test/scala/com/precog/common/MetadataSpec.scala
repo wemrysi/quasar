@@ -73,7 +73,10 @@ class MetadataSpec extends quasar.Qspec with MetadataGenerators {
   "metadata maps" should {
     "survive round trip serialization" in prop { in: Map[MetadataType, Metadata] =>
       in.map(_._2).toList.serialize.validated[List[Metadata]] must beLike {
-        case Success(out) => in must_== Map[MetadataType, Metadata](out.map{ m => (m.metadataType, m) }: _*)
+        case Success(out) =>
+          in must_== Map[MetadataType, Metadata](out.map { m =>
+            (m.metadataType, m)
+          }: _*)
       }
     }
 
@@ -99,19 +102,23 @@ class MetadataSpec extends quasar.Qspec with MetadataGenerators {
   }
 }
 
-trait MetadataGenerators  {
-  implicit val arbMetadata: Arbitrary[Metadata] = Arbitrary(genMetadata)
+trait MetadataGenerators {
+  implicit val arbMetadata: Arbitrary[Metadata]                       = Arbitrary(genMetadata)
   implicit val arbMetadataMap: Arbitrary[Map[MetadataType, Metadata]] = Arbitrary(genMetadataMap)
 
   val metadataGenerators = List[Gen[Metadata]](genBooleanMetadata, genLongMetadata, genDoubleMetadata, genBigDecimalMetadata, genStringMetadata)
 
-  private def upTo1K: Gen[Long]                        = choose(0L, 1000L)
-  def genMetadataList: Gen[List[Metadata]]             = genMetadata * (0 upTo 10)
-  def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l => Map( l.map( m => (m.metadataType, m) ): _* ) }
-  def genMetadata: Gen[Metadata]                       = frequency( metadataGenerators.map { (1, _) }: _* )
-  def genBooleanMetadata: Gen[BooleanValueStats]       = for(count <- upTo1K; trueCount <- choose(0L, count)) yield BooleanValueStats(count, trueCount)
-  def genLongMetadata: Gen[LongValueStats]             = for(count <- upTo1K; a <- genLong; b <- genLong) yield LongValueStats(count, a min b,a max b)
-  def genDoubleMetadata: Gen[DoubleValueStats]         = for(count <- upTo1K; a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b,a max b)
-  def genBigDecimalMetadata: Gen[BigDecimalValueStats] = for(count <- upTo1K; a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
-  def genStringMetadata: Gen[StringValueStats]         = for(count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, Ord[String].min(a,b), Ord[String].max(a,b))
+  private def upTo1K: Gen[Long]            = choose(0L, 1000L)
+  def genMetadataList: Gen[List[Metadata]] = genMetadata * (0 upTo 10)
+  def genMetadataMap: Gen[Map[MetadataType, Metadata]] = genMetadataList map { l =>
+    Map(l.map(m => (m.metadataType, m)): _*)
+  }
+  def genMetadata: Gen[Metadata]                 = frequency(metadataGenerators.map { (1, _) }: _*)
+  def genBooleanMetadata: Gen[BooleanValueStats] = for (count <- upTo1K; trueCount <- choose(0L, count)) yield BooleanValueStats(count, trueCount)
+  def genLongMetadata: Gen[LongValueStats]       = for (count <- upTo1K; a <- genLong; b <- genLong) yield LongValueStats(count, a min b, a max b)
+  def genDoubleMetadata: Gen[DoubleValueStats]   = for (count <- upTo1K; a <- genDouble; b <- genDouble) yield DoubleValueStats(count, a min b, a max b)
+  def genBigDecimalMetadata: Gen[BigDecimalValueStats] =
+    for (count <- upTo1K; a <- genBigDecimal; b <- genBigDecimal) yield BigDecimalValueStats(count, a min b, a max b)
+  def genStringMetadata: Gen[StringValueStats] =
+    for (count <- upTo1K; a <- genString; b <- genString) yield StringValueStats(count, Ord[String].min(a, b), Ord[String].max(a, b))
 }

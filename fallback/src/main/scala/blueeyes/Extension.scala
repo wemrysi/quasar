@@ -4,10 +4,9 @@ import scala.collection.generic.CanBuildFrom
 import scalaz._
 
 class ScalaMapOps[A, B, CC[B] <: Traversable[B]](left: scMap[A, CC[B]]) {
-  def cogroup[C, CC2[C] <: Traversable[C], Result](right: scMap[A, CC2[C]])(
-      implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
-      cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
-      cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
+  def cogroup[C, CC2[C] <: Traversable[C], Result](right: scMap[A, CC2[C]])(implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
+                                                                            cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
+                                                                            cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
     val resultBuilder = cbf()
 
     left foreach {

@@ -24,8 +24,7 @@ import blueeyes._
 import com.precog.common._
 import scalaz._, Scalaz._
 
-trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTransforms {
-  self: ColumnarTableModule =>
+trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTransforms { self: ColumnarTableModule =>
 
   // we will warn for tables with >1M rows.
   final def InMemoryLimit = 1000000L
@@ -199,8 +198,8 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
     private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
       //assertSorted(as)
       //assertSorted(bs)
-      var i = 0
-      var j = 0
+      var i    = 0
+      var j    = 0
       val alen = as.size
       val blen = bs.size
       val out  = new ArrayIntList(alen min blen)
@@ -307,8 +306,8 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
         var i = 0
         while (i < n) {
           var dead = false
-          val row = new Array[RValue](numKeys)
-          var k = 0
+          val row  = new Array[RValue](numKeys)
+          var k    = 0
           while (!dead && k < numKeys) {
             val jv = keys(k)(i)
             if (jv != null) {
@@ -405,8 +404,8 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
     private def unionBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
       //assertSorted(as)
       //assertSorted(bs)
-      var i = 0
-      var j = 0
+      var i    = 0
+      var j    = 0
       val alen = as.size
       val blen = bs.size
       val out  = new ArrayIntList(alen max blen)

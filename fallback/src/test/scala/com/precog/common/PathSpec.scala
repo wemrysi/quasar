@@ -32,9 +32,9 @@ class PathSpec extends quasar.Qspec {
       val sample = Path("/my/fancy/path")
       sample.rollups(3) must containTheSameElementsAs(
         sample ::
-        Path("/my/fancy") ::
-        Path("/my") ::
-        Path("/") :: Nil
+          Path("/my/fancy") ::
+            Path("/my") ::
+              Path("/") :: Nil
       )
     }
 
@@ -42,8 +42,8 @@ class PathSpec extends quasar.Qspec {
       val sample = Path("/my/fancy/path")
       sample.rollups(2) must containTheSameElementsAs(
         sample ::
-        Path("/my/fancy") ::
-        Path("/my") :: Nil
+          Path("/my/fancy") ::
+            Path("/my") :: Nil
       )
     }
 
@@ -52,10 +52,10 @@ class PathSpec extends quasar.Qspec {
     }
 
     "Correctly identify child paths" in {
-      val parent = Path("/my/fancy/path")
+      val parent    = Path("/my/fancy/path")
       val identical = Path("/my/fancy/path")
-      val child1 = Path("/my/fancy/path/child")
-      val child2 = Path("/my/fancy/path/grand/child")
+      val child1    = Path("/my/fancy/path/child")
+      val child2    = Path("/my/fancy/path/grand/child")
       val notChild1 = Path("/other/fancy/path")
       val notChild2 = Path("/my/fancy/")
 

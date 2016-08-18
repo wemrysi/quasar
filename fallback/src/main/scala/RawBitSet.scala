@@ -37,7 +37,7 @@ object RawBitSet {
   final def clear(bits: Array[Int]) = fill(bits, 0)
 
   final def toArray(bits: Array[Int]): Array[Int] = {
-    val len = bits.length
+    val len  = bits.length
     var size = 0
     cforRange(0 until len)(i => size += bitCount(bits(i)))
     val ints = new Array[Int](size)

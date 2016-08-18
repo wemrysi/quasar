@@ -97,22 +97,22 @@ private sealed trait ColumnHasher {
 }
 
 private final case class StrColumnHasher(columnRef: ColumnRef, column: StrColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 3 * pathHash + 23 * column(row).hashCode
 }
 
 private final case class BoolColumnHasher(columnRef: ColumnRef, column: BoolColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 5 * pathHash + 457 * (if (column(row)) 42 else 21)
 }
 
 private final case class DateColumnHasher(columnRef: ColumnRef, column: DateColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 7 * pathHash + 17 * column(row).toString().hashCode
 }
 
 private final case class PeriodColumnHasher(columnRef: ColumnRef, column: PeriodColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 11 * pathHash + 503 * column(row).hashCode
 }
 
@@ -140,22 +140,22 @@ private object NumericHash {
 }
 
 private final case class LongColumnHasher(columnRef: ColumnRef, column: LongColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 13 * pathHash + 23 * NumericHash(column(row))
 }
 
 private final case class DoubleColumnHasher(columnRef: ColumnRef, column: DoubleColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 13 * pathHash + 23 * NumericHash(column(row))
 }
 
 private final case class NumColumnHasher(columnRef: ColumnRef, column: NumColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 13 * pathHash + 23 * NumericHash(column(row))
 }
 
 private final case class CValueColumnHasher(columnRef: ColumnRef, column: Column) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
+  private val pathHash                        = columnRef.selector.hashCode
   protected final def hashImpl(row: Int): Int = 17 * pathHash + 23 * column.cValue(row).hashCode
 }
 

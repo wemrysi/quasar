@@ -27,7 +27,7 @@ import quasar.precog._
   */
 sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int = this.typeIndex compare that.typeIndex
-  def to_s = this.renderPretty
+  def to_s                       = this.renderPretty
 }
 sealed trait JContainer extends JValue {
   assert(contained forall (_ != null), contained)
@@ -134,7 +134,7 @@ object JValue {
 }
 
 case object JUndefined extends JValue
-case object JNull extends JValue
+case object JNull      extends JValue
 
 sealed abstract class JBool(val value: Boolean) extends JValue {
   override def compare(that: JValue) = that match {
@@ -142,7 +142,7 @@ sealed abstract class JBool(val value: Boolean) extends JValue {
     case _        => super.compare(that)
   }
 }
-final case object JTrue extends JBool(true)
+final case object JTrue  extends JBool(true)
 final case object JFalse extends JBool(false)
 
 object JBool {
@@ -280,7 +280,7 @@ object JString {
 
   protected[json] final def internalEscape(sb: StringBuilder, s: String) {
     sb.append('"')
-    var i = 0
+    var i   = 0
     val len = s.length
     while (i < len) {
       (s.charAt(i): @switch) match {
@@ -361,8 +361,7 @@ case class JObject(fields: Map[String, JValue]) extends JContainer {
           val cres = (v1 compare v2)
           if (cres == 0) rec(fields, i + 1) else cres
         }
-      }
-      else 0
+      } else 0
     }
     val arr: Array[String] = (m1.keySet ++ m2.keySet).toArray
     quickSort(arr)

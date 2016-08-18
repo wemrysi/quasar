@@ -94,16 +94,16 @@ class JsonASTSpec extends quasar.Qspec {
   "Remove all" in {
     val removeAllProp = (x: JValue) =>
       (x remove { _ =>
-            true
-          }) == JUndefined
+        true
+      }) == JUndefined
     prop(removeAllProp)
   }
 
   "Remove nothing" in {
     val removeNothingProp = (x: JValue) =>
       (x remove { _ =>
-            false
-          }) == x
+        false
+      }) == x
     prop(removeNothingProp)
   }
 

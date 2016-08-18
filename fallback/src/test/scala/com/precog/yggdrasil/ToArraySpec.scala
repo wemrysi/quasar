@@ -33,14 +33,11 @@ trait ToArraySpec extends ColumnarTableQspec {
         JObject(JField("value", JNum(-12.4)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.toArray[Double])
 
-    val expected = Stream(
-      JArray(JNum(23.4) :: Nil),
-      JArray(JNum(12.4) :: Nil),
-      JArray(JNum(-12.4) :: Nil))
+    val expected = Stream(JArray(JNum(23.4) :: Nil), JArray(JNum(12.4) :: Nil), JArray(JNum(-12.4) :: Nil))
 
     results.copoint must_== expected
   }
@@ -53,7 +50,7 @@ trait ToArraySpec extends ColumnarTableQspec {
         JObject(JField("value", JObject(JField("bar", JNum(44.4)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.toArray[Double])
 
@@ -62,5 +59,3 @@ trait ToArraySpec extends ColumnarTableQspec {
     results.copoint must_== expected
   }
 }
-
-

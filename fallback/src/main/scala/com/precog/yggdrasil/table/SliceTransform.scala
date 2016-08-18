@@ -75,8 +75,8 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           l0.zip(r0) { (sl, sr) =>
             Slice(sl.size, {
               val resultColumns = for {
-                cl <- sl.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
-                cr <- sr.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
+                cl     <- sl.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
+                cr     <- sr.columns collect { case (ref, col) if ref.selector == CPath.Identity => col }
                 result <- f(cl, cr)
               } yield result
 
@@ -165,7 +165,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
               }
 
               class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {
-                val equality = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
+                val equality              = cf.std.Eq(left, right).get.asInstanceOf[BoolColumn] // yay!
                 def isDefinedAt(row: Int) = (left isDefinedAt row) || (right isDefinedAt row)
                 def apply(row: Int)       = equality.isDefinedAt(row) && equality(row)
               }
@@ -295,8 +295,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           if (objects.size == 1) {
             val typed = Typed(objects.head, JObjectUnfixedT)
             composeSliceTransform2(typed)
-          }
-          else {
+          } else {
             objects.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
                 Slice(sl.size, {
@@ -402,8 +401,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           if (elements.size == 1) {
             val typed = Typed(elements.head, JArrayUnfixedT)
             composeSliceTransform2(typed)
-          }
-          else {
+          } else {
             elements.map(composeSliceTransform2).reduceLeft { (l0, r0) =>
               l0.zip(r0) { (sl, sr) =>
                 Slice(sl.size, {
@@ -495,13 +493,13 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           l0.zip(r0) { (slice, derefBy) =>
             assert(derefBy.columns.size <= 1)
             derefBy.columns.headOption collect {
-              case (ColumnRef.id(CLong), c: LongColumn)        =>
+              case (ColumnRef.id(CLong), c: LongColumn)                     =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
-              case (ColumnRef.id(CDouble), c: DoubleColumn)    =>
+              case (ColumnRef.id(CDouble), c: DoubleColumn)                 =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
 
-              case (ColumnRef.id(CNum), c: NumColumn)          =>
+              case (ColumnRef.id(CNum), c: NumColumn)                       =>
                 new DerefSlice(slice, { case row: Int if c.isDefinedAt(row) => CPathIndex(c(row).toInt) })
             } getOrElse {
               slice
@@ -529,27 +527,28 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           predTransform.zip2(leftTransform, rightTransform) { (predS, leftS, rightS) =>
             val size = predS.size
             Slice(size, {
-              predS.columns get ColumnRef.id(CBoolean) map { predC =>
-                val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
+              predS.columns get ColumnRef.id(CBoolean) map {
+                predC =>
+                  val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
 
-                val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
-                rightMask.flip(0, size)
+                  val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
+                  rightMask.flip(0, size)
 
-                val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
+                  val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
 
-                val joined: ColumnMap = grouped.map({
-                  case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
-                  case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
-                  case (ref, Middle3((left :: Nil, right :: Nil))) => {
-                    val left2  = cf.util.filter(0, size, leftMask)(left).get
-                    val right2 = cf.util.filter(0, size, rightMask)(right).get
+                  val joined: ColumnMap = grouped.map({
+                    case (ref, Left3(col))  => ref -> cf.util.filter(0, size, leftMask)(col).get
+                    case (ref, Right3(col)) => ref -> cf.util.filter(0, size, rightMask)(col).get
+                    case (ref, Middle3((left :: Nil, right :: Nil))) => {
+                      val left2  = cf.util.filter(0, size, leftMask)(left).get
+                      val right2 = cf.util.filter(0, size, rightMask)(right).get
 
-                    ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
-                  }
-                  case (_, x) => abort("Unexpected: " + x)
-                })(collection.breakOut)
+                      ref -> cf.util.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
+                    }
+                    case (_, x) => abort("Unexpected: " + x)
+                  })(collection.breakOut)
 
-                joined
+                  joined
               } getOrElse Map()
             })
           }
@@ -754,7 +753,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
     private[table] case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
       val f: (A, Slice) => M[A -> Slice] = { case (a, s) => Need(f0(a, s)) }
       def advance(s: Slice): M[SliceTransform1[A] -> Slice] =
-        Need ({ (a: A) =>
+        Need({ (a: A) =>
           SliceTransform1S[A](a, f0)
         } <-: f0(initial, s))
     }
@@ -994,7 +993,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           after.f(b0, s0) map { case (b, s) => ((a, b), s) }
       }
 
-      def advance(sl: Slice, sr: Slice): M[SliceTransform2[A->B] -> Slice] = apply(sl, sr) map {
+      def advance(sl: Slice, sr: Slice): M[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
         case ((a, b), slice) =>
           val after0 = SliceTransform1M(b, after.f)
           (SliceTransform2SM[A, B](before.copy(initial = a), after0), slice)
@@ -1013,7 +1012,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
           }
       }
 
-      def advance(sl: Slice, sr: Slice): M[SliceTransform2[A->B] -> Slice] = apply(sl, sr) map {
+      def advance(sl: Slice, sr: Slice): M[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
         case ((a, b), slice) =>
           val before0 = SliceTransform2M(a, before.f)
           (SliceTransform2MS[A, B](before0, after.copy(initial = b)), slice)
@@ -1032,10 +1031,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHel
 }
 
 trait ConcatHelpers {
-  def buildFilters(columns: ColumnMap,
-                   size: Int,
-                   filter: ColumnMap => ColumnMap,
-                   filterEmpty: ColumnMap => ColumnMap) = {
+  def buildFilters(columns: ColumnMap, size: Int, filter: ColumnMap => ColumnMap, filterEmpty: ColumnMap => ColumnMap) = {
     val definedBits = filter(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
     val emptyBits   = filterEmpty(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
     (definedBits, emptyBits)

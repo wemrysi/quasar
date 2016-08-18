@@ -24,8 +24,8 @@ import scalaz._, Scalaz._
 
 class Path private (val elements: String*) {
   def components: List[String] = elements.toList
-  val path: String = elements.mkString("/", "/", "/").replaceAll("/+", "/")
-  val length: Int  = elements.length
+  val path: String             = elements.mkString("/", "/", "/").replaceAll("/+", "/")
+  val length: Int              = elements.length
 
   lazy val parent: Option[Path] = elements.size match {
     case 0 => None

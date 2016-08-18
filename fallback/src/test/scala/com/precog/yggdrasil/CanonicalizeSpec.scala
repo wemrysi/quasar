@@ -52,18 +52,17 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
   def checkBoundedCanonicalize = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val size = sample.data.size
+      val table     = fromSample(sample)
+      val size      = sample.data.size
       val minLength = Gen.choose(0, size / 2).sample.get
       val maxLength = minLength + Gen.choose(1, size / 2 + 1).sample.get
 
       val canonicalizedTable = table.canonicalize(minLength, Some(maxLength))
-      val slices = canonicalizedTable.slices.toStream.copoint map (_.size)
+      val slices             = canonicalizedTable.slices.toStream.copoint map (_.size)
       if (size > 0) {
         slices.init must contain(like[Int]({ case size: Int => size must beBetween(minLength, maxLength) })).forall
         slices.last must be_<=(maxLength)
-      }
-      else {
+      } else {
         slices must haveSize(0)
       }
     }
@@ -72,30 +71,30 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
   def checkCanonicalize = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val size = sample.data.size
+      val table  = fromSample(sample)
+      val size   = sample.data.size
       val length = Gen.choose(1, size + 3).sample.get
 
       val canonicalizedTable = table.canonicalize(length)
-      val resultSlices = canonicalizedTable.slices.toStream.copoint
-      val resultSizes = resultSlices.map(_.size)
+      val resultSlices       = canonicalizedTable.slices.toStream.copoint
+      val resultSizes        = resultSlices.map(_.size)
 
       val expected = {
-        val num = size / length
+        val num       = size / length
         val remainder = size % length
-        val prefix = Stream.fill(num)(length)
+        val prefix    = Stream.fill(num)(length)
         if (remainder > 0) prefix :+ remainder else prefix
       }
 
       resultSizes mustEqual expected
     }
-  }.set(minTestsOk =  1000)
+  }.set(minTestsOk = 1000)
 
   def testCanonicalize = {
     val result = table.canonicalize(3)
 
     val slices = result.slices.toStream.copoint
-    val sizes = slices.map(_.size)
+    val sizes  = slices.map(_.size)
 
     sizes mustEqual Stream(3, 3, 3, 3, 2)
   }
@@ -108,7 +107,7 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
     val result = table.canonicalize(5)
 
     val slices = result.slices.toStream.copoint
-    val sizes = slices.map(_.size)
+    val sizes  = slices.map(_.size)
 
     sizes mustEqual Stream(5, 5, 4)
   }
@@ -117,7 +116,7 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
     val result = table.canonicalize(12)
 
     val slices = result.slices.toStream.copoint
-    val sizes = slices.map(_.size)
+    val sizes  = slices.map(_.size)
 
     sizes mustEqual Stream(12, 2)
   }
@@ -128,9 +127,9 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
 
     val slices =
       Stream(Slice.empty) ++ tableTakeRange(table, 0, 5) ++
-      Stream(Slice.empty) ++ tableTakeRange(table, 5, 4) ++
-      Stream(Slice.empty) ++ tableTakeRange(table, 9, 5) ++
-      Stream(Slice.empty)
+        Stream(Slice.empty) ++ tableTakeRange(table, 5, 4) ++
+        Stream(Slice.empty) ++ tableTakeRange(table, 9, 5) ++
+        Stream(Slice.empty)
 
     val newTable     = Table(StreamT.fromStream(Need(slices)), table.size)
     val result       = newTable.canonicalize(4)

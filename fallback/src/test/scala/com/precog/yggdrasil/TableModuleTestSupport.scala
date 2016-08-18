@@ -22,7 +22,7 @@ package quasar.ygg
 import blueeyes._, json._
 import scalaz._, Scalaz._
 
-abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport
+abstract class TableQspec         extends quasar.Qspec with TableModuleTestSupport
 abstract class ColumnarTableQspec extends TableQspec with table.ColumnarTableModuleTestSupport
 
 trait TableModuleTestSupport extends TableModule {

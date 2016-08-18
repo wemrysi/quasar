@@ -96,8 +96,8 @@ object AsyncParserSpec extends quasar.Qspec {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    val vs = ArrayBuffer.empty[JValue]
-    val n = data.length
+    val vs                  = ArrayBuffer.empty[JValue]
+    val n                   = data.length
     var i                   = 0
     var parser: AsyncParser = async
     while (i < n) {
@@ -247,7 +247,7 @@ xyz
     val bs = json.getBytes(Utf8Charset)
     val c  = chunk(bs, 0, bs.length)
 
-    val p = AsyncParser.stream()
+    val p                       = AsyncParser.stream()
     val (AsyncParse(es, js), _) = p(c)
 
     // we should only have parsed 1 valid record, and seen 1 error
@@ -377,12 +377,12 @@ object ArrayUnwrappingSpec extends quasar.Qspec {
         (es.mkString("", "\n", "\n").getBytes("UTF-8"), es.mkString("", "\n", "\n").getBytes("UTF-8"), leftover.mkString("", "\n", "\n").getBytes("UTF-8"))
       }
 
-      var i      = 0
-      var p      = parser
-      var done   = false
-      var seen   = 0
-      var bytes  = 0
-      val t0 = System.currentTimeMillis
+      var i     = 0
+      var p     = parser
+      var done  = false
+      var seen  = 0
+      var bytes = 0
+      val t0    = System.currentTimeMillis
 
       while (i <= completeChunks && !done) {
         val (AsyncParse(errors, results), parser) = if (i <= completeChunks) {

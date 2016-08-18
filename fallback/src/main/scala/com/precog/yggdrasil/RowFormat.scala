@@ -402,16 +402,16 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
 
     def encodedSize(xs: List[CValue]) = xs.foldLeft(rawBitSetCodec.encodedSize(undefineds(xs))) { (acc, x) =>
       acc + (x match {
-            case x: CWrappedValue[_] => codecForCValueType(x.cType).encodedSize(x.value)
-            case _                   => 0
-          })
+        case x: CWrappedValue[_] => codecForCValueType(x.cType).encodedSize(x.value)
+        case _                   => 0
+      })
     }
 
     override def maxSize(xs: List[CValue]) = xs.foldLeft(rawBitSetCodec.maxSize(undefineds(xs))) { (acc, x) =>
       acc + (x match {
-            case x: CWrappedValue[_] => codecForCValueType(x.cType).maxSize(x.value)
-            case _                   => 0
-          })
+        case x: CWrappedValue[_] => codecForCValueType(x.cType).maxSize(x.value)
+        case _                   => 0
+      })
     }
 
     def writeUnsafe(xs: List[CValue], sink: ByteBuffer) {
@@ -489,7 +489,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 
   private def zipWithSelectors[A](xs: Seq[A]): List[CPath -> Seq[A -> CType]] = {
     @tailrec
-    def zip(zipped: List[CPathTypeGroup[A]], right: Seq[A], sels: List[CPath -> List[CType]]): List[CPathTypeGroup[A]]   = sels match {
+    def zip(zipped: List[CPathTypeGroup[A]], right: Seq[A], sels: List[CPath -> List[CType]]): List[CPathTypeGroup[A]] = sels match {
       case Nil => zipped.reverse
       case (path, cTypes) :: sels =>
         val (head, tail) = right splitAt cTypes.size
@@ -599,9 +599,9 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
     }.sequence[ByteBufferPoolS, Unit]
 
     pool.run(for {
-      _ <- writes
+      _     <- writes
       bytes <- flipBytes
-      _ <- release
+      _     <- release
     } yield bytes)
   }
 

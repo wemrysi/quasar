@@ -60,8 +60,8 @@ trait RowFormatCodecs extends StdCodecs { self: RowFormat =>
   implicit def PeriodCodec: Codec[Period]         = Codec.PeriodCodec
   // implicit def BitSetCodec: Codec[BitSet] = Codec.BitSetCodec
   //@transient implicit lazy val BitSetCodec: Codec[BitSet] = Codec.SparseBitSetCodec(columnRefs.size)
-  @transient implicit lazy val BitSetCodec: Codec[BitSet]       = Codec.SparseBitSetCodec(columnRefs.size)
-  @transient implicit lazy val RawBitSetCodec: Codec[RawBitSet] = Codec.SparseRawBitSetCodec(columnRefs.size)
-  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]       = Codec.IndexedSeqCodec(elemCodec)
+  @transient implicit lazy val BitSetCodec: Codec[BitSet]                               = Codec.SparseBitSetCodec(columnRefs.size)
+  @transient implicit lazy val RawBitSetCodec: Codec[RawBitSet]                         = Codec.SparseRawBitSetCodec(columnRefs.size)
+  implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]   = Codec.IndexedSeqCodec(elemCodec)
   implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]] = Codec.ArrayCodec(elemCodec)(m)
 }

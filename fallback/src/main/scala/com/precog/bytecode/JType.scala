@@ -29,17 +29,17 @@ case object JNumberT  extends JPrimitiveType
 case object JTextT    extends JPrimitiveType
 case object JBooleanT extends JPrimitiveType
 case object JNullT    extends JPrimitiveType
-case object JDateT   extends JPrimitiveType
-case object JPeriodT extends JPrimitiveType
+case object JDateT    extends JPrimitiveType
+case object JPeriodT  extends JPrimitiveType
 
-sealed trait JArrayT extends JType
+sealed trait JArrayT                               extends JType
 case class JArrayHomogeneousT(jType: JType)        extends JArrayT
 case class JArrayFixedT(elements: Map[Int, JType]) extends JArrayT
-case object JArrayUnfixedT extends JArrayT
+case object JArrayUnfixedT                         extends JArrayT
 
-sealed trait JObjectT extends JType
+sealed trait JObjectT                                extends JType
 case class JObjectFixedT(fields: Map[String, JType]) extends JObjectT
-case object JObjectUnfixedT extends JObjectT
+case object JObjectUnfixedT                          extends JObjectT
 
 case class JUnionT(left: JType, right: JType) extends JType {
   override def toString = {

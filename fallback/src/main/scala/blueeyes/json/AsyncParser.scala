@@ -16,7 +16,7 @@ private[json] class FailureException extends Exception
 object AsyncParser {
   sealed trait Input
   case class More(buf: ByteBuffer) extends Input
-  case object Done extends Input
+  case object Done                 extends Input
 
   @deprecated("Use AsyncParser.stream() to maintain the current behavior", "1.0")
   def apply(): AsyncParser = stream()

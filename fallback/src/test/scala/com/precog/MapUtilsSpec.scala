@@ -11,7 +11,6 @@ class MapUtilsSpec extends quasar.Qspec {
 
   "cogroup" should {
     "produce left, right and middle cases" in skipped(prop { (left: IntMap, right: IntMap) =>
-
       val result     = left cogroup right
       val leftKeys   = left.keySet -- right.keySet
       val rightKeys  = right.keySet -- left.keySet
@@ -38,9 +37,7 @@ class MapUtilsSpec extends quasar.Qspec {
 }
 
 class RingDequeSpec extends quasar.Qspec {
-  implicit val params = set(
-    minTestsOk = 2500,
-    workers = Runtime.getRuntime.availableProcessors)
+  implicit val params = set(minTestsOk = 2500, workers = Runtime.getRuntime.availableProcessors)
 
   "unsafe ring deque" should {
     "implement prepend" in prop { (xs: List[Int], x: Int) =>
@@ -85,7 +82,9 @@ class RingDequeSpec extends quasar.Qspec {
     "append a full list following a half-appending" in prop { xs: List[Int] =>
       val deque = new RingDeque[Int](xs.length)
       xs take (xs.length / 2) foreach deque.pushBack
-      (0 until (xs.length / 2)) foreach { _ => deque.popFront() }
+      (0 until (xs.length / 2)) foreach { _ =>
+        deque.popFront()
+      }
       xs foreach deque.pushBack
       deque.toList must_=== xs
     }
@@ -98,5 +97,7 @@ class RingDequeSpec extends quasar.Qspec {
   }
 
   private def fromList(xs: List[Int], bound: Int): RingDeque[Int] =
-    xs.foldLeft(new RingDeque[Int](bound)) { (deque, x) => deque pushBack x; deque }
+    xs.foldLeft(new RingDeque[Int](bound)) { (deque, x) =>
+      deque pushBack x; deque
+    }
 }

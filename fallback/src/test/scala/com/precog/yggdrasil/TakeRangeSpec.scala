@@ -31,7 +31,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
-      val size = sample.data.size
+      val size  = sample.data.size
 
       val start = Gen.choose(-7, size + 7).sample.get
       val count = Gen.choose(start, size + 7).sample.get
@@ -45,7 +45,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
 
       result must_== expected
     }
-  }.set(minTestsOk =  1000)
+  }.set(minTestsOk = 1000)
 
   def testTakeRange = {
     val data: Stream[JValue] =
@@ -56,7 +56,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(1, 2))
 
@@ -76,7 +76,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(-1, 5))
 
@@ -92,7 +92,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(2, -3))
 
@@ -108,7 +108,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(-1, 5))
 
@@ -124,7 +124,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(2, 17))
 
@@ -144,7 +144,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample)
+    val table  = fromSample(sample)
 
     val results = toJson(table.takeRange(6, 17))
 
@@ -166,7 +166,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample, Some(5))
+    val table  = fromSample(sample, Some(5))
 
     val results = toJson(table.takeRange(1, 6))
 
@@ -194,7 +194,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample, Some(5))
+    val table  = fromSample(sample, Some(5))
 
     val results = toJson(table.takeRange(5, 2))
 
@@ -218,7 +218,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
 
     val sample = SampleData(data)
-    val table = fromSample(sample, Some(5))
+    val table  = fromSample(sample, Some(5))
 
     val results = toJson(table.takeRange(0, 5))
 

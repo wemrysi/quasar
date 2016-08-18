@@ -5,30 +5,30 @@ import internal._
 import scalaz._, Scalaz._
 
 /**
- * In-place merge sort implementation. This sort is stable but does mutate
- * the given array. It is an in-place sort but it does allocate a temporary
- * array of the same size as the input. It uses InsertionSort for sorting very
- * small arrays.
- */
+  * In-place merge sort implementation. This sort is stable but does mutate
+  * the given array. It is an in-place sort but it does allocate a temporary
+  * array of the same size as the input. It uses InsertionSort for sorting very
+  * small arrays.
+  */
 object MergeSort {
   @inline final def startWidth: Int = 8
   @inline final def startStep: Int  = 16
 
-  final def sort[@spec A : Ord : CTag](data: Array[A]): Unit = {
+  final def sort[@spec A: Ord: CTag](data: Array[A]): Unit = {
     val len = data.length
 
     if (len <= startStep) return InsertionSort.sort(data)
 
-    var buf1:Array[A] = data
-    var buf2:Array[A] = new Array[A](len)
-    var tmp:Array[A] = null
+    var buf1: Array[A] = data
+    var buf2: Array[A] = new Array[A](len)
+    var tmp: Array[A]  = null
 
-    var i = 0
+    var i     = 0
     var limit = len - startWidth
     while (i < limit) { InsertionSort.sort(data, i, i + startWidth); i += startWidth }
     if (i < len) InsertionSort.sort(data, i, len)
     var width = startWidth
-    var step = startStep
+    var step  = startStep
     while (width < len) {
       i = 0
       limit = len - step
@@ -50,12 +50,12 @@ object MergeSort {
   }
 
   /**
-   * Helper method for mergeSort, used to do a single "merge" between two
-   * sections of the input array. The start, mid and end parameters denote the
-   * left and right ranges of the input to merge, as well as the area of the
-   * ouput to write to.
-   */
-  @inline final def merge[@spec A: Ord](in:Array[A], out:Array[A], start:Int, mid:Int, end:Int): Unit = {
+    * Helper method for mergeSort, used to do a single "merge" between two
+    * sections of the input array. The start, mid and end parameters denote the
+    * left and right ranges of the input to merge, as well as the area of the
+    * ouput to write to.
+    */
+  @inline final def merge[@spec A: Ord](in: Array[A], out: Array[A], start: Int, mid: Int, end: Int): Unit = {
     var ii = start
     var jj = mid
     var kk = start
@@ -71,8 +71,8 @@ object MergeSort {
 }
 
 object InsertionSort {
-  final def sort[@spec A : Ord : CTag](data:Array[A]): Unit = sort(data, 0, data.length)
-  final def sort[@spec A : Ord : CTag](data:Array[A], start:Int, end:Int): Unit = {
+  final def sort[@spec A: Ord: CTag](data: Array[A]): Unit = sort(data, 0, data.length)
+  final def sort[@spec A: Ord: CTag](data: Array[A], start: Int, end: Int): Unit = {
     var i = start + 1
     while (i < end) {
       val item = data(i)

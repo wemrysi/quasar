@@ -48,9 +48,9 @@ class QueryExamplesSpec extends quasar.Qspec {
     case class Server(ip: String, uptime: Long)
 
     val ss = for {
-      JArray(servers) <- json \\ "servers"
-      JObjectFields(server) <- servers
-      JField("ip", JString(ip)) <- server
+      JArray(servers)                <- json \\ "servers"
+      JObjectFields(server)          <- servers
+      JField("ip", JString(ip))      <- server
       JField("uptime", JNum(uptime)) <- server
     } yield Server(ip, uptime.longValue)
 
@@ -64,7 +64,7 @@ class QueryExamplesSpec extends quasar.Qspec {
 
   "Clusters administered by liza" in {
     val clusters = for {
-      JObjectFields(cluster) <- json
+      JObjectFields(cluster)           <- json
       JField("admins", JArray(admins)) <- cluster
       if admins contains JString("liza")
       JField("name", JString(name)) <- cluster

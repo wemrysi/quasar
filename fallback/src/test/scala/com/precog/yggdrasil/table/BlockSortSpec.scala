@@ -27,18 +27,22 @@ import SampleData._
 import TableModule._
 
 /**
- * This provides an ordering on JValue that mimics how we'd order them as
- * columns in a table, rather than using JValue's default ordering which
- * behaves differently.
- *
- * XXX FIXME
- */
+  * This provides an ordering on JValue that mimics how we'd order them as
+  * columns in a table, rather than using JValue's default ordering which
+  * behaves differently.
+  *
+  * XXX FIXME
+  */
 trait PrecogJValueOrder extends Ord[JValue] {
   def order(a: JValue, b: JValue): Cmp = {
     val prims0 = a.flattenWithPath.toMap
     val prims1 = b.flattenWithPath.toMap
-    val cols0  = (prims1.mapValues { _ => JUndefined } ++ prims0).toList.sortMe
-    val cols1  = (prims0.mapValues { _ => JUndefined } ++ prims1).toList.sortMe
+    val cols0 = (prims1.mapValues { _ =>
+      JUndefined
+    } ++ prims0).toList.sortMe
+    val cols1 = (prims0.mapValues { _ =>
+      JUndefined
+    } ++ prims1).toList.sortMe
 
     cols0 ?|? cols1
   }
@@ -49,8 +53,8 @@ object PrecogJValueOrder {
 }
 
 /** Ugh, without this import it still compiles but the tests
- *  no longer pass (specifically "heterogeneous sort keys case 2")
- */
+  *  no longer pass (specifically "heterogeneous sort keys case 2")
+  */
 import PrecogJValueOrder._
 
 trait BlockSortSpec extends quasar.Qspec {
@@ -63,7 +67,9 @@ trait BlockSortSpec extends quasar.Qspec {
     val globalIdPath = JPath(".globalId")
 
     val original = if (unique) {
-      sample.data.map { jv => JArray(sortKeys.map(_.extract(jv \ "value")).toList) -> jv }.toMap.toList.unzip._2.toStream
+      sample.data.map { jv =>
+        JArray(sortKeys.map(_.extract(jv \ "value")).toList) -> jv
+      }.toMap.toList.unzip._2.toStream
     } else {
       sample.data
     }
@@ -81,7 +87,7 @@ trait BlockSortSpec extends quasar.Qspec {
 
     val resultM = for {
       sorted <- module.fromSample(sample).sort(module.sortTransspec(cSortKeys: _*), sortOrder)
-      json <- sorted.toJson
+      json   <- sorted.toJson
     } yield (json, sorted)
 
     val (result, resultTable) = resultM.copoint
@@ -93,11 +99,13 @@ trait BlockSortSpec extends quasar.Qspec {
 
   def checkSortDense(sortOrder: DesiredSortOrder) = {
     implicit val gen = sample(objectSchema(_, 3))
-    prop { (sample: SampleData) => {
-      val Some((_, schema)) = sample.schema
+    prop { (sample: SampleData) =>
+      {
+        val Some((_, schema)) = sample.schema
 
-      testSortDense(sample, sortOrder, false, schema.map(_._1).head)
-    }}
+        testSortDense(sample, sortOrder, false, schema.map(_._1).head)
+      }
+    }
   }
 
   // Simple test of sorting on homogeneous data
@@ -124,7 +132,7 @@ trait BlockSortSpec extends quasar.Qspec {
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1 , List(JPath(".uid") -> CString, JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
+        (1, List(JPath(".uid") -> CString, JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
     )
 
@@ -139,7 +147,7 @@ trait BlockSortSpec extends quasar.Qspec {
         {"key":[1],"value":5}
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1 , List(JPath(".") -> CString))
+        (1, List(JPath(".") -> CString))
       )
     )
 
@@ -226,12 +234,7 @@ trait BlockSortSpec extends quasar.Qspec {
           "key":[2.0,1.0]
         }
       ]""") --> classOf[JArray]).elements.toStream,
-      Some((2,List(
-        JPath(".m") -> CEmptyArray,
-        JPath(".f") -> CBoolean,
-        JPath(".u") -> CDouble,
-        JPath(".q") -> CNum,
-        JPath(".vxu") -> CEmptyArray))))
+      Some((2, List(JPath(".m") -> CEmptyArray, JPath(".f") -> CBoolean, JPath(".u") -> CDouble, JPath(".q") -> CNum, JPath(".vxu") -> CEmptyArray))))
     testSortDense(sampleData, SortAscending, false, JPath("q"))
   }
 
@@ -302,14 +305,16 @@ trait BlockSortSpec extends quasar.Qspec {
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (3, List(JPath(".uid") -> CLong,
-                 JPath(".uid") -> CDouble,
-                 JPath(".f.bn[0]") -> CNull,
-                 JPath(".f.wei") -> CDouble,
-                 JPath(".ljz[0]") -> CNull,
-                 JPath(".ljz[1][0]") -> CString,
-                 JPath(".ljz[2]") -> CBoolean,
-                 JPath(".jmy") -> CDouble))
+        (3,
+         List(
+           JPath(".uid")       -> CLong,
+           JPath(".uid")       -> CDouble,
+           JPath(".f.bn[0]")   -> CNull,
+           JPath(".f.wei")     -> CDouble,
+           JPath(".ljz[0]")    -> CNull,
+           JPath(".ljz[1][0]") -> CString,
+           JPath(".ljz[2]")    -> CBoolean,
+           JPath(".jmy")       -> CDouble))
       )
     )
 
@@ -340,12 +345,8 @@ trait BlockSortSpec extends quasar.Qspec {
           "key":[2.0]
         }]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1, List(JPath(".e") -> CNull,
-                 JPath(".chl") -> CNum,
-                 JPath(".zw1") -> CNum,
-                 JPath("[0]") -> CLong,
-                 JPath("[1]") -> CLong,
-                 JPath("[2]") -> CEmptyObject))
+        (1,
+         List(JPath(".e") -> CNull, JPath(".chl") -> CNum, JPath(".zw1") -> CNum, JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath("[2]") -> CEmptyObject))
       )
     )
 
@@ -495,9 +496,7 @@ trait BlockSortSpec extends quasar.Qspec {
         }
       ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (3, List(JPath(".zbtQhnpnun") -> CLong,
-                 JPath(".ohvhwN") -> CNum,
-                 JPath(".viip") -> CNum))
+        (3, List(JPath(".zbtQhnpnun") -> CLong, JPath(".ohvhwN") -> CNum, JPath(".viip") -> CNum))
       )
     )
 
@@ -511,7 +510,7 @@ trait BlockSortSpec extends quasar.Qspec {
         { "key" : [1], "value" : { "foo" : 10 } }
        ]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1 , List())
+        (1, List())
       )
     )
 
@@ -522,7 +521,7 @@ trait BlockSortSpec extends quasar.Qspec {
     val sampleData = SampleData(
       (JParser.parseUnsafe("""[]""") --> classOf[JArray]).elements.toStream,
       Some(
-        (1 , List())
+        (1, List())
       )
     )
 

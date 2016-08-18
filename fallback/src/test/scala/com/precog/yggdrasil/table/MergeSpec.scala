@@ -32,14 +32,15 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
   import TableModule._
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = groupId.getAndIncrement
-  implicit val fid = NaturalTransformation.refl[Need]
+  def newGroupId      = groupId.getAndIncrement
+  implicit val fid    = NaturalTransformation.refl[Need]
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
+    def load(apiKey: APIKey, jtpe: JType)                                       = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] =
+      sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
@@ -58,7 +59,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
         | {"key":[5908438637678328472],"value":{"a":2,"b":6}}
         | {"key":[5908438637678328473],"value":{"a":3,"b":7}}
         | """.stripMargin
-      val foo = fromJson(JParser.parseManyFromString(fooJson).valueOr(throw _).toStream)
+      val foo     = fromJson(JParser.parseManyFromString(fooJson).valueOr(throw _).toStream)
 
       val barJson = """
         | {"key":[5908438637678328576],"value":{"a":-1,"c":8,"b":-1}}
@@ -68,7 +69,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
         | {"key":[5908438637678328580],"value":{"a":0,"c":12,"b":-1}}
         | {"key":[5908438637678328581],"value":{"a":0,"c":13,"b":-1}}
         | """.stripMargin
-      val bar = fromJson(JParser.parseManyFromString(barJson).valueOr(throw _).toStream)
+      val bar     = fromJson(JParser.parseManyFromString(barJson).valueOr(throw _).toStream)
 
       val resultJson0 = """
         | {"key":[5908438637678328470,5908438637678328580],"value":{"b":4,"c":12,"a":0,"fa":{"b":4,"a":0}}}
@@ -77,22 +78,27 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
         | {"key":[5908438637678328472,5908438637678328578],"value":{"b":6,"c":10,"a":2,"fa":{"b":6,"a":2}}}
         | {"key":[5908438637678328473,5908438637678328579],"value":{"b":7,"c":11,"a":3,"fa":{"b":7,"a":3}}}
         | """.stripMargin
-      val resultJson = JParser.parseManyFromString(resultJson0).valueOr(throw _)
+      val resultJson  = JParser.parseManyFromString(resultJson0).valueOr(throw _)
 
-      val keyField = CPathField("key")
+      val keyField   = CPathField("key")
       val valueField = CPathField("value")
-      val aField = CPathField("a")
-      val bField = CPathField("b")
-      val cField = CPathField("c")
-      val oneField = CPathField("1")
-      val twoField = CPathField("2")
+      val aField     = CPathField("a")
+      val bField     = CPathField("b")
+      val cField     = CPathField("c")
+      val oneField   = CPathField("1")
+      val twoField   = CPathField("2")
 
       val grouping =
-        GroupingAlignment(TransSpec1.Id, TransSpec1.Id,
+        GroupingAlignment(
+          TransSpec1.Id,
+          TransSpec1.Id,
           GroupingSource(
             bar,
             DerefObjectStatic(Leaf(Source), keyField),
-            Some(InnerObjectConcat(ObjectDelete(Leaf(Source), Set(valueField)), WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), cField), "value"))),
+            Some(
+              InnerObjectConcat(
+                ObjectDelete(Leaf(Source), Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), cField), "value"))),
             0,
             GroupKeySpecOr(
               GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), aField)),
@@ -101,14 +107,13 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
           GroupingSource(
             foo,
             DerefObjectStatic(Leaf(Source), keyField),
-            Some(InnerObjectConcat(ObjectDelete(Leaf(Source),Set(valueField)), WrapObject(DerefObjectStatic(Leaf(Source),valueField),"value"))),
+            Some(InnerObjectConcat(ObjectDelete(Leaf(Source), Set(valueField)), WrapObject(DerefObjectStatic(Leaf(Source), valueField), "value"))),
             3,
             GroupKeySpecAnd(
               GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), aField)),
               GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), bField)))
           ),
-          GroupingSpec.Intersection
-        )
+          GroupingSpec.Intersection)
 
       def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(JParser.parseUnsafe("""{"1":0,"2":4}"""))
@@ -163,7 +168,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
         | {"key":[5908438637678314379],"value":{"Edition":"1996","Gender":"Men"}}
         | {"key":[5908438637678314380],"value":{"Edition":"2008","Gender":"Women"}}
         | """.stripMargin
-      val medals = fromJson(JParser.parseManyFromString(medalsJson).valueOr(throw _).toStream)
+      val medals     = fromJson(JParser.parseManyFromString(medalsJson).valueOr(throw _).toStream)
 
       val resultJson0 = """
         | {"key":[],"value":{"year":"1996","ratio":139.0}}
@@ -171,38 +176,53 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
         | {"key":[],"value":{"year":"2004","ratio":122.0}}
         | {"key":[],"value":{"year":"2008","ratio":119.0}}
         | """.stripMargin
-      val resultJson = JParser.parseManyFromString(resultJson0).valueOr(throw _)
+      val resultJson  = JParser.parseManyFromString(resultJson0).valueOr(throw _)
 
-      val keyField = CPathField("key")
-      val valueField = CPathField("value")
-      val genderField = CPathField("Gender")
+      val keyField     = CPathField("key")
+      val valueField   = CPathField("value")
+      val genderField  = CPathField("Gender")
       val editionField = CPathField("Edition")
-      val extra0Field = CPathField("extra0")
-      val extra1Field = CPathField("extra1")
-      val oneField = CPathField("1")
+      val extra0Field  = CPathField("extra0")
+      val extra1Field  = CPathField("extra1")
+      val oneField     = CPathField("1")
 
       val grouping =
-        GroupingAlignment(TransSpec1.Id, TransSpec1.Id,
+        GroupingAlignment(
+          TransSpec1.Id,
+          TransSpec1.Id,
           GroupingSource(
             medals,
             DerefObjectStatic(Leaf(Source), keyField),
-            Some(InnerObjectConcat(ObjectDelete(Leaf(Source),Set(valueField)), WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),"value"))),
+            Some(
+              InnerObjectConcat(
+                ObjectDelete(Leaf(Source), Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), "value"))),
             0,
             GroupKeySpecAnd(
-              GroupKeySpecSource(extra0Field,Filter(EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),CString("Men"),false),EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),CString("Men"),false))),
-              GroupKeySpecSource(oneField,DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),editionField)))
+              GroupKeySpecSource(
+                extra0Field,
+                Filter(
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Men"), false),
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Men"), false))),
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), editionField)))
           ),
           GroupingSource(
             medals,
-            DerefObjectStatic(Leaf(Source),keyField),
-            Some(InnerObjectConcat(ObjectDelete(Leaf(Source),Set(valueField)), WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),"value"))),
+            DerefObjectStatic(Leaf(Source), keyField),
+            Some(
+              InnerObjectConcat(
+                ObjectDelete(Leaf(Source), Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), "value"))),
             2,
             GroupKeySpecAnd(
-              GroupKeySpecSource(extra1Field,Filter(EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),CString("Women"),false),EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),genderField),CString("Women"),false))),
-              GroupKeySpecSource(oneField,DerefObjectStatic(DerefObjectStatic(Leaf(Source),valueField),editionField)))
+              GroupKeySpecSource(
+                extra1Field,
+                Filter(
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Women"), false),
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Women"), false))),
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), editionField)))
           ),
-          GroupingSpec.Intersection
-        )
+          GroupingSpec.Intersection)
 
       def evaluator(key: RValue, partition: GroupId => Need[Table]) = {
         val K0 = RValue.fromJValue(JParser.parseUnsafe("""{"1":"1996","extra0":true,"extra1":true}"""))

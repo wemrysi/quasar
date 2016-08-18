@@ -84,13 +84,13 @@ case class EstimateSize(minSize: Long, maxSize: Long) extends TableSize {
 }
 
 case object UnknownSize extends TableSize {
-  val maxSize = Long.MaxValue
+  val maxSize             = Long.MaxValue
   def +(other: TableSize) = UnknownSize
   def *(other: TableSize) = UnknownSize
 }
 
 case object InfiniteSize extends TableSize {
-  val maxSize = Long.MaxValue
+  val maxSize             = Long.MaxValue
   def +(other: TableSize) = InfiniteSize
   def *(other: TableSize) = InfiniteSize
 }
@@ -103,7 +103,7 @@ object TableModule {
     def isAscending: Boolean
   }
 
-  case object SortAscending  extends DesiredSortOrder { val isAscending = true }
+  case object SortAscending  extends DesiredSortOrder { val isAscending = true  }
   case object SortDescending extends DesiredSortOrder { val isAscending = false }
 
   sealed trait JoinOrder
@@ -172,8 +172,7 @@ trait TableModule extends TransSpecModule {
     def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[CrossOrder -> Table]
   }
 
-  trait TableLike {
-    this: Table =>
+  trait TableLike { this: Table =>
     import trans._
     import TransSpecModule._
 
@@ -301,11 +300,8 @@ trait TableModule extends TransSpecModule {
     * @param targetTrans The key which will be used by `merge` to access a particular subset of the target
     * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
     */
-  /*final*/ case class GroupingSource(table: Table,
-                                  idTrans: trans.TransSpec1,
-                                  targetTrans: Option[trans.TransSpec1],
-                                  groupId: GroupId,
-                                  groupKeySpec: trans.GroupKeySpec)
+  /*final*/
+  case class GroupingSource(table: Table, idTrans: trans.TransSpec1, targetTrans: Option[trans.TransSpec1], groupId: GroupId, groupKeySpec: trans.GroupKeySpec)
       extends GroupingSpec {
     def sources: Vector[GroupingSource] = Vector(this)
     def sorted: M[GroupingSource] =
@@ -316,11 +312,12 @@ trait TableModule extends TransSpecModule {
       }
   }
 
-  /*final*/ case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
-                                     groupKeyRightTrans: trans.TransSpec1,
-                                     left: GroupingSpec,
-                                     right: GroupingSpec,
-                                     alignment: GroupingSpec.Alignment)
+  /*final*/
+  case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
+                               groupKeyRightTrans: trans.TransSpec1,
+                               left: GroupingSpec,
+                               right: GroupingSpec,
+                               alignment: GroupingSpec.Alignment)
       extends GroupingSpec {
     def sources: Vector[GroupingSource] = left.sources ++ right.sources
     def sorted: M[GroupingAlignment] = (left.sorted |@| right.sorted) { (t1, t2) =>

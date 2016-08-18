@@ -181,7 +181,7 @@ object CPath {
 
   private[this] case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
-  def apply(n: CPathNode*): CPath      = CompositeCPath(n.toList)
+  def apply(n: CPathNode*): CPath = CompositeCPath(n.toList)
 
   def apply(l: List[CPathNode]): CPath = apply(l: _*)
 

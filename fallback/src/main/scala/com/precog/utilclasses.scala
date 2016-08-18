@@ -14,13 +14,13 @@ final case object IntNil extends IntList {
 }
 
 object IntList {
-  def empty: IntList = IntNil
+  def empty: IntList           = IntNil
   def apply(xs: Int*): IntList = xs.foldRight(empty)(_ :: _)
 
   implicit class IntListOps(private val xs: IntList) extends AnyVal {
     def ::(head: Int): IntCons = IntCons(head, xs)
     @tailrec final def foreach(f: Int => Any): Unit = xs match {
-      case IntCons(hd, tl) => f(hd) ; tl foreach f
+      case IntCons(hd, tl) => f(hd); tl foreach f
       case _               =>
     }
   }
@@ -105,7 +105,7 @@ object PrecogUnit extends PrecogUnit {
 final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
   val bound = _bound + 1
 
-  private val ring = new Array[A](bound)
+  private val ring  = new Array[A](bound)
   private var front = 0
   private var back  = rotate(front, 1)
 

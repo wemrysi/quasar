@@ -34,13 +34,14 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
   import trans._
 
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = groupId.getAndIncrement
+  def newGroupId      = groupId.getAndIncrement
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
+    def load(apiKey: APIKey, jtpe: JType)                                       = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = sys.error("todo")
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] =
+      sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
@@ -48,8 +49,7 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
 
     def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1):
-        Need[Table -> Table] = sys.error("not implemented here")
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
@@ -62,7 +62,7 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
       val table = fromJson(Stream.empty[JValue])
 
       val keySpecs = Array(groupkey("a"), groupkey("b"))
-      val valSpec = valuekey("c")
+      val valSpec  = valuekey("c")
 
       val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
@@ -141,13 +141,21 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
       test(Array(CString("foo"), CLong(999)), empty)
     }
 
-    val index1 = TableIndex.createFromTable(
-      table, Array(groupkey("a")), valuekey("c")
-    ).copoint
+    val index1 = TableIndex
+      .createFromTable(
+        table,
+        Array(groupkey("a")),
+        valuekey("c")
+      )
+      .copoint
 
-    val index2 = TableIndex.createFromTable(
-      table, Array(groupkey("b")), valuekey("c")
-    ).copoint
+    val index2 = TableIndex
+      .createFromTable(
+        table,
+        Array(groupkey("b")),
+        valuekey("c")
+      )
+      .copoint
 
     "efficiently combine to produce unions" in {
 

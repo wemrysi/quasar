@@ -5,8 +5,7 @@ import java.nio.file._
 import java.math.MathContext.UNLIMITED
 import scala.collection.{ mutable => scm, immutable => sci }
 
-trait PackageMethods {
-  self: PackageAliases =>
+trait PackageMethods { self: PackageAliases =>
 
   def scmSet[A](): scmSet[A]                                    = scm.HashSet[A]()
   def sciQueue[A](): sciQueue[A]                                = sci.Queue[A]()
@@ -33,7 +32,7 @@ trait PackageMethods {
   def lp[T](label: String): T => Unit                                    = (t: T) => println(label + ": " + t)
   def lpf[T](label: String)(f: T => Any): T => Unit                      = (t: T) => println(label + ": " + f(t))
 
-  def doto[A](x: A)(f: A => Any): A = { f(x) ; x }
+  def doto[A](x: A)(f: A => Any): A = { f(x); x }
 
   def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
     val len = a1.length

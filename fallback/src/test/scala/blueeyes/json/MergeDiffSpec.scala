@@ -63,6 +63,7 @@ class MergeDiffSpec extends quasar.Qspec {
 }
 
 object MergeDiffData {
+
   /** Diff **/
   def expectedChanges = parseUnsafe("""
     {

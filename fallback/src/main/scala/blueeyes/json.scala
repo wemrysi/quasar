@@ -27,13 +27,13 @@ package object json {
     def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
   }
 
-  val NoJPath     = JPath()
+  val NoJPath = JPath()
   type JPath      = quasar.precog.JPath
   type JPathNode  = quasar.precog.JPathNode
   type JPathField = quasar.precog.JPathField
-  val JPathField  = quasar.precog.JPathField
+  val JPathField = quasar.precog.JPathField
   type JPathIndex = quasar.precog.JPathIndex
-  val JPathIndex  = quasar.precog.JPathIndex
+  val JPathIndex = quasar.precog.JPathIndex
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
     val sb = new StringBuilder
@@ -199,7 +199,6 @@ package object json {
         sb.append("}")
     }
   }
-
 
   implicit class JValueOps(private val self: JValue) {
     import Validation._
@@ -509,7 +508,7 @@ package object json {
               rec(p \ t._2, t._1) match {
                 case JUndefined => Nil
                 case x          => x :: Nil
-              })))
+            })))
 
         case x => f(p, x)
       }
@@ -685,8 +684,8 @@ package object json {
 package json {
   object JPath {
     def apply(path: String): JPath = {
-      val PathPattern  = """[.]|(?=\[\d+\])""".r
-      val IndexPattern = """^\[(\d+)\]$""".r
+      val PathPattern      = """[.]|(?=\[\d+\])""".r
+      val IndexPattern     = """^\[(\d+)\]$""".r
       def ppath(p: String) = if (p startsWith ".") p else "." + p
       JPath(
         PathPattern split ppath(path) map (_.trim) flatMap {

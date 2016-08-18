@@ -69,18 +69,25 @@ class CodecSpec extends quasar.Qspec {
   }
   def surviveHardRoundTrip[A](a: A)(implicit codec: Codec[A]) = {
     val bytes = smallPool.run(for {
-      _ <- codec.write(a)
+      _     <- codec.write(a)
       bytes <- flipBytes
-      _ <- release
+      _     <- release
     } yield bytes)
     bytes.length must_== codec.encodedSize(a)
     codec.read(ByteBufferWrap(bytes)) must_== a
   }
   def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" should {
-    "with large buffers" in { prop { (a: A) => surviveEasyRoundTrip(a)(codec) } }
-    "with small buffers" in { prop { (a: A) => surviveHardRoundTrip(a)(codec) } }
+    "with large buffers" in {
+      prop { (a: A) =>
+        surviveEasyRoundTrip(a)(codec)
+      }
+    }
+    "with small buffers" in {
+      prop { (a: A) =>
+        surviveHardRoundTrip(a)(codec)
+      }
+    }
   }
-
 
   "constant codec" should {
     "write 0 bytes" in {
@@ -129,28 +136,52 @@ class CodecSpec extends quasar.Qspec {
   "IndexedSeqCodec" should {
     "survive round-trip" should {
       "with large buffers" in {
-        prop { (xs: IndexedSeq[Long]) => surviveEasyRoundTrip(xs) }
-        prop { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveEasyRoundTrip(xs) }
-        prop { (xs: IndexedSeq[String]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: IndexedSeq[Long]) =>
+          surviveEasyRoundTrip(xs)
+        }
+        prop { (xs: IndexedSeq[IndexedSeq[Long]]) =>
+          surviveEasyRoundTrip(xs)
+        }
+        prop { (xs: IndexedSeq[String]) =>
+          surviveEasyRoundTrip(xs)
+        }
       }
       "with small buffers" in {
-        prop { (xs: IndexedSeq[Long]) => surviveHardRoundTrip(xs) }
-        prop { (xs: IndexedSeq[IndexedSeq[Long]]) => surviveHardRoundTrip(xs) }
-        prop { (xs: IndexedSeq[String]) => surviveHardRoundTrip(xs) }
+        prop { (xs: IndexedSeq[Long]) =>
+          surviveHardRoundTrip(xs)
+        }
+        prop { (xs: IndexedSeq[IndexedSeq[Long]]) =>
+          surviveHardRoundTrip(xs)
+        }
+        prop { (xs: IndexedSeq[String]) =>
+          surviveHardRoundTrip(xs)
+        }
       }
     }
   }
   "ArrayCodec" should {
     "survive round-trip" should {
       "with large buffers" in {
-        prop { (xs: Array[Long]) => surviveEasyRoundTrip(xs) }
-        prop { (xs: Array[Array[Long]]) => surviveEasyRoundTrip(xs) }
-        prop { (xs: Array[String]) => surviveEasyRoundTrip(xs) }
+        prop { (xs: Array[Long]) =>
+          surviveEasyRoundTrip(xs)
+        }
+        prop { (xs: Array[Array[Long]]) =>
+          surviveEasyRoundTrip(xs)
+        }
+        prop { (xs: Array[String]) =>
+          surviveEasyRoundTrip(xs)
+        }
       }
       "with small buffers" in {
-        prop { (xs: Array[Long]) => surviveHardRoundTrip(xs) }
-        prop { (xs: Array[Array[Long]]) => surviveHardRoundTrip(xs) }
-        prop { (xs: Array[String]) => surviveHardRoundTrip(xs) }
+        prop { (xs: Array[Long]) =>
+          surviveHardRoundTrip(xs)
+        }
+        prop { (xs: Array[Array[Long]]) =>
+          surviveHardRoundTrip(xs)
+        }
+        prop { (xs: Array[String]) =>
+          surviveHardRoundTrip(xs)
+        }
       }
     }
   }

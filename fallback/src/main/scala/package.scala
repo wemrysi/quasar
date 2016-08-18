@@ -18,7 +18,7 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   implicit def implicitScalaMapOps[A, B, CC[B] <: Traversable[B]](x: scMap[A, CC[B]]): ScalaMapOps[A, B, CC] =
     new ScalaMapOps(x)
 
-  implicit def comparableOrder[A <: Comparable[A]] : Ord[A] =
+  implicit def comparableOrder[A <: Comparable[A]]: Ord[A] =
     Ord.order[A]((x, y) => Cmp(x compareTo y))
 
   implicit def translateToScalaOrdering[A](implicit z: Ord[A]): scala.math.Ordering[A] = z.toScalaOrdering
@@ -42,7 +42,7 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   }
 
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
-    def |>[B](f: A => B): B = f(x)
+    def |>[B](f: A => B): B       = f(x)
     def unsafeTap(f: A => Any): A = doto(x)(f)
   }
 

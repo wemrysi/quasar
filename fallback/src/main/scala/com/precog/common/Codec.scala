@@ -78,12 +78,12 @@ trait Codec[@spec(Boolean, Long, Double) A] { self =>
     def loop(s: S): M[Unit] =
       for {
         buf <- M.getBuffer(min)
-        _ <- writeMore(s, buf) map (loop(_)) getOrElse ().point[M]
+        _   <- writeMore(s, buf) map (loop(_)) getOrElse ().point[M]
       } yield ()
 
     for {
       buf <- M.getBuffer(min)
-      _ <- writeInit(a, buf) map (loop(_)) getOrElse ().point[M]
+      _   <- writeInit(a, buf) map (loop(_)) getOrElse ().point[M]
     } yield ()
   }
 
@@ -163,9 +163,9 @@ object Codec {
     import ByteBufferPool._
 
     byteBufferPool.run(for {
-      _ <- codec.write[ByteBufferPoolS](a)
+      _     <- codec.write[ByteBufferPoolS](a)
       bytes <- flipBytes
-      _ <- release
+      _     <- release
     } yield bytes)
   }
 
@@ -260,7 +260,7 @@ object Codec {
   }
 
   case class ConstCodec[A](a: A) extends FixedWidthCodec[A] {
-    val size = 0
+    val size                                      = 0
     def writeUnsafe(a: A, sink: ByteBuffer): Unit = ()
     def read(buffer: ByteBuffer): A               = a
     override def skip(buf: ByteBuffer) {}
@@ -449,9 +449,9 @@ object Codec {
     def compare(a: ByteBuffer, b: ByteBuffer): Int = {
       val alen = readPackedInt(a)
       val blen = readPackedInt(b)
-      var cmp = 0
-      var pos = 0
-      val len = if (alen < blen) alen else blen
+      var cmp  = 0
+      var pos  = 0
+      val len  = if (alen < blen) alen else blen
       while (cmp == 0 && pos < len) {
         cmp = (a.get() & 0xFF) - (b.get() & 0xFF)
         pos += 1
@@ -597,7 +597,7 @@ object Codec {
 
     override def skip(buf: ByteBuffer) {
       val length = readPackedInt(buf)
-      var i = 0
+      var i      = 0
       while (i < length) { elemCodec.skip(buf); i += 1 }
     }
   }

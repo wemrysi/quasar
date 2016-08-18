@@ -174,7 +174,7 @@ sealed trait CPathTraversal { self =>
 
 object CPathTraversal {
 
-  case object Done extends CPathTraversal
+  case object Done                                                    extends CPathTraversal
   case class Sequence(traversals: List[CPathTraversal])               extends CPathTraversal
   case class Select(path: CPathNode, next: CPathTraversal)            extends CPathTraversal
   case class Loop(start: Int, end: Option[Int], tail: CPathTraversal) extends CPathTraversal
@@ -261,7 +261,7 @@ object CPathTraversal {
       def order(p1: CPathPosition, p2: CPathPosition): Cmp = (p1, p2) match {
         case (CPathPoint(CPathIndex(i)), CPathRange(_, l, r)) => i ?|? l
         case (CPathRange(_, l, r), CPathPoint(CPathIndex(i))) => l ?|? i
-        case (CPathRange(_, l1, r1), CPathRange(_, l2, r2))   =>
+        case (CPathRange(_, l1, r1), CPathRange(_, l2, r2)) =>
           (l1 ?|? l2) |+| ((r1, r2) match {
             case (Some(r1), Some(r2)) => r1 ?|? r2
             case _                    => r2 ?|? r1 // it was like this when I got here

@@ -14,11 +14,11 @@ trait PackageTime {
     def getMillis: Long = x.toMillis
   }
   implicit class QuasarInstantOps(private val x: Instant) {
-    def getMillis: Long           = x.toEpochMilli
+    def getMillis: Long         = x.toEpochMilli
     def -(y: Instant): Duration = java.time.Duration.between(x, y)
   }
   implicit class QuasarPeriodOps(private val x: Period) {
-    def getMillis: Long       = toDuration.getMillis
+    def getMillis: Long      = toDuration.getMillis
     def toDuration: Duration = java.time.Duration from x
   }
   implicit class QuasarDateTimeOps(private val x: DateTime) {

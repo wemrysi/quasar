@@ -34,7 +34,7 @@ object CValueGenerators {
   type JSchema = Seq[JPath -> CType]
 
   def inferSchema(data: Seq[JValue]): JSchema = data match {
-    case Seq()    => Seq()
+    case Seq() => Seq()
     case hd +: tl =>
       val current = hd.flattenWithPath flatMap { case (path, jv) => CType.forJValue(jv) map (path -> _) }
       current ++ inferSchema(tl) distinct
@@ -50,8 +50,8 @@ trait CValueGenerators {
 
   def objectSchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] = {
     for {
-      size <- sizeGen
-      names <- containerOfN[Set, String](size, identifier)
+      size       <- sizeGen
+      names      <- containerOfN[Set, String](size, identifier)
       subschemas <- listOfN(size, schema(depth - 1))
     } yield {
       for {
@@ -66,15 +66,19 @@ trait CValueGenerators {
   def arraySchema(depth: Int, sizeGen: Gen[Int]): Gen[JSchema] =
     sizeGen >> { size =>
       schema(depth - 1) * size ^^ { subschemas =>
-        0 until size zip subschemas flatMap { case (idx, pairs) =>
-          pairs map { case (jpath, ctype) =>
-            (JPathIndex(idx) \ jpath) -> ctype
-          }
+        0 until size zip subschemas flatMap {
+          case (idx, pairs) =>
+            pairs map {
+              case (jpath, ctype) =>
+                (JPathIndex(idx) \ jpath) -> ctype
+            }
         }
       }
     }
 
-  def leafSchema: Gen[JSchema] = ctype map { t => (NoJPath -> t) :: Nil }
+  def leafSchema: Gen[JSchema] = ctype map { t =>
+    (NoJPath -> t) :: Nil
+  }
 
   def ctype: Gen[CType] = oneOf(
     CString,
@@ -117,17 +121,17 @@ trait CValueGenerators {
 
   def genEventColumns(jschema: JSchema): Gen[Int -> Stream[Identities -> Seq[JPath -> JValue]]] =
     for {
-      idCount  <- choose(1, 3)
-      dataSize <- choose(0, 20)
-      ids      <- setOfN[List[Long]](dataSize, listOfN[Long](idCount, genPosLong))
-      values   <- listOfN[Seq[JPath -> JValue]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
+      idCount     <- choose(1, 3)
+      dataSize    <- choose(0, 20)
+      ids         <- setOfN[List[Long]](dataSize, listOfN[Long](idCount, genPosLong))
+      values      <- listOfN[Seq[JPath -> JValue]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
       falseDepth  <- choose(1, 3)
       falseSchema <- schema(falseDepth)
       falseSize   <- choose(0, 5)
       falseIds    <- setOfN[List[Long]](falseSize, listOfN(idCount, genPosLong))
       falseValues <- listOfN[Seq[JPath -> JValue]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
 
-      falseIds2 = falseIds -- ids     // distinct ids
+      falseIds2 = falseIds -- ids // distinct ids
     } yield {
       (idCount, (ids.map(_.toArray) zip values).toStream ++ (falseIds2.map(_.toArray) zip falseValues).toStream)
     }
@@ -144,12 +148,13 @@ trait CValueGenerators {
 trait JdbmCValueGenerators {
   def maxArrayDepth = 3
 
-  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
+  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List, Seq[CValue]](size, values.map(_.toSeq))
 
   private def genNonArrayCValueType: Gen[CValueType[_]] = Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum, CDate)
 
   def genCValueType(maxDepth: Int = maxArrayDepth, depth: Int = 0): Gen[CValueType[_]] = {
-    if (depth >= maxDepth) genNonArrayCValueType else {
+    if (depth >= maxDepth) genNonArrayCValueType
+    else {
       frequency(0 -> (genCValueType(maxDepth, depth + 1) map (CArrayType(_))), 6 -> genNonArrayCValueType)
     }
   }
@@ -161,12 +166,13 @@ trait JdbmCValueGenerators {
     case CBoolean => genBool map (CBoolean(_))
     case CLong    => genLong map (CLong(_))
     case CDouble  => genDouble map (CDouble(_))
-    case CNum     => for {
-      scale  <- genInt
-      bigInt <- genBigInt
-    } yield CNum(decimal(bigInt.bigInteger, scale - 1))
+    case CNum =>
+      for {
+        scale  <- genInt
+        bigInt <- genBigInt
+      } yield CNum(decimal(bigInt.bigInteger, scale - 1))
 
-    case CDate                => genPosLong ^^ (n => CDate(dateTime fromMillis n))
+    case CDate => genPosLong ^^ (n => CDate(dateTime fromMillis n))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.classTag), CArrayType(elemType))
@@ -182,5 +188,3 @@ trait JdbmCValueGenerators {
     case invalid            => sys.error("No values for type " + invalid)
   }
 }
-
-

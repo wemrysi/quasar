@@ -277,7 +277,7 @@ object Schema {
         (row: Int) =>
           leftTypes(row) || rightTypes(row)
 
-        case JArrayHomogeneousT(jtpe) =>
+      case JArrayHomogeneousT(jtpe) =>
         findTypes(jtpe, CPath(seenPath.nodes :+ CPathArray), cols, size)
     }
   }
@@ -329,10 +329,10 @@ object Schema {
     */
   def requiredBy(jtpe: JType, path: CPath, ctpe: CType): Boolean =
     includes(jtpe, path, ctpe) || ((jtpe, path, ctpe) match {
-          case (JArrayFixedT(elements), CPath(CPathArray, tail @ _ *), CArrayType(elemType)) =>
-            elements.values exists (requiredBy(_, CPath(tail: _*), elemType))
-          case _ => false
-        })
+      case (JArrayFixedT(elements), CPath(CPathArray, tail @ _ *), CArrayType(elemType)) =>
+        elements.values exists (requiredBy(_, CPath(tail: _*), elemType))
+      case _ => false
+    })
 
   /**
     * Tests whether the supplied JType includes the supplied CPath and CType.

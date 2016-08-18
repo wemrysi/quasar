@@ -107,6 +107,7 @@ object ColumnarTableModule {
     * "the fox said: ""hello, my name is fred."""
     */
   def renderCsv[M[+ _]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
+
     /**
       * Represents the column headers we have. We track three things:
       *
@@ -132,7 +133,7 @@ object ColumnarTableModule {
         case that: Indices =>
           val len = n
           if (len != that.size) return false
-          var i = 0
+          var i     = 0
           val paths = that.getPaths
           while (i < len) {
             if (a(i) != paths(i)) return false
@@ -145,7 +146,7 @@ object ColumnarTableModule {
       def writeToBuilder(sb: StringBuilder): Unit = {
         if (n == 0) return ()
         sb.append(a(0))
-        var i = 1
+        var i   = 1
         val len = n
         while (i < len) { sb.append(','); sb.append(a(i)); i += 1 }
         sb.append("\r\n")
@@ -158,8 +159,8 @@ object ColumnarTableModule {
       def fromPaths(ps: Array[String]): Indices = {
         val paths = ps.sorted
         val m     = scmMap[String, Int]()
-        var i = 0
-        val len = paths.length
+        var i     = 0
+        val len   = paths.length
         while (i < len) { m(paths(i)) = i; i += 1 }
         new Indices(len, m, paths)
       }
@@ -251,7 +252,7 @@ object ColumnarTableModule {
       while (row < height) {
         // fill in all the buckets for this particular row
         val buckets = Array.fill(width)("")
-        var i = 0
+        var i       = 0
         while (i < ncols) {
           val s = columns(i)(row)
           if (s != "") buckets(positions(i)) = s
@@ -286,12 +287,7 @@ object ColumnarTableModule {
   }
 }
 
-trait ColumnarTableModule
-    extends TableModule
-    with ColumnarTableTypes
-    with SliceTransforms
-    with SamplableColumnarTableModule
-    with IndicesModule {
+trait ColumnarTableModule extends TableModule with ColumnarTableTypes with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
 
   import TableModule._
   import trans._
@@ -391,7 +387,7 @@ trait ColumnarTableModule
       case class IndexedSource(groupId: GroupId, index: TableIndex, keySchema: KeySchema)
 
       (for {
-        source <- grouping.sources
+        source              <- grouping.sources
         groupKeyProjections <- mkProjections(source.groupKeySpec)
         disjunctGroupKeyTransSpecs = groupKeyProjections.map { case (key, spec) => spec }
       } yield {
@@ -419,7 +415,7 @@ trait ColumnarTableModule
 
           def normalizedKeys(index: TableIndex, keySchema: KeySchema): scSet[Key] = {
             val schemaMap = for (k <- fullSchema) yield keySchema.indexOf(k)
-            for (key <- index.getUniqueKeys)
+            for (key       <- index.getUniqueKeys)
               yield for (k <- schemaMap) yield if (k == -1) CUndefined else key(k)
           }
 
@@ -547,7 +543,7 @@ trait ColumnarTableModule
                                                                              joinSpec: TransSpec2): M[JoinOrder -> Table] = {
       val emptySpec = trans.ConstLiteral(CEmptyArray, Leaf(Source))
       for {
-        left0 <- left.sort(leftKeySpec)
+        left0  <- left.sort(leftKeySpec)
         right0 <- right.sort(rightKeySpec)
         cogrouped = left0.cogroup(leftKeySpec, rightKeySpec, right0)(emptySpec, emptySpec, trans.WrapArray(joinSpec))
       } yield {
@@ -803,8 +799,7 @@ trait ColumnarTableModule
             pairL <- leftTransform(remappedLeft)
             pairR <- rightTransform(remappedRight)
             pairB <- bothTransform(remappedLeq, remappedReq)
-          }
-          yield {
+          } yield {
             val (ls0, lx) = pairL
             val (rs0, rx) = pairR
             val (bs0, bx) = pairB
@@ -872,7 +867,7 @@ trait ColumnarTableModule
                            rightEnd: Option[SlicePosition[RK]])
             extends CogroupState
         case class EndRight(rr: RR, rhead: Slice, rtail: StreamT[M, Slice]) extends CogroupState
-        case object CogroupDone extends CogroupState
+        case object CogroupDone                                             extends CogroupState
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
         def step(state: CogroupState): M[Option[Slice -> CogroupState]] = {
@@ -1159,20 +1154,18 @@ trait ColumnarTableModule
 
         val initialState = for {
           // We have to compact both sides to avoid any rows for which the key is completely undefined
-          leftUnconsed <- self.compact(leftKey).slices.uncons
+          leftUnconsed  <- self.compact(leftKey).slices.uncons
           rightUnconsed <- that.compact(rightKey).slices.uncons
 
           back <- {
             val cogroup = for {
-              (leftHead, leftTail) <- leftUnconsed
+              (leftHead, leftTail)   <- leftUnconsed
               (rightHead, rightTail) <- rightUnconsed
-            }
-            yield {
+            } yield {
               for {
                 pairL <- stlk(leftHead)
                 pairR <- strk(rightHead)
-              }
-              yield {
+              } yield {
                 val (lkstate, lkey) = pairL
                 val (rkstate, rkey) = pairR
 
@@ -1247,7 +1240,9 @@ trait ColumnarTableModule
 
                   val lslice = Slice(
                     rows,
-                    lhead.columns.lazyMapValues(Remap({ i => offset + (i / rhead.size) })(_).get)
+                    lhead.columns.lazyMapValues(Remap({ i =>
+                      offset + (i / rhead.size)
+                    })(_).get)
                   )
 
                   val rslice = Slice(
@@ -1390,8 +1385,7 @@ trait ColumnarTableModule
                     pairPrev <- id.f(state._1, s)
                     // TODO use an Applicative
                     pairNext <- filter.f(state._2, s)
-                  }
-                  yield {
+                  } yield {
                     val (prevFilter, cur)  = pairPrev
                     val (nextT, curFilter) = pairNext
                     val next               = cur.distinct(prevFilter, curFilter)
@@ -1692,11 +1686,11 @@ trait ColumnarTableModule
         StreamT(
           StreamT
             .Skip({
-            println(prelude);
-            slices map { s =>
-              println(f(s)); s
-            }
-          })
+              println(prelude);
+              slices map { s =>
+                println(f(s)); s
+              }
+            })
             .point[M]),
         size)
     }
@@ -1716,7 +1710,7 @@ trait ColumnarTableModule
     }
 
     private def toEvents[A](f: (Slice, RowId) => Option[A]): M[Iterable[A]] = {
-      for (stream <- self.compact(Leaf(Source)).slices.toStream) yield {
+      for (stream  <- self.compact(Leaf(Source)).slices.toStream) yield {
         for (slice <- stream; i <- 0 until slice.size; a <- f(slice, i)) yield a
       }
     }

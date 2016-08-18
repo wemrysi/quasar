@@ -31,13 +31,13 @@ trait PackageAliases {
   type Regex          = scala.util.matching.Regex
   type scmMap[K, V]   = scm.Map[K, V]
   type scmSet[A]      = scm.Set[A]
-  val ArrayBuffer     = scm.ArrayBuffer
-  val BigDecimal      = scala.math.BigDecimal
-  val ListBuffer      = scm.ListBuffer
-  val scmMap          = scm.HashMap
-  val scmSet          = scm.HashSet
-  val Try             = scala.util.Try
-  val ScalaFailure    = scala.util.Failure
+  val ArrayBuffer  = scm.ArrayBuffer
+  val BigDecimal   = scala.math.BigDecimal
+  val ListBuffer   = scm.ListBuffer
+  val scmMap       = scm.HashMap
+  val scmSet       = scm.HashSet
+  val Try          = scala.util.Try
+  val ScalaFailure = scala.util.Failure
 
   // java stdlib
   type AtomicInt            = java.util.concurrent.atomic.AtomicInteger
@@ -66,7 +66,7 @@ trait PackageAliases {
   type M[+A]     = scalaz.Need[A]
   type Ord[A]    = scalaz.Order[A]
   type Cmp       = scalaz.Ordering
-  val Ord        = scalaz.Order
+  val Ord = scalaz.Order
 
   def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 }

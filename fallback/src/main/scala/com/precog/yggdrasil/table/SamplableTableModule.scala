@@ -33,8 +33,7 @@ trait SamplableTableModule extends TableModule {
   }
 }
 
-trait SamplableColumnarTableModule extends SamplableTableModule {
-  self: ColumnarTableModule with SliceTransforms =>
+trait SamplableColumnarTableModule extends SamplableTableModule { self: ColumnarTableModule with SliceTransforms =>
 
   import trans._
 

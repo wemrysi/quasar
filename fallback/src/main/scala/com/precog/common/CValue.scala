@@ -117,7 +117,7 @@ case class RObject(fields: Map[String, RValue]) extends RValue {
 }
 
 object RObject {
-  val empty = new RObject(Map.empty)
+  val empty                                    = new RObject(Map.empty)
   def apply(fields: (String, RValue)*): RValue = new RObject(Map(fields: _*))
 }
 
@@ -127,7 +127,7 @@ case class RArray(elements: List[RValue]) extends RValue {
 }
 
 object RArray {
-  val empty = new RArray(Nil)
+  val empty                            = new RArray(Nil)
   def apply(elements: RValue*): RValue = new RArray(elements.toList)
 }
 
@@ -154,16 +154,17 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 
 object CValue {
   implicit val CValueOrder: Ord[CValue] = Ord order {
-    case (CString(as), CString(bs))                                                   => as ?|? bs
-    case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
-    case (CLong(al), CLong(bl))                                                       => al ?|? bl
-    case (CDouble(ad), CDouble(bd))                                                   => ad ?|? bd
-    case (CNum(an), CNum(bn))                                                         => fromInt(an compare bn)
-    case (CDate(ad), CDate(bd))                                                       => fromInt(ad compareTo bd)
-    case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
-    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
-    case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
-    case (a, b)                                                                       => a.cType ?|? b.cType
+    case (CString(as), CString(bs))   => as ?|? bs
+    case (CBoolean(ab), CBoolean(bb)) => ab ?|? bb
+    case (CLong(al), CLong(bl))       => al ?|? bl
+    case (CDouble(ad), CDouble(bd))   => ad ?|? bd
+    case (CNum(an), CNum(bn))         => fromInt(an compare bn)
+    case (CDate(ad), CDate(bd))       => fromInt(ad compareTo bd)
+    case (CPeriod(ad), CPeriod(bd))   => ad.toDuration ?|? bd.toDuration
+    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe =>
+      as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
+    case (a: CNumericValue[_], b: CNumericValue[_]) => (a.toCNum: CValue) ?|? b.toCNum
+    case (a, b)                                     => a.cType ?|? b.cType
   }
 }
 
@@ -273,7 +274,7 @@ object CType {
     case JNull         => CNull
     case JObject.empty => CEmptyObject
     case JArray.empty  => CEmptyArray
-    case JNum(d)       =>
+    case JNum(d) =>
       forJValue(jval) match {
         case Some(CLong)   => CLong(d.toLong)
         case Some(CDouble) => CDouble(d.toDouble)
@@ -360,8 +361,8 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
       leafEquiv(a.asInstanceOf[Array[Double]], b.asInstanceOf[Array[Double]])
 
     case CArrayType(elemType) =>
-      val as = a.asInstanceOf[Array[Array[_]]]
-      val bs = b.asInstanceOf[Array[Array[_]]]
+      val as     = a.asInstanceOf[Array[Array[_]]]
+      val bs     = b.asInstanceOf[Array[Array[_]]]
       var i      = 0
       var result = as.length == bs.length
       while (result && i < as.length) {

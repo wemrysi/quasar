@@ -19,8 +19,7 @@ import quasar.precog.TestSupport._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 
 package quasar.precog {
-  object TableTestSupport extends TestSupport with TableGenerators {
-  }
+  object TableTestSupport extends TestSupport with TableGenerators {}
 
   object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerators {
     def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
@@ -82,8 +81,8 @@ package blueeyes.json {
     def genJPath: Gen[JPath] = genJPathNode * choose(0, 10) ^^ (JPath(_))
 
     /** The delay wrappers are needed because we generate
-     *  JValues recursively.
-     */
+      *  JValues recursively.
+      */
     def genJValue: Gen[JValue] = frequency(
       5 -> genSimple,
       1 -> delay(genJArray),

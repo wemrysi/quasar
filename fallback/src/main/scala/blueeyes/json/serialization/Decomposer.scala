@@ -46,8 +46,9 @@ object ExtractorDecomposer {
   }
 
   def by[A] = new {
-    def apply[B](fg: A => B)(gf: B => A)(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A]                            = make[A, B](fg, gf)
-    def opt[B](fg: A => B)(gf: B => Validation[Extractor.Error, A])(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] = makeOpt[A, B](fg, gf)
+    def apply[B](fg: A => B)(gf: B => A)(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] = make[A, B](fg, gf)
+    def opt[B](fg: A => B)(gf: B => Validation[Extractor.Error, A])(implicit ez: Extractor[B], dz: Decomposer[B]): ExtractorDecomposer[A] =
+      makeOpt[A, B](fg, gf)
   }
 }
 
@@ -65,8 +66,7 @@ trait MiscSerializers {
     StringExtractor validated jv map (MimeTypes parseMimeTypes _ toList) flatMap {
       case Nil        => Failure(Extractor.Error.invalid("No mime types found in " + jv.renderCompact))
       case first :: _ => Success(first)
-    }
-  )
+  })
 }
 
 /** Serialization implicits allow a convenient syntax for serialization and

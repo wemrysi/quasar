@@ -36,10 +36,10 @@ sealed abstract class MaybeOrdering(val toInt: Int) {
 }
 
 object MaybeOrdering {
-  case object Lt     extends MaybeOrdering(-1) { def complement = Gt }
-  case object Gt     extends MaybeOrdering(1) { def complement  = Lt }
-  case object Eq     extends MaybeOrdering(0) { def complement  = Eq }
-  case object NoComp extends MaybeOrdering(0) { def complement  = NoComp }
+  case object Lt     extends MaybeOrdering(-1) { def complement = Gt     }
+  case object Gt     extends MaybeOrdering(1)  { def complement = Lt     }
+  case object Eq     extends MaybeOrdering(0)  { def complement = Eq     }
+  case object NoComp extends MaybeOrdering(0)  { def complement = NoComp }
 
   def fromInt(n: Int): MaybeOrdering = if (n < 0) Lt else if (n == 0) Eq else Gt
 }
@@ -262,8 +262,7 @@ private[ygg] final class ArrayCPathComparator[@spec(Boolean, Long, Double) A, @s
   * ArraySelector provides a non-boxing way of accessing the leaf elements in a
   * bunch of nested arrays.
   */
-private[ygg]
-final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
+private[ygg] final class ArraySelector[@spec(Boolean, Long, Double) A](implicit m: CTag[A]) {
   def canPluck(a: Array[_], indices: Array[Int], mask: Array[Boolean]): Boolean = {
     var arr: Array[_] = a
     var i             = 0

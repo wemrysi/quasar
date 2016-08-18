@@ -14,6 +14,7 @@ case class IncompleteParseException(msg: String)                        extends 
   * Parser contains the state machine that does all the work. The only
   */
 private[json] trait Parser {
+
   /**
     * Read the byte/char at 'i' as a Char.
     *

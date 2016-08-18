@@ -32,7 +32,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): EitherT[Need, ResourceError, Table] = EitherT.right {
       for {
-        paths <- pathsM(table)
+        paths       <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
@@ -66,7 +66,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
 
   type GroupId = String
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = "groupId(" + groupId.getAndIncrement + ")"
+  def newGroupId      = "groupId(" + groupId.getAndIncrement + ")"
 
   trait TableCompanion extends BaseBlockStoreTestTableCompanion
 
@@ -106,7 +106,10 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
           }.getOrElse(s.columns)
         })
 
-        BlockProjectionData[JArray](s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray], s0)
+        BlockProjectionData[JArray](
+          s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray],
+          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray],
+          s0)
       }
     }
   }
@@ -126,16 +129,18 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
     case _                                 => false
   }
 
-  def sortTransspec(sortKeys: CPath*): TransSpec1 = InnerObjectConcat(sortKeys.zipWithIndex.map {
-    case (sortKey, idx) => WrapObject(
-      sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
-        case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
-        case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
-        case x                              => sys.error(s"Unexpected arg $x")
-      },
-      "%09d".format(idx)
-    )
-  }: _*)
+  def sortTransspec(sortKeys: CPath*): TransSpec1 =
+    InnerObjectConcat(sortKeys.zipWithIndex.map {
+      case (sortKey, idx) =>
+        WrapObject(
+          sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
+            case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
+            case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
+            case x                              => sys.error(s"Unexpected arg $x")
+          },
+          "%09d".format(idx)
+        )
+    }: _*)
 }
 
 object BlockStoreTestModule {
@@ -143,4 +148,3 @@ object BlockStoreTestModule {
     val projections = Map[Path, Projection]()
   }
 }
-

@@ -169,7 +169,7 @@ class DerefSliceOps(private val source: Slice) extends AnyVal {
 
           case cArrayType: CArrayType[a] =>
             new HomogeneousArrayColumn[a] {
-              val tpe = cArrayType
+              val tpe                                        = cArrayType
               private var row0: Int                          = -1
               private var refCol0: HomogeneousArrayColumn[a] = _
               @inline private def refCol(row: Int): HomogeneousArrayColumn[a] =
