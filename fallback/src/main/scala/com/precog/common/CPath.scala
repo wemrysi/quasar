@@ -170,8 +170,6 @@ object CPath {
 
   type AndValue = CPath -> CValue
 
-  // import blueeyes.json._
-
   implicit val CPathDecomposer: Decomposer[CPath] = new Decomposer[CPath] {
     def decompose(cpath: CPath): JValue = JString(cpath.toString)
   }
