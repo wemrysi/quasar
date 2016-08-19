@@ -116,7 +116,6 @@ object managefile {
     }
   )
   
-
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
   ): Free[S, FileSystemError \/ AFile] = {
@@ -131,5 +130,4 @@ object managefile {
       }
     }
   }
-
 }

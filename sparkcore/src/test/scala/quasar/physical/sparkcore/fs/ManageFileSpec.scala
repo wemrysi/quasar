@@ -54,8 +54,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
           } yield {
             // then
             result  must_= \/-(())
-            existed must_= true
-            existsAfter must_= false
+            existed must beTrue
+            existsAfter must beFalse
           }
         }
       }
@@ -74,7 +74,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result <- execute(program(path))
           } yield {
             // then
-            existed must_= false
+            existed must beFalse
             result must_= -\/((PathErr(PathNotFound(path))))
           }
         }
@@ -98,7 +98,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result must beRightDisjunction.like {
               case path =>
                 posixCodec.unsafePrintPath(path)
-                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must_= true
+                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must beTrue
             }
           }
         }
@@ -120,7 +120,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result must beRightDisjunction.like {
               case path =>
                 posixCodec.unsafePrintPath(path)
-                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must_= true
+                  .startsWith(posixCodec.unsafePrintPath(nearDir)) must beTrue
             }
           }
         }
@@ -142,7 +142,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
             result must beRightDisjunction.like {
               case path =>
                 posixCodec.unsafePrintPath(path)
-                  .startsWith(posixCodec.unsafePrintPath(parentDir(nearFile).get)) must_= true
+                  .startsWith(posixCodec.unsafePrintPath(parentDir(nearFile).get)) must beTrue
             }
 
           }
@@ -197,8 +197,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 dstContent must_= List("src content")
               }
             }
@@ -224,8 +224,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 dstContent must_= List("some content")
               }
             }
@@ -253,8 +253,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
               } yield {
                 // then
                 result must_= -\/((PathErr(pathExists(dst))))
-                srcExists must_= true
-                dstExists must_= true
+                srcExists must beTrue
+                dstExists must beTrue
                 srcContent must_= List("src content")
                 dstContent must_= List("dst content")
               }
@@ -281,8 +281,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstContent <- getContent(dst)
               } yield {
                 // then
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 dstContent must_= List("src content")
               }
             }
@@ -309,7 +309,7 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
               } yield {
                 // then
                 result must_= -\/((PathErr(pathNotFound(dst))))
-                srcExists must_= true
+                srcExists must beTrue
               }
             }
           }
@@ -334,8 +334,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
@@ -366,8 +366,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
@@ -396,8 +396,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 dstExists <- exists(dst)
                 children <- getChildren(dst)
               } yield {
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
@@ -482,8 +482,8 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
                 children <- getChildren(dst)
               } yield {
                 // then
-                srcExists must_= false
-                dstExists must_= true
+                srcExists must beFalse
+                dstExists must beTrue
                 children must_= List(
                   dst </> file("temp1.tmp"),
                   dst </> file("temp2.tmp")
