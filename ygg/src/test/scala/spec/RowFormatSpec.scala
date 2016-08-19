@@ -62,7 +62,7 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   }
 
   def arrayColumnsFor(size: Int, refs: List[ColumnRef]): List[ArrayColumn[_]] =
-    refs map JDBMSlice.columnFor(CPath.Identity, size) map (_._2)
+    refs map JDBM.columnFor(CPath.Identity, size) map (_._2)
 
   def verify(rows: List[List[CValue]], cols: List[Column]) = {
     rows.zipWithIndex foreach {

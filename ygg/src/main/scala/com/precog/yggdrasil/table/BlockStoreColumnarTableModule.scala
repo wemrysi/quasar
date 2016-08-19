@@ -73,6 +73,24 @@ object JDBM {
   case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
     val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
   }
+
+  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): ColumnRef -> ArrayColumn[_] = ((
+     ref.copy(selector = prefix \ ref.selector),
+     ref.ctype match {
+       case CString              => ArrayStrColumn.empty(sliceSize)
+       case CBoolean             => ArrayBoolColumn.empty()
+       case CLong                => ArrayLongColumn.empty(sliceSize)
+       case CDouble              => ArrayDoubleColumn.empty(sliceSize)
+       case CNum                 => ArrayNumColumn.empty(sliceSize)
+       case CDate                => ArrayDateColumn.empty(sliceSize)
+       case CPeriod              => ArrayPeriodColumn.empty(sliceSize)
+       case CNull                => MutableNullColumn.empty()
+       case CEmptyObject         => MutableEmptyObjectColumn.empty()
+       case CEmptyArray          => MutableEmptyArrayColumn.empty()
+       case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
+       case CUndefined           => abort("CUndefined cannot be serialized")
+     }
+  ))
 }
 
 trait BlockStoreColumnarTableModuleConfig {
