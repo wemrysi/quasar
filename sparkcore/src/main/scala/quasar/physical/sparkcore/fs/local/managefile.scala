@@ -42,7 +42,7 @@ import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
-
+import java.io.FileNotFoundException
 
 import org.apache.commons.io.FileUtils
 import pathy.Path._
@@ -106,17 +106,16 @@ object managefile {
 
   private def delete[S[_]](path: APath)(implicit
     s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = {
-    val task: Task[FileSystemError \/ Unit] = Task.delay {
-      \/.fromTryCatchNonFatal(Files.delete(toNioPath(path)))
+  ): Free[S, FileSystemError \/ Unit] = injectFT[Task, S].apply(
+    Task.delay {
+      \/.fromTryCatchNonFatal(FileUtils.forceDelete(toNioPath(path).toFile()))
         .leftMap {
-        case e: NoSuchFileException => pathErr(pathNotFound(path))
-        case e: DirectoryNotEmptyException => pathErr(pathNotFound(path))
+        case e: FileNotFoundException => pathErr(pathNotFound(path))
         case e => pathErr(invalidPath(path, e.getMessage()))
       }
     }
-    injectFT[Task, S].apply(task)
-  }
+  )
+  
 
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
