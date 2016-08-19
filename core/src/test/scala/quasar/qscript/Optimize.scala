@@ -25,31 +25,31 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
+  val opt = new quasar.qscript.Optimize[Fix]
+
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "optimizer" should {
     "elide a no-op map in a constant boolean" in {
        val query = LP.Constant(Data.Bool(true))
-       val run = liftFG(QueryFile.optimize.elideNopMap[QS])
+       val run = liftFG(opt.elideNopMap[QS])
 
-       QueryFile.optimizeEval(run)(query).toOption must
+       QueryFile.optimizeEval(query)(run).toOption must
        equal(
          QC.inj(Map(RootR, BoolLit(true))).embed.some)
     }
 
     "optimize a basic read" in {
-      import QueryFile.optimize._
-
       val run =
-        (quasar.fp.free.injectedNT[QS](simplifyProjections).apply(_: QS[Fix[QS]])) ⋙
-          liftFG(coalesceMapShift[QS, QS](optionIdF[QS])) ⋙
+        (quasar.fp.free.injectedNT[QS](opt.simplifyProjections).apply(_: QS[Fix[QS]])) ⋙
+          liftFG(opt.coalesceMapShift[QS, QS](opt.optionIdF[QS])) ⋙
           Normalizable[QS].normalize ⋙
-          liftFG(simplifySP[QS, QS](optionIdF[QS])) ⋙
-          liftFG(compactLeftShift[QS, QS])
+          liftFG(opt.simplifySP[QS, QS](opt.optionIdF[QS])) ⋙
+          liftFG(opt.compactLeftShift[QS, QS])
 
       val query = lpRead("/foo")
 
-      QueryFile.optimizeEval(run)(query).toOption must
+      QueryFile.optimizeEval(query)(run).toOption must
       equal(
         SP.inj(LeftShift(
           RootR,
