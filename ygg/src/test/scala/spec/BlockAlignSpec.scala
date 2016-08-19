@@ -119,7 +119,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   }
 
   def alignSimple = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
         {
           "value":{ "fr8y":-2.761198250953116839E+14037, "hw":[], "q":2.429467767811669098E+50018 },
           "key":[1.0,2.0]
@@ -144,7 +144,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           "value":{ "fr8y":123473018907070400.0, "hw":[], "q":0E+35485 },
           "key":[4.0,4.0]
         }]
-    """)
+    """.toYgg
 
     val sample = SampleData(elements.toStream, Some((2, List((JPath(".q"), CNum), (JPath(".hw"), CEmptyArray), (JPath(".fr8y"), CNum)))))
 

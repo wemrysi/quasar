@@ -3,6 +3,7 @@ package ygg
 import jawn._
 import blueeyes._
 import scalaz._, Scalaz._
+import io.circe.Json
 
 package object json {
   import JValue._
@@ -22,6 +23,20 @@ package object json {
       case scala.util.Left(t: ParseException) => AsyncParse(Seq(t), Nil) -> p.copy()
       case scala.util.Left(t)                 => AsyncParse(Seq(new ParseException(t.getMessage, 0, 0, 0)), Nil) -> p.copy()
     }
+  }
+  implicit final class CirceJsonStringContext(sc: StringContext) {
+    final def json(args: Any*): Json = macro io.circe.literal.LiteralMacros.jsonStringContext
+  }
+
+  implicit class CirceJsonOps(private val c: Json) {
+    def toYgg: JValue = c.fold[JValue](
+      JNull,
+      JBool(_),
+      x => JNum(x.toBigDecimal.get),
+      JString(_),
+      xs => JArray(xs map (_.toYgg)),
+      x => JObject(x.toMap mapValues (_.toYgg) toMap)
+    )
   }
 
   implicit val YggFacade: SimpleFacade[JValue] = new SimpleFacade[JValue] {

@@ -185,7 +185,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testMod2Filter = {
-    val array: JValue = JParser.parseUnsafe("""
+    val array: JValue = json"""
       [{
         "value":-6.846973248137671E+307,
         "key":[7.0]
@@ -193,7 +193,7 @@ trait TransformSpec extends TableQspec {
       {
         "value":-4611686018427387904,
         "key":[5.0]
-      }]""")
+      }]""".toYgg
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -360,8 +360,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def checkEqualSelfArray = {
-    val array: JValue = JParser.parseUnsafe("""
-      [[9,10,11]]""")
+    val array: JValue = json"""[[9,10,11]]""".toYgg
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
