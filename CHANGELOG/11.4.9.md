@@ -1,0 +1,3 @@
+- Reorganize sbt project dependencies for more parallelism
+- Inherit less in test specifications to reduce compile time
+- Modify test mixin strategy to reduce bytecode footprint

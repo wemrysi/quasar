@@ -21,7 +21,7 @@ import quasar.Predef._
 
 import scalaz.{\/-, -\/}
 
-class HeaderParamSpec extends quasar.QuasarSpecification {
+class HeaderParamSpec extends quasar.Qspec {
   import org.http4s.util._
 
   import HeaderParam._

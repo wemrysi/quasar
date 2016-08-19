@@ -29,7 +29,7 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 import scodec.bits.ByteVector
 
-class QResponseSpec extends quasar.QuasarSpecification {
+class QResponseSpec extends quasar.Qspec {
   import QResponse.{PROCESS_EFFECT_THRESHOLD_BYTES, HttpResponseStreamFailureException}
   import QResponseSpec._
 

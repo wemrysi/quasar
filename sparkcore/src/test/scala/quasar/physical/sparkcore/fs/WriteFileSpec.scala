@@ -17,7 +17,6 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.QuasarSpecification
 import quasar.Data
 import quasar.fp.TaskRef
 import quasar.fp.numeric._
@@ -29,10 +28,9 @@ import quasar.effect._
 import java.io._
 
 import pathy.Path._
-import org.specs2.ScalaCheck
 import scalaz._, Scalaz._, concurrent.Task
 
-class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugars  {
+class WriteFileSpec extends quasar.Qspec with TempFSSugars {
 
   type Eff0[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Task, A]
   type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
@@ -151,7 +149,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugar
   
   private def execute[C](program: FileSystemErrT[Free[WriteFile, ?], C]):
       Task[FileSystemError \/ C] = interpreter.flatMap(program.run.foldMap(_))
- 
+
   private def interpreter: Task[WriteFile ~> Task] = {
 
     def innerInterpreter: Task[Eff ~> Task] =  {
@@ -172,7 +170,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck with TempFSSugar
     (implicit writeUnsafe: WriteFile.Unsafe[WriteFile])
       : FileSystemErrT[Free[WriteFile, ?], C] =
     defined(writeUnsafe)
-  
+
   private def user(login: String, age: Int) =
     Data.Obj(ListMap("login" -> Data.Str(login), "age" -> Data.Int(age)))
 }

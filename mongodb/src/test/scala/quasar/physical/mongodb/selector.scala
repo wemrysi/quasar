@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 
-class SelectorSpec extends quasar.QuasarSpecification  {
+class SelectorSpec extends quasar.Qspec  {
 
   implicit def toBson(x: Int) = Bson.Int32(x)
   implicit def toField(name: String) = BsonField.Name(name)

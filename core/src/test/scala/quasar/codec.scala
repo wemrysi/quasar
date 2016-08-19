@@ -20,13 +20,10 @@ import argonaut._, Argonaut._
 import quasar.DataEncodingError.{UnrepresentableDataError, UnescapedKeyError}
 import quasar.Predef._
 
-import org.specs2.scalaz._
-import org.specs2.ScalaCheck
-
 import org.threeten.bp._
 import scalaz._, Scalaz._
 
-class DataCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
+class DataCodecSpecs extends quasar.Qspec {
   import DataArbitrary._
 
   implicit val DataShow = new Show[Data] { override def show(v: Data) = v.toString }

@@ -16,18 +16,36 @@
 
 package quasar
 
-import quasar.Predef._
-import quasar.fp._
-import org.specs2.mutable._
-import org.specs2.scalaz.ScalazMatchers
-import org.specs2.execute.AsResult
+import scala._
+import java.lang.String
 import scalaz._
+import org.specs2.main.ArgProperty
+import org.specs2.execute._
+import quasar.build.BuildInfo._
 
-trait QuasarSpecification extends SpecificationLike with ScalazMatchers with PendingWithAccurateCoverage {
-  // Fail fast and repot all timings when running on CI.
+/** Use Qspec if you can, QuasarSpecification only if you must.
+ *  An abstract class allows the many trait forwarders to be reused
+ *  by all the subclasses. Mixing in the trait means that your
+ *  specification sprouts hundreds of pure forwarders.
+ */
+abstract class Qspec extends QuasarSpecification
+
+trait QuasarSpecification extends AnyRef
+        with org.specs2.mutable.SpecLike
+        with org.specs2.specification.core.SpecificationStructure
+        with org.specs2.matcher.ShouldExpectations
+        with org.specs2.matcher.MatchResultCombinators
+        with org.specs2.matcher.ValueChecks
+        with org.specs2.execute.PendingUntilFixed
+        with org.specs2.ScalaCheck
+        with org.specs2.scalaz.ScalazMatchers
+{
+  outer =>
+
+  // Fail fast and report all timings when running on CI.
   if (scala.sys.env contains "TRAVIS") {
-    args(stopOnFail=true)
-    args.report(showtimes = true)
+    args(stopOnFail = ArgProperty(true))
+    args.report(showtimes = ArgProperty(true))
   }
 
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
@@ -48,4 +66,31 @@ trait QuasarSpecification extends SpecificationLike with ScalazMatchers with Pen
         Skipped(s"${r.message}, but test is marked as flaky$explain", r.expected)
     }
   }
+
+  implicit class QuasarOpsForAsResultable[T: AsResult](t: => T) {
+    /** Steps in front of the standard specs2 implicit. */
+    def pendingUntilFixed: Result = pendingUntilFixed("")
+    def pendingUntilFixed(m: String): Result = (
+      if (coverageEnabled) Skipped(m + " (pending example skipped during coverage run)")
+      else if (isCIBuild) Skipped(m + " (pending example skipped during CI build)")
+      else outer.toPendingUntilFixed(t).pendingUntilFixed(m)
+    )
+
+    def skippedOnUserEnv: Result            = skippedOnUserEnv("")
+    def skippedOnUserEnv(m: String): Result = if (isIsolatedEnv) AsResult(t) else Skipped(m)
+  }
+}
+
+/** Trait that tags all examples in a spec for exclusive execution. Examples
+  * will be executed sequentially and parallel execution will be disabled.
+  *
+  * Use this when you have tests that muck with global state.
+  */
+trait ExclusiveQuasarSpecification extends QuasarSpecification {
+  import org.specs2.specification.core.Fragments
+  import org.specs2.specification.dsl.FragmentsDsl._
+
+  sequential
+  override def map(fs: => Fragments) =
+    section(exclusiveTestTag) ^ super.map(fs) ^ section(exclusiveTestTag)
 }

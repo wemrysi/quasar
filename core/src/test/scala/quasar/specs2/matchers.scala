@@ -58,3 +58,5 @@ trait DisjunctionMatchers extends org.specs2.scalaz.DisjunctionMatchers {
     }
   }
 }
+
+object QuasarMatchers extends ValidationMatchers with DisjunctionMatchers

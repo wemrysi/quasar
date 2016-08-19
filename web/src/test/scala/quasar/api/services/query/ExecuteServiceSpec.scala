@@ -21,7 +21,7 @@ import quasar._
 import quasar.api._
 import quasar.api.services.Fixture._
 import quasar.api.matchers._
-import quasar.api.{ApiError, PathUtils}
+import quasar.api.ApiError
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.api.ToApiError.ops._
 import quasar.api.matchers._
@@ -39,7 +39,6 @@ import eu.timepit.refined.scalacheck.numeric._
 import matryoshka.Fix
 import org.http4s._
 import org.scalacheck.Arbitrary
-import org.specs2.ScalaCheck
 import org.specs2.matcher.MatchResult
 import pathy.Path._
 import pathy.scalacheck.{AbsFileOf, RelFileOf}
@@ -49,8 +48,9 @@ import rapture.json._, jsonBackends.json4s._, patternMatching.exactObjects._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
+import quasar.api.PathUtils._
 
-class ExecuteServiceSpec extends quasar.QuasarSpecification with FileSystemFixture with ScalaCheck with PathUtils {
+class ExecuteServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
   import posixCodec.printPath
   import FileSystemError.executionFailed_

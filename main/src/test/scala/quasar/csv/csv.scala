@@ -20,7 +20,7 @@ import quasar.Predef._
 
 import scalaz._, Scalaz._
 
-class CsvSpec extends quasar.QuasarSpecification {
+class CsvSpec extends quasar.Qspec {
   import CsvDetect._
 
   val Standard =
