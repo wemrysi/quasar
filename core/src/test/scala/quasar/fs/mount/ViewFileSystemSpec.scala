@@ -30,12 +30,11 @@ import quasar.std._, IdentityLib.Squash, StdLib._, set._
 import eu.timepit.refined.auto._
 import matryoshka.{free => _, _}
 import monocle.macros.Lenses
-import org.specs2.ScalaCheck
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
+class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch

@@ -22,10 +22,9 @@ import quasar.fp._
 import quasar.fs._
 
 import matryoshka._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
-class QScriptOptimizeSpec extends CompilerHelpers with QScriptHelpers with ScalazMatchers {
+class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   val opt = new quasar.qscript.Optimize[Fix]
 
   // TODO instead of calling `.toOption` on the `\/`

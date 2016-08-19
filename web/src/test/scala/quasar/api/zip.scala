@@ -18,8 +18,6 @@ package quasar.api
 
 import quasar.fp.numeric._
 
-import org.specs2.ScalaCheck
-import org.specs2.scalaz.ScalazMatchers
 import org.scalacheck.Arbitrary
 import quasar.Predef._
 
@@ -40,9 +38,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.auto._
 
-class ZipSpecs extends quasar.QuasarSpecification with ScalaCheck with ScalazMatchers {
-  args.report(showtimes=true)
-
+class ZipSpecs extends quasar.Qspec {
   "zipFiles" should {
     import Zip._
 

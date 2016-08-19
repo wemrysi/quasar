@@ -32,15 +32,14 @@ import scala.Either
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.specs2.scalaz._
 import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
+import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with CompilerHelpers with DisjunctionMatchers {
+class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
   import StdLib.{set => s, _}
   import structural._
   import LogicalPlan._
@@ -3462,8 +3461,6 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       (fields aka "column order" must beSome(columnNames(q))) or
         (fields must beSome(List("value"))) // NB: some edge cases (all constant projections) end up under "value" and aren't interesting anyway
     }
-
-    args.report(showtimes = true)
 
     "plan multiple reducing projections (all, distinct, orderBy)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
       plan(q.value) must beRight.which { fop =>

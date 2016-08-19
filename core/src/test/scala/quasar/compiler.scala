@@ -20,9 +20,8 @@ import quasar.Predef._
 import quasar.std._
 
 import matryoshka.Fix
-import org.specs2.scalaz._
 
-class CompilerSpec extends quasar.QuasarSpecification with CompilerHelpers with DisjunctionMatchers {
+class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   import StdLib._
   import agg._
   import array._
@@ -30,7 +29,7 @@ class CompilerSpec extends quasar.QuasarSpecification with CompilerHelpers with 
   import identity._
   import math._
   import relations._
-  import set._
+  import StdLib.set._
   import string._
   import structural._
 

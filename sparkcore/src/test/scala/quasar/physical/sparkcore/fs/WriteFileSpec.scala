@@ -17,7 +17,6 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.QuasarSpecification
 import quasar.Data
 import quasar.fp.TaskRef
 import quasar.fp.numeric._
@@ -30,12 +29,11 @@ import java.lang.System
 import java.io._
 import java.nio.file._
 
-import org.specs2.ScalaCheck
 import pathy.Path.posixCodec
 import pathy.Path._
 import scalaz._, Scalaz._, concurrent.Task
 
-class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
+class WriteFileSpec extends quasar.Qspec {
 
   type Eff0[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Task, A]
   type Eff[A] = Coproduct[MonotonicSeq, Eff0, A]
@@ -158,7 +156,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
 
   private def execute[C](program: FileSystemErrT[Free[WriteFile, ?], C]):
       Task[FileSystemError \/ C] = interpreter.flatMap(program.run.foldMap(_))
- 
+
   private def interpreter: Task[WriteFile ~> Task] = {
 
     def innerInterpreter: Task[Eff ~> Task] =  {
@@ -173,7 +171,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
       local.writefile.interpret[Eff] andThen foldMapNT[Eff, Task](inner)
     }
   }
-  
+
   private def withTempDir[C](createIt: Boolean = true, withTailDir: List[String] = Nil)
     (run: ADir => Task[C]): C = {
 
@@ -248,7 +246,7 @@ class WriteFileSpec extends QuasarSpecification with ScalaCheck  {
     (implicit writeUnsafe: WriteFile.Unsafe[WriteFile])
       : FileSystemErrT[Free[WriteFile, ?], C] =
     defined(writeUnsafe)
-  
+
   private def user(login: String, age: Int) =
     Data.Obj(ListMap("login" -> Data.Str(login), "age" -> Data.Int(age)))
 

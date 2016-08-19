@@ -27,7 +27,7 @@ import quasar.qscript._
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
 
-class OptimizeSpecs extends quasar.QuasarSpecification with TreeMatchers {
+class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
   import CollectionUtil._
 
   "simplifyGroupƒ" should {
