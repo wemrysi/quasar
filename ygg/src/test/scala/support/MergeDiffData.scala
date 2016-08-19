@@ -1,34 +1,33 @@
 package ygg.tests
 
-import ygg.json.JParser._
+import ygg.json._
 
 object MergeDiffData {
-
   /** Diff **/
-  def expectedChanges = parseUnsafe("""
+  def expectedChanges: JValue = json"""
     {
       "tags": ["static-typing","fp"],
       "features": {
         "key2":"newval2"
       }
-    }""")
+    }"""
 
-  def expectedAdditions = parseUnsafe("""
+  def expectedAdditions: JValue = json"""
     {
       "features": {
         "key3":"val3"
       },
       "compiled": true
-    }""")
+    }"""
 
-  def expectedDeletions = parseUnsafe("""
+  def expectedDeletions: JValue = json"""
     {
       "year":2006,
       "features":{ "key1":"val1" }
-    }""")
+    }"""
 
   /** Common **/
-  def scala1 = parseUnsafe("""
+  def scala1: JValue = json"""
     {
       "lang": "scala",
       "year": 2006,
@@ -37,9 +36,9 @@ object MergeDiffData {
         "key1":"val1",
         "key2":"val2"
       }
-    }""")
+    }"""
 
-  def scala2 = parseUnsafe("""
+  def scala2: JValue = json"""
     {
       "tags": ["static-typing","fp"],
       "compiled": true,
@@ -48,9 +47,9 @@ object MergeDiffData {
         "key2":"newval2",
         "key3":"val3"
       }
-    }""")
+    }"""
 
-  def expectedMergeResult = parseUnsafe("""
+  def expectedMergeResult: JValue = json"""
     {
       "lang": "scala",
       "year": 2006,
@@ -61,42 +60,35 @@ object MergeDiffData {
         "key3":"val3"
       },
       "compiled": true
-    }""")
+    }"""
 
-  def lotto1 = parseUnsafe("""
-    {
-      "lotto":{
-        "lotto-id":5,
-        "winning-numbers":[2,45,34,23,7,5,3],
-        "winners":[{
-          "winner-id":23,
-          "numbers":[2,45,34,23,3,5]
-        }]
-      }
-    }""")
+  private def lotto(x: JValue): JValue = json"""{ "lotto": $x }"""
 
-  def lotto2 = parseUnsafe("""
-    {
-      "lotto":{
-        "winners":[{
-          "winner-id":54,
-          "numbers":[52,3,12,11,18,22]
-        }]
-      }
-    }""")
+  def lotto1: JValue = lotto(json"""{
+    "lotto-id":5,
+    "winning-numbers":[2,45,34,23,7,5,3],
+    "winners":[{
+      "winner-id":23,
+      "numbers":[2,45,34,23,3,5]
+    }]
+  }""")
 
-  def mergedLottoResult = parseUnsafe("""
-    {
-      "lotto":{
-        "lotto-id":5,
-        "winning-numbers":[2,45,34,23,7,5,3],
-        "winners":[{
-          "winner-id":23,
-          "numbers":[2,45,34,23,3,5]
-        },{
-          "winner-id":54,
-          "numbers":[52,3,12,11,18,22]
-        }]
-      }
-    }""")
+  def lotto2: JValue = lotto(json"""{
+    "winners":[{
+      "winner-id":54,
+      "numbers":[52,3,12,11,18,22]
+    }]
+  }""")
+
+  def mergedLottoResult: JValue = lotto(json"""{
+    "lotto-id":5,
+    "winning-numbers":[2,45,34,23,7,5,3],
+    "winners":[{
+      "winner-id":23,
+      "numbers":[2,45,34,23,3,5]
+    },{
+      "winner-id":54,
+      "numbers":[52,3,12,11,18,22]
+    }]
+  }""")
 }

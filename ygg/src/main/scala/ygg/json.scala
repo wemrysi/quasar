@@ -3,8 +3,7 @@ package ygg
 import jawn._
 import blueeyes._
 import scalaz._, Scalaz._
-import io.circe.{ Json, HCursor, Encoder, Decoder }
-// { Json, HCursor }
+import io.circe._
 
 package object json {
   import JValue._
