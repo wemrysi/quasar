@@ -23,40 +23,29 @@ import quasar.Planner.PlannerError
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
-import quasar.fp._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
-import quasar.physical.marklogic._
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionIO}
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
-import com.marklogic.xcc.RequestOptions
 import matryoshka._, Recursive.ops._
-import pathy.Path._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
-  import FileSystemError._, PathError._
+  import FileSystemError._
   import MarkLogicPlanner._
 
   def interpret[S[_]](
     resultsChunkSize: Positive
   )(implicit
     S0: SessionIO :<: S,
-    S1: MLResultHandles :<: S,
-    S2: MonotonicSeq :<: S,
-    S3: Task :<: S,
-    S4: ClientR :<: S
+    S1: Task :<: S,
+    S2: MLResultHandles :<: S,
+    S3: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] = {
-    val evalOpts = {
-      val ropts = new RequestOptions
-      ropts.setCacheResult(false)
-      ropts
-    }
-
     def planLP(lp: Fix[LogicalPlan]): PlannerError \/ XQuery =
       convertToQScript(lp) >>= (_.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
 
@@ -71,7 +60,7 @@ object queryfile {
       EitherT.fromDisjunction[Free[S, ?]](planLP(lp))
         .leftMap(planningFailed(lp, _))
         .flatMap(xqy => lift(
-          SessionIO.evaluateQueryChunked(xqy, evalOpts, resultsChunkSize)
+          SessionIO.evaluateQueryChunked_(xqy, resultsChunkSize)
         ).into[S].liftM[FileSystemErrT])
         .run
         .strengthL(Vector.empty[PhaseResult])
@@ -83,16 +72,12 @@ object queryfile {
         xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(ExecutionPlan(FsType, xqy)))
       ).point[Free[S, ?]]
 
-    def exists(file: AFile) = {
-      val asDir = fileParent(file) </> dir(fileName(file).value)
-      Client.exists[S](asDir)
-    }
+    def exists(file: AFile): Free[S, Boolean] =
+      lift(ops.exists(file)).into[S]
 
     def listContents(dir: ADir): Free[S, FileSystemError \/ Set[PathSegment]] =
-      Client.subDirs(dir).map(_.bimap(
-        κ(pathErr(pathNotFound(dir))),
-        dirs => dirs.map(SandboxedPathy.segAt(0,_)).toList.unite.toSet
-      ))
+      lift(ops.subDirs(dir)).into[S]
+        .map(_.foldMap(d => SandboxedPathy.segAt(0, d).toSet).right[FileSystemError])
 
     queryFileFromDataCursor[S, Task, ChunkedResultSequence](
       exec, eval, explain, listContents, exists)

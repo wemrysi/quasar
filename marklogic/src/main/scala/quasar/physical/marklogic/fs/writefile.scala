@@ -17,49 +17,39 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar._
-import quasar.fp._
-import quasar.fs._
-import quasar.fs.FileSystemError._
-import quasar.fs.PathError._
-import quasar.effect.{Read, KeyValueStore, MonotonicSeq}
-import quasar.physical.marklogic._
+import quasar.fp.free.lift
+import quasar.fs._, FileSystemError._
+import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.physical.marklogic.uuid.GenUUID
+import quasar.physical.marklogic.xcc.SessionIO
 
-import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object writefile {
 
-  implicit val coded = DataCodec.Precise
-
-  def asString(data: Vector[Data]): Vector[String] = data.map(DataCodec.render(_).toOption).unite
-
-  def interpret[S[_]](implicit
-    S0:      Task :<: S,
-    client:  Read.Ops[Client,S],
+  def interpret[S[_]](
+    implicit
+    S0:      SessionIO :<: S,
+    S1:      GenUUID :<: S,
     cursors: KeyValueStore.Ops[WriteFile.WriteHandle, Unit, S],
     seq:     MonotonicSeq.Ops[S]
-   ): WriteFile ~> Free[S,?] = new (WriteFile ~> Free[S, ?]) {
+  ): WriteFile ~> Free[S, ?] = new (WriteFile ~> Free[S, ?]) {
     def apply[A](fa: WriteFile[A]): Free[S, A] = fa match {
       case WriteFile.Open(file) =>
-        val asDir = fileParent(file) </> dir(fileName(file).value)
-        (for {
-          id <- seq.next.liftM[FileSystemErrT]
+        for {
+          id <- seq.next
           writeHandle = WriteFile.WriteHandle(file, id)
-          _ <- cursors.put(writeHandle, ()).liftM[FileSystemErrT]
-          _ <- Client.exists(asDir).liftM[FileSystemErrT].ifM(
-            // No need to do anything if it exists
-            ().pure[Free[S,?]].liftM[FileSystemErrT],
-            // Else, create the directory
-            EitherT(Client.createDir(asDir)).leftMap(κ(pathErr(pathExists(file)))))
-        } yield writeHandle).run
+          _  <- cursors.put(writeHandle, ())
+          r  <- lift(ops.exists(file).ifM(
+                  ().right[PathError].point[SessionIO],
+                  ops.createFile(file))
+                ).into[S]
+        } yield r.leftMap(pathErr(_)).as(writeHandle)
 
       case WriteFile.Write(h, data) =>
-        val asDir = fileParent(h.file) </> dir(fileName(h.file).value)
         cursors.get(h).isDefined.ifM(
-          Client.writeInDir(asDir, asString(data)).as(Vector[FileSystemError]()),
-          Vector(unknownWriteHandle(h)).pure[Free[S,?]])
+          ops.appendToFile[S](h.file, data),
+          Vector(unknownWriteHandle(h)).pure[Free[S, ?]])
 
       case WriteFile.Close(h) =>
         cursors.delete(h)

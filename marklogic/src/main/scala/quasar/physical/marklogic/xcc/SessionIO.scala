@@ -28,6 +28,8 @@ import com.marklogic.xcc._
 import com.marklogic.xcc.exceptions.{XccException, RequestException}
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import scalaz.stream.Process
+import scalaz.stream.io
 
 final class SessionIO[A] private (protected val k: Kleisli[Task, Session, A]) {
   def map[B](f: A => B): SessionIO[B] =
@@ -72,23 +74,32 @@ object SessionIO {
     SessionIO(s => s.submitRequest(s.newAdhocQuery(query, options)))
 
   def evaluateQuery_(query: XQuery): SessionIO[ResultSequence] =
-    SessionIO(s => s.submitRequest(s.newAdhocQuery(query)))
+    evaluateQuery(query, new RequestOptions)
 
   def evaluateQueryChunked(
     query: XQuery,
-    options: RequestOptions,
-    chunkSize: Positive
+    chunkSize: Positive,
+    options: RequestOptions
   ): SessionIO[ChunkedResultSequence] =
     evaluateQuery(query, options) map (new ChunkedResultSequence(chunkSize, _))
 
   def evaluateQueryChunked_(query: XQuery, chunkSize: Positive): SessionIO[ChunkedResultSequence] =
-    evaluateQuery_(query) map (new ChunkedResultSequence(chunkSize, _))
+    evaluateQueryChunked(query, chunkSize, new RequestOptions)
+
+  def evaluateQueryP(query: XQuery, options: RequestOptions): Process[SessionIO, ResultItem] =
+    Process.bracket(evaluateQuery(query, options))(
+      rs => Process.eval_(liftT(Task.delay(rs.close))))(
+      rs => io.iterator(Task.delay(rs.iterator.asScala)) translate SessionIO.liftT)
+
+  def evaluateQueryP_(query: XQuery): Process[SessionIO, ResultItem] =
+    evaluateQueryP(query, new RequestOptions)
 
   def insertContent[F[_]: Foldable](content: F[Content]): SessionIO[Executed] =
     SessionIO(_.insertContent(content.to[Array])).as(executed)
 
   def insertContentCollectErrors[F[_]: Foldable](content: F[Content]): SessionIO[List[RequestException]] =
-    SessionIO(_.insertContentCollectErrors(content.to[Array])).map(_.asScala.toList)
+    SessionIO(_.insertContentCollectErrors(content.to[Array]))
+      .map(errs => Option(errs).toList flatMap (_.asScala.toList))
 
   def isClosed: SessionIO[Boolean] =
     SessionIO(_.isClosed)

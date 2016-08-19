@@ -17,17 +17,16 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.fs._
 import quasar.fs.impl._
 import quasar.fs.FileSystemError.pathErr
 import quasar.fs.PathError.pathNotFound
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.physical.marklogic._
+import quasar.physical.marklogic.xcc.SessionIO
 
-import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 object readfile {
 
@@ -35,27 +34,26 @@ object readfile {
     chunkSize: Positive
   )(
     implicit
-    S0:    Task :<: S,
-    S1:    ClientR :<: S,
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[Task], S],
+    S0:    SessionIO :<: S,
+    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[SessionIO], S],
     seq:   MonotonicSeq.Ops[S]
-  ): ReadFile ~> Free[S,?] =
-    readFromProcess { (file, readOpts) =>
-      val dirPath = fileParent(file) </> dir(fileName(file).value)
-      Client.exists(dirPath).ifM(
-        // Do not remove call to `getItem`. It will still compile and do the wrong thing.
-        // This is due to a very shady pattern that was used in marklogic xcc java driver where
-        // ResultItem extends XdmItem in order to "forward calls" but that messes up
-        // pattern matching, we want the "actual" XdmItem
-        Client.readDirectory(dirPath) map { p =>
-          val ltd = p.map(item => xdmitem.toData(item.getItem))
-                     .drop(readOpts.offset.get.toInt)
+  ): ReadFile ~> Free[S, ?] = {
+    def dataProcess(file: AFile, skip: Int, limit: Option[Int]): ReadStream[SessionIO] = {
+      val ltd = ops.readFile(file).drop(skip)
 
-          readOpts.limit.fold(ltd)(l => ltd.take(l.get.toInt))
-            .chunk(chunkSize.get.toInt)
-            .map(_.right[FileSystemError])
-            .right[FileSystemError]
-        },
-        pathErr(pathNotFound(file)).left[ReadStream[Task]].pure[Free[S, ?]])
+      limit.fold(ltd)(ltd.take)
+        .chunk(chunkSize.get.toInt)
+        .map(_.right[FileSystemError])
     }
+
+    readFromProcess { (file, readOpts) =>
+      lift(ops.exists(file) map { doesExist =>
+        if (doesExist)
+          dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt))
+            .right[FileSystemError]
+        else
+          pathErr(pathNotFound(file)).left[ReadStream[SessionIO]]
+      }).into[S]
+    }
+  }
 }

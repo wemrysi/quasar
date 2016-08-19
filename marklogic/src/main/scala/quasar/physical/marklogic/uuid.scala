@@ -17,13 +17,37 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
+import quasar.effect.Read
 
 import java.util.UUID
 
+import com.fasterxml.uuid._
+import scalaz.{:<:, ~>}
 import scalaz.std.anyVal._
 import scalaz.syntax.equal._
+import scalaz.concurrent.Task
 
 object uuid {
+  type GenUUID[A] = Read[UUID, A]
+
+  object GenUUID {
+    def Ops[S[_]](implicit S: GenUUID :<: S) =
+      Read.Ops[UUID, S]
+
+    val type1: Task[GenUUID ~> Task] =
+      Task.delay(
+        fromNoArg(Option(EthernetAddress.fromInterface).fold(
+          Generators.timeBasedGenerator)(
+          Generators.timeBasedGenerator)))
+
+    private def fromNoArg(noArgGen: NoArgGenerator): GenUUID ~> Task =
+      new (GenUUID ~> Task) {
+        def apply[A](ga: GenUUID[A]) = ga match {
+          case Read.Ask(f) => Task.delay(f(noArgGen.generate))
+        }
+      }
+  }
+
   /** Returns an opaque string from the given UUID */
   def toOpaqueString(uuid: UUID): String =
     uuid.toString.replace("-", "")

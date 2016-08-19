@@ -20,12 +20,11 @@ import quasar.Predef._
 import quasar.{Data, DataCodec}
 import quasar.fs._
 import quasar.fp.free.lift
-import quasar.physical.marklogic.uuid
+import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
-import scala.collection.JavaConverters._
 import scala.math.{ceil, log}
 
 import com.marklogic.xcc._
@@ -35,7 +34,6 @@ import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
-import scalaz.stream.io
 
 // TODO: Lots of error handling/existence checking
 // TODO: Add support for operations on uri prefixes? i.e. paths that don't map
@@ -119,10 +117,10 @@ object ops {
     }}
   }
 
-  def moveDocuments(src: ADir, dst: ADir): SessionIO[Unit] = {
+  def moveFile(src: AFile, dst: AFile): SessionIO[Unit] = {
     def moveXqy = {
-      val srcUri = pathUri(src)
-      val dstUri = pathUri(dst)
+      val srcUri = pathUri(asDir(src))
+      val dstUri = pathUri(asDir(dst))
 
       mkSeq_(
         for_("$d" -> xdmp.directory(dstUri.xs, "1".xs))
@@ -137,17 +135,15 @@ object ops {
     if (src === dst) ().point[SessionIO] else SessionIO.evaluateQuery_(moveXqy).void
   }
 
-  def readDirectory(dir: ADir): Process[SessionIO, ResultItem] = {
-    val uri = pathUri(dir)
+  def readFile(file: AFile): Process[SessionIO, Data] = {
+    val uri = pathUri(asDir(file))
 
     val xqy = cts.search(
       fn.doc(),
       cts.directoryQuery(uri.xs),
       IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
 
-    Process.bracket(SessionIO.evaluateQuery_(xqy))(
-      rs => Process.eval_(SessionIO.liftT(Task.delay(rs.close))))(
-      rs => io.iterator(Task.delay(rs.iterator.asScala)) translate SessionIO.liftT)
+    SessionIO.evaluateQueryP_(xqy).map(ritem => xdmitem.toData(ritem.getItem))
   }
 
   def subDirs(dir: ADir): SessionIO[Set[RDir]] = {
@@ -173,7 +169,7 @@ object ops {
     fileParent(file) </> dir(fileName(file).value)
 
   private def chunkId[S[_]](implicit S: GenUUID :<: S): Free[S, String] =
-    GenUUID.Ops[S].asks(id => uuid.toSequentialString(id) getOrElse uuid.toOpaqueString(id))
+    GenUUID.Ops[S].asks(id => toSequentialString(id) getOrElse toOpaqueString(id))
 
   private def pathUri(path: APath): String =
     posixCodec.printPath(path)
