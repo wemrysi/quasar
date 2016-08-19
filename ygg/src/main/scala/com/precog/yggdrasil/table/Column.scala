@@ -33,7 +33,6 @@ trait Column {
   def jValue(row: Int): JValue
   def cValue(row: Int): CValue
   def strValue(row: Int): String
-  def rowEq(row1: Int, row2: Int): Boolean
   def rowCompare(row1: Int, row2: Int): Int
 
   def |>(f1: CF1): Option[Column]           = f1(this)
@@ -46,22 +45,6 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with
   val tpe: CArrayType[A]
   def apply(row: Int): Array[A]
   def isDefinedAt(row: Int): Boolean
-
-  def rowEq(row1: Int, row2: Int): Boolean = {
-    if (!isDefinedAt(row1)) return !isDefinedAt(row2)
-    if (!isDefinedAt(row2)) return false
-
-    val a1 = apply(row1)
-    val a2 = apply(row2)
-    if (a1.length != a2.length) return false
-    val n = a1.length
-    var i = 0
-    while (i < n) {
-      if (a1(i) != a2(i)) return false
-      i += 1
-    }
-    true
-  }
 
   def rowCompare(row1: Int, row2: Int): Int = abort("...")
 
@@ -149,7 +132,6 @@ object HomogeneousArrayColumn {
 
 trait BoolColumn extends Column with (Int => Boolean) {
   def apply(row: Int): Boolean
-  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
   def asBitSet(undefinedVal: Boolean, size: Int): BitSet = {
@@ -191,7 +173,6 @@ object BoolColumn {
 
 trait LongColumn extends Column with (Int => Long) {
   def apply(row: Int): Long
-  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
   override val tpe                        = CLong
@@ -203,7 +184,6 @@ trait LongColumn extends Column with (Int => Long) {
 
 trait DoubleColumn extends Column with (Int => Double) {
   def apply(row: Int): Double
-  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
   override val tpe                        = CDouble
@@ -215,7 +195,6 @@ trait DoubleColumn extends Column with (Int => Double) {
 
 trait NumColumn extends Column with (Int => BigDecimal) {
   def apply(row: Int): BigDecimal
-  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
 
   override val tpe                        = CNum
@@ -227,7 +206,6 @@ trait NumColumn extends Column with (Int => BigDecimal) {
 
 trait StrColumn extends Column with (Int => String) {
   def apply(row: Int): String
-  def rowEq(row1: Int, row2: Int): Boolean = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
 
@@ -240,7 +218,6 @@ trait StrColumn extends Column with (Int => String) {
 
 trait DateColumn extends Column with (Int => DateTime) {
   def apply(row: Int): DateTime
-  def rowEq(row1: Int, row2: Int): Boolean = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int =
     apply(row1) compareTo apply(row2)
 
@@ -253,7 +230,6 @@ trait DateColumn extends Column with (Int => DateTime) {
 
 trait PeriodColumn extends Column with (Int => Period) {
   def apply(row: Int): Period
-  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
 
   override val tpe                        = CPeriod
@@ -264,7 +240,6 @@ trait PeriodColumn extends Column with (Int => Period) {
 }
 
 trait EmptyArrayColumn extends Column {
-  def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyArray
   override def jValue(row: Int)             = JArray(Nil)
@@ -277,7 +252,6 @@ object EmptyArrayColumn {
 }
 
 trait EmptyObjectColumn extends Column {
-  def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyObject
   override def jValue(row: Int)             = JObject(Nil)
@@ -291,7 +265,6 @@ object EmptyObjectColumn {
 }
 
 trait NullColumn extends Column {
-  def rowEq(row1: Int, row2: Int): Boolean  = true
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CNull
   override def jValue(row: Int)             = JNull
@@ -310,7 +283,6 @@ object UndefinedColumn {
 
   def apply(col: Column) = new Column {
     val tpe                                   = col.tpe
-    def rowEq(row1: Int, row2: Int): Boolean  = fail()
     def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare undefined values.")
     def isDefinedAt(row: Int)                 = false
     def jValue(row: Int)                      = fail()
@@ -320,7 +292,6 @@ object UndefinedColumn {
 
   val raw = new Column {
     val tpe                                   = CUndefined
-    def rowEq(row1: Int, row2: Int): Boolean  = fail()
     def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare undefined values.")
     def isDefinedAt(row: Int)                 = false
     def jValue(row: Int)                      = fail()
