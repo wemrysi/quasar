@@ -26,15 +26,13 @@ import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
 
-import org.specs2.ScalaCheck
-
 import java.io._
 
 import scalaz._, Scalaz._, concurrent.Task
 
 import org.apache.spark._
 
-class ReadFileSpec extends quasar.QuasarSpecification with ScalaCheck  {
+class ReadFileSpec extends quasar.Qspec {
 
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff1[A] = Coproduct[Task, Eff0, A]

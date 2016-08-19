@@ -23,7 +23,7 @@ import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig._
 import quasar.physical.mongodb._
 
 import com.mongodb.async.client.MongoClient
-import org.specs2.specification.core.Fragments
+import org.specs2.specification.core.Fragment
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -42,7 +42,7 @@ class MongoDbIOSpec extends QuasarSpecification {
       err => Task.fail(new RuntimeException(err.toString)),
       Task.now))
 
-  def clientShould(examples: (ADir, MongoClient, MongoClient) => Fragments): Unit =
+  def clientShould(examples: (ADir, MongoClient, MongoClient) => Fragment): Unit =
     TestConfig.testDataPrefix.flatMap { prefix =>
       cfgs(MongoDBFsType).map(_ traverse_[Id] { case (name, setupUri, testUri) =>
         (connect(setupUri) |@| connect(testUri)) { (setupClient, testClient) =>

@@ -131,10 +131,10 @@ abstract class QueryRegressionTest[S[_]](
   }
 
   /** Verify that the given data file exists in the filesystem. */
-  def verifyDataExists(file: AFile): F[Result] =
+  def verifyDataExists(file: AFile): F[org.specs2.execute.Result] =
     query.fileExists(file).map(exists =>
-      if (exists) success(s"data file exists: ${fileName(file).value}")
-      else failure(s"data file does not exist: ${fileName(file).value}"))
+      if (exists) org.specs2.execute.Success(s"data file exists: ${fileName(file).value}")
+      else org.specs2.execute.Failure(s"data file does not exist: ${fileName(file).value}"))
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
@@ -229,7 +229,7 @@ abstract class QueryRegressionTest[S[_]](
     testDir: RDir,
     knownBackends: Set[BackendName]
   ): Task[Map[RFile, RegressionTest]] =
-    descendantsMatching(testDir, """^([^.].*)\.test"""r) // don't match file names with a leading .
+    descendantsMatching(testDir, """^([^.].*)\.test""".r) // don't match file names with a leading .
       .map(f =>
         (loadRegressionTest(f) >>= verifyBackends(knownBackends)) strengthL
           (f relativeTo testDir).get)

@@ -21,6 +21,7 @@ object Dependencies {
   private val specsVersion      = "3.8.4-scalacheck-1.12.5"
 
   def foundation = Seq(
+    "org.threeten"               %  "threetenbp"                %     "1.3.2",
     "org.scalaz"                 %% "scalaz-core"               %   scalazVersion force(),
     "org.scalaz"                 %% "scalaz-concurrent"         %   scalazVersion,
     "org.scalaz"                 %% "scalaz-iteratee"           %   scalazVersion,
@@ -40,9 +41,6 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-scalacheck-binding" %   scalazVersion   %     Test,
     "org.typelevel"              %% "shapeless-scalacheck"      %     slcVersion    %     Test,
     "org.typelevel"              %% "scalaz-specs2"             %      "0.4.0"      %     Test
-  )
-  def effect = Seq(
-    "org.threeten"                % "threetenbp"     %    "1.3.2"
   )
   def core = Seq(
     "com.github.tototoshi"       %% "scala-csv"      %    "1.3.1",

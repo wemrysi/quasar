@@ -20,12 +20,9 @@ import quasar.Predef._
 import quasar._
 
 import scala.collection.immutable.ListMap
-
-import org.specs2.ScalaCheck
-import org.specs2.scalaz._
 import scalaz._
 
-class BsonCodecSpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
+class BsonCodecSpecs extends quasar.Qspec {
   import BsonCodec._
 
   import DataArbitrary._

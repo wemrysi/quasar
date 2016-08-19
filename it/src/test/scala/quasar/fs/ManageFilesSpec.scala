@@ -21,16 +21,13 @@ import quasar.Predef._
 import quasar.{Data, TestConfig}
 import quasar.fp._
 
-import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.stream._
+import FileSystemTest.allFsUT
 
-class ManageFilesSpec extends FileSystemTest[FileSystem](
-    FileSystemTest.allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name))))
-    with ScalaCheck {
-
+class ManageFilesSpec extends FileSystemTest[FileSystem](allFsUT.map(_.filterNot(fs => TestConfig.isMongoReadOnly(fs.name)))) {
   import FileSystemTest._, FileSystemError._, PathError._
   import ManageFile._
 
