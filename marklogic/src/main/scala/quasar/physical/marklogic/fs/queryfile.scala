@@ -26,7 +26,7 @@ import quasar.fs.impl.queryFileFromDataCursor
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.physical.marklogic.qscript._
-import quasar.physical.marklogic.xcc.{ChunkedResultSequence, SessionIO}
+import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
@@ -42,9 +42,10 @@ object queryfile {
     resultsChunkSize: Positive
   )(implicit
     S0: SessionIO :<: S,
-    S1: Task :<: S,
-    S2: MLResultHandles :<: S,
-    S3: MonotonicSeq :<: S
+    S1: ContentSourceIO :<: S,
+    S2: Task :<: S,
+    S3: MLResultHandles :<: S,
+    S4: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] = {
     def planLP(lp: Fix[LogicalPlan]): PlannerError \/ XQuery =
       convertToQScript(lp) >>= (_.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
@@ -60,7 +61,7 @@ object queryfile {
       EitherT.fromDisjunction[Free[S, ?]](planLP(lp))
         .leftMap(planningFailed(lp, _))
         .flatMap(xqy => lift(
-          SessionIO.evaluateQueryChunked_(xqy, resultsChunkSize)
+          ContentSourceIO.resultCursor(SessionIO.evaluateQuery_(xqy), resultsChunkSize)
         ).into[S].liftM[FileSystemErrT])
         .run
         .strengthL(Vector.empty[PhaseResult])
@@ -79,7 +80,7 @@ object queryfile {
       lift(ops.subDirs(dir)).into[S]
         .map(_.foldMap(d => SandboxedPathy.segAt(0, d).toSet).right[FileSystemError])
 
-    queryFileFromDataCursor[S, Task, ChunkedResultSequence](
+    queryFileFromDataCursor[S, Task, ResultCursor](
       exec, eval, explain, listContents, exists)
   }
 }

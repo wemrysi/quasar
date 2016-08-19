@@ -16,40 +16,34 @@
 
 package quasar.physical.marklogic
 
-import quasar.Predef.{Option, Some, None}
-import quasar.SKI._
+import quasar.Predef._
 
-import com.marklogic.xcc.{ContentSource, RequestOptions, Session}
-import scalaz.~>
-import scalaz.concurrent.Task
+import com.marklogic.xcc.exceptions.XccException
+import scalaz._, Scalaz._
 
 package object xcc {
+  def attemptXcc[F[_], A](fa: F[A])(implicit FM: Monad[F], FC: Catchable[F]): F[XccException \/ A] =
+    FM.bind(FC.attempt(fa)) {
+      case -\/(xe: XccException) => FM.point(xe.left)
+      case -\/(t)                => FC.fail(t)
+      case \/-(a)                => FM.point(a.right)
+    }
 
-  def runSessionIO(
-    contentSource: ContentSource,
-    defaultRequestOptions: RequestOptions
-  ): SessionIO ~> Task =
-    runSessionIO0(contentSource, Some(defaultRequestOptions))
+  def handleXcc[F[_]: Monad: Catchable, A, B >: A](
+    fa: F[A])(
+    pf: PartialFunction[XccException, B]
+  ): F[B] =
+    handleXccWith[F, A, B](fa)(pf andThen (_.point[F]))
 
-  def runSessionIO_(contentSource: ContentSource): SessionIO ~> Task =
-    runSessionIO0(contentSource, None)
-
-  ////
-
-  private def runSessionIO0(
-    contentSource: ContentSource,
-    defaultRequestOptions: Option[RequestOptions]
-  ): SessionIO ~> Task =
-    new (SessionIO ~> Task) {
-      def apply[A](sio: SessionIO[A]) =
-        newSession flatMap { session =>
-          sio.run(session).onFinish(κ(Task.delay(session.close)))
-        }
-
-      def newSession: Task[Session] = Task.delay {
-        val session = contentSource.newSession
-        defaultRequestOptions foreach session.setDefaultRequestOptions
-        session
-      }
+  def handleXccWith[F[_], A, B >: A](
+    fa: F[A])(
+    pf: PartialFunction[XccException, F[B]]
+  )(implicit
+    FM: Monad[F],
+    FC: Catchable[F]
+  ): F[B] =
+    FM.bind(attemptXcc(fa)) {
+      case -\/(e) => pf.lift(e) getOrElse FC.fail(e)
+      case \/-(a) => FM.point[B](a)
     }
 }

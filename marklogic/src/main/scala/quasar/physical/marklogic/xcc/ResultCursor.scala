@@ -19,16 +19,16 @@ package quasar.physical.marklogic.xcc
 import quasar.Predef._
 import quasar.fp.numeric.Positive
 
-import com.marklogic.xcc.{ResultItem, ResultSequence}
+import com.marklogic.xcc.{ResultItem, ResultSequence, Session}
 import com.marklogic.xcc.types.XdmItem
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 import scalaz.concurrent.Task
 
-final class ChunkedResultSequence(val chunkSize: Positive, rs: ResultSequence) {
+final class ResultCursor private[xcc] (val chunkSize: Positive, s: Session, rs: ResultSequence) {
 
   def close: Task[Executed] =
-    Task.delay(rs.close()).as(Executed.executed)
+    Task.delay(s.close()).as(Executed.executed)
 
   def nextChunk: Task[Vector[XdmItem]] =
     Process.unfoldEval(())(_ => next.map(_ strengthR (())))
@@ -38,13 +38,7 @@ final class ChunkedResultSequence(val chunkSize: Positive, rs: ResultSequence) {
   ////
 
   private def next: Task[Option[XdmItem]] =
-    nextItem >>= (_ traverse cachedItem)
-
-  private def cachedItem(ritem: ResultItem): Task[XdmItem] =
-    Task.delay {
-      ritem.cache()
-      ritem.getItem
-    }
+    nextItem >>= (_ traverse resultitem.loadItem)
 
   private def nextItem: Task[Option[ResultItem]] =
     Task.delay(if (rs.hasNext) Some(rs.next) else None)

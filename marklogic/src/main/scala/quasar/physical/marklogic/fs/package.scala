@@ -34,19 +34,20 @@ import scalaz.concurrent.Task
 
 package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
-  import xcc.{ChunkedResultSequence, SessionIO}
+  import xcc.{ContentSourceIO, ResultCursor, SessionIO}
   import uuid.GenUUID
 
-  type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[SessionIO], A]
+  type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[ContentSourceIO], A]
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
-  type MLResultHandles[A] = KeyValueStore[ResultHandle, ChunkedResultSequence, A]
+  type MLResultHandles[A] = KeyValueStore[ResultHandle, ResultCursor, A]
 
   type MarkLogicFs[A]  = Coproduct[Task, MarkLogicFs0, A]
   type MarkLogicFs0[A] = Coproduct[SessionIO, MarkLogicFs1, A]
-  type MarkLogicFs1[A] = Coproduct[GenUUID, MarkLogicFs2, A]
-  type MarkLogicFs2[A] = Coproduct[MonotonicSeq, MarkLogicFs3, A]
-  type MarkLogicFs3[A] = Coproduct[MLReadHandles, MarkLogicFs4, A]
-  type MarkLogicFs4[A] = Coproduct[MLWriteHandles, MLResultHandles, A]
+  type MarkLogicFs1[A] = Coproduct[ContentSourceIO, MarkLogicFs2, A]
+  type MarkLogicFs2[A] = Coproduct[GenUUID, MarkLogicFs3, A]
+  type MarkLogicFs3[A] = Coproduct[MonotonicSeq, MarkLogicFs4, A]
+  type MarkLogicFs4[A] = Coproduct[MLReadHandles, MarkLogicFs5, A]
+  type MarkLogicFs5[A] = Coproduct[MLWriteHandles, MLResultHandles, A]
 
   val FsType = FileSystemType("marklogic")
 
@@ -71,43 +72,29 @@ package object fs {
   def runMarkLogicFs(connectionUri: ConnectionUri): Task[MarkLogicFs ~> Task] = {
     val uri = new URI(connectionUri.value)
 
-    val defaultRequestOpts = {
-      val opts = new RequestOptions
-      opts.setCacheResult(false)
-      opts
-    }
-
     (
-      KeyValueStore.impl.empty[WriteHandle, Unit]                   |@|
-      KeyValueStore.impl.empty[ReadHandle, ReadStream[SessionIO]]   |@|
-      KeyValueStore.impl.empty[ResultHandle, ChunkedResultSequence] |@|
-      MonotonicSeq.fromZero                                         |@|
-      GenUUID.type1                                                 |@|
+      KeyValueStore.impl.empty[WriteHandle, Unit]                       |@|
+      KeyValueStore.impl.empty[ReadHandle, ReadStream[ContentSourceIO]] |@|
+      KeyValueStore.impl.empty[ResultHandle, ResultCursor]              |@|
+      MonotonicSeq.fromZero                                             |@|
+      GenUUID.type1                                                     |@|
       // TODO: Catch any XccConfigExceptions thrown here and returns as config errors
       Task.delay(ContentSourceFactory.newContentSource(uri))
     ) { (whandles, rhandles, qhandles, seq, genUUID, csource) =>
-      import SessionIO.liftT
+      val runCSIO = ContentSourceIO.runNT(csource)
+      val runSIO  = runCSIO compose ContentSourceIO.runSessionIO
 
-      val toSessionIO =
-        liftT                    :+:
-        reflNT[SessionIO]        :+:
-        (liftT compose genUUID)  :+:
-        (liftT compose seq)      :+:
-        (liftT compose rhandles) :+:
-        (liftT compose whandles) :+:
-        (liftT compose qhandles)
-
-      xcc.runSessionIO(csource, defaultRequestOpts) compose toSessionIO
+      reflNT[Task] :+: runSIO :+: runCSIO :+: genUUID :+: seq :+: rhandles :+: whandles :+: qhandles
     }
   }
 
-  implicit val chunkedResultSequenceDataCursor: DataCursor[Task, ChunkedResultSequence] =
-    new DataCursor[Task, ChunkedResultSequence] {
-      def close(crs: ChunkedResultSequence) =
-        crs.close.void
+  implicit val resultCursorDataCursor: DataCursor[Task, ResultCursor] =
+    new DataCursor[Task, ResultCursor] {
+      def close(rc: ResultCursor) =
+        rc.close.void
 
-      def nextChunk(crs: ChunkedResultSequence) =
-        crs.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
+      def nextChunk(rc: ResultCursor) =
+        rc.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
           ds :+ xdmitem.toData(x)))
     }
 }

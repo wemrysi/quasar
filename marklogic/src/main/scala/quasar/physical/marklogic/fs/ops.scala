@@ -85,7 +85,7 @@ object ops {
     val uri = pathUri(asDir(file))
 
     // TODO: If dir exists and is empty, then shouldn't error
-    SessionIO.evaluateQuery_(xdmp.directoryCreate(uri.xs)).as(().right[PathError]) handleXcc {
+    handleXcc(SessionIO.executeQuery_(xdmp.directoryCreate(uri.xs)) as ().right[PathError]) {
       case qex: XQueryException if qex.getCode === "XDMP-DIREXISTS" => PathError.pathExists(file).left
     }
   }
@@ -93,8 +93,8 @@ object ops {
   def deleteFile(file: AFile): SessionIO[Unit] = {
     val uri = pathUri(asDir(file))
 
-    SessionIO.evaluateQuery_(mkSeq_(
-      fn.map("xdmp:document-delete", xdmp.directory(uri.xs, "1".xs)),
+    SessionIO.executeQuery_(mkSeq_(
+      fn.map(func ("$d") { xdmp.documentDelete(fn.baseUri("$d")) }, xdmp.directory(uri.xs, "1".xs)),
       if_ (fn.not(fn.exists(xdmp.directory(uri.xs, "infinity".xs))))
         .then_ { xdmp.directoryDelete(uri.xs) }
         .else_ { expr.emptySeq }
@@ -103,7 +103,7 @@ object ops {
 
   // TODO: Does this fail when the directory isn't empty?
   def deleteDir(dir: ADir): SessionIO[Unit] =
-    SessionIO.evaluateQuery_(xdmp.directoryDelete(pathUri(dir).xs)).void
+    SessionIO.executeQuery_(xdmp.directoryDelete(pathUri(dir).xs)).void
 
   // TODO: Can this be implemented with fn:exists(fn:doc($uri))?
   // TODO: How do we separate the file/dir namespace, should this return false if given a file and no docs in dir?
@@ -112,8 +112,8 @@ object ops {
 
     val xqy = fn.exists(fn.filter(func("$uri") { fn.startsWith("$uri", uri.xs) }, cts.uris))
 
-    SessionIO.evaluateQuery_(xqy) flatMap { rs => SessionIO.liftT {
-      Task.delay(rs.next.getItem.asInstanceOf[XSBoolean].asPrimitiveBoolean)
+    SessionIO.resultsOf_(xqy) flatMap { items => SessionIO.liftT {
+      Task.delay(items(0).asInstanceOf[XSBoolean].asPrimitiveBoolean)
     }}
   }
 
@@ -128,14 +128,14 @@ object ops {
         for_("$d" -> xdmp.directory(srcUri.xs, "1".xs))
           .let_(
             "$oldName" -> xdmp.nodeUri("$d"),
-            "$newName" -> select(fn.concat(dstUri.xs, fn.tokenize("$oldName", "/".xs)), fn.last))
+            "$newName" -> fn.concat(dstUri.xs, select(fn.tokenize("$oldName", "/".xs), fn.last)))
           .return_(mkSeq_(xdmp.documentInsert("$newName", fn.doc("$oldName")), xdmp.documentDelete("$oldName"))))
     }
 
-    if (src === dst) ().point[SessionIO] else SessionIO.evaluateQuery_(moveXqy).void
+    if (src === dst) ().point[SessionIO] else SessionIO.executeQuery_(moveXqy).void
   }
 
-  def readFile(file: AFile): Process[SessionIO, Data] = {
+  def readFile(file: AFile): Process[ContentSourceIO, Data] = {
     val uri = pathUri(asDir(file))
 
     val xqy = cts.search(
@@ -143,7 +143,8 @@ object ops {
       cts.directoryQuery(uri.xs),
       IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
 
-    SessionIO.evaluateQueryP_(xqy).map(ritem => xdmitem.toData(ritem.getItem))
+    ContentSourceIO.resultStream(SessionIO.evaluateQuery_(xqy))
+      .map(xdmitem.toData)
   }
 
   def subDirs(dir: ADir): SessionIO[Set[RDir]] = {
@@ -154,13 +155,10 @@ object ops {
         .where_(fn.exists("$d/property::directory"))
         .return_(fn.baseUri("$d"))
 
-    SessionIO.evaluateQuery_(xqy) map { rs =>
-      rs.toResultItemArray.toList foldMap { ri =>
-        posixCodec.parseAbsDir(ri.getItem.asString)
-          .flatMap(adir => sandboxAbs(adir).relativeTo(dir))
-          .toSet
-      }
-    }
+    SessionIO.resultsOf_(xqy) map (_ foldMap (item =>
+      posixCodec.parseAbsDir(item.asString)
+        .flatMap(adir => sandboxAbs(adir).relativeTo(dir))
+        .toSet))
   }
 
   ////

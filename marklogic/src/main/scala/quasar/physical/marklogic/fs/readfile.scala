@@ -24,7 +24,7 @@ import quasar.fs.impl._
 import quasar.fs.FileSystemError.pathErr
 import quasar.fs.PathError.pathNotFound
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.physical.marklogic.xcc.SessionIO
+import quasar.physical.marklogic.xcc._
 
 import scalaz._, Scalaz._
 
@@ -34,11 +34,11 @@ object readfile {
     chunkSize: Positive
   )(
     implicit
-    S0:    SessionIO :<: S,
-    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[SessionIO], S],
+    S0:    ContentSourceIO :<: S,
+    state: KeyValueStore.Ops[ReadFile.ReadHandle, ReadStream[ContentSourceIO], S],
     seq:   MonotonicSeq.Ops[S]
   ): ReadFile ~> Free[S, ?] = {
-    def dataProcess(file: AFile, skip: Int, limit: Option[Int]): ReadStream[SessionIO] = {
+    def dataProcess(file: AFile, skip: Int, limit: Option[Int]): ReadStream[ContentSourceIO] = {
       val ltd = ops.readFile(file).drop(skip)
 
       limit.fold(ltd)(ltd.take)
@@ -47,12 +47,12 @@ object readfile {
     }
 
     readFromProcess { (file, readOpts) =>
-      lift(ops.exists(file) map { doesExist =>
+      lift(ContentSourceIO.runSessionIO(ops.exists(file)) map { doesExist =>
         if (doesExist)
           dataProcess(file, readOpts.offset.get.toInt, readOpts.limit.map(_.get.toInt))
             .right[FileSystemError]
         else
-          pathErr(pathNotFound(file)).left[ReadStream[SessionIO]]
+          pathErr(pathNotFound(file)).left[ReadStream[ContentSourceIO]]
       }).into[S]
     }
   }
