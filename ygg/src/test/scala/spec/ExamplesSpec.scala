@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._, json.{ JPath => _, _ }
+import blueeyes._, json._
 import Examples._
 import ygg.json._
 

@@ -21,6 +21,7 @@ package com.precog.common
 
 import blueeyes._, json._
 import scalaz._, Scalaz._, Ordering._
+import ygg.json._
 
 sealed trait CPath {
   def nodes: List[CPathNode]

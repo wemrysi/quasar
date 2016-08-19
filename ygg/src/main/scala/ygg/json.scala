@@ -7,6 +7,8 @@ import blueeyes.json.JValue
 package object json {
   type Result[A] = scalaz.Validation[Throwable, A]
 
+  val NoJPath = JPath()
+
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
     type R = AsyncParse[A] -> AsyncParser[A]
 

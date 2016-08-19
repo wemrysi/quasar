@@ -21,6 +21,7 @@ import scalaz._, Scalaz._
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
 import ygg.api._
+import ygg.json._
 
 /**
   * Data type for Json AST.

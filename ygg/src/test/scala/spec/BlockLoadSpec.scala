@@ -26,7 +26,7 @@ import scalaz._
 import scalaz.syntax.std.boolean._
 import SampleData._
 import CValueGenerators._
-import ygg.json.{ JPath => _, JPathField => _, JPathIndex => _, _ }
+import ygg.json._
 
 trait BlockLoadSpec extends quasar.Qspec {
   class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {

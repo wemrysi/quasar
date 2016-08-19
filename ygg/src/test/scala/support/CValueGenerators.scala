@@ -5,6 +5,7 @@ import com.precog.common._
 import blueeyes._, json._
 import TestSupport._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
+import ygg.json._
 
 object CValueGenerators {
   type JSchema = Seq[JPath -> CType]

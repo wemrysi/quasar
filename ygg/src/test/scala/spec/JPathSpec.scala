@@ -2,6 +2,7 @@ package ygg.tests
 
 import blueeyes._, json._
 import JsonTestSupport._
+import ygg.json._
 
 class JPathSpec extends quasar.Qspec {
   "Parser" should {

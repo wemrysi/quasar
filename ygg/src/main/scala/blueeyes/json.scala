@@ -1,6 +1,7 @@
 package blueeyes
 
 import scalaz._, Scalaz._
+import ygg.json._
 
 package object json {
   import JValue._
@@ -25,16 +26,6 @@ package object json {
 
     def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
   }
-
-  type JPath      = ygg.json.JPath
-  val JPath       = ygg.json.JPath
-  type JPathNode  = ygg.json.JPathNode
-  type JPathField = ygg.json.JPathField
-  val JPathField  = ygg.json.JPathField
-  type JPathIndex = ygg.json.JPathIndex
-  val JPathIndex  = ygg.json.JPathIndex
-
-  val NoJPath     = ygg.json.JPath()
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
     val sb = new StringBuilder

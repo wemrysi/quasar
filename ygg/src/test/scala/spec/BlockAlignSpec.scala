@@ -26,9 +26,7 @@ import scalaz._, Scalaz._
 import SampleData._
 import TableModule._
 import BlockStoreTestModule.module
-import ygg.json.{ JPath => _, _ }
-
-// import ygg.json.{ JPath => _, _ }
+import ygg.json._
 
 /**
   * This provides an ordering on JValue that mimics how we'd order them as

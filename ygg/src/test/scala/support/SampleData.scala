@@ -27,6 +27,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 import TestSupport._
 import CValueGenerators.JSchema
+import ygg.json._
 
 case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
   override def toString = {
