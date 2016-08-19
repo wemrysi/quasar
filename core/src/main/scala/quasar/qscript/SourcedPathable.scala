@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -94,6 +95,10 @@ object SourcedPathable {
             r.show ++ Cord(")")
         })
     }
+
+  implicit def renderTree[T[_[_]]: ShowT]:
+      Delay[RenderTree, SourcedPathable[T, ?]] =
+    RenderTree.delayFromShow
 
   implicit def mergeable[T[_[_]]: EqualT]:
       Mergeable.Aux[T, SourcedPathable[T, ?]] =

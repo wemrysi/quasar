@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -148,6 +149,10 @@ object QScriptCore {
             c.show ++ Cord(")")
         }
     }
+
+  implicit def renderTree[T[_[_]]: ShowT]:
+      Delay[RenderTree, QScriptCore[T, ?]] =
+    RenderTree.delayFromShow
 
   implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =

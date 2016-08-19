@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -61,7 +62,6 @@ object ThetaJoin {
         f(fa.src) ∘ (ThetaJoin(_, fa.lBranch, fa.rBranch, fa.on, fa.f, fa.combine))
     }
 
-
   implicit def show[T[_[_]]: ShowT]: Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
@@ -75,6 +75,9 @@ object ThetaJoin {
           combine.show ++ Cord(")")
       }
     }
+
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
+    RenderTree.delayFromShow
 
   implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
@@ -106,4 +109,3 @@ object ThetaJoin {
       }
     }
 }
-

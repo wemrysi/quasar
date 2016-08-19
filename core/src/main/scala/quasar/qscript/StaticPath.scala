@@ -16,10 +16,9 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar.Planner.PlannerError
 import quasar.fp._
-
-import scala.inline
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import matryoshka.patterns.CoEnv

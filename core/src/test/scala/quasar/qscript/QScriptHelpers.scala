@@ -25,7 +25,7 @@ import scala.Predef.implicitly
 
 import matryoshka._
 import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 
 trait QScriptHelpers {
   // TODO: Narrow this to QScriptPure
@@ -35,11 +35,17 @@ trait QScriptHelpers {
   val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
-  def RootR: Fix[QS] = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
+  def RootR: Fix[QS] =
+    CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
 
-  def ProjectFieldR[A](src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]): Free[MapFunc[Fix, ?], A] =
+  def ProjectFieldR[A](
+    src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
+      Free[MapFunc[Fix, ?], A] =
     Free.roll(ProjectField(src, field))
 
   def lpRead(path: String): Fix[LP] =
     LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+
+  def convert(lp: Fix[LP]): Option[Fix[QScriptTotal[Fix, ?]]] =
+    QueryFile.convertToQScript[Fix](None)(lp).toOption.run.copoint
 }

@@ -1098,9 +1098,9 @@ object MongoDbPlanner {
   }
 
   def plan0[F[_]: Functor: Coalesce: Crush: Crystallize]
-      (joinHandler: JoinHandler[F, WorkflowBuilder.M])
-      (logical: Fix[LogicalPlan])
-      (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
+    (joinHandler: JoinHandler[F, WorkflowBuilder.M])
+    (logical: Fix[LogicalPlan])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: Delay[RenderTree, F])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
@@ -1138,10 +1138,6 @@ object MongoDbPlanner {
     } yield wf2).evalZero
   }
 
-  final case class QueryContext(
-    model: MongoQueryModel,
-    statistics: Collection => Option[CollectionStatistics])
-
   /** Translate the high-level "logical" plan to an executable MongoDB "physical"
     * plan, taking into account the current runtime environment as captured by
     * the given context.
@@ -1149,7 +1145,7 @@ object MongoDbPlanner {
     * can be used, but the resulting plan uses the largest, common type so that
     * callers don't need to worry about it.
     */
-  def plan(logical: Fix[LogicalPlan], queryContext: QueryContext)
+  def plan(logical: Fix[LogicalPlan], queryContext: fs.QueryContext)
     : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 

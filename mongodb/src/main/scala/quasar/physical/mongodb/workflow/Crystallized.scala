@@ -28,7 +28,7 @@ final case class Crystallized[F[_]](op: Fix[F]) {
 }
 
 object Crystallized {
-  implicit def renderTree[F[_]](implicit R: RenderTree[Fix[F]]):
+  implicit def renderTree[F[_]](implicit R: Delay[RenderTree, F]):
       RenderTree[Crystallized[F]] =
     new RenderTree[Crystallized[F]] {
       def render(v: Crystallized[F]) = v.op.render
