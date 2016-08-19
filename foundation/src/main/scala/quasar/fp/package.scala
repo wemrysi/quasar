@@ -648,12 +648,6 @@ package object fp
       M[A] =
     free.ghyloM[W, Id, M, CoEnv[E, F, ?], A](k, distAna, φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
 
-  // def freeHistoM[M[_]: Monad, F[_]: Traverse, E, A](
-  //   free: Free[F, E])(
-  //   φ: GAlgebraM[Cofree[F, ?], M, CoEnv[E, F, ?], A]):
-  //     M[A] =
-  //   free.dynaM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
-
   def distTraverse[F[_]: Traverse, G[_]: Applicative] =
     new DistributiveLaw[F, G] {
       def apply[A](fga: F[G[A]]) = fga.sequence
