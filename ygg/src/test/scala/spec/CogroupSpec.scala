@@ -23,6 +23,7 @@ import blueeyes._, json._
 import com.precog.common._
 import scalaz._, Scalaz._, Ordering._, Either3._
 import TestSupport._
+import ygg.json._
 
 trait CogroupSpec extends TableQspec {
   import SampleData._

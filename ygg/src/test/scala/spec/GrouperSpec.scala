@@ -21,9 +21,10 @@ package ygg.tests
 
 import quasar.ygg._, table._
 import com.precog.common._
-import blueeyes._, json._
+import blueeyes._, json.{ JPathField => _, _ }
 import scalaz._, Scalaz._
 import ygg.tests.TestSupport._
+import ygg.json._
 import BlockStoreTestModule.module
 
 /*

@@ -25,7 +25,7 @@ import blueeyes._, json._
 import scalaz._, Scalaz._
 import TableModule._
 import SampleData._
-import ygg.json.JType
+import ygg.json._
 
 class ColumnarTableModuleSpec
       extends ColumnarTableQspec

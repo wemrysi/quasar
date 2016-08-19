@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes.json.JParser._
+import ygg.json.JParser._
 
 object MergeDiffData {
 

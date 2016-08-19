@@ -23,6 +23,7 @@ import quasar.ygg._, table._
 import blueeyes._, json._
 import scalaz._, Scalaz._
 import TestSupport._
+import ygg.json._
 
 trait CanonicalizeSpec extends ColumnarTableQspec {
   import SampleData._

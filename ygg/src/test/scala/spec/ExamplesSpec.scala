@@ -1,8 +1,8 @@
 package ygg.tests
 
-import blueeyes._, json._
+import blueeyes._, json.{ JPath => _, _ }
 import Examples._
-// import ygg.json.JNum
+import ygg.json._
 
 class ExamplesSpec extends quasar.Qspec {
   import JParser._

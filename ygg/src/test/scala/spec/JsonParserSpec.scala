@@ -1,10 +1,10 @@
 package ygg.tests
 
 import blueeyes._, json._
+import ygg.json._
 import java.net.URLDecoder
 import scala.util.control.Exception._
 import scalaz._
-import scala.math.min
 import JsonTestSupport._
 
 class JsonParserSpec extends quasar.Qspec {
@@ -70,181 +70,6 @@ class ParsingByteBufferSpec extends quasar.Qspec {
 }
 
 class AsyncParserSpec extends quasar.Qspec {
-  import AsyncParser._
-
-  private def loadBytes(path: String): Array[Byte] = jPath(path).slurpBytes
-
-  private def chunk(data: Array[Byte], i: Int, j: Int) = {
-    val len = min(j, data.length) - i
-    if (len > 0) More(ByteBufferWrap(data, i, len)) else Done
-  }
-
-  private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    val vs                  = ArrayBuffer.empty[JValue]
-    val n                   = data.length
-    var i                   = 0
-    var parser: AsyncParser = async
-    while (i < n) {
-      val step                              = f()
-      val (AsyncParse(errors, results), p0) = parser(chunk(data, i, i + step))
-      if (!errors.isEmpty) sys.error("failed %s" format errors)
-      vs ++= results
-      parser = p0
-      i += step
-    }
-    vs
-  }
-
-  private def runTest(path: String, step: Int) = {
-    val data = loadBytes(path)
-    chunkAll(AsyncParser.stream(), data, () => step)
-  }
-
-  private def runTestRandomStep(path: String, f: () => Int) = {
-    val data = loadBytes(path)
-    chunkAll(AsyncParser.stream(), data, f)
-  }
-
-  "Async parser works on one 1M chunk" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1024 * 1024)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 100K" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 100 * 1024)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 10K" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 10 * 1024)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 1K" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1024)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 100B" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 100)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 10B" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 10)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of 1B" in {
-    val vs = runTest("ygg/src/test/resources/z1k_nl.json", 1)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of sizes 10B-1K" in {
-    val f  = () => randomInt(1014) + 10
-    val vs = runTestRandomStep("ygg/src/test/resources/z1k_nl.json", f)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  "Async parser works on chunks of sizes 1k-10K" in {
-    val f  = () => randomInt(9 * 1024) + 1024
-    val vs = runTestRandomStep("ygg/src/test/resources/z1k_nl.json", f)
-    vs.length must_== 1000
-    0 until 1000 forall (i => vs(i) must not be equalTo(JNull))
-  }
-
-  def run1(chunks: Seq[Input], expected: Int) = {
-    var parser: AsyncParser = AsyncParser.stream()
-    val t0                  = System.nanoTime
-    var count               = 0
-    chunks.foreach { input =>
-      val (AsyncParse(errors, results), p0) = parser(input)
-      if (!errors.isEmpty) sys.error("errors: %s" format errors)
-      count += results.length
-      parser = p0
-    }
-    val t = System.nanoTime - t0
-    if (count != expected) sys.error("wrong number of records")
-    t
-  }
-
-  def run2(bb: ByteBuffer, expected: Int) = {
-    val tt0 = System.nanoTime
-    val v   = JParser.parseManyFromByteBuffer(bb)
-    val tt  = System.nanoTime - tt0
-    val seq = v.toOption.getOrElse(sys.error("failed to parse"))
-    if (seq.length != expected) sys.error("wrong number of records")
-    tt
-  }
-
-  "Async parser performs adequately" in {
-    val n    = 1 * 1000
-    val data = loadBytes("ygg/src/test/resources/z1k_nl.json")
-
-    val step = 100000
-    println("parsing %d bytes with %d-byte chunks" format (data.length, step))
-
-    def chunks = (0 until data.length by step).map(i => chunk(data, i, i + step))
-    def bb     = ByteBufferWrap(data)
-
-    // warmup
-    run1(chunks, n); run2(bb, n)
-    run1(chunks, n); run2(bb, n)
-    System.gc()
-
-    val t1 = (0 until 10).foldLeft(0.0) { (t, _) =>
-      val tt = run1(chunks, n); System.gc(); t + tt
-    }
-    println("async: %.2f ms" format (t1 / 10000000.0))
-
-    val t2 = (0 until 10).foldLeft(0.0) { (t, _) =>
-      val tt = run2(bb, n); System.gc(); t + tt
-    }
-    println("byteb: %.2f ms" format (t2 / 10000000.0))
-    ok
-  }
-
-  "Async parser can fail fast" in {
-    val json = """{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999x}
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": {"foo": 123, "bar": 999}}
-{"foo": 123, "bar: {"foo": 123, "bar": 999}}
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999}
-xyz
-{"foo": 123, "bar": 999}
-{"foo": 123, "bar": 999}"""
-
-    val bs = json.getBytes(Utf8Charset)
-    val c  = chunk(bs, 0, bs.length)
-
-    val p                       = AsyncParser.stream()
-    val (AsyncParse(es, js), _) = p(c)
-
-    // we should only have parsed 1 valid record, and seen 1 error
-    json.split('\n').length must_== 14
-    es.length must_== 1
-    js.length must_== 1
-
-    def confirm(e: ParseException, y: Int, x: Int) =
-      (e.line must_== y) && (e.col must_== x)
-
-    confirm(es(0), 2, 24)
-  }
-
   "Handles whitespace correctly" in {
     def ja(ns: Int*) = JArray(ns.map(n => JNum(n)): _*)
 
@@ -265,56 +90,26 @@ xyz
 }
 
 class ArrayUnwrappingSpec extends quasar.Qspec {
-  import AsyncParser._
-
-  def bb(s: String)        = More(ByteBufferWrap(s.getBytes("UTF-8")))
-  def j(s: String, n: Int) = JObject(Map(s -> JNum(n)))
-
-  "Unwrapping array parser catches errors" in {
-    val p1                       = AsyncParser.unwrap()
-    val (AsyncParse(e1, r1), p2) = p1.apply(bb("""[{"a": 1}, {"b": 2}"""))
-    e1.length must_== 0
-    r1 must_== Seq(j("a", 1), j("b", 2))
-
-    val (AsyncParse(e2, r2), p3) = p2.apply(bb(""", {"c": 3}"""))
-    e2.length must_== 0
-    r2 must_== Seq(j("c", 3))
-
-    val (AsyncParse(e3a, r3a), _) = p3.apply(bb("""["""))
-    r3a must_== Seq()
-    e3a.length must_== 1
-
-    val (AsyncParse(e3b, r3b), _) = p3.apply(bb(""))
-    r3b must_== Seq()
-    e3b.length must_== 0
-
-    val (AsyncParse(e3c, r3c), _) = p3.apply(bb("]"))
-    r3c must_== Seq()
-    e3c.length must_== 0
-  }
-
   "Unwrapping array parser treats non-arrays correctly" in {
     val p1                      = AsyncParser.unwrap()
-    val (AsyncParse(e1, _), p2) = p1.apply(bb("""{"a": 1, "b": 2"""))
+    val (AsyncParse(e1, _), p2) = p1("""{"a": 1, "b": 2""")
     e1.length must_== 0
 
     // ending the object is valid
-    val (AsyncParse(e2a, _), _) = p2.apply(bb("""}"""))
+    val (AsyncParse(e2a, _), _) = p2("""}""")
     e2a.length must_== 0
 
     // acting like you're in an array is not valid
-    val (AsyncParse(e2b, _), _) = p2.apply(bb("""}, 999"""))
+    val (AsyncParse(e2b, _), _) = p2("""}, 999""")
     e2b.length must_== 1
 
     // in unwrap mode only a single object is allowed
-    val (AsyncParse(e2c, _), _) = p2.apply(bb("""} 999"""))
+    val (AsyncParse(e2c, _), _) = p2("""} 999""")
     e2c.length must_== 1
   }
 
   "Unwrapping array parser performs adequately" in {
     val num = 100 * 1000
-    //val num = 1 * 1000 * 1000
-    //val num = 2 * 1000 * 1000
     val elem = """{"a": 999, "b": [1,2,3], "c": "fooooo", "d": {"aa": 123}}"""
 
     def sync(elem: String, num: Int): (Int, Int, Long) = {
@@ -347,7 +142,7 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
       (js.length, data.length, ms)
     }
 
-    def async(parser: AsyncParser, isArray: Boolean, elem: String, num: Int): (Int, Int, Long) = {
+    def async(parser: jawn.AsyncParser[JValue], isArray: Boolean, elem: String, num: Int): (Int, Int, Long) = {
       val elemsPerChunk    = 4520
       val completeChunks   = num / elemsPerChunk
       val partialChunkSize = num % elemsPerChunk
@@ -355,34 +150,32 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
 
       val es       = (0 until elemsPerChunk).map(_ => elem)
       val leftover = (0 until partialChunkSize).map(_ => elem)
-      val (firstChunk, chunk, lastChunk) = if (isArray) {
-        (es.mkString("[", ",", ",").getBytes("UTF-8"), es.mkString("", ",", ",").getBytes("UTF-8"), leftover.mkString("", ",", "]").getBytes("UTF-8"))
-      } else {
-        (es.mkString("", "\n", "\n").getBytes("UTF-8"), es.mkString("", "\n", "\n").getBytes("UTF-8"), leftover.mkString("", "\n", "\n").getBytes("UTF-8"))
-      }
+      val (firstChunk, chunk, lastChunk) = (
+        if (isArray)
+          (( es mkString ("[", ",", ","), es mkString ("", ",", ","), leftover mkString ("", ",", "]") ))
+        else
+          (( es mkString ("", "\n", "\n"), es mkString ("", "\n", "\n"), leftover mkString ("", "\n", "\n") ))
+      )
 
       var i     = 0
       var p     = parser
-      var done  = false
       var seen  = 0
       var bytes = 0
       val t0    = System.currentTimeMillis
 
-      while (i <= completeChunks && !done) {
+      while (i <= completeChunks) {
         val (AsyncParse(errors, results), parser) = if (i <= completeChunks) {
-          val data =
-            if (i == 0)
-              firstChunk
-            else if (i < completeChunks)
-              chunk
-            else
-              lastChunk
-
+          val data: Array[Byte] = utf8Bytes(i match {
+            case 0                       => firstChunk
+            case _ if i < completeChunks => chunk
+            case _                       => lastChunk
+          })
           bytes += data.length
-          p.apply(More(ByteBufferWrap(data)))
-        } else {
-          done = true
-          p.apply(Done)
+          p(data)
+        }
+        else {
+          p.finish()
+          p.apply("")
         }
         if (!errors.isEmpty) throw errors.head
         seen += results.length

@@ -21,6 +21,7 @@ package ygg.tests
 
 import blueeyes._, json._
 import scalaz._, Scalaz._
+import ygg.json._
 
 trait CrossSpec extends TableQspec {
   import SampleData._

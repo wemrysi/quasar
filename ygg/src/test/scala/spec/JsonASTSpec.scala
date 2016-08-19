@@ -1,7 +1,8 @@
 package ygg.tests
 
-import blueeyes._, json._
+import blueeyes._, json.{ JPathIndex => _, JPathField => _, JPath => _, _ }
 import scalaz._, Scalaz._, Ordering._
+import ygg.json._
 import JsonTestSupport._
 
 class JsonASTSpec extends quasar.SequentialQspec {
