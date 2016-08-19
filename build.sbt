@@ -7,7 +7,7 @@ def circeVersion      = "0.4.1"
 
 def repl = """
   |import ygg._, blueeyes._, json._
-  |import io.circe._, literal._
+  |import io.circe._
 """.stripMargin.trim
 
 lazy val root = project.root.setup.noArtifacts aggregate ygg dependsOn ygg also (
@@ -18,6 +18,7 @@ lazy val ygg = project.setup deps (
 
   "org.spire-math" %% "jawn-parser"       % "0.9.0",
   "io.circe"       %% "circe-literal"     % circeVersion,
+  "io.circe"       %% "circe-generic"     % circeVersion,
   "org.mapdb"      %  "mapdb"             % "3.0.1",
   "org.spire-math" %% "spire-macros"      % "0.11.0",
   "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),

@@ -3,7 +3,8 @@ package ygg
 import jawn._
 import blueeyes._
 import scalaz._, Scalaz._
-import io.circe.Json
+import io.circe.{ Json, HCursor, Encoder, Decoder }
+// { Json, HCursor }
 
 package object json {
   import JValue._
@@ -28,11 +29,29 @@ package object json {
     final def json(args: Any*): Json = macro io.circe.literal.LiteralMacros.jsonStringContext
   }
 
+  implicit def circeToJvalue(x: Json): JValue = x.as[JValue].toOption.get
+  implicit def jvalueToCirce(x: JValue): Json = CirceJsonEncoder(x)
+
+  implicit object CirceJsonEncoder extends Encoder[JValue] {
+    def apply(x: JValue): Json = x match {
+      case JNull      => Json.Null
+      case JBool(x)   => Json fromBoolean x
+      case JNum(x)    => Json fromBigDecimal x
+      case JString(x) => Json fromString x
+      case JObject(x) => Json fromFields (x mapValues apply)
+      case JArray(x)  => Json arr (x map apply: _*)
+    }
+  }
+  implicit object CirceJsonDecoder extends Decoder[JValue] {
+    private val dc = Decoder[Json] map (_.toYgg)
+    def apply(c: HCursor): Decoder.Result[JValue] = dc(c)
+  }
+
   implicit class CirceJsonOps(private val c: Json) {
     def toYgg: JValue = c.fold[JValue](
       JNull,
       JBool(_),
-      x => JNum(x.toBigDecimal.get),
+      _.toBigDecimal.fold[JValue](JUndefined)(JNum(_)),
       JString(_),
       xs => JArray(xs map (_.toYgg)),
       x => JObject(x.toMap mapValues (_.toYgg) toMap)
