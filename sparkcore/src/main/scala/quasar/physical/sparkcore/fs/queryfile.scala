@@ -17,16 +17,22 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
+import quasar.{PhaseResults, LogicalPlan, Data}
+import quasar.qscript.QScriptTotal
 import quasar.fs.QueryFile
 import quasar.fs.QueryFile._
 import quasar.fs._
 import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
+import quasar.effect.Read
 
 import java.io.File
 import java.nio.file._
 
+import org.apache.spark._
+import org.apache.spark.rdd._
+import matryoshka._
 import pathy.Path._
 import scalaz._
 import Scalaz._
@@ -34,15 +40,42 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
+  type SparkContextRead[A] = Read[SparkContext, A]
+
   def interperter[S[_]](implicit
-  s0: Task :<: S): QueryFile ~> Free[S, ?] =
+    s0: Task :<: S,
+    s1: SparkContextRead :<: S
+  ): QueryFile ~> Free[S, ?] =
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case FileExists(f) => fileExists(f)
         case ListContents(dir) => listContents(dir)
+        case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) =>
+          // (QueryFile.convertToQscript(lp) >>= executePlan(_, out)).run
+          QueryFile.convertToQScript(lp).map(executePlan(_, out)).sequence.map(_.leftMap(planningFailed(lp, _)).join)
         case _ => ???
       }
     }
+
+
+  private def store(rdd: RDD[Data]): Task[AFile] = ???
+
+  // EitherT[(PhaseResults, ?), FileSystemError, AFile]
+  private def executePlan[S[_]](qs: Fix[QScriptTotal[Fix, ?]], out: AFile)
+    (implicit
+      s0: Task :<: S,
+      read: Read.Ops[SparkContext, S]
+    ): Free[S, (PhaseResults, FileSystemError \/ AFile)] = {
+    read.ask { sc =>
+      val sparkStuff: PlannerError \/ SparkStuff =
+        qs.cataM(Planner[QScriptTotal[Fix, ?]].plan).eval(sc)
+      injectFT.apply {
+        sparkStuff.bitraverse(
+          PPlannerError(_).point[(PhaseResults, ?)].point[Task],
+          ss => (Vector(PhaseResult.Detail("RDD", ss.toDebugString())), store(ss)).sequence)
+      }
+    }
+  }
 
   private def fileExists[S[_]](f: AFile)(implicit
     s0: Task :<: S): Free[S, Boolean] =
