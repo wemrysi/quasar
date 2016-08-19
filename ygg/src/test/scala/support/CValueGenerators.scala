@@ -2,7 +2,7 @@ package ygg.tests
 
 import quasar.ygg._
 import com.precog.common._
-import blueeyes._, json._
+import blueeyes._
 import TestSupport._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
 import ygg.json._

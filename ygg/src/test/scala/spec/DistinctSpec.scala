@@ -19,7 +19,6 @@
  */
 package ygg.tests
 
-import blueeyes._, json._
 import scalaz._, Scalaz._
 import ygg.json._
 

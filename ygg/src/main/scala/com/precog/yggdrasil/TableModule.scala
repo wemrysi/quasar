@@ -19,7 +19,7 @@
  */
 package quasar.ygg
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import scalaz._
 import scalaz.syntax.monad._

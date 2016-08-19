@@ -1,6 +1,7 @@
 package ygg.tests
 
-import blueeyes._, json._
+import blueeyes._
+import ygg.json._
 
 class JNumSpec extends quasar.Qspec {
   "JNums must sort correctly" in {

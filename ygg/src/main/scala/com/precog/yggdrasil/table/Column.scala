@@ -21,9 +21,10 @@ package quasar.ygg
 package table
 
 import ygg.cf
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import scalaz.{ Semigroup, Ordering }, Ordering._
+import ygg.json._
 
 trait Column {
   val tpe: CType

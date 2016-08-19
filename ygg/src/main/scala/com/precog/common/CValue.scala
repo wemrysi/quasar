@@ -20,8 +20,9 @@
 package com.precog
 package common
 
-import blueeyes._, json._
+import blueeyes._
 import scalaz._, Scalaz._, Ordering._
+import ygg.json._
 
 sealed trait RValue { self =>
   def toJValue: JValue

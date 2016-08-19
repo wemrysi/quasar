@@ -23,7 +23,7 @@ package table
 import ygg.cf
 import com.precog.common._
 import TransSpecModule._
-import blueeyes._, json._
+import blueeyes._
 import scalaz.{ =?> => _, _ }, Ordering._
 import java.nio.CharBuffer
 

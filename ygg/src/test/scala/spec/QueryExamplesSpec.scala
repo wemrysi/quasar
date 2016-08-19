@@ -1,6 +1,5 @@
 package ygg.tests
 
-import blueeyes._, json._
 import ygg.json._
 import JParser._
 

@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._, json._
+import blueeyes._
 import scalaz._, Scalaz._, Ordering._
 import ygg.json._
 import JsonTestSupport._

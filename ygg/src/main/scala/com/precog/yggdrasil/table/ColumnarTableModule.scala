@@ -1,7 +1,7 @@
 package quasar.ygg
 package table
 
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import ygg.cf.{ Remap, Empty }
 import TransSpecModule._

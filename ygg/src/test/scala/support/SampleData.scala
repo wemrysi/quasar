@@ -20,7 +20,7 @@
 package ygg.tests
 
 import quasar.ygg._
-import blueeyes._, json._
+import blueeyes._
 import scalaz._, Scalaz._
 import org.scalacheck.Gen.choose
 import scala.collection.generic.CanBuildFrom

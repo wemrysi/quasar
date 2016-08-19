@@ -21,7 +21,7 @@ package ygg.tests
 
 import quasar.ygg._
 import com.precog.common._
-import blueeyes._, json._
+import blueeyes._
 import scala.util.Random
 import org.scalacheck.{ Gen, Arbitrary }
 import scalaz._, Scalaz._

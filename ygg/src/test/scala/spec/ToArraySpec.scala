@@ -19,8 +19,8 @@
  */
 package ygg.tests
 
-import blueeyes.json._
 import scalaz.syntax.comonad._
+import ygg.json._
 
 trait ToArraySpec extends ColumnarTableQspec {
   def testToArrayHomogeneous = {

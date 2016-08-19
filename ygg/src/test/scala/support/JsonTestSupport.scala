@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._, json._
+import blueeyes._
 import TestSupport._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 import ygg.json._

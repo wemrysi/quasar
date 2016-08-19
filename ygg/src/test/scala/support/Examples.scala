@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._, json._
+import ygg.json._
 
 object Examples {
   val quoted  = """["foo \" \n \t \r bar"]"""

@@ -21,10 +21,11 @@ package ygg.tests
 
 import quasar.ygg._, table._
 import ygg.cf
-import blueeyes._, json._
+import blueeyes._
 import com.precog.common._
 import scalaz._
 import scalaz.syntax.std.boolean._
+import ygg.json._
 
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
   def newGroupId: GroupId

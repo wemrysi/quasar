@@ -20,7 +20,6 @@
 package ygg.tests
 
 import quasar.ygg._, table._
-import blueeyes._, json._
 import scalaz._, Scalaz._
 import TestSupport._
 import ygg.json._

@@ -20,7 +20,6 @@
 package ygg.tests
 
 import quasar.ygg._
-import blueeyes._, json._
 import com.precog.common._
 import scalaz._
 import scalaz.syntax.std.boolean._
