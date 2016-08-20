@@ -40,7 +40,7 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
     import trans._
     def load(apiKey: APIKey, jtpe: JType)                                       = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = sys.error("todo")
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] =
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
       sys.error("todo")
   }
 

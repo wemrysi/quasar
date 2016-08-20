@@ -664,7 +664,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       }
     }
 
-  def sortWith(keySlice: Slice, sortOrder: DesiredSortOrder = SortAscending): (Slice, Slice) = {
+  def sortWith(keySlice: Slice, sortOrder: DesiredSortOrder): (Slice, Slice) = {
 
     // We filter out rows that are completely undefined.
     val order: Array[Int] = Array.range(0, source.size) filter { row =>
@@ -687,7 +687,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     (sortedSlice.distinct(None, sortedKeySlice), sortedKeySlice.distinct(None, sortedKeySlice))
   }
 
-  def sortBy(prefixes: Vector[CPath], sortOrder: DesiredSortOrder = SortAscending): Slice = {
+  def sortBy(prefixes: Vector[CPath], sortOrder: DesiredSortOrder): Slice = {
     // TODO This is slow... Faster would require a prefix map or something... argh.
     val keySlice = Slice(source.size, prefixes.zipWithIndex.flatMap({
       case (prefix, i) =>
@@ -697,7 +697,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         }
     })(collection.breakOut))
 
-    source sortWith (keySlice) _1
+    source sortWith (keySlice, sortOrder = SortAscending) _1
   }
 
   /**

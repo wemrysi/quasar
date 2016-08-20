@@ -1014,7 +1014,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): Need[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
@@ -1046,7 +1046,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
       EitherT[M, ExternalTable, InternalTable](Need(\/-(this)))
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] =
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] =
@@ -1120,7 +1120,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#groupByN(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]] = {
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]] = {
       writeSorted(groupKeys, valueSpec, sortOrder, unique) map {
         case (streamIds, indices) =>
           val streams = indices.groupBy(_._1.streamId)
@@ -1132,7 +1132,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     protected def writeSorted(groupKeys: Seq[TransSpec1],
                               valueSpec: TransSpec1,
-                              sortOrder: DesiredSortOrder = SortAscending,
+                              sortOrder: DesiredSortOrder,
                               unique: Boolean): M[List[String] -> IndexMap] = {
 
       // If we don't want unique key values (e.g. preserve duplicates), we need to add

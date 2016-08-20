@@ -254,14 +254,13 @@ trait TableModule extends TransSpecModule {
       * we assign a unique row ID as part of the key so that multiple equal values are
       * preserved
       */
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean): M[Seq[Table]]
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
 
     def takeRange(startIndex: Long, numberToTake: Long): Table
 
     def canonicalize(length: Int): Table
-    // def canonicalize(length: Int, maxLength0: Option[Int]): Table
 
     def schemas: M[scSet[JType]]
 

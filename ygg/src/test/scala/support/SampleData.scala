@@ -21,7 +21,6 @@ package ygg.tests
 
 import quasar.ygg._
 import blueeyes._
-import scalaz._, Scalaz._
 import org.scalacheck.Gen.choose
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
@@ -29,7 +28,7 @@ import TestSupport._
 import CValueGenerators.JSchema
 import ygg.json._
 
-case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
+final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
   override def toString = {
     "SampleData: \ndata = " + data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
       "\nschema: " + schema
@@ -41,9 +40,10 @@ case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = Non
 }
 
 object SampleData extends CValueGenerators {
-  def toRecord(ids: Array[Long], jv: JValue): JValue = {
-    JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
-  }
+  def toRecord(ids: Array[Long], jv: JValue): JValue = json"""{
+    ".key" : $ids,
+    ".value" : $jv
+  }"""
 
   implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
 
