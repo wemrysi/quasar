@@ -1661,16 +1661,12 @@ object Slice {
     * Given a JValue, an existing map of columnrefs to column data,
     * a sliceIndex, and a sliceSize, return an updated map.
     */
-  def withIdsAndValues(jv: JValue,
-                       into: Map[ColumnRef, ArrayColumn[_]],
-                       sliceIndex: Int,
-                       sliceSize: Int,
-                       remapPath: Option[JPath => CPath] = None): Map[ColumnRef, ArrayColumn[_]] = {
+  def withIdsAndValues(jv: JValue, into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int, sliceSize: Int): Map[ColumnRef, ArrayColumn[_]] = {
     jv.flattenWithPath.foldLeft(into) {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>
         val ctype = CType.forJValue(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
-        val ref   = ColumnRef(remapPath.map(_(jpath)).getOrElse(CPath(jpath)), ctype)
+        val ref   = ColumnRef(CPath(jpath), ctype)
 
         val updatedColumn: ArrayColumn[_] = v match {
           case JBool(b) =>

@@ -139,11 +139,10 @@ trait TableModule extends TransSpecModule {
     def constDate(v: scSet[DateTime]): Table
     def constBoolean(v: scSet[Boolean]): Table
     def constNull: Table
-
     def constEmptyObject: Table
     def constEmptyArray: Table
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
+    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
 
     def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table]
@@ -154,7 +153,7 @@ trait TableModule extends TransSpecModule {
       * but must be a valid `JoinOrder`. This method should not assume any
       * particular order of the tables, unlike `cogroup`.
       */
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
+    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
                                                                              rightKeySpec: TransSpec1,
                                                                              joinSpec: TransSpec2): M[JoinOrder -> Table]
 
@@ -164,7 +163,7 @@ trait TableModule extends TransSpecModule {
       * Hints can be provided on how we'd prefer the table to be crossed, but
       * the actual cross order is returned as part of the result.
       */
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[CrossOrder -> Table]
+    def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
   }
 
   trait TableLike { this: Table =>
@@ -261,7 +260,8 @@ trait TableModule extends TransSpecModule {
 
     def takeRange(startIndex: Long, numberToTake: Long): Table
 
-    def canonicalize(length: Int, maxLength0: Option[Int] = None): Table
+    def canonicalize(length: Int): Table
+    // def canonicalize(length: Int, maxLength0: Option[Int]): Table
 
     def schemas: M[scSet[JType]]
 

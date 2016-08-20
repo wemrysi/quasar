@@ -105,12 +105,7 @@ object ColumnarTableModule {
       def size                        = n
       def getPaths: Array[String]     = a
       def columnForPath(path: String) = m(path)
-      def combine(that: Indices): Indices = {
-        val buf = new ArrayBuffer[String](a.length)
-        buf ++= a
-        that.getPaths.foreach(p => if (!m.contains(p)) buf.append(p))
-        Indices.fromPaths(buf.toArray)
-      }
+
       override def equals(that: Any): Boolean = that match {
         case that: Indices =>
           val len = n
@@ -136,8 +131,6 @@ object ColumnarTableModule {
     }
 
     object Indices {
-      def empty: Indices = new Indices(0, Map.empty[String, Int], new Array[String](0))
-
       def fromPaths(ps: Array[String]): Indices = {
         val paths = ps.sorted
         val m     = scmMap[String, Int]()
@@ -498,7 +491,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
       }
     }
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table = {
+    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table = {
       val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
 
       def makeSlice(data: Stream[RValue]): (Slice, Stream[RValue]) = {
@@ -519,7 +512,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
       )
     }
 
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
+    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
                                                                              rightKeySpec: TransSpec1,
                                                                              joinSpec: TransSpec2): M[JoinOrder -> Table] = {
       val emptySpec = trans.ConstLiteral(CEmptyArray, Leaf(Source))
@@ -532,7 +525,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
       }
     }
 
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder] = None)(spec: TransSpec2): M[CrossOrder -> Table] = {
+    def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table] = {
       import CrossOrder._
       Need(orderHint match {
         case Some(CrossRight | CrossRightLeft) =>
@@ -673,10 +666,8 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
       * For slices being loaded from ingest, it is often the case that we are missing a
       * few rows at the end, so we shouldn't be too strict.
       */
-    def canonicalize(length: Int, maxLength0: Option[Int] = None): Table = {
-      val minLength = length
-      val maxLength = maxLength0 getOrElse length
-
+    def canonicalize(length: Int): Table = canonicalize(length, length)
+    def canonicalize(minLength: Int, maxLength: Int): Table = {
       require(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
       def concat(rslices: List[Slice]): Slice = rslices.reverse match {
@@ -1290,8 +1281,8 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
         }
 
         // We canonicalize the tables so that no slices are too small.
-        val left  = this.canonicalize(yggConfig.minIdealSliceSize, Some(yggConfig.maxSliceSize))
-        val right = that.canonicalize(yggConfig.minIdealSliceSize, Some(yggConfig.maxSliceSize))
+        val left  = this.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
+        val right = that.canonicalize(yggConfig.minIdealSliceSize, maxLength = yggConfig.maxSliceSize)
 
         left.slices.uncons flatMap {
           case Some((lhead, ltail)) =>

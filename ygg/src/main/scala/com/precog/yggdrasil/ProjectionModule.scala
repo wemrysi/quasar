@@ -36,7 +36,7 @@ trait ProjectionLike {
     * key. Each resulting block should contain only the columns specified in the
     * column set; if the set of columns is empty, return all columns.
     */
-  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None): Need[Option[BlockProjectionData[Key]]]
+  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]]): Need[Option[BlockProjectionData[Key]]]
 
   def getBlockStream(columns: Option[Set[ColumnRef]]): StreamT[Need, Slice] = {
     StreamT.unfoldM[Need, Slice, Option[Key]](None) { key =>

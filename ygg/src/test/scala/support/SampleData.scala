@@ -47,7 +47,7 @@ object SampleData extends CValueGenerators {
 
   implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
 
-  def sample(schema: Int => Gen[JSchema]) = Arbitrary(
+  def sample(schema: Int => Gen[JSchema]): Arbitrary[SampleData] = Arbitrary(
     for {
       depth           <- choose(0, 1)
       jschema         <- schema(depth)

@@ -885,9 +885,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       Table(StreamT(Need(head)), ExactSize(totalCount)).transform(TransSpec1.DerefArray1)
     }
 
-    override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder] = None)(leftKeySpec: TransSpec1,
-                                                                                        rightKeySpec: TransSpec1,
-                                                                                        joinSpec: TransSpec2): M[JoinOrder -> Table] = {
+    override def join(left0: Table, right0: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
+                                                                                rightKeySpec: TransSpec1,
+                                                                                joinSpec: TransSpec2): M[JoinOrder -> Table] = {
 
       def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
