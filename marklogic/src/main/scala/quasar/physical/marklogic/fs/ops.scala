@@ -35,11 +35,12 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-// TODO: Lots of error handling/existence checking
-// TODO: Add support for operations on uri prefixes? i.e. paths that don't map
-//       to an actual MarkLogic directory, but look like a directory path
+// NB: MarkLogic appears to possibly execute independent expressions in parallel,
+//     which can cause side-effecting statements (like deleting) to fail, thus it
+//     seems to be better to sequence them at the `SessionIO` (i.e. make multiple
+//     requests) rather than to sequence them as expressions in XQuery.
 object ops {
-  import expr.{if_, for_, select, func}
+  import expr.{func, if_, for_, let_}
 
   def appendToFile[S[_]](
     dstFile: AFile,
@@ -93,20 +94,21 @@ object ops {
   def deleteFile(file: AFile): SessionIO[Unit] = {
     val uri = pathUri(asDir(file))
 
-    SessionIO.executeQuery_(mkSeq_(
-      fn.map(func ("$d") { xdmp.documentDelete(fn.baseUri("$d")) }, xdmp.directory(uri.xs, "1".xs)),
-      if_ (fn.not(fn.exists(xdmp.directory(uri.xs, "infinity".xs))))
-        .then_ { xdmp.directoryDelete(uri.xs) }
-        .else_ { expr.emptySeq }
-    )).void
+    val deleteChildDocuments =
+      SessionIO.executeQuery_(
+        fn.map(
+          func("$d") { xdmp.documentDelete(fn.baseUri("$d")) },
+          xdmp.directory(uri.xs, "1".xs)))
+
+    val deleteMLDirIfEmpty =
+      SessionIO.executeQuery_(deleteIfEmptyXqy(uri.xs))
+
+    deleteChildDocuments *> deleteMLDirIfEmpty.void
   }
 
-  // TODO: Does this fail when the directory isn't empty?
   def deleteDir(dir: ADir): SessionIO[Unit] =
     SessionIO.executeQuery_(xdmp.directoryDelete(pathUri(dir).xs)).void
 
-  // TODO: Can this be implemented with fn:exists(fn:doc($uri))?
-  // TODO: How do we separate the file/dir namespace, should this return false if given a file and no docs in dir?
   def exists(path: APath): SessionIO[Boolean] = {
     val uri = pathUri(refineType(path).map(asDir).merge)
 
@@ -117,22 +119,95 @@ object ops {
     }}
   }
 
-  def moveFile(src: AFile, dst: AFile): SessionIO[Unit] = {
-    def moveXqy = {
-      val srcUri = pathUri(asDir(src))
-      val dstUri = pathUri(asDir(dst))
+  def ls(dir: ADir): SessionIO[Set[PathSegment]] = {
+    val uri = pathUri(dir)
 
-      mkSeq_(
-        for_("$d" -> xdmp.directory(dstUri.xs, "1".xs))
-          .return_(xdmp.documentDelete(xdmp.nodeUri("$d"))),
+    def isMLDir(u: XQuery) =
+      fn.exists(xdmp.documentProperties(u) xp "/prop:properties/prop:directory")
+
+    val prefixPathsXqy =
+      fn.filter(
+        func("$u") { isMLDir("$u") and fn.startsWith("$u", uri.xs) },
+        cts.uris(uri.xs, IList("properties".xs)))
+
+    def childPathsXqy(prefixed: XQuery) =
+      fn.distinctValues(fn.map(
+        func("$u") {
+          fn.concat(
+            uri.xs,
+            fn.tokenize(fn.substringAfter("$u", uri.xs), "/".xs) ? "1",
+            "/".xs)
+        },
+        prefixed))
+
+    def isDirXqy(pathUri: XQuery) = {
+      val hasChildMLDirs =
+        fn.exists(
+          for_("$d" -> xdmp.directory(pathUri, "1".xs))
+            .where_("$d[property::directory]")
+            .return_("$d"))
+
+      fn.not(isMLDir(pathUri)) or hasChildMLDirs
+    }
+
+    def isFileXqy(pathUri: XQuery) =
+      fn.exists(
+        for_("$d" -> xdmp.directory(pathUri, "1".xs))
+          .where_("$d[not(property::directory)]")
+          .return_("$d"))
+
+    def filesXqy(dirUris: XQuery) =
+      fn.map(
+        func("$u") { fn.substring("$u", "1", some(fn.stringLength("$u") - "1")) },
+        fn.filter(func("$f") { isFileXqy("$f") }, dirUris))
+
+    val xqy = let_(
+      "$pathUris"      -> prefixPathsXqy,
+      "$childPathUris" -> childPathsXqy("$pathUris"),
+      "$dirUris"       -> fn.filter(func("$u") { isDirXqy("$u") }, "$childPathUris"),
+      "$fileUris"      -> filesXqy("$childPathUris")
+    ) return_ (
+      mkSeq_("$dirUris", "$fileUris")
+    )
+
+    def parseDir(s: String): Option[PathSegment] =
+      posixCodec.parseAbsDir(s) flatMap dirName map (_.left)
+
+    def parseFile(s: String): Option[PathSegment] =
+      posixCodec.parseAbsFile(s) map (f => fileName(f).right)
+
+    SessionIO.resultsOf_(xqy) map (_ foldMap { item =>
+      val itemStr = item.asString
+      parseDir(itemStr).orElse(parseFile(itemStr)).toSet
+    })
+  }
+
+  def moveFile(src: AFile, dst: AFile): SessionIO[Unit] = {
+    val srcUri = pathUri(asDir(src))
+    val dstUri = pathUri(asDir(dst))
+
+    def doMove =
+      SessionIO.executeQuery_(mkSeq_(
+        if_(fn.exists(fn.doc(dstUri.xs) ? "property::directory"))
+          .then_ {
+            for_("$d" -> xdmp.directory(dstUri.xs, "1".xs))
+              .return_(xdmp.documentDelete(xdmp.nodeUri("$d")))
+          } else_ {
+            xdmp.directoryCreate(dstUri.xs)
+          },
+
         for_("$d" -> xdmp.directory(srcUri.xs, "1".xs))
           .let_(
             "$oldName" -> xdmp.nodeUri("$d"),
-            "$newName" -> fn.concat(dstUri.xs, select(fn.tokenize("$oldName", "/".xs), fn.last)))
-          .return_(mkSeq_(xdmp.documentInsert("$newName", fn.doc("$oldName")), xdmp.documentDelete("$oldName"))))
-    }
+            "$newName" -> fn.concat(dstUri.xs, fn.tokenize("$oldName", "/".xs) ? fn.last))
+          .return_(mkSeq_(
+            xdmp.documentInsert("$newName", fn.doc("$oldName")),
+            xdmp.documentDelete("$oldName")))))
 
-    if (src === dst) ().point[SessionIO] else SessionIO.executeQuery_(moveXqy).void
+    def deleteSrcIfEmpty =
+      SessionIO.executeQuery_(deleteIfEmptyXqy(srcUri.xs))
+
+    if (src === dst) ().point[SessionIO] else doMove *> deleteSrcIfEmpty.void
   }
 
   def readFile(file: AFile): Process[ContentSourceIO, Data] = {
@@ -147,20 +222,6 @@ object ops {
       .map(xdmitem.toData)
   }
 
-  def subDirs(dir: ADir): SessionIO[Set[RDir]] = {
-    val uri = pathUri(dir)
-
-    val xqy =
-      for_("$d" -> xdmp.directory(uri.xs, "1".xs))
-        .where_(fn.exists("$d/property::directory"))
-        .return_(fn.baseUri("$d"))
-
-    SessionIO.resultsOf_(xqy) map (_ foldMap (item =>
-      posixCodec.parseAbsDir(item.asString)
-        .flatMap(adir => sandboxAbs(adir).relativeTo(dir))
-        .toSet))
-  }
-
   ////
 
   private def asDir(file: AFile): ADir =
@@ -171,4 +232,9 @@ object ops {
 
   private def pathUri(path: APath): String =
     posixCodec.printPath(path)
+
+  private def deleteIfEmptyXqy(dirUri: XQuery): XQuery =
+    if_ (fn.not(fn.exists(xdmp.directory(dirUri, "infinity".xs))))
+      .then_ { xdmp.directoryDelete(dirUri) }
+      .else_ { expr.emptySeq }
 }

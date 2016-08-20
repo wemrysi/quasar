@@ -35,7 +35,7 @@ import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
   import QueryFile._
-  import FileSystemError._
+  import FileSystemError._, PathError._
   import MarkLogicPlanner._
 
   def interpret[S[_]](
@@ -77,8 +77,11 @@ object queryfile {
       lift(ops.exists(file)).into[S]
 
     def listContents(dir: ADir): Free[S, FileSystemError \/ Set[PathSegment]] =
-      lift(ops.subDirs(dir)).into[S]
-        .map(_.foldMap(d => SandboxedPathy.segAt(0, d).toSet).right[FileSystemError])
+      lift(
+        ops.exists(dir).ifM(
+          ops.ls(dir).map(_.right[FileSystemError]),
+          pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[SessionIO])
+      ).into[S]
 
     queryFileFromDataCursor[S, Task, ResultCursor](
       exec, eval, explain, listContents, exists)

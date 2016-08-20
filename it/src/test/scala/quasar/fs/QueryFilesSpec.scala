@@ -57,9 +57,9 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
 
       // TODO: Our chrooting prevents this from working, maybe we need a
       //       spec that does no chrooting and writes no files?
-      "listing root dir should succeed" >> todo /* {
-        runT(run)(query.ls(rootDir)).runEither must beRight
-      } */
+      "listing root dir should succeed" >> pending {
+        runT(fs.testInterpM)(query.ls(rootDir)).runEither must beRight
+      }
 
       "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")

@@ -28,6 +28,9 @@ object fn {
   def concat(x: XQuery, xs: XQuery*): XQuery =
     s"fn:concat${mkSeq_(x, xs: _*)}"
 
+  def distinctValues(seq: XQuery): XQuery =
+    s"fn:distinct-values($seq)"
+
   def doc(uri: XQuery = ""): XQuery =
     s"fn:doc($uri)"
 
@@ -57,6 +60,15 @@ object fn {
 
   def startsWith(str: XQuery, prefix: XQuery, collation: Option[XQuery] = None): XQuery =
     s"fn:starts-with($str, ${prefix}${asArg(collation)})"
+
+  def stringLength(str: XQuery): XQuery =
+    s"fn:string-length($str)"
+
+  def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
+    s"fn:substring($str, ${startLoc}${asArg(length)})"
+
+  def substringAfter(input: XQuery, after: XQuery): XQuery =
+    s"fn:substring-after($input, $after)"
 
   def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
     s"fn:tokenize($input, ${pattern}${asArg(flags)})"

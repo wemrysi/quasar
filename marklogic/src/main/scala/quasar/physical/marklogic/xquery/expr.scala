@@ -29,6 +29,9 @@ import scalaz.syntax.std.boolean._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object expr {
+  def and(x1: XQuery, x2: XQuery): XQuery =
+    s"$x1 and $x2"
+
   val emptySeq: XQuery =
     "()"
 
@@ -44,8 +47,8 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
-  def select(seq: XQuery, selector: XQuery): XQuery =
-    s"$seq[$selector]"
+  def or(x1: XQuery, x2: XQuery): XQuery =
+    s"$x1 or $x2"
 
   def string(str: String): XQuery =
     s""""$str""""
