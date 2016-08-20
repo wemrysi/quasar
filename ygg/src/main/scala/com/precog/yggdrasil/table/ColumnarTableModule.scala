@@ -1653,22 +1653,6 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
     def renderCsv(): StreamT[M, CharBuffer] =
       ColumnarTableModule.renderCsv(slices)
 
-    def slicePrinter(prelude: String)(f: Slice => String): Table = {
-      Table(
-        StreamT(
-          StreamT
-            .Skip({
-              println(prelude);
-              slices map { s =>
-                println(f(s)); s
-              }
-            })
-            .point[M]),
-        size)
-    }
-
-    def printer(prelude: String = "", flag: String = ""): Table = slicePrinter(prelude)(s => s.toJsonString(flag))
-
     def toStrings: M[Iterable[String]] = {
       toEvents { (slice, row) =>
         slice.toString(row)

@@ -270,8 +270,6 @@ trait TableModule extends TransSpecModule {
 
     // for debugging only!!
     def toJson: Need[Iterable[JValue]]
-
-    def printer(prelude: String = "", flag: String = ""): Table
   }
 
   sealed trait GroupingSpec {
