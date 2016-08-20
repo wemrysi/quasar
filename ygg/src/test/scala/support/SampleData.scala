@@ -94,58 +94,27 @@ object SampleData extends CValueGenerators {
   def distinct(sd: Arbitrary[SampleData]): Arbitrary[SampleData]     = sd ^^ (_ transform (_.distinct))
   def distinctKeys(sd: Arbitrary[SampleData]): Arbitrary[SampleData] = sd ^^ (_ transform (d => distinctBy(d)(_ \ "keys")))
 
-  def distinctValues(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    Arbitrary(
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        SampleData(distinctBy(sampleData.data)(_ \ "value"), sampleData.schema)
+  def distinctValues(sample: Arbitrary[SampleData]): Arbitrary[SampleData] =
+    sample ^^ (sd => SampleData(distinctBy(sd.data)(_ \ "value"), sd.schema))
+
+  def duplicateRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = sample ^^ { sd =>
+    val rows       = sd.data
+    val duplicates = randomSubset(rows, 0.25)
+    SampleData(Random.shuffle(rows ++ duplicates), sd.schema)
+  }
+
+  def undefineRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = sample ^^ { sd =>
+    val rows = sd.data map (row => if (Random.nextDouble < 0.25) JUndefined else row)
+    SampleData(rows, sd.schema)
+  }
+
+  def undefineRowsForColumn(sample: Arbitrary[SampleData], path: JPath): Arbitrary[SampleData] = sample ^^ { sd =>
+    val rows = sd.data map (row =>
+      row get path match {
+        case null | JUndefined => row
+        case _                 => row.set(path, JUndefined)
       }
     )
-  }
-
-  def duplicateRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    val gen =
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        val rows       = sampleData.data
-        val duplicates = randomSubset(rows, 0.25)
-        SampleData(Random.shuffle(rows ++ duplicates), sampleData.schema)
-      }
-
-    Arbitrary(gen)
-  }
-
-  def undefineRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = {
-    val gen =
-      for {
-        sampleData <- arbitrary(sample)
-      } yield {
-        val rows = for (row <- sampleData.data)
-          yield if (Random.nextDouble < 0.25) JUndefined else row
-        SampleData(rows, sampleData.schema)
-      }
-
-    Arbitrary(gen)
-  }
-
-  def undefineRowsForColumn(sample: Arbitrary[SampleData], path: JPath): Arbitrary[SampleData] = {
-    val gen = for {
-      sampleData <- arbitrary(sample)
-    } yield {
-      val rows = for (row <- sampleData.data) yield {
-        if (false && Random.nextDouble >= 0.25) {
-          row
-        } else if (row.get(path) != null && row.get(path) != JUndefined) {
-          row.set(path, JUndefined)
-        } else {
-          row
-        }
-      }
-      SampleData(rows, sampleData.schema)
-    }
-
-    Arbitrary(gen)
+    SampleData(rows, sd.schema)
   }
 }
