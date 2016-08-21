@@ -1,0 +1,371 @@
+package ygg.json.literal
+
+import cats.data.Xor
+import java.lang.reflect.{ InvocationHandler, Method, Proxy }
+import java.util.UUID
+import scala.reflect.macros.whitebox
+
+class LiteralMacros(val c: whitebox.Context) {
+  import c.universe._
+
+  val Json     = typeOf[io.circe.Json].typeSymbol.companion
+  val Encoder  = typeOf[io.circe.Encoder[_]].typeSymbol.companion
+  val Decoder  = typeOf[io.circe.Decoder[_]].typeSymbol.companion
+  val XorSym   = typeOf[cats.data.Xor[_,_]].typeConstructor
+  def FContext = Class.forName("jawn.FContext")
+
+  private[this] abstract class HandlerHelpers(placeHolders: Map[String, (Tree, Option[Tree])])
+    extends InvocationHandler {
+    final def invoke(proxy: Object, method: Method, args: Array[Object]): Object =
+      (args, method.getParameterTypes) match {
+        case (Array(arg), Array(cls)) => invokeWithArg(method.getName, cls, arg)
+        case _ => invokeWithoutArg(method.getName)
+      }
+
+    def invokeWithoutArg: String => Object
+    def invokeWithArg: (String, Class[_], Object) => Object
+
+    def toJsonKey(s: String): Tree = placeHolders.get(s).flatMap(_._2).getOrElse(q"$s")
+
+    def toJsonString(s: String): Tree =
+      placeHolders.get(s).map(_._1).getOrElse(q"$Json.fromString($s)")
+
+    def asProxy(cls: Class[_]): Object =
+      Proxy.newProxyInstance(getClass.getClassLoader, Array(cls), this)
+  }
+
+  private[this] class SingleContextHandler(placeHolders: Map[String, (Tree, Option[Tree])])
+    extends HandlerHelpers(placeHolders) {
+    var value: Tree = null
+
+    val invokeWithoutArg: String => Object = {
+      case "finish" => value
+      case "isObj" => false: java.lang.Boolean
+    }
+
+    val invokeWithArg: (String, Class[_], Object) => Object = {
+      case ("add", cls, arg: String) if cls == classOf[String] =>
+        value = toJsonString(arg)
+        null
+      case ("add", cls, arg: Tree) =>
+        value = arg
+        null
+    }
+  }
+
+  private[this] class ArrayContextHandler(placeHolders: Map[String, (Tree, Option[Tree])])
+    extends HandlerHelpers(placeHolders) {
+    var values: List[Tree] = Nil
+
+    val invokeWithoutArg: String => Object = {
+      case "finish" => q"$Json.arr(..$values)"
+      case "isObj" => false: java.lang.Boolean
+    }
+
+    val invokeWithArg: (String, Class[_], Object) => Object = {
+      case ("add", cls, arg: String) if cls == classOf[String] =>
+        values = values :+ toJsonString(arg)
+        null
+      case ("add", cls, arg: Tree) =>
+        values = values :+ arg
+        null
+    }
+  }
+
+  private[this] class ObjectContextHandler(placeHolders: Map[String, (Tree, Option[Tree])])
+    extends HandlerHelpers(placeHolders) {
+    var key: String = null
+    var fields: List[Tree] = Nil
+
+    val invokeWithoutArg: String => Object = {
+      case "finish" => q"$Json.obj(..$fields)"
+      case "isObj" => true: java.lang.Boolean
+    }
+
+    val invokeWithArg: (String, Class[_], Object) => Object = {
+      case ("add", cls, arg: String) if cls == classOf[String] =>
+        if (key == null) {
+          key = arg
+        } else {
+          fields = fields :+ q"(${ toJsonKey(key) }, ${ toJsonString(arg) })"
+          key = null
+        }
+        null
+      case ("add", cls, arg: Tree) =>
+        fields = fields :+ q"(${ toJsonKey(key) }, $arg)"
+        key = null
+        null
+    }
+  }
+
+  private[this] class TreeFacadeHandler(placeHolders: Map[String, (Tree, Option[Tree])])
+    extends HandlerHelpers(placeHolders) {
+    val invokeWithoutArg: String => Object = {
+      case "jnull"         => q"$Json.Null"
+      case "jfalse"        => q"$Json.False"
+      case "jtrue"         => q"$Json.True"
+      case "singleContext" => new SingleContextHandler(placeHolders) asProxy FContext
+      case "arrayContext"  => new ArrayContextHandler(placeHolders) asProxy FContext
+      case "objectContext" => new ObjectContextHandler(placeHolders) asProxy FContext
+    }
+
+    val invokeWithArg: (String, Class[_], Object) => Object = {
+      case ("jnum", cls, arg: String) if cls == classOf[String] => q"""
+        $Json.fromJsonNumber(
+          _root_.io.circe.JsonNumber.unsafeDecimal($arg)
+        )
+      """
+      case ("jint", cls, arg: String) if cls == classOf[String] => q"""
+        $Json.fromJsonNumber(
+          _root_.io.circe.JsonNumber.unsafeIntegral($arg)
+        )
+      """
+      case ("jstring", cls, arg: String) if cls == classOf[String] => toJsonString(arg)
+    }
+  }
+
+  final def parse(
+    jsonString: String,
+    placeHolders: Map[String, (Tree, Option[Tree])]
+  ): Xor[Throwable, Tree] =
+    Xor.catchNonFatal {
+      val jawnParserClass = Class.forName("jawn.Parser$")
+      val jawnParser = jawnParserClass.getField("MODULE$").get(jawnParserClass)
+      val jawnFacadeClass = Class.forName("jawn.Facade")
+      val parseMethod = jawnParserClass.getMethod("parseUnsafe", classOf[String], jawnFacadeClass)
+
+      parseMethod.invoke(
+        jawnParser,
+        jsonString,
+        new TreeFacadeHandler(placeHolders).asProxy(jawnFacadeClass)
+      ).asInstanceOf[Tree]
+    }
+
+  private[this] final def randomPlaceHolder(): String = UUID.randomUUID().toString
+
+  /**
+   * Using Tree here instead of c.Expr fails to compile on 2.10.
+   */
+  final def jsonStringContext(args: c.Expr[Any]*): c.Expr[Json] = c.prefix.tree match {
+    case Apply(_, Apply(_, parts) :: Nil) =>
+      val stringParts = parts.map {
+        case Literal(Constant(part: String)) => part
+        case _ => c.abort(
+          c.enclosingPosition,
+          "A StringContext part for the json interpolator is not a string"
+        )
+      }
+
+      val encodedArgs: Seq[(String, (Tree, Option[Tree]))] = args.map { arg =>
+        val tpe = c.typecheck(arg.tree).tpe
+        val placeHolder = Stream.continually(randomPlaceHolder()).distinct.dropWhile(s =>
+          stringParts.exists(_.contains(s))
+        ).head
+
+        (
+          placeHolder,
+          (
+            q"$Encoder[$tpe].apply($arg)",
+            if (tpe =:= typeOf[String]) Some(q"$arg") else None
+          )
+        )
+      }
+
+      val placeHolders = encodedArgs.map(_._1)
+
+      if (stringParts.size != encodedArgs.size + 1) c.abort(
+        c.enclosingPosition,
+        "Invalid arguments for the json interpolator"
+      ) else {
+        val jsonString = stringParts.zip(placeHolders).foldLeft("") {
+          case (acc, (part, placeHolder)) =>
+            val qm = "\""
+
+            s"$acc$part$qm$placeHolder$qm"
+        } + stringParts.last
+
+        c.Expr[Json](
+          parse(jsonString, encodedArgs.toMap).valueOr[Tree] {
+            case _: ClassNotFoundException => c.abort(
+              c.enclosingPosition,
+              "The json interpolator requires jawn to be available at compile time"
+            )
+            case t: Throwable => c.abort(
+              c.enclosingPosition,
+              "Invalid JSON in interpolated string"
+            )
+          }
+        )
+      }
+    case _ => c.abort(c.enclosingPosition, "Invalid use of the json interpolator")
+  }
+
+  final def decodeLiteralStringImpl[S <: String: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: String)) =>
+        val name = s"""String("$lit")"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asString.flatMap[$sType] {
+                case s if s == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralBooleanImpl[S <: Boolean: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Boolean)) =>
+        val name = s"""Boolean($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asBoolean.flatMap[$sType] {
+                case s if s == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralDoubleImpl[S <: Double: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Double)) =>
+        val name = s"""Double($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asNumber.map(_.toDouble).flatMap[$sType] {
+                case s if s == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralFloatImpl[S <: Float: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Float)) =>
+        val name = s"""Float($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asNumber.map(_.toDouble).flatMap[$sType] {
+                case s if s.toFloat == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralLongImpl[S <: Long: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Long)) =>
+        val name = s"""Long($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asNumber.flatMap(_.toLong).flatMap[$sType] {
+                case s if s == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralIntImpl[S <: Int: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Int)) =>
+        val name = s"""Int($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asNumber.flatMap(_.toInt).flatMap[$sType] {
+                case s if s == $lit => _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def decodeLiteralCharImpl[S <: Char: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Char)) =>
+        val name = s"""Char($lit)"""
+
+        q"""
+          $Decoder.instance[$sType] { c =>
+            $XorSym.fromOption(
+              c.focus.asString.flatMap[$sType] {
+                case s if s.length == 1 && s.charAt(0) == $lit =>
+                  _root_.scala.Some[$sType]($lit: $sType)
+                case _ => _root_.scala.None
+              },
+              _root_.io.circe.DecodingFailure($name, c.history)
+            )
+          }
+        """
+    }
+
+  final def encodeLiteralStringImpl[S <: String: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: String)) =>
+        q"$Encoder.apply[_root_.java.lang.String].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralBooleanImpl[S <: Boolean: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Boolean)) =>
+        q"$Encoder.apply[_root_.scala.Boolean].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralDoubleImpl[S <: Double: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Double)) =>
+        q"$Encoder.apply[_root_.scala.Double].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralFloatImpl[S <: Float: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Float)) =>
+        q"$Encoder.apply[_root_.scala.Float].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralLongImpl[S <: Long: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Long)) =>
+        q"$Encoder.apply[_root_.scala.Long].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralIntImpl[S <: Int: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Int)) =>
+        q"$Encoder.apply[_root_.scala.Int].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+
+  final def encodeLiteralCharImpl[S <: Char: c.WeakTypeTag]: Tree =
+    weakTypeOf[S].dealias match {
+      case sType @ ConstantType(Constant(lit: Char)) =>
+        q"$Encoder.apply[_root_.scala.Char].contramap[$sType](_root_.scala.Predef.identity)"
+    }
+}

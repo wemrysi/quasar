@@ -3,9 +3,8 @@ package ygg
 import jawn._
 import blueeyes._
 import scalaz._, Scalaz._
-import io.circe._
 
-package object json {
+package object json extends ygg.json.JsonMacros {
   type JFieldTuple = String -> JValue
   type Result[A]   = Validation[Throwable, A]
 
@@ -21,9 +20,6 @@ package object json {
       case scala.util.Left(t: ParseException) => AsyncParse(Seq(t), Nil) -> p.copy()
       case scala.util.Left(t)                 => AsyncParse(Seq(new ParseException(t.getMessage, 0, 0, 0)), Nil) -> p.copy()
     }
-  }
-  implicit final class CirceJsonStringContext(sc: StringContext) {
-    final def json(args: Any*): Json = macro io.circe.literal.LiteralMacros.jsonStringContext
   }
 
   implicit def circeToJvalue(x: Json): JValue = x.as[JValue].toOption.get

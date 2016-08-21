@@ -1,24 +1,19 @@
 import xygg.build.Build._
 
-def scalazVersion     = "7.2.4"
-def specsVersion      = "3.8.4-scalacheck-1.12.5"
-def scalacheckVersion = "1.12.5"
-def circeVersion      = "0.4.1"
-
 def repl = """
   |import ygg._, blueeyes._, json._
   |import io.circe._
 """.stripMargin.trim
 
-lazy val root = project.root.setup.noArtifacts aggregate ygg dependsOn ygg also (
+lazy val root = project.root.setup.noArtifacts aggregate (macros, ygg) dependsOn ygg also (
   initialCommands in console := repl
 )
 
-lazy val ygg = project.setup deps (
+lazy val macros = project.setup also macroDependencies
+
+lazy val ygg = project.setup dependsOn (macros) deps (
 
   "org.spire-math" %% "jawn-parser"       % "0.9.0",
-  "io.circe"       %% "circe-literal"     % circeVersion,
-  "io.circe"       %% "circe-generic"     % circeVersion,
   "org.mapdb"      %  "mapdb"             % "3.0.1",
   "org.spire-math" %% "spire-macros"      % "0.11.0",
   "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),

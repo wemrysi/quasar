@@ -5,6 +5,11 @@ import sbt._, Keys._
 object Build {
   val BothScopes = "compile->compile;test->test"
 
+  def scalazVersion     = "7.2.4"
+  def specsVersion      = "3.8.4-scalacheck-1.12.5"
+  def scalacheckVersion = "1.12.5"
+  def circeVersion      = "0.4.1"
+
   // Careful, this makes sbt recompile everything whenever anything
   // in the build definition changes.
   //
@@ -12,6 +17,14 @@ object Build {
   val warningArgs = Seq("-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-numeric-widen")
   val stdArgs     = Seq("-deprecation", "-unchecked", "-language:_")
   val consoleArgs = Seq("-language:_")
+
+  def macroDependencies: Seq[Setting[_]] = Seq(
+    libraryDependencies ++= Seq(
+      "io.circe"       %% "circe-generic"  % circeVersion,
+      "org.scala-lang" %  "scala-compiler" % scalaVersion.value % "provided",
+      macroParadise
+    )
+  )
 
   // val Default = IncOptions(
   //   //    1. recompile changed sources
