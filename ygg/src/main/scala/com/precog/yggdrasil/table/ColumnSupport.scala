@@ -183,7 +183,7 @@ class RangeColumn(range: Range) { this: Column =>
 
 class EmptyColumn[T <: Column] { this: T =>
   def isDefinedAt(row: Int)    = false
-  def apply(row: Int): Nothing = sys.error("Undefined.")
+  def apply(row: Int): Nothing = abort("Undefined.")
 }
 
 abstract class ArraySetColumn[T <: Column](val tpe: CType, protected val backing: Array[T]) { this: T =>

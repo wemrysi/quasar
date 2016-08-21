@@ -63,7 +63,7 @@ class JNumSpec extends quasar.Qspec {
         (d1 compare d2) must be_<(1)
         (n1 compare n2) must be_<(1)
 
-      case _ => sys.error("invalid starting data")
+      case _ => abort("invalid starting data")
     }
   }
 }

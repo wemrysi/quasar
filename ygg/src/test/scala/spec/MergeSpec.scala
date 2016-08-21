@@ -36,16 +36,16 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType)                                       = sys.error("todo")
+    def load(apiKey: APIKey, jtpe: JType)                                       = abort("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
-      sys.error("todo")
+      abort("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[Need, Slice], size: TableSize)                                                           = new Table(slices, size)
     def singleton(slice: Slice)                                                                                        = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = sys.error("not implemented here")
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = abort("not implemented here")
   }
 
   object Table extends TableCompanion
@@ -145,7 +145,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
             case K1 => r1
             case K2 => r2
             case K3 => r3
-            case _  => sys.error("Unexpected group key")
+            case _  => abort("Unexpected group key")
           }
         }
       }
@@ -253,7 +253,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
             case K1 => r1
             case K2 => r2
             case K3 => r3
-            case _  => sys.error("Unexpected group key")
+            case _  => abort("Unexpected group key")
           }
         }
       }

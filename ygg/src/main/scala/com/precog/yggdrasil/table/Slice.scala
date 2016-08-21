@@ -159,7 +159,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
           def isDefinedAt(row: Int)          = loopForall[StrColumn](strcols)(row)
           def apply(row: Int): Array[String] = inflate(cols, row)
         }
-      case _ => sys.error("unsupported type")
+      case _ => abort("unsupported type")
     }
 
     def key = ColumnRef(CPath(CPathArray), CArrayType(tpe0))
@@ -227,7 +227,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         (ColumnRef.id(CEmptyArray), new EmptyArrayColumn {
           def isDefinedAt(row: Int) = source.isDefinedAt(row)
         })
-      case CUndefined => sys.error("Cannot define a constant undefined value")
+      case CUndefined => abort("Cannot define a constant undefined value")
     }))
 
   def deref(node: CPathNode): Slice = Slice(
@@ -346,7 +346,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
           Some((ref, new HomogeneousArrayColumn[a] {
             val tpe                       = ctype
             def isDefinedAt(row: Int)     = col.isDefinedAt(row)
-            def apply(row: Int): Array[a] = trans(col(row).asInstanceOf[Array[a]]) getOrElse sys.error("Oh dear, this cannot be happening to me.")
+            def apply(row: Int): Array[a] = trans(col(row).asInstanceOf[Array[a]]) getOrElse abort("Oh dear, this cannot be happening to me.")
           }))
 
         case (ref, col) => Some(ref -> col)
@@ -815,7 +815,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         ncol
 
       case col =>
-        sys.error("Cannot materialise non-standard (extensible) column")
+        abort("Cannot materialise non-standard (extensible) column")
     }
   )
 
@@ -878,7 +878,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
             case CPathMeta(_) :: _ => target
 
-            case CPathArray :: _ => sys.error("todo")
+            case CPathArray :: _ => abort("todo")
 
             case Nil => {
               val node = SchemaNode.Leaf(ctype, col)
@@ -1602,7 +1602,7 @@ object Slice {
               c.update(sliceIndex, true)
             }
           case x =>
-            sys.error(s"Unexpected arg $x")
+            abort(s"Unexpected arg $x")
         }
 
         acc + (ref -> updatedColumn)
@@ -1665,7 +1665,7 @@ object Slice {
     jv.flattenWithPath.foldLeft(into) {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>
-        val ctype = CType.forJValue(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
+        val ctype = CType.forJValue(v) getOrElse { abort("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
         val ref   = ColumnRef(CPath(jpath), ctype)
 
         val updatedColumn: ArrayColumn[_] = v match {
@@ -1691,7 +1691,7 @@ object Slice {
                   c.update(sliceIndex, d)
                 }
 
-              case _ => sys.error("non-numeric type reached")
+              case _ => abort("non-numeric type reached")
             }
 
           case JString(s) =>
@@ -1714,7 +1714,7 @@ object Slice {
               c.update(sliceIndex, true)
             }
 
-          case _ => sys.error("non-flattened value reached")
+          case _ => abort("non-flattened value reached")
         }
 
         acc + (ref -> updatedColumn)

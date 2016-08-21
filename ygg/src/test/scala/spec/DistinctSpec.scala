@@ -108,7 +108,7 @@ trait DistinctSpec extends ColumnarTableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected a JArray")
+      case _          => abort("Expected a JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -188,7 +188,7 @@ trait DistinctSpec extends ColumnarTableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)

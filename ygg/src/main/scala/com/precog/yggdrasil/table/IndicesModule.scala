@@ -447,7 +447,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
     def joinSubSlices(tpls: List[(SliceIndex, (Seq[Int], Seq[RValue]))]): Slice =
       tpls match {
         case Nil =>
-          sys.error("empty slice") // FIXME
+          abort("empty slice") // FIXME
         case (index, (ids, vals)) :: tail =>
           var rows = index.getRowsForKeys(ids, vals)
           tail.foreach {

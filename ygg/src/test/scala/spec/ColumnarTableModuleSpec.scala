@@ -51,9 +51,9 @@ class ColumnarTableModuleSpec
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType) = sys.error("todo")
+    def load(apiKey: APIKey, jtpe: JType) = abort("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = abort("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
@@ -62,7 +62,7 @@ class ColumnarTableModuleSpec
     def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
 
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] =
-      sys.error("not implemented here")
+      abort("not implemented here")
   }
 
   object Table extends TableCompanion

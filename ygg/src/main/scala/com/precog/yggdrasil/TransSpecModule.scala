@@ -19,6 +19,7 @@
  */
 package quasar.ygg
 
+import blueeyes._
 import com.precog.common._
 import ygg.api._
 import ygg.json._
@@ -154,7 +155,7 @@ trait TransSpecModule extends FNModule {
           (t1, t2) match {
             case (t1: ObjectSpec[_], t2: ObjectSpec[_]) => trans.InnerObjectConcat(t1, t2)
             case (t1: ArraySpec[_], t2: ArraySpec[_])   => trans.InnerArrayConcat(t1, t2)
-            case _                                      => sys.error("cannot have this")
+            case _                                      => abort("cannot have this")
           }
         }
 

@@ -230,7 +230,7 @@ trait DateColumn extends Column with (Int => DateTime) {
 
 trait PeriodColumn extends Column with (Int => Period) {
   def apply(row: Int): Period
-  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+  def rowCompare(row1: Int, row2: Int): Int = abort("Cannot compare periods.")
 
   override val tpe                        = CPeriod
   override def jValue(row: Int)           = JString(this(row).toString)
@@ -320,7 +320,7 @@ object Column {
     case CEmptyArray                         => new InfiniteColumn with EmptyArrayColumn
     case CNull                               => new InfiniteColumn with NullColumn
     case CUndefined                          => UndefinedColumn.raw
-    case _                                   => sys.error(s"Unexpected arg $cv")
+    case _                                   => abort(s"Unexpected arg $cv")
   }
 
   @inline def const(v: Boolean) = new InfiniteColumn with BoolColumn {
@@ -359,7 +359,7 @@ object Column {
   object unionRightSemigroup extends Semigroup[Column] {
     def append(c1: Column, c2: => Column): Column = {
       cf.UnionRight(c1, c2) getOrElse {
-        sys.error("Illgal attempt to merge columns of dissimilar type: " + c1.tpe + "," + c2.tpe)
+        abort("Illgal attempt to merge columns of dissimilar type: " + c1.tpe + "," + c2.tpe)
       }
     }
   }

@@ -896,7 +896,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
                           case None =>
                             //println("lhead\n" + lkey.toJsonString())
                             //println("rhead\n" + rkey.toJsonString())
-                            sys.error(
+                            abort(
                               "Inputs are not sorted; value on the left exceeded value on the right at the end of equal span. lpos = %d, rpos = %d"
                                 .format(lpos, rpos))
 
@@ -924,7 +924,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
                     // then continue in the cartesian
                     NextCartesianLeft(leftPosition, rightPosition.copy(pos = rpos), rightStart, rightEnd)
                   } else {
-                    sys.error("This state should be unreachable, since we only increment one side at a time.")
+                    abort("This state should be unreachable, since we only increment one side at a time.")
                   }
 
                 case None =>
@@ -948,7 +948,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
                     // left side is exhausted, so we should just split the right and emit
                     SplitRight(rpos)
                   } else {
-                    sys.error("This state should be unreachable, since we only increment one side at a time.")
+                    abort("This state should be unreachable, since we only increment one side at a time.")
                   }
               }
             }
@@ -1432,15 +1432,15 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
             } else if (midOrd eq EQ) {
               findEnd(compare, imid, imax - 1)
             } else {
-              sys.error("Inputs to partitionMerge not sorted.")
+              abort("Inputs to partitionMerge not sorted.")
             }
           } else {
-            sys.error("Inputs to partitionMerge not sorted.")
+            abort("Inputs to partitionMerge not sorted.")
           }
         } else if ((minOrd eq LT) && (compare(imax) eq LT)) {
           imin
         } else {
-          sys.error("Inputs to partitionMerge not sorted.")
+          abort("Inputs to partitionMerge not sorted.")
         }
       }
 
@@ -1566,7 +1566,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           case CEmptyObject           => JObjectFixedT(Map.empty)
           case CEmptyArray            => JArrayFixedT(Map.empty)
           case CNull                  => JNullT
-          case CUndefined             => sys.error("not supported")
+          case CUndefined             => abort("not supported")
         }
 
         def fresh(paths: List[CPathNode], leaf: JType): Option[JType] = paths match {
@@ -1595,7 +1595,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           case (None, paths) =>
             fresh(paths, leaf)
           case (jtype, paths) =>
-            sys.error("Invalid schema.") // This shouldn't happen for any real data.
+            abort("Invalid schema.") // This shouldn't happen for any real data.
         }
 
         cols.foldLeft(None: Option[JType]) {

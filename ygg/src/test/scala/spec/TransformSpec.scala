@@ -197,7 +197,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -240,7 +240,7 @@ trait TransformSpec extends TableQspec {
       val results = toJson(table.transform {
         DerefObjectStatic(Leaf(Source), fieldHead match {
           case JPathField(s) => CPathField(s)
-          case _             => sys.error("non-field reached")
+          case _             => abort("non-field reached")
         })
       })
 
@@ -264,7 +264,7 @@ trait TransformSpec extends TableQspec {
       val results = toJson(table.transform {
         DerefArrayStatic(Leaf(Source), fieldHead match {
           case JPathIndex(s) => CPathIndex(s)
-          case _             => sys.error("non-index reached")
+          case _             => abort("non-index reached")
         })
       })
 
@@ -364,7 +364,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("expected JArray")
+      case _          => abort("expected JArray")
     }).map { k =>
       { JObject(List(JField("value", k), JField("key", JArray(List(JNum(0)))))) }
     }.toStream
@@ -397,7 +397,7 @@ trait TransformSpec extends TableQspec {
         else
           jo + JField("value", JBool(false))
       }
-      case _ => sys.error("unreachable case")
+      case _ => abort("unreachable case")
     }).toStream
 
     results.copoint must_== expected
@@ -421,7 +421,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -460,7 +460,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -502,7 +502,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -538,7 +538,7 @@ trait TransformSpec extends TableQspec {
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
-      case _          => sys.error("Expected JArray")
+      case _          => abort("Expected JArray")
     }).toStream
 
     val sample = SampleData(data)
@@ -1557,7 +1557,7 @@ trait TransformSpec extends TableQspec {
     // the jtype that chooses all of the elements of the non-random data.
     val jtpe = JObjectFixedT(
       Map(
-        "value" -> Schema.mkType(cschema).getOrElse(sys.error("Could not generate JType from schema " + cschema)),
+        "value" -> Schema.mkType(cschema).getOrElse(abort("Could not generate JType from schema " + cschema)),
         "key"   -> JArrayUnfixedT
       ))
 
@@ -1619,7 +1619,7 @@ trait TransformSpec extends TableQspec {
     // the jtype that chooses all of the elements of the non-random data.
     val jtpe = JObjectFixedT(
       Map(
-        "value" -> Schema.mkType(cschema).getOrElse(sys.error("Could not generate JType from schema " + cschema)),
+        "value" -> Schema.mkType(cschema).getOrElse(abort("Could not generate JType from schema " + cschema)),
         "key"   -> JArrayUnfixedT
       ))
 
@@ -2043,7 +2043,7 @@ trait TransformSpec extends TableQspec {
           }
 
         case (JPath(JPathField("key") :: _), _) => true
-        case _                                  => sys.error("Unexpected JValue schema for " + jv)
+        case _                                  => abort("Unexpected JValue schema for " + jv)
       }
 
       JValue.unflatten(filtered)

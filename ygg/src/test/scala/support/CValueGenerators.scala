@@ -118,7 +118,7 @@ trait CValueGenerators {
       case (acc, (selector, jv)) => acc.unsafeInsert(selector, jv)
     }
 
-    if (result != JUndefined || parts.isEmpty) result else sys.error("Cannot build object from " + parts)
+    if (result != JUndefined || parts.isEmpty) result else abort("Cannot build object from " + parts)
   }
 }
 
@@ -162,6 +162,6 @@ trait JdbmCValueGenerators {
     case CNull              => Gen.const(CNull)
     case CEmptyObject       => Gen.const(CEmptyObject)
     case CEmptyArray        => Gen.const(CEmptyArray)
-    case invalid            => sys.error("No values for type " + invalid)
+    case invalid            => abort("No values for type " + invalid)
   }
 }

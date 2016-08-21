@@ -96,7 +96,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
 
   trait BaseBlockStoreTestTableCompanion extends SliceColumnarTableCompanion
 
-  def userMetadataView(apiKey: APIKey) = sys.error("TODO")
+  def userMetadataView(apiKey: APIKey) = abort("TODO")
 
   def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
     case (_: JNum, CNum | CLong | CDouble) => true
@@ -116,7 +116,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
           sortKey.nodes.foldLeft[TransSpec1](DerefObjectStatic(Leaf(Source), CPathField("value"))) {
             case (innerSpec, field: CPathField) => DerefObjectStatic(innerSpec, field)
             case (innerSpec, index: CPathIndex) => DerefArrayStatic(innerSpec, index)
-            case x                              => sys.error(s"Unexpected arg $x")
+            case x                              => abort(s"Unexpected arg $x")
           },
           "%09d".format(idx)
         )

@@ -84,14 +84,14 @@ object JValue {
                 val (child, rest) = obj.partitionField(name)
                 rest + JField(name, rec(child, JPath(nodes), value))
 
-              case JPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case JPathIndex(_) :: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case Nil                => fail()
             }
 
           case arr @ JArray(elements) =>
             path.nodes match {
               case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
-              case JPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case JPathField(_) :: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case Nil                        => fail()
             }
 

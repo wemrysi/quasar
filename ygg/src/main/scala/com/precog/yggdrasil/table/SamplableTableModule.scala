@@ -149,7 +149,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule { self: Columnar
         case CNull                => MutableNullColumn.empty()
         case CEmptyObject         => MutableEmptyObjectColumn.empty()
         case CEmptyArray          => MutableEmptyArrayColumn.empty()
-        case CUndefined           => sys.error("this shouldn't exist")
+        case CUndefined           => abort("this shouldn't exist")
       })
     }
 
@@ -208,7 +208,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule { self: Columnar
               def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
             }
           case (src, dest) =>
-            sys.error("Slice lied about column type. Expected %s, but found %s." format (ref.ctype, src.tpe))
+            abort("Slice lied about column type. Expected %s, but found %s." format (ref.ctype, src.tpe))
         }
     }
   }

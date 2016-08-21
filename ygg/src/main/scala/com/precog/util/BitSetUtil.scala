@@ -42,7 +42,7 @@ object BitSetUtil {
 
     def min(): Int = {
       val n = bs.nextSetBit(0)
-      if (n < 0) sys.error("can't take min of empty set") else n
+      if (n < 0) abort("can't take min of empty set") else n
     }
 
     def max(): Int = {
@@ -58,7 +58,7 @@ object BitSetUtil {
         if (ns(i) != 0) return findBit(i * 64, -1)
         i -= 1
       }
-      sys.error("can't find max of empty set")
+      abort("can't find max of empty set")
     }
 
     def foreach(f: Int => Unit) = {

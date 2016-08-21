@@ -422,7 +422,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                     //println("Found equal on left.")
                     buildFilters(comparator, lidx + 1, lsize, lacc + lidx, ridx, rsize, racc, LeftSpan)
                   case LT =>
-                    sys.error("Inputs to align are not correctly sorted.")
+                    abort("Inputs to align are not correctly sorted.")
                   case GT =>
                     buildFilters(comparator, lidx, lsize, lacc, ridx, rsize, racc, NoSpan)
                 }
@@ -446,7 +446,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                       buildFilters(comparator, lidx + 1, lsize, lacc, ridx, rsize, racc, NoSpan)
                     }
                   case GT =>
-                    if (span eq RightSpan) sys.error("Inputs to align are not correctly sorted")
+                    if (span eq RightSpan) abort("Inputs to align are not correctly sorted")
                     else buildFilters(comparator, lidx, lsize, lacc, ridx + 1, rsize, racc, NoSpan)
                 }
               } else if (lidx < lsize) {

@@ -215,7 +215,7 @@ trait RowFormatSupport { self: StdCodecs =>
         def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = None
       }
 
-    case (cType, col) => sys.error("Cannot create column encoder, columns of wrong type (expected %s, found %s)." format (cType, col.tpe))
+    case (cType, col) => abort("Cannot create column encoder, columns of wrong type (expected %s, found %s)." format (cType, col.tpe))
   }
 
   protected trait ColumnValueDecoder {
@@ -263,7 +263,7 @@ trait RowFormatSupport { self: StdCodecs =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, true)
       }
-    case _ => sys.error("Cannot create column decoder, columns of wrong type.")
+    case _ => abort("Cannot create column decoder, columns of wrong type.")
   }
 
   protected def encodeRow(row: Int, undefined: RawBitSet, encoders: Array[ColumnValueEncoder], init: ByteBuffer, pool: ByteBufferPool): Array[Byte] = {
@@ -722,7 +722,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
             math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
           case FPeriod =>
             math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
-          case x => sys.error("Match error for: " + x)
+          case x => abort("Match error for: " + x)
         }
       } else {
         (aType.toInt & 0xFF) - (bType.toInt & 0xFF)
@@ -857,7 +857,7 @@ trait IdentitiesRowFormat extends RowFormat {
     @tailrec
     def sumPackedSize(cvals: List[CValue], len: Int): Int = cvals match {
       case CLong(n) :: cvals => sumPackedSize(cvals, len + packedSize(n))
-      case cv :: _           => sys.error("Expecting CLong, but found: " + cv)
+      case cv :: _           => abort("Expecting CLong, but found: " + cv)
       case Nil               => len
     }
 
@@ -901,7 +901,7 @@ trait IdentitiesRowFormat extends RowFormat {
 
     val longCols: Array[LongColumn] = cols.map({
       case col: LongColumn => col
-      case col             => sys.error("Expecing LongColumn, but found: " + col)
+      case col             => abort("Expecing LongColumn, but found: " + col)
     })(collection.breakOut)
 
     new ColumnEncoder {
@@ -932,7 +932,7 @@ trait IdentitiesRowFormat extends RowFormat {
 
     val longCols: Array[ArrayLongColumn] = cols.map({
       case col: ArrayLongColumn => col
-      case col                  => sys.error("Expecing ArrayLongColumn, but found: " + col)
+      case col                  => abort("Expecing ArrayLongColumn, but found: " + col)
     })(collection.breakOut)
 
     new ColumnDecoder {

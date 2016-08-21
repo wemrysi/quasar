@@ -225,7 +225,7 @@ object CPath {
             node match {
               case (field: CPathField) => FieldNode(field, recurse(paths))
               case (index: CPathIndex) => IndexNode(index, recurse(paths))
-              case _                   => sys.error("CPathArray and CPathMeta not supported")
+              case _                   => abort("CPathArray and CPathMeta not supported")
             }
         }
         result

@@ -191,7 +191,7 @@ package object json {
     def isDefined = self != JUndefined
 
     def normalize: JValue = self match {
-      case JUndefined       => sys error "Can't normalize JUndefined"
+      case JUndefined       => abort("Can't normalize JUndefined")
       case JObject(fields)  => JObject(fields filter (_._2.isDefined) mapValues (_.normalize) toMap)
       case JArray(elements) => JArray(elements filter (_.isDefined) map (_.normalize))
       case _                => self
@@ -213,7 +213,7 @@ package object json {
     /**
       * Returns the element as a JValue of the specified class.
       */
-    def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(sys.error("Expected class " + clazz + ", but found: " + self.getClass))
+    def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(abort("Expected class " + clazz + ", but found: " + self.getClass))
 
     /**
       * Returns the element as an option of a JValue of the specified class.
@@ -315,7 +315,7 @@ package object json {
                 rest + JField(name, child.set(JPath(nodes), value))
 
               case x =>
-                sys.error("Objects are not indexed: attempted to set " + path + " on " + self)
+                abort("Objects are not indexed: attempted to set " + path + " on " + self)
             }
 
           case arr @ JArray(elements) =>
@@ -323,7 +323,7 @@ package object json {
               case JPathIndex(index) :: nodes =>
                 JArray(arraySet(elements, index, JPath(nodes), value))
               case x =>
-                sys.error("Arrays have no fields: attempted to set " + path + " on " + self)
+                abort("Arrays have no fields: attempted to set " + path + " on " + self)
             }
 
           case _ =>

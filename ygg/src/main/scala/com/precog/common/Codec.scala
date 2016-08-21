@@ -279,7 +279,7 @@ object Codec {
     def read(src: ByteBuffer): Boolean = src.get() match {
       case TRUE_VALUE  => true
       case FALSE_VALUE => false
-      case invalid     => sys.error("Error reading boolean: expecting %d or %d, found %d" format (TRUE_VALUE, FALSE_VALUE, invalid))
+      case invalid     => abort("Error reading boolean: expecting %d or %d, found %d" format (TRUE_VALUE, FALSE_VALUE, invalid))
     }
   }
 

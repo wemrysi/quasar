@@ -59,7 +59,7 @@ trait RowComparator { self =>
           val lmid = lmin + ((lmax - lmin) / 2)
           compare(lmid, ridx) match {
             case LT => nextLeftIndex(lmid + 1, lmax, ridx)
-            case GT => sys.error("inputs on the left not sorted.")
+            case GT => abort("inputs on the left not sorted.")
             case EQ => nextLeftIndex(lmin, lmid - 1, ridx)
           }
         }

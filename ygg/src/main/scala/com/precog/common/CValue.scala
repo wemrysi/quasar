@@ -73,9 +73,9 @@ object RValue {
                 val (child, rest) = (fields.get(name).getOrElse(CUndefined), fields - name)
                 RObject(rest + (name -> rec(child, CPath(nodes), value)))
 
-              case CPathIndex(_) :: _ => sys.error("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathIndex(_) :: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
-                sys.error(
+                abort(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
                     " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
             }
@@ -83,9 +83,9 @@ object RValue {
           case arr @ RArray(elements) =>
             path.nodes match {
               case CPathIndex(index) :: nodes => RArray(arrayInsert(elements, index, CPath(nodes), value))
-              case CPathField(_) :: _         => sys.error("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathField(_) :: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
-                sys.error(
+                abort(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
                     " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
             }
@@ -95,12 +95,12 @@ object RValue {
               case Nil                => value
               case CPathIndex(_) :: _ => rec(RArray.empty, path, value)
               case CPathField(_) :: _ => rec(RObject.empty, path, value)
-              case CPathArray :: _    => sys.error("todo")
-              case CPathMeta(_) :: _  => sys.error("todo")
+              case CPathArray :: _    => abort("todo")
+              case CPathMeta(_) :: _  => abort("todo")
             }
 
           case x =>
-            sys.error(
+            abort(
               "RValue insert would overwrite existing data: " + x + " cannot be updated to " + value + " at " + path +
                 " in unsafeInsert of " + rootValue + " at " + rootPath + " in " + rootTarget)
         }
@@ -218,7 +218,7 @@ object CType {
     case CArrayType(elemType) => "Array[%s]" format nameOf(elemType)
     case CDate                => "Timestamp"
     case CPeriod              => "Period"
-    case CUndefined           => sys.error("CUndefined cannot be serialized")
+    case CUndefined           => abort("CUndefined cannot be serialized")
   }
 
   val ArrayName = """Array[(.*)]""".r
@@ -268,7 +268,7 @@ object CType {
         case _             => CNum(d)
       }
     case JArray(_) =>
-      sys.error("TODO: Allow for homogeneous JArrays -> CArray.")
+      abort("TODO: Allow for homogeneous JArrays -> CArray.")
   }
 
   @inline
@@ -391,7 +391,7 @@ case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()
     } find (_ != EQ) getOrElse Ordering.fromInt(as.size - bs.size)
 
   def jValueFor(as: Array[A]) =
-    sys.error("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
+    abort("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
 }
 
 //
@@ -470,7 +470,7 @@ case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
 
 case object CDate extends CValueType[DateTime] {
   def readResolve()                     = CDate
-  def order(v1: DateTime, v2: DateTime) = sys.error("todo")
+  def order(v1: DateTime, v2: DateTime) = abort("todo")
   def jValueFor(v: DateTime)            = JString(v.toString)
 }
 
@@ -480,7 +480,7 @@ case class CPeriod(value: Period) extends CWrappedValue[Period] {
 
 case object CPeriod extends CValueType[Period] {
   def readResolve()                 = CPeriod
-  def order(v1: Period, v2: Period) = sys.error("todo")
+  def order(v1: Period, v2: Period) = abort("todo")
   def jValueFor(v: Period)          = JString(v.toString)
 }
 
