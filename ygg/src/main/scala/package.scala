@@ -8,6 +8,7 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
 
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
+    def slurpString(): String     = new String(slurpBytes, Utf8Charset)
   }
 
   implicit class ScalaMapOps[K, V, CC[B] <: Traversable[B]](left: scMap[K, CC[V]]) {

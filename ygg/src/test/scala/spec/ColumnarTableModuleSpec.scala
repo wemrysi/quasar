@@ -51,8 +51,9 @@ class ColumnarTableModuleSpec
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType) = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
+
+    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
   }
 
@@ -68,16 +69,12 @@ class ColumnarTableModuleSpec
   object Table extends TableCompanion
 
   def testConcat = {
-    val json1 = """{ "a": 1, "b": "x", "c": null }"""
-    val json2 = """[4, "foo", null, true]"""
+    val data1: Stream[JValue] = Stream.fill(25)(json"""{ "a": 1, "b": "x", "c": null }""")
+    val data2: Stream[JValue] = Stream.fill(35)(json"""[4, "foo", null, true]""")
 
-    val data1: Stream[JValue] = Stream.fill(25)(JParser.parseFromString(json1).fold(throw _, identity))
-    val data2: Stream[JValue] = Stream.fill(35)(JParser.parseFromString(json2).fold(throw _, identity))
-
-    val table1 = fromSample(SampleData(data1), Some(10))
-    val table2 = fromSample(SampleData(data2), Some(10))
-
-    val results = toJson(table1.concat(table2))
+    val table1   = fromSample(SampleData(data1), Some(10))
+    val table2   = fromSample(SampleData(data2), Some(10))
+    val results  = toJson(table1.concat(table2))
     val expected = data1 ++ data2
 
     results.copoint must_== expected

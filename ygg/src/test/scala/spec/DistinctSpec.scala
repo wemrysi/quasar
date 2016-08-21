@@ -19,92 +19,119 @@
  */
 package ygg.tests
 
+import blueeyes._
 import scalaz._, Scalaz._
 import ygg.json._
+import TestSupport._
 
 trait DistinctSpec extends ColumnarTableQspec {
   import SampleData._
   import trans._
 
   def testDistinctIdentity = {
-    implicit val gen = sort(distinct(sample(schema)))
+    implicit val gen: Arbitrary[SampleData] = sort(distinct(sample(schema)))
+
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
 
+      val table         = fromSample(sample)
       val distinctTable = table.distinct(Leaf(Source))
-
-      val result = toJson(distinctTable)
+      val result        = toJson(distinctTable)
 
       result.copoint must_== sample.data
     }
   }
 
   def testDistinctAcrossSlices = {
-    val array: JValue = JParser.parseUnsafe("""
-      [{
-        "value":{
-
-        },
-        "key":[1.0,1.0]
+    val array: JValue = json"""[
+      {
+        "value": {},
+        "key": [
+          1,
+          1
+        ]
       },
       {
-        "value":{
-
-        },
-        "key":[1.0,1.0]
+        "value": {},
+        "key": [
+          1,
+          1
+        ]
       },
       {
-        "value":{
-
-        },
-        "key":[2.0,1.0]
+        "value": {},
+        "key": [
+          2,
+          1
+        ]
       },
       {
-        "value":{
-
-        },
-        "key":[2.0,2.0]
+        "value": {},
+        "key": [
+          2,
+          2
+        ]
       },
       {
-        "value":{
-          "fzz":false,
-          "em":[{
-            "l":210574764564691785.5,
-            "fbk":-1.0
-          },[[],""]],
-          "z3y":[{
-            "wd":null,
-            "tv":false,
-            "o":[]
-          },{
-            "sry":{
-
+        "value": {
+          "fzz": false,
+          "em": [
+            {
+              "l": 210574764564691780,
+              "fbk": -1
             },
-            "in0":[]
-          }]
+            [
+              [],
+              ""
+            ]
+          ],
+          "z3y": [
+            {
+              "wd": null,
+              "tv": false,
+              "o": []
+            },
+            {
+              "sry": {},
+              "in0": []
+            }
+          ]
         },
-        "key":[1.0,2.0]
+        "key": [
+          1,
+          2
+        ]
       },
       {
-        "value":{
-          "fzz":false,
-          "em":[{
-            "l":210574764564691785.5,
-            "fbk":-1.0
-          },[[],""]],
-          "z3y":[{
-            "wd":null,
-            "tv":false,
-            "o":[]
-          },{
-            "sry":{
-
+        "value": {
+          "fzz": false,
+          "em": [
+            {
+              "l": 210574764564691780,
+              "fbk": -1
             },
-            "in0":[]
-          }]
+            [
+              [],
+              ""
+            ]
+          ],
+          "z3y": [
+            {
+              "wd": null,
+              "tv": false,
+              "o": []
+            },
+            {
+              "sry": {},
+              "in0": []
+            }
+          ]
         },
-        "key":[1.0,2.0]
-      }]""")
+        "key": [
+          1,
+          2
+        ]
+      }
+    ]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -113,7 +140,6 @@ trait DistinctSpec extends ColumnarTableQspec {
 
     val sample = SampleData(data)
     val table  = fromSample(sample, Some(5))
-
     val result = toJson(table.distinct(Leaf(Source)))
 
     result.copoint must_== sample.data.toSeq.distinct
