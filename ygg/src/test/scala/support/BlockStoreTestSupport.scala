@@ -96,7 +96,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
 
   trait BaseBlockStoreTestTableCompanion extends SliceColumnarTableCompanion
 
-  def userMetadataView(apiKey: APIKey) = abort("TODO")
+  def userMetadataView(apiKey: APIKey) = ???
 
   def compliesWithSchema(jv: JValue, ctype: CType): Boolean = (jv, ctype) match {
     case (_: JNum, CNum | CLong | CDouble) => true

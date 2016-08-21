@@ -38,10 +38,10 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType)                                       = abort("todo")
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = abort("todo")
+    def load(apiKey: APIKey, jtpe: JType)                                       = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = ???
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
-      abort("todo")
+      ???
   }
 
   trait TableCompanion extends ColumnarTableCompanion {

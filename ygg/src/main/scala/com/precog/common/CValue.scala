@@ -95,8 +95,8 @@ object RValue {
               case Nil                => value
               case CPathIndex(_) :: _ => rec(RArray.empty, path, value)
               case CPathField(_) :: _ => rec(RObject.empty, path, value)
-              case CPathArray :: _    => abort("todo")
-              case CPathMeta(_) :: _  => abort("todo")
+              case CPathArray :: _    => ???
+              case CPathMeta(_) :: _  => ???
             }
 
           case x =>
@@ -470,7 +470,7 @@ case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
 
 case object CDate extends CValueType[DateTime] {
   def readResolve()                     = CDate
-  def order(v1: DateTime, v2: DateTime) = abort("todo")
+  def order(v1: DateTime, v2: DateTime) = ???
   def jValueFor(v: DateTime)            = JString(v.toString)
 }
 
@@ -480,7 +480,7 @@ case class CPeriod(value: Period) extends CWrappedValue[Period] {
 
 case object CPeriod extends CValueType[Period] {
   def readResolve()                 = CPeriod
-  def order(v1: Period, v2: Period) = abort("todo")
+  def order(v1: Period, v2: Period) = ???
   def jValueFor(v: Period)          = JString(v.toString)
 }
 

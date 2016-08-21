@@ -51,9 +51,9 @@ class ColumnarTableModuleSpec
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType) = abort("todo")
+    def load(apiKey: APIKey, jtpe: JType) = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = abort("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
   }
 
   trait TableCompanion extends ColumnarTableCompanion {

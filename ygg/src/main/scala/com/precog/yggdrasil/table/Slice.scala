@@ -878,7 +878,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
             case CPathMeta(_) :: _ => target
 
-            case CPathArray :: _ => abort("todo")
+            case CPathArray :: _ => ???
 
             case Nil => {
               val node = SchemaNode.Leaf(ctype, col)
