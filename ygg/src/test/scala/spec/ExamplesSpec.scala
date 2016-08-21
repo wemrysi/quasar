@@ -9,13 +9,13 @@ class ExamplesSpec extends quasar.Qspec {
 
   "Lotto example" in {
     val json          = parseUnsafe(lotto)
-    val renderedLotto = json.renderCompact
+    val renderedLotto = json.render
     json mustEqual parseUnsafe(renderedLotto)
   }
 
   "Person example" in {
     val json           = parseUnsafe(person)
-    val renderedPerson = json.renderPretty
+    val renderedPerson = json.render
     json mustEqual parseUnsafe(renderedPerson)
     //render(json) mustEqual render(personDSL)
     //compact(render(json \\ "name")) mustEqual """["Joe","Marilyn"]"""
@@ -24,7 +24,7 @@ class ExamplesSpec extends quasar.Qspec {
 
   "Transformation example" in {
     val uppercased = parseUnsafe(person).transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
-    val rendered   = uppercased.renderCompact
+    val rendered   = uppercased.render
     rendered.contains(""""NAME":"Joe"""") mustEqual true
     rendered.contains(""""AGE":35.0""") mustEqual true
     //rendered mustEqual
@@ -33,7 +33,7 @@ class ExamplesSpec extends quasar.Qspec {
 
   "Remove example" in {
     val json = parseUnsafe(person) remove { _ == JString("Marilyn") }
-    (json \\ "name").renderCompact mustEqual "\"Joe\""
+    (json \\ "name").render mustEqual "\"Joe\""
   }
 
   "Quoted example" in {
@@ -41,11 +41,11 @@ class ExamplesSpec extends quasar.Qspec {
   }
 
   "Null example" in {
-    parseUnsafe(""" {"name": null} """).renderCompact mustEqual """{"name":null}"""
+    parseUnsafe(""" {"name": null} """).render mustEqual """{"name":null}"""
   }
 
   "Symbol example" in {
-    symbols.renderCompact mustEqual """{"f1":"foo","f2":"bar"}"""
+    symbols.render mustEqual """{"f1":"foo","f2":"bar"}"""
   }
 
   "Unicode example" in {
@@ -63,7 +63,7 @@ class ExamplesSpec extends quasar.Qspec {
     val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++
         JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
 
-    json.renderCompact mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
+    json.render mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
   }
 
   "Example which collects all integers and forms a new JSON" in {
@@ -74,7 +74,7 @@ class ExamplesSpec extends quasar.Qspec {
         case _       => a
       }
     }
-    val out = ints.renderCompact
+    val out = ints.render
     out == "[33.0,35.0]" || out == "[35.0,33.0]" mustEqual true
   }
 
@@ -94,13 +94,13 @@ class ExamplesSpec extends quasar.Qspec {
 
     val formed = form(
       NoJPath,
-      JPath("person"),
-      JPath("person.age"),
-      JPath("person.name"),
-      JPath("person.spouse"),
-      JPath("person.spouse.person"),
-      JPath("person.spouse.person.age"),
-      JPath("person.spouse.person.name")
+      "person",
+      "person.age",
+      "person.name",
+      "person.spouse",
+      "person.spouse.person",
+      "person.spouse.person.age",
+      "person.spouse.person.name"
     )
 
     folded mustEqual formed

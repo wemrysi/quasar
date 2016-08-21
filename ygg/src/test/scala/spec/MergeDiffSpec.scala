@@ -37,9 +37,9 @@ class MergeDiffSpec extends quasar.Qspec {
 
     val Diff(changes, additions, deletions) = json1 diff json2
 
-    changes.renderCanonical mustEqual expectedChanges.renderCanonical
-    additions.renderCanonical mustEqual expectedAdditions.renderCanonical
-    deletions.renderCanonical mustEqual expectedDeletions.renderCanonical
+    changes.render mustEqual expectedChanges.render
+    additions.render mustEqual expectedAdditions.render
+    deletions.render mustEqual expectedDeletions.render
   }
 
   private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)

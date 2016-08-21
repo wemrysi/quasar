@@ -11,7 +11,8 @@ import ygg.api._
   */
 sealed trait JValue extends Product with Ordered[JValue] with ToString {
   def compare(that: JValue): Int = this.typeIndex compare that.typeIndex
-  def to_s                       = this.renderPretty
+  def render: String             = CanonicalRenderer render this
+  def to_s: String               = render
 }
 sealed trait JContainer extends JValue {
   assert(contained forall (_ != null), contained)
@@ -25,11 +26,6 @@ sealed trait JContainer extends JValue {
 }
 
 object JValue {
-  sealed trait RenderMode
-  case object Pretty    extends RenderMode
-  case object Compact   extends RenderMode
-  case object Canonical extends RenderMode
-
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
 
   private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {

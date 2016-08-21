@@ -11,7 +11,7 @@ class JsonParserSpec extends quasar.Qspec {
   import JParser._
 
   "Any valid json can be parsed" in {
-    val parsing = (json: JValue) => { parseUnsafe(json.renderPretty); true }
+    val parsing = (json: JValue) => { parseUnsafe(json.render); true }
     prop(parsing)
   }
 

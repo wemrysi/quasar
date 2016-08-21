@@ -6,8 +6,6 @@ import scalaz._, Scalaz._
 import io.circe._
 
 package object json {
-  import JValue._
-
   type JFieldTuple = String -> JValue
   type Result[A]   = Validation[Throwable, A]
 
@@ -174,95 +172,6 @@ package object json {
     def \(that: JPathNode) = JPath(x :: that :: Nil)
   }
 
-  private def renderJArray(self: JArray, sb: StringBuilder, mode: RenderMode, indent: String) {
-    import self.elements
-    mode match {
-      case Compact =>
-        // render as compactly as possible
-        sb.append("[")
-        var seen = false
-        elements.foreach { v =>
-          if (seen) sb.append(",") else seen = true
-          renderJValue(v, sb, mode, "")
-        }
-        sb.append("]")
-
-      case _ =>
-        val indent2   = indent + "  "
-        val oneLine   = !self.isNested
-        val delimiter = if (oneLine) ", " else ",\n"
-
-        sb.append("[")
-        if (!oneLine) sb.append("\n")
-
-        var seen = false
-        elements.foreach { v =>
-          if (seen) sb.append(delimiter) else seen = true
-          if (!oneLine) sb.append(indent2)
-          renderJValue(v, sb, mode, indent2)
-        }
-
-        if (!oneLine) {
-          sb.append("\n")
-          sb.append(indent)
-        }
-        sb.append("]")
-    }
-  }
-
-  private def renderJValue(self: JValue, sb: StringBuilder, mode: RenderMode, indent: String): Unit = self match {
-    case JString(value) => JString.internalEscape(sb, value)
-    case x: JObject     => renderJObject(x, sb, mode, indent)
-    case x: JArray      => renderJArray(x, sb, mode, indent)
-    case _              => sb append self.renderCompact
-  }
-
-  private def renderJObject(self: JObject, sb: StringBuilder, mode: RenderMode, indent: String) {
-    import self.fields
-    mode match {
-      case Compact =>
-        // render as compactly as possible
-        sb.append("{")
-        var seen = false
-        fields.foreach {
-          case (k, v) =>
-            if (seen) sb.append(",") else seen = true
-            JString.internalEscape(sb, k)
-            sb.append(":")
-            renderJValue(v, sb, Compact, "")
-        }
-        sb.append("}")
-
-      case _ =>
-        val indent2   = indent + "  "
-        val oneLine   = fields.size < 4 && !self.isNested
-        val delimiter = if (oneLine) ", " else ",\n"
-
-        sb.append("{")
-        if (!oneLine) sb.append("\n")
-
-        var seen = false
-        def handlePair(tpl: (String, JValue)) {
-          if (seen) sb.append(delimiter) else seen = true
-          if (!oneLine) sb.append(indent2)
-          JString.internalEscape(sb, tpl._1)
-          sb.append(": ")
-          renderJValue(tpl._2, sb, mode, indent2)
-        }
-
-        if (mode == Canonical)
-          fields.toSeq.sorted.foreach(handlePair)
-        else
-          fields.foreach(handlePair)
-
-        if (!oneLine) {
-          sb.append("\n")
-          sb.append(indent)
-        }
-        sb.append("}")
-    }
-  }
-
   implicit class JValueOps(private val self: JValue) {
     import Validation._
 
@@ -280,29 +189,6 @@ package object json {
     }
 
     def isDefined = self != JUndefined
-
-    def renderPretty: String = self match {
-      case JString(s) => JString escape s
-      case x: JObject => buildString(renderJObject(x, _, Pretty, ""))
-      case x: JArray  => buildString(renderJArray(x, _, Pretty, ""))
-      case _          => renderCompact
-    }
-    def renderCanonical: String = self match {
-      case _: JArray | _: JObject => buildString(renderJValue(self, _, Canonical, ""))
-      case _                      => renderCompact
-    }
-    def renderCompact: String = self match {
-      case JNull      => "null"
-      case JUndefined => "<undef>"
-      case JTrue      => "true"
-      case JFalse     => "false"
-      case JString(s) => JString escape s
-      case x: JNum    => x.toRawString
-      case x: JObject => buildString(renderJObject(x, _, Compact, ""))
-      case x: JArray  => buildString(renderJArray(x, _, Compact, ""))
-    }
-
-    def to_s = renderPretty
 
     def normalize: JValue = self match {
       case JUndefined       => sys error "Can't normalize JUndefined"
