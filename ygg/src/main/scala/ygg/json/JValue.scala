@@ -241,7 +241,7 @@ case object JNum {
   def apply(value: Double): JValue =
     if (value.isNaN || isInfinite(value)) JUndefined else JNumDouble(value)
 
-  /** XXX private */ def apply(value: String): JNum = {
+  /* XXX private */ def apply(value: String): JNum = {
     assert(value != null)
     JNumStr(value)
   }

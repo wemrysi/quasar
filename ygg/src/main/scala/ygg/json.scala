@@ -33,6 +33,7 @@ package object json {
 
   implicit object CirceJsonEncoder extends Encoder[JValue] {
     def apply(x: JValue): Json = x match {
+      case JUndefined => Json.Null // ???
       case JNull      => Json.Null
       case JBool(x)   => Json fromBoolean x
       case JNum(x)    => Json fromBigDecimal x

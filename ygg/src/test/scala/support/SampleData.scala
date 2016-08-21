@@ -41,8 +41,8 @@ final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema]
 
 object SampleData extends CValueGenerators {
   def toRecord(ids: Array[Long], jv: JValue): JValue = json"""{
-    ".key" : $ids,
-    ".value" : $jv
+    "key" : $ids,
+    "value" : $jv
   }"""
 
   implicit def keyOrder[A]: Ord[Identities -> A] = tupledIdentitiesOrder[A](IdentitiesOrder)
