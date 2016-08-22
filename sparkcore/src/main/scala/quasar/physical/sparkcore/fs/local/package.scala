@@ -25,10 +25,10 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fp.TaskRef
 import quasar.fp.free._
-import quasar.fs.mount.ConnectionUri
 
 import java.io.PrintWriter
 
+import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -43,13 +43,12 @@ package object local {
 
   final case class SparkFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
-  def sparkFsDef[S[_]](uri: ConnectionUri)(implicit
+  def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
     S0: Task :<: S
   ): Free[S, SparkFSDef[S]] = {
 
     val genSc = Task.delay {
-      val conf = new SparkConf().setMaster(uri.value).setAppName ("quasar")
-      new SparkContext(conf)
+      new SparkContext(sparkConf.setAppName("quasar"))
     }
 
     lift((TaskRef(0L) |@|
@@ -73,16 +72,18 @@ package object local {
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
-        val fsDef = sparkFsDef(uri)
+        val fsConf = parseUri(uri).getOrElse(SparkFSConf(new SparkConf().setMaster("local[*]"), rootDir </> dir("rabbit")))
+
+          val fsDef = sparkFsDef(fsConf.sparkConf)
 
         fsDef.map { case SparkFSDef(run, close) =>
           FileSystemDef.DefinitionResult[Free[S, ?]]({
 
           val interpreter: FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-            queryfile.interperter[Eff],
-            corereadfile.interpret(readfile.input[Eff]),
-            writefile.interpret[Eff],
-            managefile.interpret[Eff])
+            queryfile.chrooted[Eff](fsConf.prefix),
+            corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
+            writefile.chrooted[Eff](fsConf.prefix),
+            managefile.chrooted[Eff](fsConf.prefix))
 
             interpreter andThen run
 
@@ -90,4 +91,5 @@ package object local {
           close)
       }.liftM[DefErrT]
     }
+
 }

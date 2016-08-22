@@ -34,8 +34,12 @@ import scalaz.concurrent.Task
 
 object queryfile {
 
-  def interperter[S[_]](implicit
-  s0: Task :<: S): QueryFile ~> Free[S, ?] =
+  def chrooted[S[_]](prefix: ADir)(implicit
+    s0: Task :<: S): QueryFile ~> Free[S, ?] =
+    flatMapSNT(interpret) compose chroot.queryFile[QueryFile](prefix)
+
+  def interpret[S[_]](implicit
+    s0: Task :<: S): QueryFile ~> Free[S, ?] =
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case FileExists(f) => fileExists(f)

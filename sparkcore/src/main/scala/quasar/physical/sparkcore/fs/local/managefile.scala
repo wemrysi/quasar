@@ -36,6 +36,11 @@ import scalaz.concurrent.Task
 
 object managefile {
 
+  def chrooted[S[_]](prefix: ADir)(implicit
+    s0: Task :<: S
+  ): ManageFile ~> Free[S, ?] =
+    flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
+
   def interpret[S[_]](implicit
     s0: Task :<: S
   ): ManageFile ~> Free[S, ?] =
