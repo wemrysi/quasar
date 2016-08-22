@@ -144,7 +144,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           "value":{ "fr8y":123473018907070400.0, "hw":[], "q":0E+35485 },
           "key":[4.0,4.0]
         }]
-    """.toYgg
+    """
 
     val sample = SampleData(elements.toStream, Some((2, List((JPath(".q"), CNum), (JPath(".hw"), CEmptyArray), (JPath(".fr8y"), CNum)))))
 

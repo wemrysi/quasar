@@ -2,7 +2,6 @@ package ygg.tests
 
 import MergeDiffData._
 import ygg.json._
-import JParser._
 
 class MergeDiffSpec extends quasar.Qspec {
   "Merge example" in {
@@ -42,5 +41,5 @@ class MergeDiffSpec extends quasar.Qspec {
     deletions.render mustEqual expectedDeletions.render
   }
 
-  private def read(resource: String) = parseUnsafe(scala.io.Source.fromInputStream(getClass.getResourceAsStream(resource)).getLines.mkString)
+  private def read(name: String) = JParser.parseFromResource[this.type](name)
 }

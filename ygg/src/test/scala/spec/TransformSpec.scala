@@ -193,7 +193,7 @@ trait TransformSpec extends TableQspec {
       {
         "value":-4611686018427387904,
         "key":[5.0]
-      }]""".toYgg
+      }]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -360,7 +360,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def checkEqualSelfArray = {
-    val array: JValue = json"""[[9,10,11]]""".toYgg
+    val array: JValue = json"""[[9,10,11]]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li

@@ -4,11 +4,22 @@ import jawn._
 import blueeyes._
 import scalaz._, Scalaz._
 
-package object json extends ygg.json.JsonMacros {
+package object json {
   type JFieldTuple = String -> JValue
   type Result[A]   = Validation[Throwable, A]
+  val Json         = io.circe.Json
+  val Encoder      = io.circe.Encoder
+  val Decoder      = io.circe.Decoder
+  type Json        = io.circe.Json
+  type Encoder[A]  = io.circe.Encoder[A]
+  type Decoder[A]  = io.circe.Decoder[A]
+  type HCursor     = io.circe.HCursor
 
   val NoJPath = JPath()
+
+  implicit final class JsonStringContext(sc: StringContext) {
+    final def json(args: Any*): JValue = macro ygg.macros.JsonMacros.jsonImpl
+  }
 
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
     type R = AsyncParse[A] -> AsyncParser[A]
@@ -22,36 +33,27 @@ package object json extends ygg.json.JsonMacros {
     }
   }
 
-  implicit def circeToJvalue(x: Json): JValue = x.as[JValue].toOption.get
-  implicit def jvalueToCirce(x: JValue): Json = CirceJsonEncoder(x)
+  implicit def circeToJvalue(x: Json): JValue = x.as[JValue].toOption getOrElse JUndefined
 
-  implicit object CirceJsonEncoder extends Encoder[JValue] {
-    def apply(x: JValue): Json = x match {
-      case JUndefined => Json.Null // ???
-      case JNull      => Json.Null
-      case JBool(x)   => Json fromBoolean x
-      case JNum(x)    => Json fromBigDecimal x
-      case JString(x) => Json fromString x
-      case JObject(x) => Json fromFields (x mapValues apply)
-      case JArray(x)  => Json arr (x map apply: _*)
-    }
+  implicit val CirceJsonEncoder: Encoder[JValue] = Encoder instance {
+    case JUndefined => Json.Null // ???
+    case JNull      => Json.Null
+    case JBool(x)   => Json fromBoolean x
+    case JNum(x)    => Json fromBigDecimal x
+    case JString(x) => Json fromString x
+    case JObject(x) => Json fromFields (x mapValues CirceJsonEncoder.apply)
+    case JArray(x)  => Json arr (x map CirceJsonEncoder.apply: _*)
   }
-  implicit object CirceJsonDecoder extends Decoder[JValue] {
-    private val dc = Decoder[Json] map (_.toYgg)
-    def apply(c: HCursor): Decoder.Result[JValue] = dc(c)
-  }
-
-  implicit class CirceJsonOps(private val c: Json) {
-    def toYgg: JValue = c.fold[JValue](
+  implicit val CirceJsonDecoder: Decoder[JValue] = Decoder[Json] map (c =>
+    c.fold[JValue](
       JNull,
       JBool(_),
       _.toBigDecimal.fold[JValue](JUndefined)(JNum(_)),
       JString(_),
-      xs => JArray(xs map (_.toYgg)),
-      x => JObject(x.toMap mapValues (_.toYgg) toMap)
+      xs => JArray(xs map circeToJvalue),
+      x => JObject(x.toMap mapValues circeToJvalue toMap)
     )
-  }
-
+  )
   implicit val YggFacade: SimpleFacade[JValue] = new SimpleFacade[JValue] {
     def jnull()                          = JNull
     def jfalse()                         = JFalse

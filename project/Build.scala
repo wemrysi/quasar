@@ -20,6 +20,7 @@ object Build {
 
   def macroDependencies: Seq[Setting[_]] = Seq(
     libraryDependencies ++= Seq(
+      "org.spire-math" %% "jawn-parser"    % "0.9.0",
       "io.circe"       %% "circe-generic"  % circeVersion,
       "org.scala-lang" %  "scala-compiler" % scalaVersion.value % "provided",
       macroParadise

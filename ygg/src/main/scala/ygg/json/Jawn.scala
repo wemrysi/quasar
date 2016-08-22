@@ -2,7 +2,7 @@ package ygg.json
 
 import jawn._
 import jawn.AsyncParser._
-import blueeyes.ByteBuffer
+import blueeyes._
 import scalaz.Validation.fromTryCatchNonFatal
 
 case class AsyncParse[A](errors: Seq[ParseException], values: Seq[A])
@@ -14,6 +14,9 @@ object AsyncParser {
 }
 
 object JParser {
+  def parseFromStream(in: InputStream): JValue                      = parseUnsafe(slurpString(in))
+  def parseFromResource[A: CTag](name: String): JValue              = parseUnsafe(slurpString(jResource[A](name)))
+  def parseFromFile(path: jPath): JValue                            = parseUnsafe(path.slurpString)
   def parseUnsafe(str: String): JValue                              = Parser.parseUnsafe[JValue](str)
   def parseFromString(str: String): Result[JValue]                  = fromTryCatchNonFatal( parseUnsafe(str) )
   def parseFromByteBuffer(buf: ByteBuffer): Result[JValue]          = Parser.parseFromByteBuffer[JValue](buf)

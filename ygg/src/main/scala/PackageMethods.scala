@@ -3,6 +3,7 @@ package ygg.pkg
 import java.nio.file._
 import java.math.MathContext.UNLIMITED
 import scala.collection.{ mutable => scm, immutable => sci }
+import java.io.{ ByteArrayOutputStream, BufferedInputStream }
 
 trait PackageMethods { self: PackageAliases =>
 
@@ -11,6 +12,9 @@ trait PackageMethods { self: PackageAliases =>
   def sciTreeMap[K: Ordering, V](xs: (K, V)*): sciTreeMap[K, V] = sci.TreeMap[K, V](xs: _*)
   def jclass[A: CTag]: jClass                                   = ctag[A].runtimeClass.asInstanceOf[jClass]
   def jPath(path: String): jPath                                = Paths get path
+  def jclassLoader[A: CTag]: ClassLoader                        = jclass[A].getClassLoader
+  def jResource[A: CTag](name: String): InputStream             = jResource(jclass[A], name)
+  def jResource(c: jClass, name: String): InputStream           = c getResourceAsStream name
 
   def warn[A](msg: String)(value: => A): A = {
     java.lang.System.err.println(msg)
@@ -51,4 +55,31 @@ trait PackageMethods { self: PackageAliases =>
   def decimal(d: Double): BigDecimal                       = BigDecimal.decimal(d, UNLIMITED)
   def decimal(d: Float): BigDecimal                        = BigDecimal.decimal(d, UNLIMITED)
   def decimal(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, UNLIMITED)
+
+  private final val InputStreamBufferSize = 8192
+
+  def slurpString(in: InputStream): String = new String(slurp(in), Utf8Charset)
+  def slurp(in: InputStream): Array[Byte]  = slurp(new BufferedInputStream(in))
+
+  def slurp(in: BufferedInputStream): Array[Byte] = {
+    val out = new ByteArrayOutputStream
+    val buf = new Array[Byte](InputStreamBufferSize)
+    def loop(): Array[Byte] = in read buf match {
+      case -1 => out.toByteArray
+      case n  => out.write(buf, 0, n) ; loop()
+    }
+    try loop() finally in.close()
+  }
+  def slurp(in: BufferedInputStream, len: Int): Array[Byte] = {
+    val buf = new Array[Byte](len)
+    def loop(remaining: Int): Array[Byte] = {
+      if (remaining == 0) buf
+      else in.read(buf, len - remaining, remaining) match {
+        case -1 => buf
+        case n  => loop(remaining - n)
+      }
+    }
+    try loop(len) finally in.close()
+  }
+
 }
