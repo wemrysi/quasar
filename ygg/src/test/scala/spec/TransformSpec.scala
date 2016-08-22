@@ -799,7 +799,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerObjectConcatEmptyObject = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": {}, "bar": {"ack": 12}},
       {"foo": {}, "bar": {"ack": 12, "bak": 13}},
       {"foo": {"ook": 99}, "bar": {}},
@@ -814,7 +814,7 @@ trait TransformSpec extends TableQspec {
       {"foo": {"ook": 7}, "bar": {}, "baz": 24},
       {"foo": {"ook": 3}, "bar": {"ack": 9}, "baz": 18},
       {"foo": {}, "bar": {"ack": 0}, "baz": 18}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -839,7 +839,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterObjectConcatEmptyObject = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": {}, "bar": {"ack": 12}},
       {"foo": {}, "bar": {"ack": 12, "bak": 13}},
       {"foo": {"ook": 99}, "bar": {}},
@@ -854,7 +854,7 @@ trait TransformSpec extends TableQspec {
       {"foo": {"ook": 7}, "bar": {}, "baz": 24},
       {"foo": {"ook": 3}, "bar": {"ack": 9}, "baz": 18},
       {"foo": {}, "bar": {"ack": 0}, "baz": 18}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -904,12 +904,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterObjectConcatUndefined = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": {"baz": 4}, "bar": {"ack": 12}},
       {"foo": {"baz": 5}},
       {"bar": {"ack": 45}},
       {"foo": {"baz": 7}, "bar" : {"ack": 23}, "baz": {"foobar": 24}}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)

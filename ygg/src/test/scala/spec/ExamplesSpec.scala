@@ -8,13 +8,13 @@ class ExamplesSpec extends quasar.Qspec {
   import JParser._
 
   "Lotto example" in {
-    val json          = parseUnsafe(lotto)
+    val json          = lotto
     val renderedLotto = json.render
     json mustEqual parseUnsafe(renderedLotto)
   }
 
   "Person example" in {
-    val json           = parseUnsafe(person)
+    val json           = person
     val renderedPerson = json.render
     json mustEqual parseUnsafe(renderedPerson)
     //render(json) mustEqual render(personDSL)
@@ -23,7 +23,7 @@ class ExamplesSpec extends quasar.Qspec {
   }
 
   "Transformation example" in {
-    val uppercased = parseUnsafe(person).transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
+    val uppercased = person.transform(JField.liftCollect { case JField(n, v) => JField(n.toUpperCase, v) })
     val rendered   = uppercased.render
     rendered.contains(""""NAME":"Joe"""") mustEqual true
     rendered.contains(""""AGE":35.0""") mustEqual true
@@ -32,20 +32,26 @@ class ExamplesSpec extends quasar.Qspec {
   }
 
   "Remove example" in {
-    val json = parseUnsafe(person) remove { _ == JString("Marilyn") }
+    val json = person remove { _ == JString("Marilyn") }
     (json \\ "name").render mustEqual "\"Joe\""
   }
 
   "Quoted example" in {
-    parseUnsafe(quoted) mustEqual JArray(List(JString("foo \" \n \t \r bar")))
+    val quoted   = json"""["foo \" \n \t \r bar"]"""
+    val expected = JArray(List(JString("foo \" \n \t \r bar")))
+
+    quoted mustEqual expected
   }
 
   "Null example" in {
-    parseUnsafe(""" {"name": null} """).render mustEqual """{"name":null}"""
+    json""" {"name": null} """.render mustEqual """{"name":null}"""
   }
 
   "Symbol example" in {
-    symbols.render mustEqual """{"f1":"foo","f2":"bar"}"""
+    val symbols  = json"""{"f1":"foo","f2":"bar"}"""
+    val expected = """{"f1":"foo","f2":"bar"}"""
+
+    symbols.render mustEqual expected
   }
 
   "Unicode example" in {
@@ -60,14 +66,14 @@ class ExamplesSpec extends quasar.Qspec {
   }
 
   "JSON building example" in {
-    val json = JObject(JField("name", JString("joe")) :: Nil) ++ JObject(JField("age", JNum(34)) :: Nil) ++
-        JObject(JField("name", JString("mazy")) :: Nil) ++ JObject(JField("age", JNum(31)) :: Nil)
+    val data     = json"""[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
+    val expected = """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
 
-    json.render mustEqual """[{"name":"joe"},{"age":34},{"name":"mazy"},{"age":31}]"""
+    data.render mustEqual expected
   }
 
   "Example which collects all integers and forms a new JSON" in {
-    val json = parseUnsafe(person)
+    val json = person
     val ints = json.foldDown(JUndefined: JValue) { (a, v) =>
       v match {
         case x: JNum => a ++ x
@@ -79,7 +85,7 @@ class ExamplesSpec extends quasar.Qspec {
   }
 
   "Example which folds up to form a flattened list" in {
-    val json = parseUnsafe(person)
+    val json = person
 
     def form(list: JPath*): List[JPath -> JValue] = list.toList.map { path =>
       (path, json(path))

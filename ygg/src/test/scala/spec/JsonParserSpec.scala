@@ -20,7 +20,7 @@ class JsonParserSpec extends quasar.Qspec {
 
     val json     = Examples.person
     val executor = Executors.newFixedThreadPool(100)
-    val results  = (0 to 100).map(_ => executor.submit(new Callable[JValue] { def call = parseUnsafe(json) })).toList.map(_.get)
+    val results  = (0 to 100).map(_ => executor.submit(new Callable[JValue] { def call = json })).toList.map(_.get)
     results.zip(results.tail).forall(pair => pair._1 == pair._2) mustEqual true
   }
 
