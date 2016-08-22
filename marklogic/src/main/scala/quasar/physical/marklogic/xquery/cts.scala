@@ -47,6 +47,9 @@ object cts {
   ): XQuery =
     XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
+  val trueQuery: XQuery =
+    XQuery("cts:true-query()")
+
   val uriReference: XQuery =
     XQuery("cts:uri-reference()")
 

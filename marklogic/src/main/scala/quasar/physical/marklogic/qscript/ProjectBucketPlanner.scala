@@ -17,14 +17,15 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
 import matryoshka._
+import scalaz._, Scalaz._
 
 private[qscript] final class ProjectBucketPlanner[T[_[_]]] extends MarkLogicPlanner[ProjectBucket[T, ?]] {
   val plan: AlgebraM[Planning, ProjectBucket[T, ?], XQuery] = {
-    case BucketField(src, value, name)  => ???
-    case BucketIndex(src, value, index) => ???
+    case BucketField(src, value, name)  => src.point[Planning]
+    case BucketIndex(src, value, index) => src.point[Planning]
   }
 }
