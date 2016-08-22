@@ -1,6 +1,6 @@
 package ygg.external
 
-import ygg.internal._
+import ygg.common._
 import scalaz._, Scalaz._
 
 /**

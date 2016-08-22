@@ -1,8 +1,8 @@
 package ygg.tests
 
-import ygg.internal._
-import scala.collection.mutable.Builder
+import ygg.common._
 import ygg.data._
+import scala.collection.mutable.Builder
 
 object TestSupport extends TestSupport
 trait TestSupport extends ScalacheckSupport with SpecsSupport {

@@ -1,6 +1,6 @@
 package ygg.data
 
-import ygg.internal._
+import ygg.common._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
 import _root_.ygg.macros.Spire._

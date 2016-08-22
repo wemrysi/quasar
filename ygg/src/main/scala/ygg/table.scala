@@ -9,10 +9,9 @@ package object table {
   type ColumnMap  = Map[ColumnRef, Column]
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
-    var i = 0
-    while (i < prefixLength) {
-      longInstance.order(ids1(i), ids2(i)) match {
-        case EQ  => i += 1
+    0 until prefixLength foreach { i =>
+      ids1(i) ?|? ids2(i) match {
+        case EQ  => ()
         case cmp => return cmp
       }
     }

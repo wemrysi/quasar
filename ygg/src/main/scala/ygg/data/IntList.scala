@@ -1,6 +1,6 @@
 package ygg.data
 
-import ygg.internal._
+import ygg.common._
 
 class ArrayIntList(initialCapacity: Int) {
   private[this] var _size: Int        = 0
