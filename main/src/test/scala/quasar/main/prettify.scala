@@ -16,18 +16,13 @@
 
 package quasar.main
 
+import quasar._
 import quasar.Predef._
 
-import org.specs2.scalaz._
-import org.specs2.ScalaCheck
-
 import org.threeten.bp._
-
 import scalaz._
 
-import quasar._
-
-class PrettifySpecs extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers  {
+class PrettifySpecs extends quasar.Qspec {
   import Prettify._
 
   "flatten" should {

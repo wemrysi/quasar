@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -87,6 +88,10 @@ object ProjectBucket {
             i.show ++ Cord(")")
         }
     }
+
+  implicit def renderTree[T[_[_]]: ShowT]:
+      Delay[RenderTree, ProjectBucket[T, ?]] =
+    RenderTree.delayFromShow
 
   implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =

@@ -22,11 +22,10 @@ import quasar._
 import quasar.javascript._
 import quasar.jscore
 
-import org.specs2.ScalaCheck
 import org.threeten.bp._
 import scalaz._, Scalaz._
 
-class BsonSpecs extends quasar.QuasarSpecification with ScalaCheck {
+class BsonSpecs extends quasar.Qspec {
   import Bson._
 
   "fromRepr" should {

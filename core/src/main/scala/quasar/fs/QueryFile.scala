@@ -42,23 +42,39 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix, QScriptTotal[Fix, ?]]
-  val optimize = new Optimize[Fix]
+  type QS[T[_[_]], A] = QScriptTotal[T, A]
+
+  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] (
+    lp: T[LogicalPlan])(
+    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]):
+      PlannerError \/ T[QS[T, ?]] = {
+    val transform = new Transform[T, QS[T, ?]]
+
+    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
+    //       so we don’t duplicate work.
+    lp.transCata(orOriginal(Optimizer.elideLets[T]))
+      .transCataM(transform.lpToQScript).map(qs =>
+      EnvT((EmptyAnn[T], Inject[QScriptCore[T, ?], QS[T, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
+  }
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptTotal[Fix, ?]] =
-    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
-    //       so we don’t duplicate work.
-    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
-      .transCataM(qscript.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QScriptTotal[Fix, ?], Fix[QScriptTotal[Fix, ?]]]).lower) ⋙ optimize.applyAll)
-        // TODO: Rather than explicitly applying multiple times, we should apply
-        //       repeatedly until unchanged.
-        .transCata(optimize.applyAll)
-        .transCata(optimize.applyAll))
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
+    lp: T[LogicalPlan]):
+      EitherT[Writer[PhaseResults, ?], PlannerError, T[QS[T, ?]]] = {
+    val optimize = new Optimize[T]
+
+    // TODO: Rather than explicitly applying multiple times, we should apply
+    //       repeatedly until unchanged.
+    val qs = optimizeEval(lp)(optimize.applyAll).map(
+      _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+
+    EitherT(Writer(
+      qs.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qs))
+  }
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.

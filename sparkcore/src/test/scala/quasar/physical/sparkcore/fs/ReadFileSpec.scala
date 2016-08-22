@@ -39,7 +39,7 @@ import pathy.Path.posixCodec
 import scalaz._, Scalaz._, concurrent.Task
 import org.apache.spark._
 
-class ReadFileSpec extends Specification with ScalaCheck  {
+class ReadFileSpec extends quasar.Qspec with TempFSSugars {
 
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff1[A] = Coproduct[Task, Eff0, A]

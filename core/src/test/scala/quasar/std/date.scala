@@ -22,7 +22,7 @@ import org.threeten.bp._
 import scalaz._
 import quasar._, SemanticError._
 
-class DateSpecs extends quasar.QuasarSpecification {
+class DateSpecs extends quasar.Qspec {
   import DateLib._
 
   "parseInterval" should {

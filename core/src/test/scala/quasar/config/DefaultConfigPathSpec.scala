@@ -28,7 +28,7 @@ import scalaz.concurrent.Task
 
 // NB: Not possible to test windows deterministically at this point as cannot
 //     programatically set environment variables like we can with properties.
-class DefaultConfigPathSpec extends quasar.QuasarSpecification {
+class DefaultConfigPathSpec extends quasar.Qspec {
   import ConfigOps.defaultPathForOS, FsPath._
 
   sequential

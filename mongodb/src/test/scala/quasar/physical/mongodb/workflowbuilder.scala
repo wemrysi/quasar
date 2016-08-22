@@ -24,15 +24,12 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
-import quasar.specs2._
 
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import scalaz._, Scalaz._
+import quasar.specs2.QuasarMatchers._
 
-class WorkflowBuilderSpec
-    extends quasar.QuasarSpecification
-    with DisjunctionMatchers
-    with TreeMatchers {
+class WorkflowBuilderSpec extends quasar.Qspec {
   import WorkflowBuilder._
   import CollectionUtil._
 

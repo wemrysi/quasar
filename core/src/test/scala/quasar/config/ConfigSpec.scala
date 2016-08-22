@@ -21,11 +21,10 @@ import quasar.fp._
 import quasar.fs.mount.ConnectionUri
 
 import argonaut._
-import org.specs2.scalaz._
 import pathy._, Path._
 import scalaz._, concurrent.Task, Scalaz._
 
-abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.QuasarSpecification with DisjunctionMatchers {
+abstract class ConfigSpec[Config: CodecJson: ConfigOps] extends quasar.Qspec {
   import FsPath._, ConfigError._
 
   sequential

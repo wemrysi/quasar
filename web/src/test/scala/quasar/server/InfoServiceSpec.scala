@@ -23,7 +23,7 @@ import org.http4s.argonaut._
 
 import argonaut.Json
 
-class InfoServiceSpec extends quasar.QuasarSpecification {
+class InfoServiceSpec extends quasar.Qspec {
 
   "Info Service" should {
     "be capable of providing it's name and version" in {

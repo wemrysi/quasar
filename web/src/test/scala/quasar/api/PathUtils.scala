@@ -24,7 +24,7 @@ import org.http4s.{Uri}
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 
-trait PathUtils {
+object PathUtils {
   // NB: these paths confuse the codec and don't seem important at the moment.
   // See https://github.com/slamdata/scala-pathy/issues/23.
   def hasDot(p: Path[_, _, _]): Boolean =
@@ -32,5 +32,3 @@ trait PathUtils {
 
   def pathUri(path: APath): Uri = Uri(path = UriPathCodec.printPath(path))
 }
-
-object PathUtils extends PathUtils

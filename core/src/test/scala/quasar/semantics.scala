@@ -22,7 +22,7 @@ import quasar.sql.fixpoint._
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
 
-class SemanticsSpec extends quasar.QuasarSpecification with TreeMatchers {
+class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
     import quasar.SemanticAnalysis._

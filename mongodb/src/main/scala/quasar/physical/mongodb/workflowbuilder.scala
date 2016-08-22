@@ -268,9 +268,7 @@ object WorkflowBuilder {
       }
     }
 
-  implicit def WorkflowBuilderTraverse[F[_]: Coalesce]
-    (implicit ev: WorkflowOpCoreF :<: F)
-    : Traverse[WorkflowBuilderF[F, ?]] =
+  implicit def WorkflowBuilderTraverse[F[_]]: Traverse[WorkflowBuilderF[F, ?]] =
     new Traverse[WorkflowBuilderF[F, ?]] {
       def traverseImpl[G[_], A, B](
         fa: WorkflowBuilderF[F, A])(

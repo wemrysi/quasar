@@ -20,56 +20,35 @@ import quasar.Predef._
 import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
 import quasar.ejson
 import quasar.fp._
-import quasar.fs._
 import quasar.qscript.MapFuncs._
+import quasar.std.StdLib
 import quasar.std.StdLib._
 
-import scala.Predef.implicitly
-
 import matryoshka._
-import org.specs2.scalaz._
-import pathy.Path._
 import scalaz._, Scalaz._
 
-class QScriptSpec extends CompilerHelpers with ScalazMatchers {
-  val transform = new Transform[Fix, QScriptTotal[Fix, ?]]
-
-  // TODO: Narrow this to QScriptPure
-  type QS[A] = QScriptTotal[Fix, A]
-  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
-  val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
-  val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
-
-  def RootR: Fix[QS] = CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
-
-  def ProjectFieldR[A](src: FreeMap[Fix], field: FreeMap[Fix]): FreeMap[Fix] =
-    Free.roll(ProjectField(src, field))
-
-  def lpRead(path: String): Fix[LP] =
-    LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
-
+class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
-       QueryFile.convertToQScript(LP.Constant(Data.Bool(true))).toOption must
+       convert(LP.Constant(Data.Bool(true))) must
        equal(
          QC.inj(Map(RootR, BoolLit(true))).embed.some)
     }
 
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
-      QueryFile.convertToQScript(
+      convert(
         LP.Constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
-          Data.Obj(ListMap("0" -> Data.Int(3))))))).toOption must
+          Data.Obj(ListMap("0" -> Data.Int(3))))))) must
       equal(None)
     }
 
     "convert a simple read" in {
-      QueryFile.convertToQScript(lpRead("/foo")).toOption must
+      convert(lpRead("/foo")) must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -79,8 +58,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
     "convert a squashed read" in {
       // "select * from foo"
-      QueryFile.convertToQScript(
-        identity.Squash(lpRead("/foo"))).toOption must
+      convert(identity.Squash(lpRead("/foo"))) must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -89,8 +67,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     "convert a simple read with path projects" in {
-      QueryFile.convertToQScript(
-        lpRead("/some/foo/bar")).toOption must
+      convert(lpRead("/some/foo/bar")) must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -103,8 +80,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     "convert a basic invoke" in {
-      QueryFile.convertToQScript(
-        math.Add(lpRead("/foo"), lpRead("/bar")).embed).toOption must
+      convert(math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
       equal(
         TJ.inj(ThetaJoin(
           RootR,
@@ -136,32 +112,31 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     "convert project object and make object" in {
-      QueryFile.convertToQScript(
+      convert(
         identity.Squash(
           makeObj(
             "name" -> structural.ObjectProject(
               lpRead("/city"),
-              LP.Constant(Data.Str("name")))))).toOption must
+              LP.Constant(Data.Str("name")))))) must
       equal(
         SP.inj(LeftShift(
           RootR,
           ProjectFieldR(HoleF, StrLit("city")),
           Free.roll(MakeMap[Fix, JoinFunc[Fix]](
             StrLit[Fix, JoinSide]("name"),
-            Free.roll(ProjectField(
+            ProjectFieldR(
               Free.point[MapFunc[Fix, ?], JoinSide](RightSide),
-              StrLit[Fix, JoinSide]("name"))))))).embed.some)
+              StrLit[Fix, JoinSide]("name")))))).embed.some)
     }
 
     "convert a basic reduction" in {
-      QueryFile.convertToQScript(
-        agg.Sum[FLP](lpRead("/person"))).toOption must
+      convert(agg.Sum[FLP](lpRead("/person"))) must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
             QC.inj(Map(
               RootR,
-              Free.roll(ProjectField(HoleF, StrLit("person"))))).embed,
+              ProjectFieldR(HoleF, StrLit("person")))).embed,
             Free.roll(ZipMapKeys(HoleF)),
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
@@ -176,18 +151,18 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
     "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
-      QueryFile.convertToQScript(
+      convert(
         makeObj(
           "0" ->
-            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))).toOption must
+            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))) must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
             RootR,
-            Free.roll(ProjectField(HoleF, StrLit("person"))),
-            Free.roll(ProjectField(
+            ProjectFieldR(HoleF, StrLit("person")),
+            ProjectFieldR(
               Free.point(RightSide),
-              StrLit("height"))))).embed,
+              StrLit("height")))).embed,
           Free.roll(MakeArray(
             Free.roll(MakeMap(
               StrLit("j"),
@@ -200,19 +175,19 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
     "convert a flatten array" in {
       // "select loc[:*] from zips",
-      QueryFile.convertToQScript(
+      convert(
         makeObj(
           "loc" ->
             structural.FlattenArray[FLP](
-              structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))).toOption must
+              structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))) must
       equal(
         SP.inj(LeftShift(
           SP.inj(LeftShift(
             RootR,
-            Free.roll(ProjectField(HoleF, StrLit("zips"))),
-            Free.roll(ProjectField(
+            ProjectFieldR(HoleF, StrLit("zips")),
+            ProjectFieldR(
               Free.point(RightSide),
-              StrLit("loc"))))).embed,
+              StrLit("loc")))).embed,
           HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
@@ -220,14 +195,14 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     "convert a constant shift array" in pending {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
-      QueryFile.convertToQScript(
+      convert(
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
                 structural.MakeArrayN[Fix](LP.Constant(Data.Int(1))),
                 structural.MakeArrayN[Fix](LP.Constant(Data.Int(2)))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))).toOption must
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))) must
       equal(
         SP.inj(LeftShift(
           RootR,
@@ -240,35 +215,35 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     }
 
     "convert a read shift array" in pending {
-      QueryFile.convertToQScript(
+      convert(
         LP.Let('x, lpRead("/foo/bar"),
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
                 structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
                 structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
-              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))).toOption must
+              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))) must
       equal(RootR.some) // TODO incorrect expectation
     }
 
     "convert a shift/unshift array" in pending {
       // "select [loc[_:] * 10 ...] from zips",
-      QueryFile.convertToQScript(
+      convert(
         makeObj(
           "0" ->
             structural.UnshiftArray[FLP](
               math.Multiply[FLP](
                 structural.ShiftArrayIndices[FLP](
                   structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))),
-                LP.Constant(Data.Int(10)))))).toOption must
+                LP.Constant(Data.Int(10)))))) must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
             RootR,
             Free.roll(DupArrayIndices(
-              Free.roll(ProjectField(
-                Free.roll(ProjectField(HoleF, StrLit("zips"))),
-                StrLit("loc"))))),
+              ProjectFieldR(
+                ProjectFieldR(HoleF, StrLit("zips")),
+                StrLit("loc")))),
             Free.roll(Multiply(Free.point(RightSide), IntLit(10))))).embed,
           HoleF,
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
@@ -279,21 +254,21 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
 
     "convert a filter" in pending {
       // "select * from foo where bar between 1 and 10"
-      QueryFile.convertToQScript(
-        set.Filter[FLP](
+      convert(
+        StdLib.set.Filter[FLP](
           lpRead("/foo"),
           relations.Between[FLP](
             structural.ObjectProject(lpRead("/foo"), LP.Constant(Data.Str("bar"))),
             LP.Constant(Data.Int(1)),
-            LP.Constant(Data.Int(10))))).toOption must
+            LP.Constant(Data.Int(10))))) must
       equal(
         QC.inj(Filter(
           SP.inj(LeftShift(
             RootR,
-            Free.roll(ProjectField(HoleF, StrLit("foo"))),
+            ProjectFieldR(HoleF, StrLit("foo")),
             Free.point(RightSide))).embed,
           Free.roll(Between(
-            Free.roll(ProjectField(HoleF, StrLit("bar"))),
+            ProjectFieldR(HoleF, StrLit("bar")),
             IntLit(1),
             IntLit(10))))).embed.some)
     }
@@ -301,13 +276,13 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in pending {
       // "select * from person, car",
-      QueryFile.convertToQScript(
+      convert(
         LP.Let('__tmp0,
-          set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
+          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
           identity.Squash[FLP](
             structural.ObjectConcat[FLP](
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
-              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))).toOption must
+              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))) must
       equal(RootR.some) // TODO incorrect expectation
     }
 
@@ -317,7 +292,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
       val lp = LP.Let('__tmp0, lpRead("/foo"),
         LP.Let('__tmp1, lpRead("/bar"),
           LP.Let('__tmp2,
-            set.InnerJoin[FLP](LP.Free('__tmp0), LP.Free('__tmp1),
+            StdLib.set.InnerJoin[FLP](LP.Free('__tmp0), LP.Free('__tmp1),
               relations.Eq[FLP](
                 structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("id"))),
                 structural.ObjectProject(LP.Free('__tmp1), LP.Constant(Data.Str("foo_id"))))),
@@ -330,7 +305,7 @@ class QScriptSpec extends CompilerHelpers with ScalazMatchers {
                 structural.ObjectProject[FLP](
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
-      QueryFile.convertToQScript(lp).toOption must equal(
+      convert(lp) must equal(
         QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
     }
   }
