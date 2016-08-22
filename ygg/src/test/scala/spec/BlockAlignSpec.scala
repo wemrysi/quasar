@@ -151,7 +151,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   }
 
   def alignAcrossBoundaries = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {
         "value":{
           "sp7hpv":{ },
@@ -332,7 +332,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         },
         "key":[55.0,46.0,57.0]
       }]
-    """)
+    """
 
     val sample = SampleData(
       elements.toStream,
@@ -370,16 +370,16 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
     def test0 = {
       val lsortedOn     = DerefArrayStatic(Leaf(Source), CPathIndex(1))
       val rsortedOn     = DerefArrayStatic(Leaf(Source), CPathIndex(1))
-      val JArray(ljson) = JParser.parseUnsafe("""[
+      val JArray(ljson) = json"""[
         [[3],{ "000000":-1 },-1],
         [[4],{ "000000":0 },0],
         [[5],{ "000000":0 },0],
         [[0],{ "000000":1 },1],
         [[2],{ "000000":2126441435 },2126441435],
         [[1],{ "000000":2147483647 },2147483647]
-      ]""")
+      ]"""
 
-      val JArray(rjson) = JParser.parseUnsafe("""[
+      val JArray(rjson) = json"""[
         [[1],{ "000000":-2147483648 },-2147483648],
         [[6],{ "000000":-1904025337 },-1904025337],
         [[2],{ "000000":-1456034303 },-1456034303],
@@ -387,13 +387,13 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         [[0],{ "000000":2006322377 },2006322377],
         [[3],{ "000000":2147483647 },2147483647],
         [[5],{ "000000":2147483647 },2147483647]
-      ]""")
+      ]"""
 
       test(fromJson(ljson.toStream), lsortedOn, fromJson(rjson.toStream), rsortedOn)
     }
 
     def test1 = {
-      val JArray(ljson) = JParser.parseUnsafe("""[
+      val JArray(ljson) = json"""[
         [[10],{ "000001":-2, "000000":42 },{ "a":42, "b":-2 }],
         [[7],{ "000001":6, "000000":17 },{ "a":17, "b":6 }],
         [[0],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
@@ -402,7 +402,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         [[13],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
         [[6],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
         [[12],{ "000001":42, "000000":7 },{ "a":7, "b":42 }]
-      ]""")
+      ]"""
 
       val lsortedOn = OuterObjectConcat(
         WrapObject(
@@ -416,13 +416,13 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           "000000"
         ))
 
-      val JArray(rjson) = JParser.parseUnsafe("""[
+      val JArray(rjson) = json"""[
         [[3],{ "000000":1 },{ "b":1 }],
         [[1],{ "000000":6 },{ "b":6 }],
         [[0],{ "000000":12 },{ "b":12 }],
         [[4],{ "000000":12 },{ "b":12 }],
         [[6],{ "000000":42 },{ "b":42 }]
-      ]""")
+      ]"""
 
       val rsortedOn = DerefArrayStatic(Leaf(Source), CPathIndex(1))
 
@@ -430,18 +430,18 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
     }
 
     def test2 = {
-      val JArray(ljson)  = JParser.parseUnsafe("""[
+      val JArray(ljson)  = json"""[
         [[6],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
         [[12],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
         [[7],{ "000001":6, "000000":17 },{ "a":17, "b":6 }],
         [[9],{ "000001":12, "000000":21 },{ "a":21, "b":12 }]
-      ]""")
-      val JArray(ljson2) = JParser.parseUnsafe("""[
+      ]"""
+      val JArray(ljson2) = json"""[
         [[0],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
         [[5],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
         [[10],{ "000001":-2, "000000":42 },{ "a":42, "b":-2 }],
         [[13],{ "000001":12, "000000":42 },{ "a":42, "b":12 }]
-      ]""")
+      ]"""
 
       val lsortedOn = OuterObjectConcat(
         WrapObject(
@@ -455,17 +455,17 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           "000000"
         ))
 
-      val JArray(rjson)  = JParser.parseUnsafe("""[
+      val JArray(rjson)  = json"""[
         [[6],{ "000000":7 },{ "a":7, "b":42 }],
         [[12],{ "000000":7 },{ "a":7 }],
         [[7],{ "000000":17 },{ "a":17, "c":77 }]
-      ]""")
-      val JArray(rjson2) = JParser.parseUnsafe("""[
+      ]"""
+      val JArray(rjson2) = json"""[
         [[0],{ "000000":42 },{ "a":42 }],
         [[1],{ "000000":42 },{ "a":42 }],
         [[13],{ "000000":42 },{ "a":42 }],
         [[2],{ "000000":77 },{ "a":77 }]
-      ]""")
+      ]"""
 
       val rsortedOn = DerefArrayStatic(Leaf(Source), CPathIndex(1))
 
@@ -533,7 +533,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of sorting on homogeneous data
   def homogeneousSortSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":{
             "uid":"joe",
@@ -552,7 +552,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -564,10 +564,10 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of sorting on homogeneous data with objects
   def homogeneousSortSampleWithNonexistentSortKey = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {"key":[2],"value":6},
         {"key":[1],"value":5}
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List(JPath(".") -> CString))
       )
@@ -579,7 +579,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of partially undefined sort key data
   def partiallyUndefinedSortSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":{
             "uid":"ted",
@@ -597,7 +597,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".fa") -> CNull, JPath(".hW") -> CDouble, JPath(".rzp") -> CEmptyObject))
       )
@@ -608,7 +608,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def heterogeneousBaseValueTypeSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value": [0, 1],
           "key":[1]
@@ -620,7 +620,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List(JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath(".uid") -> CString, JPath("abc") -> CLong))
       )
@@ -631,7 +631,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def badSchemaSortSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":{
             "vxu":[],
@@ -655,7 +655,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2.0,1.0]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some((2, List(JPath(".m") -> CEmptyArray, JPath(".f") -> CBoolean, JPath(".u") -> CDouble, JPath(".q") -> CNum, JPath(".vxu") -> CEmptyArray))))
     testSortDense(sampleData, SortAscending, false, JPath("q"))
   }
@@ -663,11 +663,11 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of sorting on heterogeneous data
   def heterogeneousSortSample2 = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {"key":[1,4,3],"value":{"b0":["",{"alxk":-1},-5.170005125478374E+307],"y":{"pvbT":[-1458654748381439976,{}]}}},
         {"key":[1,4,4],"value":{"y":false,"qvd":[],"aden":{}}},
         {"key":[3,3,3],"value":{"b0":["gxy",{"alxk":-1},6.614267528783459E+307],"y":{"pvbT":[1,{}]}}}
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       None)
 
     testSortDense(sampleData, SortDescending, false, JPath(".y"))
@@ -676,10 +676,10 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of sorting on heterogeneous data
   def heterogeneousSortSampleDescending = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {"key":[2],"value":{"y":false}},
         {"key":[3],"value":{"y":{"pvbT":1}}}
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       None)
 
     testSortDense(sampleData, SortDescending, false, JPath(".y"))
@@ -688,10 +688,10 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of sorting on heterogeneous data
   def heterogeneousSortSampleAscending = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {"key":[2],"value":{"y":false}},
         {"key":[3],"value":{"y":{"pvbT":1}}}
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       None)
 
     testSortDense(sampleData, SortAscending, false, JPath(".y"))
@@ -700,7 +700,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
   // Simple test of heterogeneous sort keys
   def heterogeneousSortSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":{
            "uid": 12,
@@ -725,7 +725,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2,1,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (3,
          List(
@@ -745,7 +745,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def secondHetSortSample = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":[1.0,0,{
 
@@ -765,7 +765,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
             "zw1":81740903825956729.9
           },
           "key":[2.0]
-        }]""") --> classOf[JArray]).elements.toStream,
+        }]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1,
          List(JPath(".e") -> CNull, JPath(".chl") -> CNum, JPath(".zw1") -> CNum, JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath("[2]") -> CEmptyObject))
@@ -783,7 +783,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
    */
   def threeCellMerge = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         {
           "value":-2355162409801206381,
           "key":[1.0,1.0,11.0]
@@ -916,7 +916,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[10.0,1.0,4.0]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (3, List(JPath(".zbtQhnpnun") -> CLong, JPath(".ohvhwN") -> CNum, JPath(".viip") -> CNum))
       )
@@ -927,10 +927,10 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def uniqueSort = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[
+      (json"""[
         { "key" : [2], "value" : { "foo" : 10 } },
         { "key" : [1], "value" : { "foo" : 10 } }
-       ]""") --> classOf[JArray]).elements.toStream,
+       ]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List())
       )
@@ -941,7 +941,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def emptySort = {
     val sampleData = SampleData(
-      (JParser.parseUnsafe("""[]""") --> classOf[JArray]).elements.toStream,
+      (json"""[]""" --> classOf[JArray]).elements.toStream,
       Some(
         (1, List())
       )
