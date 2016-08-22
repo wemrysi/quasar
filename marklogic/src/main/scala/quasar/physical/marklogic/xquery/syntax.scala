@@ -19,18 +19,8 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 object syntax {
-  // TODO: Make XQuery a newtype and add these to that class.
-  final implicit class XQueryOps(val xqy: XQuery) extends scala.AnyVal {
-    def ?(predicate: String): XQuery = s"$xqy[$predicate]"
-    def -(other: XQuery): XQuery = s"$xqy - $other"
-    def +(other: XQuery): XQuery = s"$xqy + $other"
-    def and(other: XQuery): XQuery = expr.and(xqy, other)
-    def or(other: XQuery): XQuery = expr.or(xqy, other)
-    def seq: XQuery = mkSeq_(xqy)
-    def xp(xpath: String): XQuery = xqy + xpath
-  }
-
   final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
+    def xqy: XQuery = XQuery(str)
     def xs: XQuery = expr.string(str)
   }
 }

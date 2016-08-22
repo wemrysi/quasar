@@ -23,56 +23,62 @@ import java.lang.SuppressWarnings
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object fn {
   def baseUri(node: XQuery): XQuery =
-    s"fn:base-uri($node)"
+    XQuery(s"fn:base-uri($node)")
 
   def concat(x: XQuery, xs: XQuery*): XQuery =
-    s"fn:concat${mkSeq_(x, xs: _*)}"
+    XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
 
   def distinctValues(seq: XQuery): XQuery =
-    s"fn:distinct-values($seq)"
+    XQuery(s"fn:distinct-values($seq)")
 
-  def doc(uri: XQuery = ""): XQuery =
-    s"fn:doc($uri)"
+  def doc(): XQuery =
+    XQuery("fn:doc()")
+
+  def doc(uri: XQuery): XQuery =
+    XQuery(s"fn:doc($uri)")
 
   def exists(seq: XQuery): XQuery =
-    s"fn:exists($seq)"
+    XQuery(s"fn:exists($seq)")
 
   val False: XQuery =
-    "fn:false()"
+    XQuery("fn:false()")
 
   def filter(p: XQuery, seq: XQuery): XQuery =
-    s"fn:filter($p, $seq)"
+    XQuery(s"fn:filter($p, $seq)")
 
   val last: XQuery =
-    "fn:last()"
+    XQuery("fn:last()")
 
   def map(f: XQuery, seq: XQuery): XQuery =
-    s"fn:map($f, $seq)"
+    XQuery(s"fn:map($f, $seq)")
 
   def not(bool: XQuery): XQuery =
-    s"fn:not($bool)"
+    XQuery(s"fn:not($bool)")
 
   def QName(localPart: XQuery): XQuery =
-    s"fn:QName($localPart)"
+    XQuery(s"fn:QName($localPart)")
 
   def QName(namespace: XQuery, localPart: XQuery): XQuery =
-    s"fn:QName($namespace, $localPart)"
+    XQuery(s"fn:QName($namespace, $localPart)")
 
   def startsWith(str: XQuery, prefix: XQuery, collation: Option[XQuery] = None): XQuery =
-    s"fn:starts-with($str, ${prefix}${asArg(collation)})"
+    XQuery(s"fn:starts-with($str, ${prefix}${asArg(collation)})")
 
   def stringLength(str: XQuery): XQuery =
-    s"fn:string-length($str)"
+    XQuery(s"fn:string-length($str)")
 
   def substring(str: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
-    s"fn:substring($str, ${startLoc}${asArg(length)})"
+    XQuery(s"fn:substring($str, ${startLoc}${asArg(length)})")
 
   def substringAfter(input: XQuery, after: XQuery): XQuery =
-    s"fn:substring-after($input, $after)"
+    XQuery(s"fn:substring-after($input, $after)")
+
+  def subsequence(srcSeq: XQuery, startLoc: XQuery, length: Option[XQuery] = None): XQuery =
+    XQuery(s"fn:subsequence($srcSeq, ${startLoc}${asArg(length)})")
 
   def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
-    s"fn:tokenize($input, ${pattern}${asArg(flags)})"
+    XQuery(s"fn:tokenize($input, ${pattern}${asArg(flags)})")
 
   val True: XQuery =
-    "fn:true()"
+    XQuery("fn:true()")
 }

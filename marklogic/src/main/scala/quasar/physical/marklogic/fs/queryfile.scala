@@ -53,7 +53,7 @@ object queryfile {
     def exec(lp: Fix[LogicalPlan], out: AFile) =
       planLP(lp).fold(
         err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
-        xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(out))
+        xqy => (Vector(PhaseResult.Detail("XQuery", xqy.toString)), \/.right(out))
       ).point[Free[S, ?]]
 
     // TODO: PhaseResults
@@ -70,7 +70,7 @@ object queryfile {
     def explain(lp: Fix[LogicalPlan]) =
       planLP(lp).fold(
         err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
-        xqy => (Vector(PhaseResult.Detail("XQuery", xqy)), \/.right(ExecutionPlan(FsType, xqy)))
+        xqy => (Vector(PhaseResult.Detail("XQuery", xqy.toString)), \/.right(ExecutionPlan(FsType, xqy.toString)))
       ).point[Free[S, ?]]
 
     def exists(file: AFile): Free[S, Boolean] =

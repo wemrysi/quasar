@@ -18,7 +18,8 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
 import quasar.Planner.PlannerError
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
@@ -29,14 +30,19 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]] extends MarkLogicPlanne
     case Map(src, f)                           => ???
     case Reduce(src, bucket, reducers, repair) => ???
     case Sort(src, bucket, order)              => ???
-    case Filter(src, f)                        => s"cts:and-query(($src, $f))".right
+
+    case Filter(src, f)                        =>
+      val f0 = XQuery("PREDICATE QUERY")
+      cts.andQuery(src, f0).right
+
     case Take(src, from, count)                =>
-      def from0 = ""
-      def count0 = ""
-      s"fn:subsequence($src, $from0, $count0)".right
+      val from0 = XQuery("FROM")
+      val count0 = XQuery("COUNT")
+      src(from0 to (from0 + count0).seq).right
+
     case Drop(src, from, count)                =>
-      def from0 = ""
-      def count0 = ""
-      s"(fn:subsequence($src, 1, $from0), fn:subsequence($src, $from0 + $count0))".right
+      val from0 = XQuery("FROM")
+      val count0 = XQuery("COUNT")
+      mkSeq_(fn.subsequence(src, "1".xqy, some(from0)), fn.subsequence(src, from0 + count0)).right
   }
 }

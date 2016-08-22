@@ -18,7 +18,8 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.Planner.PlannerError
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
@@ -30,6 +31,6 @@ private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]
     case Const(Read(absFile)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
-      s"""cts:directory-query("$dirRepr", "1")""".right
+      cts.directoryQuery(dirRepr.xs, "1".xs).right
   }
 }

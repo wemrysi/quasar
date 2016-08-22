@@ -97,7 +97,7 @@ object ops {
     val deleteChildDocuments =
       SessionIO.executeQuery_(
         fn.map(
-          func("$d") { xdmp.documentDelete(fn.baseUri("$d")) },
+          func("$d") { xdmp.documentDelete(fn.baseUri("$d".xqy)) },
           xdmp.directory(uri.xs, "1".xs)))
 
     val deleteMLDirIfEmpty =
@@ -112,7 +112,7 @@ object ops {
   def exists(path: APath): SessionIO[Boolean] = {
     val uri = pathUri(refineType(path).map(asDir).merge)
 
-    val xqy = fn.exists(fn.filter(func("$uri") { fn.startsWith("$uri", uri.xs) }, cts.uris))
+    val xqy = fn.exists(fn.filter(func("$uri") { fn.startsWith("$uri".xqy, uri.xs) }, cts.uris))
 
     SessionIO.resultsOf_(xqy) flatMap { items => SessionIO.liftT {
       Task.delay(items(0).asInstanceOf[XSBoolean].asPrimitiveBoolean)
@@ -127,7 +127,7 @@ object ops {
 
     val prefixPathsXqy =
       fn.filter(
-        func("$u") { isMLDir("$u") and fn.startsWith("$u", uri.xs) },
+        func("$u") { isMLDir("$u".xqy) and fn.startsWith("$u".xqy, uri.xs) },
         cts.uris(uri.xs, IList("properties".xs)))
 
     def childPathsXqy(prefixed: XQuery) =
@@ -135,7 +135,7 @@ object ops {
         func("$u") {
           fn.concat(
             uri.xs,
-            fn.tokenize(fn.substringAfter("$u", uri.xs), "/".xs) ? "1",
+            fn.tokenize(fn.substringAfter("$u".xqy, uri.xs), "/".xs)("1".xqy),
             "/".xs)
         },
         prefixed))
@@ -144,8 +144,8 @@ object ops {
       val hasChildMLDirs =
         fn.exists(
           for_("$d" -> xdmp.directory(pathUri, "1".xs))
-            .where_("$d[property::directory]")
-            .return_("$d"))
+            .where_("$d".xqy("property::directory".xqy))
+            .return_("$d".xqy))
 
       fn.not(isMLDir(pathUri)) or hasChildMLDirs
     }
@@ -153,21 +153,21 @@ object ops {
     def isFileXqy(pathUri: XQuery) =
       fn.exists(
         for_("$d" -> xdmp.directory(pathUri, "1".xs))
-          .where_("$d[not(property::directory)]")
-          .return_("$d"))
+          .where_("$d".xqy(fn.not("property::directory".xqy)))
+          .return_("$d".xqy))
 
     def filesXqy(dirUris: XQuery) =
       fn.map(
-        func("$u") { fn.substring("$u", "1", some(fn.stringLength("$u") - "1")) },
-        fn.filter(func("$f") { isFileXqy("$f") }, dirUris))
+        func("$u") { fn.substring("$u".xqy, "1".xqy, some(fn.stringLength("$u".xqy) - "1".xqy)) },
+        fn.filter(func("$f") { isFileXqy("$f".xqy) }, dirUris))
 
     val xqy = let_(
       "$pathUris"      -> prefixPathsXqy,
-      "$childPathUris" -> childPathsXqy("$pathUris"),
-      "$dirUris"       -> fn.filter(func("$u") { isDirXqy("$u") }, "$childPathUris"),
-      "$fileUris"      -> filesXqy("$childPathUris")
+      "$childPathUris" -> childPathsXqy("$pathUris".xqy),
+      "$dirUris"       -> fn.filter(func("$u") { isDirXqy("$u".xqy) }, "$childPathUris".xqy),
+      "$fileUris"      -> filesXqy("$childPathUris".xqy)
     ) return_ (
-      mkSeq_("$dirUris", "$fileUris")
+      mkSeq_("$dirUris".xqy, "$fileUris".xqy)
     )
 
     def parseDir(s: String): Option[PathSegment] =
@@ -188,21 +188,21 @@ object ops {
 
     def doMove =
       SessionIO.executeQuery_(mkSeq_(
-        if_(fn.exists(fn.doc(dstUri.xs) ? "property::directory"))
+        if_(fn.exists(fn.doc(dstUri.xs)("property::directory".xqy)))
           .then_ {
             for_("$d" -> xdmp.directory(dstUri.xs, "1".xs))
-              .return_(xdmp.documentDelete(xdmp.nodeUri("$d")))
+              .return_(xdmp.documentDelete(xdmp.nodeUri("$d".xqy)))
           } else_ {
             xdmp.directoryCreate(dstUri.xs)
           },
 
         for_("$d" -> xdmp.directory(srcUri.xs, "1".xs))
           .let_(
-            "$oldName" -> xdmp.nodeUri("$d"),
-            "$newName" -> fn.concat(dstUri.xs, fn.tokenize("$oldName", "/".xs) ? fn.last))
+            "$oldName" -> xdmp.nodeUri("$d".xqy),
+            "$newName" -> fn.concat(dstUri.xs, fn.tokenize("$oldName".xqy, "/".xs)(fn.last)))
           .return_(mkSeq_(
-            xdmp.documentInsert("$newName", fn.doc("$oldName")),
-            xdmp.documentDelete("$oldName")))))
+            xdmp.documentInsert("$newName".xqy, fn.doc("$oldName".xqy)),
+            xdmp.documentDelete("$oldName".xqy)))))
 
     def deleteSrcIfEmpty =
       SessionIO.executeQuery_(deleteIfEmptyXqy(srcUri.xs))

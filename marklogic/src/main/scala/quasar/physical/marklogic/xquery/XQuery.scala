@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.physical.marklogic.xquery.XQuery
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
-import matryoshka.Algebra
-
-object mapFuncXQuery {
-  def apply[T[_[_]]]: Algebra[MapFunc[T, ?], XQuery] = {
-    case v @ ToString(a1) => ???
-    case v => s" ???(MapFunc - $v)??? ".xqy
-  }
+final case class XQuery(override val toString: String) extends scala.AnyVal {
+  def apply(predicate: XQuery): XQuery = XQuery(s"${this}[$predicate]")
+  def -(other: XQuery): XQuery = XQuery(s"$this - $other")
+  def +(other: XQuery): XQuery = XQuery(s"$this + $other")
+  def and(other: XQuery): XQuery = XQuery(s"$this and $other")
+  def or(other: XQuery): XQuery = XQuery(s"$this or $other")
+  def seq: XQuery = mkSeq_(this)
+  def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
+  def xp(xpath: XPath): XQuery = XQuery(toString + xpath)
 }

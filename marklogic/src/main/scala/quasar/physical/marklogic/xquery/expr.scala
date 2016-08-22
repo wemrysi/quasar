@@ -29,17 +29,14 @@ import scalaz.syntax.std.boolean._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object expr {
-  def and(x1: XQuery, x2: XQuery): XQuery =
-    s"$x1 and $x2"
-
   val emptySeq: XQuery =
-    "()"
+    XQuery("()")
 
   def for_(ts: (String, XQuery), tss: (String, XQuery)*): Flwor =
     Flwor(ts :: IList.fromList(tss.toList), IList.empty, None, IList.empty, false)
 
   def func(args: String*)(body: XQuery): XQuery =
-    s"function${mkSeq(args)} { $body }"
+    XQuery(s"function${mkSeq(args map (XQuery(_)))} { $body }")
 
   def if_(cond: XQuery): IfExpr =
     IfExpr(cond)
@@ -47,11 +44,8 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
-  def or(x1: XQuery, x2: XQuery): XQuery =
-    s"$x1 or $x2"
-
   def string(str: String): XQuery =
-    s""""$str""""
+    XQuery(s""""$str"""")
 
   final case class Flwor(
     tupleStreams: IList[(String, XQuery)],
@@ -102,7 +96,7 @@ object expr {
         if (orderSpecs.isEmpty) "" else s"$orderKeyword by $specs "
       }
 
-      s"${forClause}${letClause}${whereClause}${orderClause}return $expr"
+      XQuery(s"${forClause}${letClause}${whereClause}${orderClause}return $expr")
     }
   }
 
@@ -112,6 +106,6 @@ object expr {
 
   final case class IfThenExpr(cond: XQuery, whenTrue: XQuery) {
     def else_(whenFalse: XQuery): XQuery =
-      s"if ($cond) then $whenTrue else $whenFalse"
+      XQuery(s"if ($cond) then $whenTrue else $whenFalse")
   }
 }

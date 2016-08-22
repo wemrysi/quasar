@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xquery.syntax._
 
 import java.lang.SuppressWarnings
 
@@ -25,14 +26,17 @@ import scalaz.std.iterable._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object cts {
+  def andQuery(query: XQuery, queryOrOptions: XQuery*): XQuery =
+    XQuery(s"cts:and-query${mkSeq_(query, queryOrOptions: _*)}")
+
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
-    s"cts:directory-query($uri, ${mkSeq(urisOrDepth)})"
+    XQuery(s"cts:directory-query($uri, ${mkSeq(urisOrDepth)})")
 
   def documentOrder(direction: XQuery): XQuery =
-    s"cts:document-order($direction)"
+    XQuery(s"cts:document-order($direction)")
 
   def indexOrder(index: XQuery, options: XQuery*) =
-    s"cts:index-order($index, ${mkSeq(options)})"
+    XQuery(s"cts:index-order($index, ${mkSeq(options)})")
 
   def search(
     expr: XQuery,
@@ -41,16 +45,16 @@ object cts {
     qualityWeight: Option[XQuery] = None,
     forestIds: IList[XQuery] = IList.empty
   ): XQuery =
-    s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0"}, ${mkSeq(forestIds)})"
+    XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 
   val uriReference: XQuery =
-    "cts:uri-reference()"
+    XQuery("cts:uri-reference()")
 
   val uris: XQuery =
-    "cts:uris()"
+    XQuery("cts:uris()")
 
   def uris(start: XQuery, options: IList[XQuery]): XQuery =
-    s"cts:uris($start, ${mkSeq(options)})"
+    XQuery(s"cts:uris($start, ${mkSeq(options)})")
 
   def uris(
     start: XQuery,
@@ -59,5 +63,5 @@ object cts {
     qualityWeight: Option[XQuery] = None,
     forestIds: IList[XQuery] = IList.empty
   ): XQuery =
-    s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0"}, ${mkSeq(forestIds)})"
+    XQuery(s"cts:uris($start, ${mkSeq(options)}, $query, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
 }
