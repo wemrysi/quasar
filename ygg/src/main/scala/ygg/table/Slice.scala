@@ -4,7 +4,6 @@ import ygg.cf
 import TransSpecModule._
 import ygg.common._
 import scalaz.{ =?> => _, _ }, Ordering._
-import java.nio.CharBuffer
 import ygg.macros.Spire._
 import ygg.json._
 import ygg.data._
@@ -973,7 +972,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
         // we have the schema, now emit
 
-        var buffer = CharBuffer.allocate(BufferSize)
+        var buffer = charBuffer(BufferSize)
         val vector = new ArrayBuffer[CharBuffer](math.max(1, size / 10))
 
         @inline
@@ -982,7 +981,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
             buffer.flip()
             vector += buffer
 
-            buffer = CharBuffer.allocate(BufferSize)
+            buffer = charBuffer(BufferSize)
           }
         }
 

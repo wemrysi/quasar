@@ -3,7 +3,6 @@ package ygg.table
 import ygg.common._
 import scalaz._
 import scalaz.syntax.monad._
-import java.nio.CharBuffer
 import ygg.json._
 
 final case class APIKey(value: String) extends AnyVal

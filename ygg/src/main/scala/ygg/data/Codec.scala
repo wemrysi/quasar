@@ -3,7 +3,6 @@ package ygg.data
 import ygg.common._
 import ygg.table._
 
-import java.nio.CharBuffer
 import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }
 
@@ -393,7 +392,7 @@ object Codec {
       else {
         writePackedInt(strEncodedSize(a), sink)
 
-        val source  = CharBuffer.wrap(a)
+        val source  = charBuffer(a)
         val encoder = Utf8Charset.newEncoder
 
         if (encoder.encode(source, sink, true) == CoderResult.OVERFLOW) {
