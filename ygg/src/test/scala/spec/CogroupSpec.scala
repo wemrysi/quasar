@@ -1,22 +1,3 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package ygg.tests
 
 import blueeyes._
@@ -87,10 +68,9 @@ trait CogroupSpec extends TableQspec {
     val keyOrder = Ord[JValue].contramap((_: JValue) \ "key")
 
     val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
-      case Left3(jv) => jv
-      case Middle3((jv1, jv2)) =>
-        JObject(JField("key", jv1 \ "key"), JField("valueLeft", jv1 \ "value"), JField("valueRight", jv2 \ "value"))
-      case Right3(jv) => jv
+      case Left3(jv)           => jv
+      case Middle3((jv1, jv2)) => JObject(JField("key", jv1 \ "key"), JField("valueLeft", jv1 \ "value"), JField("valueRight", jv2 \ "value"))
+      case Right3(jv)          => jv
     }
 
     val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
@@ -263,44 +243,41 @@ trait CogroupSpec extends TableQspec {
   }
 
   def testCogroupPathology1 = {
-    import JParser.parseUnsafe
-    val s1 = SampleData(Stream(toRecord(Array(1, 1, 1), parseUnsafe("""{ "a":[] }"""))))
-    val s2 = SampleData(Stream(toRecord(Array(1, 1, 1), parseUnsafe("""{ "b":0 }"""))))
+    val s1 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "a":[] }""")))
+    val s2 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "b":0 }""")))
 
     testCogroup(s1, s2)
   }
 
   def testCogroupSliceBoundaries = {
-    import JParser.parseUnsafe
-
     val s1 = SampleData(
       Stream(
-        toRecord(Array(1), parseUnsafe("""{ "ruoh5A25Jaxa":-1.0 }""")),
-        toRecord(Array(2), parseUnsafe("""{ "ruoh5A25Jaxa":-2.735023101944097E37 }""")),
-        toRecord(Array(3), parseUnsafe("""{ "ruoh5A25Jaxa":2.12274644226519E38 }""")),
-        toRecord(Array(4), parseUnsafe("""{ "ruoh5A25Jaxa":1.085656944502855E38 }""")),
-        toRecord(Array(5), parseUnsafe("""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }""")),
-        toRecord(Array(6), parseUnsafe("""{ "ruoh5A25Jaxa":-1.0 }""")),
-        toRecord(Array(7), parseUnsafe("""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }""")),
-        toRecord(Array(8), parseUnsafe("""{ "ruoh5A25Jaxa":2.4225587899613125E38 }""")),
-        toRecord(Array(9), parseUnsafe("""{ "ruoh5A25Jaxa":-3.078101074510345E38 }""")),
-        toRecord(Array(10), parseUnsafe("""{ "ruoh5A25Jaxa":0.0 }""")),
-        toRecord(Array(11), parseUnsafe("""{ "ruoh5A25Jaxa":-2.049657967962047E38 }"""))
+        toRecord(Array(1), json"""{ "ruoh5A25Jaxa":-1.0 }"""),
+        toRecord(Array(2), json"""{ "ruoh5A25Jaxa":-2.735023101944097E37 }"""),
+        toRecord(Array(3), json"""{ "ruoh5A25Jaxa":2.12274644226519E38 }"""),
+        toRecord(Array(4), json"""{ "ruoh5A25Jaxa":1.085656944502855E38 }"""),
+        toRecord(Array(5), json"""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }"""),
+        toRecord(Array(6), json"""{ "ruoh5A25Jaxa":-1.0 }"""),
+        toRecord(Array(7), json"""{ "ruoh5A25Jaxa":-3.4028234663852886E38 }"""),
+        toRecord(Array(8), json"""{ "ruoh5A25Jaxa":2.4225587899613125E38 }"""),
+        toRecord(Array(9), json"""{ "ruoh5A25Jaxa":-3.078101074510345E38 }"""),
+        toRecord(Array(10), json"""{ "ruoh5A25Jaxa":0.0 }"""),
+        toRecord(Array(11), json"""{ "ruoh5A25Jaxa":-2.049657967962047E38 }""")
       ))
 
     val s2 = SampleData(
       Stream(
-        toRecord(Array(1), parseUnsafe("""{ "mbsn8ya":-629648309198725501 }""")),
-        toRecord(Array(2), parseUnsafe("""{ "mbsn8ya":-1642079669762657762 }""")),
-        toRecord(Array(3), parseUnsafe("""{ "mbsn8ya":-75462980385303464 }""")),
-        toRecord(Array(4), parseUnsafe("""{ "mbsn8ya":-4407493923710190330 }""")),
-        toRecord(Array(5), parseUnsafe("""{ "mbsn8ya":4611686018427387903 }""")),
-        toRecord(Array(6), parseUnsafe("""{ "mbsn8ya":-4374327062386862583 }""")),
-        toRecord(Array(7), parseUnsafe("""{ "mbsn8ya":1920642186250198767 }""")),
-        toRecord(Array(8), parseUnsafe("""{ "mbsn8ya":1 }""")),
-        toRecord(Array(9), parseUnsafe("""{ "mbsn8ya":0 }""")),
-        toRecord(Array(10), parseUnsafe("""{ "mbsn8ya":1 }""")),
-        toRecord(Array(11), parseUnsafe("""{ "mbsn8ya":758880641626989193 }"""))
+        toRecord(Array(1), json"""{ "mbsn8ya":-629648309198725501 }"""),
+        toRecord(Array(2), json"""{ "mbsn8ya":-1642079669762657762 }"""),
+        toRecord(Array(3), json"""{ "mbsn8ya":-75462980385303464 }"""),
+        toRecord(Array(4), json"""{ "mbsn8ya":-4407493923710190330 }"""),
+        toRecord(Array(5), json"""{ "mbsn8ya":4611686018427387903 }"""),
+        toRecord(Array(6), json"""{ "mbsn8ya":-4374327062386862583 }"""),
+        toRecord(Array(7), json"""{ "mbsn8ya":1920642186250198767 }"""),
+        toRecord(Array(8), json"""{ "mbsn8ya":1 }"""),
+        toRecord(Array(9), json"""{ "mbsn8ya":0 }"""),
+        toRecord(Array(10), json"""{ "mbsn8ya":1 }"""),
+        toRecord(Array(11), json"""{ "mbsn8ya":758880641626989193 }""")
       ))
 
     testCogroup(s1, s2)
@@ -361,53 +338,51 @@ trait CogroupSpec extends TableQspec {
   }
 
   def testCogroupPathology3 = {
-    import JParser.parseUnsafe
     val s1 = SampleData(
       Stream(
-        parseUnsafe("""{ "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":0.0 }, "key":[3.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":3.323617580854415E+307 }, "key":[5.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":-9.458984438931391E+306 }, "key":[6.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":1.0 }, "key":[10.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":0.0 }, "key":[13.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":-3.8439741460685273E+307 }, "key":[14.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":5.690895589711475E+307 }, "key":[15.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":0.0 }, "key":[16.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":-5.567237049482096E+307 }, "key":[17.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":-8.988465674311579E+307 }, "key":[18.0] }"""),
-        parseUnsafe("""{ "value":{ "ugsrry":2.5882896341488965E+307 }, "key":[22.0] }""")
+        json"""{ "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }""",
+        json"""{ "value":{ "ugsrry":0.0 }, "key":[3.0] }""",
+        json"""{ "value":{ "ugsrry":3.323617580854415E+307 }, "key":[5.0] }""",
+        json"""{ "value":{ "ugsrry":-9.458984438931391E+306 }, "key":[6.0] }""",
+        json"""{ "value":{ "ugsrry":1.0 }, "key":[10.0] }""",
+        json"""{ "value":{ "ugsrry":0.0 }, "key":[13.0] }""",
+        json"""{ "value":{ "ugsrry":-3.8439741460685273E+307 }, "key":[14.0] }""",
+        json"""{ "value":{ "ugsrry":5.690895589711475E+307 }, "key":[15.0] }""",
+        json"""{ "value":{ "ugsrry":0.0 }, "key":[16.0] }""",
+        json"""{ "value":{ "ugsrry":-5.567237049482096E+307 }, "key":[17.0] }""",
+        json"""{ "value":{ "ugsrry":-8.988465674311579E+307 }, "key":[18.0] }""",
+        json"""{ "value":{ "ugsrry":2.5882896341488965E+307 }, "key":[22.0] }"""
       ))
 
     val s2 = SampleData(
       Stream(
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-40146] }, "key":[2.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[-9.44770762864723688E-39073] }, "key":[3.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[2.894611552200768372E+19] }, "key":[5.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[-2.561276432629787073E-42575] }, "key":[6.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-10449] }, "key":[10.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[2110233717777347493] }, "key":[13.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[3.039020270015831847E+19] }, "key":[14.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[1E-50000] }, "key":[15.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[-1.296393752892965818E-49982] }, "key":[16.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[4.611686018427387903E+50018] }, "key":[17.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[0E+48881] }, "key":[18.0] }"""),
-        parseUnsafe("""{ "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }""")
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-40146] }, "key":[2.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-9.44770762864723688E-39073] }, "key":[3.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2.894611552200768372E+19] }, "key":[5.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-2.561276432629787073E-42575] }, "key":[6.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-10449] }, "key":[10.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2110233717777347493] }, "key":[13.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[3.039020270015831847E+19] }, "key":[14.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[1E-50000] }, "key":[15.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1.296393752892965818E-49982] }, "key":[16.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[4.611686018427387903E+50018] }, "key":[17.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[0E+48881] }, "key":[18.0] }""",
+        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }"""
       ))
 
     testCogroup(s1, s2)
   }
 
   def testPartialUndefinedCogroup = {
-    import JParser.parseUnsafe
-
-    val ltable = fromSample(SampleData(Stream(parseUnsafe("""{ "id" : "foo", "val" : 4 }"""))))
+    val ltable = fromSample(SampleData(Stream(json"""{ "id" : "foo", "val" : 4 }""")))
 
     val rtable = fromSample(
-      SampleData(Stream(parseUnsafe("""{ "id" : "foo", "val" : 2 }"""), parseUnsafe("""{ "val" : 3 }"""), parseUnsafe("""{ "id" : "foo", "val" : 4 }"""))))
+      SampleData(Stream(json"""{ "id" : "foo", "val" : 2 }""", json"""{ "val" : 3 }""", json"""{ "id" : "foo", "val" : 4 }"""))
+    )
 
     val expected = Stream(
-      parseUnsafe("""{ "id": "foo", "left": 4, "right": 2 }"""),
-      parseUnsafe("""{ "id": "foo", "left": 4, "right": 4 }""")
+      json"""{ "id": "foo", "left": 4, "right": 2 }""",
+      json"""{ "id": "foo", "left": 4, "right": 4 }"""
     )
 
     val keySpec = DerefObjectStatic(Leaf(Source), CPathField("id"))
@@ -423,12 +398,9 @@ trait CogroupSpec extends TableQspec {
   }
 
   def testLongEqualSpansOnRight = {
-    val record = JParser.parseUnsafe("""{"key":"Bob","value":42}""")
-    val ltable = fromSample(SampleData(Stream(record)))
-    val rtable = fromSample(SampleData(Stream.tabulate(22) { i =>
-      JParser.parseUnsafe("""{"key":"Bob","value":%d}""" format i)
-    }))
-
+    val record   = json"""{"key":"Bob","value":42}"""
+    val ltable   = fromSample(SampleData(Stream(record)))
+    val rtable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = Stream.tabulate(22)(JNum(_))
 
     val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
@@ -443,10 +415,8 @@ trait CogroupSpec extends TableQspec {
   }
 
   def testLongEqualSpansOnLeft = {
-    val record = JParser.parseUnsafe("""{"key":"Bob","value":42}""")
-    val ltable = fromSample(SampleData(Stream.tabulate(22) { i =>
-      JParser.parseUnsafe("""{"key":"Bob","value":%d}""" format i)
-    }))
+    val record = json"""{"key":"Bob","value":42}"""
+    val ltable = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val rtable = fromSample(SampleData(Stream(record)))
 
     val expected = Stream.tabulate(22)(JNum(_))
@@ -463,16 +433,8 @@ trait CogroupSpec extends TableQspec {
   }
 
   def testLongEqualSpansOnBoth = {
-    val table = fromSample(SampleData(Stream.tabulate(22) { i =>
-      JParser.parseUnsafe("""{"key":"Bob","value":%d}""" format i)
-    }))
-
-    val expected = (for {
-      left  <- 0 until 22
-      right <- 0 until 22
-    } yield {
-      JParser.parseUnsafe("""{ "left": %d, "right": %d }""" format (left, right))
-    }).toStream
+    val table    = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
+    val expected = ( for (l  <- 0 until 22; r <- 0 until 22) yield json"""{ "left": $l, "right": $r }""" ).toStream
 
     val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
     val result: Table = table.cogroup(keySpec, keySpec, table)(
