@@ -1673,7 +1673,7 @@ object Slice {
               c.update(sliceIndex, s)
             }
 
-          case JArray(Nil) =>
+          case JArray(Seq()) =>
             acc.getOrElse(ref, MutableEmptyArrayColumn.empty()).asInstanceOf[MutableEmptyArrayColumn].unsafeTap { c =>
               c.update(sliceIndex, true)
             }

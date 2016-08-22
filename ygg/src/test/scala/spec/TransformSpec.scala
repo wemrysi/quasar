@@ -1041,8 +1041,8 @@ trait TransformSpec extends TableQspec {
         */
       val sample = SampleData(sample0.data flatMap { jv =>
         (jv \ "value") match {
-          case JArray(x :: Nil) => None
-          case z                => Some(z)
+          case JArray(Seq(x)) => None
+          case z              => Some(z)
         }
       })
 
@@ -1162,7 +1162,7 @@ trait TransformSpec extends TableQspec {
       JArray(JNum(99) :: JUndefined :: JNum(100) :: JNum(101) :: Nil),
       JArray(JNum(99) :: JNum(100) :: Nil),
       JArray(JNum(99) :: JNum(100) :: JNum(102) :: Nil),
-      JArray(Nil),
+      jarray(),
       JArray(JNum(7) :: Nil),
       JArray(JNum(3) :: JNum(9) :: Nil),
       JArray(JUndefined :: JNum(0) :: Nil))
@@ -1205,10 +1205,10 @@ trait TransformSpec extends TableQspec {
       JArray(JNum(99) :: JUndefined :: JNum(100) :: JNum(101) :: Nil),
       JArray(JNum(99) :: JNum(100) :: Nil),
       JArray(JNum(99) :: JNum(100) :: JNum(102) :: Nil),
-      JArray(Nil),
+      jarray(),
       JArray(JNum(88) :: Nil),
-      JArray(Nil),
-      JArray(Nil),
+      jarray(),
+      jarray(),
       JArray(JUndefined :: JNum(77) :: Nil),
       JArray(JNum(7) :: Nil),
       JArray(JNum(3) :: JNum(9) :: Nil),
@@ -1942,9 +1942,9 @@ trait TransformSpec extends TableQspec {
         */
       val sample = SampleData(sample0.data flatMap { jv =>
         (jv \ "value") match {
-          case JArray(x :: Nil)      => None
-          case JArray(x :: y :: Nil) => None
-          case z                     => Some(z)
+          case JArray(Seq(x))    => None
+          case JArray(Seq(x, y)) => None
+          case z                 => Some(z)
         }
       })
       val table = fromSample(sample)
@@ -1954,7 +1954,7 @@ trait TransformSpec extends TableQspec {
 
       val expected = sample.data flatMap { jv =>
         (jv \ "value") match {
-          case JArray(x :: y :: z :: xs) => Some(JArray(z :: y :: x :: xs))
+          case JArray(x +: y +: z +: xs) => Some(JArray(z +: y +: x +: xs))
           case _                         => None
         }
       }

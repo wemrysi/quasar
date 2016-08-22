@@ -53,11 +53,11 @@ object Diff {
     diffRec(vs1, vs2)
   }
 
-  private def diffVals(vs1: List[JValue], vs2: List[JValue]) = {
-    def diffRec(xleft: List[JValue], yleft: List[JValue]): Diff = (xleft, yleft) match {
-      case (xs, Nil) => Diff(JUndefined, JUndefined, if (xs.isEmpty) JUndefined else JArray(xs))
-      case (Nil, ys) => Diff(JUndefined, if (ys.isEmpty) JUndefined else JArray(ys), JUndefined)
-      case (x :: xs, y :: ys) =>
+  private def diffVals(vs1: Vector[JValue], vs2: Vector[JValue]) = {
+    def diffRec(xleft: Vector[JValue], yleft: Vector[JValue]): Diff = (xleft, yleft) match {
+      case (xs, Seq())        => Diff(JUndefined, JUndefined, if (xs.isEmpty) JUndefined else JArray(xs))
+      case (Seq(), ys)        => Diff(JUndefined, if (ys.isEmpty) JUndefined else JArray(ys), JUndefined)
+      case (x +: xs, y +: ys) =>
         val Diff(c1, a1, d1) = diff(x, y)
         val Diff(c2, a2, d2) = diffRec(xs, ys)
         Diff(c1 ++ c2, a1 ++ a2, d1 ++ d2)

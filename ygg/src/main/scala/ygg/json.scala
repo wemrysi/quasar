@@ -51,7 +51,7 @@ package object json {
       JBool(_),
       _.toBigDecimal.fold[JValue](JUndefined)(JNum(_)),
       JString(_),
-      xs => JArray(xs map circeToJvalue),
+      xs => JArray(xs map circeToJvalue toVector),
       x => JObject(x.toMap mapValues circeToJvalue toMap)
     )
   )
@@ -62,7 +62,7 @@ package object json {
     def jnum(s: String)                  = JNum(s)
     def jint(s: String)                  = JNum(s)
     def jstring(s: String)               = JString(s)
-    def jarray(vs: List[JValue])         = JArray(vs)
+    def jarray(vs: List[JValue])         = JArray(vs.toVector)
     def jobject(vs: Map[String, JValue]) = JObject(vs)
   }
 
@@ -76,7 +76,7 @@ package object json {
     case scala.util.Left(x)            => scalaz.Failure(new RuntimeException("" + x))
   }
 
-  def jarray(elements: JValue*): JValue              = JArray(elements.toList)
+  def jarray(elements: JValue*): JValue              = JArray(elements.toVector)
   def jobject(fields: JField*): JValue               = JObject(fields.toList)
   def jfield[A](name: String, value: JValue): JField = JField(name, value)
 
@@ -202,7 +202,7 @@ package object json {
   }
 
   private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
-    elements.foldLeft(JArray(Nil)) { (arr, t) =>
+    elements.foldLeft(JArray(Vector.empty)) { (arr, t) =>
       arr.set(t._1, t._2) --> classOf[JArray]
     }
   }
@@ -266,8 +266,8 @@ package object json {
       * Does a breadth-first traversal of all descendant JValues, beginning
       * with this one.
       */
-    def breadthFirst: List[JValue] = {
-      def breadthFirst0(cur: List[JValue], queue: sciQueue[JValue]): List[JValue] = {
+    def breadthFirst: Vector[JValue] = {
+      def breadthFirst0(cur: Vector[JValue], queue: sciQueue[JValue]): Vector[JValue] = {
         if (queue.isEmpty) cur
         else {
           val (head, nextQueue) = queue.dequeue
@@ -284,25 +284,25 @@ package object json {
         }
       }
 
-      breadthFirst0(Nil, sciQueue[JValue]() enqueue self).reverse
+      breadthFirst0(Vector.empty, sciQueue[JValue]() enqueue self).reverse
     }
 
     /** XPath-like expression to query JSON fields by name. Returns all matching fields.
       */
     def \\(nameToFind: String): JValue = {
-      def find(json: JValue): List[JValue] = json match {
+      def find(json: JValue): Vector[JValue] = json match {
         case JObject(l) =>
-          l.foldLeft(List[JValue]()) {
+          l.foldLeft(Vector[JValue]()) {
             case (acc, (`nameToFind`, v)) => v :: acc ::: find(v)
             case (acc, (_, v))            => acc ::: find(v)
           }
 
         case JArray(l) => l flatMap find
-        case _         => Nil
+        case _         => Vector.empty
       }
       find(self) match {
-        case x :: Nil => x
-        case x        => JArray(x)
+        case Seq(x) => x
+        case x      => JArray(x)
       }
     }
 
@@ -325,10 +325,10 @@ package object json {
       def rec(target: JValue, path: JPath, value: JValue): JValue = {
         if ((target == JNull || target == JUndefined) && path == NoJPath) value
         else {
-          def arrayInsert(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
-            def update(l: List[JValue], j: Int): List[JValue] = l match {
-              case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
-              case Nil     => Nil
+          def arrayInsert(l: Vector[JValue], i: Int, rem: JPath, v: JValue): Vector[JValue] = {
+            def update(l: Vector[JValue], j: Int): Vector[JValue] = l match {
+              case x +: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
+              case Seq()   => Vector.empty
             }
 
             update(l.padTo(i + 1, JUndefined), 0)
@@ -364,7 +364,7 @@ package object json {
             case JNull | JUndefined =>
               path.nodes match {
                 case Nil                => value
-                case JPathIndex(_) :: _ => rec(JArray(Nil), path, value)
+                case JPathIndex(_) :: _ => rec(jarray(), path, value)
                 case JPathField(_) :: _ => rec(JObject(Nil), path, value)
               }
 
@@ -381,10 +381,10 @@ package object json {
     def set(path: JPath, value: JValue): JValue =
       if (path == NoJPath) value
       else {
-        def arraySet(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
-          def update(l: List[JValue], j: Int): List[JValue] = l match {
-            case x :: xs => (if (j == i) x.set(rem, v) else x) :: update(xs, j + 1)
-            case Nil     => Nil
+        def arraySet(l: Vector[JValue], i: Int, rem: JPath, v: JValue): Vector[JValue] = {
+          def update(l: Vector[JValue], j: Int): Vector[JValue] = l match {
+            case x +: xs => (if (j == i) x.set(rem, v) else x) :: update(xs, j + 1)
+            case Seq()   => Vector.empty
           }
 
           update(l.padTo(i + 1, JUndefined), 0)
@@ -412,7 +412,7 @@ package object json {
           case _ =>
             path.nodes match {
               case Nil                => value
-              case JPathIndex(_) :: _ => JArray(Nil).set(path, value)
+              case JPathIndex(_) :: _ => jarray().set(path, value)
               case JPathField(_) :: _ => JObject(Nil).set(path, value)
             }
         }
@@ -655,23 +655,23 @@ package object json {
 
     /** Return a List of all elements which matches the given predicate.
       */
-    def filter(p: JValue => Boolean): List[JValue] =
-      foldDown(List.empty[JValue])((acc, e) => if (p(e)) e :: acc else acc).reverse
+    def filter(p: JValue => Boolean): Vector[JValue] =
+      foldDown(Vector[JValue]())((acc, e) => if (p(e)) e :: acc else acc).reverse
 
-    def withFilter(p: JValue => Boolean): List[JValue] = filter(p)
+    def withFilter(p: JValue => Boolean): Vector[JValue] = filter(p)
 
-    def flatten: List[JValue] =
-      foldDown(List.empty[JValue])((acc, e) => e :: acc).reverse
+    def flatten: Vector[JValue] =
+      foldDown(Vector[JValue]())((acc, e) => e :: acc).reverse
 
     /** Flattens the JValue down to a list of path to simple JValue primitive.
       */
-    def flattenWithPath: List[JPath -> JValue] = {
-      def flatten0(path: JPath)(value: JValue): List[JPath -> JValue] = value match {
-        case JObject.empty | JArray.empty => List(path -> value)
+    def flattenWithPath: Vector[JPath -> JValue] = {
+      def flatten0(path: JPath)(value: JValue): Vector[JPath -> JValue] = value match {
+        case JObject.empty | JArray.empty => Vector(path -> value)
         case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
         case JArray(elements)             => elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })
-        case JUndefined                   => Nil
-        case leaf                         => List(path -> leaf)
+        case JUndefined                   => Vector()
+        case leaf                         => Vector(path -> leaf)
       }
 
       flatten0(NoJPath)(self)
@@ -684,10 +684,10 @@ package object json {
       def append(value1: JValue, value2: JValue): JValue = (value1, value2) match {
         case (JUndefined, x)          => x
         case (x, JUndefined)          => x
-        case (JArray(xs), JArray(ys)) => JArray(xs ::: ys)
-        case (JArray(xs), v: JValue)  => JArray(xs ::: List(v))
-        case (v: JValue, JArray(xs))  => JArray(v :: xs)
-        case (x, y)                   => JArray(x :: y :: Nil)
+        case (JArray(xs), JArray(ys)) => JArray(xs ++ ys)
+        case (JArray(xs), v: JValue)  => JArray(xs :+ v)
+        case (v: JValue, JArray(xs))  => JArray(v +: xs)
+        case (x, y)                   => jarray(x, y)
       }
       append(self, other)
     }

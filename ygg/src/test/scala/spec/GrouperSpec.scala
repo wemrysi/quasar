@@ -641,8 +641,8 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
     forall(resultJson) { v =>
       v must beLike {
         case obj: JObject => {
-          val JArray(JNum(ka) :: JNum(kb) :: Nil) = obj \ "key"
-          val JNum(v)                             = obj \ "value"
+          val JArray(Vector(JNum(ka), JNum(kb))) = obj \ "key"
+          val JNum(v)                            = obj \ "value"
 
           v must_== (grouped1ab(ka.toInt)(kb.toInt).size + grouped2(ka.toInt).size)
         }

@@ -104,7 +104,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
     case (_: JBool, CBoolean)              => true
     case (_: JString, CString)             => true
     case (JObject(fields), CEmptyObject)   => fields.isEmpty
-    case (JArray(Nil), CEmptyArray)        => true
+    case (JArray(Seq()), CEmptyArray)      => true
     case _                                 => false
   }
 

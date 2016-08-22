@@ -12,6 +12,12 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
     def slurpString(): String     = new String(slurpBytes, Utf8Charset)
   }
 
+  implicit class ScalaVectorOps[A](private val xs: Vector[A]) {
+    def :::(that: Vector[A]): Vector[A] = that ++ xs
+    def ::(head: A): Vector[A]          = head +: xs
+  }
+
+
   implicit class ByteBufferOps(private val bb: ByteBuffer) {
     def read[A](implicit z: Codec[A]): A = z read bb
   }

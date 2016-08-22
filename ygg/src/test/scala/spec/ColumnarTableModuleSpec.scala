@@ -104,7 +104,7 @@ class ColumnarTableModuleSpec
     def minimize(value: JValue): Option[JValue] = value match {
       case JUndefined       => None
       case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
-      case JArray(Nil)      => Some(JArray(Nil))
+      case JArray(Seq())    => Some(jarray())
       case JArray(elements) => elements flatMap minimize match { case Seq() => None ; case xs => Some(JArray(xs)) }
       case v                => Some(v)
     }
@@ -112,7 +112,7 @@ class ColumnarTableModuleSpec
     val table     = fromJson(seq.toStream)
     val expected  = JArray(seq.toList)
     val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
-    val minimized = minimize(expected) getOrElse JArray(Nil)
+    val minimized = minimize(expected) getOrElse jarray()
 
     arrayM.copoint mustEqual minimized
   }

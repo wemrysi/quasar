@@ -49,7 +49,7 @@ final case object JUndefined                          extends JValue
 final case object JNull                               extends JValue
 final case class JString(value: String)               extends JValue
 final case class JObject(fields: Map[String, JValue]) extends JValue
-final case class JArray(elements: List[JValue])       extends JValue
+final case class JArray(elements: Vector[JValue])       extends JValue
 final case object JTrue                               extends JBool
 final case object JFalse                              extends JBool
 final case class JNumLong(n: Long)                    extends JNum
@@ -117,10 +117,11 @@ final object JObject {
   def apply(fields: Traversable[JField]): JObject = JObject(fields.map(_.toTuple).toMap)
   def apply(fields: JField*): JObject             = JObject(fields.map(_.toTuple).toMap)
 }
-final object JArray extends (List[JValue] => JArray) {
-  val empty = JArray(Nil)
+final object JArray extends (Vector[JValue] => JArray) {
+  val empty = JArray(Vector.empty)
 
-  def apply(vals: JValue*): JArray = JArray(vals.toList)
+  def apply(vals: List[JValue]): JArray = JArray(vals.toVector)
+  def apply(vals: JValue*): JArray      = JArray(vals.toVector)
 }
 final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
   def _1                        = name

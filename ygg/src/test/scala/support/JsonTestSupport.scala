@@ -52,8 +52,8 @@ trait JsonGenerators {
     case (JObject(_), JPathIndex(_) :: _)  => true
     case (_, Nil)                          => false
     case (_, JPathField(name) :: xs)       => badPath(jv \ name, JPath(xs))
-    case (JArray(ns), JPathIndex(i) :: xs) => (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(JArray(Nil), JPath(xs))
-    case (_, JPathIndex(i) :: xs)          => (i != 0) || badPath(JArray(Nil), JPath(xs))
+    case (JArray(ns), JPathIndex(i) :: xs) => (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(jarray(), JPath(xs))
+    case (_, JPathIndex(i) :: xs)          => (i != 0) || badPath(jarray(), JPath(xs))
   }
 
   def genJPathNode: Gen[JPathNode] = frequency(
@@ -79,5 +79,5 @@ trait JsonGenerators {
   def genJString: Gen[JString] = genIdent ^^ (s => JString(s))
   def genJField: Gen[JField]   = (genIdent, genPosInt, genJValue) >> ((name, id, value) => JField(s"$name$id", value))
   def genJObject: Gen[JObject] = genJField * genSmallInt ^^ (xs => JObject(xs: _*))
-  def genJArray: Gen[JArray]   = genJValue * genSmallInt ^^ JArray
+  def genJArray: Gen[JArray]   = genJValue * genSmallInt ^^ (xs => JArray(xs.toVector))
 }

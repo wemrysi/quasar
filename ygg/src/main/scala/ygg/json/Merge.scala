@@ -31,13 +31,13 @@ object Merge {
     mergeRec(vs1, vs2)
   }
 
-  private[json] def mergeVals(vs1: List[JValue], vs2: List[JValue]): List[JValue] = {
-    def mergeRec(xleft: List[JValue], yleft: List[JValue]): List[JValue] = xleft match {
-      case Nil => yleft
-      case x :: xs =>
+  private[json] def mergeVals(vs1: Vector[JValue], vs2: Vector[JValue]): Vector[JValue] = {
+    def mergeRec(xleft: Vector[JValue], yleft: Vector[JValue]): Vector[JValue] = xleft match {
+      case Seq()   => yleft
+      case x +: xs =>
         yleft find (_ == x) match {
-          case Some(y) => merge(x, y) :: mergeRec(xs, yleft.filterNot(_ == y))
-          case None    => x :: mergeRec(xs, yleft)
+          case Some(y) => merge(x, y) +: mergeRec(xs, yleft.filterNot(_ == y))
+          case None    => x +: mergeRec(xs, yleft)
         }
     }
 

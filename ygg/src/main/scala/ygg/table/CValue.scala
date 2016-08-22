@@ -30,7 +30,7 @@ sealed trait RValue { self =>
 object RValue {
   def fromJValue(jv: JValue): RValue = jv match {
     case JObject(fields)  => RObject(fields mapValues fromJValue toMap)
-    case JArray(elements) => RArray(elements map fromJValue)
+    case JArray(elements) => RArray(elements map fromJValue toList)
     case other            => CType.toCValue(other)
   }
 
@@ -103,7 +103,7 @@ object RObject {
 }
 
 case class RArray(elements: List[RValue]) extends RValue {
-  def toJValue                     = JArray(elements map { _.toJValue })
+  def toJValue                     = JArray(elements map { _.toJValue } toVector)
   def \(fieldName: String): RValue = CUndefined
 }
 
@@ -276,7 +276,7 @@ object CType {
 
     case JString(_)    => Some(CString)
     case JNull         => Some(CNull)
-    case JArray(Nil)   => Some(CEmptyArray)
+    case JArray(Seq()) => Some(CEmptyArray)
     case JObject.empty => Some(CEmptyObject)
     case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
     case _             => None
@@ -481,7 +481,7 @@ case object CEmptyObject extends CNullType with CNullValue {
 
 case object CEmptyArray extends CNullType with CNullValue {
   def readResolve() = CEmptyArray
-  def toJValue      = JArray(Nil)
+  def toJValue      = jarray()
 }
 
 //

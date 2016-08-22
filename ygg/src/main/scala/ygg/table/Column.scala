@@ -222,7 +222,7 @@ trait PeriodColumn extends Column with (Int => Period) {
 trait EmptyArrayColumn extends Column {
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyArray
-  override def jValue(row: Int)             = JArray(Nil)
+  override def jValue(row: Int)             = jarray()
   override def cValue(row: Int)             = CEmptyArray
   override def strValue(row: Int): String   = "[]"
   override def toString                     = "EmptyArrayColumn"
