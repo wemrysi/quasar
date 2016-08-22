@@ -1,7 +1,6 @@
 package ygg.tests
 
 import ygg.json._
-import JParser._
 
 class QueryExamplesSpec extends quasar.Qspec {
   "List of IPs" in {
@@ -56,7 +55,7 @@ class QueryExamplesSpec extends quasar.Qspec {
     clusters mustEqual List("cluster2")
   }
 
-  def json = parseUnsafe("""
+  def json = json"""
     { "data_center": [
       {
         "name": "cluster1",
@@ -84,5 +83,5 @@ class QueryExamplesSpec extends quasar.Qspec {
         "admins": ["joe", "liza"]
       }
    ]}
-  """)
+  """
 }

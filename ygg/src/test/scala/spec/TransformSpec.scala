@@ -47,17 +47,17 @@ trait TransformSpec extends TableQspec {
   }
 
   def testDeepMap1CoerceToDouble = {
-    val data: Stream[JValue] = Stream(
-      JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-      JObject(JField("value", JNum(34.5)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-      JObject(JField("value", JNum(31.9)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JObject(JField("baz", JNum(31)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JNum(20)) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data: Stream[JValue] = jsonMany"""
+      {"key":[1],"value":12}
+      {"key":[2],"value":34.5}
+      {"key":[3],"value":31.9}
+      {"key":[3],"value":{"baz":31}}
+      {"key":[3],"value":"foo"}
+      {"key":[4],"value":20}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val sample   = SampleData(data)
+    val table    = fromSample(sample)
     val results  = toJson(table.transform { DeepMap1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "coerceToDouble")) })
     val expected = Stream(JNum(12), JNum(34.5), JNum(31.9), JObject(JField("baz", JNum(31)) :: Nil), JNum(20))
 
@@ -384,7 +384,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testSimpleEqual = {
-    val array: JValue = JParser.parseUnsafe("""
+    val array: JValue = json"""
       [{
         "value":{
           "value2":-2874857152017741205
@@ -397,7 +397,7 @@ trait TransformSpec extends TableQspec {
           "value2":2354405013357379940
         },
         "key":[2.0,2.0,1.0]
-      }]""")
+    }]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -426,7 +426,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testAnotherSimpleEqual = {
-    val array: JValue = JParser.parseUnsafe("""
+    val array: JValue = json"""
       [{
         "value":{
           "value2":-2874857152017741205
@@ -436,7 +436,7 @@ trait TransformSpec extends TableQspec {
       {
         "value":null,
         "key":[2.0,2.0,2.0]
-      }]""")
+      }]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -465,7 +465,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testYetAnotherSimpleEqual = {
-    val array: JValue = JParser.parseUnsafe("""
+    val array: JValue = json"""
       [{
         "value":{
           "value1":-1380814338912438254,
@@ -478,7 +478,7 @@ trait TransformSpec extends TableQspec {
           "value1":1
         },
         "key":[2.0,2.0]
-      }]""")
+      }]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -507,14 +507,14 @@ trait TransformSpec extends TableQspec {
   }
 
   def testASimpleNonEqual = {
-    val array: JValue = JParser.parseUnsafe("""
+    val array: JValue = json"""
       [{
         "value":{
           "value1":-1380814338912438254,
           "value2":1380814338912438254
         },
         "key":[2.0,1.0]
-      }]""")
+      }]"""
 
     val data: Stream[JValue] = (array match {
       case JArray(li) => li
@@ -602,7 +602,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testEqual1 = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {
         "value":{
           "value1":-1503074360046022108,
@@ -621,7 +621,7 @@ trait TransformSpec extends TableQspec {
         },
         "key":[3.0]
       }
-    ]""")
+    ]"""
 
     testEqual(SampleData(elements.toStream))
   }
@@ -863,12 +863,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerObjectConcatUndefined = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": {"baz": 4}, "bar": {"ack": 12}},
       {"foo": {"baz": 5}},
       {"bar": {"ack": 45}},
       {"foo": {"baz": 7}, "bar" : {"ack": 23}, "baz": {"foobar": 24}}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -908,12 +908,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerObjectConcatLeftEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -928,12 +928,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterObjectConcatLeftEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1087,12 +1087,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerArrayConcatUndefined = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1107,12 +1107,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterArrayConcatUndefined = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1128,7 +1128,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerArrayConcatEmptyArray = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": [], "bar": [12]},
       {"foo": [], "bar": [12, 13]},
       {"foo": [99], "bar": []},
@@ -1143,7 +1143,7 @@ trait TransformSpec extends TableQspec {
       {"foo": [7], "bar": [], "baz": 24},
       {"foo": [3], "bar": [9], "baz": 18},
       {"foo": [], "bar": [0], "baz": 18}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1171,7 +1171,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterArrayConcatEmptyArray = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": [], "bar": [12]},
       {"foo": [], "bar": [12, 13]},
       {"foo": [99], "bar": []},
@@ -1186,7 +1186,7 @@ trait TransformSpec extends TableQspec {
       {"foo": [7], "bar": [], "baz": 24},
       {"foo": [3], "bar": [9], "baz": 18},
       {"foo": [], "bar": [0], "baz": 18}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1218,12 +1218,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testInnerArrayConcatLeftEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1238,12 +1238,12 @@ trait TransformSpec extends TableQspec {
   }
 
   def testOuterArrayConcatLeftEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
       {"bar": 45},
       {"foo": 7, "bar" :23, "baz": 24}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1285,7 +1285,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeNumeric = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value": "value1"},
       45,
       true,
@@ -1297,7 +1297,7 @@ trait TransformSpec extends TableQspec {
       [{"bar": 12}],
       {"baz": 34.3},
       23
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1313,7 +1313,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeUnionTrivial = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value": "value1"},
       45,
       true,
@@ -1325,7 +1325,7 @@ trait TransformSpec extends TableQspec {
       [{"bar": 12}],
       {"baz": 34.3},
       23
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1340,7 +1340,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeUnion = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value": 23},
       {"key":[1, "bax"], "value": {"foo":4, "bar":{}}},
       {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}},
@@ -1352,7 +1352,7 @@ trait TransformSpec extends TableQspec {
       {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}},
       {"value":"foobaz"},
       {}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1368,7 +1368,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeUnfixed = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value": 23},
       {"key":[1, "bax"], "value": {"foo":4, "bar":{}}},
       {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}},
@@ -1380,7 +1380,7 @@ trait TransformSpec extends TableQspec {
       {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}},
       {"value":"foobaz"},
       {}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1396,7 +1396,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeObject = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value": 23},
       {"key":[1, "bax"], "value": 24},
       {"key":[2], "value": "foo"},
@@ -1407,7 +1407,7 @@ trait TransformSpec extends TableQspec {
       {"key":[3], "value": 18, "baz": true},
       {"key":["foo"], "value": 18.6, "baz": true},
       {"key":[3, 5], "value": [34], "baz": 33}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1423,7 +1423,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeObjectEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       [],
       1,
       {},
@@ -1431,7 +1431,7 @@ trait TransformSpec extends TableQspec {
       {"a": 1},
       [6.2, -6],
       {"b": [9]}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1447,7 +1447,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeArrayEmpty = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       [],
       1,
       {},
@@ -1455,7 +1455,7 @@ trait TransformSpec extends TableQspec {
       {"a": 1},
       [6.2, -6],
       {"b": [9]}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1471,7 +1471,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeObjectUnfixed = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       [],
       1,
       {},
@@ -1479,7 +1479,7 @@ trait TransformSpec extends TableQspec {
       {"a": 1},
       [6.2, -6],
       {"b": [9]}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1495,7 +1495,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeArrayUnfixed = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       [],
       1,
       {},
@@ -1503,7 +1503,7 @@ trait TransformSpec extends TableQspec {
       [false, 3.2, "a"],
       [6.2, -6],
       {"b": [9]}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1519,10 +1519,10 @@ trait TransformSpec extends TableQspec {
   }
 
   def testIsTypeTrivial = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[2,1,1],"value":[]},
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
-    """)
+    """
 
     val sample = SampleData(elements.toStream, Some((3, Seq((NoJPath, CEmptyArray)))))
 
@@ -1617,19 +1617,19 @@ trait TransformSpec extends TableQspec {
   }
 
   def testTypedAtSliceBoundary = {
-    val JArray(data) = JParser.parseUnsafe("""[
-        { "value":{ "n":{ } }, "key":[1,1,1] },
-        { "value":{ "lvf":2123699568254154891, "vbeu":false, "dAc":4611686018427387903 }, "key":[1,1,3] },
-        { "value":{ "lvf":1, "vbeu":true, "dAc":0 }, "key":[2,1,1] },
-        { "value":{ "lvf":1, "vbeu":true, "dAc":-1E-28506 }, "key":[2,2,1] },
-        { "value":{ "n":{ } }, "key":[2,2,2] },
-        { "value":{ "n":{ } }, "key":[2,3,2] },
-        { "value":{ "n":{ } }, "key":[2,4,4] },
-        { "value":{ "n":{ } }, "key":[3,1,3] },
-        { "value":{ "n":{ } }, "key":[3,2,2] },
-        { "value":{ "n":{ } }, "key":[4,3,1] },
-        { "value":{ "lvf":-1, "vbeu":true, "dAc":0 }, "key":[4,3,4] }
-      ]""")
+    val JArray(data) = json"""[
+      { "value":{ "n":{ } }, "key":[1,1,1] },
+      { "value":{ "lvf":2123699568254154891, "vbeu":false, "dAc":4611686018427387903 }, "key":[1,1,3] },
+      { "value":{ "lvf":1, "vbeu":true, "dAc":0 }, "key":[2,1,1] },
+      { "value":{ "lvf":1, "vbeu":true, "dAc":-1E-28506 }, "key":[2,2,1] },
+      { "value":{ "n":{ } }, "key":[2,2,2] },
+      { "value":{ "n":{ } }, "key":[2,3,2] },
+      { "value":{ "n":{ } }, "key":[2,4,4] },
+      { "value":{ "n":{ } }, "key":[3,1,3] },
+      { "value":{ "n":{ } }, "key":[3,2,2] },
+      { "value":{ "n":{ } }, "key":[4,3,1] },
+      { "value":{ "lvf":-1, "vbeu":true, "dAc":0 }, "key":[4,3,4] }
+    ]"""
 
     val sample = SampleData(data.toStream, Some((3, List((JPath(".n"), CEmptyObject)))))
 
@@ -1637,29 +1637,29 @@ trait TransformSpec extends TableQspec {
   }
 
   def testTypedHeterogeneous = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1], "value":"value1"},
       {"key":[2], "value":23}
-    ]""")
+    ]"""
 
     val sample  = SampleData(elements.toStream)
     val table   = fromSample(sample)
     val jtpe    = JObjectFixedT(Map("value" -> JTextT, "key" -> JArrayUnfixedT))
     val results = toJson(table.transform(Typed(Leaf(Source), jtpe)))
 
-    val JArray(expected) = JParser.parseUnsafe("""[
+    val JArray(expected) = json"""[
       {"key":[1], "value":"value1"},
       {"key":[2]}
-    ]""")
+    ]"""
 
     results.copoint must_== expected.toStream
   }
 
   def testTypedObject = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       {"key":[1, 3], "value": {"foo": 23}},
       {"key":[2, 4], "value": {}}
-    ]""")
+    ]"""
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
@@ -1668,10 +1668,10 @@ trait TransformSpec extends TableQspec {
       Typed(Leaf(Source), JObjectFixedT(Map("value" -> JObjectFixedT(Map("foo" -> JNumberT)), "key" -> JArrayUnfixedT)))
     })
 
-    val JArray(expected) = JParser.parseUnsafe("""[
+    val JArray(expected) = json"""[
       {"key":[1, 3], "value": {"foo": 23}},
       {"key":[2, 4]}
-    ]""")
+    ]"""
 
     results.copoint must_== expected.toStream
   }
@@ -1705,10 +1705,10 @@ trait TransformSpec extends TableQspec {
   }
 
   def testTypedArray = {
-    val JArray(data) = JParser.parseUnsafe("""[
+    val JArray(data) = json"""[
       {"key": [1, 2], "value": [2, true] },
       {"key": [3, 4], "value": {} }
-    ]""")
+    ]"""
     val sample       = SampleData(data.toStream)
     val table        = fromSample(sample)
 
@@ -1716,18 +1716,18 @@ trait TransformSpec extends TableQspec {
       Typed(Leaf(Source), JObjectFixedT(Map("value" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JBooleanT)), "key" -> JArrayUnfixedT)))
     })
 
-    val JArray(expected) = JParser.parseUnsafe("""[
+    val JArray(expected) = json"""[
       {"key": [1, 2], "value": [2, true] },
       {"key": [3, 4] }
-    ]""")
+    ]"""
 
     results.copoint must_== expected.toStream
   }
 
   def testTypedArray2 = {
-    val JArray(data) = JParser.parseUnsafe("""[
+    val JArray(data) = json"""[
       {"key": [1], "value": [2, true] }
-    ]""")
+    ]"""
 
     val sample = SampleData(data.toStream)
     val table  = fromSample(sample)
@@ -1788,10 +1788,10 @@ trait TransformSpec extends TableQspec {
   }
 
   def testTypedNumber = {
-    val JArray(data) = JParser.parseUnsafe("""[
+    val JArray(data) = json"""[
       {"key": [1, 2], "value": 23 },
       {"key": [3, 4], "value": "foo" }
-    ]""")
+    ]"""
 
     val sample = SampleData(data.toStream)
     val table  = fromSample(sample)
@@ -1800,10 +1800,10 @@ trait TransformSpec extends TableQspec {
       Typed(Leaf(Source), JObjectFixedT(Map("value" -> JNumberT, "key" -> JArrayUnfixedT)))
     })
 
-    val JArray(expected) = JParser.parseUnsafe("""[
+    val JArray(expected) = json"""[
       {"key": [1, 2], "value": 23 },
       {"key": [3, 4] }
-    ]""")
+    ]"""
 
     results.copoint must_== expected.toStream
   }
@@ -1826,9 +1826,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testTypedEmpty = {
-    val JArray(data) = JParser.parseUnsafe("""[
-      {"key":[1], "value":{"foo":[]}}
-    ]""")
+    val JArray(data) = json"""[ {"key":[1], "value":{"foo":[]}} ]"""
     val sample       = SampleData(data.toStream)
     val table        = fromSample(sample)
 
@@ -1836,9 +1834,7 @@ trait TransformSpec extends TableQspec {
       Typed(Leaf(Source), JObjectFixedT(Map("value" -> JArrayFixedT(Map()), "key" -> JArrayUnfixedT)))
     })
 
-    val JArray(expected) = JParser.parseUnsafe("""[
-      {"key":[1] }
-    ]""")
+    val JArray(expected) = json"""[ {"key":[1] } ]"""
 
     results.copoint must_== expected.toStream
   }
