@@ -19,21 +19,17 @@ package object table {
     EQ
   }
 
-  object IdentitiesOrder extends Ord[Identities] {
-    def order(ids1: Identities, ids2: Identities): Cmp = fullIdentityOrdering(ids1, ids2)
-  }
-
-  def fullIdentityOrdering(ids1: Identities, ids2: Identities): Cmp =
-    prefixIdentityOrdering(ids1, ids2, ids1.length min ids2.length)
+  val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
 
   def prefixIdentityOrder(prefixLength: Int): Ord[Identities] =
-    Ord order ((ids1, ids2) => prefixIdentityOrdering(ids1, ids2, prefixLength))
+    Ord order (prefixIdentityOrdering(_, _, prefixLength))
 
-  def identityValueOrder[A](idOrder: Ord[Identities])(implicit ord: Ord[A]): Ord[Identities -> A] =
+  def identityValueOrder[A: Ord](idOrder: Ord[Identities]): Ord[Identities -> A] =
     Ord order ((x, y) => idOrder.order(x._1, y._1) |+| (x._2 ?|? y._2))
+
+  def fullIdentityOrdering(ids1: Identities, ids2: Identities): Cmp =
+    prefixIdentityOrder(ids1.length min ids2.length)(ids1, ids2)
 
   def tupledIdentitiesOrder[A](ord: Ord[Identities]): Ord[Identities -> A] = ord contramap (_._1)
   def valueOrder[A](ord: Ord[A]): Ord[Identities -> A]                     = ord contramap (_._2)
-
-  // def apply(n: CPathNode*): CPath = CPath(n: _*)
 }
