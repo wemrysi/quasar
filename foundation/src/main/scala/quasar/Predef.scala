@@ -20,9 +20,15 @@ import scala.{Predef => P}
 import scala.{collection => C}
 import scala.collection.{immutable => I}
 import scala.{runtime => R}
+import scala.inline
+import java.lang.String
 
+object Predef extends Predef
 
-object Predef extends LowPriorityImplicits {
+class Predef extends LowPriorityImplicits {
+  type AnyVal = scala.AnyVal
+  type StringBuilder = java.lang.StringBuilder
+
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec
   type SuppressWarnings = java.lang.SuppressWarnings
@@ -75,18 +81,16 @@ object Predef extends LowPriorityImplicits {
   def ??? : Nothing = throw new java.lang.RuntimeException("not implemented")
 
   @SuppressWarnings(Array("org.wartremover.warts.ExplicitImplicitTypes"))
-  implicit def $conforms[A]: P.<:<[A, A] = P.$conforms[A]
-  implicit def ArrowAssoc[A]: A => P.ArrowAssoc[A] = P.ArrowAssoc[A] _
-  implicit def augmentString(x: String): I.StringOps = P.augmentString(x)
-  implicit def genericArrayOps[T]: Array[T] => C.mutable.ArrayOps[T] =
-    P.genericArrayOps[T] _
-  implicit val wrapString: String => I.WrappedString = P.wrapString _
-  implicit val unwrapString: I.WrappedString => String = P.unwrapString _
-  @inline implicit val booleanWrapper: Boolean => R.RichBoolean =
-    P.booleanWrapper _
-  @inline implicit val charWrapper: Char => R.RichChar = P.charWrapper _
-  @inline implicit val intWrapper: Int => R.RichInt = P.intWrapper _
-  @inline implicit val doubleWrapper: Double => R.RichDouble = P.doubleWrapper _
+  implicit def $conforms[A]: P.<:<[A, A]                             = P.$conforms[A]
+  implicit def ArrowAssoc[A]: A => P.ArrowAssoc[A]                   = P.ArrowAssoc[A] _
+  implicit def genericArrayOps[T]: Array[T] => C.mutable.ArrayOps[T] = P.genericArrayOps[T] _
+
+  @inline implicit def wrapString(x: String): I.WrappedString    = P.wrapString(x)
+  @inline implicit def unwrapString(x: I.WrappedString): String  = P.unwrapString(x)
+  @inline implicit def booleanWrapper(x: Boolean): R.RichBoolean = P.booleanWrapper(x)
+  @inline implicit def charWrapper(x: Char): R.RichChar          = P.charWrapper(x)
+  @inline implicit def intWrapper(x: Int): R.RichInt             = P.intWrapper(x)
+  @inline implicit def doubleWrapper(x: Double): R.RichDouble    = P.doubleWrapper(x)
 
   // would rather not have these, but …
   def print(x: scala.Any)   = scala.Console.print(x)
@@ -98,9 +102,11 @@ object Predef extends LowPriorityImplicits {
   val  List     = I.List
   val  Nil      = I.Nil
   val  ::       = I.::
+  type Traversable[+A] = scala.collection.Traversable[A]
   type Option[A] = scala.Option[A] // use scalaz.Maybe instead
   val  Option    = scala.Option
   val  None      = scala.None
+  type Some[A]   = scala.Some[A]
   val  Some      = scala.Some
   type Nothing = scala.Nothing // make functors invariant
   type Throwable = java.lang.Throwable
@@ -108,7 +114,6 @@ object Predef extends LowPriorityImplicits {
 }
 
 abstract class LowPriorityImplicits {
-  implicit def genericWrapArray[T]:
-      scala.Array[T] => C.mutable.WrappedArray[T] =
-    P.genericWrapArray[T] _
+  @inline implicit def augmentString(x: String): I.StringOps                     = P.augmentString(x)
+  implicit def genericWrapArray[T](x: scala.Array[T]): C.mutable.WrappedArray[T] = P.genericWrapArray[T](x)
 }

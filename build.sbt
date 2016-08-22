@@ -15,8 +15,6 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
-val BothScopes = "test->test;compile->compile"
-
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -243,6 +241,8 @@ lazy val main = project
   .dependsOn(
     mongodb,
     skeleton,
+    macros,
+    ygg,
     postgresql,
     marklogic,
     core % BothScopes)
@@ -250,7 +250,13 @@ lazy val main = project
   .settings(libraryDependencies ++= Dependencies.main)
   .enablePlugins(AutomateHeaderPlugin)
 
+def setup(p: Project): Project = (
+  p settings commonSettings enablePlugins AutomateHeaderPlugin
+)
+
 // filesystems (backends)
+lazy val macros = project |> setup |> Ygg.macros
+lazy val ygg    = project |> setup |> Ygg.ygg
 
 lazy val mongodb = project
   .settings(name := "quasar-mongodb-internal")
