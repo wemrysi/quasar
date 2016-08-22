@@ -139,7 +139,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "unflatten is the inverse of flattenWithPath" in {
-    val inverse = (value: JValue) => JValue.unflatten(value.flattenWithPath) == value
+    val inverse = (value: JValue) => unflatten(value.flattenWithPath) == value
 
     prop(inverse)
   }

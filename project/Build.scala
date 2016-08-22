@@ -22,9 +22,20 @@ object Build {
     libraryDependencies ++= Seq(
       "org.spire-math" %% "jawn-parser"    % "0.9.0",
       "io.circe"       %% "circe-generic"  % circeVersion,
-      "org.scala-lang" %  "scala-compiler" % scalaVersion.value % "provided",
+      "org.scalaz"     %% "scalaz-core"    % scalazVersion force(),
+      "org.scala-lang" %  "scala-compiler" % scalaVersion.value     % "provided",
       macroParadise
     )
+  )
+
+  def yggDependencies = Seq(
+    "org.spire-math" %% "jawn-parser"       % "0.9.0",
+    "org.mapdb"      %  "mapdb"             % "3.0.1",
+    "org.spire-math" %% "spire-macros"      % "0.11.0",
+    "org.scalacheck" %% "scalacheck"        % scalacheckVersion % Test force(),
+    "org.specs2"     %% "specs2-scalacheck" % specsVersion      % Test,
+    "org.typelevel"  %% "scalaz-specs2"     % "0.4.0"           % Test,
+    "org.specs2"     %% "specs2-core"       % specsVersion      % Test
   )
 
   // val Default = IncOptions(

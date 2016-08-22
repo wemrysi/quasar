@@ -1,7 +1,8 @@
 package ygg.json
+package ast
 
-import blueeyes._
-import scala.util.Sorting
+import scala.util.Sorting.quickSort
+import scala.annotation.switch
 
 /** Adapted from jawn 0.9.0. */
 sealed trait Renderer {
@@ -22,7 +23,7 @@ sealed trait Renderer {
     case JObject(vs) => renderObject(sb, depth, canonicalizeObject(vs))
   }
 
-  def canonicalizeObject(vs: sciMap[String, JValue]): Iterator[String -> JValue]
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue]
 
   def renderString(sb: StringBuilder, s: String): Unit
 
@@ -80,18 +81,18 @@ sealed trait Renderer {
 }
 
 object CompactRenderer extends Renderer {
-  def canonicalizeObject(vs: sciMap[String, JValue]): Iterator[String -> JValue] = {
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = {
     val keys = vs.keys.toArray
-    Sorting.quickSort(keys)
+    quickSort(keys)
     keys.iterator.map(k => (k, vs(k)))
   }
   def renderString(sb: StringBuilder, s: String): Unit = escape(sb, s, true)
 }
 
 object CanonicalRenderer extends Renderer {
-  def canonicalizeObject(vs: sciMap[String, JValue]): Iterator[String -> JValue] = {
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = {
     val keys = vs.keys.toArray
-    Sorting.quickSort(keys)
+    quickSort(keys)
     keys.iterator.map(k => (k, vs(k)))
   }
   def renderString(sb: StringBuilder, s: String): Unit =
@@ -99,6 +100,6 @@ object CanonicalRenderer extends Renderer {
 }
 
 object FastRenderer extends Renderer {
-  def canonicalizeObject(vs: sciMap[String, JValue]): Iterator[String -> JValue] = vs.iterator
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = vs.iterator
   def renderString(sb: StringBuilder, s: String): Unit                           = escape(sb, s, false)
 }

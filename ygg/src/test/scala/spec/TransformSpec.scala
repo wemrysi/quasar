@@ -2046,7 +2046,7 @@ trait TransformSpec extends TableQspec {
         case _                                  => abort("Unexpected JValue schema for " + jv)
       }
 
-      JValue.unflatten(filtered)
+      unflatten(filtered)
     }
   }
 }

@@ -200,23 +200,36 @@ package object json {
     }
   }
 
-  implicit class JValueOps(private val self: JValue) {
-    import Validation._
+  private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
+    elements.foldLeft(JArray(Nil)) { (arr, t) =>
+      arr.set(t._1, t._2) --> classOf[JArray]
+    }
+  }
 
+  private def unflattenObject(elements: Seq[JPath -> JValue]): JObject = {
+    elements.foldLeft(JObject(Nil)) { (obj, t) =>
+      obj.set(t._1, t._2) --> classOf[JObject]
+    }
+  }
+
+  def unflatten(elements: Seq[JPath -> JValue]): JValue = {
+    if (elements.isEmpty) JUndefined
+    else {
+      val sorted = elements.sortBy(_._1)
+
+      val (xp, xv) = sorted.head
+
+      if (xp == NoJPath && sorted.size == 1) xv
+      else if (xp.path.startsWith("[")) unflattenArray(sorted)
+      else unflattenObject(sorted)
+    }
+  }
+
+  implicit class JValueOps(private val self: JValue) {
     def diff(other: JValue)          = Diff.diff(self, other)
     def merge(other: JValue): JValue = Merge.merge(self, other)
     def isDefined                    = self != JUndefined
-    def render: String               = CanonicalRenderer render self
-
-    def typeIndex: Int = self match {
-      case _: JUndefined.type => -1
-      case _: JNull.type      => 0
-      case _: JBool           => 1
-      case _: JNum            => 4
-      case _: JString         => 5
-      case _: JArray          => 6
-      case _: JObject         => 7
-    }
+    def render: String               = self.toString
 
     def normalize: JValue = self match {
       case JUndefined       => abort("Can't normalize JUndefined")
@@ -305,22 +318,63 @@ package object json {
       case _          => JUndefined
     }
 
-    def insert(path: JPath, value: JValue): Validation[Throwable, JValue] = value match {
-      case JUndefined => success(self)
-      case value      => Validation fromTryCatchNonFatal unsafeInsert(path, value)
-    }
-
-    /**
-      * A safe merge function that ensures that values are not overwritten.
-      */
-    def insertAll(other: JValue): ValidationNel[Throwable, JValue] = {
-      other.flattenWithPath.foldLeft[ValidationNel[Throwable, JValue]](success(self)) {
-        case (acc, (path, value)) => acc flatMap { (_: JValue).insert(path, value).toValidationNel }
-      }
-    }
-
     def unsafeInsert(rootPath: JPath, rootValue: JValue): JValue = {
-      JValue.unsafeInsert(self, rootPath, rootValue)
+      def rootTarget = self
+
+      def rec(target: JValue, path: JPath, value: JValue): JValue = {
+        if ((target == JNull || target == JUndefined) && path == NoJPath) value
+        else {
+          def arrayInsert(l: List[JValue], i: Int, rem: JPath, v: JValue): List[JValue] = {
+            def update(l: List[JValue], j: Int): List[JValue] = l match {
+              case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
+              case Nil     => Nil
+            }
+
+            update(l.padTo(i + 1, JUndefined), 0)
+          }
+          def fail(): Nothing = {
+            val msg = s"""
+              |JValue insert would overwrite existing data:
+              |  $target \\ $path := $value
+              |Initial call was
+              |  $rootValue \\ $rootPath := $rootValue
+              |""".stripMargin.trim
+            sys error msg
+          }
+
+          target match {
+            case obj @ JObject(fields) =>
+              path.nodes match {
+                case JPathField(name) :: nodes =>
+                  val (child, rest) = obj.partitionField(name)
+                  rest + JField(name, rec(child, JPath(nodes), value))
+
+                case JPathIndex(_) :: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+                case Nil                => fail()
+              }
+
+            case arr @ JArray(elements) =>
+              path.nodes match {
+                case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
+                case JPathField(_) :: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+                case Nil                        => fail()
+              }
+
+            case JNull | JUndefined =>
+              path.nodes match {
+                case Nil                => value
+                case JPathIndex(_) :: _ => rec(JArray(Nil), path, value)
+                case JPathField(_) :: _ => rec(JObject(Nil), path, value)
+              }
+
+            case x =>
+              // println(s"Target is $x ${x.getClass}")
+              fail()
+          }
+        }
+      }
+
+      rec(rootTarget, rootPath, rootValue)
     }
 
     def set(path: JPath, value: JValue): JValue =
@@ -367,7 +421,7 @@ package object json {
       path.nodes match {
         case JPathField(name) :: xs =>
           self match {
-            case JObjectFields(fields) =>
+            case JObject.Fields(fields) =>
               Some(
                 JObject(fields flatMap {
                   case JField(`name`, value) =>
@@ -546,7 +600,7 @@ package object json {
           head match {
             case JPathField(name1) =>
               j match {
-                case JObjectFields(fields) =>
+                case JObject.Fields(fields) =>
                   JObject(fields.map {
                     case JField(name2, value) if (name1 == name2) => JField(name1, replace0(JPath(tail: _*), value))
 
@@ -649,7 +703,7 @@ package object json {
       */
     def minimize: Option[JValue] = {
       self match {
-        case JObjectFields(fields) => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
+        case JObject.Fields(fields) => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
         case JArray(elements)      => Some(JArray(elements.flatMap(_.minimize)))
         case JUndefined            => None
         case value                 => Some(value)

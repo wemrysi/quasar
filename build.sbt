@@ -10,17 +10,7 @@ lazy val root = project.root.setup.noArtifacts aggregate (macros, ygg) dependsOn
 
 lazy val macros = project.setup also macroDependencies
 
-lazy val ygg = project.setup dependsOn (macros) deps (
-
-  "org.spire-math" %% "jawn-parser"       % "0.9.0",
-  "org.mapdb"      %  "mapdb"             % "3.0.1",
-  "org.spire-math" %% "spire-macros"      % "0.11.0",
-  "org.scalaz"     %% "scalaz-core"       % scalazVersion force(),
-  "org.scalacheck" %% "scalacheck"        % scalacheckVersion      % Test force(),
-  "org.specs2"     %% "specs2-scalacheck" % specsVersion           % Test,
-  "org.typelevel"  %% "scalaz-specs2"     % "0.4.0"                % Test,
-  "org.specs2"     %% "specs2-core"       % specsVersion           % Test
-)
+lazy val ygg = project.setup dependsOn macros deps (yggDependencies: _*)
 
 lazy val benchmark = project.setup dependsOn (ygg % BothScopes) enablePlugins JmhPlugin also (
                 fork in Test :=  true,

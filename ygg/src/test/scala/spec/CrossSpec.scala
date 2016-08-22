@@ -12,7 +12,7 @@ trait CrossSpec extends TableQspec {
     val rtable = fromSample(r)
 
     def removeUndefined(jv: JValue): JValue = jv match {
-      case JObjectFields(jfields) => JObject(jfields collect { case JField(s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
+      case JObject.Fields(jfields) => JObject(jfields collect { case JField(s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
       case JArray(jvs) =>
         JArray(jvs map { jv =>
           removeUndefined(jv)

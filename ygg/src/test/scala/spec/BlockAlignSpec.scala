@@ -501,7 +501,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
     // order) to match real sort semantics for disambiguation of equal
     // values
     val sorted = original.zipWithIndex.map {
-      case (jv, i) => JValue.unsafeInsert(jv, globalIdPath, JNum(i))
+      case (jv, i) => jv.unsafeInsert(globalIdPath, JNum(i))
     }.sortBy { v =>
       JArray(sortKeys.map(_.extract(v \ "value")).toList ::: List(v \ "globalId")).asInstanceOf[JValue]
     }(desiredJValueOrder).map(_.delete(globalIdPath).get).toList
