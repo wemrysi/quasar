@@ -86,21 +86,6 @@ public class BitSet {
     }
 
     /**
-     * Adds the specified index to this set. This method is equivalent
-     * to <code>set(index.intValue())</code>.
-     *
-     * @param index the integer value to be appended to this set.
-     * @return {@code true} if this set did not contains the specified
-     *         index; {@code false} otherwise.
-     */
-    public boolean add( Index index) {
-        int bitIndex = ((Index) index).intValue();
-        if (this.get(bitIndex)) return false; // Already there.
-        set(bitIndex);
-        return true;
-    }
-
-    /**
      * Performs the logical AND operation on this bit set and the
      * given bit set. This means it builds the intersection
      * of the two sets. The result is stored into this bit set.
