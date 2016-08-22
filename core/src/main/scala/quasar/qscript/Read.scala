@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.fp._
+import quasar.RenderTree
 
 import matryoshka._
 import monocle.macros.Lenses
@@ -31,4 +32,6 @@ object Read {
   implicit def equal: Equal[Read] = Equal.equalBy(_.path)
   implicit def show: Show[Read] =
     Show.show(Cord("Read(") ++ _.path.show ++ Cord(")"))
+
+  implicit def renderTree: RenderTree[Read] = RenderTree.fromShow("Read")
 }

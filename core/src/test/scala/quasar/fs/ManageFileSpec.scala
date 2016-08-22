@@ -20,12 +20,11 @@ import quasar.Predef._
 import quasar.Data
 import quasar.fp._
 
-import org.specs2.ScalaCheck
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.stream._
 
-class ManageFileSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture {
+class ManageFileSpec extends quasar.Qspec with FileSystemFixture {
 
   "ManageFile" should {
     "renameFile" >> {

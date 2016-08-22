@@ -24,11 +24,10 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.scalacheck.ScalazProperties._
 
-class OptimizerSpec extends quasar.QuasarSpecification with CompilerHelpers with TreeMatchers with ScalaCheck {
+class OptimizerSpec extends quasar.Qspec with CompilerHelpers with TreeMatchers {
   import StdLib.structural._
   import StdLib.set._
   import LogicalPlan._

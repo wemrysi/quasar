@@ -31,12 +31,11 @@ import eu.timepit.refined.W
 import eu.timepit.refined.api.Refined
 import monocle.std.{disjunction => D}
 import org.scalacheck.Prop
-import org.specs2.ScalaCheck
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, _}, Scalaz._
 import scalaz.stream._
 
-class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) with ScalaCheck {
+class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
   import ReadFilesSpec._, FileSystemError._, PathError._
   import ReadFile._
 

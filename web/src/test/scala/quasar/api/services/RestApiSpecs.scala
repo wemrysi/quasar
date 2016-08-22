@@ -29,8 +29,9 @@ import org.http4s.dsl._
 import org.http4s.headers._
 import scalaz.{Failure => _, _}
 import scalaz.concurrent.Task
+import org.specs2.matcher.TraversableMatchers._
 
-class RestApiSpecs extends quasar.QuasarSpecification {
+class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
   type Eff0[A] = Coproduct[FileSystemFailure, MountingFileSystem, A]

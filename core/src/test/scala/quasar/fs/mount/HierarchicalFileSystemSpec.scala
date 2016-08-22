@@ -33,7 +33,7 @@ import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
 
-class HierarchicalFileSystemSpec extends quasar.QuasarSpecification with FileSystemFixture {
+class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._

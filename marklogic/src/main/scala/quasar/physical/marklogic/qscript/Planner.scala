@@ -16,13 +16,11 @@
 
 package quasar.physical.marklogic.qscript
 
-import quasar.Planner.PlannerError
-
 import matryoshka._
 import scalaz._
 
 trait Planner[QS[_], A] {
-  def plan: AlgebraM[PlannerError \/ ?, QS, A]
+  def plan: AlgebraM[Planning, QS, A]
 }
 
 object Planner {
@@ -30,7 +28,7 @@ object Planner {
 
   implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
     new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[PlannerError \/ ?, Coproduct[F, G, ?], A] =
+      def plan: AlgebraM[Planning, Coproduct[F, G, ?], A] =
         _.run.fold(F.plan, G.plan)
     }
 }

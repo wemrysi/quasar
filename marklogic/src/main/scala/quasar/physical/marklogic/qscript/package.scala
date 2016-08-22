@@ -16,12 +16,15 @@
 
 package quasar.physical.marklogic
 
+import quasar.{PhaseResultW, PlannerErrT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.XQuery
 
 import scalaz.Const
 
 package object qscript {
+  type Planning[A] = PlannerErrT[PhaseResultW, A]
+
   type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
 
   object MarkLogicPlanner {

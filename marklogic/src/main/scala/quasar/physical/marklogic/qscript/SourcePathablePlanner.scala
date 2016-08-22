@@ -17,16 +17,14 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.Planner.PlannerError
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._
 
 private[qscript] final class SourcedPathablePlanner[T[_[_]]] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
-  val plan: AlgebraM[PlannerError \/ ?, SourcedPathable[T, ?], XQuery] = {
+  val plan: AlgebraM[Planning, SourcedPathable[T, ?], XQuery] = {
     case LeftShift(src, struct, repair) => ???
-    case Union(src, lBranch, rBranch) => ???
+    case Union(src, lBranch, rBranch)   => ???
   }
 }

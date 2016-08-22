@@ -17,15 +17,14 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.Planner.PlannerError
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._
+import scalaz.Const
 
 private[qscript] final class DeadEndPlanner extends MarkLogicPlanner[Const[DeadEnd, ?]] {
-  val plan: AlgebraM[PlannerError \/ ?, Const[DeadEnd, ?], XQuery] = {
+  val plan: AlgebraM[Planning, Const[DeadEnd, ?], XQuery] = {
     case Const(Root) => ???
   }
 }

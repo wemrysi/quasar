@@ -21,10 +21,9 @@ import quasar.Predef._
 import argonaut._, Argonaut._
 import argonaut.JsonScalaz._
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import scalaz.Equal
 
-class RenderedTreeSpec extends quasar.QuasarSpecification with ScalaCheck {
+class RenderedTreeSpec extends quasar.Qspec {
   private implicit def RenderedTreeEqual: Equal[RenderedTree]                  = Equal.equalBy(_.asJson)
   private def expectJson(t: RenderedTree, expect: Json)                        = t.asJson must_= expect
   private def expect(t1: RenderedTree, t2: RenderedTree, result: RenderedTree) = (t1 diff t2) must_= result

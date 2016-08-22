@@ -18,7 +18,6 @@ package quasar.api.services.query
 
 import quasar.Predef._
 import quasar._, fs._
-import quasar.api.PathUtils
 import quasar.api.matchers._
 import quasar.api.ApiError
 import quasar.api.ApiErrorEntityDecoder._
@@ -26,18 +25,18 @@ import quasar.fs._, InMemory._
 
 import argonaut._, Argonaut._
 import org.http4s._
-import org.specs2.specification.core.Fragments
-import org.specs2.ScalaCheck
+import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
+import quasar.api.PathUtils._
 
-class QueryServiceSpec extends quasar.QuasarSpecification with FileSystemFixture with PathUtils with ScalaCheck {
+class QueryServiceSpec extends quasar.Qspec with FileSystemFixture {
   import queryFixture._
 
   "Execute and Compile Services" should {
-    def testBoth[A](test: (InMemState => HttpService) => Fragments) = {
+    def testBoth[A](test: (InMemState => HttpService) => Fragment) = {
       "Compile" should {
         test(compileService)
       }

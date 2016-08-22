@@ -17,15 +17,13 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.Planner.PlannerError
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._
 
 private[qscript] final class ThetaJoinPlanner[T[_[_]]] extends MarkLogicPlanner[ThetaJoin[T, ?]] {
-  val plan: AlgebraM[PlannerError \/ ?, ThetaJoin[T, ?], XQuery] = {
+  val plan: AlgebraM[Planning, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) => ???
   }
 }

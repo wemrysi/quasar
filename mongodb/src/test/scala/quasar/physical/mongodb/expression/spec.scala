@@ -20,8 +20,6 @@ import quasar.Predef._
 
 import matryoshka.Recursive.ops._
 import org.scalacheck._
-import org.specs2.scalaz._
-
 import quasar.physical.mongodb.{Bson, BsonField}
 
 object ArbitraryExprOp {
@@ -29,7 +27,7 @@ object ArbitraryExprOp {
   lazy val genExpr: Gen[Expression] = Gen.const($literal(Bson.Int32(1)))
 }
 
-class ExpressionSpec extends quasar.QuasarSpecification with DisjunctionMatchers {
+class ExpressionSpec extends quasar.Qspec {
 
   "Expression" should {
 

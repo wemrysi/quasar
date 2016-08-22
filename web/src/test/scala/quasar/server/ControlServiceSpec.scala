@@ -30,7 +30,7 @@ import scalaz.concurrent.Task
 import scalaz.concurrent.Strategy.DefaultTimeoutScheduler
 import shapeless.nat._
 
-class ControlServiceSpec extends quasar.QuasarSpecification {
+class ControlServiceSpec extends quasar.Qspec {
 
   val client = Retry(_ => Some(250.milliseconds))(org.http4s.client.blaze.defaultClient)
 
@@ -62,8 +62,6 @@ class ControlServiceSpec extends quasar.QuasarSpecification {
       client.fetch(req)(response => Task.now(response.status must_== Status.Ok))
     }
     "restart on new port when PUT succeeds" in {
-      skipped("still failing in Travis -- see SD-1532")
-
       val Seq(startPort, newPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
       withServerExpectingRestart(initialPort = startPort){ baseUri: Uri =>
@@ -72,16 +70,15 @@ class ControlServiceSpec extends quasar.QuasarSpecification {
           _   <- client.fetch(req)(Task.now)
         } yield ()
       }{ checkRunningOn(newPort) }
-    }
-    "restart on default port when DELETE succeeds" in {
-      skipped("still failing in Travis -- see SD-1532")
+    }.flakyTest("java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
 
+    "restart on default port when DELETE succeeds" in {
       val Seq(startPort, defaultPort) = Http4sUtils.anyAvailablePorts[_2].unsafePerformSync.unsized
 
       withServerExpectingRestart(initialPort = startPort, defaultPort = defaultPort){ baseUri: Uri =>
         val req = Request(uri = baseUri, method = Method.DELETE)
         client.fetch(req)(Task.now).void
       }{ checkRunningOn(defaultPort) }
-    }
+    }.flakyTest("java.util.concurrent.TimeoutException: Timed out after 30000 milliseconds. (see SD-1532)")
   }
 }

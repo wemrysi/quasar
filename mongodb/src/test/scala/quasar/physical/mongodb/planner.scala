@@ -32,15 +32,14 @@ import scala.Either
 import eu.timepit.refined.auto._
 import matryoshka._, Recursive.ops._
 import org.scalacheck._
-import org.specs2.ScalaCheck
 import org.specs2.execute.Result
 import org.specs2.matcher.{Matcher, Expectable}
-import org.specs2.scalaz._
 import org.threeten.bp.Instant
 import pathy.Path._
 import scalaz._, Scalaz._
+import quasar.specs2.QuasarMatchers._
 
-class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with CompilerHelpers with DisjunctionMatchers {
+class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with CompilerHelpers {
   import StdLib.{set => s, _}
   import structural._
   import LogicalPlan._
@@ -78,7 +77,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       // tests currently run into that.
       .flatMap(_.fold(
         e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        lp => MongoDbPlanner.plan(lp, MongoDbPlanner.QueryContext(model, stats)).leftMap(CPlannerError(_))))
+        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats)).leftMap(CPlannerError(_))))
 
   def plan0(query: String, model: MongoQueryModel, stats: Collection => Option[CollectionStatistics])
       : Either[CompilationError, Crystallized[WorkflowF]] = {
@@ -98,7 +97,7 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, MongoDbPlanner.QueryContext(MongoQueryModel.`3.2`, κ(None)))
+      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, κ(None)))
     } yield phys).run.value.toEither
   }
 
@@ -3462,8 +3461,6 @@ class PlannerSpec extends quasar.QuasarSpecification with ScalaCheck with Compil
       (fields aka "column order" must beSome(columnNames(q))) or
         (fields must beSome(List("value"))) // NB: some edge cases (all constant projections) end up under "value" and aren't interesting anyway
     }
-
-    args.report(showtimes = true)
 
     "plan multiple reducing projections (all, distinct, orderBy)" >> Prop.forAll(select(distinct, maybeReducingExpr, Gen.option(filter), Gen.option(groupBySeveral), orderBySeveral)) { q =>
       plan(q.value) must beRight.which { fop =>

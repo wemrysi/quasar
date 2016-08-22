@@ -17,7 +17,6 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.Variables
 import quasar.api._
 import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
@@ -26,22 +25,20 @@ import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
 import quasar.fs.mount.{MountRequest => MR, _}
-import quasar.sql
 
 import argonaut._, Argonaut._
-import matryoshka.Fix
 import org.http4s._, Status._
 import org.http4s.argonaut._
-import org.specs2.specification.core.Fragments
-import org.specs2.ScalaCheck
+import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
+import quasar.api.PathUtils._
 
-class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Http4s with PathUtils {
-  import MountServiceSpec._
+class MountServiceSpec extends quasar.Qspec with Http4s {
+  import quasar.internal.MountServiceConfig._
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
@@ -326,7 +323,7 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
         def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]): Free[Eff, Request]
       }
 
-      def testBoth(test: RequestBuilder => Fragments) = {
+      def testBoth(test: RequestBuilder => Fragment) = {
         "POST" should {
           test(new RequestBuilder {
             def apply[B](parent: ADir, mount: RPath, body: B)(implicit B: EntityEncoder[B]) =
@@ -709,12 +706,4 @@ class MountServiceSpec extends quasar.QuasarSpecification with ScalaCheck with H
       }
     }
   }
-}
-
-object MountServiceSpec {
-  def unsafeViewCfg(q: String, vars: (String, String)*): (Fix[sql.Sql], Variables) =
-    (
-      sql.fixParser.parse(sql.Query(q)).toOption.get,
-      Variables(Map(vars.map { case (n, v) => quasar.VarName(n) -> quasar.VarValue(v) }: _*))
-    )
 }

@@ -41,11 +41,13 @@ package object main {
   val MainTask           = MonadError[EitherT[Task, String, ?], String]
 
   /** The physical filesystems currently supported. */
-  val physicalFileSystems: FileSystemDef[PhysFsEffM] =
-    quasar.physical.skeleton.fs.definition[PhysFsEff]          |+|
-    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff] |+|
-    quasar.physical.postgresql.fs.definition[PhysFsEff]        |+|
+  val physicalFileSystems: FileSystemDef[PhysFsEffM] = IList(
+    quasar.physical.skeleton.fs.definition[PhysFsEff],
+    quasar.physical.mongodb.fs.mongoDbFileSystemDef[PhysFsEff],
+    quasar.physical.mongodb.fs.mongoDbQScriptFileSystemDef[PhysFsEff],
+    quasar.physical.postgresql.fs.definition[PhysFsEff],
     quasar.physical.marklogic.fs.definition[PhysFsEff]
+  ).fold
 
   /** A "terminal" effect, encompassing failures and other effects which
     * we may want to interpret using more than one implementation.

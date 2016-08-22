@@ -17,7 +17,6 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.Planner.PlannerError
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -27,10 +26,10 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
-  val plan: AlgebraM[PlannerError \/ ?, Const[Read, ?], XQuery] = {
+  val plan: AlgebraM[Planning, Const[Read, ?], XQuery] = {
     case Const(Read(absFile)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
-      cts.directoryQuery(dirRepr.xs, "1".xs).right
+      cts.directoryQuery(dirRepr.xs, "1".xs).point[Planning]
   }
 }

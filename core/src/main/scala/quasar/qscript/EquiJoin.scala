@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.fp._
+import quasar.RenderTree
 
 import matryoshka._
 import matryoshka.patterns._
@@ -70,6 +71,9 @@ object EquiJoin {
           combine.show ++ Cord(")")
       }
     }
+
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
+    RenderTree.delayFromShow
 
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {

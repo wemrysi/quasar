@@ -27,7 +27,7 @@ import monocle.std.tuple2._
 import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class FileSystemMountHandlerSpec extends quasar.QuasarSpecification {
+class FileSystemMountHandlerSpec extends quasar.Qspec {
   import FileSystemDef._
 
   type Abort[A]  = Failure[String, A]

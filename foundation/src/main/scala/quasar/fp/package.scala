@@ -500,6 +500,10 @@ package object fp
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig)
 
+  def liftFGM[M[_]: Monad, F[_], G[_], A](orig: F[A] => M[G[A]])(implicit F: F :<: G):
+      G[A] => M[G[A]] =
+    ftf => F.prj(ftf).fold(ftf.point[M])(orig)
+
   def liftFF[F[_], G[_], A](orig: F[A] => F[A])(implicit F: F :<: G):
       G[A] => G[A] =
     ftf => F.prj(ftf).fold(ftf)(orig.andThen(F.inj))
@@ -636,6 +640,18 @@ package object fp
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
     free.hyloM(φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
+
+  def freeGcataM[W[_]: Comonad: Traverse, M[_]: Monad, F[_]: Traverse, E, A](
+    free: Free[F, E])(
+    k: DistributiveLaw[CoEnv[E, F, ?], W],
+    φ: GAlgebraM[W, M, CoEnv[E, F, ?], A]):
+      M[A] =
+    free.ghyloM[W, Id, M, CoEnv[E, F, ?], A](k, distAna, φ, CoEnv.freeIso[E, F].reverseGet(_).point[M])
+
+  def distTraverse[F[_]: Traverse, G[_]: Applicative] =
+    new DistributiveLaw[F, G] {
+      def apply[A](fga: F[G[A]]) = fga.sequence
+    }
 
   implicit final class FreeOps[F[_], E](val self: Free[F, E]) extends scala.AnyVal {
     final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =

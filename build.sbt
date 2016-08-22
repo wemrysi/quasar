@@ -2,7 +2,7 @@ import github.GithubPlugin._
 import quasar.project._
 import quasar.project.build._
 
-import java.lang.Integer
+import java.lang.{ String, Integer }
 import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
@@ -43,7 +43,6 @@ lazy val buildSettings = Seq(
   },
   autoCompilerPlugins := true,
   autoAPIMappings := true,
-  exportJars := true,
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -171,7 +170,9 @@ lazy val githubReleaseSettings =
       pushChanges)
   )
 
-lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
@@ -202,7 +203,9 @@ lazy val foundation = project
   .settings(publishTestsSettings)
   .settings(libraryDependencies ++= Dependencies.foundation,
     isCIBuild := sys.env contains "TRAVIS",
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
+    isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
+    exclusiveTestTag := "exclusive",
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build")
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
@@ -216,7 +219,6 @@ lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.effect)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
@@ -239,10 +241,11 @@ lazy val core = project
 lazy val main = project
   .settings(name := "quasar-main-internal")
   .dependsOn(
-    mongodb    % BothScopes,
-    skeleton   % BothScopes,
-    postgresql % BothScopes,
-    marklogic  % BothScopes)
+    mongodb,
+    skeleton,
+    postgresql,
+    marklogic,
+    core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
   .enablePlugins(AutomateHeaderPlugin)
@@ -293,7 +296,7 @@ lazy val sparkcore = project
 
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(main % BothScopes)
+  .dependsOn(main, foundation % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
@@ -305,7 +308,7 @@ lazy val repl = project
 
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(main % BothScopes)
+  .dependsOn(main, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
@@ -318,9 +321,10 @@ lazy val web = project
 
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(web % BothScopes)
+  .dependsOn(web, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(libraryDependencies ++= Dependencies.web)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)

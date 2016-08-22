@@ -33,15 +33,13 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.Planner.PlannerError
 import quasar.physical.marklogic.xquery.XQuery
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._
 
 private[qscript] final class EquiJoinPlanner[T[_[_]]] extends MarkLogicPlanner[EquiJoin[T, ?]] {
-  val plan: AlgebraM[PlannerError \/ ?, EquiJoin[T, ?], XQuery] = {
+  val plan: AlgebraM[Planning, EquiJoin[T, ?], XQuery] = {
     case EquiJoin(src, lBranch, rBranch, leftKey, rightKey, joinType, combineFunc) => ???
   }
 }
