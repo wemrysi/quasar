@@ -19,8 +19,7 @@
  */
 package ygg.tests
 
-import quasar.ygg._, table._
-import com.precog.common._
+import ygg.table._
 import blueeyes._
 import scalaz._, Scalaz._
 import TableModule._

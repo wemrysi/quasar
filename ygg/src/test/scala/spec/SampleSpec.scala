@@ -1,6 +1,6 @@
 package ygg.tests
 
-import com.precog.common._
+import ygg.table._
 import scalaz._, Scalaz._
 import ygg.json._
 

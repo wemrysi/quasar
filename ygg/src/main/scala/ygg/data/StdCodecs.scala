@@ -1,8 +1,7 @@
 package ygg.data
 
 import blueeyes._
-import quasar.ygg._
-import com.precog.common._
+import ygg.table._
 
 /**
   * Defines a base set of codecs that are often used in `RowFormat`s.

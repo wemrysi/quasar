@@ -2,7 +2,7 @@ package ygg
 
 import blueeyes._
 import ygg.data._
-import quasar.ygg._, table._
+import ygg.table._
 
 package object cf {
   /**

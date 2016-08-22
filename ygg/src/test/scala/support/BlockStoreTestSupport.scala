@@ -1,10 +1,9 @@
 package ygg.tests
 
-import quasar.ygg._, table._
-import com.precog.common._
 import blueeyes._
 import scalaz._, Scalaz._
 import ygg.json._
+import ygg.table._
 
 trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStoreColumnarTableModule {
   def projections: Map[Path, Projection]

@@ -1,8 +1,7 @@
 package ygg.tests
 
-import quasar.ygg._
 import ygg.api._
-import com.precog.common._
+import ygg.table._
 
 class TransSpecModuleSpec extends quasar.Qspec with TransSpecModule with FNDummyModule {
   import trans._

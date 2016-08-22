@@ -1,6 +1,6 @@
 package ygg.cf
 
-import quasar.ygg._, table._
+import ygg.table._
 
 object math {
   val Negate = CF1P("builtin::ct::negate") {

@@ -19,7 +19,7 @@
  */
 package ygg.tests
 
-import quasar.ygg._, table._
+import ygg.table._
 import scalaz._, Scalaz._
 import TestSupport._
 import ygg.json._

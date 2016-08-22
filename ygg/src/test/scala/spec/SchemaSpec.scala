@@ -1,9 +1,8 @@
 package ygg.tests
 
-import quasar.ygg._
-import com.precog.common._
-import ygg.json._
 import blueeyes._
+import ygg.table._
+import ygg.json._
 
 class SchemaSpec extends quasar.Qspec {
   "cpath" should {

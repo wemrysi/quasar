@@ -19,12 +19,11 @@
  */
 package ygg.tests
 
-import quasar.ygg._, table._
-import com.precog.common._
 import blueeyes._
 import scalaz._, Scalaz._
-import ygg.tests.TestSupport._
+import TestSupport._
 import ygg.json._
+import ygg.table._
 import BlockStoreTestModule.module
 
 /*

@@ -19,14 +19,13 @@
  */
 package ygg.tests
 
-import quasar.ygg._
-import com.precog.common._
 import blueeyes._
 import scalaz._, Scalaz._
+import ygg.table._
+import ygg.json._
 import SampleData._
 import TableModule._
 import BlockStoreTestModule.module
-import ygg.json._
 
 /**
   * This provides an ordering on JValue that mimics how we'd order them as

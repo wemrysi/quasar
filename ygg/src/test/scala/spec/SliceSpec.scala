@@ -19,10 +19,9 @@
  */
 package ygg.tests
 
-import quasar.ygg._, table._
 import blueeyes._
-import com.precog.common._
-import ygg.tests.TableTestSupport._
+import ygg.table._
+import TableTestSupport._
 
 class SliceSpec extends quasar.Qspec {
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering

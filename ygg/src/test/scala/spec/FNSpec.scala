@@ -19,7 +19,7 @@
  */
 package ygg.tests
 
-import quasar.ygg._, table._
+import ygg.table._
 // import ygg.tests.TestSupport._
 
 class FNSpec extends quasar.Qspec {

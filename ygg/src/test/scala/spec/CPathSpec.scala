@@ -1,6 +1,6 @@
 package ygg.tests
 
-import com.precog.common._
+import ygg.table._
 
 class CPathSpec extends quasar.Qspec {
   import CPath._

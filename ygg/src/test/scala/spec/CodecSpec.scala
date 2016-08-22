@@ -1,10 +1,9 @@
 package ygg.tests
 
 import blueeyes._
-import com.precog.util.ByteBufferPool
+import TestSupport._
 import org.scalacheck.Shrink
 import ygg.data._
-import TestSupport._
 import ByteBufferPool._
 
 class CodecSpec extends quasar.Qspec {

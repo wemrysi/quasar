@@ -1,9 +1,8 @@
 package ygg.tests
 
-import quasar.ygg._, table._
 import ygg.cf
 import blueeyes._
-import com.precog.common._
+import ygg.table._
 import scalaz._
 import scalaz.syntax.std.boolean._
 import ygg.json._

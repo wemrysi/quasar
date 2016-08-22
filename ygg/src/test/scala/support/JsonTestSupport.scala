@@ -17,8 +17,7 @@ object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerat
 }
 
 trait TableGenerators {
-  import quasar.ygg.table._
-  import com.precog.common._
+  import ygg.table._
 
   def genSlice(refs: Seq[ColumnRef], sz: Int): Gen[Slice] = {
     val zero    = Nil: Gen[List[ColumnRef -> Column]]

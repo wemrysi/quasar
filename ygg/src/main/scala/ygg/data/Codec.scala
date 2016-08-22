@@ -1,8 +1,8 @@
 package ygg.data
 
 import blueeyes._
-import com.precog.common._
-import com.precog.util.{ ByteBufferMonad, ByteBufferPool }
+import ygg.table._
+
 import java.nio.CharBuffer
 import java.nio.charset.{ CharsetEncoder, CoderResult }
 import java.math.{ BigDecimal => BigDec }

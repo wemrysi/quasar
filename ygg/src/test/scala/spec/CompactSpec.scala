@@ -1,11 +1,10 @@
 package ygg.tests
 
-import quasar.ygg._, table._
 import ygg.cf
 import blueeyes._
-import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._
+import ygg.table._
 import ygg.data._
 
 trait CompactSpec extends ColumnarTableQspec {

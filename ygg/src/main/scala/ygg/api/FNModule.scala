@@ -1,7 +1,6 @@
 package ygg.api
 
-import quasar.ygg._
-import com.precog.common._
+import ygg.table._
 
 trait FNModule {
   type F1
@@ -22,8 +21,8 @@ trait FNModule {
 }
 
 trait FNDummyModule extends FNModule {
-  type F1 = table.CF1
-  type F2 = table.CF2
+  type F1 = ygg.table.CF1
+  type F2 = ygg.table.CF2
   implicit def liftF1(f1: F1): F1Like = ???
   implicit def liftF2(f2: F2): F2Like = ???
 }

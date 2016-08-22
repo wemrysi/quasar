@@ -1,7 +1,7 @@
 package ygg.cf
 
 import blueeyes._
-import quasar.ygg._, table._
+import ygg.table._
 
 case object NConcat {
   // Closest thing we can get to casting an array. This is completely unsafe.

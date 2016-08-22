@@ -1,8 +1,7 @@
 package ygg.tests
 
 import blueeyes._
-import com.precog.common._
-import quasar.ygg._, table._
+import ygg.table._
 import ygg.data._
 
 class CPathTraversalSpec extends quasar.Qspec {
