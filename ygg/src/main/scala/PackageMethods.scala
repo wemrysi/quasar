@@ -37,17 +37,6 @@ trait PackageMethods { self: PackageAliases =>
 
   def doto[A](x: A)(f: A => Any): A = { f(x); x }
 
-  def arrayEq[@specialized A](a1: Array[A], a2: Array[A]): Boolean = {
-    val len = a1.length
-    if (len != a2.length) return false
-    var i = 0
-    while (i < len) {
-      if (a1(i) != a2(i)) return false
-      i += 1
-    }
-    true
-  }
-
   def decimal(d: java.math.BigDecimal): BigDecimal         = new BigDecimal(d, UNLIMITED)
   def decimal(d: String): BigDecimal                       = BigDecimal(d, UNLIMITED)
   def decimal(d: Int): BigDecimal                          = decimal(d.toLong)
