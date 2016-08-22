@@ -18,7 +18,7 @@ class CodecSpec extends quasar.Qspec {
     val buf = pool.acquire
     codec.writeUnsafe(a, buf)
     buf.flip()
-    codec.read(buf) must_== a
+    buf.read[A] must_=== a
   }
   def surviveHardRoundTrip[A](a: A)(implicit codec: Codec[A]) = {
     val bytes = smallPool.run(for {
@@ -26,8 +26,9 @@ class CodecSpec extends quasar.Qspec {
       bytes <- flipBytes
       _     <- release
     } yield bytes)
-    bytes.length must_== codec.encodedSize(a)
-    codec.read(byteBuffer(bytes)) must_== a
+
+    bytes.length must_=== codec.encodedSize(a)
+    byteBuffer(bytes).read[A] must_=== a
   }
   def surviveRoundTrip[A](codec: Codec[A])(implicit a: Arbitrary[A], s: Shrink[A]) = "survive round-trip" should {
     "with large buffers" in prop((a: A) => surviveEasyRoundTrip(a)(codec))
@@ -38,7 +39,7 @@ class CodecSpec extends quasar.Qspec {
     "write 0 bytes" in {
       val codec = Codec.ConstCodec(true)
       codec.encodedSize(true) must_== 0
-      codec.read(byteBuffer(new Array[Byte](0))) must_== true
+      byteBuffer(new Array[Byte](0)).read[Boolean](codec) must_== true
       codec.writeUnsafe(true, java.nio.ByteBuffer.allocate(0))
       ok
     }

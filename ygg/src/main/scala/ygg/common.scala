@@ -12,6 +12,10 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
     def slurpString(): String     = new String(slurpBytes, Utf8Charset)
   }
 
+  implicit class ByteBufferOps(private val bb: ByteBuffer) {
+    def read[A](implicit z: Codec[A]): A = z read bb
+  }
+
   implicit class ScalaMapOps[K, V, CC[B] <: Traversable[B]](left: scMap[K, CC[V]]) {
     def cogroup[V1, That](right: scMap[K, CC[V1]])(implicit cbf: CBF[_, K -> Either3[V, CC[V] -> CC[V1], V1], That]): That = (
       new Cogrouped(left, right) build

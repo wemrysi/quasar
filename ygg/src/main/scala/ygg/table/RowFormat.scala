@@ -203,31 +203,31 @@ trait RowFormatSupport { self: StdCodecs =>
   def getColumnDecoder(cType: CType, col: ArrayColumn[_]): ColumnValueDecoder = (cType, col) match {
     case (CLong, col: ArrayLongColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[Long].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[Long])
       }
     case (CDouble, col: ArrayDoubleColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[Double].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[Double])
       }
     case (CNum, col: ArrayNumColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[BigDecimal].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[BigDecimal])
       }
     case (CBoolean, col: ArrayBoolColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[Boolean].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[Boolean])
       }
     case (CString, col: ArrayStrColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[String].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[String])
       }
     case (CDate, col: ArrayDateColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[DateTime].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[DateTime])
       }
     case (CPeriod, col: ArrayPeriodColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[Period].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, buf.read[Period])
       }
     case (CEmptyObject, col: MutableEmptyObjectColumn) =>
       new ColumnValueDecoder {
@@ -336,7 +336,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
         val buf       = byteBuffer(src, offset, src.length - offset)
-        val undefined = Codec[RawBitSet].read(buf)
+        val undefined = buf.read[RawBitSet]
         @tailrec
         def helper(i: Int, decs: List[ColumnValueDecoder]) {
           decs match {
@@ -626,14 +626,14 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
           case FNumeric =>
             aType match {
               case FLong =>
-                val a = Codec[Long].read(abuf)
+                val a = abuf.read[Long]
                 bType match {
                   case FLong =>
-                    NumericComparisons.compare(a, Codec[Long].read(bbuf))
+                    NumericComparisons.compare(a, bbuf.read[Long])
                   case FDouble =>
-                    NumericComparisons.compare(a, Codec[Double].read(bbuf))
+                    NumericComparisons.compare(a, bbuf.read[Double])
                   case FBigDecimal =>
-                    val b = Codec[Double].read(bbuf)
+                    val b = bbuf.read[Double]
                     NumericComparisons.approxCompare(a.toDouble, b) match {
                       case 0 =>
                         BigDecimal(a) compare super.BigDecimalCodec.read(bbuf)
@@ -643,14 +643,14 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
                     }
                 }
               case FDouble =>
-                val a = Codec[Double].read(abuf)
+                val a = abuf.read[Double]
                 bType match {
                   case FLong =>
-                    NumericComparisons.compare(a, Codec[Long].read(bbuf))
+                    NumericComparisons.compare(a, bbuf.read[Long])
                   case FDouble =>
-                    NumericComparisons.compare(a, Codec[Double].read(bbuf))
+                    NumericComparisons.compare(a, bbuf.read[Double])
                   case FBigDecimal =>
-                    val b = Codec[Double].read(bbuf)
+                    val b = bbuf.read[Double]
                     NumericComparisons.approxCompare(a, b) match {
                       case 0 =>
                         BigDecimal(a) compare super.BigDecimalCodec.read(bbuf)
@@ -661,10 +661,10 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 
                 }
               case FBigDecimal =>
-                val a = Codec[Double].read(abuf)
+                val a = abuf.read[Double]
                 bType match {
                   case FLong =>
-                    val b = Codec[Long].read(bbuf)
+                    val b = bbuf.read[Long]
                     NumericComparisons.approxCompare(a, b.toDouble) match {
                       case 0 =>
                         super.BigDecimalCodec.read(abuf) compare BigDecimal(b)
@@ -673,7 +673,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
                         cmp
                     }
                   case FDouble =>
-                    val b = Codec[Double].read(bbuf)
+                    val b = bbuf.read[Double]
                     NumericComparisons.approxCompare(a, b) match {
                       case 0 =>
                         super.BigDecimalCodec.read(abuf) compare BigDecimal(b)
@@ -682,7 +682,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
                         cmp
                     }
                   case FBigDecimal =>
-                    val b = Codec[Double].read(bbuf)
+                    val b = bbuf.read[Double]
                     NumericComparisons.approxCompare(a, b) match {
                       case 0 =>
                         super.BigDecimalCodec.read(abuf) compare super.BigDecimalCodec.read(bbuf)
@@ -696,11 +696,9 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
           case FEmptyObject => 0
           case FEmptyArray  => 0
           case FNull        => 0
-          case FDate =>
-            math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
-          case FPeriod =>
-            math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
-          case x => abort("Match error for: " + x)
+          case FDate        => math.signum(abuf.read[Long] - bbuf.read[Long]).toInt
+          case FPeriod      => math.signum(abuf.read[Long] - bbuf.read[Long]).toInt
+          case x            => abort("Match error for: " + x)
         }
       } else {
         (aType.toInt & 0xFF) - (bType.toInt & 0xFF)
