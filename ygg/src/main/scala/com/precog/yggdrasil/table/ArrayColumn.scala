@@ -1,27 +1,9 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package quasar.ygg
 package table
 
 import blueeyes._
 import com.precog.common._
+import ygg.data._
 
 trait DefinedAtIndex {
   private[table] val defined: BitSet
@@ -45,7 +27,7 @@ class ArrayHomogeneousArrayColumn[@spec(Boolean, Long, Double) A](val defined: B
 
 object ArrayHomogeneousArrayColumn {
   def apply[@spec(Boolean, Long, Double) A: CValueType](values: Array[Array[A]]) =
-    new ArrayHomogeneousArrayColumn(BitSetUtil.range(0, values.length), values)(CArrayType(CValueType[A]))
+    new ArrayHomogeneousArrayColumn(Bits.range(0, values.length), values)(CArrayType(CValueType[A]))
   def apply[@spec(Boolean, Long, Double) A: CValueType](defined: BitSet, values: Array[Array[A]]) =
     new ArrayHomogeneousArrayColumn(defined.copy, values)(CArrayType(CValueType[A]))
   def empty[@spec(Boolean, Long, Double) A](size: Int)(implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
@@ -68,10 +50,10 @@ object ArrayBoolColumn {
   def apply(defined: BitSet, values: BitSet) =
     new ArrayBoolColumn(defined.copy, values.copy)
   def apply(defined: BitSet, values: Array[Boolean]) =
-    new ArrayBoolColumn(defined.copy, BitSetUtil.filteredRange(0, values.length)(values))
+    new ArrayBoolColumn(defined.copy, Bits.filteredRange(0, values.length)(values))
   def apply(values: Array[Boolean]) = {
-    val d = BitSetUtil.range(0, values.length)
-    val v = BitSetUtil.filteredRange(0, values.length)(values)
+    val d = Bits.range(0, values.length)
+    val v = Bits.filteredRange(0, values.length)(values)
     new ArrayBoolColumn(d, v)
   }
 
@@ -90,7 +72,7 @@ class ArrayLongColumn(val defined: BitSet, val values: Array[Long]) extends Arra
 
 object ArrayLongColumn {
   def apply(values: Array[Long]) =
-    new ArrayLongColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayLongColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[Long]) =
     new ArrayLongColumn(defined.copy, values)
   def empty(size: Int): ArrayLongColumn =
@@ -108,7 +90,7 @@ class ArrayDoubleColumn(val defined: BitSet, values: Array[Double]) extends Arra
 
 object ArrayDoubleColumn {
   def apply(values: Array[Double]) =
-    new ArrayDoubleColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayDoubleColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[Double]) =
     new ArrayDoubleColumn(defined.copy, values)
   def empty(size: Int): ArrayDoubleColumn =
@@ -126,7 +108,7 @@ class ArrayNumColumn(val defined: BitSet, values: Array[BigDecimal]) extends Arr
 
 object ArrayNumColumn {
   def apply(values: Array[BigDecimal]) =
-    new ArrayNumColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayNumColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[BigDecimal]) =
     new ArrayNumColumn(defined.copy, values)
   def empty(size: Int): ArrayNumColumn =
@@ -144,7 +126,7 @@ class ArrayStrColumn(val defined: BitSet, values: Array[String]) extends ArrayCo
 
 object ArrayStrColumn {
   def apply(values: Array[String]) =
-    new ArrayStrColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayStrColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[String]) =
     new ArrayStrColumn(defined.copy, values)
   def empty(size: Int): ArrayStrColumn =
@@ -162,7 +144,7 @@ class ArrayDateColumn(val defined: BitSet, values: Array[DateTime]) extends Arra
 
 object ArrayDateColumn {
   def apply(values: Array[DateTime]) =
-    new ArrayDateColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayDateColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[DateTime]) =
     new ArrayDateColumn(defined.copy, values)
   def empty(size: Int): ArrayDateColumn =
@@ -180,7 +162,7 @@ class ArrayPeriodColumn(val defined: BitSet, values: Array[Period]) extends Arra
 
 object ArrayPeriodColumn {
   def apply(values: Array[Period]) =
-    new ArrayPeriodColumn(BitSetUtil.range(0, values.length), values)
+    new ArrayPeriodColumn(Bits.range(0, values.length), values)
   def apply(defined: BitSet, values: Array[Period]) =
     new ArrayPeriodColumn(defined.copy, values)
   def empty(size: Int): ArrayPeriodColumn =

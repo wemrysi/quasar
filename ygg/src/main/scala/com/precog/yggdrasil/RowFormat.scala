@@ -315,7 +315,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
   def encode(cValues: List[CValue]) = getBytesFrom(RowCodec.writeAll(cValues)(pool.acquire _).reverse)
 
   def decode(bytes: Array[Byte], offset: Int): List[CValue] =
-    RowCodec.read(ByteBufferWrap(bytes, offset, bytes.length - offset))
+    RowCodec.read(byteBuffer(bytes, offset, bytes.length - offset))
 
   def ColumnEncoder(cols: Seq[Column]) = {
     require(columnRefs.size == cols.size)
@@ -357,7 +357,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
 
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
-        val buf       = ByteBufferWrap(src, offset, src.length - offset)
+        val buf       = byteBuffer(src, offset, src.length - offset)
         val undefined = Codec[RawBitSet].read(buf)
         @tailrec
         def helper(i: Int, decs: List[ColumnValueDecoder]) {
@@ -562,7 +562,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
 
     new ColumnDecoder {
       def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
-        val buf = ByteBufferWrap(src, offset, src.length - offset)
+        val buf = byteBuffer(src, offset, src.length - offset)
 
         @tailrec
         def decode(decoders: List[Map[Byte, ColumnValueDecoder]]): Unit = decoders match {
@@ -606,7 +606,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
   }
 
   def decode(bytes: Array[Byte], offset: Int = 0): List[CValue] = {
-    val buf = ByteBufferWrap(bytes)
+    val buf = byteBuffer(bytes)
 
     def readForSelector(cTypes: List[CType]): List[CValue] = {
       val cValue = cTypeForFlag(buf.get()) match {
@@ -630,8 +630,8 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
   }
 
   override def compare(a: Array[Byte], b: Array[Byte]): Int = {
-    val abuf = ByteBufferWrap(a)
-    val bbuf = ByteBufferWrap(b)
+    val abuf = byteBuffer(a)
+    val bbuf = byteBuffer(b)
 
     @inline
     def compareNext(): Int = {

@@ -6,6 +6,7 @@ import blueeyes._
 import com.precog.common._
 import scala.util.Random
 import scalaz._, Scalaz._
+import ygg.data._
 
 trait CompactSpec extends ColumnarTableQspec {
   import SampleData._
@@ -60,9 +61,9 @@ trait CompactSpec extends ColumnarTableQspec {
         val bs =
           (
             if (numSlices > 1 && Random.nextDouble < 0.25)
-              new BitSet
+              Bits()
             else
-              BitSetUtil create (0 until sz filter (_ => randomDouble < 0.75))
+              Bits(0 until sz filter (_ => randomDouble < 0.75))
           )
         Slice(sz, slice.columns mapValues (_ |> cf.filter(0, sz, bs) get))
       }
@@ -85,7 +86,7 @@ trait CompactSpec extends ColumnarTableQspec {
               val retained = (0 until slice.size).map { (x: Int) =>
                 if (scala.util.Random.nextDouble < 0.75) Some(x) else None
               }.flatten
-              (col |> cf.filter(0, slice.size, BitSetUtil.create(retained))).get
+              (col |> cf.filter(0, slice.size, Bits(retained))).get
             }
 
           Slice(slice.size, slice.columns.updated(colRef, maskedCol))

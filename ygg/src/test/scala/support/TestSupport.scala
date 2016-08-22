@@ -2,6 +2,7 @@ package ygg.tests
 
 import ygg.internal._
 import scala.collection.mutable.Builder
+import ygg.data._
 
 object TestSupport extends TestSupport
 trait TestSupport extends ScalacheckSupport with SpecsSupport {
@@ -41,6 +42,7 @@ trait ScalacheckSupport {
 
   def choose(lo: Int, hi: Int): Gen[Int]    = Gen.choose(lo, hi)
   def choose(lo: Long, hi: Long): Gen[Long] = Gen.choose(lo, hi)
+  def const[A](value: A): Gen[A]            = Gen.const(value)
 
   def arbitrary[A](implicit z: Arbitrary[A]): Gen[A] = z.arbitrary
 
@@ -106,6 +108,28 @@ trait ScalacheckSupport {
         exponent
     )
     decimal(unscaledVal = mantissa, scale = adjusted)
+  }
+
+  def genBitSet: Gen[BitSet] = listOf(0 upTo 500) ^^ (Bits(_))
+
+  def genSparseBitSet: Gen[Codec[BitSet] -> BitSet] = {
+    (0 upTo 500) >> { size =>
+      val codec = Codec.SparseBitSetCodec(size)
+      if (size > 0)
+        listOf(0 upTo size - 1) ^^ (bits => codec -> Bits(bits))
+      else
+        const(codec -> Bits())
+    }
+  }
+  def genSparseRawBitSet: Gen[Codec[RawBitSet] -> RawBitSet] = {
+    (0 upTo 500) >> { size =>
+      val codec: Gen[Codec[RawBitSet]] = Codec.SparseRawBitSetCodec(size)
+      val bits: Gen[RawBitSet] = size match {
+        case 0 => const(RawBitSet create 0)
+        case n => listOf(0 upTo size - 1) ^^ (bits => doto(RawBitSet create size)(bs => bits foreach (b => RawBitSet.set(bs, b))))
+      }
+      (codec, bits).zip
+    }
   }
 
   implicit class ScalacheckIntOps(private val n: Int) {

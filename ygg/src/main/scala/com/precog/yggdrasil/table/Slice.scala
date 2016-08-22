@@ -70,7 +70,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def isDefinedAt(row: Int) = columns.values.exists(_.isDefinedAt(row))
 
-  def definedAt: BitSet = doto(BitSetUtil.create())(defined => columns foreach { case (_, col) => defined or col.definedAt(0, size) })
+  def definedAt: BitSet = doto(Bits())(defined => columns foreach { case (_, col) => defined or col.definedAt(0, size) })
 
   def mapRoot(f: CF1): Slice =
     Slice(source.size, {
@@ -360,7 +360,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       case _                                                      => false
     }
 
-    val becomeEmpty = BitSetUtil.filteredRange(0, source.size) { i =>
+    val becomeEmpty = Bits.filteredRange(0, source.size) { i =>
       Column.isDefinedAt(removed.values.toArray, i) && !Column.isDefinedAt(withoutPrefixes.values.toArray, i)
     }
 
@@ -415,7 +415,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       if (subsumes) {
         val cols         = source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
         val included     = Schema.findTypes(jtpe, CPath.Identity, cols, size)
-        val includedBits = BitSetUtil.filteredRange(0, size)(included)
+        val includedBits = Bits.filteredRange(0, size)(included)
 
         BoolColumn.Either(definedBits, includedBits)
       } else BoolColumn.False(definedBits)
@@ -500,7 +500,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val colValues = filter.columns.values.toArray
     lazy val defined = definedness match {
       case AnyDefined =>
-        BitSetUtil.filteredRange(0, source.size) { i =>
+        Bits.filteredRange(0, source.size) { i =>
           colValues.exists(_.isDefinedAt(i))
         }
 
@@ -508,7 +508,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         if (colValues.isEmpty)
           new BitSet
         else
-          BitSetUtil.filteredRange(0, source.size) { i =>
+          Bits.filteredRange(0, source.size) { i =>
             colValues.forall(_.isDefinedAt(i))
           }
     }
@@ -740,7 +740,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     source.columns lazyMapValues {
       case col: BoolColumn =>
         val defined = col.definedAt(0, source.size)
-        val values = BitSetUtil.filteredRange(0, source.size) { row =>
+        val values = Bits.filteredRange(0, source.size) { row =>
           defined(row) && col(row)
         }
         ArrayBoolColumn(defined, values)

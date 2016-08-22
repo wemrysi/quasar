@@ -4,6 +4,7 @@ import blueeyes._
 import TestSupport._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 import ygg.json._
+import ygg.data._
 
 object TableTestSupport extends TestSupport with TableGenerators {}
 
@@ -28,7 +29,7 @@ trait TableGenerators {
   }
 
   def genColumn(col: ColumnRef, size: Int): Gen[Column] = {
-    def bs = BitSetUtil.range(0, size)
+    def bs = Bits.range(0, size)
     col.ctype match {
       case CString       => arrayOfN(size, genString) ^^ (ArrayStrColumn(bs, _))
       case CBoolean      => arrayOfN(size, genBool) ^^ (ArrayBoolColumn(bs, _))

@@ -3,7 +3,7 @@ package ygg.tests
 import blueeyes._
 import ygg.json._
 import java.net.URLDecoder
-import scala.util.control.Exception._
+// import scala.util.control.Exception._
 import scalaz._
 import JsonTestSupport._
 
@@ -35,11 +35,11 @@ class ParserBugsSpec extends quasar.Qspec {
   }
 
   "Does not hang when parsing 2.2250738585072012e-308" in {
-    allCatch.opt(JParser.parseFromString(""" [ 2.2250738585072012e-308 ] """)) mustNotEqual None
+    Try(json""" [ 2.2250738585072012e-308 ] """).toOption mustNotEqual None
   }
 
   "Does not hang when parsing 22.250738585072012e-309" in {
-    allCatch.opt(JParser.parseFromString(""" [ 22.250738585072012e-309 ] """)) mustNotEqual None
+    Try(json""" [ 22.250738585072012e-309 ] """).toOption mustNotEqual None
   }
 
   "Can parse funky characters" in {
@@ -49,7 +49,7 @@ class ParserBugsSpec extends quasar.Qspec {
 
 class ParsingByteBufferSpec extends quasar.Qspec {
   "Respects current ByteBuffer's position" in {
-    val bb = ByteBufferWrap(Array(54, 55, 56, 57))
+    val bb = byteBuffer(Array(54, 55, 56, 57))
     bb.remaining must_== 4
     bb.get must_== 54
     bb.remaining must_== 3
@@ -58,7 +58,7 @@ class ParsingByteBufferSpec extends quasar.Qspec {
   }
 
   "Respects current ByteBuffer's limit" in {
-    val bb = ByteBufferWrap(Array(54, 55, 56, 57))
+    val bb = byteBuffer(Array(54, 55, 56, 57))
     bb.limit(3)
     JParser.parseFromByteBuffer(bb) must_== Success(JNum(678))
     bb.remaining must_== 0
@@ -121,7 +121,7 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
       }
       sb.append("]")
       val data = sb.toString.getBytes("UTF-8")
-      val bb   = ByteBufferWrap(data)
+      val bb   = byteBuffer(data)
       val t0   = System.currentTimeMillis
       JParser.parseFromByteBuffer(bb)
       val ms = System.currentTimeMillis() - t0
@@ -135,7 +135,7 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
         sb.append("\n")
       }
       val data        = sb.toString.getBytes("UTF-8")
-      val bb          = ByteBufferWrap(data)
+      val bb          = byteBuffer(data)
       val t0          = System.currentTimeMillis
       val Success(js) = JParser.parseManyFromByteBuffer(bb)
       val ms          = System.currentTimeMillis() - t0
