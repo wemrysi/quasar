@@ -796,9 +796,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   )
 
-  def renderJson[M[+ _]](delimiter: String)(implicit M: Monad[M]): (StreamT[M, CharBuffer], Boolean) = {
+  def renderJson(delimiter: String): (StreamT[M, CharBuffer], Boolean) = {
     if (columns.isEmpty) {
-      (StreamT.empty[M, CharBuffer], false)
+      (emptyStreamT[CharBuffer], false)
     } else {
       val BufferSize = 1024 * 10 // 10 KB
 
@@ -1426,17 +1426,16 @@ class SliceOps(private val source: Slice) extends AnyVal {
         vector += buffer
 
         val stream = StreamT.unfoldM(0) { idx =>
-          val back =
+          Need(
             if (idx < vector.length)
               Some((vector(idx), idx + 1))
             else
               None
-
-          M.point(back)
+          )
         }
 
         (stream, rendered)
-      } else StreamT.empty[M, CharBuffer] -> false
+      } else emptyStreamT[CharBuffer] -> false
     }
   }
 

@@ -4,8 +4,12 @@ import java.nio.file._
 import java.math.MathContext.UNLIMITED
 import scala.collection.{ mutable => scm, immutable => sci }
 import java.io.{ ByteArrayOutputStream, BufferedInputStream }
+import scalaz.{ Need, StreamT }
 
 trait PackageMethods { self: PackageAliases =>
+
+  def emptyStreamT[A](): StreamT[Need, A]             = StreamT.empty[Need, A]
+  def singleStreamT[A](value: => A): StreamT[Need, A] = value :: emptyStreamT[A]()
 
   def scmSet[A](): scmSet[A]                                    = scm.HashSet[A]()
   def sciQueue[A](): sciQueue[A]                                = sci.Queue[A]()

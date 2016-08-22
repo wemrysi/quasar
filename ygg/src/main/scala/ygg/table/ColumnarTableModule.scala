@@ -32,18 +32,18 @@ trait ColumnarTableModuleConfig {
 final case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
 object ColumnarTableModule {
-  def renderJson[M[+ _]](slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String)(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
+  def renderJson(slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
     def wrap(stream: StreamT[M, CharBuffer]) = {
       if (prefix == "" && suffix == "") stream
       else if (suffix == "") charBuffer(prefix) :: stream
-      else if (prefix == "") stream ++ (charBuffer(suffix) :: StreamT.empty[M, CharBuffer])
-      else charBuffer(prefix) :: (stream ++ (charBuffer(suffix) :: StreamT.empty[M, CharBuffer]))
+      else if (prefix == "") stream ++ singleStreamT(charBuffer(suffix))
+      else charBuffer(prefix) :: (stream ++ singleStreamT(charBuffer(suffix)))
     }
 
     def foldFlatMap(slices: StreamT[M, Slice], rendered: Boolean): StreamT[M, CharBuffer] = {
       StreamT[M, CharBuffer](slices.step map {
         case StreamT.Yield(slice, tail) =>
-          val (stream, rendered2) = slice.renderJson[M](delimiter)
+          val (stream, rendered2) = slice.renderJson(delimiter)
           val stream2             = if (rendered && rendered2) charBuffer(delimiter) :: stream else stream
 
           StreamT.Skip(stream2 ++ foldFlatMap(tail(), rendered || rendered2))
@@ -291,17 +291,14 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
 
     implicit def groupIdShow: Show[GroupId] = Show.showFromToString[GroupId]
 
-    def empty: Table = Table(StreamT.empty[M, Slice], ExactSize(0))
+    def empty: Table = Table(emptyStreamT(), ExactSize(0))
 
     def constSliceTable[A: CValueType](vs: Array[A], mkColumn: Array[A] => Column): Table = Table(
-      Slice(
-        vs.length,
-        Map(ColumnRef.id(CValueType[A]) -> mkColumn(vs))
-      ) :: StreamT.empty[M, Slice],
+      singleStreamT(Slice(vs.length, Map(ColumnRef.id(CValueType[A]) -> mkColumn(vs)))),
       ExactSize(vs.length)
     )
     def constSingletonTable(singleType: CType, column: Column): Table = Table(
-      Slice(1, Map(ColumnRef.id(singleType) -> column)) :: StreamT.empty[M, Slice],
+      singleStreamT(Slice(1, Map(ColumnRef.id(singleType) -> column))),
       ExactSize(1)
     )
 
@@ -705,7 +702,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
 
           case None =>
             if (sliceSize > 0) {
-              Need(StreamT.Yield(concat(acc), StreamT.empty[M, Slice]))
+              Need(StreamT.Yield(concat(acc), emptyStreamT()))
             } else {
               Need(StreamT.Done)
             }
@@ -1306,10 +1303,10 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
                   }
                 } yield back
 
-              case None => Need(StreamT.empty[M, Slice])
+              case None => Need(emptyStreamT())
             }
 
-          case None => Need(StreamT.empty[M, Slice])
+          case None => Need(emptyStreamT())
         }
       }
 
@@ -1386,7 +1383,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
         // Somewhere in between, need to transition to splitting/reading
         case Some(_) if readSoFar < (startIndex + 1) => inner(stream, 0, (startIndex - readSoFar).toInt)
         // Read off the end (we took nothing)
-        case _ => Need(StreamT.empty[M, Slice])
+        case _ => Need(emptyStreamT())
       }
 
       def inner(stream: StreamT[M, Slice], takenSoFar: Long, sliceStartIndex: Int): M[StreamT[M, Slice]] = stream.uncons flatMap {
@@ -1394,7 +1391,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
           inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
         }
-        case _ => Need(StreamT.empty[M, Slice])
+        case _ => Need(emptyStreamT())
       }
 
       def calcNewSize(current: Long): Long = ((current - startIndex) max 0) min numberToTake
@@ -1448,9 +1445,9 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
               val headComparator = comparatorGen(head)
               val spanEnd        = findEnd(headComparator, 0, head.size - 1)
               if (spanEnd < head.size) {
-                Need(Table(subSlices ++ (head.take(spanEnd) :: StreamT.empty[M, Slice]), ExactSize(size + spanEnd)))
+                Need(Table(subSlices ++ singleStreamT(head take spanEnd), ExactSize(size + spanEnd)))
               } else {
-                subTable0(tail, subSlices ++ (head :: StreamT.empty[M, Slice]), size + head.size)
+                subTable0(tail, subSlices ++ singleStreamT(head), size + head.size)
               }
 
             case None =>
@@ -1458,7 +1455,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           }
         }
 
-        subTable0(slices, StreamT.empty[M, Slice], 0)
+        subTable0(slices, emptyStreamT(), 0)
       }
 
       def dropAndSplit(comparatorGen: Slice => (Int => Ordering), slices: StreamT[M, Slice], spanStart: Int): StreamT[M, Slice] = StreamT.wrapEffect {
@@ -1473,7 +1470,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
             }
 
           case None =>
-            StreamT.empty[M, Slice]
+            emptyStreamT()
         }
       }
 

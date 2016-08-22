@@ -320,7 +320,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       }
     }
 
-    def singleton(slice: Slice) = new SingletonTable(slice :: StreamT.empty[M, Slice])
+    def singleton(slice: Slice) = new SingletonTable(slice :: emptyStreamT[Slice])
 
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table] = {
       sealed trait AlignState
@@ -682,7 +682,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         StreamT[M, Slice](slices.uncons map {
           case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
           case None if ss.isEmpty => StreamT.Done
-          case None               => StreamT.Yield(Slice.concat(ss.reverse), StreamT.empty)
+          case None               => StreamT.Yield(Slice.concat(ss.reverse), emptyStreamT())
         })
       }
 
@@ -1020,7 +1020,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     * slice and are completely in-memory. Because they fit in memory, we are
     * allowed more optimizations when doing things like joins.
     */
-  class InternalTable(val slice: Slice) extends Table(slice :: StreamT.empty[M, Slice], ExactSize(slice.size)) {
+  class InternalTable(val slice: Slice) extends Table(singleStreamT(slice), ExactSize(slice.size)) {
     import TableModule._
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =

@@ -84,9 +84,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
       val vt  = composeSliceTransform(valueSpec)
 
       val indices = table.slices flatMap { slice =>
-        val streamTM = SliceIndex.createFromSlice(slice, sts, vt) map { si =>
-          si :: StreamT.empty[M, SliceIndex]
-        }
+        val streamTM = SliceIndex.createFromSlice(slice, sts, vt) map (si => singleStreamT(si))
 
         StreamT wrapEffect streamTM
       }
@@ -218,7 +216,7 @@ trait IndicesModule extends TransSpecModule with ColumnarTableTypes with SliceTr
       * Given a set of rows, builds the appropriate subslice.
       */
     private[table] def buildSubTable(rows: ArrayIntList): Table = {
-      val slices = buildSubSlice(rows) :: StreamT.empty[M, Slice]
+      val slices = singleStreamT(buildSubSlice(rows))
       Table(slices, ExactSize(rows.size))
     }
 
