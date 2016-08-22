@@ -4,7 +4,10 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import ygg.json._
 
-final class CPath(val nodes: List[CPathNode]) {
+sealed trait CPath {
+  def nodes: List[CPathNode]
+}
+private[table] case class CPathClass(nodes: List[CPathNode]) extends CPath {
   override def toString: String = if (nodes.isEmpty) "." else nodes mkString ""
 }
 
@@ -16,10 +19,9 @@ object CPath {
 
   type AndValue = CPath -> CValue
 
+  def apply(l: List[CPathNode]): CPath = CPathClass(l)
   def apply(n: CPathNode*): CPath      = apply(n.toList)
-  def apply(l: List[CPathNode]): CPath = new CPath(l)
-
-  def apply(path: JPath): CPath = new CPath(
+  def apply(path: JPath): CPath        = apply(
     path.nodes map {
       case JPathField(name) => CPathField(name)
       case JPathIndex(idx)  => CPathIndex(idx)
