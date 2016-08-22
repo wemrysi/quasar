@@ -2,6 +2,7 @@ package ygg.tests
 
 import blueeyes._
 import ygg.json._
+import scalaz._, Scalaz._
 
 class JNumSpec extends quasar.Qspec {
   "JNums must sort correctly" in {
@@ -48,11 +49,6 @@ class JNumSpec extends quasar.Qspec {
               b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: b9 :: b10 :: b11 :: b12 ::
                 Nil
       )
-
-    type Q = (JNum, BigDecimal, Double, Long)
-    implicit val ordq = new scala.math.Ordering[Q] {
-      def compare(a: Q, b: Q) = a._1 numCompare b._1
-    }
 
     // ensure that for all the numbers given, their BigDecimal, Double, and
     // Long interpretations all agree with their JNum ordering.

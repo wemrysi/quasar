@@ -170,23 +170,53 @@ package object json {
     def \(that: JPathNode) = JPath(x :: that :: Nil)
   }
 
+  implicit class JObjectOps(private val x: JObject) {
+    import x.fields
+
+    def sortedFields: Vector[JField] = fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
+    def get(name: String): JValue    = fields.getOrElse(name, JUndefined)
+
+    def +(field: JField): JObject                           = x.copy(fields = fields + field.toTuple)
+    def -(name: String): JObject                            = x.copy(fields = fields - name)
+    def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)
+    def partition(f: JField => Boolean): (JObject, JObject) = fields partition (x => f(JField(x._1, x._2))) bimap (JObject(_), JObject(_))
+  }
+
+  implicit class JNumOps(private val self: JNum) {
+    def toBigDecimal: BigDecimal = self match {
+      case JNumBigDec(x) => x
+      case JNumStr(x)    => BigDecimal(x)
+      case JNumLong(x)   => BigDecimal(x)
+    }
+    def toDouble: Double = self match {
+      case JNumBigDec(x) => x.toDouble
+      case JNumStr(x)    => x.toDouble
+      case JNumLong(x)   => x.toDouble
+    }
+    def toLong: Long = self match {
+      case JNumBigDec(x) => x.toLong
+      case JNumStr(x)    => x.toDouble.toLong
+      case JNumLong(x)   => x
+    }
+  }
+
   implicit class JValueOps(private val self: JValue) {
     import Validation._
 
     def diff(other: JValue)          = Diff.diff(self, other)
     def merge(other: JValue): JValue = Merge.merge(self, other)
+    def isDefined                    = self != JUndefined
+    def render: String               = CanonicalRenderer render self
 
     def typeIndex: Int = self match {
-      case JUndefined => -1
-      case JNull      => 0
-      case _: JBool   => 1
-      case _: JNum    => 4
-      case _: JString => 5
-      case _: JArray  => 6
-      case _: JObject => 7
+      case _: JUndefined.type => -1
+      case _: JNull.type      => 0
+      case _: JBool           => 1
+      case _: JNum            => 4
+      case _: JString         => 5
+      case _: JArray          => 6
+      case _: JObject         => 7
     }
-
-    def isDefined = self != JUndefined
 
     def normalize: JValue = self match {
       case JUndefined       => abort("Can't normalize JUndefined")
