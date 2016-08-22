@@ -30,8 +30,6 @@ import ygg.json._
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
   def newGroupId: GroupId
 
-  def defaultSliceSize = 10
-
   private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {
     @tailrec def buildColArrays(from: Stream[JValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
       from match {
@@ -51,9 +49,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
   // production-path code uses fromRValues, but all the tests use fromJson
   // this will need to be changed when our tests support non-json such as CDate and CPeriod
-  def fromJson0(values: Stream[JValue], maxSliceSize: Option[Int] = None): Table = {
-    val sliceSize = maxSliceSize.getOrElse(yggConfig.maxSliceSize)
-
+  def fromJson0(values: Stream[JValue], sliceSize: Int): Table = {
     Table(
       StreamT.unfoldM(values) { events =>
         Need {
@@ -66,8 +62,8 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     )
   }
 
-  def fromJson(values: Stream[JValue], maxSliceSize: Option[Int] = None): Table =
-    fromJson0(values, maxSliceSize orElse Some(defaultSliceSize))
+  def fromJson(values: Seq[JValue], maxSliceSize: Option[Int]): Table =
+    fromJson0(values.toStream, maxSliceSize getOrElse yggConfig.maxSliceSize)
 
   def lookupF1(namespace: List[String], name: String): F1 = {
     val lib = Map[String, CF1](

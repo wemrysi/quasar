@@ -8,7 +8,8 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._
 
   def checkTakeRange = {
-    implicit val gen = sample(schema)
+    implicit val gen: Arbitrary[SampleData] = sample(schema)
+
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
       val size  = sample.data.size
@@ -28,186 +29,179 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }.set(minTestsOk = 1000)
 
   def testTakeRange = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data: Stream[JValue] = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val table   = fromSample(SampleData(data))
     val results = toJson(table.takeRange(1, 2))
 
-    val expected = Stream(
-      JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-      JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil))
+    val expected = jsonMany"""
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+    """.toStream
 
     results.copoint must_== expected
   }
 
   def testTakeRangeNegStart = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
     val results = toJson(table.takeRange(-1, 5))
 
     results.copoint must_== Stream()
   }
 
   def testTakeRangeNegNumber = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
     val results = toJson(table.takeRange(2, -3))
 
     results.copoint must_== Stream()
   }
 
   def testTakeRangeNeg = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
     val results = toJson(table.takeRange(-1, 5))
 
     results.copoint must_== Stream()
   }
 
   def testTakeRangeLarger = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
+    val sample   = SampleData(data)
+    val table    = fromSample(sample)
+    val results  = toJson(table.takeRange(2, 17))
 
-    val results = toJson(table.takeRange(2, 17))
-
-    val expected = Stream(
-      JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val expected = jsonMany"""
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
     results.copoint must_== expected
   }
 
   def testTakeRangeEmpty = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
     val results = toJson(table.takeRange(6, 17))
 
-    val expected = Stream()
-
-    results.copoint must_== expected
+    results.copoint must_== Stream()
   }
 
   def testTakeRangeAcrossSlices = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack1")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack2")) :: JField("key", JArray(JNum(5) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack3")) :: JField("key", JArray(JNum(6) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack1"}
+      {"key":[5],"value":"ack2"}
+      {"key":[6],"value":"ack3"}
+      {"key":[7],"value":"ack4"}
+      {"key":[8],"value":"ack5"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample, Some(5))
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample, Some(5))
     val results = toJson(table.takeRange(1, 6))
 
-    val expected = Stream(
-      JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-      JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack1")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack2")) :: JField("key", JArray(JNum(5) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack3")) :: JField("key", JArray(JNum(6) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil))
+    val expected = jsonMany"""
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack1"}
+      {"key":[5],"value":"ack2"}
+      {"key":[6],"value":"ack3"}
+      {"key":[7],"value":"ack4"}
+    """.toStream
 
     results.copoint must_== expected
   }
 
   def testTakeRangeSecondSlice = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack1")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack2")) :: JField("key", JArray(JNum(5) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack3")) :: JField("key", JArray(JNum(6) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack1"}
+      {"key":[5],"value":"ack2"}
+      {"key":[6],"value":"ack3"}
+      {"key":[7],"value":"ack4"}
+      {"key":[8],"value":"ack5"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample, Some(5))
+    val sample   = SampleData(data)
+    val table    = fromSample(sample, Some(5))
+    val results  = toJson(table.takeRange(5, 2))
 
-    val results = toJson(table.takeRange(5, 2))
-
-    val expected = Stream(
-      JObject(JField("value", JString("ack3")) :: JField("key", JArray(JNum(6) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil))
+    val expected = jsonMany"""
+      {"key":[6],"value":"ack3"}
+      {"key":[7],"value":"ack4"}
+    """.toStream
 
     results.copoint must_== expected
   }
 
   def testTakeRangeFirstSliceOnly = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack1")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack2")) :: JField("key", JArray(JNum(5) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack3")) :: JField("key", JArray(JNum(6) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack4")) :: JField("key", JArray(JNum(7) :: Nil)) :: Nil),
-        JObject(JField("value", JString("ack5")) :: JField("key", JArray(JNum(8) :: Nil)) :: Nil))
+    val data = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack1"}
+      {"key":[5],"value":"ack2"}
+      {"key":[6],"value":"ack3"}
+      {"key":[7],"value":"ack4"}
+      {"key":[8],"value":"ack5"}
+    """.toStream
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample, Some(5))
-
+    val sample  = SampleData(data)
+    val table   = fromSample(sample, Some(5))
     val results = toJson(table.takeRange(0, 5))
 
-    val expected = Stream(
-      JObject(JField("value", JString("foo")) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-      JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-      JObject(JField("value", JObject(JField("baz", JBool(true)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack1")) :: JField("key", JArray(JNum(4) :: Nil)) :: Nil),
-      JObject(JField("value", JString("ack2")) :: JField("key", JArray(JNum(5) :: Nil)) :: Nil))
+    val expected = jsonMany"""
+      {"key":[1],"value":"foo"}
+      {"key":[2],"value":12}
+      {"key":[3],"value":{"baz":true}}
+      {"key":[4],"value":"ack1"}
+      {"key":[5],"value":"ack2"}
+    """.toStream
 
     results.copoint must_== expected
   }

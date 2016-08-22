@@ -493,7 +493,7 @@ class ColumnarTableModuleSpec
     "single traversal" >> {
       implicit val gen = sample(objectSchema(_, 3))
       prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
+        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
 
         val table = fromSample(sample)
         val t0 = table.transform(TransSpec1.Id)
@@ -509,7 +509,7 @@ class ColumnarTableModuleSpec
     "multiple transforms" >> {
       implicit val gen = sample(objectSchema(_, 3))
       prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
+        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
 
         val table = fromSample(sample)
         val t0 = table.transform(TransSpec1.Id).transform(TransSpec1.Id).transform(TransSpec1.Id)
@@ -525,7 +525,7 @@ class ColumnarTableModuleSpec
     "multiple forcing calls" >> {
       implicit val gen = sample(objectSchema(_, 3))
       prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / defaultSliceSize).ceil
+        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
 
         val table = fromSample(sample)
         val t0 = table.compact(TransSpec1.Id).compact(TransSpec1.Id).compact(TransSpec1.Id)

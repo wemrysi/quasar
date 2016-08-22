@@ -11,11 +11,12 @@ trait TableModuleTestSupport extends TableModule {
   def lookupF1(namespace: List[String], name: String): F1
   def lookupF2(namespace: List[String], name: String): F2
   def lookupScanner(namespace: List[String], name: String): Scanner
+  def fromJson(data: Seq[JValue], maxBlockSize: Option[Int]): Table
 
-  def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
-  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
-
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
+  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def fromJson(data: Seq[JValue]): Table                                   = fromJson(data, None)
+  def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
 }
 
 trait TableModuleSpec extends quasar.QuasarSpecification {

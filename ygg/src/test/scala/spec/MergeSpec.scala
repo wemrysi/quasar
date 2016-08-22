@@ -52,13 +52,12 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
 
   "merge" should {
     "avoid crosses in trivial cases" in {
-      val fooJson = """
-        | {"key":[5908438637678328470],"value":{"a":0,"b":4}}
-        | {"key":[5908438637678328471],"value":{"a":1,"b":5}}
-        | {"key":[5908438637678328472],"value":{"a":2,"b":6}}
-        | {"key":[5908438637678328473],"value":{"a":3,"b":7}}
-        | """.stripMargin
-      val foo     = fromJson(JParser.parseManyFromString(fooJson).valueOr(throw _).toStream)
+      val foo = fromJson(jsonMany"""
+        {"key":[5908438637678328470],"value":{"a":0,"b":4}}
+        {"key":[5908438637678328471],"value":{"a":1,"b":5}}
+        {"key":[5908438637678328472],"value":{"a":2,"b":6}}
+        {"key":[5908438637678328473],"value":{"a":3,"b":7}}
+      """.toStream)
 
       val barJson = """
         | {"key":[5908438637678328576],"value":{"a":-1,"c":8,"b":-1}}
