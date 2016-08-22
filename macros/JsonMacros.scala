@@ -3,6 +3,7 @@ package ygg.macros
 import scala.collection.{ mutable => scm }
 import scala.reflect.macros.whitebox
 import jawn._, Parser.parseUnsafe
+import java.nio.file._
 
 class JsonMacros(val c: whitebox.Context) {
   import c.universe._
@@ -14,13 +15,33 @@ class JsonMacros(val c: whitebox.Context) {
     case _                                                => freshUUID(exclude)
   }
 
-  final def jsonImpl(args: c.Expr[Any]*): Tree = c.prefix.tree match {
+  private def parseJson(json: String, facade: MacroFacade): Tree = (
+    scala.util.Try(parseUnsafe(json)(facade)) match {
+      case scala.util.Success(t) => t
+      case scala.util.Failure(t) => fail("Invalid JSON in interpolated string: " + t.getMessage)
+    }
+  )
+
+  def parseFromPathImpl(path: c.Expr[String]): Tree = {
+    path.tree foreach (t => println("" + ((t, t.getClass))))
+
+    val jpath: Path = path.tree match {
+      case Literal(Constant(p: String)) => Paths get p
+      case _                            => fail("A StringContext part for the json interpolator is not a string")
+    }
+    val json = scala.util.Try(new String(Files readAllBytes jpath, "UTF-8")).toOption getOrElse ""
+    if (json.length == 0)
+      fail(s"No json found at $jpath")
+
+    parseJson(json, new MacroFacade(Map(), Map()))
+  }
+
+  def jsonInterpolatorImpl(args: c.Expr[Any]*): Tree = c.prefix.tree match {
     case Apply(_, Apply(_, parts) :: Nil) =>
       val stringParts = parts map {
         case Literal(Constant(part: String)) => part
         case _                               => fail("A StringContext part for the json interpolator is not a string")
       }
-
       var uuids  = Vector[String]()
       val keys   = scm.Map[String, Tree]()
       val values = scm.Map[String, Tree]()
@@ -37,12 +58,10 @@ class JsonMacros(val c: whitebox.Context) {
       if (stringParts.size != uuids.size + 1)
         fail("Invalid arguments to json interpolator")
 
-      val json = (stringParts, uuids).zipped map ((part, uuid) => part + "\"" + uuid + "\"") mkString ("", "", stringParts.last)
-
-      scala.util.Try(parseUnsafe(json)(new MacroFacade(keys.toMap, values.toMap))) match {
-        case scala.util.Success(t) => t
-        case scala.util.Failure(t) => fail("Invalid JSON in interpolated string: " + t.getMessage)
-      }
+      parseJson(
+        (stringParts, uuids).zipped map ((part, uuid) => part + "\"" + uuid + "\"") mkString ("", "", stringParts.last),
+        new MacroFacade(keys.toMap, values.toMap)
+      )
 
     case tree => fail("Unexpected tree shape for json interpolation macro: " + tree)
   }
@@ -70,7 +89,7 @@ class JsonMacros(val c: whitebox.Context) {
       def isObj: Boolean       = false
     }
 
-    final def arrayContext(): FContext[Tree] = new FContext[Tree] {
+    def arrayContext(): FContext[Tree] = new FContext[Tree] {
       val vs = scm.ArrayBuffer[Tree]()
 
       def add(s: String): Unit = vs append toJsonString(s)
@@ -78,7 +97,7 @@ class JsonMacros(val c: whitebox.Context) {
       def finish: Tree         = jarray(vs.toArray)
       def isObj: Boolean       = false
     }
-    final def objectContext(): FContext[Tree] = new FContext[Tree] {
+    def objectContext(): FContext[Tree] = new FContext[Tree] {
       var key: String = null
       val fields      = scm.ArrayBuffer[Tree]()
 

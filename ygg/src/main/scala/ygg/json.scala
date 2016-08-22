@@ -18,7 +18,7 @@ package object json {
   val NoJPath = JPath()
 
   implicit final class JsonStringContext(sc: StringContext) {
-    final def json(args: Any*): JValue = macro ygg.macros.JsonMacros.jsonImpl
+    final def json(args: Any*): JValue = macro ygg.macros.JsonMacros.jsonInterpolatorImpl
   }
 
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
