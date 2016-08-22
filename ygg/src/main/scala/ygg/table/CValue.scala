@@ -3,6 +3,7 @@ package ygg.table
 import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import ygg.json._
+import ygg.macros.Spire._
 
 sealed trait RValue { self =>
   def toJValue: JValue
@@ -134,17 +135,16 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
 
 object CValue {
   implicit val CValueOrder: Ord[CValue] = Ord order {
-    case (CString(as), CString(bs))   => as ?|? bs
-    case (CBoolean(ab), CBoolean(bb)) => ab ?|? bb
-    case (CLong(al), CLong(bl))       => al ?|? bl
-    case (CDouble(ad), CDouble(bd))   => ad ?|? bd
-    case (CNum(an), CNum(bn))         => fromInt(an compare bn)
-    case (CDate(ad), CDate(bd))       => fromInt(ad compareTo bd)
-    case (CPeriod(ad), CPeriod(bd))   => ad.toDuration ?|? bd.toDuration
-    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe =>
-      as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
-    case (a: CNumericValue[_], b: CNumericValue[_]) => (a.toCNum: CValue) ?|? b.toCNum
-    case (a, b)                                     => a.cType ?|? b.cType
+    case (CString(as), CString(bs))                                                   => as ?|? bs
+    case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
+    case (CLong(al), CLong(bl))                                                       => al ?|? bl
+    case (CDouble(ad), CDouble(bd))                                                   => ad ?|? bd
+    case (CNum(an), CNum(bn))                                                         => fromInt(an compare bn)
+    case (CDate(ad), CDate(bd))                                                       => fromInt(ad compareTo bd)
+    case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
+    case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
+    case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
+    case (a, b)                                                                       => a.cType ?|? b.cType
   }
 }
 
@@ -308,13 +308,15 @@ object CValueType {
 //
 case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
   private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = {
-    var i      = 0
-    var result = as.length == bs.length
-    while (result && i < as.length) {
-      result = as(i) == bs(i)
-      i += 1
+    if (as.length != bs.length)
+      return false
+
+    cforRange(0 until as.length){ i =>
+      if (as(i) != bs(i))
+        return false
     }
-    result
+
+    true
   }
 
   private final def equiv(a: Any, b: Any, elemType: CValueType[_]): Boolean = elemType match {

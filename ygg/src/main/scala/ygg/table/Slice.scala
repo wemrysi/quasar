@@ -1441,10 +1441,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def toRValue(row: Int): RValue = {
     columns.foldLeft[RValue](CUndefined) {
-      case (rv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
-        rv.unsafeInsert(selector, col.cValue(row))
-
-      case (rv, _) => rv
+      case (rv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) => rv.unsafeInsert(selector, col.cValue(row))
+      case (rv, _)                                                     => rv
     }
   }
 

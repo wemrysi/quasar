@@ -18,7 +18,6 @@ trait StdCodecs {
   implicit def RawBitSetCodec: Codec[RawBitSet]
   implicit def IndexedSeqCodec[A](implicit elemCodec: Codec[A]): Codec[IndexedSeq[A]]
   implicit def ArrayCodec[A](implicit elemCodec: Codec[A], m: CTag[A]): Codec[Array[A]]
-
   def codecForCValueType[A](cType: CValueType[A]): Codec[A] = cType match {
     case CBoolean             => BooleanCodec
     case CString              => StringCodec

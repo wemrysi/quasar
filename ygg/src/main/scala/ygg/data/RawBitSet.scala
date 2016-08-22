@@ -3,7 +3,7 @@ package ygg.data
 import ygg.common._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
-import _root_.ygg.macros.Spire._
+import ygg.macros.Spire._
 
 final class RawBitSet(val bits: Array[Int]) {
   def length: Int = bits.length

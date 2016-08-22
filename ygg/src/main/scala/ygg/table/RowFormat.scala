@@ -750,15 +750,15 @@ object SortingRowFormat {
     case FUndefined   => CUndefined
   }
 
-  private val FUndefined: Byte   = 0x0.toByte
-  private val FBoolean: Byte     = 0x10.toByte
-  private val FString: Byte      = 0x20.toByte
-  private val FNumeric: Byte     = 0x40.toByte
-  private val FLong: Byte        = 0x41.toByte
-  private val FDouble: Byte      = 0x42.toByte
-  private val FBigDecimal: Byte  = 0x43.toByte
-  private val FEmptyObject: Byte = 0x60.toByte
-  private val FEmptyArray: Byte  = 0x70.toByte
+  private val FUndefined: Byte   = 0x0
+  private val FBoolean: Byte     = 0x10
+  private val FString: Byte      = 0x20
+  private val FNumeric: Byte     = 0x40
+  private val FLong: Byte        = 0x41
+  private val FDouble: Byte      = 0x42
+  private val FBigDecimal: Byte  = 0x43
+  private val FEmptyObject: Byte = 0x60
+  private val FEmptyArray: Byte  = 0x70
   private val FNull: Byte        = 0x80.toByte
   private val FDate: Byte        = 0x90.toByte
   private val FPeriod: Byte      = 0x91.toByte
