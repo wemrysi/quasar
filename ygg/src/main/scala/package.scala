@@ -46,19 +46,10 @@ package object blueeyes extends p.PackageTime with p.PackageAliases with p.Packa
   }
 
   implicit class BitSetOperations(private val bs: BitSet) extends AnyVal {
-    def +(elem: Int)      = { val b = bs.copy; b.set(elem); b }
-    def -(elem: Int)      = { val b = bs.copy; b.clear(elem); b }
-    def &(other: BitSet)  = { val b = bs.copy; b.and(other); b }
-    def &~(other: BitSet) = { val b = bs.copy; b.andNot(other); b }
-    def |(other: BitSet)  = { val b = bs.copy; b.or(other); b }
-    def ++(other: BitSet) = { val b = bs.copy; b.or(other); b }
-
-    def +=(elem: Int)      = bs.set(elem)
-    def -=(elem: Int)      = bs.clear(elem)
-    def &=(other: BitSet)  = bs.and(other)
-    def &~=(other: BitSet) = bs.andNot(other)
-    def |=(other: BitSet)  = bs.or(other)
-    def ++=(other: BitSet) = bs.or(other)
+    def +(elem: Int)      = doto(bs.copy)(_ set elem)
+    def &(other: BitSet)  = doto(bs.copy)(_ and other)
+    def &~(other: BitSet) = doto(bs.copy)(_ andNot other)
+    def |(other: BitSet)  = doto(bs.copy)(_ or other)
 
     def isEmpty(): Boolean =
       bs.nextSetBit(0) < 0
