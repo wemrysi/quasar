@@ -73,8 +73,7 @@ object managefile {
       val deleted = FileUtils.deleteQuietly(toNioPath(dst).toFile())
       FileUtils.moveFile(toNioPath(src).toFile(), toNioPath(dst).toFile)
     } .leftMap {
-      case e =>
-        pathErr(invalidPath(dst, e.getMessage()))
+      case e => ioFailed(e.getMessage())
     }.void
   }
 
@@ -84,7 +83,7 @@ object managefile {
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
     }
       .leftMap {
-      case e => pathErr(invalidPath(dst, e.getMessage()))
+      case e => ioFailed(e.getMessage())
     }.void
   }
 
