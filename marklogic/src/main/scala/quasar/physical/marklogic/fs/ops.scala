@@ -36,9 +36,9 @@ import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 // NB: MarkLogic appears to possibly execute independent expressions in parallel,
-//     which can cause side-effecting statements (like deleting) to fail, thus it
-//     seems to be better to sequence them at the `SessionIO` (i.e. make multiple
-//     requests) rather than to sequence them as expressions in XQuery.
+//     which can cause side-effects intended to be sequenced after other operations
+//     to fail, thus it seems to be better to sequence them via `SessionIO` (i.e.
+//     make multiple requests) rather than to sequence them as expressions in XQuery.
 object ops {
   import expr.{func, if_, for_, let_}
 
@@ -188,7 +188,7 @@ object ops {
 
     def doMove =
       SessionIO.executeQuery_(mkSeq_(
-        if_(fn.exists(fn.doc(dstUri.xs)("property::directory".xqy)))
+        if_(fn.exists(xdmp.documentProperties(dstUri.xs)("/prop:properties/prop:directory".xqy)))
           .then_ {
             for_("$d" -> xdmp.directory(dstUri.xs, "1".xs))
               .return_(xdmp.documentDelete(xdmp.nodeUri("$d".xqy)))

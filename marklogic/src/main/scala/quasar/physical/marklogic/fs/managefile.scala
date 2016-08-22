@@ -29,6 +29,7 @@ import scalaz.concurrent.Task
 
 object managefile {
   import ManageFile._
+  import PathError._, FileSystemError._
 
   def interpret[S[_]](implicit S: SessionIO :<: S): ManageFile ~> Free[S, ?] =
     new (ManageFile ~> Free[S, ?]) {
@@ -40,16 +41,56 @@ object managefile {
 
       def move(scenario: MoveScenario, semantics: MoveSemantics): Free[S, FileSystemError \/ Unit] =
         lift(scenario match {
-          case MoveScenario.FileToFile(src, dst) =>
-            ops.moveFile(src, dst).map(_.right[FileSystemError])
-
-          case MoveScenario.DirToDir(src, dst) => ???
+          case MoveScenario.FileToFile(src, dst) => moveFile(src, dst, semantics)
+          case MoveScenario.DirToDir(src, dst)   => moveDir(src, dst, semantics)
         }).into[S]
 
+      def checkMoveSemantics(
+        src: APath, dst: APath, sem: MoveSemantics
+      ): FileSystemErrT[SessionIO, Unit] =
+        EitherT(sem match {
+          case MoveSemantics.Overwrite =>
+            ().right[FileSystemError].point[SessionIO]
+
+          case MoveSemantics.FailIfExists =>
+            ops.exists(dst).map(_.fold(
+              pathErr(pathExists(dst)).left[Unit],
+              ().right))
+
+          case MoveSemantics.FailIfMissing =>
+            ops.exists(dst).map(_.fold(
+              ().right,
+              pathErr(pathNotFound(dst)).left[Unit]))
+        })
+
+      def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] =
+        ops.exists(src).ifM(
+          (checkMoveSemantics(src, dst, sem) *> ops.moveFile(src, dst).liftM[FileSystemErrT]).run,
+          pathErr(pathNotFound(src)).left[Unit].point[SessionIO])
+
+      def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] = {
+        def moveContents(src0: ADir, dst0: ADir): SessionIO[Unit] =
+          ops.ls(src0).flatMap(_.traverse_(_.fold(
+            d => moveContents(src0 </> dir1(d), dst0 </> dir1(d)),
+            f => ops.moveFile(src0 </> file1(f), dst0 </> file1(f)))))
+
+        def doMove =
+          checkMoveSemantics(src, dst, sem)        *>
+          moveContents(src, dst).liftM[FileSystemErrT] *>
+          ops.deleteDir(src).liftM[FileSystemErrT]
+
+        ops.exists(src).ifM(
+          doMove.run,
+          pathErr(pathNotFound(src)).left[Unit].point[SessionIO])
+      }
+
       def delete(path: APath): Free[S, FileSystemError \/ Unit] =
-        lift(refineType(path).fold(ops.deleteDir, ops.deleteFile))
-          .into[S]
-          .map(_.right)
+        lift(ops.exists(path).ifM(
+          refineType(path)
+            .fold(ops.deleteDir, ops.deleteFile)
+            .map(_.right[FileSystemError]),
+          pathErr(pathNotFound(path)).left[Unit].point[SessionIO]
+        )).into[S]
 
       def tempFile(path: APath): Free[S, FileSystemError \/ AFile] =
         tempName map { fname =>
