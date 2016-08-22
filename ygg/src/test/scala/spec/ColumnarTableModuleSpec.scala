@@ -102,29 +102,19 @@ class ColumnarTableModuleSpec
   def testRenderJson(seq: Seq[JValue]) = {
     def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
 
-    def minimize(value: JValue): Option[JValue] = {
-      value match {
-        case JObject(fields) => Some(JObject(fields.flatMap(minimizeItem)))
-
-        case JArray(Nil) => Some(JArray(Nil))
-
-        case JArray(elements) =>
-          val elements2 = elements.flatMap(minimize)
-          if (elements2.isEmpty) None else Some(JArray(elements2))
-
-        case JUndefined => None
-
-        case v => Some(v)
-      }
+    def minimize(value: JValue): Option[JValue] = value match {
+      case JUndefined       => None
+      case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
+      case JArray(Nil)      => Some(JArray(Nil))
+      case JArray(elements) => elements flatMap minimize match { case Seq() => None ; case xs => Some(JArray(xs)) }
+      case v                => Some(v)
     }
 
-    val table = fromJson(seq.toStream)
-
-    val expected = JArray(seq.toList)
-
-    val arrayM = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
-
+    val table     = fromJson(seq.toStream)
+    val expected  = JArray(seq.toList)
+    val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
     val minimized = minimize(expected) getOrElse JArray(Nil)
+
     arrayM.copoint mustEqual minimized
   }
 
@@ -138,30 +128,16 @@ class ColumnarTableModuleSpec
 
   "a table dataset" should {
     "verify bijection from static JSON" in {
-      val sample: List[JValue] = List(
-        JObject(
-          JField("key", JArray(JNum(-1L), JNum(0L))),
-          JField("value", JNull)
-        ),
-        JObject(
-          JField("key", JArray(JNum(-3090012080927607325l), JNum(2875286661755661474l))),
-          JField("value", JObject(
-            JField("q8b", JArray(
-              JNum(6.615224799778253E307d),
-              JArray(JBool(false), JNull, JNum(-8.988465674311579E307d), JNum(-3.536399224770604E307d))
-            )),
-            JField("lwu",JNum(-5.121099465699862E307d))
-          ))
-        ),
-        JObject(
-          JField("key", JArray(JNum(-3918416808128018609l), JNum(-1L))),
-          JField("value", JNum(-1.0))
-        )
-      )
+      val sample = jsonMany"""
+        {"key":[-1,0],"value":null}
+        {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307,-3.536399224770604E+307]]}}
+        {"key":[-3918416808128018609,-1],"value":-1.0}
+      """.toStream
 
-      val dataset = fromJson(sample.toStream)
+      val dataset = fromJson(sample)
       val results = dataset.toJson
-      results.copoint.toList must_== sample
+
+      results.copoint.toList must_== sample.toList
     }
 
     "verify bijection from JSON" in checkMappings(this)
@@ -231,22 +207,22 @@ class ColumnarTableModuleSpec
     }
 
     "in cogroup" >> {
-      "perform a trivial cogroup" in testTrivialCogroup(identity[Table])
-      "perform a simple cogroup" in testSimpleCogroup(identity[Table])
-      "perform another simple cogroup" in testAnotherSimpleCogroup
-      "cogroup for unions" in testUnionCogroup
-      "perform yet another simple cogroup" in testAnotherSimpleCogroupSwitched
-      "cogroup across slice boundaries" in testCogroupSliceBoundaries
-      "error on unsorted inputs" in testUnsortedInputs
-      "cogroup partially defined inputs properly" in testPartialUndefinedCogroup
+      "perform a trivial cogroup"                                                in testTrivialCogroup(identity[Table])
+      "perform a simple cogroup"                                                 in testSimpleCogroup(identity[Table])
+      "perform another simple cogroup"                                           in testAnotherSimpleCogroup
+      "cogroup for unions"                                                       in testUnionCogroup
+      "perform yet another simple cogroup"                                       in testAnotherSimpleCogroupSwitched
+      "cogroup across slice boundaries"                                          in testCogroupSliceBoundaries
+      "error on unsorted inputs"                                                 in testUnsortedInputs
+      "cogroup partially defined inputs properly"                                in testPartialUndefinedCogroup
 
-      "survive pathology 1" in testCogroupPathology1
-      "survive pathology 2" in testCogroupPathology2
-      "survive pathology 3" in testCogroupPathology3
+      "survive pathology 1"                                                      in testCogroupPathology1
+      "survive pathology 2"                                                      in testCogroupPathology2
+      "survive pathology 3"                                                      in testCogroupPathology3
 
-      "not truncate cogroup when right side has long equal spans" in testLongEqualSpansOnRight
-      "not truncate cogroup when left side has long equal spans" in testLongEqualSpansOnLeft
-      "not truncate cogroup when both sides have long equal spans" in testLongEqualSpansOnBoth
+      "not truncate cogroup when right side has long equal spans"                in testLongEqualSpansOnRight
+      "not truncate cogroup when left side has long equal spans"                 in testLongEqualSpansOnLeft
+      "not truncate cogroup when both sides have long equal spans"               in testLongEqualSpansOnBoth
       "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
 
       "survive scalacheck" in {
@@ -258,35 +234,15 @@ class ColumnarTableModuleSpec
       "perform a simple cartesian" in testSimpleCross
 
       "split a cross that would exceed maxSliceSize boundaries" in {
-        val sample: List[JValue] = List(
-          JObject(
-            JField("key", JArray(JNum(-1L) :: JNum(0L) :: Nil)) ::
-            JField("value", JNull) :: Nil
-          ),
-          JObject(
-            JField("key", JArray(JNum(-3090012080927607325l) :: JNum(2875286661755661474l) :: Nil)) ::
-            JField("value", JObject(List(
-              JField("q8b", JArray(List(
-                JNum(6.615224799778253E307d),
-                JArray(List(JBool(false), JNull, JNum(-8.988465674311579E307d))), JNum(-3.536399224770604E307d)))),
-              JField("lwu",JNum(-5.121099465699862E307d))))
-            ) :: Nil
-          ),
-          JObject(
-            JField("key", JArray(JNum(-3918416808128018609l) :: JNum(-1L) :: Nil)) ::
-            JField("value", JNum(-1.0)) :: Nil
-          ),
-          JObject(
-            JField("key", JArray(JNum(-3918416898128018609l) :: JNum(-2L) :: Nil)) ::
-            JField("value", JNum(-1.0)) :: Nil
-          ),
-          JObject(
-            JField("key", JArray(JNum(-3918426808128018609l) :: JNum(-3L) :: Nil)) ::
-            JField("value", JNum(-1.0)) :: Nil
-          )
-        )
+        val sample = jsonMany"""
+          {"key":[-1,0],"value":null}
+          {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307],-3.536399224770604E+307]}}
+          {"key":[-3918416808128018609,-1],"value":-1.0}
+          {"key":[-3918416898128018609,-2],"value":-1.0}
+          {"key":[-3918426808128018609,-3],"value":-1.0}
+        """.toStream
 
-        val dataset1 = fromJson(sample.toStream, Some(3))
+        val dataset1 = fromJson(sample, Some(3))
 
         dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
           case Some((head, _)) => head.size must beLessThanOrEqualTo(yggConfig.maxSliceSize)
@@ -300,60 +256,60 @@ class ColumnarTableModuleSpec
     }
 
     "in transform" >> {
-      "perform the identity transform" in checkTransformLeaf
+      "perform the identity transform"                                          in checkTransformLeaf
 
-      "perform a trivial map1" in testMap1IntLeaf
-      "perform deepmap1 using numeric coercion" in testDeepMap1CoerceToDouble
-      "perform map1 using numeric coercion" in testMap1CoerceToDouble
-      "fail to map1 into array and object" in testMap1ArrayObject
-      "perform a less trivial map1" in checkMap1.pendingUntilFixed
+      "perform a trivial map1"                                                  in testMap1IntLeaf
+      "perform deepmap1 using numeric coercion"                                 in testDeepMap1CoerceToDouble
+      "perform map1 using numeric coercion"                                     in testMap1CoerceToDouble
+      "fail to map1 into array and object"                                      in testMap1ArrayObject
+      "perform a less trivial map1"                                             in checkMap1.pendingUntilFixed
 
-      //"give the identity transform for the trivial filter" in checkTrivialFilter
-      "give the identity transform for the trivial 'true' filter" in checkTrueFilter
-      "give the identity transform for a nontrivial filter" in checkFilter.pendingUntilFixed
-      "give a transformation for a big decimal and a long" in testMod2Filter.pendingUntilFixed
+      //"give the identity transform for the trivial filter"                    in checkTrivialFilter
+      "give the identity transform for the trivial 'true' filter"               in checkTrueFilter
+      "give the identity transform for a nontrivial filter"                     in checkFilter.pendingUntilFixed
+      "give a transformation for a big decimal and a long"                      in testMod2Filter.pendingUntilFixed
 
-      "perform an object dereference" in checkObjectDeref
-      "perform an array dereference" in checkArrayDeref
-      "perform metadata dereference on data without metadata" in checkMetaDeref
+      "perform an object dereference"                                           in checkObjectDeref
+      "perform an array dereference"                                            in checkArrayDeref
+      "perform metadata dereference on data without metadata"                   in checkMetaDeref
 
-      "perform a trivial map2 add" in checkMap2Add.pendingUntilFixed
-      "perform a trivial map2 eq" in checkMap2Eq
-      "perform a map2 add over but not into arrays and objects" in testMap2ArrayObject
+      "perform a trivial map2 add"                                              in checkMap2Add.pendingUntilFixed
+      "perform a trivial map2 eq"                                               in checkMap2Eq
+      "perform a map2 add over but not into arrays and objects"                 in testMap2ArrayObject
 
-      "perform a trivial equality check" in checkEqualSelf
-      "perform a trivial equality check on an array" in checkEqualSelfArray
-      "perform a slightly less trivial equality check" in checkEqual
-      "test a failing equality example" in testEqual1
-      "perform a simple equality check" in testSimpleEqual
-      "perform another simple equality check" in testAnotherSimpleEqual
-      "perform yet another simple equality check" in testYetAnotherSimpleEqual
-      "perform a simple not-equal check" in testASimpleNonEqual
+      "perform a trivial equality check"                                        in checkEqualSelf
+      "perform a trivial equality check on an array"                            in checkEqualSelfArray
+      "perform a slightly less trivial equality check"                          in checkEqual
+      "test a failing equality example"                                         in testEqual1
+      "perform a simple equality check"                                         in testSimpleEqual
+      "perform another simple equality check"                                   in testAnotherSimpleEqual
+      "perform yet another simple equality check"                               in testYetAnotherSimpleEqual
+      "perform a simple not-equal check"                                        in testASimpleNonEqual
 
-      "perform a equal-literal check" in checkEqualLiteral
-      "perform a not-equal-literal check" in checkNotEqualLiteral
+      "perform a equal-literal check"                                           in checkEqualLiteral
+      "perform a not-equal-literal check"                                       in checkNotEqualLiteral
 
-      "wrap the results of a transform in an object as the specified field" in checkWrapObject
-      "give the identity transform for self-object concatenation" in checkObjectConcatSelf
-      "use a right-biased overwrite strategy in object concat conflicts" in checkObjectConcatOverwrite
-      "test inner object concat with a single boolean" in testObjectConcatSingletonNonObject
-      "test inner object concat with a boolean and an empty object" in testObjectConcatTrivial
-      "concatenate dissimilar objects" in checkObjectConcat
-      "test inner object concat join semantics" in testInnerObjectConcatJoinSemantics
-      "test inner object concat with empty objects" in testInnerObjectConcatEmptyObject
-      "test outer object concat with empty objects" in testOuterObjectConcatEmptyObject
-      "test inner object concat with undefined" in testInnerObjectConcatUndefined
-      "test outer object concat with undefined" in testOuterObjectConcatUndefined
-      "test inner object concat with empty" in testInnerObjectConcatLeftEmpty
-      "test outer object concat with empty" in testOuterObjectConcatLeftEmpty
+      "wrap the results of a transform inside an object as the specified field" in checkWrapObject
+      "give the identity transform for self-object concatenation"               in checkObjectConcatSelf
+      "use a right-biased overwrite strategy when object concat conflicts"      in checkObjectConcatOverwrite
+      "test inner object concat with a single boolean"                          in testObjectConcatSingletonNonObject
+      "test inner object concat with a boolean and an empty object"             in testObjectConcatTrivial
+      "concatenate dissimilar objects"                                          in checkObjectConcat
+      "test inner object concat join semantics"                                 in testInnerObjectConcatJoinSemantics
+      "test inner object concat with empty objects"                             in testInnerObjectConcatEmptyObject
+      "test outer object concat with empty objects"                             in testOuterObjectConcatEmptyObject
+      "test inner object concat with undefined"                                 in testInnerObjectConcatUndefined
+      "test outer object concat with undefined"                                 in testOuterObjectConcatUndefined
+      "test inner object concat with empty"                                     in testInnerObjectConcatLeftEmpty
+      "test outer object concat with empty"                                     in testOuterObjectConcatLeftEmpty
 
-      "concatenate dissimilar arrays" in checkArrayConcat
-      "inner concatenate arrays with undefineds" in testInnerArrayConcatUndefined
-      "outer concatenate arrays with undefineds" in testOuterArrayConcatUndefined
-      "inner concatenate arrays with empty arrays" in testInnerArrayConcatEmptyArray
-      "outer concatenate arrays with empty arrays" in testOuterArrayConcatEmptyArray
-      "inner array concatenate when one side is not an array" in testInnerArrayConcatLeftEmpty
-      "outer array concatenate when one side is not an array" in testOuterArrayConcatLeftEmpty
+      "concatenate dissimilar arrays"                                           in checkArrayConcat
+      "inner concatenate arrays with undefineds"                                in testInnerArrayConcatUndefined
+      "outer concatenate arrays with undefineds"                                in testOuterArrayConcatUndefined
+      "inner concatenate arrays with empty arrays"                              in testInnerArrayConcatEmptyArray
+      "outer concatenate arrays with empty arrays"                              in testOuterArrayConcatEmptyArray
+      "inner array concatenate when one side is not an array"                   in testInnerArrayConcatLeftEmpty
+      "outer array concatenate when one side is not an array"                   in testOuterArrayConcatLeftEmpty
 
       "delete elements according to a JType" in checkObjectDelete
       "delete only field in object without removing from array" in {
