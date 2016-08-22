@@ -203,7 +203,7 @@ package object json {
 
   private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
     elements.foldLeft(JArray(Vector())) { (arr, t) =>
-      arr.set(t._1, t._2) --> classOf[JArray]
+      arr.set(t._1, t._2).asArray
     }
   }
 
@@ -256,6 +256,11 @@ package object json {
       * Returns the element as a JValue of the specified class.
       */
     def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(abort("Expected class " + clazz + ", but found: " + self.getClass))
+
+    def asArray: JArray = self match {
+      case x: JArray => x
+      case _         => abort(s"Expected class JArray but found: ${self.getClass}")
+    }
 
     /**
       * Returns the element as an option of a JValue of the specified class.

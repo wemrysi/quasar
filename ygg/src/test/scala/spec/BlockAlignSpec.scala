@@ -552,7 +552,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -567,7 +567,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
       (json"""[
         {"key":[2],"value":6},
         {"key":[1],"value":5}
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (1, List(JPath(".") -> CString))
       )
@@ -597,7 +597,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[1]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".fa") -> CNull, JPath(".hW") -> CDouble, JPath(".rzp") -> CEmptyObject))
       )
@@ -620,7 +620,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (1, List(JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath(".uid") -> CString, JPath("abc") -> CLong))
       )
@@ -655,7 +655,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2.0,1.0]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some((2, List(JPath(".m") -> CEmptyArray, JPath(".f") -> CBoolean, JPath(".u") -> CDouble, JPath(".q") -> CNum, JPath(".vxu") -> CEmptyArray))))
     testSortDense(sampleData, SortAscending, false, JPath("q"))
   }
@@ -667,7 +667,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         {"key":[1,4,3],"value":{"b0":["",{"alxk":-1},-5.170005125478374E+307],"y":{"pvbT":[-1458654748381439976,{}]}}},
         {"key":[1,4,4],"value":{"y":false,"qvd":[],"aden":{}}},
         {"key":[3,3,3],"value":{"b0":["gxy",{"alxk":-1},6.614267528783459E+307],"y":{"pvbT":[1,{}]}}}
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       None)
 
     testSortDense(sampleData, SortDescending, false, JPath(".y"))
@@ -679,7 +679,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
       (json"""[
         {"key":[2],"value":{"y":false}},
         {"key":[3],"value":{"y":{"pvbT":1}}}
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       None)
 
     testSortDense(sampleData, SortDescending, false, JPath(".y"))
@@ -691,7 +691,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
       (json"""[
         {"key":[2],"value":{"y":false}},
         {"key":[3],"value":{"y":{"pvbT":1}}}
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       None)
 
     testSortDense(sampleData, SortAscending, false, JPath(".y"))
@@ -725,7 +725,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[2,1,1]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (3,
          List(
@@ -765,7 +765,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
             "zw1":81740903825956729.9
           },
           "key":[2.0]
-        }]""" --> classOf[JArray]).elements.toStream,
+        }]""".asArray).elements.toStream,
       Some(
         (1,
          List(JPath(".e") -> CNull, JPath(".chl") -> CNum, JPath(".zw1") -> CNum, JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath("[2]") -> CEmptyObject))
@@ -916,7 +916,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
           },
           "key":[10.0,1.0,4.0]
         }
-      ]""" --> classOf[JArray]).elements.toStream,
+      ]""".asArray).elements.toStream,
       Some(
         (3, List(JPath(".zbtQhnpnun") -> CLong, JPath(".ohvhwN") -> CNum, JPath(".viip") -> CNum))
       )
@@ -930,10 +930,8 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
       (json"""[
         { "key" : [2], "value" : { "foo" : 10 } },
         { "key" : [1], "value" : { "foo" : 10 } }
-       ]""" --> classOf[JArray]).elements.toStream,
-      Some(
-        (1, List())
-      )
+       ]""".asArray).elements.toStream,
+      Some(1 -> Nil)
     )
 
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
@@ -941,10 +939,8 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
 
   def emptySort = {
     val sampleData = SampleData(
-      (json"""[]""" --> classOf[JArray]).elements.toStream,
-      Some(
-        (1, List())
-      )
+      (json"""[]""".asArray).elements.toStream,
+      Some(1 -> Nil)
     )
 
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))

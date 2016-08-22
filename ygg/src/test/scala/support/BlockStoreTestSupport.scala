@@ -86,8 +86,8 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
         })
 
         BlockProjectionData[JArray](
-          s0.toJson(0).getOrElse(JUndefined) \ "key" --> classOf[JArray],
-          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" --> classOf[JArray],
+          s0.toJson(0).getOrElse(JUndefined) \ "key" asArray,
+          s0.toJson(s0.size - 1).getOrElse(JUndefined) \ "key" asArray,
           s0)
       }
     }

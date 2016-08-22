@@ -88,7 +88,7 @@ trait BlockLoadSpec extends quasar.Qspec {
           },
           "key":[1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""").asArray).elements.toStream,
       Some(
         (1, List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -108,7 +108,7 @@ trait BlockLoadSpec extends quasar.Qspec {
           },
           "key":[2,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""").asArray).elements.toStream,
       Some(
         (2, List(JPath(".fa") -> CNull, JPath(".hW") -> CLong, JPath(".rzp") -> CEmptyObject))
       )
@@ -142,7 +142,7 @@ trait BlockLoadSpec extends quasar.Qspec {
            },
            "key":[2,1,1]
          }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""").asArray).elements.toStream,
       Some(
         (3,
          List(
@@ -178,7 +178,7 @@ trait BlockLoadSpec extends quasar.Qspec {
           },
           "key":[1,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""").asArray).elements.toStream,
       Some(
         (2,
          List(JPath(".dV.d") -> CBoolean, JPath(".dV.l") -> CBoolean, JPath(".dV.vq") -> CEmptyObject, JPath(".oy.nm") -> CBoolean, JPath(".uR") -> CDouble))
@@ -279,7 +279,7 @@ trait BlockLoadSpec extends quasar.Qspec {
           },
           "key":[9]
         }
-      ]""") --> classOf[JArray]).elements.toStream,
+      ]""").asArray).elements.toStream,
       Some(
         (1,
          List(
