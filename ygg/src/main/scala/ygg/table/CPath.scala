@@ -94,30 +94,21 @@ object CPath {
 
   implicit def singleNodePath(node: CPathNode): CPath = CPath(node)
 
-  implicit val CPathOrder: Ord[CPath] = new Ord[CPath] {
-    def order(v1: CPath, v2: CPath): Cmp = {
-      def compare0(n1: List[CPathNode], n2: List[CPathNode]): Cmp = (n1, n2) match {
-        case (Nil, Nil) => EQ
-        case (Nil, _)   => LT
-        case (_, Nil)   => GT
-        case (n1 :: ns1, n2 :: ns2) =>
-          val ncomp = Ord[CPathNode].order(n1, n2)
-          if (ncomp != EQ) ncomp else compare0(ns1, ns2)
-      }
-
-      compare0(v1.nodes, v2.nodes)
+  implicit val CPathOrder: Ord[CPath] = Ord order { (v1, v2) =>
+    def compare0(n1: List[CPathNode], n2: List[CPathNode]): Cmp = (n1, n2) match {
+      case (Nil, Nil) => EQ
+      case (Nil, _)   => LT
+      case (_, Nil)   => GT
+      case (n1 :: ns1, n2 :: ns2) =>
+        val ncomp = Ord[CPathNode].order(n1, n2)
+        if (ncomp != EQ) ncomp else compare0(ns1, ns2)
     }
-  }
 
+    compare0(v1.nodes, v2.nodes)
+  }
 
   implicit class CPathOps(private val self: CPath) extends AnyVal {
     import self.nodes
-    def parent: Option[CPath] = if (nodes.isEmpty) None else Some(CPath(nodes.init))
-
-    def ancestors: List[CPath] = {
-      def ancestors0(path: CPath, acc: List[CPath]): List[CPath] = path.parent.fold(acc)(p => ancestors0(p, p :: acc))
-      ancestors0(self, Nil).reverse
-    }
 
     def combine(paths: Seq[CPath]): Seq[CPath] = (
       if (paths.isEmpty) Seq(self)
@@ -128,78 +119,6 @@ object CPath {
     def \(that: String): CPath = CPath(nodes :+ CPathField(that))
     def \(that: Int): CPath    = CPath(nodes :+ CPathIndex(that))
 
-    def \:(that: CPath): CPath  = CPath(that.nodes ++ nodes)
-    def \:(that: String): CPath = CPath(CPathField(that) +: nodes)
-    def \:(that: Int): CPath    = CPath(CPathIndex(that) +: nodes)
-
-    def hasPrefix(p: CPath): Boolean = nodes.startsWith(p.nodes)
-    def hasSuffix(p: CPath): Boolean = nodes.endsWith(p.nodes)
-
-    def take(length: Int): Option[CPath] = {
-      (nodes.length >= length).option(CPath(nodes.take(length)))
-    }
-
-    def dropPrefix(p: CPath): Option[CPath] = {
-      def remainder(nodes: List[CPathNode], toDrop: List[CPathNode]): Option[CPath] = {
-        nodes match {
-          case x :: xs =>
-            toDrop match {
-              case `x` :: ys => remainder(xs, ys)
-              case Nil       => Some(CPath(nodes))
-              case _         => None
-            }
-
-          case Nil =>
-            if (toDrop.isEmpty) Some(CPath(nodes))
-            else None
-        }
-      }
-
-      remainder(nodes, p.nodes)
-    }
-
-    def apply(index: Int): CPathNode = nodes(index)
-
-    def extract(jvalue: JValue): JValue = {
-      def extract0(path: List[CPathNode], d: JValue): JValue = path match {
-        case Nil                       => d
-        case CPathField(name) :: tail  => extract0(tail, d \ name)
-        case CPathIndex(index) :: tail => extract0(tail, d(index))
-        case head :: _                 => abort("Unexpected CPathNode " + head)
-      }
-      extract0(nodes, jvalue)
-    }
-
-    def head: Option[CPathNode] = nodes.headOption
-    def tail: CPath             = CPath(nodes.tail: _*)
-
-    def expand(jvalue: JValue): List[CPath] = {
-      def isRegex(s: String) = s.startsWith("(") && s.endsWith(")")
-
-      def expand0(current: List[CPathNode], right: List[CPathNode], d: JValue): List[CPath] = right match {
-        case Nil                                              => CPath(current) :: Nil
-        case (x @ CPathIndex(index)) :: tail                  => expand0(current :+ x, tail, jvalue(index))
-        case (x @ CPathField(name)) :: tail if !isRegex(name) => expand0(current :+ x, tail, jvalue \ name)
-        case (x @ CPathField(name)) :: tail =>
-          val R = name.r
-          val fields = jvalue match {
-            case JObject(fs) => fs.toList
-            case _           => Nil
-          }
-          fields flatMap {
-            case (R(name), value) => expand0(current :+ CPathField(name), tail, value)
-            case _                => Nil
-          }
-        case head :: _ => abort("Unexpected CPathNode " + head)
-      }
-
-      expand0(Nil, nodes, jvalue)
-    }
-
-    def path = nodes.mkString("")
-
-    def iterator = nodes.iterator
-
-    def length = nodes.length
+    def hasPrefix(p: CPath): Boolean = nodes startsWith p.nodes
   }
 }
