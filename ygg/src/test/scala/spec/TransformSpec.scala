@@ -762,7 +762,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testObjectConcatTrivial = {
-    val data: Stream[JValue] = Stream(JBool(true), JObject(Nil))
+    val data: Stream[JValue] = Stream(JBool(true), jobject())
     val sample               = SampleData(data)
     val table                = fromSample(sample)
 
@@ -774,8 +774,8 @@ trait TransformSpec extends TableQspec {
       OuterObjectConcat(Leaf(Source))
     })
 
-    resultsInner.copoint must_== Stream(JObject(Nil))
-    resultsOuter.copoint must_== Stream(JObject(Nil))
+    resultsInner.copoint must_== Stream(jobject())
+    resultsOuter.copoint must_== Stream(jobject())
   }
 
   def testInnerObjectConcatEmptyObject = {
@@ -810,7 +810,7 @@ trait TransformSpec extends TableQspec {
       JObject(JField("ook", JNum(99)) :: JField("ack", JNum(100)) :: JField("bak", JNum(101)) :: Nil),
       JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: Nil),
       JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: JField("ack", JNum(102)) :: Nil),
-      JObject(Nil),
+      jobject(),
       JObject(JField("ook", JNum(7)) :: Nil),
       JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),
       JObject(JField("ack", JNum(0)) :: Nil))
@@ -850,10 +850,10 @@ trait TransformSpec extends TableQspec {
       JObject(JField("ook", JNum(99)) :: JField("ack", JNum(100)) :: JField("bak", JNum(101)) :: Nil),
       JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: Nil),
       JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: JField("ack", JNum(102)) :: Nil),
-      JObject(Nil),
+      jobject(),
       JObject(JField("ook", JNum(88)) :: Nil),
-      JObject(Nil),
-      JObject(Nil),
+      jobject(),
+      jobject(),
       JObject(JField("ook", JNum(77)) :: Nil),
       JObject(JField("ook", JNum(7)) :: Nil),
       JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),

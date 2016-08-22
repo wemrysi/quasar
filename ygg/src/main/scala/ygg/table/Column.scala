@@ -234,7 +234,7 @@ object EmptyArrayColumn {
 trait EmptyObjectColumn extends Column {
   def rowCompare(row1: Int, row2: Int): Int = 0
   override val tpe                          = CEmptyObject
-  override def jValue(row: Int)             = JObject(Nil)
+  override def jValue(row: Int)             = jobject()
   override def cValue(row: Int)             = CEmptyObject
   override def strValue(row: Int): String   = "{}"
   override def toString                     = "EmptyObjectColumn"

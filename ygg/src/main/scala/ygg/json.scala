@@ -202,7 +202,7 @@ package object json {
   }
 
   private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
-    elements.foldLeft(JArray(Vector.empty)) { (arr, t) =>
+    elements.foldLeft(JArray(Vector())) { (arr, t) =>
       arr.set(t._1, t._2) --> classOf[JArray]
     }
   }
@@ -365,7 +365,7 @@ package object json {
               path.nodes match {
                 case Nil                => value
                 case JPathIndex(_) :: _ => rec(jarray(), path, value)
-                case JPathField(_) :: _ => rec(JObject(Nil), path, value)
+                case JPathField(_) :: _ => rec(jobject(), path, value)
               }
 
             case x =>
@@ -413,7 +413,7 @@ package object json {
             path.nodes match {
               case Nil                => value
               case JPathIndex(_) :: _ => jarray().set(path, value)
-              case JPathField(_) :: _ => JObject(Nil).set(path, value)
+              case JPathField(_) :: _ => jobject().set(path, value)
             }
         }
       }

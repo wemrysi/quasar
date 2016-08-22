@@ -91,9 +91,8 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "flattenWithPath includes empty object values" in {
-    val test = JObject(JField("a", JObject(Nil)) :: Nil)
-
-    val expected = List((JPath(".a"), JObject(Nil)))
+    val test     = jobject(JField("a", jobject()))
+    val expected = List((JPath(".a"), jobject()))
 
     test.flattenWithPath must_== expected
   }

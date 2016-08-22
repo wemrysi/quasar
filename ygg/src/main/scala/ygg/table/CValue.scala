@@ -476,7 +476,7 @@ case object CNull extends CNullType with CNullValue {
 
 case object CEmptyObject extends CNullType with CNullValue {
   def readResolve() = CEmptyObject
-  def toJValue      = JObject(Nil)
+  def toJValue      = jobject()
 }
 
 case object CEmptyArray extends CNullType with CNullValue {
