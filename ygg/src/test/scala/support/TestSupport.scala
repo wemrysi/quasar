@@ -126,7 +126,7 @@ trait ScalacheckSupport {
       val codec: Gen[Codec[RawBitSet]] = Codec.SparseRawBitSetCodec(size)
       val bits: Gen[RawBitSet] = size match {
         case 0 => const(RawBitSet create 0)
-        case n => listOf(0 upTo size - 1) ^^ (bits => doto(RawBitSet create size)(bs => bits foreach (b => RawBitSet.set(bs, b))))
+        case n => listOf(0 upTo size - 1) ^^ (bits => doto(RawBitSet create size)(bs => bits foreach (bs set _)))
       }
       (codec, bits).zip
     }

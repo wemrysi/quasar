@@ -274,7 +274,7 @@ trait RowFormatSupport { self: StdCodecs =>
     @inline
     @tailrec
     def encodeAll(i: Int): Unit = if (i < encoders.length) {
-      if (!RawBitSet.get(undefined, i)) {
+      if (!undefined.get(i)) {
         encoders(i).encode(row, buffer, pool) match {
           case Some(buffers) =>
             if (filled == null)
@@ -334,7 +334,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
 
         @inline
         @tailrec def definedCols(i: Int): Unit = if (i >= 0) {
-          if (!colsArray(i).isDefinedAt(row)) RawBitSet.set(undefined, i)
+          if (!colsArray(i).isDefinedAt(row)) undefined.set(i)
           definedCols(i - 1)
         }
         definedCols(colsArray.length - 1)
@@ -363,7 +363,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
         def helper(i: Int, decs: List[ColumnValueDecoder]) {
           decs match {
             case h :: t =>
-              if (!RawBitSet.get(undefined, i)) h.decode(row, buf)
+              if (!undefined.get(i)) h.decode(row, buf)
               helper(i + 1, t)
             case Nil =>
           }
@@ -391,7 +391,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
       @inline
       @tailrec
       def rec(i: Int, xs: List[CValue]): Unit = xs match {
-        case CUndefined :: xs => RawBitSet.set(bits, i); rec(i + 1, xs)
+        case CUndefined :: xs => bits.set(i); rec(i + 1, xs)
         case _ :: xs          => rec(i + 1, xs)
         case Nil              =>
       }
@@ -458,8 +458,8 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
     def read(src: ByteBuffer): List[CValue] = {
       val undefined = rawBitSetCodec.read(src)
       codecs.zipWithIndex collect {
-        case (codec, i) if RawBitSet.get(undefined, i) => CUndefined
-        case (codec, _)                                => codec.read(src)
+        case (codec, i) if undefined.get(i) => CUndefined
+        case (codec, _)                     => codec.read(src)
       }
     }
   }

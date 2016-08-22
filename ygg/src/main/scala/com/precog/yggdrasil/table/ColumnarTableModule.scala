@@ -1517,7 +1517,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
     def schemas: M[Set[JType]] = {
 
       // Returns true iff masks contains an array equivalent to mask.
-      def contains(masks: List[Array[Int]], mask: Array[Int]): Boolean = {
+      def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {
 
         @tailrec
         def equal(x: Array[Int], y: Array[Int], i: Int): Boolean =
@@ -1530,10 +1530,10 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           }
 
         @tailrec
-        def loop(xs: List[Array[Int]], y: Array[Int]): Boolean = xs match {
-          case x :: xs if x.length == y.length && equal(x, y, 0) => true
-          case _ :: xs                                           => loop(xs, y)
-          case Nil                                               => false
+        def loop(xs: List[RawBitSet], y: Array[Int]): Boolean = xs match {
+          case x :: xs if x.length == y.length && equal(x.bits, y, 0) => true
+          case _ :: xs                                                => loop(xs, y)
+          case Nil                                                    => false
         }
 
         loop(masks, mask)
@@ -1606,22 +1606,30 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
 
       // Collects all possible schemas from some slices.
       def collectSchemas(schemas: Set[JType], slices: StreamT[M, Slice]): M[Set[JType]] = {
-        def buildMasks(cols: Array[Column], sliceSize: Int): List[Array[Int]] = {
+        def buildMasks(cols: Array[Column], sliceSize: Int): List[RawBitSet] = {
           import java.util.Arrays.copyOf
           val mask = RawBitSet.create(cols.length)
 
-          @tailrec def build0(row: Int, masks: List[Array[Int]]): List[Array[Int]] = {
+          @tailrec def build0(row: Int, masks: List[RawBitSet]): List[RawBitSet] = {
             if (row < sliceSize) {
-              RawBitSet.clear(mask)
+              mask.clear()
 
               var j = 0
               while (j < cols.length) {
-                if (cols(j) isDefinedAt row) RawBitSet.set(mask, j)
+                if (cols(j) isDefinedAt row) mask.set(j)
                 j += 1
               }
 
-              build0(row + 1, if (!contains(masks, mask) && !isZero(mask)) copyOf(mask, mask.length) :: masks else masks)
-            } else masks
+              val next = (
+                if (!contains(masks, mask.bits) && !isZero(mask.bits))
+                  new RawBitSet(copyOf(mask.bits, mask.length)) :: masks
+                else
+                  masks
+              )
+
+              build0(row + 1, next)
+            }
+            else masks
           }
 
           build0(0, Nil)
@@ -1634,7 +1642,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
             val masks                        = buildMasks(cols0.toArray, slice.size)
             val refs: List[ColumnRef -> Int] = refs0.zipWithIndex.toList
             val next = masks flatMap { schemaMask =>
-              mkSchema(refs collect { case (ref, i) if RawBitSet.get(schemaMask, i) => ref })
+              mkSchema(refs collect { case (ref, i) if schemaMask.get(i) => ref })
             }
 
             collectSchemas(schemas ++ next, slices)

@@ -794,7 +794,7 @@ object Codec {
         bytes(i) = ((1 << (offset & 0x7)) | bytes(i).toInt).toByte
       }
 
-      val arr = RawBitSet.toArray(bs)
+      val arr = bs.toArray
       def rec_(start: Int, end: Int, l: Int, r: Int, offset: Int): Int = {
 
         if (l == r) return offset
@@ -857,7 +857,7 @@ object Codec {
         }
       }
 
-      val len = rec(RawBitSet.toList(bs), 0, size, 0)
+      val len = rec(bs.toList, 0, size, 0)
       java.util.Arrays.copyOf(bytes, (len >>> 3) + 1) // The +1 covers the extra 2 '0' bits.
     }
 
@@ -873,7 +873,7 @@ object Codec {
           offset
         } else if (r - l == 1) {
           if (get(offset)) {
-            RawBitSet.set(bits, l)
+            bits.set(l)
           }
           offset + 2
         } else {

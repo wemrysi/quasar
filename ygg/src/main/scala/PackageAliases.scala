@@ -4,7 +4,7 @@ import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
   type BitSet    = ygg.data.BitSet
-  type RawBitSet = Array[Int]
+  type RawBitSet = ygg.data.RawBitSet
 
   type =?>[-A, +B]          = scala.PartialFunction[A, B]
   type CTag[A]              = scala.reflect.ClassTag[A]

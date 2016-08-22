@@ -5,8 +5,25 @@ import java.util.Arrays.fill
 import java.lang.Integer.bitCount
 import _root_.ygg.macros.Spire._
 
+final class RawBitSet(val bits: Array[Int]) {
+  def length: Int = bits.length
+
+  def get(i: Int): Boolean  = RawBitSet.get(bits, i)
+  def set(i: Int): Unit     = RawBitSet.set(bits, i)
+  def clear(i: Int): Unit   = RawBitSet.clear(bits, i)
+  def clear(): Unit         = RawBitSet.clear(bits)
+  def toArray(): Array[Int] = RawBitSet.toArray(bits)
+  def toList(): List[Int]   = RawBitSet.toList(bits)
+
+  override def hashCode = bits.toSeq.##
+  override def equals(that: Any) = that match {
+    case x: RawBitSet => bits.toSeq == x.bits.toSeq
+    case _            => false
+  }
+}
+
 object RawBitSet {
-  final def create(size: Int): RawBitSet = new Array[Int]((size >>> 5) + 1)
+  final def create(size: Int): RawBitSet = new RawBitSet(new Array[Int]((size >>> 5) + 1))
 
   final def get(bits: Array[Int], i: Int): Boolean = {
     val pos = i >>> 5
