@@ -6,7 +6,7 @@ import ygg.json._
 trait SchemasSpec extends ColumnarTableQspec {
   def testSingleSchema = {
     val expected    = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
-    val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))
+    val trivialData = Stream.fill(100)(json"""{ "a": 1, "b": "x", "c": null }""")
     val sample      = SampleData(trivialData)
     val table       = fromSample(sample, Some(10))
     table.schemas.copoint must_== expected
@@ -14,7 +14,7 @@ trait SchemasSpec extends ColumnarTableQspec {
 
   def testHomogeneousArraySchema = {
     val expected = Set(JArrayHomogeneousT(JNumberT))
-    val data     = Stream.fill(10)(JParser.parseUnsafe("""[1, 2, 3]"""))
+    val data     = Stream.fill(10)(json"""[1, 2, 3]""")
     val table0   = fromSample(SampleData(data), Some(10))
     val table    = table0.toArray[Long]
     table.schemas.copoint must_== expected
@@ -25,8 +25,8 @@ trait SchemasSpec extends ColumnarTableQspec {
       JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT)),
       JObjectFixedT(Map("a" -> JTextT, "b"   -> JNumberT))
     )
-    val data = Stream.fill(10)(JParser.parseUnsafe("""{ "a": 1, "b": "2" }""")) ++
-        Stream.fill(10)(JParser.parseUnsafe("""{ "a": "x", "b": 2 }"""))
+    val data = Stream.fill(10)(json"""{ "a": 1, "b": "2" }""") ++
+        Stream.fill(10)(json"""{ "a": "x", "b": 2 }""")
     val table = fromSample(SampleData(data), Some(10))
     table.schemas.copoint must_== expected
   }
@@ -34,13 +34,13 @@ trait SchemasSpec extends ColumnarTableQspec {
   def testIntervleavedSchema = {
     val expected = Set(
       JObjectFixedT(Map("a" -> JArrayFixedT(Map.empty), "b" -> JTextT)),
-      JObjectFixedT(Map("a" -> JNullT, "b"                  -> JTextT)),
-      JObjectFixedT(Map("a" -> JArrayFixedT(Map(0           -> JNumberT, 1 -> JNumberT)), "b" -> JArrayFixedT(Map(0 -> JTextT, 1 -> JObjectFixedT(Map.empty)))))
+      JObjectFixedT(Map("a" -> JNullT, "b" -> JTextT)),
+      JObjectFixedT(Map("a" -> JArrayFixedT(Map(0 -> JNumberT, 1 -> JNumberT)), "b" -> JArrayFixedT(Map(0 -> JTextT, 1 -> JObjectFixedT(Map.empty)))))
     )
     val data = Stream.tabulate(30) {
-      case i if i % 3 == 0 => JParser.parseUnsafe("""{ "a": [], "b": "2" }""")
-      case i if i % 3 == 1 => JParser.parseUnsafe("""{ "a": null, "b": "2" }""")
-      case _ => JParser.parseUnsafe("""{ "a": [ 1, 2 ], "b": [ "2", {} ] }""")
+      case i if i % 3 == 0 => json"""{ "a": [], "b": "2" }"""
+      case i if i % 3 == 1 => json"""{ "a": null, "b": "2" }"""
+      case _               => json"""{ "a": [ 1, 2 ], "b": [ "2", {} ] }"""
     }
     val table = fromSample(SampleData(data), Some(10))
     table.schemas.copoint must_== expected

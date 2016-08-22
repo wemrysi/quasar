@@ -36,8 +36,8 @@ trait CrossSpec extends TableQspec {
   }
 
   def testSimpleCross = {
-    val s1 = SampleData(Stream(toRecord(Array(1), JParser.parseUnsafe("""{"a":[]}""")), toRecord(Array(2), JParser.parseUnsafe("""{"a":[]}"""))))
-    val s2 = SampleData(Stream(toRecord(Array(1), JParser.parseUnsafe("""{"b":0}""")), toRecord(Array(2), JParser.parseUnsafe("""{"b":1}"""))))
+    val s1 = SampleData(Stream(toRecord(Array(1), json"""{"a":[]}"""), toRecord(Array(2), json"""{"a":[]}""")))
+    val s2 = SampleData(Stream(toRecord(Array(1), json"""{"b":0}"""), toRecord(Array(2), json"""{"b":1}""")))
 
     testCross(s1, s2)
   }
@@ -45,20 +45,20 @@ trait CrossSpec extends TableQspec {
   def testCrossSingles = {
     val s1 = SampleData(
       Stream(
-        toRecord(Array(1), JParser.parseUnsafe("""{ "a": 1 }""")),
-        toRecord(Array(2), JParser.parseUnsafe("""{ "a": 2 }""")),
-        toRecord(Array(3), JParser.parseUnsafe("""{ "a": 3 }""")),
-        toRecord(Array(4), JParser.parseUnsafe("""{ "a": 4 }""")),
-        toRecord(Array(5), JParser.parseUnsafe("""{ "a": 5 }""")),
-        toRecord(Array(6), JParser.parseUnsafe("""{ "a": 6 }""")),
-        toRecord(Array(7), JParser.parseUnsafe("""{ "a": 7 }""")),
-        toRecord(Array(8), JParser.parseUnsafe("""{ "a": 8 }""")),
-        toRecord(Array(9), JParser.parseUnsafe("""{ "a": 9 }""")),
-        toRecord(Array(10), JParser.parseUnsafe("""{ "a": 10 }""")),
-        toRecord(Array(11), JParser.parseUnsafe("""{ "a": 11 }"""))
+        toRecord(Array(1), json"""{ "a": 1 }"""),
+        toRecord(Array(2), json"""{ "a": 2 }"""),
+        toRecord(Array(3), json"""{ "a": 3 }"""),
+        toRecord(Array(4), json"""{ "a": 4 }"""),
+        toRecord(Array(5), json"""{ "a": 5 }"""),
+        toRecord(Array(6), json"""{ "a": 6 }"""),
+        toRecord(Array(7), json"""{ "a": 7 }"""),
+        toRecord(Array(8), json"""{ "a": 8 }"""),
+        toRecord(Array(9), json"""{ "a": 9 }"""),
+        toRecord(Array(10), json"""{ "a": 10 }"""),
+        toRecord(Array(11), json"""{ "a": 11 }""")
       ))
 
-    val s2 = SampleData(Stream(toRecord(Array(1), JParser.parseUnsafe("""{"b":1}""")), toRecord(Array(2), JParser.parseUnsafe("""{"b":2}"""))))
+    val s2 = SampleData(Stream(toRecord(Array(1), json"""{"b":1}"""), toRecord(Array(2), json"""{"b":2}""")))
 
     testCross(s1, s2)
     testCross(s2, s1)

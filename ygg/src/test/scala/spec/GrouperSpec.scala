@@ -247,7 +247,7 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
   }
 
   def simpleMultiKeyData = {
-    val JArray(elements) = JParser.parseUnsafe("""[
+    val JArray(elements) = json"""[
       { "key": [0], "value": {"a": 12, "b": 7} },
       { "key": [1], "value": {"a": 42} },
       { "key": [2], "value": {"a": 11, "c": true} },
@@ -256,7 +256,7 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
       { "key": [5], "value": {"b": -1, "c": false} },
       { "key": [6], "value": {"b": 7} },
       { "key": [7], "value": {"a": -7, "b": 3, "d": "testing"} }
-    ]""")
+    ]"""
 
     elements.toStream
   }
@@ -486,13 +486,13 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
 
     resultJson must haveSize(5)
 
-    val JArray(expected) = JParser.parseUnsafe("""[
+    val JArray(expected) = json"""[
       [{"tic_b": 7}, 2],
       [{"tic_b": 15}, 1],
       [{"tic_b": -1}, 1],
       [{"tic_b": 3}, 1],
       [{"extra": true}, 2]
-    ]""")
+    ]"""
 
     resultJson.toSet must_== expected.toSet
   }
@@ -760,7 +760,7 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
     import trans._
     import constants._
 
-    val JArray(foo0) = JParser.parseUnsafe("""[
+    val JArray(foo0) = json"""[
       { "a":42.0, "b":12.0 },
       { "a":42.0 },
       { "a":77.0 },
@@ -775,9 +775,9 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
       { "c":-3.0 },
       { "a":7.0, "b":42.0 },
       { "a":42.0, "b":12.0 }
-    ]""")
+    ]"""
 
-    val JArray(bar0) = JParser.parseUnsafe("""[
+    val JArray(bar0) = json"""[
       { "a":42.0 },
       { "a":42.0 },
       { "a":77.0 },
@@ -792,9 +792,9 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
       { "c":-3.0 },
       { "a":7.0 },
       { "a":42.0 }
-    ]""")
+    ]"""
 
-    val JArray(baz0) = JParser.parseUnsafe("""[
+    val JArray(baz0) = json"""[
       { "b":12.0 },
       { "b":6.0 },
       { "a":42.0 },
@@ -803,7 +803,7 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
       { "c":-3.0 },
       { "b":42.0 },
       { "d":0.0 }
-    ]""")
+    ]"""
 
     val foo = augmentWithIdentities(foo0.toStream)
     val bar = augmentWithIdentities(bar0.toStream)
