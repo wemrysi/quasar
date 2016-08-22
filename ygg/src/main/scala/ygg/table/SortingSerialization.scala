@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import org.mapdb._
 
 final case class SortingKeyComparator(rowFormat: RowFormat, ascending: Boolean) extends Serializer[Array[Byte]] {

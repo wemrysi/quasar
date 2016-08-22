@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._
+import ygg.common._
 import ygg.json._
 import java.net.URLDecoder
 // import scala.util.control.Exception._

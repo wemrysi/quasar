@@ -1,7 +1,7 @@
 package ygg.tests
 
 import ygg.data._
-import blueeyes._
+import ygg.common._
 import scalaz._, Either3._
 
 class MapUtilsSpec extends quasar.Qspec {

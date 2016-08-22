@@ -1,7 +1,7 @@
 package ygg.tests
 
 import ygg.cf
-import blueeyes._
+import ygg.common._
 import scala.util.Random
 import scalaz._, Scalaz._
 import ygg.table._

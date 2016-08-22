@@ -2,7 +2,7 @@ package ygg.table
 
 import ygg.cf
 import TransSpecModule._
-import blueeyes._
+import ygg.common._
 import scalaz.{ =?> => _, _ }, Ordering._
 import java.nio.CharBuffer
 import ygg.macros.Spire._
@@ -1620,7 +1620,7 @@ object Slice {
       case ((cols, offset), _) => (cols, offset)
     }
 
-    Slice(_size, _columns flatMap { case (ref, parts) => cf.NConcat(parts) map (ref -> _) })
+    Slice(_size, _columns flatMap { case (ref, parts) => NConcat(parts) map (ref -> _) })
   }
 
   def rowComparatorFor(s1: Slice, s2: Slice)(keyf: Slice => Iterable[CPath]): RowComparator = {

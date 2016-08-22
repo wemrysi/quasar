@@ -1,9 +1,9 @@
-package ygg.cf
+package ygg.table
 
-import blueeyes._
-import ygg.table._
+import ygg.common._
+import ygg.data._
 
-case object NConcat {
+final object NConcat {
   // Closest thing we can get to casting an array. This is completely unsafe.
   private def copyCastArray[A: CTag](as: Array[_]): Array[A] = {
     val bs = new Array[A](as.length)

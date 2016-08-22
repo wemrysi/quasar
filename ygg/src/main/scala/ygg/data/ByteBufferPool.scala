@@ -5,7 +5,7 @@ import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQ
 import java.util.concurrent.atomic.AtomicLong
 import java.lang.ref.SoftReference
 
-import blueeyes._
+import ygg.common._
 import scalaz._
 
 /**

@@ -1,6 +1,6 @@
 package ygg.data
 
-import blueeyes._
+import ygg.common._
 import scalaz.Either3, Either3._
 
 final case class Cogrouped[K, V, V1, CC[X] <: Traversable[X]](lmap: scMap[K, CC[V]], rmap: scMap[K, CC[V1]]) {

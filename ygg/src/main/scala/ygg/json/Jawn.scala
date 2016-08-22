@@ -2,7 +2,7 @@ package ygg.json
 
 import jawn._
 import jawn.AsyncParser._
-import blueeyes._
+import ygg.common._
 import scalaz.Validation.fromTryCatchNonFatal
 
 case class AsyncParse[A](errors: Seq[ParseException], values: Seq[A])

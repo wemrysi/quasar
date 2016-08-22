@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import ygg.json._
 import JsonTestSupport._
@@ -15,7 +15,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
     // Works in scalacheck 1.12.5
     // Fails in ScalaCheck 1.13.0
     //
-    // [error] /l/w/platform/blueeyes/src/test/scala/blueeyes/json/JsonASTTest.scala:33: could not find implicit value for parameter arbitrary2: org.scalacheck.Arbitrary[blueeyes.json.JValue => blueeyes.json.JValue]
+    // [error] could not find implicit value for parameter arbitrary2: org.scalacheck.Arbitrary[JValue => JValue]
     // [error]     prop(compositionProp)
     // [error]         ^
     // [error] one error found

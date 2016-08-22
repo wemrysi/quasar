@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import ygg.data._
 
 trait DefinedAtIndex {

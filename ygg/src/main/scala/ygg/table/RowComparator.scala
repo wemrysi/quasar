@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import scalaz.Ordering._
 
 trait RowComparator { self =>

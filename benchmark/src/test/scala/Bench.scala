@@ -1,6 +1,6 @@
 package ygg.bench
 
-import blueeyes._
+import ygg.common._
 import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations._
 

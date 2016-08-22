@@ -1,7 +1,7 @@
 package ygg.table
 
 import ygg.cf
-import blueeyes._
+import ygg.common._
 import scalaz.{ Semigroup, Ordering }, Ordering._
 import ygg.json._
 import ygg.data._

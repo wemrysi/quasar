@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import scalaz._
 import scalaz.syntax.monad._
 import java.nio.CharBuffer

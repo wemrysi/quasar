@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import scalaz.Scalaz._
 
 case class ColumnRef(selector: CPath, ctype: CType)

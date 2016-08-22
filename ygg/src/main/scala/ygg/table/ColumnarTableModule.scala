@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import java.nio.CharBuffer
 import java.nio.file.Files

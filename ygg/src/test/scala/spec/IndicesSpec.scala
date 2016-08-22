@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._
 import ygg.table._
 import ygg.json._

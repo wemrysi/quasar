@@ -1,6 +1,6 @@
 package ygg.data
 
-import blueeyes._
+import ygg.common._
 import ygg.table._
 
 /**

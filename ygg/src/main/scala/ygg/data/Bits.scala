@@ -1,6 +1,6 @@
 package ygg.data
 
-import blueeyes._
+import ygg.common._
 
 object Bits {
   def apply(): BitSet                     = new BitSet()

@@ -1,7 +1,7 @@
 package ygg.tests
 
 import ygg.cf
-import blueeyes._
+import ygg.common._
 import ygg.table._
 import scalaz._
 import scalaz.syntax.std.boolean._

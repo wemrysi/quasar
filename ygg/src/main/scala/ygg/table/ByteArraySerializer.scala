@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import java.io.{ DataInput, DataOutput }
 import org.mapdb._
 

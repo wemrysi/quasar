@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._
 import ygg.data._
 import ByteBufferPool._

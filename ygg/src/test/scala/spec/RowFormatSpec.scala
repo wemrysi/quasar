@@ -1,6 +1,6 @@
 package ygg.tests
 
-import blueeyes._
+import ygg.common._
 import TestSupport._
 import org.scalacheck.Shrink
 import ygg.table._

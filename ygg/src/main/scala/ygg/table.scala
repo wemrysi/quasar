@@ -1,14 +1,12 @@
 package ygg
 
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 package object table {
-  type AccountId    = String
-  type ResetTokenId = String
-  type Identity     = Long
-  type Identities   = Array[Identity]
-  type ColumnMap    = Map[ColumnRef, Column]
+  type Identity   = Long
+  type Identities = Array[Identity]
+  type ColumnMap  = Map[ColumnRef, Column]
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
     var i = 0

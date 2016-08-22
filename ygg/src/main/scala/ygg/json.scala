@@ -1,7 +1,7 @@
 package ygg
 
 import jawn._
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._
 
 package object json {

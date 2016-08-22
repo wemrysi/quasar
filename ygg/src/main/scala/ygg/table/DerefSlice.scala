@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 
 class DerefSliceOps(private val source: Slice) extends AnyVal {
   def dereferencedColumns(derefBy: Int =?> CPathNode): Map[ColumnRef, Column] = {

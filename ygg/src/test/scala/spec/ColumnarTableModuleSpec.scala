@@ -20,7 +20,7 @@
 package ygg.tests
 
 import ygg.table._
-import blueeyes._
+import ygg.common._
 import scalaz._, Scalaz._
 import TableModule._
 import SampleData._

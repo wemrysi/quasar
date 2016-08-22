@@ -1,6 +1,6 @@
 package ygg.data
 
-import blueeyes._
+import ygg.common._
 
 /**
   * Unchecked and unboxed (fast!) deque implementation with a fixed bound.  None

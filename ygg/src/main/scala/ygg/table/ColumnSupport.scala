@@ -1,6 +1,6 @@
 package ygg.table
 
-import blueeyes._
+import ygg.common._
 import ygg.data._
 
 class BitsetColumn(definedAt: BitSet) { this: Column =>

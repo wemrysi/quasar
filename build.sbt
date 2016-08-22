@@ -1,11 +1,7 @@
 import xygg.build.Build._
 
-def repl = """
-  |import ygg._, blueeyes._, json._
-""".stripMargin.trim
-
 lazy val root = project.root.setup.noArtifacts aggregate (macros, ygg) dependsOn (ygg % BothScopes) also (
-  initialCommands in console := repl
+  initialCommands in console := "import ygg._, common._, json._, data._, table._"
 )
 
 lazy val macros = project.setup also macroDependencies

@@ -1,9 +1,10 @@
+package ygg
+
 import scalaz._, Ordering._
-import ygg.{ pkg => p }
 import ygg.data._
 import java.nio.file._
 
-package object blueeyes extends p.PackageTime with p.PackageAliases with p.PackageMethods {
+package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
 
   implicit class jPathOps(private val p: jPath) {
