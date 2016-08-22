@@ -17,9 +17,8 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.LogicalPlan
-import quasar.PhaseResult
-import quasar.Planner.PlannerError
+import quasar.SKI.κ
+import quasar.{LogicalPlan, PhaseResult, PhaseResults}
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
@@ -47,43 +46,38 @@ object queryfile {
     S3: MLResultHandles :<: S,
     S4: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] = {
-    def planLP(lp: Fix[LogicalPlan]): PlannerError \/ XQuery =
-      convertToQScript(lp) >>= (_.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
+    def xqyPhase(xqy: XQuery): PhaseResults =
+      Vector(PhaseResult.Detail("XQuery", xqy.toString))
+
+    def plannedLP[F[_]: Applicative, A](
+      lp: Fix[LogicalPlan])(
+      f: XQuery => F[A]
+    ): F[(PhaseResults, FileSystemError \/ A)] =
+      convertToQScript(lp).flatMap(_.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan)).fold(
+        err => (Vector.empty[PhaseResult], planningFailed(lp, err).left[A]).point[F],
+        xqy => f(xqy) map (_.right[FileSystemError]) strengthL xqyPhase(xqy))
 
     def exec(lp: Fix[LogicalPlan], out: AFile) =
-      planLP(lp).fold(
-        err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
-        xqy => (Vector(PhaseResult.Detail("XQuery", xqy.toString)), \/.right(out))
-      ).point[Free[S, ?]]
+      plannedLP(lp)(κ(out.point[Free[S, ?]]))
 
-    // TODO: PhaseResults
     def eval(lp: Fix[LogicalPlan]) =
-      EitherT.fromDisjunction[Free[S, ?]](planLP(lp))
-        .leftMap(planningFailed(lp, _))
-        .flatMap(xqy => lift(
-          ContentSourceIO.resultCursor(SessionIO.evaluateQuery_(xqy), resultsChunkSize)
-        ).into[S].liftM[FileSystemErrT])
-        .run
-        .strengthL(Vector.empty[PhaseResult])
+      lift(plannedLP(lp)(xqy => ContentSourceIO.resultCursor(
+        SessionIO.evaluateQuery_(xqy),
+        resultsChunkSize
+      ))).into[S]
 
-    // TODO: Eliminate duplication with exec
     def explain(lp: Fix[LogicalPlan]) =
-      planLP(lp).fold(
-        err => (Vector.empty[PhaseResult], \/.left(planningFailed(lp, err))),
-        xqy => (Vector(PhaseResult.Detail("XQuery", xqy.toString)), \/.right(ExecutionPlan(FsType, xqy.toString)))
-      ).point[Free[S, ?]]
+      plannedLP(lp)(xqy => ExecutionPlan(FsType, xqy.toString).point[Free[S, ?]])
 
     def exists(file: AFile): Free[S, Boolean] =
       lift(ops.exists(file)).into[S]
 
     def listContents(dir: ADir): Free[S, FileSystemError \/ Set[PathSegment]] =
-      lift(
-        ops.exists(dir).ifM(
-          ops.ls(dir).map(_.right[FileSystemError]),
-          pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[SessionIO])
-      ).into[S]
+      lift(ops.exists(dir).ifM(
+        ops.ls(dir).map(_.right[FileSystemError]),
+        pathErr(pathNotFound(dir)).left[Set[PathSegment]].point[SessionIO]
+      )).into[S]
 
-    queryFileFromDataCursor[S, Task, ResultCursor](
-      exec, eval, explain, listContents, exists)
+    queryFileFromDataCursor[S, Task, ResultCursor](exec, eval, explain, listContents, exists)
   }
 }
