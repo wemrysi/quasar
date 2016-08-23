@@ -155,7 +155,8 @@ trait TableModuleTestSupport extends TableModule {
 
   def fromJson(data: Seq[JValue], maxBlockSize: Option[Int]): Table
 
-  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
 
   def fromJson(data: Seq[JValue]): Table                    = fromJson(data, None)
   def fromJson(data: Seq[JValue], maxBlockSize: Int): Table = fromJson(data, Some(maxBlockSize))

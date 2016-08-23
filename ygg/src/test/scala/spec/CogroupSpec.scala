@@ -9,7 +9,6 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
   import trans._, constants._
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
-
   implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
 
   "in cogroup" >> {
@@ -25,48 +24,37 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
     "survive pathology 1"                                                      in testCogroupPathology1
     "survive pathology 2"                                                      in testCogroupPathology2
     "survive pathology 3"                                                      in testCogroupPathology3
+    "survive scalacheck"                                                       in prop(testCogroup _)
 
     "not truncate cogroup when right side has long equal spans"                in testLongEqualSpansOnRight
     "not truncate cogroup when left side has long equal spans"                 in testLongEqualSpansOnLeft
     "not truncate cogroup when both sides have long equal spans"               in testLongEqualSpansOnBoth
     "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
-
-    "survive scalacheck" in prop((cd: CogroupData) => testCogroup(cd._1, cd._2))
   }
 
-  @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Ord[A]): CogroupResult[A] = {
-    (l, r) match {
-      case (lh #:: lt, rh #:: rt) =>
-        ord.order(lh, rh) match {
-          case EQ => {
-            val (leftSpan, leftRemain)   = l.partition(ord.order(_, lh) == EQ)
-            val (rightSpan, rightRemain) = r.partition(ord.order(_, rh) == EQ)
+  @tailrec private def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Ord[A]): CogroupResult[A] = (l, r) match {
+    case (Seq(), _)             => acc ++ (r map right3)
+    case (_, Seq())             => acc ++ (l map left3)
+    case (lh #:: lt, rh #:: rt) =>
+    (lh ?|? rh) match {
+        case EQ =>
+          val (leftSpan, leftRemain)   = l partition (_ ?|? lh === EQ)
+          val (rightSpan, rightRemain) = r partition (_ ?|? rh === EQ)
+          val cartesian                = leftSpan flatMap (lv => rightSpan map (rv => middle3(lv -> rv)))
+          computeCogroup(leftRemain, rightRemain, acc ++ cartesian)
 
-            val cartesian = leftSpan.flatMap { lv =>
-              rightSpan.map { rv =>
-                middle3((lv, rv))
-              }
-            }
+        case LT =>
+          val (leftRun, leftRemain) = l partition (_ ?|? rh == LT)
+          computeCogroup(leftRemain, r, acc ++ (leftRun map left3))
 
-            computeCogroup(leftRemain, rightRemain, acc ++ cartesian)
-          }
-          case LT => {
-            val (leftRun, leftRemain) = l.partition(ord.order(_, rh) == LT)
-
-            computeCogroup(leftRemain, r, acc ++ leftRun.map { case v => left3(v) })
-          }
-          case GT => {
-            val (rightRun, rightRemain) = r.partition(ord.order(lh, _) == GT)
-
-            computeCogroup(l, rightRemain, acc ++ rightRun.map { case v => right3(v) })
-          }
-        }
-      case (Stream.Empty, _) => acc ++ r.map { case v => right3(v) }
-      case (_, Stream.Empty) => acc ++ l.map { case v => left3(v) }
-    }
+        case GT =>
+          val (rightRun, rightRemain) = r partition (lh ?|? _ == GT)
+          computeCogroup(l, rightRemain, acc ++ (rightRun map right3))
+      }
   }
 
-  def testCogroup(l: SampleData, r: SampleData) = {
+  def testCogroup(pair: CogroupData) = {
+    val (l, r)   = pair
     val ltable   = fromSample(l)
     val rtable   = fromSample(r)
     val keyOrder = Ord[JValue].contramap((_: JValue) \ "key")
@@ -84,9 +72,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
         WrapObject(SourceKey.Left, "key"),
         OuterObjectConcat(WrapObject(SourceValue.Left, "valueLeft"), WrapObject(SourceValue.Right, "valueRight"))))
 
-    val jsonResult = toJson(result)
-
-    jsonResult.copoint must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testTrivialCogroup(f: Table => Table) = {
@@ -104,14 +90,13 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterArrayConcat(SourceValue.Left, SourceValue.Right), "value"))
     )
 
-    val jsonResult = toJson(f(result))
-    (jsonResult.copoint: Seq[JValue]) must_=== expected
+    toJsonSeq(f(result)) must_=== expected
   }
 
   def testSimpleCogroup(f: Table => Table = identity[Table]) = {
     def recl(i: Long)    = toRecord(Array(i), json"""{ "left": ${i.toString} }""")
-    def recr(i: Long)    = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
-    def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
+    def recr(i: Long)    = toRecord(Array(i), json"""{ "right": ${i.toString} }""")
+    def recBoth(i: Long) = toRecord(Array(i), json"""{ "left": ${i.toString}, "right": ${i.toString} }""")
 
     val ltable = fromSample(SampleData(Stream(recl(0), recl(1), recl(3), recl(3), recl(5), recl(7), recl(8), recl(8))))
     val rtable = fromSample(SampleData(Stream(recr(0), recr(2), recr(3), recr(4), recr(5), recr(5), recr(6), recr(8), recr(8))))
@@ -139,8 +124,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
     )
 
-    val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected
+    toJsonSeq(f(result)) must_=== expected
   }
 
   def testUnionCogroup = {
@@ -169,8 +153,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
     )
 
-    val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testAnotherSimpleCogroup = {
@@ -198,8 +181,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
     )
 
-    val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testAnotherSimpleCogroupSwitched = {
@@ -227,8 +209,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
     )
 
-    val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testUnsortedInputs = {
@@ -250,7 +231,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
     val s1 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "a":[] }""")))
     val s2 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "b":0 }""")))
 
-    testCogroup(s1, s2)
+    testCogroup(s1 -> s2)
   }
 
   def testCogroupSliceBoundaries = {
@@ -284,7 +265,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
         toRecord(Array(11), json"""{ "mbsn8ya":758880641626989193 }""")
       ))
 
-    testCogroup(s1, s2)
+    testCogroup(s1 -> s2)
   }
 
   def testCogroupPathology2 = {
@@ -338,7 +319,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
         toRecord(Array(86, 50, 9), JArray(JUndefined :: JNum(-3.4028234663852886E38) :: Nil))
       ))
 
-    testCogroup(s1, s2)
+    testCogroup(s1 -> s2)
   }
 
   def testCogroupPathology3 = {
@@ -374,7 +355,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
         json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }"""
       ))
 
-    testCogroup(s1, s2)
+    testCogroup(s1 -> s2)
   }
 
   def testPartialUndefinedCogroup = {
@@ -398,7 +379,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
         WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("val")), "left"),
         WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("val")), "right")))
 
-    toJson(result).copoint must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testLongEqualSpansOnRight = {
@@ -414,8 +395,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       DerefObjectStatic(Leaf(SourceRight), CPathField("value"))
     )
 
-    val jsonResult = toJson(result).copoint
-    jsonResult must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testLongEqualSpansOnLeft = {
@@ -432,8 +412,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       DerefObjectStatic(Leaf(SourceLeft), CPathField("value"))
     )
 
-    val jsonResult = toJson(result).copoint
-    jsonResult must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testLongEqualSpansOnBoth = {
@@ -450,8 +429,7 @@ class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
       )
     )
 
-    val jsonResult = toJson(result).copoint
-    jsonResult must_== expected
+    toJsonSeq(result) must_=== expected
   }
 
   def testLongLeftSpanWithIncreasingRight = {
