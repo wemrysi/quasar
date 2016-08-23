@@ -5,7 +5,7 @@ import sbt._, Keys._
 object Build {
   val BothScopes = "compile->compile;test->test"
 
-  def scalazVersion     = "7.2.4"
+  def scalazVersion     = "7.2.5"
   def specsVersion      = "3.8.4-scalacheck-1.12.5"
   def scalacheckVersion = "1.12.5"
   def circeVersion      = "0.4.1"
@@ -31,7 +31,7 @@ object Build {
   def yggDependencies = Seq(
     "org.spire-math" %% "jawn-parser"       % "0.9.0",
     "org.mapdb"      %  "mapdb"             % "3.0.1",
-    "org.spire-math" %% "spire-macros"      % "0.11.0",
+    "org.spire-math" %% "spire-macros"      % "0.12.0",
     "org.scalacheck" %% "scalacheck"        % scalacheckVersion % Test force(),
     "org.specs2"     %% "specs2-scalacheck" % specsVersion      % Test,
     "org.typelevel"  %% "scalaz-specs2"     % "0.4.0"           % Test,
