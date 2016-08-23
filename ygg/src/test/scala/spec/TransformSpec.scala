@@ -289,80 +289,63 @@ trait TransformSpec extends TableQspec {
   }
 
   def testMap2ArrayObject = {
-    val data: Stream[JValue] = Stream(
-      JObject(JField("value1", JObject(JField("foo", JNum(12)) :: Nil)) :: JField("value2", JArray(JNum(1) :: Nil)) :: Nil),
-      JObject(JField("value1", JArray(JNum(30) :: Nil)) :: JField("value2", JArray(JNum(1) :: Nil)) :: Nil),
-      JObject(JField("value1", JNum(20)) :: JField("value2", JArray(JNum(1) :: Nil)) :: Nil),
-      JObject(JField("value1", JObject(JField("foo", JNum(-188)) :: Nil)) :: JField("value2", JNum(77)) :: Nil),
-      JObject(JField("value1", JNum(3)) :: JField("value2", JNum(77)) :: Nil))
+    val data: Stream[JValue] = jsonMany"""
+      {"value1":{"foo":12},"value2":[1]}
+      {"value1":[30],"value2":[1]}
+      {"value1":20,"value2":[1]}
+      {"value1":{"foo":-188},"value2":77}
+      {"value1":3,"value2":77}
+    """.toStream
 
     val sample = SampleData(data)
     val table  = fromSample(sample)
 
-    val results = toJson(table.transform {
-      Map2(DerefObjectStatic(Leaf(Source), CPathField("value1")), DerefObjectStatic(Leaf(Source), CPathField("value2")), lookupF2(Nil, "add"))
-    })
+    val Trans = Map2(
+      DerefObjectStatic(Leaf(Source), CPathField("value1")),
+      DerefObjectStatic(Leaf(Source), CPathField("value2")),
+      lookupF2(Nil, "add")
+    )
+    val results  = toJson(table transform Trans)
     val expected = Stream(JNum(80))
 
-    results.copoint mustEqual expected
+    results.copoint must_=== expected
   }
 
   def checkEqualSelf = {
-    implicit val gen = sample(schema)
+    implicit val gen: Arbitrary[SampleData] = sample(schema)
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        Equal(Leaf(Source), Leaf(Source))
-      })
+      val table    = fromSample(sample)
+      val results  = toJson(table transform Equal(Leaf(Source), Leaf(Source)))
+      val expected = Stream.fill(sample.data.size)(JBool(true))
 
-      results.copoint must_== (Stream.tabulate(sample.data.size) { _ =>
-        JBool(true)
-      })
+      results.copoint must_=== expected
     }
   }
 
   def checkEqualSelfArray = {
-    val array: JValue = json"""[[9,10,11]]"""
+    val data: Stream[JValue]  = json"""[[9,10,11]]""".asArray.elements.toStream map (k => json"""{ "key": [0], "value": $k }""")
+    val data2: Stream[JValue] = Stream(json"""{"key":[],"value":[9,10,11]}""")
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("expected JArray")
-    }).map { k =>
-      { JObject(List(JField("value", k), JField("key", JArray(List(JNum(0)))))) }
-    }.toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
-    val data2: Stream[JValue] = Stream(JObject(List(JField("value", JArray(List(JNum(9), JNum(10), JNum(11)))), JField("key", JArray(List())))))
-
+    val sample  = SampleData(data)
     val sample2 = SampleData(data2)
+    val table   = fromSample(sample)
     val table2  = fromSample(sample2)
 
-    val leftIdentitySpec  = DerefObjectStatic(Leaf(SourceLeft), CPathField("key"))
-    val rightIdentitySpec = DerefObjectStatic(Leaf(SourceRight), CPathField("key"))
-
-    val newIdentitySpec = OuterArrayConcat(leftIdentitySpec, rightIdentitySpec)
-
+    val leftIdentitySpec    = DerefObjectStatic(Leaf(SourceLeft), CPathField("key"))
+    val rightIdentitySpec   = DerefObjectStatic(Leaf(SourceRight), CPathField("key"))
+    val newIdentitySpec     = OuterArrayConcat(leftIdentitySpec, rightIdentitySpec)
     val wrappedIdentitySpec = trans.WrapObject(newIdentitySpec, "key")
-
-    val leftValueSpec  = DerefObjectStatic(Leaf(SourceLeft), CPathField("value"))
-    val rightValueSpec = DerefObjectStatic(Leaf(SourceRight), CPathField("value"))
-
-    val wrappedValueSpec = trans.WrapObject(Equal(leftValueSpec, rightValueSpec), "value")
+    val leftValueSpec       = DerefObjectStatic(Leaf(SourceLeft), CPathField("value"))
+    val rightValueSpec      = DerefObjectStatic(Leaf(SourceRight), CPathField("value"))
+    val wrappedValueSpec    = trans.WrapObject(Equal(leftValueSpec, rightValueSpec), "value")
 
     val results = toJson(table.cross(table2)(InnerObjectConcat(wrappedIdentitySpec, wrappedValueSpec)))
-    val expected = (data map {
-      case jo @ JObject(fields) if fields.contains("value") => {
-        if (fields("value") == JArray(List(JNum(9), JNum(10), JNum(11))))
-          jo + JField("value", JBool(true))
-        else
-          jo + JField("value", JBool(false))
-      }
-      case _ => abort("unreachable case")
-    }).toStream
+    val expected = data map {
+      case jo @ JObject(fields) => jo.set("value", JBool(fields("value") == json"[ 9, 10, 11 ]"))
+      case x                    => abort(s"$x")
+    }
 
-    results.copoint must_== expected
+    results.copoint must_=== expected
   }
 
   def testSimpleEqual = {
@@ -381,13 +364,9 @@ trait TransformSpec extends TableQspec {
         "key":[2.0,2.0,1.0]
     }]"""
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
+    val data: Stream[JValue] = array.asArray.elements.toStream
+    val sample               = SampleData(data)
+    val table                = fromSample(sample)
 
     val results = toJson(table.transform {
       Equal(
@@ -420,13 +399,9 @@ trait TransformSpec extends TableQspec {
         "key":[2.0,2.0,2.0]
       }]"""
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
+    val data: Stream[JValue] = array.asArray.elements.toStream
+    val sample               = SampleData(data)
+    val table                = fromSample(sample)
 
     val results = toJson(table.transform {
       Equal(
@@ -462,13 +437,9 @@ trait TransformSpec extends TableQspec {
         "key":[2.0,2.0]
       }]"""
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
+    val data: Stream[JValue] = array.asArray.elements.toStream
+    val sample               = SampleData(data)
+    val table                = fromSample(sample)
 
     val results = toJson(table.transform {
       Equal(
@@ -498,13 +469,9 @@ trait TransformSpec extends TableQspec {
         "key":[2.0,1.0]
       }]"""
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
+    val data: Stream[JValue] = array.asArray.elements.toStream
+    val sample               = SampleData(data)
+    val table                = fromSample(sample)
 
     val results = toJson(table.transform {
       Equal(
@@ -535,10 +502,8 @@ trait TransformSpec extends TableQspec {
 
     val expected = sample.data flatMap { jv =>
       ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
-        case (JUndefined, JUndefined) =>
-          None
-        case (x, y) =>
-          Some(JBool(x == y))
+        case (JUndefined, JUndefined) => None
+        case (x, y)                   => Some(JBool(x == y))
       }
     }
 
@@ -636,18 +601,15 @@ trait TransformSpec extends TableQspec {
 
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
-      val results = toJson(table.transform {
-        EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")), CLong(0), false)
-      })
+      val Trans = EqualLiteral(
+        DerefObjectStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathField("value1")),
+        CLong(0),
+        invert = false
+      )
+      val results  = toJson(table transform Trans)
+      val expected = sample.data map (_ \ "value" \ "value1") filter (_.isDefined) map (x => JBool(x == JNum(0)))
 
-      val expected = sample.data flatMap { jv =>
-        jv \ "value" \ "value1" match {
-          case JUndefined => None
-          case x          => Some(JBool(x == JNum(0)))
-        }
-      }
-
-      results.copoint must_== expected
+      results.copoint must_=== expected
     }
   }
   def checkNotEqualLiteral = {
@@ -696,16 +658,11 @@ trait TransformSpec extends TableQspec {
   def checkWrapObject = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        WrapObject(Leaf(Source), "foo")
-      })
+      val table    = fromSample(sample)
+      val results  = toJson(table transform WrapObject(Leaf(Source), "foo"))
+      val expected = sample.data map (jv => jobject("foo" -> jv))
 
-      val expected = sample.data map { jv =>
-        JObject(JField("foo", jv) :: Nil)
-      }
-
-      results.copoint must_== expected
+      results.copoint must_=== expected
     }
   }
 
@@ -727,34 +684,20 @@ trait TransformSpec extends TableQspec {
   }
 
   def testObjectConcatSingletonNonObject = {
-    val data: Stream[JValue] = Stream(JBool(true))
-    val sample               = SampleData(data)
-    val table                = fromSample(sample)
-
-    val resultsInner = toJson(table.transform {
-      InnerObjectConcat(Leaf(Source))
-    })
-
-    val resultsOuter = toJson(table.transform {
-      OuterObjectConcat(Leaf(Source))
-    })
+    val sample       = SampleData(jsonMany"true".toStream)
+    val table        = fromSample(sample)
+    val resultsInner = toJson(table transform InnerObjectConcat(Leaf(Source)))
+    val resultsOuter = toJson(table transform OuterObjectConcat(Leaf(Source)))
 
     resultsInner.copoint must beEmpty
     resultsOuter.copoint must beEmpty
   }
 
   def testObjectConcatTrivial = {
-    val data: Stream[JValue] = Stream(JBool(true), jobject())
-    val sample               = SampleData(data)
-    val table                = fromSample(sample)
-
-    val resultsInner = toJson(table.transform {
-      InnerObjectConcat(Leaf(Source))
-    })
-
-    val resultsOuter = toJson(table.transform {
-      OuterObjectConcat(Leaf(Source))
-    })
+    val sample       = SampleData(jsonMany""" true {} """.toStream )
+    val table        = fromSample(sample)
+    val resultsInner = toJson(table transform InnerObjectConcat(Leaf(Source)))
+    val resultsOuter = toJson(table transform OuterObjectConcat(Leaf(Source)))
 
     resultsInner.copoint must_== Stream(jobject())
     resultsOuter.copoint must_== Stream(jobject())

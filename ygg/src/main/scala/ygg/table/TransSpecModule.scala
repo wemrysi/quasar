@@ -24,18 +24,16 @@ trait TransSpecModule extends FNModule {
   type GroupId
 
   object trans {
-    sealed trait TransSpec[+A <: SourceType]
-    sealed trait SourceType
-
+    sealed trait TransSpec[+A <: SourceType]  extends AnyRef
     sealed trait ObjectSpec[+A <: SourceType] extends TransSpec[A]
     sealed trait ArraySpec[+A <: SourceType]  extends TransSpec[A]
 
-    sealed trait Source1 extends SourceType
-    case object Source   extends Source1
-
-    sealed trait Source2    extends SourceType
-    case object SourceLeft  extends Source2
-    case object SourceRight extends Source2
+    sealed trait SourceType                   extends AnyRef
+    sealed trait Source1                      extends SourceType
+    sealed trait Source2                      extends SourceType
+    case object Source                        extends Source1
+    case object SourceLeft                    extends Source2
+    case object SourceRight                   extends Source2
 
     case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
 
@@ -276,8 +274,7 @@ trait TransSpecModule extends FNModule {
       * @param key The key which will be used by `merge` to access this particular tic-variable (which may be refined by more than one `GroupKeySpecSource`)
       * @param spec A transform which defines this key part as a function of the source table in `GroupingSource`.
       */
-    case class GroupKeySpecSource(key: CPathField, spec: TransSpec1) extends GroupKeySpec
-
+    case class GroupKeySpecSource(key: CPathField, spec: TransSpec1)    extends GroupKeySpec
     case class GroupKeySpecAnd(left: GroupKeySpec, right: GroupKeySpec) extends GroupKeySpec
     case class GroupKeySpecOr(left: GroupKeySpec, right: GroupKeySpec)  extends GroupKeySpec
 

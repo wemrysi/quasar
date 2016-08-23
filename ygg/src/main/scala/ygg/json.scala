@@ -177,6 +177,7 @@ package object json {
     def sortedFields: Vector[JField] = fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
     def get(name: String): JValue    = fields.getOrElse(name, JUndefined)
 
+    // def set(name: String, value: JValue): JObject           = this + JField(name, value)
     def +(field: JField): JObject                           = x.copy(fields = fields + field.toTuple)
     def -(name: String): JObject                            = x.copy(fields = fields - name)
     def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)
@@ -201,17 +202,11 @@ package object json {
     }
   }
 
-  private def unflattenArray(elements: Seq[JPath -> JValue]): JArray = {
-    elements.foldLeft(JArray(Vector())) { (arr, t) =>
-      arr.set(t._1, t._2).asArray
-    }
-  }
+  private def unflattenArray(elements: Seq[JPath -> JValue]): JArray =
+    elements.foldLeft(JArray(Vector()))((arr, t) => arr.set(t._1, t._2).asArray)
 
-  private def unflattenObject(elements: Seq[JPath -> JValue]): JObject = {
-    elements.foldLeft(JObject(Nil)) { (obj, t) =>
-      obj.set(t._1, t._2) --> classOf[JObject]
-    }
-  }
+  private def unflattenObject(elements: Seq[JPath -> JValue]): JObject =
+    elements.foldLeft(JObject(Nil))((obj, t) => obj.set(t._1, t._2).asObject)
 
   def unflatten(elements: Seq[JPath -> JValue]): JValue = {
     if (elements.isEmpty) JUndefined
@@ -259,7 +254,11 @@ package object json {
 
     def asArray: JArray = self match {
       case x: JArray => x
-      case _         => abort(s"Expected class JArray but found: ${self.getClass}")
+      case _         => abort(s"Expected JArray but found: ${self.getClass}")
+    }
+    def asObject: JObject = self match {
+      case x: JObject => x
+      case _         => abort(s"Expected JObject but found: ${self.getClass}")
     }
 
     /**
