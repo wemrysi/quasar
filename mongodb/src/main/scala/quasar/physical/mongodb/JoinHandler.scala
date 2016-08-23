@@ -21,6 +21,7 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.namegen._
 import quasar.std.StdLib._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
@@ -56,7 +57,11 @@ object JoinHandler {
     */
   def pipeline[WF[_]: Functor: Coalesce: Crush: Crystallize]
     (stats: Collection => Option[CollectionStatistics])
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: WorkflowOp3_2F :<: WF, ev2: Show[WorkflowBuilder[WF]])
+    (implicit
+      C: Classify[WF],
+      ev0: WorkflowOpCoreF :<: WF,
+      ev1: WorkflowOp3_2F :<: WF,
+      ev2: Show[WorkflowBuilder[WF]])
     : JoinHandler[WF, OptionT[WorkflowBuilder.M, ?]] = JoinHandler({ (tpe, left, right) =>
 
     val WB = WorkflowBuilder.Ops[WF]
@@ -65,9 +70,15 @@ object JoinHandler {
     def unsharded(coll: Collection): Boolean =
       stats(coll).cata(!_.sharded, false)
 
+    def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
+      case $read(Collection(db, _)) => db.some
+      case op => C.pipeline(op).flatMap(_.src)
+      // TODO: deal with non-pipeline sources where it's possible to identify the DB
+    }
+
     def sourceDb: Algebra[WorkflowBuilderF[WF, ?], Option[DatabaseName]] = {
       case CollectionBuilderF(Fix($read(Collection(db, _))), _, _) => db.some
-      case CollectionBuilderF(_, _, _)        => None // TODO: need sourceDb for WorkflowOp
+      case CollectionBuilderF(op, _, _)       => op.cata(wfSourceDb)
 
       case ArrayBuilderF(src, _)              => src
       case ArraySpliceBuilderF(src, _)        => src
@@ -80,33 +91,85 @@ object JoinHandler {
       case ValueBuilderF(_)                   => None
     }
 
+    // NB: filtering on the left prior to the join is not strictly necessary,
+    // but it avoids a runtime explosion in the common error case that the field
+    // referenced on one side of the condition is not found.
     def lookup(
-      lSrc: WorkflowBuilder[WF], lField: BsonField, lName: BsonField.Name,
-      rColl: CollectionName, rField: BsonField, rName: BsonField.Name) =
-    {
-      val left = WB.makeObject(lSrc, lName.asText)
-      val filtered = WB.filter(left,
-        List(ExprBuilder(left, \/-($var(DocField(lName \ lField))))),
+        lSrc: WorkflowBuilder[WF], lExpr: Expr, lName: BsonField.Name,
+        lFilter: (WorkflowBuilder[WF], BsonField) => WorkflowBuilder[WF],
+        rColl: CollectionName, rField: BsonField, rName: BsonField.Name) =
+      lExpr match {
+        case \/-($var(DocVar(_, Some(lField)))) =>
+          val left = WB.makeObject(lSrc, lName.asText)
+          val filtered = lFilter(left, lName \ lField)
+          generateWorkflow(filtered).map { case (left, _) =>
+            CollectionBuilder(
+              chain[Fix[WF]](
+                left,
+                $lookup(rColl, lName \ lField, rField, rName),
+                $unwind(DocField(rName))),
+              Root(),
+              None)
+            }
+
+        case _ =>
+          for {
+            tmpName  <- emitSt(freshName)
+            left     <- WB.objectConcat(
+                          WB.makeObject(lSrc, lName.asText),
+                          WB.makeObject(ExprBuilder(lSrc, lExpr), tmpName.asText))
+            filtered =  lFilter(left, tmpName)
+            t        <- generateWorkflow(filtered)
+            (src, _) = t
+          } yield CollectionBuilder(
+              chain[Fix[WF]](
+                src,
+                $lookup(rColl, tmpName, rField, rName),
+                $project(
+                  Reshape(ListMap(
+                    lName -> \/-($var(DocField(lName))),
+                    rName -> \/-($var(DocField(rName))))),
+                  IgnoreId),
+                $unwind(DocField(rName))),
+              Root(),
+              None)
+      }
+
+    def filterNonNull(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
+      WB.filter(wb,
+        List(ExprBuilder(wb, \/-($var(DocField(field))))),
         { case List(f) => Selector.Doc(f -> Selector.Neq(Bson.Null)) })
-      generateWorkflow(filtered).map { case (left, _) =>
-        CollectionBuilder(
-          chain[Fix[WF]](
-            left,
-            $lookup(rColl, lName \ lField, rField, rName),
-            $unwind(DocField(rName))),
-          Root(),
-          None)
-        }
-    }
 
     (tpe, left, right) match {
       case (set.InnerJoin, IsLookupInput(src, expr), IsLookupFrom(coll, field))
             if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
-        lookup(src, expr, LeftName, coll.collection, field, RightName).liftM[OptionT]
+        lookup(
+          src, expr, LeftName,
+          filterNonNull,
+          coll.collection, field, RightName).liftM[OptionT]
+
+      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
+      // case (set.LeftOuterJoin, IsLookupInput(src, expr), IsLookupFrom(coll, field))
+      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      //   lookup(
+      //     src, expr, LeftName,
+      //     noFilter,
+      //     coll.collection, field, RightName).liftM[OptionT]
 
       case (set.InnerJoin, IsLookupFrom(coll, field), IsLookupInput(src, expr))
             if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
-        lookup(src, expr, RightName, coll.collection, field, LeftName).liftM[OptionT]
+        lookup(
+          src, expr, RightName,
+          filterNonNull,
+          coll.collection, field, LeftName).liftM[OptionT]
+
+      // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
+      // case (set.RightOuterJoin, IsLookupFrom(coll, field), IsLookupInput(src, expr))
+      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      //   lookup(
+      //     src, expr, RightName,
+      //     noFilter,
+      //     coll.collection, field, LeftName).liftM[OptionT]
 
       case _ => OptionT.none
     }
@@ -117,11 +180,11 @@ object JoinHandler {
       * \$lookup-based join; essentially, it needs to have a single key.
       */
     def unapply[WF[_]](arg: JoinSource[WF])(implicit ev: Equal[WorkflowBuilder[WF]])
-      : Option[(Fix[WorkflowBuilderF[WF, ?]], BsonField)] =
+      : Option[(Fix[WorkflowBuilderF[WF, ?]], Expr)] =
       arg.keys match {
         // TODO: generalize to handle more sources (notably ShapePreservingBuilders)
-        case List(Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(field))))))) if src ≟ arg.src =>
-          (src, field).some
+        case List(Fix(ExprBuilderF(src, expr))) if src ≟ arg.src =>
+          (src, expr).some
         case _ =>
           None
       }
