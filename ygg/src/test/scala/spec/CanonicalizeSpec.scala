@@ -88,7 +88,7 @@ trait CanonicalizeSpec extends ColumnarTableQspec {
 
       resultSizes mustEqual expected
     }
-  }.set(minTestsOk = 1000)
+  }.set(minTestsOk = 200)
 
   def testCanonicalize = {
     val result = table.canonicalize(3)

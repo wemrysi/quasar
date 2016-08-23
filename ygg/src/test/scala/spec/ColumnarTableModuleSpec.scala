@@ -148,7 +148,7 @@ class ColumnarTableModuleSpec
     "verify renderJson round tripping" in {
       implicit val gen = sample(schema)
       prop((sd: SampleData) => testRenderJson(sd.data: _*))
-    }
+    }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
 
     "handle special cases of renderJson" >> {
 
@@ -160,8 +160,8 @@ class ColumnarTableModuleSpec
       "fully undefined object"           >> testRenderJson(jobject())
       "undefined row"                    >> testRenderJson(jobject(), JNum(42))
 
-      "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }"))
-      "check long encoding"  in prop((x: Long) => testRenderJson(json"$x"))
+      "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }")).set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+      "check long encoding"  in prop((x: Long) => testRenderJson(json"$x")).set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 
     "in cogroup" >> {

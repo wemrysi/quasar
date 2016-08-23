@@ -32,7 +32,7 @@ class MapUtilsSpec extends quasar.Qspec {
 }
 
 class RingDequeSpec extends quasar.Qspec {
-  implicit val params = set(minTestsOk = 2500, workers = Runtime.getRuntime.availableProcessors)
+  implicit val params = set(minTestsOk = 200, workers = Runtime.getRuntime.availableProcessors)
 
   "unsafe ring deque" should {
     "implement prepend" in prop { (xs: List[Int], x: Int) =>
