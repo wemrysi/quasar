@@ -989,8 +989,10 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testIsTypeNumeric = {
-    val elements = jsonMany"""
+  def testIsTypeNumeric = checkSpecData(
+    spec     = root isType JNumberT,
+    expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue),
+    data     = jsonMany"""
       {"key":[1], "value": "value1"}
       45
       true
@@ -1003,59 +1005,27 @@ trait TransformSpec extends TableQspec {
       {"baz": 34.3}
       23
     """
+  )
 
-    val sample   = SampleData(elements.toStream)
-    val table    = fromSample(sample)
-    val results  = toJson(table transform (root isType JNumberT))
-    val expected = Stream(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue)
-
-    results.copoint must_=== expected
-  }
-
-  def testIsTypeUnionTrivial = {
-    val JArray(elements) = json"""[
-      {"key":[1], "value": "value1"},
-      45,
-      true,
-      {"value":"foobaz"},
-      [234],
-      233.4,
-      29292.3,
-      null,
-      [{"bar": 12}],
-      {"baz": 34.3},
+  def testIsTypeUnionTrivial = checkSpecData(
+    spec     = root isType JUnionT(JNumberT, JNullT),
+    expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue),
+    data     = jsonMany"""
+      {"key":[1], "value": "value1"}
+      45
+      true
+      {"value":"foobaz"}
+      [234]
+      233.4
+      29292.3
+      null
+      [{"bar": 12}]
+      {"baz": 34.3}
       23
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-    val jtpe   = JUnionT(JNumberT, JNullT)
-    val results = toJson(table.transform {
-      IsType(Leaf(Source), jtpe)
-    })
-
-    val expected = Stream(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue)
-
-    results.copoint must_== expected
-  }
+    """
+  )
 
   def testIsTypeUnion = {
-    val JArray(elements) = json"""[
-      {"key":[1], "value": 23},
-      {"key":[1, "bax"], "value": {"foo":4, "bar":{}}},
-      {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}},
-      {"key":[], "value": {"foo":34, "bar":{"a": null}}},
-      {"key":[2], "value": {"foo": "dd"}},
-      {"key":[3]},
-      {"key":[2], "value": {"foo": -1.1, "bar": {"a": 4, "b": 5}}},
-      {"key":[2], "value": {"foo": "dd", "bar": [{"a":6}]}},
-      {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}},
-      {"value":"foobaz"},
-      {}
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
     val jtpe = JType.Object(
       "value" -> JType.Object(
         "foo" -> JUnionT(JNumberT, JTextT),
@@ -1063,65 +1033,67 @@ trait TransformSpec extends TableQspec {
       ),
       "key" -> JArrayUnfixedT
     )
-    val results  = toJson(table transform IsType(Leaf(Source), jtpe))
-    val expected = Stream(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JFalse)
-
-    results.copoint must_=== expected
+    checkSpecData(
+      spec     = root isType jtpe,
+      expected = Seq(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JFalse),
+      data     = jsonMany"""
+        {"key":[1], "value": 23}
+        {"key":[1, "bax"], "value": {"foo":4, "bar":{}}}
+        {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}}
+        {"key":[], "value": {"foo":34, "bar":{"a": null}}}
+        {"key":[2], "value": {"foo": "dd"}}
+        {"key":[3]}
+        {"key":[2], "value": {"foo": -1.1, "bar": {"a": 4, "b": 5}}}
+        {"key":[2], "value": {"foo": "dd", "bar": [{"a":6}]}}
+        {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}}
+        {"value":"foobaz"}
+        {}
+      """
+    )
   }
 
   def testIsTypeUnfixed = {
-    val JArray(elements) = json"""[
-      {"key":[1], "value": 23},
-      {"key":[1, "bax"], "value": {"foo":4, "bar":{}}},
-      {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}},
-      {"key":[], "value": {"foo":34, "bar":{"a": null}}},
-      {"key":[2], "value": {"foo": "dd"}},
-      {"key":[3]},
-      {"key":[2], "value": {"foo": -1.1, "bar": {"a": 4, "b": 5}}},
-      {"key":[2], "value": {"foo": "dd", "bar": [{"a":6}]}},
-      {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}},
-      {"value":"foobaz"},
-      {}
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val jtpe = JObjectFixedT(Map("value" -> JObjectFixedT(Map("foo" -> JNumberT, "bar" -> JObjectUnfixedT)), "key" -> JArrayUnfixedT))
-    val results = toJson(table.transform {
-      IsType(Leaf(Source), jtpe)
-    })
-
-    val expected = Stream(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JFalse, JFalse, JFalse)
-
-    results.copoint must_== expected
+    val jtpe = JType.Object(
+      "value" -> JType.Object("foo" -> JNumberT, "bar" -> JObjectUnfixedT),
+      "key"   -> JArrayUnfixedT
+    )
+    checkSpecData(
+      spec     = root isType jtpe,
+      expected = Seq(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JFalse, JFalse, JFalse),
+      data     = jsonMany"""
+        {"key":[1], "value": 23}
+        {"key":[1, "bax"], "value": {"foo":4, "bar":{}}}
+        {"key":[null, "bax", 4], "value": {"foo":4.4, "bar":{"a": false}}}
+        {"key":[], "value": {"foo":34, "bar":{"a": null}}}
+        {"key":[2], "value": {"foo": "dd"}}
+        {"key":[3]}
+        {"key":[2], "value": {"foo": -1.1, "bar": {"a": 4, "b": 5}}}
+        {"key":[2], "value": {"foo": "dd", "bar": [{"a":6}]}}
+        {"key":[44], "value": {"foo": "x", "bar": {"a": 4, "b": 5}}}
+        {"value":"foobaz"}
+        {}
+      """
+    )
   }
 
   def testIsTypeObject = {
-    val JArray(elements) = json"""[
-      {"key":[1], "value": 23},
-      {"key":[1, "bax"], "value": 24},
-      {"key":[2], "value": "foo"},
-      15,
-      {"key":[3]},
-      {"value":"foobaz"},
-      {"notkey":[3]},
-      {"key":[3], "value": 18, "baz": true},
-      {"key":["foo"], "value": 18.6, "baz": true},
-      {"key":[3, 5], "value": [34], "baz": 33}
-    ]"""
-
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val jtpe = JObjectFixedT(Map("value" -> JNumberT, "key" -> JArrayUnfixedT))
-    val results = toJson(table.transform {
-      IsType(Leaf(Source), jtpe)
-    })
-
-    val expected = Stream(JTrue, JTrue, JFalse, JFalse, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse)
-
-    results.copoint must_== expected
+    val jtpe = JType.Object("value" -> JNumberT, "key" -> JArrayUnfixedT)
+    checkSpecData(
+      spec     = root isType jtpe,
+      expected = Seq(JTrue, JTrue, JFalse, JFalse, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse),
+      data     = jsonMany"""
+        {"key":[1], "value": 23}
+        {"key":[1, "bax"], "value": 24}
+        {"key":[2], "value": "foo"}
+        15
+        {"key":[3]}
+        {"value":"foobaz"}
+        {"notkey":[3]}
+        {"key":[3], "value": 18, "baz": true}
+        {"key":["foo"], "value": 18.6, "baz": true}
+        {"key":[3, 5], "value": [34], "baz": 33}
+      """
+    )
   }
 
   def testIsTypeObjectEmpty = {
