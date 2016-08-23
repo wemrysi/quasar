@@ -815,13 +815,12 @@ object MongoDbQScriptPlanner {
 
     queryContext.model match {
       case `3.2` =>
-        val pl = JoinHandler.pipeline[Workflow3_2F](queryContext.statistics)
-        val mr = JoinHandler.mapReduce[Workflow3_2F]
         val joinHandler =
-          JoinHandler[Workflow3_2F, WorkflowBuilder.M]((tpe, l, r) =>
-            pl(tpe, l, r) getOrElseF mr(tpe, l, r))
-
+          JoinHandler.fallback(
+            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics),
+            JoinHandler.mapReduce[Workflow3_2F])
         plan0[T, Workflow3_2F](joinHandler)(logical)
+
       case _     =>
         val joinHandler = JoinHandler.mapReduce[Workflow2_6F]
         plan0[T, Workflow2_6F](joinHandler)(logical).map(_.inject[WorkflowF])

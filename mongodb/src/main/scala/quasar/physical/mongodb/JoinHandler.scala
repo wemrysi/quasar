@@ -46,6 +46,11 @@ object JoinHandler {
   val LeftName: BsonField.Name = BsonField.Name("left")
   val RightName: BsonField.Name = BsonField.Name("right")
 
+  def fallback[WF[_], F[_]: Monad](
+      first: JoinHandler[WF, OptionT[F, ?]],
+      second: JoinHandler[WF, F]): JoinHandler[WF, F] =
+    JoinHandler((tpe, l, r) => first(tpe, l, r) getOrElseF second(tpe, l, r))
+
   /** When possible, plan a join using the more efficient \$lookup operator in
     * the aggregation pipeline.
     */
