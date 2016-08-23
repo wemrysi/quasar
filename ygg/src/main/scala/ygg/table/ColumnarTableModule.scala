@@ -1508,7 +1508,7 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
 
     def normalize: Table = Table(slices.filter(!_.isEmpty), size)
 
-    def schemas: M[Set[JType]] = {
+    def schemas: Need[Set[JType]] = {
 
       // Returns true iff masks contains an array equivalent to mask.
       def contains(masks: List[RawBitSet], mask: Array[Int]): Boolean = {
@@ -1557,24 +1557,18 @@ trait ColumnarTableModule extends TableModule with ColumnarTableTypes with Slice
           case CDate                  => JDateT
           case CPeriod                => JPeriodT
           case CArrayType(elemType)   => leafType(elemType)
-          case CEmptyObject           => JObjectFixedT(Map.empty)
-          case CEmptyArray            => JArrayFixedT(Map.empty)
+          case CEmptyObject           => JType.Object()
+          case CEmptyArray            => JType.Array()
           case CNull                  => JNullT
           case CUndefined             => abort("not supported")
         }
 
         def fresh(paths: List[CPathNode], leaf: JType): Option[JType] = paths match {
-          case CPathField(field) :: paths =>
-            fresh(paths, leaf) map { tpe =>
-              JObjectFixedT(Map(field -> tpe))
-            }
-          case CPathIndex(i) :: paths =>
-            fresh(paths, leaf) map { tpe =>
-              JArrayFixedT(Map(i -> tpe))
-            }
-          case CPathArray :: paths   => fresh(paths, leaf) map (JArrayHomogeneousT(_))
-          case CPathMeta(field) :: _ => None
-          case Nil                   => Some(leaf)
+          case CPathField(field) :: paths => fresh(paths, leaf) map (tpe => JType.Object(field -> tpe))
+          case CPathIndex(i) :: paths     => fresh(paths, leaf) map (tpe => JType.Indexed(i -> tpe))
+          case CPathArray :: paths        => fresh(paths, leaf) map (tpe => JArrayHomogeneousT(tpe))
+          case CPathMeta(field) :: _      => None
+          case Nil                        => Some(leaf)
         }
 
         def merge(schema: Option[JType], paths: List[CPathNode], leaf: JType): Option[JType] = (schema, paths) match {

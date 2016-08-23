@@ -1,5 +1,7 @@
 package ygg.json
 
+import ygg.common._
+
 sealed trait JType {
   def |(jtype: JType): JType = JUnionT(this, jtype)
 }
@@ -21,3 +23,9 @@ sealed trait JObjectT                                      extends JType
 final case class JObjectFixedT(fields: Map[String, JType]) extends JObjectT
 final case object JObjectUnfixedT                          extends JObjectT
 final case class JUnionT(left: JType, right: JType)        extends JType
+
+object JType {
+  def Indexed(tps: (Int -> JType)*): JArrayFixedT    = JArrayFixedT(tps.toMap)
+  def Object(tps: (String -> JType)*): JObjectFixedT = JObjectFixedT(tps.toMap)
+  def Array(tps: JType*): JArrayFixedT               = JArrayFixedT(tps.zipWithIndex.map(x => x._2 -> x._1).toMap)
+}

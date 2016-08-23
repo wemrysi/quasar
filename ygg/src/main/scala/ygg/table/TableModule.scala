@@ -241,7 +241,7 @@ trait TableModule extends TransSpecModule {
 
     def canonicalize(length: Int): Table
 
-    def schemas: M[scSet[JType]]
+    def schemas: Need[Set[JType]]
 
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
 

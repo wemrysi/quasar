@@ -2,7 +2,7 @@ package ygg.tests
 
 import ygg.common._
 import scalaz._, Scalaz._
-import ygg.tests.TestSupport._
+import TestSupport._
 import ygg.table._
 import ygg.json._
 
@@ -165,7 +165,7 @@ trait TransformSpec extends TableQspec {
   }
 
   def testMod2Filter = {
-    val array: JValue = json"""
+    val data: Stream[JValue] = json"""
       [{
         "value":-6.846973248137671E+307,
         "key":[7.0]
@@ -173,12 +173,7 @@ trait TransformSpec extends TableQspec {
       {
         "value":-4611686018427387904,
         "key":[5.0]
-      }]"""
-
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
+      }]""".asArray.elements.toStream
 
     val sample = SampleData(data)
     val table  = fromSample(sample)
@@ -224,14 +219,8 @@ trait TransformSpec extends TableQspec {
         })
       })
 
-      val expected = sample.data.map { jv =>
-        jv(JPath(fieldHead))
-      } flatMap {
-        case JUndefined => None
-        case jv         => Some(jv)
-      }
-
-      results.copoint must_== expected
+      val expected = sample.data map (_ apply fieldHead) filter (_.isDefined)
+      results.copoint must_=== expected
     }
   }
 
@@ -248,14 +237,8 @@ trait TransformSpec extends TableQspec {
         })
       })
 
-      val expected = sample.data.map { jv =>
-        jv(JPath(fieldHead))
-      } flatMap {
-        case JUndefined => None
-        case jv         => Some(jv)
-      }
-
-      results.copoint must_== expected
+      val expected = sample.data map (_ apply fieldHead) filter (_.isDefined)
+      results.copoint must_=== expected
     }
   }
 
@@ -273,13 +256,12 @@ trait TransformSpec extends TableQspec {
 
       val expected = sample.data flatMap { jv =>
         ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
-          case (JNum(x), JNum(y)) if x == y => Some(JBool(true))
-          case (JNum(x), JNum(y))           => Some(JBool(false))
-          case _                            => None
+          case (JNum(x), JNum(y)) => Some(JBool(x == y))
+          case _                  => None
         }
       }
 
-      results.copoint must_== expected
+      results.copoint must_=== expected
     }
   }
 
@@ -1356,15 +1338,17 @@ trait TransformSpec extends TableQspec {
 
     val sample = SampleData(elements.toStream)
     val table  = fromSample(sample)
-
-    val jtpe = JObjectFixedT(Map("value" -> JObjectFixedT(Map("foo" -> JUnionT(JNumberT, JTextT), "bar" -> JObjectUnfixedT)), "key" -> JArrayUnfixedT))
-    val results = toJson(table.transform {
-      IsType(Leaf(Source), jtpe)
-    })
-
+    val jtpe = JType.Object(
+      "value" -> JType.Object(
+        "foo" -> JUnionT(JNumberT, JTextT),
+        "bar" -> JObjectUnfixedT
+      ),
+      "key" -> JArrayUnfixedT
+    )
+    val results  = toJson(table transform IsType(Leaf(Source), jtpe))
     val expected = Stream(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JFalse)
 
-    results.copoint must_== expected
+    results.copoint must_=== expected
   }
 
   def testIsTypeUnfixed = {
