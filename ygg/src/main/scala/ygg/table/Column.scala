@@ -118,7 +118,21 @@ trait Table {
   // for debugging only!!
   def toJson: Need[Stream[JValue]]
 }
+trait TableCompanion {
+  val trans: TransSpecClasses
 
+  def empty: Table
+  def constString(v: scSet[String]): Table
+  def constLong(v: scSet[Long]): Table
+  def constDouble(v: scSet[Double]): Table
+  def constDecimal(v: scSet[BigDecimal]): Table
+  def constDate(v: scSet[DateTime]): Table
+  def constBoolean(v: scSet[Boolean]): Table
+  def constNull: Table
+  def constEmptyObject: Table
+  def constEmptyArray: Table
+  def fromRValues(values: Seq[RValue]): Table
+}
 
 
 trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with (Int => Array[A]) { self =>

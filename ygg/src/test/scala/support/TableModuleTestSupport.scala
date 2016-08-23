@@ -52,9 +52,7 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
   }
 
   def testRenderJson(xs: JValue*) = {
-    val seq = xs.toVector
     def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
-
     def minimize(value: JValue): Option[JValue] = value match {
       case JUndefined       => None
       case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
@@ -63,8 +61,8 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
       case v                => Some(v)
     }
 
-    val table     = fromJson(seq.toStream)
-    val expected  = JArray(seq.toVector)
+    val table     = fromJson(xs.toVector)
+    val expected  = JArray(xs.toVector)
     val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
     val minimized = minimize(expected) getOrElse jarray()
 

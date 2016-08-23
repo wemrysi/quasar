@@ -22,28 +22,17 @@ class ColumnarTableModuleSpec
   import trans._
 
   "a table dataset" should {
-    "verify bijection from static JSON" in {
-      val sample = jsonMany"""
-        {"key":[-1,0],"value":null}
-        {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307,-3.536399224770604E+307]]}}
-        {"key":[-3918416808128018609,-1],"value":-1.0}
-      """
-
-      val dataset = fromJson(sample)
-      val results = dataset.toJson
-
-      (results.copoint.toSeq: Seq[JValue]) must_=== sample
-    }
-
     "verify bijection from JSON" in checkMappings(this)
-
+    "verify bijection from static JSON" in {
+      implicit val gen = sample(schema)
+      prop((sd: SampleData) => toJsonSeq(fromJson(sd.data)) must_=== sd.data)
+    }
     "verify renderJson round tripping" in {
       implicit val gen = sample(schema)
       prop((sd: SampleData) => testRenderJson(sd.data: _*))
-    }.set(minTestsOk = 500, workers = Runtime.getRuntime.availableProcessors)
+    }
 
     "handle special cases of renderJson" >> {
-
       "undefined at beginning of array"  >> testRenderJson(jarray(undef, JNum(1), JNum(2)))
       "undefined in middle of array"     >> testRenderJson(jarray(JNum(1), undef, JNum(2)))
       "fully undefined array"            >> testRenderJson(jarray(undef, undef, undef))
@@ -57,26 +46,10 @@ class ColumnarTableModuleSpec
     }
 
     "in cross" >> {
-      "perform a simple cartesian" in testSimpleCross
-
-      "split a cross that would exceed maxSliceSize boundaries" in {
-        val sample = jsonMany"""
-          {"key":[-1,0],"value":null}
-          {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307],-3.536399224770604E+307]}}
-          {"key":[-3918416808128018609,-1],"value":-1.0}
-          {"key":[-3918416898128018609,-2],"value":-1.0}
-          {"key":[-3918426808128018609,-3],"value":-1.0}
-        """
-
-        val dataset1 = fromJson(sample, Some(3))
-
-        dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.copoint must beLike {
-          case Some((head, _)) => head.size must beLessThanOrEqualTo(yggConfig.maxSliceSize)
-        }
-      }
-
-      "cross across slice boundaries on one side" in testCrossSingles
-      "survive scalacheck" in prop((cd: CogroupData) => testCross(cd._1, cd._2))
+      "perform a simple cartesian"                              in testSimpleCross
+      "split a cross that would exceed maxSliceSize boundaries" in testCrossLarge
+      "cross across slice boundaries on one side"               in testCrossSingles
+      "survive scalacheck"                                      in prop((cd: CogroupData) => testCross(cd._1, cd._2))
     }
 
     "in transform" >> {
@@ -134,30 +107,8 @@ class ColumnarTableModuleSpec
       "inner array concatenate when one side is not an array"                   in testInnerArrayConcatLeftEmpty
       "outer array concatenate when one side is not an array"                   in testOuterArrayConcatLeftEmpty
 
-      "delete elements according to a JType" in checkObjectDelete
-      "delete only field in object without removing from array" in {
-        val JArray(elements) = json"""[
-          {"foo": 4, "bar": 12},
-          {"foo": 5},
-          {"bar": 45},
-          {},
-          {"foo": 7, "bar" :23, "baz": 24}
-        ]"""
-
-        val sample   = SampleData(elements.toStream)
-        val table    = fromSample(sample)
-        val spec     = ObjectDelete(Leaf(Source), Set(CPathField("foo")))
-        val results  = toJson(table.transform(spec))
-        val expected = jsonMany"""
-          {"bar": 12}
-          {}
-          {"bar": 45}
-          {}
-          {"bar" :23, "baz": 24}
-        """
-        (results.copoint: Seq[JValue]) must_=== expected
-      }
-
+      "delete elements according to a JType"                     in checkObjectDelete
+      "delete only field of object without removing from array"  in checkObjectDeleteWithoutRemovingArray
       "perform a basic IsType transformation"                    in testIsTypeTrivial
       "perform an IsType transformation on numerics"             in testIsTypeNumeric
       "perform an IsType transformation on trivial union"        in testIsTypeUnionTrivial

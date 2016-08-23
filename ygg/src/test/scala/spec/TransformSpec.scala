@@ -967,6 +967,24 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
+  def checkObjectDeleteWithoutRemovingArray = checkSpecData(
+    spec = ObjectDelete(Leaf(Source), Set(CPathField("foo"))),
+    data = jsonMany"""
+      {"foo": 4, "bar": 12}
+      {"foo": 5}
+      {"bar": 45}
+      {}
+      {"foo": 7, "bar" :23, "baz": 24}
+    """,
+    expected = jsonMany"""
+      {"bar": 12}
+      {}
+      {"bar": 45}
+      {}
+      {"bar" :23, "baz": 24}
+    """
+  )
+
   def checkObjectDelete = {
     implicit val gen = sample(objectSchema(_, 3))
 
