@@ -19,16 +19,18 @@ trait TransformSpec extends TableQspec {
    *  then transformed by the given spec, produces a copoint which is the same as the
    *  function `expect` applied to the original data.
    */
-  def checkTransform(sd: SampleData, spec: TransSpec1, expect: ToSelf[Stream[JValue]]): MatchResult[Stream[JValue]] =
-    toJson(fromSample(sd) transform spec).copoint must_=== expect(sd.data)
+  def checkTransform(sd: SampleData, spec: TransSpec1, expect: SampleData => Stream[JValue]): MatchResult[Stream[JValue]] =
+    toJson(fromSample(sd) transform spec).copoint must_=== expect(sd)
 
   /** Generate a scalacheck requirement that checkTransform is true for all
    *  generate sample data.
    */
-  def checkTransformProp[A](spec: TransSpec1)(expect: ToSelf[Stream[JValue]]) = {
-    implicit val arb: Arbitrary[SampleData] = sample(schema)
-    prop((sd: SampleData) => checkTransform(sd, spec, expect))
+  def checkTransformGen[A](gen: Gen[SampleData], spec: SampleData => TransSpec1, expect: SampleData => Stream[JValue]): Prop = {
+    implicit val arb: Arbitrary[SampleData] = Arbitrary(gen)
+    prop((sd: SampleData) => checkTransform(sd, spec(sd), expect))
   }
+  def checkTransformProp[A](spec: TransSpec1)(expect: ToSelf[Stream[JValue]]): Prop =
+    checkTransformGen(sample(schema).arbitrary, _ => spec, sd => expect(sd.data))
 
   def checkTransformLeaf = checkTransformProp(Leaf(Source))(identity)
 
@@ -108,8 +110,8 @@ trait TransformSpec extends TableQspec {
     F_IsEven
   )
 
-  def checkMap1 =
-    checkTransformProp(F_ValueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
+  def checkMap1      = checkTransformProp(F_ValueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
+  def checkMetaDeref = checkTransformProp(DerefMetadataStatic(Leaf(Source), CPathMeta("foo")))(_ => Stream())
 
   def checkTrueFilter = {
     val spec = Filter(
@@ -133,56 +135,32 @@ trait TransformSpec extends TableQspec {
     checkTransform(
       SampleData(data.toStream),
       Filter(Leaf(Source), F_ValueIsEven("value")),
-      _ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false }
+      sd => sd.data map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false }
     )
   }
 
-  def checkMetaDeref = {
-    implicit val gen = sample(objectSchema(_, 3))
-    prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        DerefMetadataStatic(Leaf(Source), CPathMeta("foo"))
-      })
-
-      results.copoint must_== Stream()
-    }
-  }
-
   def checkObjectDeref = {
-    implicit val gen = sample(objectSchema(_, 3))
-    prop { (sample: SampleData) =>
-      val (field, _) = sample.schema.get._2.head
-      val fieldHead  = field.head.get
-      val table      = fromSample(sample)
-      val results = toJson(table.transform {
-        DerefObjectStatic(Leaf(Source), fieldHead match {
-          case JPathField(s) => CPathField(s)
-          case _             => abort("non-field reached")
-        })
-      })
-
-      val expected = sample.data map (_ apply fieldHead) filter (_.isDefined)
-      results.copoint must_=== expected
+    def fieldHeadName(sd: SampleData): String = sd.schema.get._2.head._1.head.get match {
+      case JPathField(s) => s
+      case _             => abort("non-field reached")
     }
+    checkTransformGen(
+      sample(objectSchema(_, 3)).arbitrary,
+      sd => DerefObjectStatic(Leaf(Source), CPathField(fieldHeadName(sd))),
+      sd => sd.data map (_ apply JPathField(fieldHeadName(sd))) filter (_.isDefined)
+    )
   }
 
   def checkArrayDeref = {
-    implicit val gen = sample(arraySchema(_, 3))
-    prop { (sample: SampleData) =>
-      val (field, _) = sample.schema.get._2.head
-      val fieldHead  = field.head.get
-      val table      = fromSample(sample)
-      val results = toJson(table.transform {
-        DerefArrayStatic(Leaf(Source), fieldHead match {
-          case JPathIndex(s) => CPathIndex(s)
-          case _             => abort("non-index reached")
-        })
-      })
-
-      val expected = sample.data map (_ apply fieldHead) filter (_.isDefined)
-      results.copoint must_=== expected
+    def fieldHeadIndex(sd: SampleData): Int = sd.schema.get._2.head._1.head.get match {
+      case JPathIndex(s) => s
+      case _             => abort("non-index reached")
     }
+    checkTransformGen(
+      sample(arraySchema(_, 3)).arbitrary,
+      sd => DerefArrayStatic(Leaf(Source), CPathIndex(fieldHeadIndex(sd))),
+      sd => sd.data map (_ apply fieldHeadIndex(sd)) filter (_.isDefined)
+    )
   }
 
   def checkMap2Eq = {
