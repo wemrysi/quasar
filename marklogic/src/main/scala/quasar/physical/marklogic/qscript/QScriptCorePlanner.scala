@@ -26,7 +26,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
-  import expr.{func, let_}
+  import expr.{func, if_, let_, emptySeq}
 
   val plan: AlgebraM[Planning, QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
@@ -43,13 +43,20 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
         .point[Planning]
 
     case Take(src, from, count) =>
-      (rebaseXQuery(from, src) |@| rebaseXQuery(count, src))((fm, ct) =>
-        src(fm to ct))
+      (rebaseXQuery(from, emptySeq) |@| rebaseXQuery(count, emptySeq))((fm, ct) =>
+        src((fm + 1.xqy).seq to ct))
 
     case Drop(src, from, count) =>
-      (rebaseXQuery(from, src) |@| rebaseXQuery(count, src))((fm, ct) =>
-        let_("$x" -> src) return_ mkSeq_(
-          fn.subsequence("$x".xqy, 1.xqy, some(fm)),
-          fn.subsequence("$x".xqy, ct)))
+      (rebaseXQuery(from, emptySeq) |@| rebaseXQuery(count, emptySeq))((fm, ct) =>
+        let_("$x" -> src) return_ {
+          if_ (fm eq 0.xqy)
+            .then_ {
+              fn.subsequence("$x".xqy, ct)
+            } else_ {
+              mkSeq_(
+                fn.subsequence("$x".xqy, 1.xqy, some(fm)),
+                fn.subsequence("$x".xqy, ct))
+            }
+        })
   }
 }

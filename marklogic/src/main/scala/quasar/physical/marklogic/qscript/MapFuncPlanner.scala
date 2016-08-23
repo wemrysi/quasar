@@ -25,6 +25,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
+import scalaz.std.option._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
@@ -64,6 +65,13 @@ object MapFuncPlanner {
     case Lower(s) => fn.lowerCase(s)
     case Upper(s) => fn.upperCase(s)
     case ToString(x) => fn.string(x)
+    case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len))
+
+    // structural
+    // TODO: Currently experimenting with sequence as Array, might not work.
+    case MakeArray(x) => x
+    case ConcatArrays(x, y) => mkSeq_(x, y)
+    case ProjectIndex(seq, idx) => seq(idx + 1.xqy)
 
     // other
     case Range(x, y) => x to y
