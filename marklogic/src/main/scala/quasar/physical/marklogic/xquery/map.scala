@@ -18,15 +18,12 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
-import scala.math.Integral
+import scalaz.Foldable
 
-object syntax {
-  final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
-    def xqy: XQuery = XQuery(str)
-    def xs: XQuery = expr.string(str)
-  }
+object map {
+  def entry(key: XQuery, value: XQuery): XQuery =
+    XQuery(s"map:entry($key, $value)")
 
-  final implicit class XQueryIntegralOps[N](val num: N)(implicit N: Integral[N]) {
-    def xqy: XQuery = XQuery(N.toLong(num).toString)
-  }
+  def new_[F[_]: Foldable](entries: F[XQuery]): XQuery =
+    XQuery(s"map:new${mkSeq(entries)}")
 }

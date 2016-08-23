@@ -17,19 +17,21 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.ejson.EJson
 import quasar.fp._
+import quasar.physical.marklogic.ejson.AsXQuery
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
 
-import matryoshka._
+import matryoshka._, Recursive.ops._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
   import expr.if_
 
-  def apply[T[_[_]]: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
-    case Nullary(ejson) => s"(: ${ejson.shows} :)".xqy
+  def apply[T[_[_]]: Recursive: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
+    case Nullary(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
 
     // array
     case Length(arr) => fn.count(arr)

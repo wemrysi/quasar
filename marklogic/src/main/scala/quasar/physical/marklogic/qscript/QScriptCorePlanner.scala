@@ -19,12 +19,15 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef.{Map => _, _}
 import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[T[_[_]]: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+  import expr.{func, let_}
+
   val plan: AlgebraM[Planning, QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
       mapFuncXQuery(f, src).point[Planning]
@@ -36,12 +39,17 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: ShowT] extends MarkLogi
       XQuery(s"((: SORT :)$src)").point[Planning]
 
     case Filter(src, f) =>
-      XQuery(s"((: FILTER :)$src)").point[Planning]
+      fn.filter(func("$x") { mapFuncXQuery(f, "$x".xqy) }, src)
+        .point[Planning]
 
     case Take(src, from, count) =>
-      XQuery(s"((: TAKE :)$src[1 to 10])").point[Planning]
+      (rebaseXQuery(from, src) |@| rebaseXQuery(count, src))((fm, ct) =>
+        src(fm to ct))
 
     case Drop(src, from, count) =>
-     XQuery(s"((: DROP :)$src").point[Planning]
+      (rebaseXQuery(from, src) |@| rebaseXQuery(count, src))((fm, ct) =>
+        let_("$x" -> src) return_ mkSeq_(
+          fn.subsequence("$x".xqy, 1.xqy, some(fm)),
+          fn.subsequence("$x".xqy, ct)))
   }
 }
