@@ -17,8 +17,8 @@
 package quasar
 
 import quasar.Predef._
-import quasar.Planner.PlannerError
 import quasar.fp._
+import quasar.fs.FileSystemError
 
 import scala.Predef.implicitly
 
@@ -47,7 +47,7 @@ package object qscript extends QScriptInstances {
 
   /** Represents QScript with portions turned into statically-known paths.
     */
-  type Pathed[F[_], A] = (NonEmptyList ∘ CoEnv[AbsFile[Sandboxed], F, ?])#λ[A]
+  type Pathed[F[_], A] = (List ∘ CoEnv[AbsDir[Sandboxed], F, ?])#λ[A]
 
   /** A function that converts a portion of QScript to statically-known paths.
     *
@@ -84,8 +84,8 @@ package object qscript extends QScriptInstances {
     * collect all the files under that directory, and rebuild the structure of
     * them in data.
     */
-  type StaticPathTransformation[T[_[_]], F[_]] =
-    AlgebraicTransformM[T, PlannerError \/ ?, Pathable[T, ?], Pathed[F, ?]]
+  type StaticPathTransformation[T[_[_]], M[_], F[_], G[_]] =
+    AlgebraicTransformM[T, EitherT[M, FileSystemError, ?], F, Pathed[G, ?]]
 
   private type QScriptTotal0[T[_[_]], A] =
     Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]

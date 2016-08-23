@@ -61,22 +61,22 @@ object QueryFile {
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
-    f: Option[StaticPathTransformation[T, QS[T, ?]]])(
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
+    f: Option[ConvertPath.ListContents[M]])(
     lp: T[LogicalPlan]):
-      EitherT[Writer[PhaseResults, ?], PlannerError, T[QS[T, ?]]] = {
+      EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
     val optimize = new Optimize[T]
 
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
     val qs =
-      (optimizeEval(lp)(optimize.applyAll) >>=
+      (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
         optimize.eliminateProjections(f)).map(
         _.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
-    EitherT(Writer(
-      qs.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
-      qs))
+    EitherT(WriterT(qs.run.map(qq => (
+      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq))))
   }
 
   /** The result of the query is stored in an output file

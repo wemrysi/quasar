@@ -31,7 +31,7 @@ import scalaz._, Scalaz._
 object Read {
   implicit def equal: Equal[Read] = Equal.equalBy(_.path)
   implicit def show: Show[Read] =
-    Show.show(Cord("Read(") ++ _.path.show ++ Cord(")"))
+    Show.show(r => Cord("Read(") ++ posixCodec.printPath(r.path) ++ Cord(")"))
 
   implicit def renderTree: RenderTree[Read] = RenderTree.fromShow("Read")
 }

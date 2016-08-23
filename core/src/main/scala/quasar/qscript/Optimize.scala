@@ -16,11 +16,11 @@
 
 package quasar.qscript
 
-import quasar.Planner.PlannerError
+import quasar.Predef._
 import quasar.fp._
+import quasar.fs.FileSystemError
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
-import quasar.Predef._
 
 import matryoshka._,
   Recursive.ops._,
@@ -231,6 +231,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => QC.inj(x)
   }
 
+  def simplifyQC[F[_]: Functor, G[_]: Functor](
+    FtoG: F ~> G)(
+    implicit DE: Const[DeadEnd, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[G]] => F[T[G]] = {
+    case Map(src, f) if f.length ≟ 0 =>
+      QC.inj(Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f))
+    case x => QC.inj(x)
+  }
+
   def simplifySP[F[_]: Functor, G[_]: Functor](
     GtoF: G ~> λ[α => Option[F[α]]])(
     implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
@@ -351,7 +361,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // - coalesce nodes
   // - normalize mapfunc
   def applyAll[F[_]: Traverse: Normalizable](
-    implicit QC: QScriptCore[T, ?] :<: F,
+    implicit DE: Const[DeadEnd, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F,
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
@@ -363,6 +374,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
       liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
       liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
+      liftFG(simplifyQC[F, F](NaturalTransformation.refl[F])) ⋙
       liftFG(simplifySP[F, F](optionIdF[F])) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
@@ -370,7 +382,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(elideNopMap[F])
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
-    implicit QC: QScriptCore[T, ?] :<: F,
+    implicit DE: Const[DeadEnd, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F,
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
@@ -384,6 +397,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
       liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      // FIXME: currently interferes with elideConstantJoin
+      // liftFG(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
       liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
@@ -397,23 +412,27 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * `Root` and its children to path, with the operations post-file remaining.
     */
-  def pathify[F[_]: Traverse](
-    f: StaticPathTransformation[T, F])(
+  def pathify[M[_]: Monad, F[_]: Traverse](
+    g: ConvertPath.ListContents[M])(
     implicit FS: StaticPath.Aux[T, F],
              DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
-      T[F] => PlannerError \/ T[QScriptTotal[T, ?]] =
-    _.cataM[PlannerError \/ ?, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[F](f)).flatMap(_.fold(_.right, FS.toRead[F, QScriptTotal[T, ?]](f)))
+             QC: QScriptCore[T, ?] :<: F,
+             FI: F :<: QScriptTotal[T, ?],
+             CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
+      T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
 
-  def eliminateProjections[F[_]: Traverse](
-    f: Option[StaticPathTransformation[T, F]])(
+  def eliminateProjections[M[_]: Monad, F[_]: Traverse](
+    fs: Option[ConvertPath.ListContents[M]])(
     implicit FS: StaticPath.Aux[T, F],
              DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
-      T[F] => PlannerError \/ T[QScriptTotal[T, ?]] = qs => {
-    val res = f.fold(qs.transAna(FI.inj).right[PlannerError])(pathify(_).apply(qs))
+             QC: QScriptCore[T, ?] :<: F,
+             FI: F :<: QScriptTotal[T, ?],
+             CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
+      T[F] => EitherT[M, FileSystemError, T[QScriptTotal[T, ?]]] = qs => {
+    val res = fs.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
 
     res.map(
       _.transAna(
