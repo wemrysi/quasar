@@ -275,50 +275,31 @@ class GrouperSpec extends quasar.Qspec with TableModuleSpec {
       SourceKey.Single,
       Some(TransSpec1.Id),
       groupId,
-      GroupKeySpecAnd(
-        GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))),
-        GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))))
+      (    GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a")))
+        && GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b")))
+      )
+    )
 
     val result = Table.merge(spec) { (key, map) =>
-      for {
-        gs1     <- map(groupId)
-        gs1Json <- gs1.toJson
-      } yield {
+      for(gs1 <- map(groupId) ; gs1Json <- gs1.toJson) yield {
         key.toJValue must beLike {
-          case obj: JObject => {
+          case obj: JObject =>
             val a = obj(tic_aj)
             val b = obj(tic_bj)
 
             a must beLike {
-              case JNum(i) if i == 12 => {
-                b must beLike {
-                  case JNum(i) if i == 7 => ok
-                }
-              }
-
-              case JNum(i) if i == -7 => {
-                b must beLike {
-                  case JNum(i) if i == 3 => ok
-                }
-              }
+              case JNum(i) if i == 12 => b must beLike { case JNum(i) if i == 7 => ok }
+              case JNum(i) if i == -7 => b must beLike { case JNum(i) if i == 3 => ok }
             }
-          }
         }
-
         gs1Json must haveSize(1)
         fromJson(Stream(JNum(gs1Json.size)))
       }
     }
 
     val resultJson = result.flatMap(_.toJson).copoint
-
     resultJson must haveSize(2)
-
-    forall(resultJson) { v =>
-      v must beLike {
-        case JNum(i) if i == 1 => ok
-      }
-    }
+    forall(resultJson)(_ must beLike { case JNum(i) if i == 1 => ok })
   }
 
   def testHistogramTwoKeysOr = {

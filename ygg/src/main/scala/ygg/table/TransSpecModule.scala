@@ -266,7 +266,10 @@ trait TransSpecModule extends FNModule {
       val DeleteKeyValueRight = ObjectDelete(Leaf(SourceRight), Set(paths.Key, paths.Value))
     }
 
-    sealed trait GroupKeySpec
+    sealed trait GroupKeySpec {
+      def &&(rhs: GroupKeySpec): GroupKeySpec = GroupKeySpecAnd(this, rhs)
+      def ||(rhs: GroupKeySpec): GroupKeySpec = GroupKeySpecOr(this, rhs)
+    }
 
     /**
       * Definition for a single (non-composite) key part.
