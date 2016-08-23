@@ -33,12 +33,11 @@ trait TransformSpec extends TableQspec {
   def checkTransformLeaf = checkTransformProp(Leaf(Source))(identity)
 
   def testMap1IntLeaf = {
-    val data     = -10 to 10 map (n => json"$n")
-    val expected = -10 to 10 map (n => json"${-n}")
+    val data = -10 to 10 map (n => json"$n")
     checkTransform(
       SampleData(data.toStream),
       Map1(Leaf(Source), lookupF1(Nil, "negate")),
-      _ => expected.toStream
+      _ => data.reverse.toStream
     )
   }
 
@@ -51,6 +50,7 @@ trait TransformSpec extends TableQspec {
     val expected = jsonMany"""
       -20
     """
+
     checkTransform(
       SampleData(data.toStream),
       Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "negate")),
@@ -99,100 +99,42 @@ trait TransformSpec extends TableQspec {
     )
   }
 
-  def checkMap1 = {
-    val spec = Map1(
-      DerefObjectStatic(Leaf(Source), CPathField("value")),
-      lookupF2(Nil, "mod") applyr CLong(2) andThen (lookupF2(Nil, "eq") applyr CLong(0))
-    )
-    checkTransformProp(spec)(data =>
-      data flatMap { jv =>
-        (jv \ "value") match {
-          case JNum(x) if x % 2 == 0 => Some(JBool(true))
-          case JNum(_) => Some(JBool(false))
-          case _       => None
-        }
-      }
-    )
-  }
+  private def F_IsEven = (
+            (lookupF2(Nil, "mod") applyr CLong(2))
+    andThen (lookupF2(Nil, "eq") applyr CLong(0))
+  )
+  private def F_ValueIsEven(name: String) = Map1(
+    DerefObjectStatic(Leaf(Source), CPathField(name)),
+    F_IsEven
+  )
 
-  /* Do we want to allow non-boolean sets to be used as filters without an explicit existence predicate?
-  def checkTrivialFilter = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        Filter(
-          Leaf(Source),
-          Leaf(Source)
-        )
-      })
-
-      results.copoint must_== sample.data
-    }
-  }
-   */
+  def checkMap1 =
+    checkTransformProp(F_ValueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
 
   def checkTrueFilter = {
     val spec = Filter(
       Leaf(Source),
-      Equal(Leaf(Source), Leaf(Source)) //Map1 now makes undefined all columns not a the root-identity level
+      Equal(Leaf(Source), Leaf(Source)) // Map1 now makes undefined all columns not a the root-identity level
     )
     checkTransformProp(spec)(identity)
   }
 
   def checkFilter = {
-    implicit val gen = sample(_ => Gen.const(Seq(NoJPath -> CLong)))
-    prop { (sample: SampleData) =>
-      val table = fromSample(sample)
-      val results = toJson(table.transform {
-        Filter(
-          Leaf(Source),
-          Map1(
-            DerefObjectStatic(Leaf(Source), CPathField("value")),
-            lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))
-          )
-        )
-      })
-
-      val expected = sample.data flatMap { jv =>
-        (jv \ "value") match {
-          case JNum(x) if x % 2 == 0 => Some(jv)
-          case _ => None
-        }
-      }
-
-      results.copoint must_== expected
-    }.set(minTestsOk = 200)
-  }
+    val spec = Filter(Leaf(Source), F_ValueIsEven("value"))
+    checkTransformProp(spec)(_ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false })
+  }.set(minTestsOk = 1000)
 
   def testMod2Filter = {
-    val data: Stream[JValue] = json"""
-      [{
-        "value":-6.846973248137671E+307,
-        "key":[7.0]
-      },
-      {
-        "value":-4611686018427387904,
-        "key":[5.0]
-      }]""".asArray.elements.toStream
+    val data = jsonMany"""
+      { "value":-6.846973248137671E+307, "key":[7.0] }
+      { "value":-4611686018427387904, "key":[5.0] }
+    """
 
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
-    val results = toJson(table.transform {
-      Filter(
-        Leaf(Source),
-        Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))))
-    })
-
-    val expected = data flatMap { jv =>
-      (jv \ "value") match {
-        case JNum(x) if x % 2 == 0 => Some(jv)
-        case _ => None
-      }
-    }
-
-    results.copoint must_== expected
+    checkTransform(
+      SampleData(data.toStream),
+      Filter(Leaf(Source), F_ValueIsEven("value")),
+      _ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false }
+    )
   }
 
   def checkMetaDeref = {
