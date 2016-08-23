@@ -703,133 +703,113 @@ trait TransformSpec extends TableQspec {
     resultsOuter.copoint must_== Stream(jobject())
   }
 
-  def testInnerObjectConcatEmptyObject = {
-    val JArray(elements) = json"""[
-      {"foo": {}, "bar": {"ack": 12}},
-      {"foo": {}, "bar": {"ack": 12, "bak": 13}},
-      {"foo": {"ook": 99}, "bar": {}},
-      {"foo": {"ook": 99}, "bar": {"ack": 100, "bak": 101}},
-      {"foo": {"ook": 99, "ick": 100}, "bar": {}},
-      {"foo": {"ook": 99, "ick": 100}, "bar": {"ack": 102}},
-      {"foo": {}, "bar": {}},
-      {"foo": {"ook": 88}},
-      {"foo": {}},
-      {"bar": {}},
-      {"bar": {"ook": 77}},
-      {"foo": {"ook": 7}, "bar": {}, "baz": 24},
-      {"foo": {"ook": 3}, "bar": {"ack": 9}, "baz": 18},
-      {"foo": {}, "bar": {"ack": 0}, "baz": 18}
-    ]"""
+  private def testConcatEmptyObject(spec: TransSpec1) = {
+    val data = jsonMany"""
+      {"bar":{"ack":12},"foo":{}}
+      {"bar":{"ack":12,"bak":13},"foo":{}}
+      {"bar":{},"foo":{"ook":99}}
+      {"bar":{"ack":100,"bak":101},"foo":{"ook":99}}
+      {"bar":{},"foo":{"ick":100,"ook":99}}
+      {"bar":{"ack":102},"foo":{"ick":100,"ook":99}}
+      {"bar":{},"foo":{}}
+      {"foo":{"ook":88}}
+      {"foo":{}}
+      {"bar":{}}
+      {"bar":{"ook":77}}
+      {"bar":{},"baz":24,"foo":{"ook":7}}
+      {"bar":{"ack":9},"baz":18,"foo":{"ook":3}}
+      {"bar":{"ack":0},"baz":18,"foo":{}}
+    """.toStream
 
-    val sample = SampleData(elements.toStream)
+    val sample = SampleData(data)
     val table  = fromSample(sample)
+    toJson(table transform spec).copoint
+  }
 
-    val spec = InnerObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
 
-    val results = toJson(table.transform(spec))
+  def testInnerObjectConcatEmptyObject = {
+    val result = testConcatEmptyObject(
+      InnerObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
+    )
+    val expected = jsonMany"""
+      {"ack":12}
+      {"ack":12,"bak":13}
+      {"ook":99}
+      {"ack":100,"bak":101,"ook":99}
+      {"ick":100,"ook":99}
+      {"ack":102,"ick":100,"ook":99}
+      {}
+      {"ook":7}
+      {"ack":9,"ook":3}
+      {"ack":0}
+    """.toStream
 
-    val expected: Stream[JValue] = Stream(
-      JObject(JField("ack", JNum(12)) :: Nil),
-      JObject(JField("ack", JNum(12)) :: JField("bak", JNum(13)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ack", JNum(100)) :: JField("bak", JNum(101)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: JField("ack", JNum(102)) :: Nil),
-      jobject(),
-      JObject(JField("ook", JNum(7)) :: Nil),
-      JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),
-      JObject(JField("ack", JNum(0)) :: Nil))
-
-    results.copoint mustEqual expected
+    result must_=== expected
   }
 
   def testOuterObjectConcatEmptyObject = {
-    val JArray(elements) = json"""[
-      {"foo": {}, "bar": {"ack": 12}},
-      {"foo": {}, "bar": {"ack": 12, "bak": 13}},
-      {"foo": {"ook": 99}, "bar": {}},
-      {"foo": {"ook": 99}, "bar": {"ack": 100, "bak": 101}},
-      {"foo": {"ook": 99, "ick": 100}, "bar": {}},
-      {"foo": {"ook": 99, "ick": 100}, "bar": {"ack": 102}},
-      {"foo": {}, "bar": {}},
-      {"foo": {"ook": 88}},
-      {"foo": {}},
-      {"bar": {}},
-      {"bar": {"ook": 77}},
-      {"foo": {"ook": 7}, "bar": {}, "baz": 24},
-      {"foo": {"ook": 3}, "bar": {"ack": 9}, "baz": 18},
-      {"foo": {}, "bar": {"ack": 0}, "baz": 18}
-    ]"""
+    val result = testConcatEmptyObject(
+      OuterObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
+    )
+    val expected: Stream[JValue] = jsonMany"""
+      {"ack":12}
+      {"ack":12,"bak":13}
+      {"ook":99}
+      {"ack":100,"bak":101,"ook":99}
+      {"ick":100,"ook":99}
+      {"ack":102,"ick":100,"ook":99}
+      {}
+      {"ook":88}
+      {}
+      {}
+      {"ook":77}
+      {"ook":7}
+      {"ack":9,"ook":3}
+      {"ack":0}
+    """.toStream
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val spec = OuterObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
-
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] = Stream(
-      JObject(JField("ack", JNum(12)) :: Nil),
-      JObject(JField("ack", JNum(12)) :: JField("bak", JNum(13)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ack", JNum(100)) :: JField("bak", JNum(101)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: Nil),
-      JObject(JField("ook", JNum(99)) :: JField("ick", JNum(100)) :: JField("ack", JNum(102)) :: Nil),
-      jobject(),
-      JObject(JField("ook", JNum(88)) :: Nil),
-      jobject(),
-      jobject(),
-      JObject(JField("ook", JNum(77)) :: Nil),
-      JObject(JField("ook", JNum(7)) :: Nil),
-      JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),
-      JObject(JField("ack", JNum(0)) :: Nil))
-
-    results.copoint mustEqual expected
+    result must_=== expected
   }
 
   def testInnerObjectConcatUndefined = {
-    val JArray(elements) = json"""[
-      {"foo": {"baz": 4}, "bar": {"ack": 12}},
-      {"foo": {"baz": 5}},
-      {"bar": {"ack": 45}},
+    val data = jsonMany"""
+      {"foo": {"baz": 4}, "bar": {"ack": 12}}
+      {"foo": {"baz": 5}}
+      {"bar": {"ack": 45}}
       {"foo": {"baz": 7}, "bar" : {"ack": 23}, "baz": {"foobar": 24}}
-    ]"""
+    """.toStream
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
+    val table    = fromSample(SampleData(data))
+    val spec     = InnerObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
+    val results  = toJson(table transform spec)
+    val expected = jsonMany"""
+      {"ack":12,"baz":4}
+      {"ack":23,"baz":7}
+    """.toStream
 
-    val spec = InnerObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
-
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] =
-      Stream(JObject(JField("baz", JNum(4)) :: JField("ack", JNum(12)) :: Nil), JObject(JField("baz", JNum(7)) :: JField("ack", JNum(23)) :: Nil))
-
-    results.copoint mustEqual expected
+    results.copoint must_=== expected
   }
 
   def testOuterObjectConcatUndefined = {
-    val JArray(elements) = json"""[
-      {"foo": {"baz": 4}, "bar": {"ack": 12}},
-      {"foo": {"baz": 5}},
-      {"bar": {"ack": 45}},
+    val data = jsonMany"""
+      {"foo": {"baz": 4}, "bar": {"ack": 12}}
+      {"foo": {"baz": 5}}
+      {"bar": {"ack": 45}}
       {"foo": {"baz": 7}, "bar" : {"ack": 23}, "baz": {"foobar": 24}}
-    ]"""
+    """.toStream
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
+    val table   = fromSample(SampleData(data))
+    val spec    = OuterObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
+    val results = toJson(table transform spec)
 
-    val spec = OuterObjectConcat(DerefObjectStatic(Leaf(Source), CPathField("foo")), DerefObjectStatic(Leaf(Source), CPathField("bar")))
+    val expected = jsonMany"""
+      {"ack":12,"baz":4}
+      {"baz":5}
+      {"ack":45}
+      {"ack":23,"baz":7}
+    """.toStream
 
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] = Stream(
-      JObject(JField("baz", JNum(4)) :: JField("ack", JNum(12)) :: Nil),
-      JObject(JField("baz", JNum(5)) :: Nil),
-      JObject(JField("ack", JNum(45)) :: Nil),
-      JObject(JField("baz", JNum(7)) :: JField("ack", JNum(23)) :: Nil))
-
-    results.copoint mustEqual expected
+    results.copoint must_=== expected
   }
 
   def testInnerObjectConcatLeftEmpty = {
