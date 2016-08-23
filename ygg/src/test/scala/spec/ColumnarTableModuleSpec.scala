@@ -98,7 +98,8 @@ class ColumnarTableModuleSpec
     streamToString(table.renderCsv())
   }
 
-  def testRenderJson(seq: Seq[JValue]) = {
+  def testRenderJson(xs: JValue*) = {
+    val seq = xs.toVector
     def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
 
     def minimize(value: JValue): Option[JValue] = value match {
@@ -110,12 +111,15 @@ class ColumnarTableModuleSpec
     }
 
     val table     = fromJson(seq.toStream)
-    val expected  = JArray(seq.toList)
+    val expected  = JArray(seq.toVector)
     val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
     val minimized = minimize(expected) getOrElse jarray()
 
     arrayM.copoint mustEqual minimized
   }
+
+  def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
+  def undef: JValue = JUndefined
 
   def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
@@ -143,66 +147,21 @@ class ColumnarTableModuleSpec
 
     "verify renderJson round tripping" in {
       implicit val gen = sample(schema)
-
-      prop { data: SampleData =>
-        testRenderJson(data.data)
-      }.set(minTestsOk = 500)
+      prop((sd: SampleData) => testRenderJson(sd.data: _*))
     }
 
     "handle special cases of renderJson" >> {
-      "undefined at beginning of array" >> {
-        testRenderJson(JArray(
-          JUndefined ::
-          JNum(1) ::
-          JNum(2) :: Nil) :: Nil)
-      }
 
-      "undefined in middle of array" >> {
-        testRenderJson(JArray(
-          JNum(1) ::
-          JUndefined ::
-          JNum(2) :: Nil) :: Nil)
-      }
+      "undefined at beginning of array"  >> testRenderJson(jarray(undef, JNum(1), JNum(2)))
+      "undefined in middle of array"     >> testRenderJson(jarray(JNum(1), undef, JNum(2)))
+      "fully undefined array"            >> testRenderJson(jarray(undef, undef, undef))
+      "undefined at beginning of object" >> testRenderJson(jobject("foo" -> undef, "bar" -> JNum(1), "baz" -> JNum(2)))
+      "undefined in middle of object"    >> testRenderJson(jobject("foo" -> JNum(1), "bar" -> undef, "baz" -> JNum(2)))
+      "fully undefined object"           >> testRenderJson(jobject())
+      "undefined row"                    >> testRenderJson(jobject(), JNum(42))
 
-      "fully undefined array" >> {
-        testRenderJson(JArray(
-          JUndefined ::
-          JUndefined ::
-          JUndefined :: Nil) :: Nil)
-      }
-
-      "undefined at beginning of object" >> {
-        testRenderJson(JObject(
-          JField("foo", JUndefined) ::
-          JField("bar", JNum(1)) ::
-          JField("baz", JNum(2)) :: Nil) :: Nil)
-      }
-
-      "undefined in middle of object" >> {
-        testRenderJson(JObject(
-          JField("foo", JNum(1)) ::
-          JField("bar", JUndefined) ::
-          JField("baz", JNum(2)) :: Nil) :: Nil)
-      }
-
-      "fully undefined object" >> {
-        testRenderJson(JObject() :: Nil)
-      }
-
-      "undefined row" >> {
-        testRenderJson(
-          JObject(Nil) ::
-          JNum(42) :: Nil)
-      }
-
-      "check utf-8 encoding" in prop { str: String =>
-        val s = str.toList.map((c: Char) => if (c < ' ') ' ' else c).mkString
-        testRenderJson(JString(s) :: Nil)
-      }.set(minTestsOk = 500)
-
-      "check long encoding" in prop { ln: Long =>
-        testRenderJson(JNum(ln) :: Nil)
-      }.set(minTestsOk = 500)
+      "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }"))
+      "check long encoding"  in prop((x: Long) => testRenderJson(json"$x"))
     }
 
     "in cogroup" >> {
@@ -263,7 +222,6 @@ class ColumnarTableModuleSpec
       "fail to map1 into array and object"                                      in testMap1ArrayObject
       "perform a less trivial map1"                                             in checkMap1.pendingUntilFixed
 
-      //"give the identity transform for the trivial filter"                    in checkTrivialFilter
       "give the identity transform for the trivial 'true' filter"               in checkTrueFilter
       "give the identity transform for a nontrivial filter"                     in checkFilter.pendingUntilFixed
       "give a transformation for a big decimal and a long"                      in testMod2Filter
@@ -312,63 +270,61 @@ class ColumnarTableModuleSpec
 
       "delete elements according to a JType" in checkObjectDelete
       "delete only field in object without removing from array" in {
-        val JArray(elements) = JParser.parseUnsafe("""[
+        val JArray(elements) = json"""[
           {"foo": 4, "bar": 12},
           {"foo": 5},
           {"bar": 45},
           {},
           {"foo": 7, "bar" :23, "baz": 24}
-        ]""")
+        ]"""
 
-        val sample = SampleData(elements.toStream)
-        val table = fromSample(sample)
-
-        val spec = ObjectDelete(Leaf(Source), Set(CPathField("foo")))
-        val results = toJson(table.transform(spec))
-        val JArray(expected) = JParser.parseUnsafe("""[
-          {"bar": 12},
-          {},
-          {"bar": 45},
-          {},
+        val sample   = SampleData(elements.toStream)
+        val table    = fromSample(sample)
+        val spec     = ObjectDelete(Leaf(Source), Set(CPathField("foo")))
+        val results  = toJson(table.transform(spec))
+        val expected = jsonMany"""
+          {"bar": 12}
+          {}
+          {"bar": 45}
+          {}
           {"bar" :23, "baz": 24}
-        ]""")
-
-        results.copoint mustEqual expected.toStream
+        """
+        (results.copoint: Seq[JValue]) must_=== expected
       }
 
-      "perform a basic IsType transformation" in testIsTypeTrivial
-      "perform an IsType transformation on numerics" in testIsTypeNumeric
-      "perform an IsType transformation on trivial union" in testIsTypeUnionTrivial
-      "perform an IsType transformation on union" in testIsTypeUnion
+      "perform a basic IsType transformation"                    in testIsTypeTrivial
+      "perform an IsType transformation on numerics"             in testIsTypeNumeric
+      "perform an IsType transformation on trivial union"        in testIsTypeUnionTrivial
+      "perform an IsType transformation on union"                in testIsTypeUnion
       "perform an IsType transformation on nested unfixed types" in testIsTypeUnfixed
-      "perform an IsType transformation on objects" in testIsTypeObject
-      "perform an IsType transformation on unfixed objects" in testIsTypeObjectUnfixed
-      "perform an IsType transformation on unfixed arrays" in testIsTypeArrayUnfixed
-      "perform an IsType transformation on empty objects" in testIsTypeObjectEmpty
-      "perform an IsType transformation on empty arrays" in testIsTypeArrayEmpty
-      "perform a check on IsType" in checkIsType
+      "perform an IsType transformation on objects"              in testIsTypeObject
+      "perform an IsType transformation on unfixed objects"      in testIsTypeObjectUnfixed
+      "perform an IsType transformation on unfixed arrays"       in testIsTypeArrayUnfixed
+      "perform an IsType transformation on empty objects"        in testIsTypeObjectEmpty
+      "perform an IsType transformation on empty arrays"         in testIsTypeArrayEmpty
+      "perform a check on IsType"                                in checkIsType
 
-      "perform a trivial type-based filter" in checkTypedTrivial
-      "perform a less trivial type-based filter" in checkTyped
-      "perform a type-based filter across slice boundaries" in testTypedAtSliceBoundary
-      "perform a trivial heterogeneous type-based filter" in testTypedHeterogeneous
-      "perform a trivial object type-based filter" in testTypedObject
-      "retain all object members when typed to unfixed object" in testTypedObjectUnfixed
-      "perform another trivial object type-based filter" in testTypedObject2
-      "perform a trivial array type-based filter" in testTypedArray
-      "perform another trivial array type-based filter" in testTypedArray2
-      "perform yet another trivial array type-based filter" in testTypedArray3
-      "perform a fourth trivial array type-based filter" in testTypedArray4
-      "perform a trivial number type-based filter" in testTypedNumber
-      "perform another trivial number type-based filter" in testTypedNumber2
-      "perform a filter returning the empty set" in testTypedEmpty
+      "perform a trivial type-based filter"                      in checkTypedTrivial
+      "perform a less trivial type-based filter"                 in checkTyped
+      "perform a type-based filter across slice boundaries"      in testTypedAtSliceBoundary
+      "perform a trivial heterogeneous type-based filter"        in testTypedHeterogeneous
+      "perform a trivial object type-based filter"               in testTypedObject
+      "retain all object members when typed to unfixed object"   in testTypedObjectUnfixed
+      "perform another trivial object type-based filter"         in testTypedObject2
+      "perform a trivial array type-based filter"                in testTypedArray
+      "perform another trivial array type-based filter"          in testTypedArray2
+      "perform yet another trivial array type-based filter"      in testTypedArray3
+      "perform a fourth trivial array type-based filter"         in testTypedArray4
+      "perform a trivial number type-based filter"               in testTypedNumber
+      "perform another trivial number type-based filter"         in testTypedNumber2
+      "perform a filter returning the empty set"                 in testTypedEmpty
 
-      "perform a summation scan case 1" in testTrivialScan
-      "perform a summation scan of heterogeneous data" in testHetScan
-      "perform a summation scan" in checkScan
-      "perform dynamic object deref" in testDerefObjectDynamic
-      "perform an array swap" in checkArraySwap
-      "replace defined rows with a constant" in checkConst
+      "perform a summation scan case 1"                          in testTrivialScan
+      "perform a summation scan of heterogeneous data"           in testHetScan
+      "perform a summation scan"                                 in checkScan
+      "perform dynamic object deref"                             in testDerefObjectDynamic
+      "perform an array swap"                                    in checkArraySwap
+      "replace defined rows with a constant"                     in checkConst
 
       "check cond" in checkCond.pendingUntilFixed
     }
@@ -384,22 +340,22 @@ class ColumnarTableModuleSpec
     }
 
     "in distinct" >> {
-      "be the identity on tables with no duplicate rows" in testDistinctIdentity
-      "peform properly when the same row appears in two different slices" in testDistinctAcrossSlices
-      "peform properly again when the same row appears in two different slices" in testDistinctAcrossSlices2
-      "have no duplicate rows" in testDistinct
+      "be the identity on tables with no duplicate rows"                            in testDistinctIdentity
+      "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices
+      "peform properly again when the same row appears inside two different slices" in testDistinctAcrossSlices2
+      "have no duplicate rows"                                                      in testDistinct
     }
 
     "in takeRange" >> {
-      "select the correct rows in a trivial case" in testTakeRange
-      "select the correct rows when we take past the end of the table" in testTakeRangeLarger
+      "select the correct rows: trivial case"                                               in testTakeRange
+      "select the correct rows when we take past the end of the table"                      in testTakeRangeLarger
       "select the correct rows when we start at an index larger than the size of the table" in testTakeRangeEmpty
-      "select the correct rows across slice boundary" in testTakeRangeAcrossSlices
-      "select the correct rows only in second slice" in testTakeRangeSecondSlice
-      "select the first slice" in testTakeRangeFirstSliceOnly
-      "select nothing with a negative starting index" in testTakeRangeNegStart
-      "select nothing with a negative number to take" in testTakeRangeNegNumber
-      "select the correct rows using scalacheck" in checkTakeRange
+      "select the correct rows across slice boundary"                                       in testTakeRangeAcrossSlices
+      "select the correct rows: second slice"                                               in testTakeRangeSecondSlice
+      "select the first slice"                                                              in testTakeRangeFirstSliceOnly
+      "select nothing with a negative starting index"                                       in testTakeRangeNegStart
+      "select nothing with a negative number to take"                                       in testTakeRangeNegNumber
+      "select the correct rows using scalacheck"                                            in checkTakeRange
     }
 
     "in toArray" >> {
