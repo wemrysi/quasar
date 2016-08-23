@@ -41,12 +41,7 @@ class ColumnarTableModuleSpec
          with DistinctSpec
          with SchemasSpec {
 
-  type GroupId = Int
-
   import trans._
-
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId = groupId.getAndIncrement
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._

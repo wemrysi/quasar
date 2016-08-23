@@ -6,13 +6,10 @@ import ygg.table._
 import ygg.json._
 
 class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
-  type GroupId = Int
   import trans._
   import TableModule._
 
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId      = groupId.getAndIncrement
-  implicit val fid    = NaturalTransformation.refl[Need]
+  implicit val fid = NaturalTransformation.refl[Need]
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._

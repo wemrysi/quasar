@@ -43,7 +43,13 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
   def -(a: A): Map[A, C]                  = iterator.toMap - a
 }
 
-final class AtomicIdSource {
+final class AtomicIntIdSource[A](f: Int => A) {
+  private val source         = new AtomicInt
+  def nextId(): A            = f(source.getAndIncrement)
+  def nextIdBlock(n: Int): A = f(source.getAndAdd(n + 1) - n)
+}
+
+final class AtomicLongIdSource {
   private val source             = new AtomicLong
   def nextId(): Long             = source.getAndIncrement
   def nextIdBlock(n: Long): Long = source.getAndAdd(n + 1) - n

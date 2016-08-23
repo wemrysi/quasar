@@ -8,13 +8,8 @@ import ygg.json._
 // TODO: mix in a trait rather than defining Table directly
 
 class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
-  type GroupId = Int
-
   import TableModule._
   import trans._
-
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId      = groupId.getAndIncrement
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._

@@ -23,10 +23,15 @@ trait Scanner {
   def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
 }
 
+final class GroupId(val id: Int) extends AnyVal {
+  override def toString = s"$id"
+}
+object GroupId {
+  implicit def apply(id: Int): GroupId = new GroupId(id)
+}
+
 trait TransSpecModule extends FNModule {
   import TransSpecModule._
-
-  type GroupId
 
   object trans {
     sealed trait TransSpec[+A <: SourceType]  extends AnyRef

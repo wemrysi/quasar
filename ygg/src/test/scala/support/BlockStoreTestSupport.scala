@@ -8,6 +8,8 @@ import ygg.table._
 trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStoreColumnarTableModule {
   def projections: Map[Path, Projection]
 
+  import trans._
+
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): Need[Table] = {
       for {
@@ -41,11 +43,6 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
       }
     }
   }
-  import trans._
-
-  type GroupId = String
-  private val groupId = new java.util.concurrent.atomic.AtomicInteger
-  def newGroupId      = "groupId(" + groupId.getAndIncrement + ")"
 
   trait TableCompanion extends BaseBlockStoreTestTableCompanion
 

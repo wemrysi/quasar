@@ -9,7 +9,8 @@ import ygg.json._
 import ygg.data._
 
 trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
-  def newGroupId: GroupId
+  private val idGen       = new AtomicIntIdSource(new GroupId(_))
+  def newGroupId: GroupId = idGen.nextId()
 
   private def makeSlice(sampleData: Stream[JValue], sliceSize: Int): (Slice, Stream[JValue]) = {
     @tailrec def buildColArrays(from: Stream[JValue], into: Map[ColumnRef, ArrayColumn[_]], sliceIndex: Int): (Map[ColumnRef, ArrayColumn[_]], Int) = {
