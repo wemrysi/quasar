@@ -1,35 +1,13 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package ygg.tests
 
 import ygg.table._
-import ygg.common._
 import scalaz._, Scalaz._
-import TableModule._
 import SampleData._
 import ygg.json._
 
 class ColumnarTableModuleSpec
       extends ColumnarTableQspec
          with TableModuleSpec
-         with CogroupSpec
          with CrossSpec
          with TransformSpec
          with CompactSpec
@@ -42,87 +20,6 @@ class ColumnarTableModuleSpec
          with SchemasSpec {
 
   import trans._
-
-  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
-    import trans._
-
-    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
-  }
-
-  trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize) = new Table(slices, size)
-
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] =
-      abort("not implemented here")
-  }
-
-  object Table extends TableCompanion
-
-  def testConcat = {
-    val data1: Stream[JValue] = Stream.fill(25)(json"""{ "a": 1, "b": "x", "c": null }""")
-    val data2: Stream[JValue] = Stream.fill(35)(json"""[4, "foo", null, true]""")
-
-    val table1   = fromSample(SampleData(data1), Some(10))
-    val table2   = fromSample(SampleData(data2), Some(10))
-    val results  = toJson(table1.concat(table2))
-    val expected = data1 ++ data2
-
-    results.copoint must_== expected
-  }
-
-  def streamToString(stream: StreamT[Need, CharBuffer]): String = {
-    def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
-      stream.uncons.flatMap {
-        case None =>
-          Need(sb.toString)
-        case Some((cb, tail)) =>
-          sb.append(cb)
-          loop(tail, sb)
-      }
-    loop(stream, new StringBuilder).copoint
-  }
-
-
-  def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
-    val es    = JParser.parseManyFromString(json).valueOr(throw _)
-    val table = fromJson(es.toStream, maxSliceSize)
-    streamToString(table.renderCsv())
-  }
-
-  def testRenderJson(xs: JValue*) = {
-    val seq = xs.toVector
-    def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
-
-    def minimize(value: JValue): Option[JValue] = value match {
-      case JUndefined       => None
-      case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
-      case JArray(Seq())    => Some(jarray())
-      case JArray(elements) => elements flatMap minimize match { case Seq() => None ; case xs => Some(JArray(xs)) }
-      case v                => Some(v)
-    }
-
-    val table     = fromJson(seq.toStream)
-    val expected  = JArray(seq.toVector)
-    val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
-    val minimized = minimize(expected) getOrElse jarray()
-
-    arrayM.copoint mustEqual minimized
-  }
-
-  def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
-  def undef: JValue = JUndefined
-
-  def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
-    val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
-    val events   = event * lots
-    val csv      = testRenderCsv(events, maxSliceSize)
-    val expected = ".x,.y,.z.xx,.z.yy\r\n" + ("123,foobar,1,2\r\n" * lots)
-    csv must_=== expected
-  }
 
   "a table dataset" should {
     "verify bijection from static JSON" in {
@@ -143,7 +40,7 @@ class ColumnarTableModuleSpec
     "verify renderJson round tripping" in {
       implicit val gen = sample(schema)
       prop((sd: SampleData) => testRenderJson(sd.data: _*))
-    }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+    }.set(minTestsOk = 500, workers = Runtime.getRuntime.availableProcessors)
 
     "handle special cases of renderJson" >> {
 
@@ -155,32 +52,8 @@ class ColumnarTableModuleSpec
       "fully undefined object"           >> testRenderJson(jobject())
       "undefined row"                    >> testRenderJson(jobject(), JNum(42))
 
-      "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }")).set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
-      "check long encoding"  in prop((x: Long) => testRenderJson(json"$x")).set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
-    }
-
-    "in cogroup" >> {
-      "perform a trivial cogroup"                                                in testTrivialCogroup(identity[Table])
-      "perform a simple cogroup"                                                 in testSimpleCogroup(identity[Table])
-      "perform another simple cogroup"                                           in testAnotherSimpleCogroup
-      "cogroup for unions"                                                       in testUnionCogroup
-      "perform yet another simple cogroup"                                       in testAnotherSimpleCogroupSwitched
-      "cogroup across slice boundaries"                                          in testCogroupSliceBoundaries
-      "error on unsorted inputs"                                                 in testUnsortedInputs
-      "cogroup partially defined inputs properly"                                in testPartialUndefinedCogroup
-
-      "survive pathology 1"                                                      in testCogroupPathology1
-      "survive pathology 2"                                                      in testCogroupPathology2
-      "survive pathology 3"                                                      in testCogroupPathology3
-
-      "not truncate cogroup when right side has long equal spans"                in testLongEqualSpansOnRight
-      "not truncate cogroup when left side has long equal spans"                 in testLongEqualSpansOnLeft
-      "not truncate cogroup when both sides have long equal spans"               in testLongEqualSpansOnBoth
-      "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
-
-      "survive scalacheck" in {
-        prop { cogroupData: (SampleData, SampleData) => testCogroup(cogroupData._1, cogroupData._2) }
-      }
+      "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }"))
+      "check long encoding"  in prop((x: Long) => testRenderJson(json"$x"))
     }
 
     "in cross" >> {
@@ -203,9 +76,7 @@ class ColumnarTableModuleSpec
       }
 
       "cross across slice boundaries on one side" in testCrossSingles
-      "survive scalacheck" in {
-        prop { cogroupData: (SampleData, SampleData) => testCross(cogroupData._1, cogroupData._2) }
-      }
+      "survive scalacheck" in prop((cd: CogroupData) => testCross(cd._1, cd._2))
     }
 
     "in transform" >> {

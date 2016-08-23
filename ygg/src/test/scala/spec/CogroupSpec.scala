@@ -1,34 +1,38 @@
 package ygg.tests
 
-import ygg.common._
-import ygg.table._
 import scalaz._, Scalaz._, Ordering._, Either3._
+import ygg._, common._, json._, table._
 import TestSupport._
-import ygg.json._
 
-trait CogroupSpec extends TableQspec {
+class CogroupSpec extends ColumnarTableQspec with TableModuleSpec {
   import SampleData._
-  import trans._
-  import trans.constants._
-
-  implicit val cogroupData = Arbitrary(
-    for {
-      depth           <- choose(1, 2)
-      cschema         <- Gen.oneOf(arraySchema(depth, 2), objectSchema(depth, 2))
-      (idCount, data) <- genEventColumns(cschema)
-    } yield {
-      val lschema = Bifunctor[Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet } _1
-      val (l, r) = data map {
-        case (ids, values) =>
-          val (d1, d2) = values.partition { case (cpath, _) => lschema.contains(cpath) }
-          (toRecord(ids, assemble(d1)), toRecord(ids, assemble(d2)))
-      } unzip
-
-      (SampleData(l.sortBy(_ \ "key").toStream), SampleData(r.sortBy(_ \ "key").toStream))
-    }
-  )
+  import trans._, constants._
 
   type CogroupResult[A] = Stream[Either3[A, (A, A), A]]
+
+  implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
+
+  "in cogroup" >> {
+    "perform a trivial cogroup"                                                in testTrivialCogroup(identity[Table])
+    "perform a simple cogroup"                                                 in testSimpleCogroup(identity[Table])
+    "perform another simple cogroup"                                           in testAnotherSimpleCogroup
+    "cogroup for unions"                                                       in testUnionCogroup
+    "perform yet another simple cogroup"                                       in testAnotherSimpleCogroupSwitched
+    "cogroup across slice boundaries"                                          in testCogroupSliceBoundaries
+    "error on unsorted inputs"                                                 in testUnsortedInputs
+    "cogroup partially defined inputs properly"                                in testPartialUndefinedCogroup
+
+    "survive pathology 1"                                                      in testCogroupPathology1
+    "survive pathology 2"                                                      in testCogroupPathology2
+    "survive pathology 3"                                                      in testCogroupPathology3
+
+    "not truncate cogroup when right side has long equal spans"                in testLongEqualSpansOnRight
+    "not truncate cogroup when left side has long equal spans"                 in testLongEqualSpansOnLeft
+    "not truncate cogroup when both sides have long equal spans"               in testLongEqualSpansOnBoth
+    "not truncate cogroup when left side is long span and right is increasing" in testLongLeftSpanWithIncreasingRight
+
+    "survive scalacheck" in prop((cd: CogroupData) => testCogroup(cd._1, cd._2))
+  }
 
   @tailrec protected final def computeCogroup[A](l: Stream[A], r: Stream[A], acc: CogroupResult[A])(implicit ord: Ord[A]): CogroupResult[A] = {
     (l, r) match {
@@ -85,7 +89,7 @@ trait CogroupSpec extends TableQspec {
     jsonResult.copoint must_== expected
   }
 
-  def testTrivialCogroup(f: Table => Table = identity[Table]) = {
+  def testTrivialCogroup(f: Table => Table) = {
     def recl = toRecord(Array(0L), JArray(JNum(12) :: Nil))
     def recr = toRecord(Array(0L), JArray(JUndefined :: JNum(13) :: Nil))
 
@@ -101,11 +105,11 @@ trait CogroupSpec extends TableQspec {
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected
+    (jsonResult.copoint: Seq[JValue]) must_=== expected
   }
 
   def testSimpleCogroup(f: Table => Table = identity[Table]) = {
-    def recl(i: Long)    = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
+    def recl(i: Long)    = toRecord(Array(i), json"""{ "left": ${i.toString} }""")
     def recr(i: Long)    = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
     def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
 
