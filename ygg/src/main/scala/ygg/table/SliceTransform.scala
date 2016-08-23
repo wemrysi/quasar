@@ -4,8 +4,9 @@ import ygg.common._
 import scalaz._, Scalaz._
 import ygg.cf
 import ygg.json._
+import ygg.data._
 
-trait SliceTransforms extends TableModule with ColumnarTableTypes with ConcatHelpers {
+trait SliceTransforms extends TableModule with ConcatHelpers {
 
   import trans._
 

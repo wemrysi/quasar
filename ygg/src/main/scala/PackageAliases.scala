@@ -3,9 +3,6 @@ package ygg.pkg
 import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
-  type BitSet    = ygg.data.BitSet
-  type RawBitSet = ygg.data.RawBitSet
-
   type =?>[-A, +B]          = scala.PartialFunction[A, B]
   type CTag[A]              = scala.reflect.ClassTag[A]
   type Try[+A]              = scala.util.Try[A]

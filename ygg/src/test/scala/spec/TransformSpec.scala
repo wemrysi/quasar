@@ -6,7 +6,6 @@ import TestSupport._
 import ygg.table._
 import ygg.json._
 
-import scala.language.dynamics
 import scala.util.Random
 
 trait TransformSpec extends TableQspec {
@@ -51,29 +50,6 @@ trait TransformSpec extends TableQspec {
 
   type ToSelf[A] = A => A
   type ASD       = Arbitrary[SampleData]
-
-  implicit class TransSpecBuilder[A <: SourceType](private val spec: TransSpec[A]) extends Dynamic {
-    def result: TransSpec[A]                             = spec
-    def selectDynamic(name: String): TransSpecBuilder[A] = new TransSpecBuilder(DerefObjectStatic(spec, CPathField(name)))
-  }
-
-  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.result
-
-  private object root extends TransSpecBuilder(Fn.source) {
-    def value = selectDynamic("value")
-  }
-  private object F1Expr {
-    def negate         = lookupF1(Nil, "negate")
-    def coerceToDouble = lookupF1(Nil, "coerceToDouble")
-    def moduloTwo      = lookupF2(Nil, "mod") applyr CLong(2)
-    def equalsZero     = lookupF2(Nil, "eq") applyr CLong(0)
-    def isEven         = moduloTwo andThen equalsZero
-  }
-  private object Fn {
-    def source                    = Leaf(Source)
-    def valueIsEven(name: String) = Map1(select(name), F1Expr.isEven)
-    def constantTrue              = Filter(source, Equal(source, source))
-  }
 
   private def defaultASD: ASD = sample(schema)
   private def select[A <: SourceType](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))

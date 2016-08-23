@@ -8,13 +8,6 @@ import ygg.data._
 import ygg.json._
 import TransSpecModule._
 
-trait ColumnarTableTypes {
-  type F1         = CF1
-  type F2         = CF2
-  type Reducer[α] = CReducer[α]
-  type RowId      = Int
-}
-
 trait ColumnarTableModuleConfig {
   def maxSliceSize: Int
 
@@ -258,7 +251,7 @@ object ColumnarTableModule {
   }
 }
 
-trait ColumnarTableModule extends TableModule with ColumnarTableTypes with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
+trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
 
   import TableModule._
   import trans._

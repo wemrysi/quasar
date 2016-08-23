@@ -101,7 +101,9 @@ object TableModule {
 trait TableModule extends TransSpecModule {
   import TableModule._
 
-  type Reducer[α]
+  type Reducer[α] = CReducer[α]
+  type RowId      = Int
+
   type Table <: TableLike
   type TableCompanion <: TableCompanionLike
 

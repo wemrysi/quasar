@@ -1,7 +1,6 @@
 package ygg.table
 
 import ygg.common._
-import ygg.api._
 import ygg.json._
 
 object TransSpecModule {
@@ -30,8 +29,57 @@ object GroupId {
   implicit def apply(id: Int): GroupId = new GroupId(id)
 }
 
-trait TransSpecModule extends FNModule {
+trait TransSpecModule {
   import TransSpecModule._
+  import trans._
+
+  type TableTransSpec[+A <: SourceType] = Map[CPathField, TransSpec[A]]
+  type TableTransSpec1                  = TableTransSpec[Source1]
+  type TableTransSpec2                  = TableTransSpec[Source2]
+
+  type F1 = CF1
+  type F2 = CF2
+
+  implicit def liftF1(f1: F1): F1Like
+  implicit def liftF2(f2: F2): F2Like
+
+  def lookupF1(namespace: List[String], name: String): F1
+  def lookupF2(namespace: List[String], name: String): F2
+
+  trait F1Like {
+    def compose(f1: F1): F1
+    def andThen(f1: F1): F1
+  }
+  trait F2Like {
+    def applyl(cv: CValue): F1
+    def applyr(cv: CValue): F1
+    def andThen(f1: F1): F2
+  }
+
+  implicit class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
+    protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
+    def selectDynamic(name: String)                                           = next(DerefObjectStatic(spec, CPathField(name)))
+    def dot(name: String)                                                     = selectDynamic(name)
+  }
+  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
+
+  object root extends TransSpecBuilder(Fn.source) {
+    def value             = selectDynamic("value")
+    def apply(index: Int) = next(DerefArrayStatic(spec, CPathIndex(index)))
+  }
+  object F1Expr {
+    def negate         = lookupF1(Nil, "negate")
+    def coerceToDouble = lookupF1(Nil, "coerceToDouble")
+    def moduloTwo      = lookupF2(Nil, "mod") applyr CLong(2)
+    def equalsZero     = lookupF2(Nil, "eq") applyr CLong(0)
+    def isEven         = moduloTwo andThen equalsZero
+  }
+  object Fn {
+    def source                    = Leaf(Source)
+    def valueIsEven(name: String) = Map1(root dot name, F1Expr.isEven)
+    def constantTrue              = Filter(source, Equal(source, source))
+  }
+
 
   object trans {
     sealed trait TransSpec[+A <: SourceType]  extends AnyRef
@@ -44,6 +92,8 @@ trait TransSpecModule extends FNModule {
     case object Source                        extends Source1
     case object SourceLeft                    extends Source2
     case object SourceRight                   extends Source2
+
+    type TransSpec1 = TransSpec[Source1]
 
     case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
 
@@ -116,8 +166,6 @@ trait TransSpecModule extends FNModule {
     case class FilterDefined[+A <: SourceType](source: TransSpec[A], definedFor: TransSpec[A], definedness: Definedness) extends TransSpec[A]
 
     case class Cond[+A <: SourceType](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
-
-    type TransSpec1 = TransSpec[Source1]
 
     object TransSpec {
       import CPath._
@@ -323,45 +371,15 @@ trait TransSpecModule extends FNModule {
 
       object SourceKey {
         val Single = DerefObjectStatic(Leaf(Source), Key)
-
-        val Left  = DerefObjectStatic(Leaf(SourceLeft), Key)
-        val Right = DerefObjectStatic(Leaf(SourceRight), Key)
+        val Left   = DerefObjectStatic(Leaf(SourceLeft), Key)
+        val Right  = DerefObjectStatic(Leaf(SourceRight), Key)
       }
 
       object SourceValue {
         val Single = DerefObjectStatic(Leaf(Source), Value)
-
-        val Left  = DerefObjectStatic(Leaf(SourceLeft), Value)
-        val Right = DerefObjectStatic(Leaf(SourceRight), Value)
+        val Left   = DerefObjectStatic(Leaf(SourceLeft), Value)
+        val Right  = DerefObjectStatic(Leaf(SourceRight), Value)
       }
     }
-  }
-
-  import trans._
-
-  type TableTransSpec[+A <: SourceType] = Map[CPathField, TransSpec[A]]
-  type TableTransSpec1                  = TableTransSpec[Source1]
-  type TableTransSpec2                  = TableTransSpec[Source2]
-
-  def makeTableTrans(tableTrans: TableTransSpec1): TransSpec1 = {
-    val wrapped = for ((key @ CPathField(fieldName), value) <- tableTrans) yield {
-      val mapped = TransSpec.deepMap(value) {
-        case Leaf(_) => DerefObjectStatic(Leaf(Source), key)
-      }
-
-      trans.WrapObject(mapped, fieldName)
-    }
-
-    wrapped.foldLeft[TransSpec1](ObjectDelete(Leaf(Source), Set(tableTrans.keys.toSeq: _*))) { (acc, ts) =>
-      trans.InnerObjectConcat(acc, ts)
-    }
-  }
-
-  def liftToValues(trans: TransSpec1): TransSpec1 =
-    makeTableTrans(Map(paths.Value -> trans))
-
-  def buildConstantWrapSpec[A <: SourceType](source: TransSpec[A]): TransSpec[A] = {
-    val bottomWrapped = trans.WrapObject(trans.ConstLiteral(CEmptyArray, source), paths.Key.name)
-    trans.InnerObjectConcat(bottomWrapped, trans.WrapObject(source, paths.Value.name))
   }
 }

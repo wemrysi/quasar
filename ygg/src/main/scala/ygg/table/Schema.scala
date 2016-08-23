@@ -2,6 +2,7 @@ package ygg.table
 
 import ygg.common._
 import ygg.json._
+import ygg.data._
 
 object Schema {
   def ctypes(jtype: JType): Set[CType] = jtype match {
