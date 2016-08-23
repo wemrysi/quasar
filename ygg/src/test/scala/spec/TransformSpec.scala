@@ -43,10 +43,11 @@ trait TransformSpec extends TableQspec {
   def checkSpecDefault(spec: TransSpec1)(expect: ToSelf[Seq[JValue]]): Prop =
     checkSpec(spec)(expect)(defaultASD)
 
-  def checkSpecConst(spec: TransSpec1, data: Seq[JValue], expected: Seq[JValue]): Prop =
+  def checkSpecData(spec: TransSpec1, data: Seq[JValue], expected: Seq[JValue]): Prop =
     TableTest(fromJson(data), spec, expected).check()
 
-    // checkSpec(spec)(_ => expect)(Arbitrary(Gen const fromJson(data))) //.set(minTestsOk = 1)
+  def checkSpecDataId(spec: TransSpec1, data: Seq[JValue]): Prop =
+    checkSpecData(spec, data, data)
 
   type ToSelf[A] = A => A
   type ASD       = Arbitrary[SampleData]
@@ -61,6 +62,18 @@ trait TransformSpec extends TableQspec {
   private object root extends TransSpecBuilder(Fn.source) {
     def value = selectDynamic("value")
   }
+  private object F1Expr {
+    def negate         = lookupF1(Nil, "negate")
+    def coerceToDouble = lookupF1(Nil, "coerceToDouble")
+    def moduloTwo      = lookupF2(Nil, "mod") applyr CLong(2)
+    def equalsZero     = lookupF2(Nil, "eq") applyr CLong(0)
+    def isEven         = moduloTwo andThen equalsZero
+  }
+  private object Fn {
+    def source                    = Leaf(Source)
+    def valueIsEven(name: String) = Map1(select(name), F1Expr.isEven)
+    def constantTrue              = Filter(source, Equal(source, source))
+  }
 
   private def defaultASD: ASD = sample(schema)
   private def select[A <: SourceType](qual: TransSpec[A], name: String): TransSpec[A] = DerefObjectStatic(qual, CPathField(name))
@@ -71,12 +84,12 @@ trait TransformSpec extends TableQspec {
   def checkMetaDeref     = checkSpecDefault(DerefMetadataStatic(Fn.source, CPathMeta("foo")))(_ => Nil)
   def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
 
-  def testMap1IntLeaf: Prop = checkSpecConst(
+  def testMap1IntLeaf: Prop = checkSpecData(
     spec     = Map1(Fn.source, lookupF1(Nil, "negate")),
-    data     = -10 to 10 map (n => json"$n")
+    data     = -10 to 10 map (n => json"$n"),
     expected = -10 to 10 map (n => json"${-n}")
   )
-  def testMap1ArrayObject: Prop = checkSpecConst(
+  def testMap1ArrayObject: Prop = checkSpecData(
     spec = Map1(root.value, lookupF1(Nil, "negate")),
     data = jsonMany"""
       {"key":[1],"value":{"foo":12}}
@@ -86,83 +99,44 @@ trait TransformSpec extends TableQspec {
     expected = Seq(json"-20")
   )
 
-  def testDeepMap1CoerceToDouble: Prop = {
-    val data = jsonMany"""
+  def testDeepMap1CoerceToDouble: Prop = checkSpecData(
+    spec = DeepMap1(root.value, F1Expr.coerceToDouble),
+    data = jsonMany"""
       {"key":[1],"value":12}
       {"key":[2],"value":34.5}
       {"key":[3],"value":31.9}
       {"key":[3],"value":{"baz":31}}
       {"key":[3],"value":"foo"}
       {"key":[4],"value":20}
-    """
-    val expected = jsonMany"""
-      12
-      34.5
-      31.9
-      { "baz": 31 }
-      20
-    """
-    TableTest(
-      fromJson(data),
-      DeepMap1(root.value, lookupF1(Nil, "coerceToDouble")),
-      expected
-    ).check()
-  }
+    """,
+    expected = json"""[ 12, 34.5, 31.9, { "baz": 31 }, 20 ]""".asArray.elements
+  )
 
-  def testMap1CoerceToDouble: Prop = {
-    val data = jsonMany"""
+  def testMap1CoerceToDouble: Prop = checkSpecData(
+    spec = Map1(root.value, F1Expr.coerceToDouble),
+    data = jsonMany"""
       {"key":[1],"value":12}
       {"key":[2],"value":34.5}
       {"key":[3],"value":31.9}
       {"key":[3],"value":{"baz":31}}
       {"key":[3],"value":"foo"}
       {"key":[4],"value":20}
-    """
-    val expected = jsonMany"""
-      12
-      34.5
-      31.9
-      20
-    """
-
-    TableTest(
-      fromJson(data),
-      Map1(root.value, F1Expr.coerceToDouble),
-      expected
-    ).check()
-  }
-
-  private object F1Expr {
-    def negate         = lookupF1(Nil, "negate")
-    def coerceToDouble = lookupF1(Nil, "coerceToDouble")
-    def moduloTwo      = lookupF2(Nil, "mod") applyr CLong(2)
-    def equalsZero     = lookupF2(Nil, "eq") applyr CLong(0)
-    def isEven         = moduloTwo andThen equalsZero
-  }
-
-  private object Fn {
-    def source                    = Leaf(Source)
-    def valueIsEven(name: String) = Map1(select(name), F1Expr.isEven)
-    def constantTrue              = Filter(source, Equal(source, source))
-  }
+    """,
+    expected = json"""[ 12, 34.5, 31.9, 20 ]""".asArray.elements
+  )
 
   def checkFilter = {
     val spec = Filter(Fn.source, Fn.valueIsEven("value"))
     checkSpecDefault(spec)(_ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false })
   }.set(minTestsOk = 1000)
 
-  def testMod2Filter = {
-    val data = jsonMany"""
+  def testMod2Filter = checkSpecDataId(
+    spec = Filter(Fn.source, Fn.valueIsEven("value")),
+    data = jsonMany"""
       { "value":-6.846973248137671E+307, "key":[7.0] }
       { "value":-4611686018427387904, "key":[5.0] }
     """
-
-    TableTest(
-      fromJson(data),
-      Filter(Fn.source, Fn.valueIsEven("value")),
-      data map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false }
-    ).check()
-  }
+  )
 
   def checkObjectDeref: Prop = {
     implicit val gen = sample(objectSchema(_, 3))

@@ -1,25 +1,5 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
 import ygg.json._
 import TestSupport._
@@ -32,219 +12,59 @@ trait DistinctSpec extends ColumnarTableQspec {
     implicit val gen: Arbitrary[SampleData] = sort(distinct(sample(schema)))
 
     prop { (sample: SampleData) =>
-
       val table         = fromSample(sample)
       val distinctTable = table.distinct(Leaf(Source))
       val result        = toJson(distinctTable)
 
-      result.copoint must_== sample.data
+      result.copoint must_=== sample.data
     }
   }
 
   def testDistinctAcrossSlices = {
-    val array: JValue = json"""[
-      {
-        "value": {},
-        "key": [
-          1,
-          1
-        ]
-      },
-      {
-        "value": {},
-        "key": [
-          1,
-          1
-        ]
-      },
-      {
-        "value": {},
-        "key": [
-          2,
-          1
-        ]
-      },
-      {
-        "value": {},
-        "key": [
-          2,
-          2
-        ]
-      },
-      {
-        "value": {
-          "fzz": false,
-          "em": [
-            {
-              "l": 210574764564691780,
-              "fbk": -1
-            },
-            [
-              [],
-              ""
-            ]
-          ],
-          "z3y": [
-            {
-              "wd": null,
-              "tv": false,
-              "o": []
-            },
-            {
-              "sry": {},
-              "in0": []
-            }
-          ]
-        },
-        "key": [
-          1,
-          2
-        ]
-      },
-      {
-        "value": {
-          "fzz": false,
-          "em": [
-            {
-              "l": 210574764564691780,
-              "fbk": -1
-            },
-            [
-              [],
-              ""
-            ]
-          ],
-          "z3y": [
-            {
-              "wd": null,
-              "tv": false,
-              "o": []
-            },
-            {
-              "sry": {},
-              "in0": []
-            }
-          ]
-        },
-        "key": [
-          1,
-          2
-        ]
-      }
-    ]"""
+    val data: Seq[JValue] = jsonMany"""
+      {"key":[1,1],"value":{}}
+      {"key":[1,1],"value":{}}
+      {"key":[2,1],"value":{}}
+      {"key":[2,2],"value":{}}
+      {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
+      {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
+    """
+    val table  = fromJson(data, maxBlockSize = 5)
+    val result = toJson(table distinct Leaf(Source))
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected a JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample, Some(5))
-    val result = toJson(table.distinct(Leaf(Source)))
-
-    result.copoint must_== sample.data.toSeq.distinct
+    result.copoint must_=== data.distinct.toStream
   }
 
   def testDistinctAcrossSlices2 = {
-    val array: JValue = JParser.parseUnsafe("""
-      [{
-        "value":{
-          "elxk7vv":-8.988465674311579E+307
-        },
-        "key":[1.0,1.0]
-      },
-      {
-        "value":{
-          "elxk7vv":-8.988465674311579E+307
-        },
-        "key":[1.0,1.0]
-      },
-      {
-        "value":{
-          "elxk7vv":-6.465000919622952E+307
-        },
-        "key":[2.0,4.0]
-      },
-      {
-        "value":{
-          "elxk7vv":-2.2425006462798597E+307
-        },
-        "key":[4.0,3.0]
-      },
-      {
-        "value":{
-          "elxk7vv":-1.0
-        },
-        "key":[5.0,8.0]
-      },
-      {
-        "value":{
-          "elxk7vv":-1.0
-        },
-        "key":[5.0,8.0]
-      },
-      {
-        "value":[[]],
-        "key":[3.0,1.0]
-      },
-      {
-        "value":[[]],
-        "key":[3.0,8.0]
-      },
-      {
-        "value":[[]],
-        "key":[6.0,7.0]
-      },
-      {
-        "value":[[]],
-        "key":[7.0,2.0]
-      },
-      {
-        "value":[[]],
-        "key":[8.0,1.0]
-      },
-      {
-        "value":[[]],
-        "key":[8.0,1.0]
-      },
-      {
-        "value":[[]],
-        "key":[8.0,4.0]
-      }]""")
+    val data: Seq[JValue] = jsonMany"""
+      {"key":[1.0,1.0],"value":{"elxk7vv":-8.988465674311579E+307}}
+      {"key":[1.0,1.0],"value":{"elxk7vv":-8.988465674311579E+307}}
+      {"key":[2.0,4.0],"value":{"elxk7vv":-6.465000919622952E+307}}
+      {"key":[4.0,3.0],"value":{"elxk7vv":-2.2425006462798597E+307}}
+      {"key":[5.0,8.0],"value":{"elxk7vv":-1.0}}
+      {"key":[5.0,8.0],"value":{"elxk7vv":-1.0}}
+      {"key":[3.0,1.0],"value":[[]]}
+      {"key":[3.0,8.0],"value":[[]]}
+      {"key":[6.0,7.0],"value":[[]]}
+      {"key":[7.0,2.0],"value":[[]]}
+      {"key":[8.0,1.0],"value":[[]]}
+      {"key":[8.0,1.0],"value":[[]]}
+      {"key":[8.0,4.0],"value":[[]]}
+    """
+    val table  = fromJson(data, maxBlockSize = 5)
+    val result = toJson(table distinct Leaf(Source))
 
-    val data: Stream[JValue] = (array match {
-      case JArray(li) => li
-      case _          => abort("Expected JArray")
-    }).toStream
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample, Some(5))
-
-    val result = toJson(table.distinct(Leaf(Source)))
-
-    result.copoint must_== sample.data.toSeq.distinct
-  }
-
-  def removeUndefined(jv: JValue): JValue = jv match {
-    case JObject(jfields) => JObject(jfields collect { case (s, v) if v != JUndefined => JField(s, removeUndefined(v)) })
-    case JArray(jvs) =>
-      JArray(jvs map { jv =>
-        removeUndefined(jv)
-      })
-    case v => v
+    (result.copoint: Seq[JValue]) must_=== data.distinct
   }
 
   def testDistinct = {
     implicit val gen = sort(duplicateRows(sample(schema)))
     prop { (sample: SampleData) =>
-      val table = fromSample(sample)
+      val table    = fromSample(sample)
+      val result   = toJson(table distinct Leaf(Source))
+      val expected = sample.data.distinct
 
-      val distinctTable = table.distinct(Leaf(Source))
-
-      val result   = toJson(distinctTable).copoint
-      val expected = sample.data.toSeq.distinct
-
-      result must_== expected
-    }.set(minTestsOk = 2000)
+      result.copoint must_=== expected.toStream
+    }
   }
 }

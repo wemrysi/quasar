@@ -146,7 +146,7 @@ class ColumnarTableModuleSpec
 
       prop { data: SampleData =>
         testRenderJson(data.data)
-      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 500)
     }
 
     "handle special cases of renderJson" >> {
@@ -198,11 +198,11 @@ class ColumnarTableModuleSpec
       "check utf-8 encoding" in prop { str: String =>
         val s = str.toList.map((c: Char) => if (c < ' ') ' ' else c).mkString
         testRenderJson(JString(s) :: Nil)
-      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 500)
 
       "check long encoding" in prop { ln: Long =>
         testRenderJson(JNum(ln) :: Nil)
-      }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
+      }.set(minTestsOk = 500)
     }
 
     "in cogroup" >> {
@@ -266,7 +266,7 @@ class ColumnarTableModuleSpec
       //"give the identity transform for the trivial filter"                    in checkTrivialFilter
       "give the identity transform for the trivial 'true' filter"               in checkTrueFilter
       "give the identity transform for a nontrivial filter"                     in checkFilter.pendingUntilFixed
-      "give a transformation for a big decimal and a long"                      in testMod2Filter.pendingUntilFixed
+      "give a transformation for a big decimal and a long"                      in testMod2Filter
 
       "perform an object dereference"                                           in checkObjectDeref
       "perform an array dereference"                                            in checkArrayDeref
