@@ -90,7 +90,7 @@ object ColumnarTableModule {
       * new instances. If this proves to be a problem we could easily
       * make a mutable version.
       */
-    class Indices(n: Int, m: scMap[String, Int], a: Array[String]) {
+    class Indices(n: Int, m: Map[String, Int], a: Array[String]) {
       def size                        = n
       def getPaths: Array[String]     = a
       def columnForPath(path: String) = m(path)

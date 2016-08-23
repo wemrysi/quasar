@@ -1,42 +1,46 @@
 package ygg
 
-import scalaz._, Ordering._
+import scalaz._, Scalaz._, Ordering._
 import ygg.data._
 import java.nio.file._
 
 package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
+  type Vec[+A]                = scala.Vector[A]
+
+  def vec[A](xs: A*): Vec[A] = xs.toVector
 
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
     def slurpString(): String     = new String(slurpBytes, Utf8Charset)
   }
 
-  implicit class ScalaVectorOps[A](private val xs: Vector[A]) {
-    def :::(that: Vector[A]): Vector[A] = that ++ xs
-    def ::(head: A): Vector[A]          = head +: xs
-    def shuffle: Vector[A] = scala.util.Random.shuffle(xs)
+  implicit class YggScalaVectorOps[A](private val xs: Vec[A]) {
+    def :::(that: Vector[A]): Vec[A] = that ++ xs
+    def ::(head: A): Vec[A]          = head +: xs
+    def shuffle: Vec[A]              = scala.util.Random.shuffle(xs)
+  }
+  implicit class YggScalaMapOps[A, B](source: Map[A, B]) {
+    def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
+  }
+  implicit class YggScalaMapOpsCC[K, V, CC[B] <: Traversable[B]](left: Map[K, CC[V]]) {
+    type Middle[V1] = Either3[V, CC[V] -> CC[V1], V1]
+
+    def cogroup[V1, That](right: Map[K, CC[V1]])(implicit cbf: CBF[_, K -> Middle[V1], That]): That = new Cogrouped(left, right) build
   }
 
-  implicit class ByteBufferOps(private val bb: ByteBuffer) {
+  implicit class YggByteBufferOps(private val bb: ByteBuffer) {
     def read[A](implicit z: Codec[A]): A = z read bb
   }
-
-  implicit class ScalaMapOps[K, V, CC[B] <: Traversable[B]](left: scMap[K, CC[V]]) {
-    def cogroup[V1, That](right: scMap[K, CC[V1]])(implicit cbf: CBF[_, K -> Either3[V, CC[V] -> CC[V1], V1], That]): That = (
-      new Cogrouped(left, right) build
-    )
-  }
-
-  implicit def comparableOrder[A <: Comparable[A]]: Ord[A] =
-    Ord.order[A]((x, y) => Cmp(x compareTo y))
-
-  implicit def translateToScalaOrdering[A](implicit z: Ord[A]): scala.math.Ordering[A] = z.toScalaOrdering
+  implicit def ordToOrdering[A](implicit z: Ord[A]): scala.math.Ordering[A] = z.toScalaOrdering
+  implicit def comparableOrder[A <: Comparable[A]]: Ord[A]                  = Ord order ((x, y) => Cmp(x compareTo y))
+  implicit def bigDecimalOrder: Ord[BigDecimal]                             = Ord order ((x, y) => Cmp(x compare y))
 
   implicit class ScalazOrderOps[A](private val ord: Ord[A]) {
-    def eqv(x: A, y: A): Boolean  = ord.order(x, y) == EQ
-    def lt(x: A, y: A): Boolean   = ord.order(x, y) == LT
-    def gt(x: A, y: A): Boolean   = ord.order(x, y) == GT
+    private implicit def ordering: Ord[A] = ord
+    def eqv(x: A, y: A): Boolean  = (x ?|? y) === EQ
+    def lt(x: A, y: A): Boolean   = (x ?|? y) === LT
+    def gt(x: A, y: A): Boolean   = (x ?|? y) === GT
     def lte(x: A, y: A): Boolean  = !gt(x, y)
     def gte(x: A, y: A): Boolean  = !lt(x, y)
     def neqv(x: A, y: A): Boolean = !eqv(x, y)
@@ -45,15 +49,9 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
   implicit def ValidationFlatMapRequested[E, A](d: Validation[E, A]): ValidationFlatMap[E, A] =
     Validation.FlatMap.ValidationFlatMapRequested[E, A](d)
 
-  implicit def bigDecimalOrder: Ord[BigDecimal] = Ord.order[BigDecimal]((x, y) => Cmp(x compare y))
-
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
     def |>[B](f: A => B): B       = f(x)
     def unsafeTap(f: A => Any): A = doto(x)(f)
-  }
-
-  implicit class LazyMapValues[A, B](source: Map[A, B]) {
-    def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
 
   implicit class BitSetOperations(private val bs: BitSet) extends AnyVal {

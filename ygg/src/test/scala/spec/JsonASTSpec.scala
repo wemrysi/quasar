@@ -7,7 +7,7 @@ import JsonTestSupport._
 
 class JsonASTSpec extends quasar.SequentialQspec {
   "JObjects equal even fields order is different" in {
-    implicit val gen = Arbitrary(genJField * 15 ^^ (_.toVector))
+    implicit val gen = Arbitrary(vectorOfN(15, genJField))
     prop((fs: Vector[JField]) => jobject(fs: _*) must_=== jobject(fs.shuffle: _*))
   }
 
@@ -76,7 +76,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "delete" in {
-    JParser.parseUnsafe("""{ "foo": { "bar": 1, "baz": 2 } }""").delete(JPath("foo.bar")) must beSome(JParser.parseUnsafe("""{ "foo": { "baz": 2 } }"""))
+    (json"""{ "foo": { "bar": 1, "baz": 2 } }""" delete JPath("foo.bar")) must_=== Some(json"""{ "foo": { "baz": 2 } }""")
   }
 
   "Remove all" in {
@@ -87,13 +87,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
     prop(removeAllProp)
   }
 
-  "Remove nothing" in {
-    val removeNothingProp = (x: JValue) =>
-      (x remove { _ =>
-        false
-      }) == x
-    prop(removeNothingProp)
-  }
+  "Remove nothing" in prop((x: JValue) => x remove (_ => false) must_=== x)
 
   "flattenWithPath includes empty object values" in {
     val test     = jobject(JField("a", jobject()))
@@ -103,19 +97,17 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "flattenWithPath includes empty array values" in {
-    val test = JObject(JField("a", jarray()) :: Nil)
+    val data     = json"""{ "a": [] }"""
+    val expected = Vector(JPath(".a") -> jarray())
 
-    val expected = List((JPath(".a"), jarray()))
-
-    test.flattenWithPath must_== expected
+    data.flattenWithPath must_=== expected
   }
 
   "flattenWithPath for values produces a single value with the identity path" in {
-    val test = JNum(1)
+    val test     = json"1" //JNum(1)
+    val expected = vec(NoJPath -> test)
 
-    val expected = List((NoJPath, test))
-
-    test.flattenWithPath must_== expected
+    test.flattenWithPath must_=== expected
   }
 
   "flattenWithPath on arrays produces index values" in {
