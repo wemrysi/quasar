@@ -756,7 +756,7 @@ object MongoDbQScriptPlanner {
     implicit I: WorkflowOpCoreF :<: WF,
              ev: Show[WorkflowBuilder[WF]],
              WB: WorkflowBuilder.Ops[WF],
-             R: Delay[RenderTree, WF]):
+             R: RenderTree[Fix[WF]]):
       EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[WF]] = {
     val optimize = new Optimize[T]
 
