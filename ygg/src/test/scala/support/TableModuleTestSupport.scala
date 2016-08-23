@@ -51,13 +51,6 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
     loop(stream, new StringBuilder).copoint
   }
 
-
-  def testRenderCsv(json: String, maxSliceSize: Option[Int] = None): String = {
-    val es    = JParser.parseManyFromString(json).valueOr(throw _)
-    val table = fromJson(es.toStream, maxSliceSize)
-    streamToString(table.renderCsv())
-  }
-
   def testRenderJson(xs: JValue*) = {
     val seq = xs.toVector
     def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
@@ -79,14 +72,6 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
   }
 
   def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
-
-  def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
-    val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"
-    val events   = event * lots
-    val csv      = testRenderCsv(events, maxSliceSize)
-    val expected = ".x,.y,.z.xx,.z.yy\r\n" + ("123,foobar,1,2\r\n" * lots)
-    csv must_=== expected
-  }
 }
 
 trait TableModuleTestSupport extends TableModule {

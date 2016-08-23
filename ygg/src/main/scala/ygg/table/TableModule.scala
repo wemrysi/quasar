@@ -247,8 +247,6 @@ trait TableModule extends TransSpecModule {
 
     def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
 
-    def renderCsv(): StreamT[M, CharBuffer]
-
     // for debugging only!!
     def toJson: Need[Stream[JValue]]
   }

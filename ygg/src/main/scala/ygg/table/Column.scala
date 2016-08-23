@@ -114,7 +114,6 @@ trait Table {
   def canonicalize(length: Int): Table
   def schemas: Need[Set[JType]]
   def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer]
-  def renderCsv(): StreamT[Need, CharBuffer]
 
   // for debugging only!!
   def toJson: Need[Stream[JValue]]
