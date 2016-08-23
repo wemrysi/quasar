@@ -3,6 +3,7 @@ package ast
 
 import scala.util.Sorting.quickSort
 import scala.annotation.switch
+import JValue._
 
 /** Adapted from jawn 0.9.0. */
 sealed trait Renderer {
@@ -23,7 +24,7 @@ sealed trait Renderer {
     case JObject(vs) => renderObject(sb, depth, canonicalizeObject(vs))
   }
 
-  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue]
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[JStringValue]
 
   def renderString(sb: StringBuilder, s: String): Unit
 
@@ -40,7 +41,7 @@ sealed trait Renderer {
     sb.append("]")
   }
 
-  final def renderObject(sb: StringBuilder, depth: Int, it: Iterator[String -> JValue]): Unit = {
+  final def renderObject(sb: StringBuilder, depth: Int, it: Iterator[JStringValue]): Unit = {
     if (!it.hasNext) return { sb.append("{}"); () }
     val (k0, v0) = it.next
     sb.append("{")
@@ -81,7 +82,7 @@ sealed trait Renderer {
 }
 
 object CompactRenderer extends Renderer {
-  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = {
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[JStringValue] = {
     val keys = vs.keys.toArray
     quickSort(keys)
     keys.iterator.map(k => (k, vs(k)))
@@ -90,7 +91,7 @@ object CompactRenderer extends Renderer {
 }
 
 object CanonicalRenderer extends Renderer {
-  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = {
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[JStringValue] = {
     val keys = vs.keys.toArray
     quickSort(keys)
     keys.iterator.map(k => (k, vs(k)))
@@ -100,6 +101,6 @@ object CanonicalRenderer extends Renderer {
 }
 
 object FastRenderer extends Renderer {
-  def canonicalizeObject(vs: Map[String, JValue]): Iterator[String -> JValue] = vs.iterator
+  def canonicalizeObject(vs: Map[String, JValue]): Iterator[JStringValue] = vs.iterator
   def renderString(sb: StringBuilder, s: String): Unit                           = escape(sb, s, false)
 }

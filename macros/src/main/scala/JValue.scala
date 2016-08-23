@@ -7,6 +7,7 @@ import scala.util.Try
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
 import scala.annotation.tailrec
+import JValue._
 
 /**
   * Data type for Json AST.
@@ -49,7 +50,7 @@ final case object JUndefined                          extends JValue
 final case object JNull                               extends JValue
 final case class JString(value: String)               extends JValue
 final case class JObject(fields: Map[String, JValue]) extends JValue
-final case class JArray(elements: Vector[JValue])       extends JValue
+final case class JArray(elements: Vector[JValue])     extends JValue
 final case object JTrue                               extends JBool
 final case object JFalse                              extends JBool
 final case class JNumLong(n: Long)                    extends JNum
@@ -57,14 +58,18 @@ final case class JNumStr(s: String)                   extends JNum
 final case class JNumBigDec(b: BigDecimal)            extends JNum
 
 object JValue {
+  type JStringValue = String -> JValue
+
   implicit object Order extends Ord[JValue] {
     def order(x: JValue, y: JValue): Ordering = (x, y) match {
-      case (JObject(m1), JObject(m2)) => fieldsCompare(m1, m2)
-      case (JString(x), JString(y))   => x ?|? y
-      case (JNum(x), JNum(y))         => x ?|? y
-      case (JArray(x), JArray(y))     => x ?|? y
-      case (JBool(x), JBool(y))       => x ?|? y
-      case (x, y)                     => x.typeIndex ?|? y.typeIndex
+      case (JObject(m1), JObject(m2))     => fieldsCompare(m1, m2)
+      case (JString(x), JString(y))       => x ?|? y
+      case (JNumLong(x), JNumLong(y))     => x ?|? y
+      case (JNumBigDec(x), JNumBigDec(y)) => x ?|? y
+      case (JNum(x), JNum(y))             => x ?|? y
+      case (JArray(x), JArray(y))         => x ?|? y
+      case (JBool(x), JBool(y))           => x ?|? y
+      case (x, y)                         => x.typeIndex ?|? y.typeIndex
     }
   }
 
@@ -93,19 +98,12 @@ object JBool {
   def unapply(value: JBool): Some[Boolean] = Some(value eq JTrue)
 }
 object JNum {
-  implicit val jnumOrder: Ord[JNum] = Order.order[JNum] {
-    case (JNumLong(x), JNumLong(y))     => x ?|? y
-    case (JNumBigDec(x), JNumBigDec(y)) => x ?|? y
-    case (JNum(x), JNum(y))             => x ?|? y
-  }
-
   def apply(value: Double): JValue             = if (value.isNaN || isInfinite(value)) JUndefined else apply(value.toString)
   def apply(value: String): JValue             = if (value == null) JUndefined else JNumStr(value)
   def apply(value: Int): JNum                  = JNumLong(value.toLong)
   def apply(value: Long): JNum                 = JNumLong(value)
   def apply(value: BigDecimal): JNum           = JNumBigDec(value)
   def unapply(value: JNum): Option[BigDecimal] = Try(value.toBigDecimal).toOption
-
 }
 final object JObject {
   val empty = JObject(Nil)
@@ -124,15 +122,15 @@ final object JArray extends (Vector[JValue] => JArray) {
   def apply(vals: JValue*): JArray      = JArray(vals.toVector)
 }
 final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
-  def _1                        = name
-  def _2                        = value
-  def toTuple: String -> JValue = name -> value
-  def isUndefined               = value == JUndefined
+  def _1                    = name
+  def _2                    = value
+  def toTuple: JStringValue = name -> value
+  def isUndefined           = value == JUndefined
 }
 final object JField {
-  def apply(x: String -> JValue): JField = JField(x._1, x._2)
+  def apply(x: JStringValue): JField = JField(x._1, x._2)
 
-  implicit def liftTuple(x: String -> JValue): JField = apply(x)
+  implicit def liftTuple(x: JStringValue): JField = apply(x)
 
   def liftCollect(f: PartialFunction[JField, JField]): PartialFunction[JValue, JValue] = {
     case JObject.Fields(fields) if fields exists f.isDefinedAt => JObject(fields collect f)

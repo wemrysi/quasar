@@ -5,15 +5,17 @@ import ygg.common._
 import scalaz._, Scalaz._
 
 package object json {
-  type JFieldTuple = String -> JValue
-  type Result[A]   = Validation[Throwable, A]
-  val Json         = io.circe.Json
-  val Encoder      = io.circe.Encoder
-  val Decoder      = io.circe.Decoder
-  type Json        = io.circe.Json
-  type Encoder[A]  = io.circe.Encoder[A]
-  type Decoder[A]  = io.circe.Decoder[A]
-  type HCursor     = io.circe.HCursor
+  type JPathValue   = JPath -> JValue
+  type JStringValue = String -> JValue
+
+  type Result[A]    = Validation[Throwable, A]
+  val Json          = io.circe.Json
+  val Encoder       = io.circe.Encoder
+  val Decoder       = io.circe.Decoder
+  type Json         = io.circe.Json
+  type Encoder[A]   = io.circe.Encoder[A]
+  type Decoder[A]   = io.circe.Decoder[A]
+  type HCursor      = io.circe.HCursor
 
   val NoJPath = JPath()
 
@@ -202,13 +204,13 @@ package object json {
     }
   }
 
-  private def unflattenArray(elements: Seq[JPath -> JValue]): JArray =
+  private def unflattenArray(elements: Seq[JPathValue]): JArray =
     elements.foldLeft(JArray(Vector()))((arr, t) => arr.set(t._1, t._2).asArray)
 
-  private def unflattenObject(elements: Seq[JPath -> JValue]): JObject =
+  private def unflattenObject(elements: Seq[JPathValue]): JObject =
     elements.foldLeft(JObject(Nil))((obj, t) => obj.set(t._1, t._2).asObject)
 
-  def unflatten(elements: Seq[JPath -> JValue]): JValue = {
+  def unflatten(elements: Seq[JPathValue]): JValue = {
     if (elements.isEmpty) JUndefined
     else {
       val sorted = elements.sortBy(_._1)
@@ -673,8 +675,8 @@ package object json {
 
     /** Flattens the JValue down to a list of path to simple JValue primitive.
       */
-    def flattenWithPath: Vector[JPath -> JValue] = {
-      def flatten0(path: JPath)(value: JValue): Vector[JPath -> JValue] = value match {
+    def flattenWithPath: Vector[JPathValue] = {
+      def flatten0(path: JPath)(value: JValue): Vector[JPathValue] = value match {
         case JObject.empty | JArray.empty => Vector(path -> value)
         case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
         case JArray(elements)             => elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })

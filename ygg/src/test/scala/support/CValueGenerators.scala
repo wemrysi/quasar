@@ -95,24 +95,24 @@ trait CValueGenerators {
     }
   }
 
-  def genEventColumns(jschema: JSchema): Gen[Int -> Stream[Identities -> Seq[JPath -> JValue]]] =
+  def genEventColumns(jschema: JSchema): Gen[Int -> Stream[Identities -> Seq[JPathValue]]] =
     for {
       idCount     <- choose(1, 3)
       dataSize    <- choose(0, 20)
       ids         <- setOfN[List[Long]](dataSize, listOfN[Long](idCount, genPosLong))
-      values      <- listOfN[Seq[JPath -> JValue]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
+      values      <- listOfN[Seq[JPathValue]](dataSize, Gen.sequence(jschema map { case (k, v) => jvalue(v) map (k -> _) }))
       falseDepth  <- choose(1, 3)
       falseSchema <- schema(falseDepth)
       falseSize   <- choose(0, 5)
       falseIds    <- setOfN[List[Long]](falseSize, listOfN(idCount, genPosLong))
-      falseValues <- listOfN[Seq[JPath -> JValue]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
+      falseValues <- listOfN[Seq[JPathValue]](falseSize, Gen.sequence(falseSchema map { case (k, v) => jvalue(v).map(k -> _) }))
 
       falseIds2 = falseIds -- ids // distinct ids
     } yield {
       (idCount, (ids.map(_.toArray) zip values).toStream ++ (falseIds2.map(_.toArray) zip falseValues).toStream)
     }
 
-  def assemble(parts: Seq[JPath -> JValue]): JValue = {
+  def assemble(parts: Seq[JPathValue]): JValue = {
     val result = parts.foldLeft[JValue](JUndefined) {
       case (acc, (selector, jv)) => acc.unsafeInsert(selector, jv)
     }

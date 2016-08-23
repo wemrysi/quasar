@@ -17,11 +17,11 @@ class JPathSpec extends quasar.Qspec {
   "Extractor" should {
     "extract all existing paths" in {
 
-      implicit val arb: Arbitrary[JValue -> Vector[JPath -> JValue]] = Arbitrary {
+      implicit val arb: Arbitrary[JValue -> Vector[JPathValue]] = Arbitrary {
         for (jv <- arbitrary[JObject]) yield (jv, jv.flattenWithPath)
       }
 
-      prop { (testData: (JValue, Vector[JPath -> JValue])) =>
+      prop { (testData: (JValue, Vector[JPathValue])) =>
         testData match {
           case (obj, allPathValues) =>
             val allProps = allPathValues.map {
