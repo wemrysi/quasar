@@ -250,7 +250,7 @@ trait TableModule extends TransSpecModule {
     def renderCsv(): StreamT[M, CharBuffer]
 
     // for debugging only!!
-    def toJson: Need[Iterable[JValue]]
+    def toJson: Need[Stream[JValue]]
   }
 
   sealed trait GroupingSpec {

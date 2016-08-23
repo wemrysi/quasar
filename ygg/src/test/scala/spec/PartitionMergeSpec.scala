@@ -1,11 +1,14 @@
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
+import ygg.common._
 import ygg.table._
 import ygg.json._
 
 trait PartitionMergeSpec extends ColumnarTableQspec {
+  val trans: TransSpecClasses
+  import trans._
+
   private object reducer extends Reducer[String] {
     def reduce(schema: CSchema, range: Range): String = {
       schema.columns(JTextT).head match {

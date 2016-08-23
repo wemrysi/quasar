@@ -90,7 +90,7 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
 }
 
 trait TableModuleTestSupport extends TableModule {
-  def lookupF1(namespace: List[String], name: String): F1 = {
+  def lookupF1(namespace: List[String], name: String): CF1 = {
     val lib = Map[String, CF1](
       "negate"         -> cf.math.Negate,
       "coerceToDouble" -> cf.CoerceToDouble,
@@ -102,7 +102,7 @@ trait TableModuleTestSupport extends TableModule {
     lib(name)
   }
 
-  def lookupF2(namespace: List[String], name: String): F2 = {
+  def lookupF2(namespace: List[String], name: String): CF2 = {
     val lib = Map[String, CF2](
       "add" -> cf.math.Add,
       "mod" -> cf.math.Mod,

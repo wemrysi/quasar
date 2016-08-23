@@ -21,7 +21,7 @@ trait TransformClasses[A] {
   case class OuterArrayConcat(arrays: TransSpec*) extends ArraySpec //done
   case class WrapArray(source: TransSpec)         extends ArraySpec //done
 
-  case class DeepMap1(source: TransSpec, f: F1)                       extends TransSpec //done
+  case class DeepMap1(source: TransSpec, f: CF1)                      extends TransSpec //done
   case class DerefArrayDynamic(left: TransSpec, right: TransSpec)     extends TransSpec //done
   case class DerefArrayStatic(source: TransSpec, element: CPathIndex) extends TransSpec //done
   case class DerefObjectDynamic(left: TransSpec, right: TransSpec)    extends TransSpec //done
@@ -30,8 +30,8 @@ trait TransformClasses[A] {
   case class Filter(source: TransSpec, predicate: TransSpec)          extends TransSpec //done
   case class IsType(source: TransSpec, tpe: JType)                    extends TransSpec //done
   case class Leaf(source: A)                                          extends TransSpec //done
-  case class Map1(source: TransSpec, f: F1)                           extends TransSpec //done
-  case class Map2(left: TransSpec, right: TransSpec, f: F2)           extends TransSpec //done
+  case class Map1(source: TransSpec, f: CF1)                          extends TransSpec //done
+  case class Map2(left: TransSpec, right: TransSpec, f: CF2)          extends TransSpec //done
   case class Scan(source: TransSpec, scanner: Scanner)                extends TransSpec //done
   case class TypedSubsumes(source: TransSpec, tpe: JType)             extends TransSpec //done
   case class Typed(source: TransSpec, tpe: JType)                     extends TransSpec //done

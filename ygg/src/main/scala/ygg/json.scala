@@ -254,11 +254,6 @@ package object json {
 
     def \?(nameToFind: String): Option[JValue] = (self \ nameToFind).toOption
 
-    /**
-      * Returns the element as a JValue of the specified class.
-      */
-    def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(abort("Expected class " + clazz + ", but found: " + self.getClass))
-
     def asNum: JNum = self match {
       case x: JNum => x
       case _       => abort(s"Expected JNum but found: ${self.getClass}")
@@ -270,36 +265,6 @@ package object json {
     def asObject: JObject = self match {
       case x: JObject => x
       case _         => abort(s"Expected JObject but found: ${self.getClass}")
-    }
-
-    /**
-      * Returns the element as an option of a JValue of the specified class.
-      */
-    def -->?[A <: JValue](clazz: Class[A]): Option[A] = if (clazz.isAssignableFrom(self.getClass)) Some(self.asInstanceOf[A]) else None
-
-    /**
-      * Does a breadth-first traversal of all descendant JValues, beginning
-      * with this one.
-      */
-    def breadthFirst: Vector[JValue] = {
-      def breadthFirst0(cur: Vector[JValue], queue: sciQueue[JValue]): Vector[JValue] = {
-        if (queue.isEmpty) cur
-        else {
-          val (head, nextQueue) = queue.dequeue
-
-          breadthFirst0(head :: cur, head match {
-            case JObject(fields) =>
-              nextQueue.enqueue(fields.values.toList)
-
-            case JArray(elements) =>
-              nextQueue.enqueue(elements)
-
-            case jvalue => nextQueue
-          })
-        }
-      }
-
-      breadthFirst0(Vector.empty, sciQueue[JValue]() enqueue self).reverse
     }
 
     /** XPath-like expression to query JSON fields by name. Returns all matching fields.
@@ -471,9 +436,7 @@ package object json {
     /** Return a combined value by folding over JSON by applying a function <code>f</code>
       * for each element. The initial value is <code>z</code>.
       */
-    def foldDown[A](z: A)(f: (A, JValue) => A): A = foldDownWithPath(z) { (acc, p, v) =>
-      f(acc, v)
-    }
+    def foldDown[A](z: A)(f: (A, JValue) => A): A = foldDownWithPath(z)((acc, p, v) => f(acc, v))
 
     /** Return a combined value by folding over JSON by applying a function `f`
       * for each element, passing along the path to the elements. The initial

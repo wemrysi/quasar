@@ -119,13 +119,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "flattenWithPath does not produce JUndefined entries" in {
-    val test = JParser.parseUnsafe("""{
-      "c":2,
-      "fn":[{
-        "fr":-2
-      }]
-    }""")
-
+    val test     = json"""{ "c":2, "fn":[{ "fr":-2 }] }"""
     val expected = List(
       JPath(".c")        -> JNum("2"),
       JPath(".fn[0].fr") -> JNum("-2")
@@ -199,9 +193,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
   }
 
   "Properly --> subclasses of JValue" in {
-    val a = JNumStr("1.234")
-
-    (a --> classOf[JNum]).isInstanceOf[JNum] mustEqual true
+    JNumStr("1.234").asNum.isInstanceOf[JNum] mustEqual true
   }
 
   def runArbitraryPathSpec = {

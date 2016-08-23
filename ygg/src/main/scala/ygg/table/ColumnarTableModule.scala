@@ -198,18 +198,15 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
   def newScratchDir(): File    = Files.createTempDirectory("quasar").toFile
   def jdbmCommitInterval: Long = 200000l
 
-  implicit def liftF1(f: F1): F1Like = new F1Like {
-    def compose(f1: F1) = f compose f1
-    def andThen(f1: F1) = f andThen f1
+  implicit def liftF1(f: CF1): CF1Like = new CF1Like {
+    def compose(f1: CF1) = f compose f1
+    def andThen(f1: CF1) = f andThen f1
   }
 
-  implicit def liftF2(f: F2) = new F2Like {
-    def applyl(cv: CValue) = CF1("builtin::liftF2::applyl") { f(Column.const(cv), _) }
-    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl") { f(_, Column.const(cv)) }
-
-    def andThen(f1: F1) = CF2("builtin::liftF2::andThen") { (c1, c2) =>
-      f(c1, c2) flatMap f1.apply
-    }
+  implicit def liftF2(f: CF2) = new CF2Like {
+    def applyl(cv: CValue) = CF1("builtin::liftF2::applyl")(f(Column const cv, _))
+    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl")(f(_, Column const cv))
+    def andThen(f1: CF1)   = CF2("builtin::liftF2::andThen")((c1, c2) => f(c1, c2) flatMap f1.apply)
   }
 
   trait ColumnarTableCompanion extends TableCompanionLike {

@@ -33,6 +33,19 @@ object ColumnIndices {
   def fromPaths(ps: Traversable[String]): ColumnIndices = new ColumnIndices(ps.toVector.sorted)
 }
 
+trait Scanner {
+  type A
+  def init: A
+  def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
+}
+
+final class GroupId(val id: Int) extends AnyVal {
+  override def toString = s"$id"
+}
+object GroupId {
+  implicit def apply(id: Int): GroupId = new GroupId(id)
+}
+
 trait ColumnarTableModuleConfig {
   def maxSliceSize: Int
 

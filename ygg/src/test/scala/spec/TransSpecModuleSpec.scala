@@ -6,8 +6,8 @@ class TransSpecModuleSpec extends quasar.Qspec with TransSpecModule {
   import trans._
   import CPath._
 
-  implicit def liftF1(f1: CF1): F1Like                              = ???
-  implicit def liftF2(f2: CF2): F2Like                              = ???
+  implicit def liftF1(f1: CF1): CF1Like                             = ???
+  implicit def liftF2(f2: CF2): CF2Like                             = ???
   def lookupF1(namespace: List[String],name: String): CF1           = ???
   def lookupF2(namespace: List[String],name: String): ygg.table.CF2 = ???
 
