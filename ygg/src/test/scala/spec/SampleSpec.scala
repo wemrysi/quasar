@@ -2,6 +2,7 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg.json._
+import org.specs2.matcher.TraversableMatchers._
 
 trait SampleSpec extends ColumnarTableQspec {
   import trans._

@@ -56,20 +56,22 @@ trait TransSpecModule {
     def andThen(f1: F1): F2
   }
 
-  implicit class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
+  class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
     protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
 
+    def isType(tp: JType): TransSpecBuilder[A]           = next(IsType(spec, tp))
     def apply(index: Int): TransSpecBuilder[A]           = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def delete(fields: CPathField*): TransSpecBuilder[A] = next(ObjectDelete(spec, fields.toSet))
     def select(name: String): TransSpecBuilder[A]        = next(DerefObjectStatic(spec, CPathField(name)))
     def selectDynamic(name: String): TransSpecBuilder[A] = select(name)
   }
-  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
-
   implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {
-    def delete(fields: CPathField*): ObjectDelete[A]                       = ObjectDelete(spec, fields.toSet)
     def inner_++(x: TransSpec[A], xs: TransSpec[A]*): InnerObjectConcat[A] = InnerObjectConcat(spec +: x +: xs: _*)
     def outer_++(x: TransSpec[A], xs: TransSpec[A]*): OuterObjectConcat[A] = OuterObjectConcat(spec +: x +: xs: _*)
   }
+
+  implicit def transSpecBuilder[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A]       = new TransSpecBuilder(x)
+  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
 
   object root extends TransSpecBuilder(Leaf(Source)) {
     def value = selectDynamic("value")

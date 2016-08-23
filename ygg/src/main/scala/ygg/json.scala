@@ -18,6 +18,7 @@ package object json {
   type HCursor      = io.circe.HCursor
 
   val NoJPath = JPath()
+  def undef: JValue = JUndefined
 
   def toRecord(ids: Array[Long], jv: JValue): JValue = json"""{
     "key" : $ids,
@@ -184,7 +185,6 @@ package object json {
     def sortedFields: Vector[JField] = fields.toVector.sorted map (kv => JField(kv._1, kv._2)) filterNot (_.isUndefined)
     def get(name: String): JValue    = fields.getOrElse(name, JUndefined)
 
-    // def set(name: String, value: JValue): JObject           = this + JField(name, value)
     def +(field: JField): JObject                           = x.copy(fields = fields + field.toTuple)
     def -(name: String): JObject                            = x.copy(fields = fields - name)
     def partitionField(field: String): (JValue, JObject)    = get(field) -> JObject(fields - field)

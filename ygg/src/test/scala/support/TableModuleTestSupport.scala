@@ -79,7 +79,6 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
   }
 
   def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")
-  def undef: JValue = JUndefined
 
   def renderLotsToCsv(lots: Int, maxSliceSize: Option[Int] = None) = {
     val event    = "{\"x\":123,\"y\":\"foobar\",\"z\":{\"xx\":1.0,\"yy\":2.0}}"

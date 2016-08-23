@@ -23,7 +23,6 @@ trait QuasarSpecification
     with MatchersImplicits
     with AnyMatchers
     with MapMatchers
-    with TraversableMatchers
     with PendingUntilFixed
     with ExampleDsl
     with ValueChecks {

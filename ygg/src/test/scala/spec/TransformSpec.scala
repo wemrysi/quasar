@@ -803,88 +803,64 @@ trait TransformSpec extends TableQspec {
           case z              => Some(z)
         }
       })
-
       val table = fromSample(sample)
-      val resultsInner = toJson(table.transform {
-        WrapObject(
-          InnerArrayConcat(
-            WrapArray(root.value(0)),
-            WrapArray(root.value(1))
-            // WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(0))),
-            // WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(1)))
-          ),
-          "value"
-        )
-      })
-
-      val resultsOuter = toJson(table.transform {
-        WrapObject(
-          OuterArrayConcat(
-            WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(0))),
-            WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(1)))
-          ),
-          "value"
-        )
-      })
-
-      def isOk(results: Need[Stream[JValue]]) =
-        results.copoint must_== (sample.data flatMap {
-          case obj @ JObject(fields) => {
-            (obj \ "value") match {
-              case JArray(inner) if inner.length >= 2 =>
-                Some(JObject(JField("value", JArray(inner take 2)) :: Nil))
-
-              case _ => None
+      val innerSpec = WrapObject(
+        InnerArrayConcat(WrapArray(root value 0), WrapArray(root value 1)),
+        "value"
+      )
+      val outerSpec = WrapObject(
+        OuterArrayConcat(WrapArray(root value 0), WrapArray(root value 1)),
+        "value"
+      )
+      def isOk(results: Need[Stream[JValue]]) = {
+        val found = sample.data collect {
+          case obj @ JObject(fields) =>
+            obj \ "value" match {
+              case JArray(inner) if inner.length >= 2 => Some(jobject("value" -> JArray(inner take 2)))
+              case _                                  => None
             }
-          }
-
-          case _ => None
-        })
-
-      isOk(resultsInner)
-      isOk(resultsOuter)
+        }
+        results.copoint must_=== found.flatten
+      }
+      isOk(toJson(table transform innerSpec))
+      isOk(toJson(table transform outerSpec))
     }
   }
 
   def testInnerArrayConcatUndefined = {
-    val JArray(elements) = json"""[
-      {"foo": 4, "bar": 12},
-      {"foo": 5},
-      {"bar": 45},
+    val elements = jsonMany"""
+      {"foo": 4, "bar": 12}
+      {"foo": 5}
+      {"bar": 45}
       {"foo": 7, "bar" :23, "baz": 24}
-    ]"""
+    """
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
+    val sample   = SampleData(elements.toStream)
+    val table    = fromSample(sample)
+    val spec     = InnerArrayConcat(WrapArray(root.foo), WrapArray(root.bar))
+    val results  = toJson(table transform spec)
+    val expected = Stream(JArray(JNum(4) :: JNum(12) :: Nil), JArray(JNum(7) :: JNum(23) :: Nil))
 
-    val spec = InnerArrayConcat(WrapArray(DerefObjectStatic(Leaf(Source), CPathField("foo"))), WrapArray(DerefObjectStatic(Leaf(Source), CPathField("bar"))))
-
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] = Stream(JArray(JNum(4) :: JNum(12) :: Nil), JArray(JNum(7) :: JNum(23) :: Nil))
-
-    results.copoint mustEqual expected
+    results.copoint must_=== expected
   }
 
   def testOuterArrayConcatUndefined = {
-    val JArray(elements) = json"""[
-      {"foo": 4, "bar": 12},
-      {"foo": 5},
-      {"bar": 45},
+    val data = jsonMany"""
+      {"foo": 4, "bar": 12}
+      {"foo": 5}
+      {"bar": 45}
       {"foo": 7, "bar" :23, "baz": 24}
-    ]"""
+    """
+    val expected = Seq(
+      jarray(JNum(4), JNum(12)),
+      jarray(JNum(5)),
+      jarray(JUndefined, JNum(45)),
+      jarray(JNum(7), JNum(23))
+    )
+    val table = fromJson(data)
+    val spec  = OuterArrayConcat(WrapArray(root.foo), WrapArray(root.bar))
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val spec = OuterArrayConcat(WrapArray(DerefObjectStatic(Leaf(Source), CPathField("foo"))), WrapArray(DerefObjectStatic(Leaf(Source), CPathField("bar"))))
-
-    val results = toJson(table.transform(spec))
-
-    val expected: Stream[JValue] =
-      Stream(JArray(JNum(4) :: JNum(12) :: Nil), JArray(JNum(5) :: Nil), JArray(JUndefined :: JNum(45) :: Nil), JArray(JNum(7) :: JNum(23) :: Nil))
-
-    results.copoint mustEqual expected
+    toJsonSeq(table transform spec) mustEqual expected
   }
 
   def testInnerArrayConcatEmptyArray = {
@@ -1026,50 +1002,40 @@ trait TransformSpec extends TableQspec {
 
     prop { (sample: SampleData) =>
       val toDelete = sample.schema.flatMap({ case (_, schema) => randomDeletionMask(schema) })
+
       toDelete.isDefined ==> {
-        val table = fromSample(sample)
-
+        val table       = fromSample(sample)
         val Some(field) = toDelete
+        val spec        = root.value delete CPathField(field.name)
+        val result      = toJson(table transform spec)
+        val expected    = sample.data flatMap (jv => jv \ "value" delete JPath(field))
 
-        val result = toJson(table.transform {
-          ObjectDelete(DerefObjectStatic(Leaf(Source), CPathField("value")), Set(CPathField(field.name)))
-        })
-
-        val expected = sample.data.flatMap { jv =>
-          (jv \ "value").delete(JPath(field))
-        }
-
-        result.copoint must_== expected
+        result.copoint must_=== expected
       }
     }
   }
 
   def testIsTypeNumeric = {
-    val JArray(elements) = json"""[
-      {"key":[1], "value": "value1"},
-      45,
-      true,
-      {"value":"foobaz"},
-      [234],
-      233.4,
-      29292.3,
-      null,
-      [{"bar": 12}],
-      {"baz": 34.3},
+    val elements = jsonMany"""
+      {"key":[1], "value": "value1"}
+      45
+      true
+      {"value":"foobaz"}
+      [234]
+      233.4
+      29292.3
+      null
+      [{"bar": 12}]
+      {"baz": 34.3}
       23
-    ]"""
+    """
 
-    val sample = SampleData(elements.toStream)
-    val table  = fromSample(sample)
-
-    val jtpe = JNumberT
-    val results = toJson(table.transform {
-      IsType(Leaf(Source), jtpe)
-    })
-
+    val sample   = SampleData(elements.toStream)
+    val table    = fromSample(sample)
+    val results  = toJson(table transform (root isType JNumberT))
     val expected = Stream(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue)
 
-    results.copoint must_== expected
+    results.copoint must_=== expected
   }
 
   def testIsTypeUnionTrivial = {
