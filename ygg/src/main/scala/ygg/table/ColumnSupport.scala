@@ -1,7 +1,52 @@
 package ygg.table
 
+import scalaz._, Scalaz._
 import ygg.common._
 import ygg.data._
+
+/**
+  * Represents the column headers we have. We track three things:
+  *
+  *  1. n: the number of headers so far.
+  *  2. m: a map from path strings to header position
+  *  3. a: an array of path strings used.
+  *
+  * The class is immutable so as we find new headers we'll create
+  * new instances. If this proves to be a problem we could easily
+  * make a mutable version.
+  */
+class ColumnIndices private (val paths: Vector[String]) {
+  val columnForPath = paths.zipWithIndex.toMap
+  def size          = paths.length
+  override def equals(that: Any): Boolean = that match {
+    case that: ColumnIndices => paths === that.paths
+    case _                   => false
+  }
+  def writeToBuilder(sb: StringBuilder): Unit = {
+    if (paths.nonEmpty) {
+      sb append (paths mkString ",")
+      sb append "\r\n"
+    }
+  }
+}
+object ColumnIndices {
+  def fromPaths(ps: Traversable[String]): ColumnIndices = new ColumnIndices(ps.toVector.sorted)
+}
+
+trait ColumnarTableModuleConfig {
+  def maxSliceSize: Int
+
+  // This is a slice size that we'd like our slices to be at least as large as.
+  def minIdealSliceSize: Int = maxSliceSize / 4
+
+  // This is what we consider a "small" slice. This may affect points where
+  // we take proactive measures to prevent problems caused by small slices.
+  def smallSliceSize: Int
+
+  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
+}
+
+final case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
 
 class BitsetColumn(definedAt: BitSet) { this: Column =>
   def isDefinedAt(row: Int): Boolean = definedAt(row)

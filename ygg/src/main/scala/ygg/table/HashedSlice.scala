@@ -7,7 +7,7 @@ import ygg.data._
   * Creates an efficient hash for a slice. From this, when given another slice, we can
   * map rows from that slice to rows in the hashed slice.
   */
-final class HashedSlice private (slice0: Slice, rowMap: Map[Int, IntList]) {
+final class HashedSlice private (slice0: Slice, rowMap: scMap[Int, IntList]) {
   def mapRowsFrom(slice1: Slice): Int => (Int => Unit) => Unit = {
     val hasher = new SliceHasher(slice1)
     val rowComparator: RowComparator = Slice.rowComparatorFor(slice1, slice0) {

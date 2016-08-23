@@ -3,38 +3,39 @@ package ygg.pkg
 import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
-  type =?>[-A, +B]          = scala.PartialFunction[A, B]
-  type CTag[A]              = scala.reflect.ClassTag[A]
-  type Try[+A]              = scala.util.Try[A]
-  type jClass               = java.lang.Class[_]
-  type jConcurrentMap[K, V] = java.util.concurrent.ConcurrentMap[K, V]
-  type jPath                = java.nio.file.Path
-  type scSeq[A]             = scala.collection.Seq[A]
-  type scSet[A]             = scala.collection.Set[A]
-  type scMap[K, V]          = scala.collection.Map[K, V]
-  type sciMap[K, +V]        = scala.collection.immutable.Map[K, V]
-  type sciQueue[+A]         = sci.Queue[A]
-  type sciTreeMap[K, +V]    = scala.collection.immutable.TreeMap[K, V]
-  type scmPriQueue[A]       = scm.PriorityQueue[A]
-  type spec                 = scala.specialized
-  type switch               = scala.annotation.switch
-  type tailrec              = scala.annotation.tailrec
-
   // scala stdlib
-  type ->[+A, +B]     = (A, B)
-  type ArrayBuffer[A] = scm.ArrayBuffer[A]
-  type BigDecimal     = scala.math.BigDecimal
-  type ListBuffer[A]  = scm.ListBuffer[A]
-  type Regex          = scala.util.matching.Regex
-  type scmMap[K, V]   = scm.Map[K, V]
-  type scmSet[A]      = scm.Set[A]
-  val ArrayBuffer  = scm.ArrayBuffer
-  val BigDecimal   = scala.math.BigDecimal
-  val ListBuffer   = scm.ListBuffer
-  val scmMap       = scm.HashMap
-  val scmSet       = scm.HashSet
-  val Try          = scala.util.Try
-  val ScalaFailure = scala.util.Failure
+  type ->[+A, +B]             = Tuple2[A, B]
+  type =?>[-A, +B]            = scala.PartialFunction[A, B]
+  type ArrayBuffer[A]         = scm.ArrayBuffer[A]
+  type BigDecimal             = scala.math.BigDecimal
+  type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
+  type CTag[A]                = scala.reflect.ClassTag[A]
+  type ListBuffer[A]          = scm.ListBuffer[A]
+  type Regex                  = scala.util.matching.Regex
+  type Try[+A]                = scala.util.Try[A]
+  type Vec[+A]                = scala.Vector[A]
+  type jClass                 = java.lang.Class[_]
+  type jConcurrentMap[K, V]   = java.util.concurrent.ConcurrentMap[K, V]
+  type jPath                  = java.nio.file.Path
+  type scMap[K, V]            = scala.collection.Map[K, V]
+  type scSeq[A]               = scala.collection.Seq[A]
+  type scSet[A]               = scala.collection.Set[A]
+  type sciMap[K, +V]          = scala.collection.immutable.Map[K, V]
+  type sciQueue[+A]           = sci.Queue[A]
+  type sciTreeMap[K, +V]      = scala.collection.immutable.TreeMap[K, V]
+  type scmMap[K, V]           = scm.Map[K, V]
+  type scmPriQueue[A]         = scm.PriorityQueue[A]
+  type scmSet[A]              = scm.Set[A]
+  type spec                   = scala.specialized
+  type switch                 = scala.annotation.switch
+  type tailrec                = scala.annotation.tailrec
+  val ArrayBuffer             = scm.ArrayBuffer
+  val BigDecimal              = scala.math.BigDecimal
+  val ListBuffer              = scm.ListBuffer
+  val ScalaFailure            = scala.util.Failure
+  val Try                     = scala.util.Try
+  val scmMap                  = scm.HashMap
+  val scmSet                  = scm.HashSet
 
   // java stdlib
   type AtomicInt            = java.util.concurrent.atomic.AtomicInteger
@@ -63,6 +64,4 @@ trait PackageAliases {
   type Ord[A] = scalaz.Order[A]
   type Cmp    = scalaz.Ordering
   val Ord     = scalaz.Order
-
-  def Cmp(n: Int): Cmp = scalaz.Ordering fromInt n
 }

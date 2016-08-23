@@ -8,6 +8,7 @@ import scalaz.{ Need, StreamT }
 
 trait PackageMethods { self: PackageAliases =>
 
+  def Cmp(n: Int): Cmp                                = scalaz.Ordering fromInt n
   def emptyStreamT[A](): StreamT[Need, A]             = StreamT.empty[Need, A]
   def singleStreamT[A](value: => A): StreamT[Need, A] = value :: emptyStreamT[A]()
 

@@ -5,9 +5,6 @@ import ygg.data._
 import java.nio.file._
 
 package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
-  type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
-  type Vec[+A]                = scala.Vector[A]
-
   def vec[A](xs: A*): Vec[A] = xs.toVector
 
   implicit class jPathOps(private val p: jPath) {

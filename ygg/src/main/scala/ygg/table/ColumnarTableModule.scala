@@ -8,21 +8,6 @@ import ygg.data._
 import ygg.json._
 import TransSpecModule._
 
-trait ColumnarTableModuleConfig {
-  def maxSliceSize: Int
-
-  // This is a slice size that we'd like our slices to be at least as large as.
-  def minIdealSliceSize: Int = maxSliceSize / 4
-
-  // This is what we consider a "small" slice. This may affect points where
-  // we take proactive measures to prevent problems caused by small slices.
-  def smallSliceSize: Int
-
-  def maxSaneCrossSize: Long = 2400000000L // 2.4 billion
-}
-
-final case class TableMetrics(startCount: Int, sliceTraversedCount: Int)
-
 object ColumnarTableModule {
   def renderJson(slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
     def wrap(stream: StreamT[M, CharBuffer]) = {
@@ -78,58 +63,6 @@ object ColumnarTableModule {
     * "the fox said: ""hello, my name is fred."""
     */
   def renderCsv[M[+ _]](slices: StreamT[M, Slice])(implicit M: Monad[M]): StreamT[M, CharBuffer] = {
-
-    /**
-      * Represents the column headers we have. We track three things:
-      *
-      *  1. n: the number of headers so far.
-      *  2. m: a map from path strings to header position
-      *  3. a: an array of path strings used.
-      *
-      * The class is immutable so as we find new headers we'll create
-      * new instances. If this proves to be a problem we could easily
-      * make a mutable version.
-      */
-    class Indices(n: Int, m: Map[String, Int], a: Array[String]) {
-      def size                        = n
-      def getPaths: Array[String]     = a
-      def columnForPath(path: String) = m(path)
-
-      override def equals(that: Any): Boolean = that match {
-        case that: Indices =>
-          val len = n
-          if (len != that.size) return false
-          var i     = 0
-          val paths = that.getPaths
-          while (i < len) {
-            if (a(i) != paths(i)) return false
-            i += 1
-          }
-          true
-        case _ =>
-          false
-      }
-      def writeToBuilder(sb: StringBuilder): Unit = {
-        if (n == 0) return ()
-        sb.append(a(0))
-        var i   = 1
-        val len = n
-        while (i < len) { sb.append(','); sb.append(a(i)); i += 1 }
-        sb.append("\r\n")
-      }
-    }
-
-    object Indices {
-      def fromPaths(ps: Array[String]): Indices = {
-        val paths = ps.sorted
-        val m     = scmMap[String, Int]()
-        var i     = 0
-        val len   = paths.length
-        while (i < len) { m(paths(i)) = i; i += 1 }
-        new Indices(len, m, paths)
-      }
-    }
-
     // these methods will quote CSV values for us
     // they could probably be a bit faster but are OK so far.
     def quoteIfNeeded(s: String): String = if (needsQuoting(s)) quote(s) else s
@@ -165,8 +98,8 @@ object ColumnarTableModule {
     /**
       * Generate indices for this slice.
       */
-    def indicesForSlice(slice: Slice): Indices =
-      Indices.fromPaths(slice.columns.keys.map(_.selector.toString).toArray)
+    def indicesForSlice(slice: Slice): ColumnIndices =
+      ColumnIndices.fromPaths(slice.columns.keys.map(_.selector.toString))
 
     /**
       * Renders a slice into an array of lines, as well as updating
@@ -180,13 +113,13 @@ object ColumnarTableModule {
       * Since we know in advance how many rows we have, we can return
       * an array of lines.
       */
-    def renderSlice(pastIndices: Option[Indices], slice: Slice): (Indices, CharBuffer) = {
+    def renderSlice(pastIndices: Option[ColumnIndices], slice: Slice): ColumnIndices -> CharBuffer = {
 
       val indices = indicesForSlice(slice)
       val height  = slice.size
       val width   = indices.size
 
-      if (width == 0) return (indices, charBuffer(0))
+      if (width == 0) return indices -> charBuffer(0)
 
       val items = slice.columns.toArray
       val ncols = items.length
@@ -235,10 +168,10 @@ object ColumnarTableModule {
 
         row += 1
       }
-      (indices, charBuffer(sb.toString))
+      indices -> charBuffer(sb.toString)
     }
 
-    StreamT.unfoldM(slices -> none[Indices]) {
+    StreamT.unfoldM(slices -> none[ColumnIndices]) {
       case (stream, pastIndices) =>
         stream.uncons.map {
           case Some((slice, tail)) =>
