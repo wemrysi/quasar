@@ -2,6 +2,7 @@ package ygg.table
 
 import ygg.common._
 import ygg.json._
+import TransSpecModule._
 
 object TransSpecModule {
   object paths {
@@ -30,7 +31,6 @@ object GroupId {
 }
 
 trait TransSpecModule {
-  import TransSpecModule._
   import trans._
 
   type TableTransSpec[+A <: SourceType] = Map[CPathField, TransSpec[A]]
@@ -80,7 +80,6 @@ trait TransSpecModule {
     def constantTrue              = Filter(source, Equal(source, source))
   }
 
-
   object trans {
     sealed trait TransSpec[+A <: SourceType]  extends AnyRef
     sealed trait ObjectSpec[+A <: SourceType] extends TransSpec[A]
@@ -101,8 +100,6 @@ trait TransSpecModule {
 
     // Adds a column to the output in the manner of scanLeft
     case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A] //done
-
-    // case class MapWith[+A <: SourceType](source: TransSpec[A], mapper: Mapper) extends TransSpec[A]
 
     case class Map1[+A <: SourceType](source: TransSpec[A], f: F1) extends TransSpec[A] //done
 
