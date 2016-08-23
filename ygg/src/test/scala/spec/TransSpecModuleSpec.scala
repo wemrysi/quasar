@@ -29,11 +29,15 @@ class TransSpecModuleSpec extends quasar.Qspec with TransSpecModule {
         WrapObject(
           InnerArrayConcat(
             InnerArrayConcat(
-              WrapArray(DerefArrayStatic(Leaf(Source), CPathIndex(4))),
-              WrapArray(WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(6)), "baz"))),
-            WrapArray(DerefArrayStatic(Leaf(Source), CPathIndex(2)))),
-          "bar"),
-        WrapObject(DerefArrayStatic(Leaf(Source), CPathIndex(0)), "foo"))
+              WrapArray(root(4)),
+              WrapArray(WrapObject(root(6), "baz"))
+            ),
+            WrapArray(root(2))
+          ),
+          "bar"
+        ),
+        WrapObject(root(0), "foo")
+      )
 
       result mustEqual expected
     }

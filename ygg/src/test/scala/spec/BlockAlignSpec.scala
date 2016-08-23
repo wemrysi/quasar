@@ -368,8 +368,8 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
     }
 
     def test0 = {
-      val lsortedOn     = DerefArrayStatic(Leaf(Source), CPathIndex(1))
-      val rsortedOn     = DerefArrayStatic(Leaf(Source), CPathIndex(1))
+      val lsortedOn     = root(1)
+      val rsortedOn     = root(1)
       val JArray(ljson) = json"""[
         [[3],{ "000000":-1 },-1],
         [[4],{ "000000":0 },0],
@@ -408,8 +408,8 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathField("000001")), "000000"),
-              WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathField("000000")), "000001")
+              WrapObject(DerefObjectStatic(root(1), CPathField("000001")), "000000"),
+              WrapObject(DerefObjectStatic(root(1), CPathField("000000")), "000001")
             ),
             CPathField("000000")
           ),
@@ -424,7 +424,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         [[6],{ "000000":42 },{ "b":42 }]
       ]"""
 
-      val rsortedOn = DerefArrayStatic(Leaf(Source), CPathIndex(1))
+      val rsortedOn = root(1)
 
       test(fromJson(ljson.toStream), lsortedOn, fromJson(rjson.toStream), rsortedOn)
     }
@@ -447,8 +447,8 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathField("000000")), "000000"),
-              WrapObject(DerefObjectStatic(DerefArrayStatic(Leaf(Source), CPathIndex(1)), CPathField("000001")), "000001")
+              WrapObject(DerefObjectStatic(root(1), CPathField("000000")), "000000"),
+              WrapObject(DerefObjectStatic(root(1), CPathField("000001")), "000001")
             ),
             CPathField("000000")
           ),
@@ -467,7 +467,7 @@ class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpe
         [[2],{ "000000":77 },{ "a":77 }]
       ]"""
 
-      val rsortedOn = DerefArrayStatic(Leaf(Source), CPathIndex(1))
+      val rsortedOn = root(1)
 
       val ltable = Table(fromJson(ljson.toStream).slices ++ fromJson(ljson2.toStream).slices, UnknownSize)
       val rtable = Table(fromJson(rjson.toStream).slices ++ fromJson(rjson2.toStream).slices, UnknownSize)
