@@ -17,16 +17,17 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
+import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[T[_[_]]] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+private[qscript] final class QScriptCorePlanner[T[_[_]]: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
   val plan: AlgebraM[Planning, QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
-      XQuery(s"((: MAP :)$src)").point[Planning]
+      mapFuncXQuery(f, src).point[Planning]
 
     case Reduce(src, bucket, reducers, repair) =>
       XQuery(s"((: REDUCE :)$src)").point[Planning]

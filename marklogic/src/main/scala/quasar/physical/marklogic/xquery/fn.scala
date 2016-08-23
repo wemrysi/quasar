@@ -28,6 +28,9 @@ object fn {
   def concat(x: XQuery, xs: XQuery*): XQuery =
     XQuery(s"fn:concat${mkSeq_(x, xs: _*)}")
 
+  def count(xs: XQuery, max: Option[XQuery] = None): XQuery =
+    XQuery(s"fn:count(${xs}${asArg(max)})")
+
   def distinctValues(seq: XQuery): XQuery =
     XQuery(s"fn:distinct-values($seq)")
 
@@ -49,6 +52,9 @@ object fn {
   val last: XQuery =
     XQuery("fn:last()")
 
+  def lowerCase(str: XQuery): XQuery =
+    XQuery(s"fn:lower-case($str)")
+
   def map(f: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:map($f, $seq)")
 
@@ -63,6 +69,9 @@ object fn {
 
   def startsWith(str: XQuery, prefix: XQuery, collation: Option[XQuery] = None): XQuery =
     XQuery(s"fn:starts-with($str, ${prefix}${asArg(collation)})")
+
+  def string(xqy: XQuery): XQuery =
+    XQuery(s"fn:string($xqy)")
 
   def stringLength(str: XQuery): XQuery =
     XQuery(s"fn:string-length($str)")
@@ -81,4 +90,7 @@ object fn {
 
   val True: XQuery =
     XQuery("fn:true()")
+
+  def upperCase(str: XQuery): XQuery =
+    XQuery(s"fn:upper-case($str)")
 }

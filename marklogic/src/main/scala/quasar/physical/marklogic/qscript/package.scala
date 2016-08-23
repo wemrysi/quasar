@@ -16,11 +16,13 @@
 
 package quasar.physical.marklogic
 
+import quasar.SKI.κ
 import quasar.{PhaseResultW, PlannerErrT}
+import quasar.fp.{freeCata, interpret, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.XQuery
 
-import scalaz.Const
+import scalaz.{Const, Free}
 
 package object qscript {
   type Planning[A] = PlannerErrT[PhaseResultW, A]
@@ -28,7 +30,7 @@ package object qscript {
   type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
 
   object MarkLogicPlanner {
-    implicit def qScriptCore[T[_[_]]]: MarkLogicPlanner[QScriptCore[T, ?]] =
+    implicit def qScriptCore[T[_[_]]: ShowT]: MarkLogicPlanner[QScriptCore[T, ?]] =
       new QScriptCorePlanner[T]
 
     implicit def sourcedPathable[T[_[_]]]: MarkLogicPlanner[SourcedPathable[T, ?]] =
@@ -49,4 +51,13 @@ package object qscript {
     implicit def equiJoin[T[_[_]]]: MarkLogicPlanner[EquiJoin[T, ?]] =
       new EquiJoinPlanner[T]
   }
+
+  def mapFuncXQuery[T[_[_]]: ShowT](fm: FreeMap[T], src: XQuery): XQuery =
+    planMapFunc(fm)(κ(src))
+
+  def planMapFunc[T[_[_]]: ShowT, A](
+    freeMap: Free[MapFunc[T, ?], A])(
+    recover: A => XQuery
+  ): XQuery =
+    freeCata(freeMap)(interpret(recover, MapFuncPlanner[T]))
 }

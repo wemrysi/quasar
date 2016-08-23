@@ -18,13 +18,46 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
+import scalaz._
+
 final case class XQuery(override val toString: String) extends scala.AnyVal {
   def apply(predicate: XQuery): XQuery = XQuery(s"${this}[$predicate]")
+  def unary_- : XQuery = XQuery(s"-$this")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
   def +(other: XQuery): XQuery = XQuery(s"$this + $other")
+  def *(other: XQuery): XQuery = XQuery(s"$this * $other")
+  def div(other: XQuery): XQuery = XQuery(s"$this div $other")
+  def idiv(other: XQuery): XQuery = XQuery(s"$this idiv $other")
+  def mod(other: XQuery): XQuery = XQuery(s"$this mod $other")
   def and(other: XQuery): XQuery = XQuery(s"$this and $other")
   def or(other: XQuery): XQuery = XQuery(s"$this or $other")
   def seq: XQuery = mkSeq_(this)
   def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
   def xp(xpath: XPath): XQuery = XQuery(toString + xpath)
+
+  // Value Comparisons
+  def eq(other: XQuery): XQuery = XQuery(s"$this eq $other")
+  def ne(other: XQuery): XQuery = XQuery(s"$this ne $other")
+  def lt(other: XQuery): XQuery = XQuery(s"$this lt $other")
+  def le(other: XQuery): XQuery = XQuery(s"$this le $other")
+  def gt(other: XQuery): XQuery = XQuery(s"$this gt $other")
+  def ge(other: XQuery): XQuery = XQuery(s"$this ge $other")
+
+  // General Comparisons
+  def ===(other: XQuery): XQuery = XQuery(s"$this = $other")
+  def =/=(other: XQuery): XQuery = XQuery(s"$this != $other")
+  def <(other: XQuery): XQuery = XQuery(s"$this < $other")
+  def <=(other: XQuery): XQuery = XQuery(s"$this <= $other")
+  def >(other: XQuery): XQuery = XQuery(s"$this > $other")
+  def >=(other: XQuery): XQuery = XQuery(s"$this >= $other")
+
+  // Node Comparisons
+  def is(other: XQuery): XQuery = XQuery(s"$this is $other")
+  def <<(other: XQuery): XQuery = XQuery(s"$this << $other")
+  def >>(other: XQuery): XQuery = XQuery(s"$this >> $other")
+}
+
+object XQuery {
+  implicit val show: Show[XQuery] =
+    Show.showFromToString
 }
