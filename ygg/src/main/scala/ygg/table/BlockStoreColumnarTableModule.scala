@@ -73,11 +73,6 @@ object JDBM {
   ))
 }
 
-trait BlockStoreColumnarTableModuleConfig {
-  def maxSliceSize: Int
-  def hashJoins: Boolean = true
-}
-
 trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   import trans._
   import TransSpec.deepMap

@@ -8,6 +8,10 @@ import ygg.data._
 import ygg.json._
 import TransSpecModule._
 
+final case class SliceId(id: Int) {
+  def +(n: Int): SliceId = SliceId(id + n)
+}
+
 object ColumnarTableModule {
   def renderJson(slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
     def wrap(stream: StreamT[M, CharBuffer]) = {
@@ -185,7 +189,6 @@ object ColumnarTableModule {
 }
 
 trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
-
   import TableModule._
   import trans._
 
@@ -474,11 +477,9 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       * Folds over the table to produce a single value (stored in a singleton table).
       */
     def reduce[A](reducer: Reducer[A])(implicit monoid: Monoid[A]): M[A] = {
-      def rec(stream: StreamT[M, A], acc: A): M[A] = {
-        stream.uncons flatMap {
-          case Some((head, tail)) => rec(tail, head |+| acc)
-          case None               => Need(acc)
-        }
+      def rec(stream: StreamT[M, A], acc: A): M[A] = stream.uncons flatMap {
+        case Some((head, tail)) => rec(tail, head |+| acc)
+        case None               => Need(acc)
       }
       rec(
         slices map (s => reducer.reduce(new CSchema(s.columns.keySet, s logicalColumns _), 0 until s.size)),
@@ -507,15 +508,12 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
 
     def force: M[Table] = {
       def loop(slices: StreamT[M, Slice], acc: List[Slice], size: Long): M[List[Slice] -> Long] = slices.uncons flatMap {
-        case Some((slice, tail)) if slice.size > 0 =>
-          loop(tail, slice.materialized :: acc, size + slice.size)
-        case Some((_, tail)) =>
-          loop(tail, acc, size)
-        case None =>
-          Need((acc.reverse, size))
+        case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
+        case Some((_, tail))                       => loop(tail, acc, size)
+        case None                                  => Need(acc.reverse -> size)
       }
       val former = new (Id.Id ~> M) { def apply[A](a: Id.Id[A]): M[A] = Need(a) }
-      loop(slices, Nil, 0L).map {
+      loop(slices, Nil, 0L) map {
         case (stream, size) =>
           Table(StreamT.fromIterable(stream).trans(former), ExactSize(size))
       }
@@ -707,10 +705,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
             "right: " + rbuf.toArray.mkString("[", ",", "]") + "\n" +
             "both: " + (leqbuf.toArray zip reqbuf.toArray).mkString("[", ",", "]")
         }
-      }
-
-      final case class SliceId(id: Int) {
-        def +(n: Int): SliceId = SliceId(id + n)
       }
 
       case class SlicePosition[K](sliceId: SliceId,
@@ -1568,31 +1562,23 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       collectSchemas(Set.empty, slices)
     }
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer] =
+    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer] =
       ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
 
-    def renderCsv(): StreamT[M, CharBuffer] =
-      ColumnarTableModule.renderCsv(slices)
+    def renderCsv(): StreamT[Need, CharBuffer] = ColumnarTableModule renderCsv slices
+    def toStrings: Need[Stream[String]]     = toEvents(_ toString _)
+    def toJson: Need[Stream[JValue]]        = toEvents(_ toJson _)
+    def metrics: TableMetrics               = TableMetrics(readStarts.get, blockReads.get)
 
-    def toStrings: M[Iterable[String]] = {
-      toEvents { (slice, row) =>
-        slice.toString(row)
-      }
-    }
-
-    def toJson: Need[Iterable[JValue]] = {
-      toEvents { (slice, row) =>
-        slice.toJson(row)
-      }
-    }
-
-    private def toEvents[A](f: (Slice, RowId) => Option[A]): M[Iterable[A]] = {
-      for (stream  <- self.compact(Leaf(Source)).slices.toStream) yield {
-        for (slice <- stream; i <- 0 until slice.size; a <- f(slice, i)) yield a
-      }
-    }
-
-    def metrics = TableMetrics(readStarts.get, blockReads.get)
+    private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] = (
+      (self compact Leaf(Source)).slices.toStream map (stream =>
+        stream flatMap (slice =>
+          0 until slice.size flatMap (i =>
+            f(slice, i)
+          )
+        )
+      )
+    )
   }
 }
 
