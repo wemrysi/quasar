@@ -17,10 +17,15 @@ object TransSpecModule {
   case object AllDefined extends Definedness
 }
 
+trait Scanner {
+  type A
+  def init: A
+  def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
+}
+
 trait TransSpecModule extends FNModule {
   import TransSpecModule._
 
-  type Scanner
   type GroupId
 
   object trans {

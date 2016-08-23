@@ -67,9 +67,9 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
     lib(name)
   }
 
-  def lookupScanner(namespace: List[String], name: String): CScanner = {
-    val lib = Map[String, CScanner](
-      "sum" -> new CScanner {
+  def lookupScanner(namespace: List[String], name: String): Scanner = {
+    val lib = Map[String, Scanner](
+      "sum" -> new Scanner {
         type A = BigDecimal
         val init = BigDecimal(0)
         def scan(a: BigDecimal, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {

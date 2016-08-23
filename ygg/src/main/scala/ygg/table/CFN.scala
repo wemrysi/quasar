@@ -1,6 +1,5 @@
 package ygg.table
 
-import ygg.common._
 import ygg.json._
 
 sealed trait CFId
@@ -90,12 +89,6 @@ object CF2P {
     def apply(c1: Column, c2: Column) = f.lift((c1, c2))
     val identity                      = id
   }
-}
-
-trait CScanner {
-  type A
-  def init: A
-  def scan(a: A, cols: ColumnMap, range: Range): A -> ColumnMap
 }
 
 class CSchema(val columnRefs: Set[ColumnRef], val columns: JType => Set[Column])

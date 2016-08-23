@@ -300,7 +300,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     case class WriteState(jdbmState: JDBMState, valueTrans: SliceTransform1[_], keyTransformsWithIds: List[SliceTransform1[_] -> String])
 
-    object addGlobalIdScanner extends CScanner {
+    object addGlobalIdScanner extends Scanner {
       type A = Long
       val init = 0l
       def scan(a: Long, cols: ColumnMap, range: Range): A -> ColumnMap = {
