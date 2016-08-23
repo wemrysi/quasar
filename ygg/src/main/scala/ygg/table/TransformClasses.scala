@@ -5,10 +5,7 @@ import TransSpecModule._
 
 /** Stub for a de-caked version. Not in use yet.
  */
-trait TransformClasses[A] {
-  type F1 = CF1
-  type F2 = CF2
-
+trait TransformClasses[A <: SourceType] {
   sealed trait TransSpec  extends AnyRef
   sealed trait ObjectSpec extends TransSpec
   sealed trait ArraySpec  extends TransSpec

@@ -277,7 +277,7 @@ trait TableModule extends TransSpecModule {
     def sources: Vector[GroupingSource] = Vector(this)
     def sorted: M[GroupingSource] =
       for {
-        t <- table.sort(trans.DerefObjectStatic(trans.Leaf(trans.Source), CPathField("key")))
+        t <- table.sort(trans.DerefObjectStatic(trans.Leaf(Source), CPathField("key")))
       } yield {
         GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec)
       }

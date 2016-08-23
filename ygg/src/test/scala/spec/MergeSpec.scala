@@ -67,24 +67,24 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
           TransSpec1.Id,
           GroupingSource(
             bar,
-            DerefObjectStatic(Leaf(Source), keyField),
+            root select keyField.name,
             Some(
               InnerObjectConcat(
-                ObjectDelete(Leaf(Source), Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), cField), "value"))),
+                ObjectDelete(root, Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), cField), "value"))),
             0,
             GroupKeySpecOr(
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), aField)),
-              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), bField)))
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), aField)),
+              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(root, valueField), bField)))
           ),
           GroupingSource(
             foo,
-            DerefObjectStatic(Leaf(Source), keyField),
-            Some(InnerObjectConcat(ObjectDelete(Leaf(Source), Set(valueField)), WrapObject(DerefObjectStatic(Leaf(Source), valueField), "value"))),
+            root select keyField.name,
+            Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(DerefObjectStatic(root, valueField), "value"))),
             3,
             GroupKeySpecAnd(
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), aField)),
-              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), bField)))
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), aField)),
+              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(root, valueField), bField)))
           ),
           GroupingSpec.Intersection)
 
@@ -161,35 +161,35 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with Ta
           TransSpec1.Id,
           GroupingSource(
             medals,
-            DerefObjectStatic(Leaf(Source), keyField),
+            root select keyField.name,
             Some(
               InnerObjectConcat(
-                ObjectDelete(Leaf(Source), Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), "value"))),
+                ObjectDelete(root, Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), "value"))),
             0,
             GroupKeySpecAnd(
               GroupKeySpecSource(
                 extra0Field,
                 Filter(
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Men"), false),
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Men"), false))),
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), editionField)))
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Men"), false),
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Men"), false))),
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), editionField)))
           ),
           GroupingSource(
             medals,
-            DerefObjectStatic(Leaf(Source), keyField),
+            root select keyField.name,
             Some(
               InnerObjectConcat(
-                ObjectDelete(Leaf(Source), Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), "value"))),
+                ObjectDelete(root, Set(valueField)),
+                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), "value"))),
             2,
             GroupKeySpecAnd(
               GroupKeySpecSource(
                 extra1Field,
                 Filter(
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Women"), false),
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), genderField), CString("Women"), false))),
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(Leaf(Source), valueField), editionField)))
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Women"), false),
+                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Women"), false))),
+              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), editionField)))
           ),
           GroupingSpec.Intersection)
 

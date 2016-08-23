@@ -2,7 +2,7 @@ package ygg.table
 
 trait TransSpecModule {
   object trans extends TransSpecClasses
-  import trans.{ Leaf, Source, Filter, Map1, Equal, root }
+  import trans.{ Leaf, Filter, Map1, Equal, root }
 
   implicit def liftF1(f1: CF1): CF1Like
   implicit def liftF2(f2: CF2): CF2Like

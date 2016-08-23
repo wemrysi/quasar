@@ -3,6 +3,7 @@ package ygg.tests
 import scalaz._, Scalaz._
 import ygg.json._
 import TestSupport._
+import ygg.table._
 
 trait CrossSpec extends TableQspec {
   import SampleData._

@@ -4,8 +4,19 @@ import ygg.common._
 import ygg.json._
 import TransSpecModule._
 
+sealed trait SourceType       extends AnyRef
+sealed trait Source1          extends SourceType
+sealed trait Source2          extends SourceType
+final case object Source      extends Source1
+final case object SourceLeft  extends Source2
+final case object SourceRight extends Source2
+
 class TransSpecClasses {
   trans =>
+
+  val Source      = ygg.table.Source  // scalaz conflict
+  type TransSpec1 = TransSpec[Source1]
+  type TransSpec2 = TransSpec[Source2]
 
   type TableTransSpec[+A <: SourceType] = Map[CPathField, TransSpec[A]]
   type TableTransSpec1                  = TableTransSpec[Source1]
@@ -35,15 +46,6 @@ class TransSpecClasses {
   sealed trait TransSpec[+A <: SourceType]  extends AnyRef
   sealed trait ObjectSpec[+A <: SourceType] extends TransSpec[A]
   sealed trait ArraySpec[+A <: SourceType]  extends TransSpec[A]
-
-  sealed trait SourceType                   extends AnyRef
-  sealed trait Source1                      extends SourceType
-  sealed trait Source2                      extends SourceType
-  case object Source                        extends Source1
-  case object SourceLeft                    extends Source2
-  case object SourceRight                   extends Source2
-
-  type TransSpec1 = TransSpec[Source1]
 
   case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
 
@@ -250,7 +252,6 @@ class TransSpecClasses {
     val DeleteKeyValue  = Id.delete(paths.Key, paths.Value)
   }
 
-  type TransSpec2 = TransSpec[Source2]
 
   object TransSpec2 {
     val LeftId = Leaf(SourceLeft)
