@@ -6,6 +6,11 @@ import ygg.json._
 import JsonTestSupport._
 
 class JsonASTSpec extends quasar.SequentialQspec {
+  "JObjects equal even fields order is different" in {
+    implicit val gen = Arbitrary(genJField * 15 ^^ (_.toVector))
+    prop((fs: Vector[JField]) => jobject(fs: _*) must_=== jobject(fs.shuffle: _*))
+  }
+
   "Functor identity" in {
     val identityProp = (json: JValue) => json == (json mapUp identity)
     prop(identityProp)

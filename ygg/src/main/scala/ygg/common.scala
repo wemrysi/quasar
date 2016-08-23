@@ -15,8 +15,8 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
   implicit class ScalaVectorOps[A](private val xs: Vector[A]) {
     def :::(that: Vector[A]): Vector[A] = that ++ xs
     def ::(head: A): Vector[A]          = head +: xs
+    def shuffle: Vector[A] = scala.util.Random.shuffle(xs)
   }
-
 
   implicit class ByteBufferOps(private val bb: ByteBuffer) {
     def read[A](implicit z: Codec[A]): A = z read bb

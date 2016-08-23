@@ -144,6 +144,7 @@ trait ScalacheckSupport {
     def ^^[B](f: A => B): Gen[B]      = gen map f
     def >>[B](f: A => Gen[B]): Gen[B] = gen flatMap f
 
+    def take(n: Int): Vector[A] = Stream continually gen.sample flatMap (x => x) take n toVector
     def *(gn: Gen[Int]): Gen[List[A]] = gn >> (this * _)
     def *(n: Int): Gen[List[A]]       = listOfN(n, gen)
     def list: Gen[List[A]]            = listOf(gen)
