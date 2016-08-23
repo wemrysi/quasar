@@ -252,6 +252,10 @@ package object json {
       */
     def -->[A <: JValue](clazz: Class[A]): A = (self -->? clazz).getOrElse(abort("Expected class " + clazz + ", but found: " + self.getClass))
 
+    def asNum: JNum = self match {
+      case x: JNum => x
+      case _       => abort(s"Expected JNum but found: ${self.getClass}")
+    }
     def asArray: JArray = self match {
       case x: JArray => x
       case _         => abort(s"Expected JArray but found: ${self.getClass}")
