@@ -808,8 +808,10 @@ trait TransformSpec extends TableQspec {
       val resultsInner = toJson(table.transform {
         WrapObject(
           InnerArrayConcat(
-            WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(0))),
-            WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(1)))
+            WrapArray(root.value(0)),
+            WrapArray(root.value(1))
+            // WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(0))),
+            // WrapArray(DerefArrayStatic(DerefObjectStatic(Leaf(Source), CPathField("value")), CPathIndex(1)))
           ),
           "value"
         )

@@ -58,14 +58,22 @@ trait TransSpecModule {
 
   implicit class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
     protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
-    def selectDynamic(name: String)                                           = next(DerefObjectStatic(spec, CPathField(name)))
-    def dot(name: String)                                                     = selectDynamic(name)
+
+    def apply(index: Int): TransSpecBuilder[A]           = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def select(name: String): TransSpecBuilder[A]        = next(DerefObjectStatic(spec, CPathField(name)))
+    def selectDynamic(name: String): TransSpecBuilder[A] = select(name)
   }
   implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
 
-  object root extends TransSpecBuilder(Fn.source) {
-    def value             = selectDynamic("value")
-    def apply(index: Int) = next(DerefArrayStatic(spec, CPathIndex(index)))
+  implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {
+    def delete(fields: CPathField*): ObjectDelete[A]                       = ObjectDelete(spec, fields.toSet)
+    def inner_++(x: TransSpec[A], xs: TransSpec[A]*): InnerObjectConcat[A] = InnerObjectConcat(spec +: x +: xs: _*)
+    def outer_++(x: TransSpec[A], xs: TransSpec[A]*): OuterObjectConcat[A] = OuterObjectConcat(spec +: x +: xs: _*)
+  }
+
+  object root extends TransSpecBuilder(Leaf(Source)) {
+    def value = selectDynamic("value")
+    def key   = selectDynamic("key")
   }
   object F1Expr {
     def negate         = lookupF1(Nil, "negate")
@@ -76,7 +84,7 @@ trait TransSpecModule {
   }
   object Fn {
     def source                    = Leaf(Source)
-    def valueIsEven(name: String) = Map1(root dot name, F1Expr.isEven)
+    def valueIsEven(name: String) = Map1(root select name, F1Expr.isEven)
     def constantTrue              = Filter(source, Equal(source, source))
   }
 
@@ -168,13 +176,13 @@ trait TransSpecModule {
       import CPath._
 
       def concatChildren[A <: SourceType](tree: CPathTree[Int], leaf: TransSpec[A] = Leaf(Source)): TransSpec[A] = {
-        def createSpecs(trees: Seq[CPathTree[Int]]): Seq[TransSpec[A]] = trees.map { child =>
-          child match {
+        def createSpecs(trees: Seq[CPathTree[Int]]): Seq[TransSpec[A]] = trees map { child =>
+          (child match {
             case node @ RootNode(seq)                  => concatChildren(node, leaf)
             case node @ FieldNode(CPathField(name), _) => trans.WrapObject(concatChildren(node, leaf), name)
             case node @ IndexNode(CPathIndex(_), _)    => trans.WrapArray(concatChildren(node, leaf)) //assuming that indices received in order
-            case LeafNode(idx)                         => trans.DerefArrayStatic(leaf, CPathIndex(idx))
-          }
+            case LeafNode(idx)                         => leaf(idx)
+          }): TransSpec[A]
         }
 
         val initialSpecs = tree match {
@@ -291,15 +299,12 @@ trait TransSpecModule {
     object TransSpec1 {
       import constants._
 
-      val Id = Leaf(Source)
-
-      val DerefArray0 = DerefArrayStatic(Leaf(Source), CPathIndex(0))
-      val DerefArray1 = DerefArrayStatic(Leaf(Source), CPathIndex(1))
-      val DerefArray2 = DerefArrayStatic(Leaf(Source), CPathIndex(2))
-
-      val PruneToKeyValue = InnerObjectConcat(WrapObject(SourceKey.Single, paths.Key.name), WrapObject(SourceValue.Single, paths.Value.name))
-
-      val DeleteKeyValue = ObjectDelete(Leaf(Source), Set(paths.Key, paths.Value))
+      val Id              = Leaf(Source)
+      val DerefArray0     = Id(0)
+      val DerefArray1     = Id(1)
+      val DerefArray2     = Id(2)
+      val PruneToKeyValue = WrapObject(SourceKey.Single, paths.Key.name) inner_++ WrapObject(SourceValue.Single, paths.Value.name)
+      val DeleteKeyValue  = Id.delete(paths.Key, paths.Value)
     }
 
     type TransSpec2 = TransSpec[Source2]
@@ -313,12 +318,12 @@ trait TransSpecModule {
         case SourceRight => SourceLeft
       }
 
-      def DerefArray0(source: Source2) = DerefArrayStatic(Leaf(source), CPathIndex(0))
-      def DerefArray1(source: Source2) = DerefArrayStatic(Leaf(source), CPathIndex(1))
-      def DerefArray2(source: Source2) = DerefArrayStatic(Leaf(source), CPathIndex(2))
+      def DerefArray0(source: Source2) = Leaf(source)(0)
+      def DerefArray1(source: Source2) = Leaf(source)(1)
+      def DerefArray2(source: Source2) = Leaf(source)(2)
 
-      val DeleteKeyValueLeft  = ObjectDelete(Leaf(SourceLeft), Set(paths.Key, paths.Value))
-      val DeleteKeyValueRight = ObjectDelete(Leaf(SourceRight), Set(paths.Key, paths.Value))
+      val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(paths.Key, paths.Value)
+      val DeleteKeyValueRight = Leaf(SourceRight).delete(paths.Key, paths.Value)
     }
 
     sealed trait GroupKeySpec {

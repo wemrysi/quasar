@@ -1,6 +1,5 @@
 package ygg.tests
 
-import ygg.table._
 import scalaz._, Scalaz._
 import ygg.json._
 
@@ -41,7 +40,7 @@ trait SampleSpec extends ColumnarTableQspec {
   def testSampleTransSpecs = {
     val data  = SampleData(simpleData2)
     val table = fromSample(data)
-    val specs = Seq(trans.DerefObjectStatic(TransSpec1.Id, CPathField("id")), trans.DerefObjectStatic(TransSpec1.Id, CPathField("value")))
+    val specs = Seq[TransSpec1](root.id, root.value)
 
     table.sample(15, specs).copoint.toList must beLike {
       case s1 :: s2 :: Nil =>
@@ -50,8 +49,8 @@ trait SampleSpec extends ColumnarTableQspec {
         result1 must have size (15)
         result2 must have size (15)
 
-        val expected1 = toJson(table.transform(trans.DerefObjectStatic(TransSpec1.Id, CPathField("id")))).copoint
-        val expected2 = toJson(table.transform(trans.DerefObjectStatic(TransSpec1.Id, CPathField("value")))).copoint
+        val expected1 = toJson(table.transform(root.id)).copoint
+        val expected2 = toJson(table.transform(root.value)).copoint
         expected1 must containAllOf(result1)
         expected2 must containAllOf(result2)
     }
