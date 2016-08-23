@@ -229,20 +229,15 @@ package object json {
   }
 
   implicit class JValueOps(private val self: JValue) {
-    def diff(other: JValue)          = Diff.diff(self, other)
-    def merge(other: JValue): JValue = Merge.merge(self, other)
-    def isDefined                    = self != JUndefined
-    def render: String               = self.toString
-
-    def normalize: JValue = self match {
-      case JUndefined       => abort("Can't normalize JUndefined")
-      case JObject(fields)  => JObject(fields filter (_._2.isDefined) mapValues (_.normalize) toMap)
-      case JArray(elements) => JArray(elements filter (_.isDefined) map (_.normalize))
-      case _                => self
-    }
-
-    def toOption                           = if (isDefined) Some(self) else None
+    def diff(other: JValue)                = Diff.diff(self, other)
+    def merge(other: JValue): JValue       = Merge.merge(self, other)
+    def isDefined                          = self != JUndefined
+    def render: String                     = self.toString
+    def toOption: Option[JValue]           = if (isDefined) Some(self) else None
     def getOrElse(that: => JValue): JValue = if (isDefined) self else that
+    def get(path: JPath): JValue           = path extract self
+    def apply(path: JPath): JValue         = path extract self
+    def apply(node: JPathNode): JValue     = apply(JPath(node))
 
     /** XPath-like expression to query JSON fields by name. Matches only fields on
       * next level.
@@ -285,12 +280,6 @@ package object json {
         case x      => JArray(x)
       }
     }
-
-    /** Gets the specified value located at the terminal of the specified path.
-      */
-    def get(path: JPath): JValue       = path extract self
-    def apply(path: JPath): JValue     = path extract self
-    def apply(node: JPathNode): JValue = apply(JPath(node))
 
     /** Return nth element from JSON Array.
       */
@@ -675,18 +664,6 @@ package object json {
     def remove(p: JValue => Boolean): JValue = self mapUp {
       case x if p(x) => JUndefined
       case x         => x
-    }
-
-    /**
-      * Remove instances of Nothing from the data structure.
-      */
-    def minimize: Option[JValue] = {
-      self match {
-        case JObject.Fields(fields) => Some(JObject(fields flatMap { case JField(k, v) => v.minimize.map(JField(k, _)) }))
-        case JArray(elements)      => Some(JArray(elements.flatMap(_.minimize)))
-        case JUndefined            => None
-        case value                 => Some(value)
-      }
     }
   }
 }

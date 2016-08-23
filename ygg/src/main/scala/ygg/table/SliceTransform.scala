@@ -15,16 +15,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
     def left[A](initial: A)     = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sl))
     def right[A](initial: A)    = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sr))
 
-    def liftM(f: Slice => Slice): SliceTransform1[Unit] =
-      SliceTransform1.liftM[Unit]((), { (u, s) =>
-        (u, f(s))
-      })
-
-    def lift(f: Slice => M[Slice]): SliceTransform1[Unit] =
-      SliceTransform1[Unit]((), { (_, s) =>
-        f(s) map { ((), _) }
-      })
-
     def composeSliceTransform(spec: TransSpec1): SliceTransform1[_] = {
       composeSliceTransform2(spec).parallel
     }

@@ -186,44 +186,10 @@ sealed abstract class CNumericType[A: CTag] extends CValueType[A] {
 }
 
 object CType {
-  def nameOf(c: CType): String = c match {
-    case CString              => "String"
-    case CBoolean             => "Boolean"
-    case CLong                => "Long"
-    case CDouble              => "Double"
-    case CNum                 => "Decimal"
-    case CNull                => "Null"
-    case CEmptyObject         => "EmptyObject"
-    case CEmptyArray          => "EmptyArray"
-    case CArrayType(elemType) => "Array[%s]" format nameOf(elemType)
-    case CDate                => "Timestamp"
-    case CPeriod              => "Period"
-    case CUndefined           => abort("CUndefined cannot be serialized")
-  }
-
-  val ArrayName = """Array[(.*)]""".r
-
-  def fromName(n: String): Option[CType] = n match {
-    case "String"        => Some(CString)
-    case "Boolean"       => Some(CBoolean)
-    case "Long"          => Some(CLong)
-    case "Double"        => Some(CDouble)
-    case "Decimal"       => Some(CNum)
-    case "Null"          => Some(CNull)
-    case "EmptyObject"   => Some(CEmptyObject)
-    case "EmptyArray"    => Some(CEmptyArray)
-    case "Timestamp"     => Some(CDate)
-    case "Period"        => Some(CPeriod)
-    case ArrayName(elem) => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
-    case _               => None
-  }
-
   def readResolve() = CType
-
   def of(v: CValue): CType = v.cType
 
-  def canCompare(t1: CType, t2: CType): Boolean =
-    (t1 == t2) || (t1.isNumeric && t2.isNumeric)
+  def canCompare(t1: CType, t2: CType): Boolean = (t1 == t2) || (t1.isNumeric && t2.isNumeric)
 
   def unify(t1: CType, t2: CType): Option[CType] = (t1, t2) match {
     case _ if t1 == t2                                    => Some(t1)
@@ -234,8 +200,7 @@ object CType {
 
   // TODO Should return Option[CValue]... is this even used?
   // Yes; it is used only in RoutingTable.scala
-  @inline
-  final def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
+  def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
     case JString(s)    => CString(s)
     case JBool(b)      => CBoolean(b)
     case JNull         => CNull
@@ -315,40 +280,20 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
       if (as(i) != bs(i))
         return false
     }
-
     true
   }
 
   private final def equiv(a: Any, b: Any, elemType: CValueType[_]): Boolean = elemType match {
-    case CBoolean =>
-      leafEquiv(a.asInstanceOf[Array[Boolean]], b.asInstanceOf[Array[Boolean]])
-
-    case CLong =>
-      leafEquiv(a.asInstanceOf[Array[Long]], b.asInstanceOf[Array[Long]])
-
-    case CDouble =>
-      leafEquiv(a.asInstanceOf[Array[Double]], b.asInstanceOf[Array[Double]])
-
-    case CArrayType(elemType) =>
-      val as     = a.asInstanceOf[Array[Array[_]]]
-      val bs     = b.asInstanceOf[Array[Array[_]]]
-      var i      = 0
-      var result = as.length == bs.length
-      while (result && i < as.length) {
-        result = equiv(as(i), bs(i), elemType)
-        i += 1
-      }
-      result
-
-    case _ =>
-      leafEquiv(a.asInstanceOf[Array[AnyRef]], b.asInstanceOf[Array[AnyRef]])
+    case CBoolean             => leafEquiv(a.asInstanceOf[Array[Boolean]], b.asInstanceOf[Array[Boolean]])
+    case CLong                => leafEquiv(a.asInstanceOf[Array[Long]], b.asInstanceOf[Array[Long]])
+    case CDouble              => leafEquiv(a.asInstanceOf[Array[Double]], b.asInstanceOf[Array[Double]])
+    case CArrayType(elemType) => (a.asInstanceOf[Array[Array[_]]] corresponds b.asInstanceOf[Array[Array[_]]])(equiv(_, _, elemType))
+    case _                    => leafEquiv(a.asInstanceOf[Array[AnyRef]], b.asInstanceOf[Array[AnyRef]])
   }
 
   override def equals(that: Any): Boolean = that match {
-    case v @ CArray(_, thatCType) if cType == thatCType =>
-      equiv(value, v.value, cType.elemType)
-
-    case _ => false
+    case v @ CArray(_, thatCType) if cType == thatCType => equiv(value, v.value, cType.elemType)
+    case _                                              => false
   }
 
   override def toString: String = value.mkString("CArray(Array(", ", ", "), " + cType.toString + ")")
