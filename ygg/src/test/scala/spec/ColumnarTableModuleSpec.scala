@@ -1,7 +1,5 @@
 package ygg.tests
 
-import ygg.table._
-import scalaz._, Scalaz._
 import SampleData._
 import ygg.json._
 
@@ -18,8 +16,6 @@ class ColumnarTableModuleSpec
          with SampleSpec
          with DistinctSpec
          with SchemasSpec {
-
-  import trans._
 
   "a table dataset" should {
     "verify bijection from JSON" in checkMappings(this)
@@ -215,56 +211,5 @@ class ColumnarTableModuleSpec
 
   "partitionMerge" should {
     "concatenate reductions of subsequences" in testPartitionMerge
-  }
-
-  "track table metrics" should {
-    "single traversal" >> {
-      implicit val gen = sample(objectSchema(_, 3))
-      prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
-
-        val table = fromSample(sample)
-        val t0 = table.transform(TransSpec1.Id)
-        t0.toJson.copoint must_== sample.data
-
-        table.metrics.startCount must_== 1
-        table.metrics.sliceTraversedCount must_== expectedSlices
-        t0.metrics.startCount must_== 1
-        t0.metrics.sliceTraversedCount must_== expectedSlices
-      }
-    }
-
-    "multiple transforms" >> {
-      implicit val gen = sample(objectSchema(_, 3))
-      prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
-
-        val table = fromSample(sample)
-        val t0 = table.transform(TransSpec1.Id).transform(TransSpec1.Id).transform(TransSpec1.Id)
-        t0.toJson.copoint must_== sample.data
-
-        table.metrics.startCount must_== 1
-        table.metrics.sliceTraversedCount must_== expectedSlices
-        t0.metrics.startCount must_== 1
-        t0.metrics.sliceTraversedCount must_== expectedSlices
-      }
-    }
-
-    "multiple forcing calls" >> {
-      implicit val gen = sample(objectSchema(_, 3))
-      prop { (sample: SampleData) =>
-        val expectedSlices = (sample.data.size.toDouble / yggConfig.maxSliceSize).ceil
-
-        val table = fromSample(sample)
-        val t0 = table.compact(TransSpec1.Id).compact(TransSpec1.Id).compact(TransSpec1.Id)
-        table.toJson.copoint must_== sample.data
-        t0.toJson.copoint must_== sample.data
-
-        table.metrics.startCount must_== 2
-        table.metrics.sliceTraversedCount must_== (expectedSlices * 2)
-        t0.metrics.startCount must_== 1
-        t0.metrics.sliceTraversedCount must_== expectedSlices
-      }
-    }
   }
 }

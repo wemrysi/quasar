@@ -308,20 +308,10 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     }
   }
 
-  abstract class ColumnarTable(slices0: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable { self: Table =>
+  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable {
+    self: Table =>
+
     import SliceTransform._
-
-    private final val readStarts = new java.util.concurrent.atomic.AtomicInteger
-    private final val blockReads = new java.util.concurrent.atomic.AtomicInteger
-
-    val slices = StreamT(
-      StreamT
-        .Skip({
-          readStarts.getAndIncrement
-          slices0.map(s => { blockReads.getAndIncrement; s })
-        })
-        .point[M]
-    )
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
@@ -1417,7 +1407,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
 
     def toStrings: Need[Stream[String]] = toEvents(_ toString _)
     def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
-    def metrics: TableMetrics           = TableMetrics(readStarts.get, blockReads.get)
 
     private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] = (
       (self compact Leaf(Source)).slices.toStream map (stream =>
