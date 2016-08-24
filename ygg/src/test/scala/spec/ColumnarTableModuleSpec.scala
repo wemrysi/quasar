@@ -167,7 +167,7 @@ class ColumnarTableModuleSpec
       "select the correct rows: second slice"                                               in testTakeRangeSecondSlice
       "select the first slice"                                                              in testTakeRangeFirstSliceOnly
       "select nothing with a negative starting index"                                       in testTakeRangeNegStart
-      "select nothing with a negative number to take"                                       in testTakeRangeNegNumber
+      "select nothing with a negative number to take"                                       in testTakeRangeNegTake
       "select the correct rows using scalacheck"                                            in checkTakeRange
     }
 

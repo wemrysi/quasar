@@ -24,6 +24,9 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
     }
   }
 
+  case class TableTestFun(table: Table, fun: Table => Table, expected: Seq[JValue]) {
+    def check(): MatchResult[Seq[JValue]] = (toJson(fun(table)).copoint: Seq[JValue]) must_=== expected
+  }
   case class TableTest(table: Table, spec: TransSpec1, expected: Seq[JValue]) {
     def check(): MatchResult[Seq[JValue]] = (toJson(table transform spec).copoint: Seq[JValue]) must_=== expected
   }
@@ -43,6 +46,9 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
 
   def checkSpecData(spec: TransSpec1, data: Seq[JValue], expected: Seq[JValue]): Prop =
     TableTest(fromJson(data), spec, expected).check()
+
+  def checkTableFun(fun: Table => Table, data: Seq[JValue], expected: Seq[JValue]): Prop = checkTableFun(fun, fromJson(data), expected)
+  def checkTableFun(fun: Table => Table, table: Table, expected: Seq[JValue]): Prop      = TableTestFun(table, fun, expected).check()
 
   def checkSpecDataId(spec: TransSpec1, data: Seq[JValue]): Prop =
     checkSpecData(spec, data, data)
