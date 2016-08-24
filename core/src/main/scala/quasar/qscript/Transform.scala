@@ -497,7 +497,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       (Planner.InternalError("un-elided Let"): PlannerError).left[TargetT]
 
     case LogicalPlan.TypecheckF(expr, typ, cont, fallback) =>
-      merge3Map(Func.Input3(expr, cont, fallback))(Guard(_, typ, _, _)).right[PlannerError]
+      merge2Map(Func.Input2(expr, cont))(Guard(_, typ, _)).right[PlannerError]
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>

@@ -360,6 +360,7 @@ object Data {
       case Id(value)        =>
         // FIXME: This evilly guesses the backend-specific OID formats
         E.inj(ejson.Meta(Str(value), EJsonType("_bson.oid"))).right
+      case NA               => C.inj(ejson.Str("NA")).right
       case data             => data.left
     })
 }
