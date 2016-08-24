@@ -916,85 +916,83 @@ object WorkflowOpCoreF {
       }
     }
 
-  implicit def renderTree: Delay[RenderTree, WorkflowOpCoreF] =
-    new Delay[RenderTree, WorkflowOpCoreF] {
-      def apply[A](fa: RenderTree[A]) = new RenderTree[WorkflowOpCoreF[A]] {
-        val wfType = "Workflow" :: Nil
+  implicit def renderTree: RenderTree[WorkflowOpCoreF[Unit]] =
+    new RenderTree[WorkflowOpCoreF[Unit]] {
+      val wfType = "Workflow" :: Nil
 
-        def render(v: WorkflowOpCoreF[A]) = v match {
-          case $PureF(value)       => Terminal("$PureF" :: wfType, Some(value.toString))
-          case $ReadF(coll)        => coll.render.copy(nodeType = "$ReadF" :: wfType)
-          case $MatchF(_, sel)     =>
-            NonTerminal("$MatchF" :: wfType, None, sel.render :: Nil)
-          case $ProjectF(_, shape, xId) =>
-            NonTerminal("$ProjectF" :: wfType, None,
-              Reshape.renderReshape(shape) :+
-                Terminal(xId.toString :: "$ProjectF" :: wfType, None))
-          case $RedactF(_, value) => NonTerminal("$RedactF" :: wfType, None,
-            value.render ::
+      def render(v: WorkflowOpCoreF[Unit]) = v match {
+        case $PureF(value)       => Terminal("$PureF" :: wfType, Some(value.toString))
+        case $ReadF(coll)        => coll.render.copy(nodeType = "$ReadF" :: wfType)
+        case $MatchF(_, sel)     =>
+          NonTerminal("$MatchF" :: wfType, None, sel.render :: Nil)
+        case $ProjectF(_, shape, xId) =>
+          NonTerminal("$ProjectF" :: wfType, None,
+            Reshape.renderReshape(shape) :+
+              Terminal(xId.toString :: "$ProjectF" :: wfType, None))
+        case $RedactF(_, value) => NonTerminal("$RedactF" :: wfType, None,
+          value.render ::
+            Nil)
+        case $LimitF(_, count)  => Terminal("$LimitF" :: wfType, Some(count.shows))
+        case $SkipF(_, count)   => Terminal("$SkipF" :: wfType, Some(count.shows))
+        case $UnwindF(_, field) => Terminal("$UnwindF" :: wfType, Some(field.toString))
+        case $GroupF(_, grouped, -\/(by)) =>
+          val nt = "$GroupF" :: wfType
+          NonTerminal(nt, None,
+            grouped.render ::
+              NonTerminal("By" :: nt, None, Reshape.renderReshape(by)) ::
               Nil)
-          case $LimitF(_, count)  => Terminal("$LimitF" :: wfType, Some(count.shows))
-          case $SkipF(_, count)   => Terminal("$SkipF" :: wfType, Some(count.shows))
-          case $UnwindF(_, field) => Terminal("$UnwindF" :: wfType, Some(field.toString))
-          case $GroupF(_, grouped, -\/(by)) =>
-            val nt = "$GroupF" :: wfType
-            NonTerminal(nt, None,
-              grouped.render ::
-                NonTerminal("By" :: nt, None, Reshape.renderReshape(by)) ::
-                Nil)
-          case $GroupF(_, grouped, \/-(expr)) =>
-            val nt = "$GroupF" :: wfType
-            NonTerminal(nt, None,
-              grouped.render ::
-                Terminal("By" :: nt, Some(expr.toString)) ::
-                Nil)
-          case $SortF(_, value)   =>
-            val nt = "$SortF" :: wfType
-            NonTerminal(nt, None,
-              value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
-          case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
-            val nt = "$GeoNearF" :: wfType
-            NonTerminal(nt, None,
-              Terminal("Near" :: nt, Some(near.shows)) ::
-                Terminal("DistanceField" :: nt, Some(distanceField.toString)) ::
-                Terminal("Limit" :: nt, Some(limit.shows)) ::
-                Terminal("MaxDistance" :: nt, Some(maxDistance.shows)) ::
-                Terminal("Query" :: nt, Some(query.toString)) ::
-                Terminal("Spherical" :: nt, Some(spherical.shows)) ::
-                Terminal("DistanceMultiplier" :: nt, Some(distanceMultiplier.toString)) ::
-                Terminal("IncludeLocs" :: nt, Some(includeLocs.toString)) ::
-                Terminal("UniqueDocs" :: nt, Some(uniqueDocs.shows)) ::
-                Nil)
+        case $GroupF(_, grouped, \/-(expr)) =>
+          val nt = "$GroupF" :: wfType
+          NonTerminal(nt, None,
+            grouped.render ::
+              Terminal("By" :: nt, Some(expr.toString)) ::
+              Nil)
+        case $SortF(_, value)   =>
+          val nt = "$SortF" :: wfType
+          NonTerminal(nt, None,
+            value.map { case (field, st) => Terminal("SortKey" :: nt, Some(field.asText + " -> " + st)) }.toList)
+        case $GeoNearF(_, near, distanceField, limit, maxDistance, query, spherical, distanceMultiplier, includeLocs, uniqueDocs) =>
+          val nt = "$GeoNearF" :: wfType
+          NonTerminal(nt, None,
+            Terminal("Near" :: nt, Some(near.shows)) ::
+              Terminal("DistanceField" :: nt, Some(distanceField.toString)) ::
+              Terminal("Limit" :: nt, Some(limit.shows)) ::
+              Terminal("MaxDistance" :: nt, Some(maxDistance.shows)) ::
+              Terminal("Query" :: nt, Some(query.toString)) ::
+              Terminal("Spherical" :: nt, Some(spherical.shows)) ::
+              Terminal("DistanceMultiplier" :: nt, Some(distanceMultiplier.toString)) ::
+              Terminal("IncludeLocs" :: nt, Some(includeLocs.toString)) ::
+              Terminal("UniqueDocs" :: nt, Some(uniqueDocs.shows)) ::
+              Nil)
 
-          case $MapF(_, fn, scope) =>
-            val nt = "$MapF" :: wfType
-            NonTerminal(nt, None,
-              JSRenderTree.render(fn) ::
-                Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
-                Nil)
-          case $FlatMapF(_, fn, scope) =>
-            val nt = "$FlatMapF" :: wfType
-            NonTerminal(nt, None,
-              JSRenderTree.render(fn) ::
-                Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
-                Nil)
-          case $SimpleMapF(_, exprs, scope) =>
-            val nt = "$SimpleMapF" :: wfType
-            NonTerminal(nt, None,
-              exprs.toList.map {
-                case MapExpr(e)  => NonTerminal("Map" :: nt, None, List(e.render))
-	        case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
-              } :+
-                Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)))
-          case $ReduceF(_, fn, scope) =>
-            val nt = "$ReduceF" :: wfType
-            NonTerminal(nt, None,
-              JSRenderTree.render(fn) ::
-                Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
-                Nil)
-          case $OutF(_, coll) => Terminal("$OutF" :: wfType, Some(coll.value))
-          case $FoldLeftF(_, _) => Terminal("$FoldLeftF" :: wfType, None)
-        }
+        case $MapF(_, fn, scope) =>
+          val nt = "$MapF" :: wfType
+          NonTerminal(nt, None,
+            JSRenderTree.render(fn) ::
+              Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
+              Nil)
+        case $FlatMapF(_, fn, scope) =>
+          val nt = "$FlatMapF" :: wfType
+          NonTerminal(nt, None,
+            JSRenderTree.render(fn) ::
+              Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
+              Nil)
+        case $SimpleMapF(_, exprs, scope) =>
+          val nt = "$SimpleMapF" :: wfType
+          NonTerminal(nt, None,
+            exprs.toList.map {
+              case MapExpr(e)  => NonTerminal("Map" :: nt, None, List(e.render))
+        case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
+            } :+
+              Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)))
+        case $ReduceF(_, fn, scope) =>
+          val nt = "$ReduceF" :: wfType
+          NonTerminal(nt, None,
+            JSRenderTree.render(fn) ::
+              Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)) ::
+              Nil)
+        case $OutF(_, coll) => Terminal("$OutF" :: wfType, Some(coll.value))
+        case $FoldLeftF(_, _) => Terminal("$FoldLeftF" :: wfType, None)
       }
     }
 }
