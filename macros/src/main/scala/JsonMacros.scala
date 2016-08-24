@@ -1,30 +1,91 @@
 package ygg.macros
 
 import scala.collection.{ mutable => scm }
-import scala.reflect.macros.whitebox
+import scala.reflect.macros.blackbox._
 import jawn._
 import java.nio.file._
+import java.util.UUID
 
-object JParser {
-  import jawn.AsyncParser._
+abstract class TreeFacades[C <: Context](val c: C) {
+  outer =>
 
-  def stream[A](implicit z: Facade[A]): AsyncParser[A] = Parser.async[A](ValueStream)
-  def json[A](implicit z: Facade[A]): AsyncParser[A]   = Parser.async[A](SingleValue)
-  def unwrap[A](implicit z: Facade[A]): AsyncParser[A] = Parser.async[A](UnwrapArray)
-
-  def parseUnsafe[A](str: String)(implicit z: Facade[A]): A                                      = Parser.parseUnsafe[A](str)
-  def parseManyFromString[A](str: String)(implicit z: Facade[A]): Either[ParseException, Seq[A]] = stream[A] absorb str
-}
-
-class JsonMacros(val c: whitebox.Context) {
   import c.universe._
 
-  private def fail(msg: String): Nothing = c.abort(c.enclosingPosition, msg)
+  type M[X]
+  type JField = (Tree, Tree)
 
-  private def freshUUID(exclude: Seq[String]): String = java.util.UUID.randomUUID.toString match {
-    case uuid if exclude forall (x => !(x contains uuid)) => uuid
-    case _                                                => freshUUID(exclude)
+  trait Builder[A] {
+    def +=(x: A): Unit
+    def result: M[A]
   }
+  def newBuilder[A](): Builder[A]
+  def stringKey(s: String): Tree
+
+  def jnull: Tree
+  def jbool(x: Boolean): Tree
+  def jnum(s: String): Tree
+  def jint(s: String): Tree
+  def jstring(s: String): Tree
+  def jarray(xs: M[Tree]): Tree
+  def jobject(xs: M[Tree]): Tree
+  def jfield(key: Tree, value: Tree): Tree
+
+  class TreeFacade(keyMap: Map[String, Tree], valueMap: Map[String, Tree]) extends Facade[Tree] {
+    def keyOrLiteral(k: String): Tree   = keyMap.getOrElse(k, stringKey(k))
+    def valueOrLiteral(x: String): Tree = valueMap.getOrElse(x, jstring(x))
+
+    def jnull: Tree                = outer.jnull
+    def jfalse: Tree               = jbool(false)
+    def jtrue: Tree                = jbool(true)
+    def jnum(s: String): Tree      = outer.jnum(s)
+    def jint(s: String): Tree      = outer.jint(s)
+    def jstring(s: String): Tree   = outer.jstring(s)
+    def jarray(xs: M[Tree]): Tree  = outer.jarray(xs)
+    def jobject(xs: M[Tree]): Tree = outer.jobject(xs)
+
+    def singleContext(): FContext[Tree] = new FContext[Tree] {
+      var value: Tree = _
+
+      def add(v: Tree): Unit   = value = v
+      def add(s: String): Unit = add(valueOrLiteral(s))
+      def finish: Tree         = value
+      def isObj: Boolean       = false
+    }
+
+    def arrayContext(): FContext[Tree] = new FContext[Tree] {
+      val buf = newBuilder[Tree]()
+
+      def add(v: Tree): Unit   = buf += v
+      def add(s: String): Unit = add(valueOrLiteral(s))
+      def finish: Tree         = jarray(buf.result)
+      def isObj: Boolean       = false
+    }
+    def objectContext(): FContext[Tree] = new FContext[Tree] {
+      var key: String = null
+      val buf         = newBuilder[Tree]()
+
+      private def clearKey(body: Unit): Unit = key = null
+      def add(arg: String): Unit = key match {
+        case null => key = arg
+        case _    => clearKey( buf += jfield(keyOrLiteral(key), valueOrLiteral(arg)) )
+      }
+      def add(arg: Tree): Unit = clearKey( buf += jfield(keyOrLiteral(key), arg) )
+      def finish: Tree         = jobject(buf.result)
+      def isObj: Boolean       = true
+    }
+  }
+}
+
+class JsonMacros(val c: Context) {
+  import c.universe._
+
+  type MacroFacade = Facade[Tree]
+
+  def jsonInterpolatorImpl(args: c.Expr[Any]*): Tree     = JsonMacroSingle(args: _*)
+  def jsonManyInterpolatorImpl(args: c.Expr[Any]*): Tree = JsonMacroMany(args: _*)
+
+  private def fail(msg: String): Nothing  = c.abort(c.enclosingPosition, msg)
+  private def fail(t: Throwable): Nothing = fail("Exception during json interpolation: " + t.getMessage)
 
   def parseFromPathImpl(path: c.Expr[String]): Tree = {
     path.tree foreach (t => println("" + ((t, t.getClass))))
@@ -33,11 +94,11 @@ class JsonMacros(val c: whitebox.Context) {
       case Literal(Constant(p: String)) => Paths get p
       case _                            => fail("A StringContext part for the json interpolator is not a string")
     }
-    val json = scala.util.Try(new String(Files readAllBytes jpath, "UTF-8")).toOption getOrElse ""
+    val json = doTry(new String(Files readAllBytes jpath, "UTF-8")).toOption getOrElse ""
     if (json.length == 0)
       fail(s"No json found at $jpath")
 
-    JsonMacroSingle.parse(json, new MacroFacade(Map(), Map()))
+    JsonMacroSingle.parse(json, facades.create())
   }
 
   trait JsonMacroBase {
@@ -55,19 +116,20 @@ class JsonMacros(val c: whitebox.Context) {
 
         args foreach { arg =>
           val tpe      = c.typecheck(arg.tree).tpe
-          val uuid     = freshUUID(stringParts)
+          val uuid     = UUID.randomUUID.toString
           uuids        = uuids :+ uuid
           values(uuid) = q"io.circe.Encoder[$tpe].apply($arg)"
 
           if (tpe =:= typeOf[String])
             keys(uuid) = q"$arg"
         }
+
         if (stringParts.size != uuids.size + 1)
           fail("Invalid arguments to json interpolator")
 
         parse(
           (stringParts, uuids).zipped map ((part, uuid) => part + "\"" + uuid + "\"") mkString ("", "", stringParts.last),
-          new MacroFacade(keys.toMap, values.toMap)
+          facades.create(keys.toMap, values.toMap)
         )
 
       case tree => fail("Unexpected tree shape for json interpolation macro: " + tree)
@@ -75,68 +137,34 @@ class JsonMacros(val c: whitebox.Context) {
   }
 
   object JsonMacroSingle extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree = (
-      scala.util.Try(JParser.parseUnsafe(json)(facade)) match {
-        case scala.util.Success(t) => t
-        case scala.util.Failure(t) => fail("Invalid JSON in interpolated string: " + t.getMessage)
-      }
-    )
+    def parse(json: String, facade: MacroFacade): Tree =
+      JParser.parse(json)(facade).fold(fail, identity)
   }
   object JsonMacroMany extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree = (
-      JParser.parseManyFromString(json)(facade) match {
-        case scala.util.Right(ts) => q"${ts.toVector}" //: Seq[ygg.json.JValue]"
-        case scala.util.Left(t)   => fail("Invalid JSON in interpolated string: " + t.getMessage)
-      }
-    )
+    def parse(json: String, facade: MacroFacade): Tree =
+      JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}")
   }
 
-  def jsonInterpolatorImpl(args: c.Expr[Any]*): Tree                                = JsonMacroSingle(args: _*)
-  def jsonManyInterpolatorImpl(args: c.Expr[Any]*): c.Expr[Vector[ygg.json.JValue]] = c.Expr(JsonMacroMany(args: _*))
+  object facades extends TreeFacades[c.type](c) {
+    type M[X] = List[X]
 
-  class MacroFacade(keys: Map[String, Tree], values: Map[String, Tree]) extends Facade[Tree] {
+    def create(): TreeFacade                                                   = create(Map(), Map())
+    def create(keys: Map[String, Tree], values: Map[String, Tree]): TreeFacade = new TreeFacade(keys, values)
+
+    def stringKey(s: String): Tree = q"$s"
+    def newBuilder[A]() = new Builder[A] {
+      val buf            = scm.ListBuffer[A]()
+      def +=(x: A): Unit = buf += x
+      def result: M[A]   = buf.result
+    }
+
+    def jbool(x: Boolean)                    = if (x) q"ygg.json.JTrue" else q"ygg.json.JFalse"
     def jnull: Tree                          = q"ygg.json.JNull"
-    def jfalse: Tree                         = q"ygg.json.JFalse"
-    def jtrue: Tree                          = q"ygg.json.JTrue"
     def jnum(s: String): Tree                = q"ygg.json.JNum($s)"
     def jint(s: String): Tree                = q"ygg.json.JNum($s)"
     def jstring(s: String): Tree             = q"ygg.json.JString($s)"
-    def jarray(xs: Array[Tree]): Tree        = q"ygg.json.JArray(${xs.toList})"
-    def jobject(xs: List[Tree]): Tree        = q"ygg.json.jobject($xs: _*)"
+    def jarray(xs: List[Tree]): Tree         = q"ygg.json.JArray($xs)"
+    def jobject(xs: List[Tree]): Tree        = q"ygg.json.JObject($xs)"
     def jfield(key: Tree, value: Tree): Tree = q"ygg.json.JField($key, $value)"
-
-    def toJsonKey(s: String): Tree     = keys.getOrElse(s, q"$s")
-    def toJsonString(s: String): Tree  = values.getOrElse(s, jstring(s))
-
-    def singleContext(): FContext[Tree] = new FContext[Tree] {
-      var value: Tree = _
-
-      def add(s: String): Unit = value = toJsonString(s)
-      def add(v: Tree): Unit   = value = v
-      def finish: Tree         = value
-      def isObj: Boolean       = false
-    }
-
-    def arrayContext(): FContext[Tree] = new FContext[Tree] {
-      val vs = scm.ArrayBuffer[Tree]()
-
-      def add(s: String): Unit = vs append toJsonString(s)
-      def add(v: Tree): Unit   = vs append v
-      def finish: Tree         = jarray(vs.toArray)
-      def isObj: Boolean       = false
-    }
-    def objectContext(): FContext[Tree] = new FContext[Tree] {
-      var key: String = null
-      val fields      = scm.ArrayBuffer[Tree]()
-
-      private def clearKey(body: Unit): Unit = key = null
-      def add(arg: String): Unit = key match {
-        case null => key = arg
-        case _    => clearKey( fields append jfield(toJsonKey(key), toJsonString(arg)) )
-      }
-      def add(arg: Tree): Unit = clearKey( fields append jfield(toJsonKey(key), arg) )
-      def finish: Tree         = jobject(fields.toList)
-      def isObj: Boolean       = true
-    }
   }
 }
