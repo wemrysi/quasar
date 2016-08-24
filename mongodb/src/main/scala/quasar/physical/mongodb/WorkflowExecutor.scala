@@ -295,12 +295,12 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
       case (List(PipelineOpCore($MatchF((), sel)), Projectable(bson), PipelineOpCore($SortF((), keys))), Nil) =>
         find(src, Find(sel.some, bson.some, keys.some, skip, limit)) map (_.right)
       case (List(Countable(field)), Nil)
-          if skip.getOrElse(0) == 0 && limit.cata(_ >= 1, true) =>
+          if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) =>
         labeledCount(src, Count(None, None, None), field) map (_.left)
       case (Nil, List(Countable(field))) =>
         labeledCount(src, Count(None, skip, limit), field) map (_.left)
       case (List(PipelineOpCore($MatchF((), sel)), Countable(field)), Nil)
-          if skip.getOrElse(0) == 0 && limit.cata(_ >= 1, true) =>
+          if skip.getOrElse(0L) ≟ 0L && limit.cata(_ >= 1L, true) =>
         labeledCount(src, Count(sel.some, None, None), field) map (_.left)
       case (List(PipelineOpCore($MatchF((), sel))), List(Countable(field))) =>
         labeledCount(src, Count(sel.some, skip, limit), field) map (_.left)
