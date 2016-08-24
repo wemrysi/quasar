@@ -35,7 +35,7 @@ package object qscript {
     implicit def qScriptCore[T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[QScriptCore[T, ?]] =
       new QScriptCorePlanner[T]
 
-    implicit def sourcedPathable[T[_[_]]]: MarkLogicPlanner[SourcedPathable[T, ?]] =
+    implicit def sourcedPathable[T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[SourcedPathable[T, ?]] =
       new SourcedPathablePlanner[T]
 
     implicit def constDeadEnd: MarkLogicPlanner[Const[DeadEnd, ?]] =

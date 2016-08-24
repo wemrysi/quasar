@@ -30,6 +30,6 @@ private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]
     case Const(Read(absFile)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
-      cts.directoryQuery(dirRepr.xs, "1".xs).point[Planning]
+      cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)).point[Planning]
   }
 }

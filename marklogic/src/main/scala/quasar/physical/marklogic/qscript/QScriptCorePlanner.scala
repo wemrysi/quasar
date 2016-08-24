@@ -42,9 +42,10 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
       fn.filter(func("$x") { mapFuncXQuery(f, "$x".xqy) }, src)
         .point[Planning]
 
+    // NB: XQuery sequences use 1-based indexing.
     case Take(src, from, count) =>
-      (rebaseXQuery(from, emptySeq) |@| rebaseXQuery(count, emptySeq))((fm, ct) =>
-        src((fm + 1.xqy).seq to ct))
+      (rebaseXQuery(from, "$src".xqy) |@| rebaseXQuery(count, "$src".xqy))((fm, ct) =>
+        let_("$src" -> src) return_ { "$src".xqy((fm + 1.xqy).seq to ct) })
 
     case Drop(src, from, count) =>
       (rebaseXQuery(from, emptySeq) |@| rebaseXQuery(count, emptySeq))((fm, ct) =>

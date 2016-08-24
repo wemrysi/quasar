@@ -123,7 +123,7 @@ object ops {
     val uri = pathUri(dir)
 
     def isMLDir(u: XQuery) =
-      fn.exists(xdmp.documentProperties(u) xp "/prop:properties/prop:directory")
+      fn.exists(xdmp.documentProperties(u) `/` "prop:properties".xs `/` "prop:directory".xs)
 
     val prefixPathsXqy =
       fn.filter(

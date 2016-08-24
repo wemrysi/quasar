@@ -44,9 +44,6 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
-  def string(str: String): XQuery =
-    XQuery(s""""$str"""")
-
   final case class Flwor(
     tupleStreams: IList[(String, XQuery)],
     letDefs: IList[(String, XQuery)],

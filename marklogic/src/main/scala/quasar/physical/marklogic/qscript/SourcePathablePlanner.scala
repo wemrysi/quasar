@@ -17,15 +17,16 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class SourcedPathablePlanner[T[_[_]]] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
+private[qscript] final class SourcedPathablePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
   val plan: AlgebraM[Planning, SourcedPathable[T, ?], XQuery] = {
-    case LeftShift(src, struct, repair) => src.point[Planning]
+    case LeftShift(src, struct, repair) => mapFuncXQuery(struct, src).point[Planning]
     case Union(src, lBranch, rBranch)   => src.point[Planning]
   }
 }

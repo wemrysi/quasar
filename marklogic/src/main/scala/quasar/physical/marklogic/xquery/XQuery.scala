@@ -20,7 +20,9 @@ import quasar.Predef._
 
 import scalaz._
 
-final case class XQuery(override val toString: String) extends scala.AnyVal {
+sealed abstract class XQuery {
+  import XQuery._
+
   def apply(predicate: XQuery): XQuery = XQuery(s"${this}[$predicate]")
   def unary_- : XQuery = XQuery(s"-$this")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
@@ -33,7 +35,16 @@ final case class XQuery(override val toString: String) extends scala.AnyVal {
   def or(other: XQuery): XQuery = XQuery(s"$this or $other")
   def seq: XQuery = mkSeq_(this)
   def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
-  def xp(xpath: XPath): XQuery = XQuery(toString + xpath)
+
+  def `/`(xqy: XQuery): XQuery = xqy match {
+    case StringLit(s)   => XQuery(s"$this/$s")
+    case Expression(ex) => XQuery(s"""$this/xdmp:value("$ex")""")
+  }
+
+  def `//`(xqy: XQuery): XQuery = xqy match {
+    case StringLit(s)   => XQuery(s"$this//$s")
+    case Expression(ex) => XQuery(s"""$this//xdmp:value("$ex")""")
+  }
 
   // Value Comparisons
   def eq(other: XQuery): XQuery = XQuery(s"$this eq $other")
@@ -58,6 +69,14 @@ final case class XQuery(override val toString: String) extends scala.AnyVal {
 }
 
 object XQuery {
+  final case class StringLit(str: String) extends XQuery {
+    override def toString = s""""$str""""
+  }
+  final case class Expression(override val toString: String) extends XQuery
+
+  def apply(expr: String): XQuery =
+    Expression(expr)
+
   implicit val show: Show[XQuery] =
     Show.showFromToString
 }

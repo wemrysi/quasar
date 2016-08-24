@@ -71,11 +71,12 @@ object MapFuncPlanner {
     // TODO: Currently experimenting with sequence as Array, might not work.
     case MakeArray(x) => x
     case ConcatArrays(x, y) => mkSeq_(x, y)
+    case ProjectField(src, field) => src `/` field
     case ProjectIndex(seq, idx) => seq(idx + 1.xqy)
 
     // other
     case Range(x, y) => x to y
 
-    case mapFunc => s"(: ${mapFunc.shows} :)".xqy
+    case mapFunc => s"(: ${mapFunc.shows} :)()".xqy
   }
 }
