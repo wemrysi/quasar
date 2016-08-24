@@ -7,6 +7,13 @@ import ygg.json._
 trait TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._
 
+  private def someJson = jsonMany"""
+    {"key":[1],"value":"foo"}
+    {"key":[2],"value":12}
+    {"key":[3],"value":{"baz":true}}
+    {"key":[4],"value":"ack"}
+  """.toStream
+
   def checkTakeRange = {
     implicit val gen: Arbitrary[SampleData] = sample(schema)
 
@@ -29,13 +36,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }.set(minTestsOk = 1000)
 
   def testTakeRange = {
-    val data: Stream[JValue] = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
+    val data    = someJson
     val table   = fromSample(SampleData(data))
     val results = toJson(table.takeRange(1, 2))
 
@@ -48,13 +49,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeNegStart = {
-    val data = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
+    val data    = someJson
     val sample  = SampleData(data)
     val table   = fromSample(sample)
     val results = toJson(table.takeRange(-1, 5))
@@ -63,13 +58,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeNegNumber = {
-    val data = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
+    val data    = someJson
     val sample  = SampleData(data)
     val table   = fromSample(sample)
     val results = toJson(table.takeRange(2, -3))
@@ -78,13 +67,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeNeg = {
-    val data = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
+    val data    = someJson
     val sample  = SampleData(data)
     val table   = fromSample(sample)
     val results = toJson(table.takeRange(-1, 5))
@@ -93,16 +76,10 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeLarger = {
-    val data = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
-    val sample   = SampleData(data)
-    val table    = fromSample(sample)
-    val results  = toJson(table.takeRange(2, 17))
+    val data    = someJson
+    val sample  = SampleData(data)
+    val table   = fromSample(sample)
+    val results = toJson(table.takeRange(2, 17))
 
     val expected = jsonMany"""
       {"key":[3],"value":{"baz":true}}
@@ -113,13 +90,7 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeEmpty = {
-    val data = jsonMany"""
-      {"key":[1],"value":"foo"}
-      {"key":[2],"value":12}
-      {"key":[3],"value":{"baz":true}}
-      {"key":[4],"value":"ack"}
-    """.toStream
-
+    val data    = someJson
     val sample  = SampleData(data)
     val table   = fromSample(sample)
     val results = toJson(table.takeRange(6, 17))
