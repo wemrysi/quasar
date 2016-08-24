@@ -96,12 +96,17 @@ object JoinHandler {
     // referenced on one side of the condition is not found.
     def lookup(
         lSrc: WorkflowBuilder[WF], lExpr: Expr, lName: BsonField.Name,
-        lFilter: (WorkflowBuilder[WF], BsonField) => WorkflowBuilder[WF],
-        rColl: CollectionName, rField: BsonField, rName: BsonField.Name) =
+        rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
+
+      def filterExists(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
+        WB.filter(wb,
+          List(ExprBuilder(wb, \/-($var(DocField(field))))),
+          { case List(f) => Selector.Doc(f -> Selector.Exists(true)) })
+
       lExpr match {
         case \/-($var(DocVar(_, Some(lField)))) =>
           val left = WB.makeObject(lSrc, lName.asText)
-          val filtered = lFilter(left, lName \ lField)
+          val filtered = filterExists(left, lName \ lField)
           generateWorkflow(filtered).map { case (left, _) =>
             CollectionBuilder(
               chain[Fix[WF]](
@@ -118,8 +123,7 @@ object JoinHandler {
             left     <- WB.objectConcat(
                           WB.makeObject(lSrc, lName.asText),
                           WB.makeObject(ExprBuilder(lSrc, lExpr), tmpName.asText))
-            filtered =  lFilter(left, tmpName)
-            t        <- generateWorkflow(filtered)
+            t        <- generateWorkflow(left)
             (src, _) = t
           } yield CollectionBuilder(
               chain[Fix[WF]](
@@ -134,18 +138,13 @@ object JoinHandler {
               Root(),
               None)
       }
-
-    def filterNonNull(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
-      WB.filter(wb,
-        List(ExprBuilder(wb, \/-($var(DocField(field))))),
-        { case List(f) => Selector.Doc(f -> Selector.Neq(Bson.Null)) })
+    }
 
     (tpe, left, right) match {
       case (set.InnerJoin, IsLookupInput(src, expr), IsLookupFrom(coll, field))
             if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, expr, LeftName,
-          filterNonNull,
           coll.collection, field, RightName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
@@ -153,14 +152,12 @@ object JoinHandler {
       //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
       //   lookup(
       //     src, expr, LeftName,
-      //     noFilter,
       //     coll.collection, field, RightName).liftM[OptionT]
 
       case (set.InnerJoin, IsLookupFrom(coll, field), IsLookupInput(src, expr))
             if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, expr, RightName,
-          filterNonNull,
           coll.collection, field, LeftName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
@@ -168,7 +165,6 @@ object JoinHandler {
       //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
       //   lookup(
       //     src, expr, RightName,
-      //     noFilter,
       //     coll.collection, field, LeftName).liftM[OptionT]
 
       case _ => OptionT.none

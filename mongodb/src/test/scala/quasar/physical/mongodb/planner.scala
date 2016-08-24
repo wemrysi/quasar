@@ -2876,7 +2876,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.Doc(
-            BsonField.Name("_id") -> Selector.Neq(Bson.Null))),
+            BsonField.Name("_id") -> Selector.Exists(true))),
           $project(reshape("left" -> $$ROOT)),
           $lookup(
             CollectionName("zips2"),
@@ -3021,7 +3021,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $match(Selector.Doc(
-          BsonField.Name("id") -> Selector.Neq(Bson.Null))),
+          BsonField.Name("id") -> Selector.Exists(true))),
         $project(reshape("left" -> $$ROOT)),
         $lookup(
           CollectionName("bar"),
@@ -3056,8 +3056,6 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           "left" -> $$ROOT,
           "__tmp0" -> $toLower($field("id"))),
           IgnoreId),
-        $match(Selector.Doc(
-          BsonField.Name("__tmp0") -> Selector.Neq(Bson.Null))),
         $lookup(
           CollectionName("bar"),
           BsonField.Name("__tmp0"),
@@ -3319,7 +3317,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $match(Selector.Doc(
-            BsonField.Name("id") -> Selector.Neq(Bson.Null))),
+            BsonField.Name("id") -> Selector.Exists(true))),
           $project(reshape("left" -> $$ROOT)),
           $lookup(
             CollectionName("bar"),
@@ -3328,7 +3326,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             BsonField.Name("right")),
           $unwind(DocField(BsonField.Name("right"))),
           $match(Selector.Doc(
-            BsonField.Name("right") \ BsonField.Name("id") -> Selector.Neq(Bson.Null))),
+            BsonField.Name("right") \ BsonField.Name("id") -> Selector.Exists(true))),
           $project(reshape("left" -> $$ROOT)),
           $lookup(
             CollectionName("baz"),
