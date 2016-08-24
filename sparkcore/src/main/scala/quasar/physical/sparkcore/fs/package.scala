@@ -17,26 +17,36 @@
 package quasar.physical.sparkcore
 
 import quasar.Predef._
+import quasar.EnvironmentError
+import quasar.fs.mount.FileSystemDef._
 import quasar.fs._
 import quasar.fs.mount.ConnectionUri
 
 import pathy.Path._
 import org.apache.spark._
+import scalaz._
+import Scalaz._
 
 package object fs {
 
   final case class SparkFSConf(sparkConf: SparkConf, prefix: ADir)
 
-  def parseUri(uri: ConnectionUri): Option[SparkFSConf] = {
+  def parseUri(uri: ConnectionUri): DefinitionError \/ SparkFSConf = {
 
-    def forge(master: String, rootPath: String): Option[SparkFSConf] =
-      posixCodec.parseAbsDir(rootPath).map { prefix =>
+    def error(msg: String): DefinitionError \/ SparkFSConf =
+      NonEmptyList(msg).left[EnvironmentError].left[SparkFSConf]
+
+    def forge(master: String, rootPath: String): DefinitionError \/ SparkFSConf =
+      posixCodec.parseAbsDir(rootPath)
+        .map { prefix =>
         SparkFSConf(new SparkConf().setMaster(master), sandboxAbs(prefix))
-      }
-    
+      }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
+
     uri.value.split('|').toList match {
       case master :: prefixPath :: Nil => forge(master, prefixPath)
-      case a => None
+      case _ =>
+        error("Missing master and prefixPath (seperated by |)" +
+          " e.g spark://host:port|/var/hadoop/")
     }
   }
 }

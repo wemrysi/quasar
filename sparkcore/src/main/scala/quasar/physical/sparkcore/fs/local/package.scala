@@ -25,10 +25,10 @@ import quasar.fs.ReadFile.ReadHandle
 import quasar.fs.WriteFile.WriteHandle
 import quasar.fp.TaskRef
 import quasar.fp.free._
+import quasar.fs.mount.FileSystemDef._
 
 import java.io.PrintWriter
 
-import pathy.Path._
 import org.apache.spark._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -43,7 +43,7 @@ package object local {
 
   final case class SparkFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
-  def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
+  private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
     S0: Task :<: S
   ): Free[S, SparkFSDef[S]] = {
 
@@ -68,28 +68,26 @@ package object local {
     }).into[S]
   }
 
+  private def fsInterpret(fsConf: SparkFSConf): FileSystem ~> Free[Eff, ?] = interpretFileSystem(
+    queryfile.chrooted[Eff](fsConf.prefix),
+    corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
+    writefile.chrooted[Eff](fsConf.prefix),
+    managefile.chrooted[Eff](fsConf.prefix))
+
   def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
       FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
-        val fsConf = parseUri(uri).getOrElse(SparkFSConf(new SparkConf().setMaster("local[*]"), rootDir </> dir("rabbit")))
-
-          val fsDef = sparkFsDef(fsConf.sparkConf)
-
-        fsDef.map { case SparkFSDef(run, close) =>
-          FileSystemDef.DefinitionResult[Free[S, ?]]({
-
-          val interpreter: FileSystem ~> Free[Eff, ?] = interpretFileSystem(
-            queryfile.chrooted[Eff](fsConf.prefix),
-            corereadfile.chrooted(readfile.input[Eff], fsConf.prefix),
-            writefile.chrooted[Eff](fsConf.prefix),
-            managefile.chrooted[Eff](fsConf.prefix))
-
-            interpreter andThen run
-
-          },
-          close)
-      }.liftM[DefErrT]
+        for {
+          fsConf <- EitherT(parseUri(uri).point[Free[S, ?]])
+          res <- {
+            sparkFsDef(fsConf.sparkConf).map {
+              case SparkFSDef(run, close) =>
+                FileSystemDef.DefinitionResult[Free[S, ?]](
+                  fsInterpret(fsConf) andThen run,
+                  close)
+            }.liftM[DefErrT]
+          }
+        }  yield res
     }
-
 }
