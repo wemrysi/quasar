@@ -9,14 +9,14 @@ class CanonicalizeSpec extends ColumnarTableQspec {
   import SampleData._
 
   "in canonicalize" >> {
-    "return the correct slice sizes using scalacheck" in checkCanonicalize
-    "return the slice size in correct bound using scalacheck with range" in checkBoundedCanonicalize
-    "return the correct slice sizes in a trivial case" in testCanonicalize
-    "return the correct slice sizes given length zero" in testCanonicalizeZero
-    "return the correct slice sizes along slice boundaries" in testCanonicalizeBoundary
-    "return the correct slice sizes greater than slice boundaries" in testCanonicalizeOverBoundary
-    "return empty table when given empty table" in testCanonicalizeEmpty
-    "remove slices of size zero" in testCanonicalizeEmptySlices
+    "return the correct slice sizes using scalacheck"                      in checkCanonicalize
+    "return the slice size with correct bound using scalacheck with range" in checkBoundedCanonicalize
+    "return the correct slice sizes: trivial case"                         in testCanonicalize
+    "return the correct slice sizes given length zero"                     in testCanonicalizeZero
+    "return the correct slice sizes along slice boundaries"                in testCanonicalizeBoundary
+    "return the correct slice sizes greater than slice boundaries"         in testCanonicalizeOverBoundary
+    "return empty table when given empty table"                            in testCanonicalizeEmpty
+    "remove slices of size zero"                                           in testCanonicalizeEmptySlices
   }
 
   lazy val table: Table = fromJson(jsonMany"""
@@ -92,7 +92,6 @@ class CanonicalizeSpec extends ColumnarTableQspec {
 
   def testCanonicalizeBoundary = {
     val result = table.canonicalize(5)
-
     val slices = result.slices.toStream.copoint
     val sizes  = slices.map(_.size)
 

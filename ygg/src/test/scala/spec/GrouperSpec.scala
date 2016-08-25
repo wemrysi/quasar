@@ -1,22 +1,3 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package ygg.tests
 
 import ygg.common._
@@ -59,15 +40,19 @@ solve 'a, 'b
  */
 
 class GrouperSpec extends quasar.Qspec {
-  def tic_a = CPathField("tic_a")
-  def tic_b = CPathField("tic_b")
+  import module._
+  import trans._
+  import constants._
 
-  def tic_aj = JPathField("tic_a")
-  def tic_bj = JPathField("tic_b")
+  private def tic_a = CPathField("tic_a")
+  private def tic_b = CPathField("tic_b")
+
+  private def tic_aj = JPathField("tic_a")
+  private def tic_bj = JPathField("tic_b")
 
   implicit val fid = NaturalTransformation.refl[Need]
 
-  val eq12F1 = CF1P("testing::eq12F1") {
+  private val eq12F1 = CF1P("testing::eq12F1") {
     case c: DoubleColumn =>
       new Map1Column(c) with BoolColumn {
         def apply(row: Int) = c(row) == 12.0d
@@ -82,15 +67,11 @@ class GrouperSpec extends quasar.Qspec {
       }
   }
 
-  def augmentWithIdentities(json: Stream[JValue]) = json.zipWithIndex map {
+  private def augmentWithIdentities(json: Stream[JValue]) = json.zipWithIndex map {
     case (v, i) => JObject(JField("key", JArray(JNum(i) :: Nil)) :: JField("value", v) :: Nil)
   }
 
-  def testHistogramByValue(set: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramByValue(set: Stream[Int]) = {
     val data    = augmentWithIdentities(set.map(JNum(_)))
     val groupId = newGroupId
 
@@ -134,11 +115,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testHistogramByValueMapped(set: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramByValueMapped(set: Stream[Int]) = {
     val data = augmentWithIdentities(set.map(JNum(_)))
 
     val doubleF1 = CF1P("testing::doubleF1") {
@@ -191,11 +168,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testHistogramEvenOdd(set: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramEvenOdd(set: Stream[Int]) = {
     val data = augmentWithIdentities(set.map(JNum(_)))
 
     val mod2 = CF1P("testing::mod2") {
@@ -246,7 +219,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def simpleMultiKeyData = {
+  private def simpleMultiKeyData = {
     val JArray(elements) = json"""[
       { "key": [0], "value": {"a": 12, "b": 7} },
       { "key": [1], "value": {"a": 42} },
@@ -261,11 +234,7 @@ class GrouperSpec extends quasar.Qspec {
     elements.toStream
   }
 
-  def testHistogramTwoKeysAnd = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramTwoKeysAnd = {
     val table = fromJson(simpleMultiKeyData)
 
     val groupId = newGroupId
@@ -302,11 +271,7 @@ class GrouperSpec extends quasar.Qspec {
     forall(resultJson)(_ must beLike { case JNum(i) if i == 1 => ok })
   }
 
-  def testHistogramTwoKeysOr = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramTwoKeysOr = {
     val table = fromJson(simpleMultiKeyData)
 
     val groupId = newGroupId
@@ -378,11 +343,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testHistogramExtraAnd = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramExtraAnd = {
     val table   = fromJson(simpleMultiKeyData)
     val groupId = newGroupId
 
@@ -422,11 +383,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testHistogramExtraOr = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testHistogramExtraOr = {
     val table   = fromJson(simpleMultiKeyData)
     val groupId = newGroupId
 
@@ -478,11 +435,7 @@ class GrouperSpec extends quasar.Qspec {
     resultJson.toSet must_== expected.toSet
   }
 
-  def testCtr(rawData1: Stream[Int], rawData2: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testCtr(rawData1: Stream[Int], rawData2: Stream[Int]) = {
     val data1 = augmentWithIdentities(rawData1.map(JNum(_)))
     val data2 = augmentWithIdentities(rawData2.map(JNum(_)))
 
@@ -536,11 +489,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testCtrPartialJoinAnd(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testCtrPartialJoinAnd(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
     val data1 = augmentWithIdentities(rawData1 map {
       case (a, b0) => JObject(JField("a", JNum(a)) :: b0.map(b => JField("b", JNum(b))).toList)
     })
@@ -631,11 +580,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  def testCtrPartialJoinOr(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
-    import module._
-    import trans._
-    import constants._
-
+  private def testCtrPartialJoinOr(rawData1: Stream[Int -> Option[Int]], rawData2: Stream[Int]) = {
     val data1 = augmentWithIdentities(rawData1 map {
       case (a, b0) => JObject(JField("a", JNum(a)) :: b0.map(b => JField("b", JNum(b))).toList)
     })
@@ -727,7 +672,7 @@ class GrouperSpec extends quasar.Qspec {
     resultJson must haveSize(joinRows.map(_._1).distinct.size + crossRows.distinct.size)
   }
 
-  def testNonTrivial = {
+  private def testNonTrivial = {
     //
     // forall 'a forall 'b
     //   foo where foo.a = 'a & foo.b = 'b
@@ -737,59 +682,54 @@ class GrouperSpec extends quasar.Qspec {
     //   { a: 'a, b: 'b, foo: count(foo'), bar: count(bar'), baz: count(baz') }
     //
 
-    import module._
-    import trans._
-    import constants._
-
-    val JArray(foo0) = json"""[
-      { "a":42.0, "b":12.0 },
-      { "a":42.0 },
-      { "a":77.0 },
-      { "c":-3.0 },
-      { "b":7.0 },
-      { "a":42.0, "b":12.0 },
-      { "a":7.0, "b":42.0 },
-      { "a":17.0, "b":6.0 },
-      { "b":1.0 },
-      { "a":21.0, "b":12.0 },
-      { "a":42.0, "b":-2.0 },
-      { "c":-3.0 },
-      { "a":7.0, "b":42.0 },
+    val foo0 = jsonMany"""
       { "a":42.0, "b":12.0 }
-    ]"""
-
-    val JArray(bar0) = json"""[
-      { "a":42.0 },
-      { "a":42.0 },
-      { "a":77.0 },
-      { "c":-3.0 },
-      { "b":7.0 },
-      { "b":12.0 },
-      { "a":7.0, "b":42.0 },
-      { "a":17.0, "c":77.0 },
-      { "b":1.0 },
-      { "b":12.0 },
-      { "b":-2.0 },
-      { "c":-3.0 },
-      { "a":7.0 },
       { "a":42.0 }
-    ]"""
+      { "a":77.0 }
+      { "c":-3.0 }
+      { "b":7.0 }
+      { "a":42.0, "b":12.0 }
+      { "a":7.0, "b":42.0 }
+      { "a":17.0, "b":6.0 }
+      { "b":1.0 }
+      { "a":21.0, "b":12.0 }
+      { "a":42.0, "b":-2.0 }
+      { "c":-3.0 }
+      { "a":7.0, "b":42.0 }
+      { "a":42.0, "b":12.0 }
+    """
 
-    val JArray(baz0) = json"""[
-      { "b":12.0 },
-      { "b":6.0 },
-      { "a":42.0 },
-      { "b":1.0 },
-      { "b":12.0 },
-      { "c":-3.0 },
-      { "b":42.0 },
+    val bar0 = jsonMany"""
+      { "a":42.0 }
+      { "a":42.0 }
+      { "a":77.0 }
+      { "c":-3.0 }
+      { "b":7.0 }
+      { "b":12.0 }
+      { "a":7.0, "b":42.0 }
+      { "a":17.0, "c":77.0 }
+      { "b":1.0 }
+      { "b":12.0 }
+      { "b":-2.0 }
+      { "c":-3.0 }
+      { "a":7.0 }
+      { "a":42.0 }
+    """
+
+    val baz0 = jsonMany"""
+      { "b":12.0 }
+      { "b":6.0 }
+      { "a":42.0 }
+      { "b":1.0 }
+      { "b":12.0 }
+      { "c":-3.0 }
+      { "b":42.0 }
       { "d":0.0 }
-    ]"""
+    """
 
-    val foo = augmentWithIdentities(foo0.toStream)
-    val bar = augmentWithIdentities(bar0.toStream)
-    val baz = augmentWithIdentities(baz0.toStream)
-
+    val foo      = augmentWithIdentities(foo0.toStream)
+    val bar      = augmentWithIdentities(bar0.toStream)
+    val baz      = augmentWithIdentities(baz0.toStream)
     val fooGroup = newGroupId
     val barGroup = newGroupId
     val bazGroup = newGroupId
@@ -843,15 +783,15 @@ class GrouperSpec extends quasar.Qspec {
         barPJson must not(beEmpty)
         bazPJson must not(beEmpty)
 
-        val result = Stream(
-          JObject(
-            JField("a", a) ::
-              JField("b", b) ::
-                JField("foo", JNum(fooPJson.size)) ::
-                  JField("bar", JNum(barPJson.size)) ::
-                    JField("baz", JNum(bazPJson.size)) :: Nil))
-
-        fromJson(result)
+        fromJson(
+          jsonMany"""{
+            "a": $a,
+            "b": $b,
+            "foo": ${ fooPJson.size },
+            "bar": ${ barPJson.size },
+            "baz": ${ bazPJson.size }
+          }"""
+        )
       }
     }
 
@@ -908,7 +848,7 @@ class GrouperSpec extends quasar.Qspec {
     }
   }
 
-  "multi-set grouping" should {
+  "multi-set grouping" >> {
     "compute ctr on value" in Prop.forAllNoShrink(testCtr _)
     "compute ctr with an empty dataset" in testCtr(Stream(), Stream(1))
     "compute ctr with singleton datasets" in testCtr(Stream(1), Stream(1))

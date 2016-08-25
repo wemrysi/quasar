@@ -1,12 +1,13 @@
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
+import ygg.common._
 import ygg.table._
 import ygg.json._
 import SampleData._
 import TableModule._
 import BlockStoreTestModule.module
+import CValueGenerators._
 
 /**
   * This provides an ordering on JValue that mimics how we'd order them as
@@ -27,7 +28,7 @@ private object JValueInColumnOrder {
   }
 }
 
-class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
+class BlockAlignSpec extends quasar.Qspec {
   implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {
@@ -45,8 +46,6 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
       "a problem sample2" in testLoadSample2
       "a problem sample3" in testLoadSample3
       "a problem sample4" in testLoadSample4
-      //"a problem sample5" in testLoadSample5 //pathological sample in the case of duplicated ids.
-      //"a dense dataset" in checkLoadDense //scalacheck + numeric columns = pain
     }
     "sort" >> {
       "fully homogeneous data"             in homogeneousSortSample
@@ -540,5 +539,125 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   private def emptySort = {
     val sampleData = SampleData(Stream(), Some(1 -> Nil))
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
+  }
+
+  private class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
+    val Some((idCount, schema)) = sampleData.schema
+    val actualSchema            = inferSchema(sampleData.data map { _ \ "value" })
+
+    val projections = List(actualSchema).map { subschema =>
+      val stream = sampleData.data flatMap { jv =>
+        val back = subschema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
+          case (obj, (jpath, ctype)) => {
+            val vpath       = JPath(JPathField("value") :: jpath.nodes)
+            val valueAtPath = jv.get(vpath)
+
+            if (compliesWithSchema(valueAtPath, ctype)) {
+              obj.set(vpath, valueAtPath)
+            } else {
+              obj
+            }
+          }
+        }
+
+        if (back \ "value" == JUndefined)
+          None
+        else
+          Some(back)
+      }
+
+      Path("/test") -> Projection(stream)
+    } toMap
+  }
+
+  private def testLoadDense(sample: SampleData) = {
+    val module = new BlockStoreLoadTestModule(sample)
+
+    val expected = sample.data flatMap { jv =>
+      val back = module.schema.foldLeft[JValue](JObject(JField("key", jv \ "key") :: Nil)) {
+        case (obj, (jpath, ctype)) => {
+          val vpath       = JPath(JPathField("value") :: jpath.nodes)
+          val valueAtPath = jv.get(vpath)
+
+          if (module.compliesWithSchema(valueAtPath, ctype)) {
+            obj.set(vpath, valueAtPath)
+          } else {
+            obj
+          }
+        }
+      }
+
+      (back \ "value" != JUndefined).option(back)
+    }
+
+    val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
+
+    val result: Need[Iterable[JValue]] = {
+      import module.Table
+      val t: Table      = Table constString Set("/test")
+      val loaded: Table = t.load(APIKey("dummyAPIKey"), Schema.mkType(cschema).get).value
+      loaded.toJson
+    }
+
+    result.value.toList must_=== expected.toList
+  }
+
+  private def testLoadSample1 = {
+    val sampleData = SampleData(
+      jsonMany"""
+        {"key":[1],"value":{"l":[],"md":"t","u":false}}
+      """.toStream,
+      Some(
+        (1, List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
+      )
+    )
+
+    testLoadDense(sampleData)
+  }
+
+  private def testLoadSample2 = {
+    testLoadDense(
+      SampleData(
+        jsonMany"""{"key":[2,1],"value":{"fa":null,"hW":1.0,"rzp":{}}}""".toStream,
+        Some((2, List(JPath(".fa") -> CNull, JPath(".hW") -> CLong, JPath(".rzp") -> CEmptyObject)))
+      )
+    )
+  }
+
+  private def testLoadSample3 = {
+    val sampleData = SampleData(
+      jsonMany"""
+        {"key":[1,2,2],"value":{"f":{"bn":[null],"wei":1.0},"jmy":4.639428637939817E+307,"ljz":[null,["W"],true]}}
+        {"key":[2,1,1],"value":{"f":{"bn":[null],"wei":5.615997508833152E+307},"jmy":-2.612503123965922E+307,"ljz":[null,[""],false]}}
+      """.toStream,
+      Some(
+        (3,
+         List(
+           JPath(".f.bn[0]")   -> CNull,
+           JPath(".f.wei")     -> CLong,
+           JPath(".f.wei")     -> CDouble,
+           JPath(".ljz[0]")    -> CNull,
+           JPath(".ljz[1][0]") -> CString,
+           JPath(".ljz[2]")    -> CBoolean,
+           JPath(".jmy")       -> CDouble))
+      )
+    )
+
+    testLoadDense(sampleData)
+  }
+
+  private def testLoadSample4 = {
+    val data = jsonMany"""
+      {"key":[1,1],"value":{"dV":{"d":true,"l":false,"vq":{}},"oy":{"nm":false},"uR":-6.41847178802919E+307}}
+    """
+    val sampleData = SampleData(
+      data.toStream,
+      Some(
+        (2,
+         List(JPath(".dV.d") -> CBoolean, JPath(".dV.l") -> CBoolean, JPath(".dV.vq") -> CEmptyObject, JPath(".oy.nm") -> CBoolean, JPath(".uR") -> CDouble))
+      )
+    )
+
+    testLoadDense(sampleData)
   }
 }

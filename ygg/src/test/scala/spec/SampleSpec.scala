@@ -8,25 +8,25 @@ class SampleSpec extends ColumnarTableQspec {
   import trans._
 
   "in sample" >> {
-     "sample from a dataset" in testSample
+     "sample from a dataset"                                in testSample
      "return no samples given empty sequence of transspecs" in testSampleEmpty
-     "sample from a dataset given non-identity transspecs" in testSampleTransSpecs
+     "sample from a dataset given non-identity transspecs"  in testSampleTransSpecs
      "return full set when sample size larger than dataset" in testLargeSampleSize
-     "resurn empty table when sample size is 0" in test0SampleSize
+     "resurn empty table when sample size is 0"             in test0SampleSize
   }
 
-  lazy val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>
+  private lazy val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>
     JObject(JField("id", if (i % 2 == 0) JString(i.toString) else JNum(i)) :: Nil)
   }
 
-  lazy val simpleData2: Stream[JValue] = Stream.tabulate(100) { i =>
+  private lazy val simpleData2: Stream[JValue] = Stream.tabulate(100) { i =>
     JObject(
       JField("id", if (i      % 2 == 0) JString(i.toString) else JNum(i)) ::
         JField("value", if (i % 2 == 0) JBool(true) else JNum(i)) ::
           Nil)
   }
 
-  def testSample = {
+  private def testSample = {
     val data  = SampleData(simpleData)
     val table = fromSample(data)
     table.sample(15, Seq(TransSpec1.Id, TransSpec1.Id)).copoint.toList must beLike {
@@ -40,13 +40,13 @@ class SampleSpec extends ColumnarTableQspec {
     }
   }
 
-  def testSampleEmpty = {
+  private def testSampleEmpty = {
     val data  = SampleData(simpleData)
     val table = fromSample(data)
     table.sample(15, Seq()).copoint.toList mustEqual Nil
   }
 
-  def testSampleTransSpecs = {
+  private def testSampleTransSpecs = {
     val data  = SampleData(simpleData2)
     val table = fromSample(data)
     val specs = Seq[TransSpec1](root.id, root.value)
@@ -65,7 +65,7 @@ class SampleSpec extends ColumnarTableQspec {
     }
   }
 
-  def testLargeSampleSize = {
+  private def testLargeSampleSize = {
     val data = SampleData(simpleData)
     fromSample(data).sample(1000, Seq(TransSpec1.Id)).copoint.toList must beLike {
       case s :: Nil =>
@@ -74,7 +74,7 @@ class SampleSpec extends ColumnarTableQspec {
     }
   }
 
-  def test0SampleSize = {
+  private def test0SampleSize = {
     val data = SampleData(simpleData)
     fromSample(data).sample(0, Seq(TransSpec1.Id)).copoint.toList must beLike {
       case s :: Nil =>

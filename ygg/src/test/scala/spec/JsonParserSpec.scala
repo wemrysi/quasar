@@ -3,7 +3,6 @@ package ygg.tests
 import ygg.common._
 import ygg.json._
 import java.net.URLDecoder
-// import scala.util.control.Exception._
 import scalaz._
 import JsonTestSupport._
 
@@ -11,8 +10,7 @@ class JsonParserSpec extends quasar.Qspec {
   import JParser._
 
   "Any valid json can be parsed" in {
-    val parsing = (json: JValue) => { parseUnsafe(json.render); true }
-    prop(parsing)
+    prop((json: JValue) => { parseUnsafe(json.render); true })
   }
 
   "Parsing is thread safe" in {

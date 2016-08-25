@@ -21,7 +21,7 @@ class CompactSpec extends ColumnarTableQspec {
     "have no empty key slices"                 in testCompactSlicesKey
   }
 
-  def tableStats(table: Table): List[Int -> Int] = table match {
+  private def tableStats(table: Table): List[Int -> Int] = table match {
     case cTable: ColumnarTable =>
       val slices = cTable.slices.toStream.copoint
       val sizes  = slices.map(_.size).toList
@@ -34,7 +34,7 @@ class CompactSpec extends ColumnarTableQspec {
       sizes zip undefined
   }
 
-  def mkDeref(path: CPath): TransSpec1 = {
+  private def mkDeref(path: CPath): TransSpec1 = {
     def mkDeref0(nodes: List[CPathNode]): TransSpec1 = nodes match {
       case (f: CPathField) :: rest => DerefObjectStatic(mkDeref0(rest), f)
       case (i: CPathIndex) :: rest => DerefArrayStatic(mkDeref0(rest), i)
@@ -44,7 +44,7 @@ class CompactSpec extends ColumnarTableQspec {
     mkDeref0(path.nodes)
   }
 
-  def extractPath(spec: TransSpec1): Option[CPath] = spec match {
+  private def extractPath(spec: TransSpec1): Option[CPath] = spec match {
     case DerefObjectStatic(TransSpec1.Id, f) => Some(f)
     case DerefObjectStatic(lhs, f)           => extractPath(lhs).map(_ \ f)
     case DerefArrayStatic(TransSpec1.Id, i)  => Some(i)
@@ -52,7 +52,7 @@ class CompactSpec extends ColumnarTableQspec {
     case _                                   => None
   }
 
-  def chooseColumn(table: Table): TransSpec1 = table match {
+  private def chooseColumn(table: Table): TransSpec1 = table match {
     case cTable: ColumnarTable =>
       cTable.slices.toStream.copoint.headOption.map { slice =>
         val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
@@ -60,7 +60,7 @@ class CompactSpec extends ColumnarTableQspec {
       } getOrElse (mkDeref(CPath.Identity))
   }
 
-  def undefineTable(fullTable: Table): Table = fullTable match {
+  private def undefineTable(fullTable: Table): Table = fullTable match {
     case cTable: ColumnarTable =>
       val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
@@ -79,7 +79,7 @@ class CompactSpec extends ColumnarTableQspec {
       Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
   }
 
-  def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
+  private def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
     case cTable: ColumnarTable =>
       val slices    = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
@@ -106,7 +106,7 @@ class CompactSpec extends ColumnarTableQspec {
       Table(StreamT.fromStream(Need(maskedSlices)), UnknownSize)
   }
 
-  def testCompactIdentity = {
+  private def testCompactIdentity = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val table        = fromSample(sample)
@@ -118,7 +118,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactPreserve = {
+  private def testCompactPreserve = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
@@ -131,7 +131,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactRows = {
+  private def testCompactRows = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
@@ -143,7 +143,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactSlices = {
+  private def testCompactSlices = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val sampleTable = undefineTable(fromSample(sample))
@@ -155,7 +155,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactPreserveKey = {
+  private def testCompactPreserveKey = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)
@@ -173,7 +173,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactRowsKey = {
+  private def testCompactRowsKey = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)
@@ -189,7 +189,7 @@ class CompactSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCompactSlicesKey = {
+  private def testCompactSlicesKey = {
     implicit val gen = sample(schema)
     prop { (sample: SampleData) =>
       val baseTable = fromSample(sample)

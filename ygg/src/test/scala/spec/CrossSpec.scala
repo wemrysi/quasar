@@ -9,7 +9,7 @@ class CrossSpec extends ColumnarTableQspec {
   import SampleData._
   import trans._
 
-  implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
+  private implicit def cogroupData: Arbitrary[CogroupData] = Arbitrary(genCogroupData)
 
   "in cross" >> {
     "perform a simple cartesian"                              in testSimpleCross
@@ -18,7 +18,7 @@ class CrossSpec extends ColumnarTableQspec {
     "survive scalacheck"                                      in prop((cd: CogroupData) => testCross(cd._1, cd._2))
   }
 
-  def testCross(l: SampleData, r: SampleData) = {
+  private def testCross(l: SampleData, r: SampleData) = {
     val ltable = fromSample(l)
     val rtable = fromSample(r)
 
@@ -43,14 +43,14 @@ class CrossSpec extends ColumnarTableQspec {
     toJson(result).copoint must_=== expected
   }
 
-  def testSimpleCross = {
+  private def testSimpleCross = {
     val s1 = SampleData(Stream(toRecord(Array(1), json"""{"a":[]}"""), toRecord(Array(2), json"""{"a":[]}""")))
     val s2 = SampleData(Stream(toRecord(Array(1), json"""{"b":0}"""), toRecord(Array(2), json"""{"b":1}""")))
 
     testCross(s1, s2)
   }
 
-  def testCrossLarge = {
+  private def testCrossLarge = {
     val sample = jsonMany"""
       {"key":[-1,0],"value":null}
       {"key":[-3090012080927607325,2875286661755661474],"value":{"lwu":-5.121099465699862E+307,"q8b":[6.615224799778253E+307,[false,null,-8.988465674311579E+307],-3.536399224770604E+307]}}
@@ -66,7 +66,7 @@ class CrossSpec extends ColumnarTableQspec {
     }
   }
 
-  def testCrossSingles = {
+  private def testCrossSingles = {
     val s1 = SampleData(
       Stream(
         toRecord(Array(1), json"""{ "a": 1 }"""),

@@ -33,7 +33,8 @@ class TransSpecClasses {
     def isType(tp: JType): TransSpecBuilder[A]           = next(IsType(spec, tp))
     def apply(index: Int): TransSpecBuilder[A]           = next(DerefArrayStatic(spec, CPathIndex(index)))
     def delete(fields: CPathField*): TransSpecBuilder[A] = next(ObjectDelete(spec, fields.toSet))
-    def select(name: String): TransSpecBuilder[A]        = next(DerefObjectStatic(spec, CPathField(name)))
+    def select(field: CPathField): TransSpecBuilder[A]   = next(DerefObjectStatic(spec, field))
+    def select(name: String): TransSpecBuilder[A]        = select(CPathField(name))
     def selectDynamic(name: String): TransSpecBuilder[A] = select(name)
   }
   implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {

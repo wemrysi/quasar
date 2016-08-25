@@ -22,7 +22,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[Need, Slice], size: TableSize)                                                           = new Table(slices, size)
     def singleton(slice: Slice)                                                                                        = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = abort("not implemented here")
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = ???
   }
 
   object Table extends TableCompanion
@@ -53,11 +53,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
         {"key":[5908438637678328473,5908438637678328579],"value":{"b":7,"c":11,"a":3,"fa":{"b":7,"a":3}}}
       """
 
-      val keyField   = CPathField("key")
       val valueField = CPathField("value")
-      val aField     = CPathField("a")
-      val bField     = CPathField("b")
-      val cField     = CPathField("c")
       val oneField   = CPathField("1")
       val twoField   = CPathField("2")
 
@@ -67,24 +63,24 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
           TransSpec1.Id,
           GroupingSource(
             bar,
-            root select keyField.name,
+            root.key,
             Some(
               InnerObjectConcat(
                 ObjectDelete(root, Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), cField), "value"))),
+                WrapObject(root.value.c, "value"))),
             0,
             GroupKeySpecOr(
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), aField)),
-              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(root, valueField), bField)))
+              GroupKeySpecSource(oneField, root.value.a),
+              GroupKeySpecSource(twoField, root.value.b))
           ),
           GroupingSource(
             foo,
-            root select keyField.name,
-            Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(DerefObjectStatic(root, valueField), "value"))),
+            root.key,
+            Some(InnerObjectConcat(ObjectDelete(root, Set(valueField)), WrapObject(root.value, "value"))),
             3,
             GroupKeySpecAnd(
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), aField)),
-              GroupKeySpecSource(twoField, DerefObjectStatic(DerefObjectStatic(root, valueField), bField)))
+              GroupKeySpecSource(oneField, root.value.a),
+              GroupKeySpecSource(twoField, root.value.b))
           ),
           GroupingSpec.Intersection)
 
@@ -147,13 +143,8 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
         {"key":[],"value":{"year":"2008","ratio":119.0}}
       """.toStream
 
-      val keyField     = CPathField("key")
-      val valueField   = CPathField("value")
-      val genderField  = CPathField("Gender")
-      val editionField = CPathField("Edition")
-      val extra0Field  = CPathField("extra0")
-      val extra1Field  = CPathField("extra1")
-      val oneField     = CPathField("1")
+      val valueField = CPathField("value")
+      val oneField   = CPathField("1")
 
       val grouping =
         GroupingAlignment(
@@ -161,35 +152,35 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
           TransSpec1.Id,
           GroupingSource(
             medals,
-            root select keyField.name,
+            root.key,
             Some(
               InnerObjectConcat(
                 ObjectDelete(root, Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), "value"))),
+                WrapObject(root.value.Gender, "value"))),
             0,
             GroupKeySpecAnd(
               GroupKeySpecSource(
-                extra0Field,
+                CPathField("extra0"),
                 Filter(
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Men"), false),
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Men"), false))),
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), editionField)))
+                  EqualLiteral(root.value.Gender, CString("Men"), false),
+                  EqualLiteral(root.value.Gender, CString("Men"), false))),
+              GroupKeySpecSource(oneField, root.value.Edition))
           ),
           GroupingSource(
             medals,
-            root select keyField.name,
+            root.key,
             Some(
               InnerObjectConcat(
                 ObjectDelete(root, Set(valueField)),
-                WrapObject(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), "value"))),
+                WrapObject(root.value.Gender, "value"))),
             2,
             GroupKeySpecAnd(
               GroupKeySpecSource(
-                extra1Field,
+                CPathField("extra1"),
                 Filter(
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Women"), false),
-                  EqualLiteral(DerefObjectStatic(DerefObjectStatic(root, valueField), genderField), CString("Women"), false))),
-              GroupKeySpecSource(oneField, DerefObjectStatic(DerefObjectStatic(root, valueField), editionField)))
+                  EqualLiteral(root.value.Gender, CString("Women"), false),
+                  EqualLiteral(root.value.Gender, CString("Women"), false))),
+              GroupKeySpecSource(oneField, root.value.Edition))
           ),
           GroupingSpec.Intersection)
 

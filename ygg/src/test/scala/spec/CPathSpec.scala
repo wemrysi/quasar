@@ -16,8 +16,7 @@ class CPathSpec extends quasar.Qspec {
       )
 
       val values: Seq[Int] = Seq(4, 6, 7, 2, 0)
-
-      val result = makeTree(cpaths, values)
+      val result           = makeTree(cpaths, values)
 
       val expected: CPathTree[Int] = {
         RootNode(

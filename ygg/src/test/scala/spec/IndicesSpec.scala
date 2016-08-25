@@ -13,10 +13,9 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
-    def load(apiKey: APIKey, jtpe: JType)                                       = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = ???
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
-      ???
+    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = ???
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
@@ -45,23 +44,23 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
       index.getSubTable(Array(0), Array(CString("a"))).size == ExactSize(0)
     }
 
-    val json = """
-{"a": 1, "b": 2, "c": 3}
-{"a": 1, "b": 2, "c": 999, "d": "foo"}
-{"a": 1, "b": 2, "c": "cat"}
-{"a": 1, "b": 2}
-{"a": 2, "b": 2, "c": 3, "d": 1248}
-{"a": 2, "b": 2, "c": 13}
-{"a": "foo", "b": "bar", "c": 3}
-{"a": 3, "b": "", "c": 333}
-{"a": 3, "b": 2, "c": [1,2,3,4]}
-{"a": 1, "b": 2, "c": {"cat": 13, "dog": 12}}
-{"a": "foo", "b": 999}
-{"b": 2, "c": 9876}
-{"a": 1, "c": [666]}
-"""
+    val json = jsonMany"""
+      {"a": 1, "b": 2, "c": 3}
+      {"a": 1, "b": 2, "c": 999, "d": "foo"}
+      {"a": 1, "b": 2, "c": "cat"}
+      {"a": 1, "b": 2}
+      {"a": 2, "b": 2, "c": 3, "d": 1248}
+      {"a": 2, "b": 2, "c": 13}
+      {"a": "foo", "b": "bar", "c": 3}
+      {"a": 3, "b": "", "c": 333}
+      {"a": 3, "b": 2, "c": [1,2,3,4]}
+      {"a": 1, "b": 2, "c": {"cat": 13, "dog": 12}}
+      {"a": "foo", "b": 999}
+      {"b": 2, "c": 9876}
+      {"a": 1, "c": [666]}
+    """
 
-    val table             = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
+    val table             = fromJson(json.toStream)
     val keySpecs          = Array(groupkey("a"), groupkey("b"))
     val valSpec           = valuekey("c")
     val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
