@@ -21,7 +21,7 @@ import quasar.RenderTree
 
 import matryoshka._
 import monocle.macros.Lenses
-import pathy._, Path._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 // TODO: Abstract Read over the backend’s preferred path representation.

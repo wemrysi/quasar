@@ -18,14 +18,12 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.FileSystemError
 
 import scala.Predef.implicitly
 
 import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import pathy.Path._
 import scalaz._, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
@@ -35,57 +33,14 @@ import scalaz._, Scalaz._
   * here, and autojoin_d has been replaced with a lower-level join operation
   * that doesn’t include the cross portion.
   */
-package object qscript extends QScriptInstances {
+package object qscript {
   private type CommonPathable[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
-  /** Statically known path components. Provided to filesystems for potential
-    * conversion to `Read`.
+  /** Statically known path components potentially converted to Read.
     */
   type Pathable[T[_[_]], A] =
     Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
-
-  /** Represents QScript with portions turned into statically-known paths.
-    */
-  type Pathed[F[_], A] = (List ∘ CoEnv[AbsDir[Sandboxed], F, ?])#λ[A]
-
-  /** A function that converts a portion of QScript to statically-known paths.
-    *
-    *     ProjectField(LeftShift(ProjectField(Root, StrLit("foo")),
-    *                            HoleF,
-    *                            RightSide),
-    *                  StrLit("bar"))
-    *
-    * Potentially represents the path “/foo/\*\/bar”, but it could also
-    * represent “/foo/\*” followed by a projection into the data. Or it could
-    * represent some mixture of files at “/foo/_” referencing a record with id
-    * “bar” and files at “/foo/_/bar”. It’s up to a particular mount to tell the
-    * compiler which of these is the case, and it does so by providing a
-    * function with this type.
-    *
-    * A particular mount might return a structure like this:
-    *
-    *     [-\/(“/foo/a/bar”),
-    *      -\/("/foo/b/bar"),
-    *      \/-(ProjectField([-\/(“/foo/c”), -\/(“/foo/d”)], StrLit("bar"))),
-    *      -\/("/foo/e/bar"),
-    *      \/-(Map([-\/("/foo/f/bar/baz")], MakeMap(StrLit("baz"), SrcHole))),
-    *      \/-(Map([-\/("/foo/f/bar/quux/ducks")],
-    *              MakeMap(StrLit("quux"), MakeMap(StrLit("ducks"), SrcHole))))]
-    *
-    * Starting from Root becoming “/”, the first projection resulted in the
-    * static path “/foo”. The LeftShift then collected everything from the next
-    * level of the file system – “a”, “b”, “c”, “d”, “e”, and “f”, where “c” and
-    * “d” are files while the others are directories. This means that the final
-    * projection is handled differently in the two contexts – on the files it
-    * remains a projection, an operation to be performed on the records in a
-    * file, while on the directories, it becomes another path component.
-    * Finally, the path “/foo/f/bar/” is still a directory, so we recursively
-    * collect all the files under that directory, and rebuild the structure of
-    * them in data.
-    */
-  type StaticPathTransformation[T[_[_]], M[_], F[_], G[_]] =
-    AlgebraicTransformM[T, EitherT[M, FileSystemError, ?], F, Pathed[G, ?]]
 
   private type QScriptTotal0[T[_[_]], A] =
     Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]
@@ -185,21 +140,4 @@ package object qscript extends QScriptInstances {
   def envtLowerNT[F[_], E]: EnvT[E, F, ?] ~> F = new (EnvT[E, F, ?] ~> F) {
     def apply[A](fa: EnvT[E, F, A]): F[A] = fa.lower
   }
-}
-
-sealed trait QScriptInstances extends LowPriorityQScriptInstances {
-  implicit def composedTraverse[F[_]: Traverse, G[_]: Traverse]:
-      Traverse[(F ∘ G)#λ] =
-    new Traverse[(F ∘ G)#λ] {
-      def traverseImpl[H[_]: Applicative, A, B](fa: F[G[A]])(f: A => H[B]) =
-        fa.traverse(_.traverse(f))
-    }
-}
-
-sealed trait LowPriorityQScriptInstances {
-  implicit def composedFunctor[F[_]: Functor, G[_]: Functor]:
-      Functor[(F ∘ G)#λ] =
-    new Functor[(F ∘ G)#λ] {
-      def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
-    }
 }

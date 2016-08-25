@@ -58,6 +58,16 @@ object QueryFile {
         .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
   }
 
+  /** A variant of convertToQScript that takes advantage of an existing QueryFile
+    * implementation.
+    */
+  def algConvertToQScript
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
+    (lp: T[LogicalPlan])
+    (implicit QF: QueryFile.Ops[S]):
+      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] =
+    convertToQScript[T, Free[S, ?]]((QF.ls(_: ADir)).some)(lp)
+
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
