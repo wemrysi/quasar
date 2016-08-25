@@ -175,41 +175,47 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     }
 
     def test0 = {
-      val lsortedOn     = root(1)
-      val rsortedOn     = root(1)
-      val JArray(ljson) = json"""[
-        [[3],{ "000000":-1 },-1],
-        [[4],{ "000000":0 },0],
-        [[5],{ "000000":0 },0],
-        [[0],{ "000000":1 },1],
-        [[2],{ "000000":2126441435 },2126441435],
-        [[1],{ "000000":2147483647 },2147483647]
-      ]"""
-
-      val JArray(rjson) = json"""[
-        [[1],{ "000000":-2147483648 },-2147483648],
-        [[6],{ "000000":-1904025337 },-1904025337],
-        [[2],{ "000000":-1456034303 },-1456034303],
-        [[4],{ "000000":0 },0],
-        [[0],{ "000000":2006322377 },2006322377],
-        [[3],{ "000000":2147483647 },2147483647],
-        [[5],{ "000000":2147483647 },2147483647]
-      ]"""
+      val lsortedOn = root(1)
+      val rsortedOn = root(1)
+      val ljson     = jsonMany"""
+        [[3],{"000000":-1},-1]
+        [[4],{"000000":0},0]
+        [[5],{"000000":0},0]
+        [[0],{"000000":1},1]
+        [[2],{"000000":2126441435},2126441435]
+        [[1],{"000000":2147483647},2147483647]
+      """
+      val rjson = jsonMany"""
+        [[1],{"000000":-2147483648},-2147483648]
+        [[6],{"000000":-1904025337},-1904025337]
+        [[2],{"000000":-1456034303},-1456034303]
+        [[4],{"000000":0},0]
+        [[0],{"000000":2006322377},2006322377]
+        [[3],{"000000":2147483647},2147483647]
+        [[5],{"000000":2147483647},2147483647]
+      """
 
       test(fromJson(ljson.toStream), lsortedOn, fromJson(rjson.toStream), rsortedOn)
     }
 
     def test1 = {
-      val JArray(ljson) = json"""[
-        [[10],{ "000001":-2, "000000":42 },{ "a":42, "b":-2 }],
-        [[7],{ "000001":6, "000000":17 },{ "a":17, "b":6 }],
-        [[0],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
-        [[5],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
-        [[9],{ "000001":12, "000000":21 },{ "a":21, "b":12 }],
-        [[13],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
-        [[6],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
-        [[12],{ "000001":42, "000000":7 },{ "a":7, "b":42 }]
-      ]"""
+      val ljson = jsonMany"""
+        [[10],{"000000":42,"000001":-2},{"a":42,"b":-2}]
+        [[7],{"000000":17,"000001":6},{"a":17,"b":6}]
+        [[0],{"000000":42,"000001":12},{"a":42,"b":12}]
+        [[5],{"000000":42,"000001":12},{"a":42,"b":12}]
+        [[9],{"000000":21,"000001":12},{"a":21,"b":12}]
+        [[13],{"000000":42,"000001":12},{"a":42,"b":12}]
+        [[6],{"000000":7,"000001":42},{"a":7,"b":42}]
+        [[12],{"000000":7,"000001":42},{"a":7,"b":42}]
+      """
+      val rjson = jsonMany"""
+        [[3],{ "000000":1 },{ "b":1 }]
+        [[1],{ "000000":6 },{ "b":6 }]
+        [[0],{ "000000":12 },{ "b":12 }]
+        [[4],{ "000000":12 },{ "b":12 }]
+        [[6],{ "000000":42 },{ "b":42 }]
+      """
 
       val lsortedOn = OuterObjectConcat(
         WrapObject(
@@ -221,63 +227,54 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
             CPathField("000000")
           ),
           "000000"
-        ))
-
-      val JArray(rjson) = json"""[
-        [[3],{ "000000":1 },{ "b":1 }],
-        [[1],{ "000000":6 },{ "b":6 }],
-        [[0],{ "000000":12 },{ "b":12 }],
-        [[4],{ "000000":12 },{ "b":12 }],
-        [[6],{ "000000":42 },{ "b":42 }]
-      ]"""
+        )
+      )
 
       val rsortedOn = root(1)
-
-      test(fromJson(ljson.toStream), lsortedOn, fromJson(rjson.toStream), rsortedOn)
+      test(fromJson(ljson), lsortedOn, fromJson(rjson), rsortedOn)
     }
 
     def test2 = {
-      val JArray(ljson)  = json"""[
-        [[6],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
-        [[12],{ "000001":42, "000000":7 },{ "a":7, "b":42 }],
-        [[7],{ "000001":6, "000000":17 },{ "a":17, "b":6 }],
+      val ljson = jsonMany"""
+        [[6],{ "000001":42, "000000":7 },{ "a":7, "b":42 }]
+        [[12],{ "000001":42, "000000":7 },{ "a":7, "b":42 }]
+        [[7],{ "000001":6, "000000":17 },{ "a":17, "b":6 }]
         [[9],{ "000001":12, "000000":21 },{ "a":21, "b":12 }]
-      ]"""
-      val JArray(ljson2) = json"""[
-        [[0],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
-        [[5],{ "000001":12, "000000":42 },{ "a":42, "b":12 }],
-        [[10],{ "000001":-2, "000000":42 },{ "a":42, "b":-2 }],
+      """
+      val ljson2 = jsonMany"""
+        [[0],{ "000001":12, "000000":42 },{ "a":42, "b":12 }]
+        [[5],{ "000001":12, "000000":42 },{ "a":42, "b":12 }]
+        [[10],{ "000001":-2, "000000":42 },{ "a":42, "b":-2 }]
         [[13],{ "000001":12, "000000":42 },{ "a":42, "b":12 }]
-      ]"""
+      """
+      val rjson  = jsonMany"""
+        [[6],{ "000000":7 },{ "a":7, "b":42 }]
+        [[12],{ "000000":7 },{ "a":7 }]
+        [[7],{ "000000":17 },{ "a":17, "c":77 }]
+      """
+      val rjson2 = jsonMany"""
+        [[0],{ "000000":42 },{ "a":42 }]
+        [[1],{ "000000":42 },{ "a":42 }]
+        [[13],{ "000000":42 },{ "a":42 }]
+        [[2],{ "000000":77 },{ "a":77 }]
+      """
 
       val lsortedOn = OuterObjectConcat(
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(DerefObjectStatic(root(1), CPathField("000000")), "000000"),
-              WrapObject(DerefObjectStatic(root(1), CPathField("000001")), "000001")
+              WrapObject(root(1).`000000`, "000000"),
+              WrapObject(root(1).`000001`, "000001")
             ),
             CPathField("000000")
           ),
           "000000"
         ))
 
-      val JArray(rjson)  = json"""[
-        [[6],{ "000000":7 },{ "a":7, "b":42 }],
-        [[12],{ "000000":7 },{ "a":7 }],
-        [[7],{ "000000":17 },{ "a":17, "c":77 }]
-      ]"""
-      val JArray(rjson2) = json"""[
-        [[0],{ "000000":42 },{ "a":42 }],
-        [[1],{ "000000":42 },{ "a":42 }],
-        [[13],{ "000000":42 },{ "a":42 }],
-        [[2],{ "000000":77 },{ "a":77 }]
-      ]"""
 
       val rsortedOn = root(1)
-
-      val ltable = Table(fromJson(ljson.toStream).slices ++ fromJson(ljson2.toStream).slices, UnknownSize)
-      val rtable = Table(fromJson(rjson.toStream).slices ++ fromJson(rjson2.toStream).slices, UnknownSize)
+      val ltable    = Table(fromJson(ljson).slices ++ fromJson(ljson2).slices, UnknownSize)
+      val rtable    = Table(fromJson(rjson).slices ++ fromJson(rjson2).slices, UnknownSize)
 
       test(ltable, lsortedOn, rtable, rsortedOn)
     }
@@ -340,26 +337,10 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   // Simple test of sorting on homogeneous data
   def homogeneousSortSample = {
     val sampleData = SampleData(
-      (json"""[
-        {
-          "value":{
-            "uid":"joe",
-            "u":false,
-            "md":"t",
-            "l":[]
-          },
-          "key":[1]
-        },
-        {
-          "value":{
-            "uid":"al",
-            "u":false,
-            "md":"t",
-            "l":[]
-          },
-          "key":[2]
-        }
-      ]""".asArray).elements.toStream,
+      jsonMany"""
+        {"key":[1],"value":{"l":[],"md":"t","u":false,"uid":"joe"}}
+        {"key":[2],"value":{"l":[],"md":"t","u":false,"uid":"al"}}
+      """.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -371,10 +352,10 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   // Simple test of sorting on homogeneous data with objects
   def homogeneousSortSampleWithNonexistentSortKey = {
     val sampleData = SampleData(
-      (json"""[
-        {"key":[2],"value":6},
+      jsonMany"""
+        {"key":[2],"value":6}
         {"key":[1],"value":5}
-      ]""".asArray).elements.toStream,
+      """.toStream,
       Some(
         (1, List(JPath(".") -> CString))
       )
@@ -386,25 +367,10 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   // Simple test of partially undefined sort key data
   def partiallyUndefinedSortSample = {
     val sampleData = SampleData(
-      (json"""[
-        {
-          "value":{
-            "uid":"ted",
-            "rzp":{ },
-            "hW":1.0,
-            "fa":null
-          },
-          "key":[1]
-        },
-        {
-          "value":{
-            "rzp":{ },
-            "hW":2.0,
-            "fa":null
-          },
-          "key":[1]
-        }
-      ]""".asArray).elements.toStream,
+      jsonMany"""
+        {"key":[1],"value":{"fa":null,"hW":1.0,"rzp":{},"uid":"ted"}}
+        {"key":[1],"value":{"fa":null,"hW":2.0,"rzp":{}}}
+      """.toStream,
       Some(
         (1, List(JPath(".uid") -> CString, JPath(".fa") -> CNull, JPath(".hW") -> CDouble, JPath(".rzp") -> CEmptyObject))
       )
@@ -415,19 +381,10 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
 
   def heterogeneousBaseValueTypeSample = {
     val sampleData = SampleData(
-      (json"""[
-        {
-          "value": [0, 1],
-          "key":[1]
-        },
-        {
-          "value":{
-            "uid": "tom",
-            "abc": 2
-          },
-          "key":[2]
-        }
-      ]""".asArray).elements.toStream,
+      jsonMany"""
+        {"key":[1],"value":[0,1]}
+        {"key":[2],"value":{"abc":2,"uid":"tom"}}
+      """.toStream,
       Some(
         (1, List(JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath(".uid") -> CString, JPath("abc") -> CLong))
       )
@@ -437,32 +394,13 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   def badSchemaSortSample = {
+    val data = jsonMany"""
+      {"key":[1.0,1.0],"value":{"q":-103811160446995821.5,"u":5.548109504404496E+307,"vxu":[]}}
+      {"key":[1.0,2.0],"value":{"q":-8.40213736307813554E+18,"u":8.988465674311579E+307,"vxu":[]}}
+      {"key":[2.0,1.0],"value":{"f":false,"m":[]}}
+    """
     val sampleData = SampleData(
-      (json"""[
-        {
-          "value":{
-            "vxu":[],
-            "q":-103811160446995821.5,
-            "u":5.548109504404496E+307
-          },
-          "key":[1.0,1.0]
-        },
-        {
-          "value":{
-            "vxu":[],
-            "q":-8.40213736307813554E+18,
-            "u":8.988465674311579E+307
-          },
-          "key":[1.0,2.0]
-        },
-        {
-          "value":{
-            "m":[],
-            "f":false
-          },
-          "key":[2.0,1.0]
-        }
-      ]""".asArray).elements.toStream,
+      data.toStream,
       Some((2, List(JPath(".m") -> CEmptyArray, JPath(".f") -> CBoolean, JPath(".u") -> CDouble, JPath(".q") -> CNum, JPath(".vxu") -> CEmptyArray))))
     testSortDense(sampleData, SortAscending, false, JPath("q"))
   }
@@ -506,33 +444,13 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
 
   // Simple test of heterogeneous sort keys
   def heterogeneousSortSample = {
+    val data = jsonMany"""
+      {"key":[1,2,2],"value":{"f":{"bn":[null],"wei":1.0},"jmy":4.639428637939817E+307,"ljz":[null,["W"],true],"uid":12}}
+      {"key":[2,1,1],"value":{"f":{"bn":[null],"wei":5.615997508833152E+307},"jmy":-2.612503123965922E+307,"ljz":[null,[""],false],"uid":1.5}}
+    """
+
     val sampleData = SampleData(
-      (json"""[
-        {
-          "value":{
-           "uid": 12,
-            "f":{
-              "bn":[null],
-              "wei":1.0
-            },
-            "ljz":[null,["W"],true],
-            "jmy":4.639428637939817E307
-          },
-          "key":[1,2,2]
-        },
-        {
-          "value":{
-           "uid": 1.5,
-            "f":{
-              "bn":[null],
-              "wei":5.615997508833152E307
-            },
-            "ljz":[null,[""],false],
-            "jmy":-2.612503123965922E307
-          },
-          "key":[2,1,1]
-        }
-      ]""".asArray).elements.toStream,
+      data.toStream,
       Some(
         (3,
          List(
@@ -551,28 +469,14 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   def secondHetSortSample = {
-    val sampleData = SampleData(
-      (json"""[
-        {
-          "value":[1.0,0,{
+    val data = jsonMany"""
+      {"key":[3.0],"value":[1.0,0,{}]}
+      {"key":[1.0],"value":{"chl":-1.0,"e":null,"zw1":-4.611686018427387904E-27271}}
+      {"key":[2.0],"value":{"chl":-8.988465674311579E+307,"e":null,"zw1":81740903825956729.9}}
+    """
 
-          }],
-          "key":[3.0]
-        }, {
-          "value":{
-            "e":null,
-            "chl":-1.0,
-            "zw1":-4.611686018427387904E-27271
-          },
-          "key":[1.0]
-        }, {
-          "value":{
-            "e":null,
-            "chl":-8.988465674311579E+307,
-            "zw1":81740903825956729.9
-          },
-          "key":[2.0]
-        }]""".asArray).elements.toStream,
+    val sampleData = SampleData(
+      data.toStream,
       Some(
         (1,
          List(JPath(".e") -> CNull, JPath(".chl") -> CNum, JPath(".zw1") -> CNum, JPath("[0]") -> CLong, JPath("[1]") -> CLong, JPath("[2]") -> CEmptyObject))
@@ -623,10 +527,10 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
 
   def uniqueSort = {
     val sampleData = SampleData(
-      (json"""[
-        { "key" : [2], "value" : { "foo" : 10 } },
+      jsonMany"""
+        { "key" : [2], "value" : { "foo" : 10 } }
         { "key" : [1], "value" : { "foo" : 10 } }
-       ]""".asArray).elements.toStream,
+      """.toStream,
       Some(1 -> Nil)
     )
 
@@ -634,11 +538,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   def emptySort = {
-    val sampleData = SampleData(
-      (json"""[]""".asArray).elements.toStream,
-      Some(1 -> Nil)
-    )
-
+    val sampleData = SampleData(Stream(), Some(1 -> Nil))
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
 }
