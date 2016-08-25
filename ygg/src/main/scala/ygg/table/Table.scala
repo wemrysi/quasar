@@ -16,8 +16,8 @@ trait TableOperations {
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
 
-trait TableCompanion {
-  type Table <: ygg.table.Table
+trait TableCompanion[T <: ygg.table.Table] {
+  type Table = T
   type NeedTable = Need[Table]
 
   def apply(slices: NeedStreamT[Slice], size: TableSize): Table
@@ -43,8 +43,16 @@ trait ColumnarTable extends Table {
   type Table >: this.type <: ygg.table.ColumnarTable
 }
 trait Table {
+  outer =>
+
   type Table >: this.type <: ygg.table.Table
+  type Companion <: TableCompanion[Table]
+
   type NeedTable = Need[Table]
+
+  def companion: TableCompanion[Table]
+
+  def newTable(slices: NeedStreamT[Slice], size: TableSize): Table = companion(slices, size)
 
   def slices: NeedStreamT[Slice]
 

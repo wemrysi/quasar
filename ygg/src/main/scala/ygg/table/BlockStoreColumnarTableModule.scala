@@ -866,6 +866,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   }
 
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+    def companion = Table
 
     /**
       * Converts a table to an internal table, if possible. If the table is

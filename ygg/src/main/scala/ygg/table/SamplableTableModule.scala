@@ -3,91 +3,81 @@ package ygg.table
 import ygg.common._
 import scalaz._, Scalaz._
 import trans._
+import SamplableColumnarTableModule._
 
-trait SamplableColumnarTableModule extends TableModule {
-  outer: ColumnarTableModule with SliceTransforms =>
-
+object SamplableColumnarTableModule {
   def rng: scala.util.Random = scala.util.Random
 
-  type Table <: ColumnarTable
+  /**
+    * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =
+    * O(m^2 lg n + n), so it is not super optimal. Another good option is to
+    * try Alissa's approach; keep 2 buffers of size m. Load one up fully,
+    * shuffle, then replace, but we aren't 100% sure it is uniform and
+    * independent.
+    *
+    * Of course, the hope is that this will not be used once we get efficient
+    * sampling in that runs in O(m lg n) time.
+    */
+  def sampleNoCake[T <: ygg.table.Table](table: T, sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[T]] = {
+    // import table._
 
-  trait SamplableColumnarTable extends ygg.table.Table {
-    self: Table =>
+    case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
 
-    type Table = outer.Table
+    def build(states: List[SampleState], slices: StreamT[M, Slice]): Need[List[T]] = {
+      slices.uncons flatMap {
+        case Some((origSlice, tail)) =>
+          val nextStates = states map {
+            case SampleState(maybePrevInserters, len0, transform) =>
+              transform advance origSlice map {
+                case (nextTransform, slice) => {
+                  val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice, scmMap())
 
-    /**
-      * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =
-      * O(m^2 lg n + n), so it is not super optimal. Another good option is to
-      * try Alissa's approach; keep 2 buffers of size m. Load one up fully,
-      * shuffle, then replace, but we aren't 100% sure it is uniform and
-      * independent.
-      *
-      * Of course, the hope is that this will not be used once we get efficient
-      * sampling in that runs in O(m lg n) time.
-      */
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = {
-      case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
+                  val defined = slice.definedAt
 
-      def build(states: List[SampleState], slices: StreamT[M, Slice]): M[List[Table]] = {
-        slices.uncons flatMap {
-          case Some((origSlice, tail)) =>
-            val nextStates = states map {
-              case SampleState(maybePrevInserters, len0, transform) =>
-                transform advance origSlice map {
-                  case (nextTransform, slice) => {
-                    val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice, scmMap())
-
-                    val defined = slice.definedAt
-
-                    @tailrec
-                    def loop(i: Int, len: Int): Int =
-                      if (i < slice.size) {
-                        // `k` is a number between 0 and number of rows we've seen
-                        if (!defined(i)) {
-                          loop(i + 1, len)
-                        } else if (len < sampleSize) {
-                          inserter.insert(src = i, dest = len)
-                          loop(i + 1, len + 1)
-                        } else {
-                          val k = rng.nextInt(len + 1)
-                          if (k < sampleSize) {
-                            inserter.insert(src = i, dest = k)
-                          }
-                          loop(i + 1, len + 1)
+                  @tailrec
+                  def loop(i: Int, len: Int): Int =
+                    if (i < slice.size) {
+                      // `k` is a number between 0 and number of rows we've seen
+                      if (!defined(i)) {
+                        loop(i + 1, len)
+                      } else if (len < sampleSize) {
+                        inserter.insert(src = i, dest = len)
+                        loop(i + 1, len + 1)
+                      } else {
+                        val k = rng.nextInt(len + 1)
+                        if (k < sampleSize) {
+                          inserter.insert(src = i, dest = k)
                         }
-                      } else len
+                        loop(i + 1, len + 1)
+                      }
+                    } else len
 
-                    val newLength = loop(0, len0)
+                  val newLength = loop(0, len0)
 
-                    SampleState(Some(inserter), newLength, nextTransform)
-                  }
+                  SampleState(Some(inserter), newLength, nextTransform)
                 }
-            }
-
-            Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
-
-          case None =>
-            Need {
-              states map {
-                case SampleState(inserter, length, _) =>
-                  val len = length min sampleSize
-                  inserter map (_ toSlice len) map { slice =>
-                    Table(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize)
-                  } getOrElse {
-                    Table(emptyStreamT(), ExactSize(0))
-                  }
               }
-            }
-        }
-      }
+          }
 
-      val transforms = specs map { SliceTransform.composeSliceTransform }
-      val states = transforms map { transform =>
-        SampleState(None, 0, transform)
+          Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
+
+        case None =>
+          Need[List[T]](
+            states map { case SampleState(inserter, length, _) =>
+              val len = length min sampleSize
+
+              (  inserter map (_ toSlice len)
+                   map (slice => table.companion(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize))
+                   getOrElse table.newTable(emptyStreamT(), ExactSize(0))
+              ).asInstanceOf[T]
+            }
+          )
       }
-      build(states.toList, slices)
     }
+
+    val transforms = specs map { SliceTransform.composeSliceTransform }
+    val states     = transforms map (transform => SampleState(None, 0, transform))
+    build(states.toList, table.slices)
   }
 
   private case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]]) {
@@ -199,14 +189,26 @@ trait SamplableColumnarTableModule extends TableModule {
         }
       }
 
-      final def move(from: Int, to: Int) {
-        if (dest.isDefinedAt(from)) {
-          unsafeMove(from, to)
-        } else {
-          dest.defined.clear(to)
-        }
-      }
+      final def move(from: Int, to: Int): Unit = (
+        if (dest.isDefinedAt(from)) unsafeMove(from, to)
+        else dest.defined.clear(to)
+      )
     }
   }
+}
 
+trait SamplableColumnarTableModule extends TableModule {
+  outer =>
+
+  // outer: ColumnarTableModule with SliceTransforms =>
+
+  // type Table <: ColumnarTable
+
+  trait SamplableColumnarTable extends ygg.table.Table {
+    self: Table =>
+
+    type Table = outer.Table
+
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = sampleNoCake[Table](self, sampleSize, specs)
+  }
 }

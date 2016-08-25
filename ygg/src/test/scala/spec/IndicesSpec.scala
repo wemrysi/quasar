@@ -8,6 +8,7 @@ import ygg._, common._, json._, table._, trans._
 class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+    def companion = Table
     def load(apiKey: APIKey, jtpe: JType)                                                                                       = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                  = ???
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                            = ???

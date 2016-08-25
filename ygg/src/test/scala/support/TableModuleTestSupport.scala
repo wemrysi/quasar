@@ -82,6 +82,7 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
   final object Table extends TableCompanion
 
   final class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+    def companion                                                                                                                   = Table
     def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                      = Need(this)
     def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                = Need(this)
