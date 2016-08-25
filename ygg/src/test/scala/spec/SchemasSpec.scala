@@ -4,8 +4,17 @@ import scalaz._, Scalaz._
 import ygg.json._
 import ygg.json.{ JType => J }
 
-trait SchemasSpec extends ColumnarTableQspec {
-  def testSingleSchema = {
+class SchemasSpec extends ColumnarTableQspec {
+  "in schemas" >> {
+    "find a schema in single-schema table" in testSingleSchema
+    "find a schema in homogeneous array table" in testHomogeneousArraySchema
+    "find schemas separated by slice boundary" in testCrossSliceSchema
+    "extract intervleaved schemas" in testIntervleavedSchema
+    "don't include undefineds in schema" in testUndefinedsInSchema
+    "deal with most expected types" in testAllTypesInSchema
+  }
+
+  private def testSingleSchema = {
     val expected    = Set[JType](J.Object("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT))
     val trivialData = Stream.fill(100)(json"""{ "a": 1, "b": "x", "c": null }""")
     val sample      = SampleData(trivialData)
@@ -14,7 +23,7 @@ trait SchemasSpec extends ColumnarTableQspec {
     table.schemas.copoint must_=== expected
   }
 
-  def testHomogeneousArraySchema = {
+  private def testHomogeneousArraySchema = {
     val expected = Set(JArrayHomogeneousT(JNumberT))
     val data     = Stream.fill(10)(json"""[1, 2, 3]""")
     val table0   = fromSample(SampleData(data), Some(10))
@@ -22,7 +31,7 @@ trait SchemasSpec extends ColumnarTableQspec {
     table.schemas.copoint must_== expected
   }
 
-  def testCrossSliceSchema = {
+  private def testCrossSliceSchema = {
     val expected = Set[JType](
       J.Object("a" -> JNumberT, "b" -> JTextT),
       J.Object("a" -> JTextT, "b"   -> JNumberT)
@@ -36,7 +45,7 @@ trait SchemasSpec extends ColumnarTableQspec {
     table.schemas.copoint must_== expected
   }
 
-  def testIntervleavedSchema = {
+  private def testIntervleavedSchema = {
     val expected = Set[JType](
       J.Object("a" -> J.Array(), "b" -> JTextT),
       J.Object("a" -> JNullT, "b" -> JTextT),
@@ -53,7 +62,7 @@ trait SchemasSpec extends ColumnarTableQspec {
     table.schemas.copoint must_== expected
   }
 
-  def testUndefinedsInSchema = {
+  private def testUndefinedsInSchema = {
     val expected = Set(
       J.Object("a" -> JNumberT, "b" -> JNumberT),
       J.Object("a" -> JNumberT),
@@ -72,7 +81,7 @@ trait SchemasSpec extends ColumnarTableQspec {
     table.schemas.copoint must_== expected
   }
 
-  def testAllTypesInSchema = {
+  private def testAllTypesInSchema = {
     val data: Stream[JValue] = jsonMany"""
       1
       true

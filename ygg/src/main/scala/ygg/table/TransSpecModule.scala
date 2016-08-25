@@ -4,7 +4,7 @@ import ygg.cf
 
 trait TransSpecModule {
   object trans extends TransSpecClasses
-  import trans.{ Leaf, Filter, Map1, Equal, root }
+  import trans.{ Leaf, Filter, Equal, root }
 
   implicit def liftF1(f1: CF1): CF1Like
   implicit def liftF2(f2: CF2): CF2Like
@@ -18,7 +18,7 @@ trait TransSpecModule {
   }
   object Fn {
     def source                    = Leaf(Source)
-    def valueIsEven(name: String) = Map1(root select name, F1Expr.isEven)
+    def valueIsEven(name: String) = root select name map1 F1Expr.isEven
     def constantTrue              = Filter(source, Equal(source, source))
   }
   trait CF1Like {

@@ -5,6 +5,11 @@ import ygg.json._
 class RenderSpec extends ColumnarTableQspec {
   import SampleData._
 
+  "verify bijection from static JSON" in {
+    implicit val gen = sample(schema)
+    prop((sd: SampleData) => toJsonSeq(fromJson(sd.data)) must_=== sd.data)
+  }
+
   "verify renderJson round tripping" in {
     implicit val gen = sample(schema)
     prop((sd: SampleData) => testRenderJson(sd.data: _*))

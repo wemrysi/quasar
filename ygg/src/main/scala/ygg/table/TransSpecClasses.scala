@@ -29,6 +29,7 @@ class TransSpecClasses {
   class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
     protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
 
+    def map1(fn: CF1): TransSpecBuilder[A]               = next(Map1(spec, fn))
     def isType(tp: JType): TransSpecBuilder[A]           = next(IsType(spec, tp))
     def apply(index: Int): TransSpecBuilder[A]           = next(DerefArrayStatic(spec, CPathIndex(index)))
     def delete(fields: CPathField*): TransSpecBuilder[A] = next(ObjectDelete(spec, fields.toSet))

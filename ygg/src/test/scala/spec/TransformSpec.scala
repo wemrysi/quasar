@@ -1,11 +1,8 @@
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
+import ygg._, common._, table._, json._
 import TestSupport._
-import ygg.table._
-import ygg.json._
-
 import scala.util.Random
 
 class TransformSpec extends ColumnarTableQspec {
@@ -193,7 +190,7 @@ class TransformSpec extends ColumnarTableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        Map2(root.value.value1, root.value.value2, cf.Std.Eq),
+        Map2(root.value.value1, root.value.value2, cf.std.Eq),
         sd.data flatMap { jv =>
           ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
             case (JNum(x), JNum(y)) => Some(JBool(x == y))
@@ -212,7 +209,7 @@ class TransformSpec extends ColumnarTableQspec {
         Map2(
           root.value.value1,
           root.value.value2,
-          lookupF2(Nil, "add")
+          cf.math.Add
         )
       })
 
@@ -228,7 +225,7 @@ class TransformSpec extends ColumnarTableQspec {
   }
 
   private def testMap2ArrayObject = checkSpecData(
-    spec = Map2(root.value1, root.value2, lookupF2(Nil, "add")),
+    spec = Map2(root.value1, root.value2, cf.math.Add),
     data = jsonMany"""
       {"value1":{"foo":12},"value2":[1]}
       {"value1":[30],"value2":[1]}
@@ -1722,7 +1719,7 @@ class TransformSpec extends ColumnarTableQspec {
       val table = fromSample(sample)
       val results = toJson(table transform {
         Cond(
-          Map1(root.value, lookupF2(Nil, "mod").applyr(CLong(2)) andThen cf.Std.Eq.applyr(CLong(0))),
+          Map1(root.value, cf.math.Mod.applyr(CLong(2)) andThen cf.std.Eq.applyr(CLong(0))),
           root.value,
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
