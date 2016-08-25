@@ -2,7 +2,6 @@ package ygg.table
 
 import ygg.common._
 import scalaz._, Scalaz._, Ordering._
-import java.nio.file.Files
 import ygg.cf.{ Remap, Empty }
 import ygg.data._
 import ygg.json._
@@ -19,7 +18,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
   type Table <: ColumnarTable
   type TableCompanion <: ColumnarTableCompanion
 
-  def newScratchDir(): File    = Files.createTempDirectory("quasar").toFile
   def jdbmCommitInterval: Long = 200000l
 
   def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {

@@ -20,6 +20,7 @@ trait PackageMethods { self: PackageAliases =>
   def jclassLoader[A: CTag]: ClassLoader                        = jclass[A].getClassLoader
   def jResource[A: CTag](name: String): InputStream             = jResource(jclass[A], name)
   def jResource(c: jClass, name: String): InputStream           = c getResourceAsStream name
+  def newScratchDir(): File                                     = Files.createTempDirectory("ygg").toFile
 
   def warn[A](msg: String)(value: => A): A = {
     java.lang.System.err.println(msg)
