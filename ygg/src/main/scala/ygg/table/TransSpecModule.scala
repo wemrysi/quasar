@@ -1,19 +1,19 @@
 package ygg.table
 
+import ygg.cf
+
 trait TransSpecModule {
   object trans extends TransSpecClasses
   import trans.{ Leaf, Filter, Map1, Equal, root }
 
   implicit def liftF1(f1: CF1): CF1Like
   implicit def liftF2(f2: CF2): CF2Like
-  def lookupF1(namespace: List[String], name: String): CF1
-  def lookupF2(namespace: List[String], name: String): CF2
 
   object F1Expr {
-    def negate         = lookupF1(Nil, "negate")
-    def coerceToDouble = lookupF1(Nil, "coerceToDouble")
-    def moduloTwo      = lookupF2(Nil, "mod") applyr CLong(2)
-    def equalsZero     = lookupF2(Nil, "eq") applyr CLong(0)
+    def negate         = cf.math.Negate
+    def coerceToDouble = cf.CoerceToDouble
+    def moduloTwo      = cf.math.Mod applyr CLong(2)
+    def equalsZero     = cf.std.Eq applyr CLong(0)
     def isEven         = moduloTwo andThen equalsZero
   }
   object Fn {

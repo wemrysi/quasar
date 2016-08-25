@@ -141,26 +141,6 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
 }
 
 trait TableModuleTestSupport extends TableModule {
-  def lookupF1(namespace: List[String], name: String): CF1 = {
-    val lib = Map[String, CF1](
-      "negate"         -> cf.math.Negate,
-      "coerceToDouble" -> cf.CoerceToDouble,
-      "true" -> CF1("testing::true") { _ =>
-        Some(Column.const(true))
-      }
-    )
-
-    lib(name)
-  }
-
-  def lookupF2(namespace: List[String], name: String): CF2 = {
-    val lib = Map[String, CF2](
-      "add" -> cf.math.Add,
-      "mod" -> cf.math.Mod,
-      "eq"  -> cf.std.Eq
-    )
-    lib(name)
-  }
 
   def lookupScanner(namespace: List[String], name: String): Scanner = {
     val lib = Map[String, Scanner](

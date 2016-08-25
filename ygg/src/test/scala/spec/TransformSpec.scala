@@ -193,7 +193,7 @@ class TransformSpec extends ColumnarTableQspec {
     TableProp(sd =>
       TableTest(
         fromSample(sd),
-        Map2(root.value.value1, root.value.value2, lookupF2(Nil, "eq")),
+        Map2(root.value.value1, root.value.value2, cf.Std.Eq),
         sd.data flatMap { jv =>
           ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
             case (JNum(x), JNum(y)) => Some(JBool(x == y))
@@ -1722,7 +1722,7 @@ class TransformSpec extends ColumnarTableQspec {
       val table = fromSample(sample)
       val results = toJson(table transform {
         Cond(
-          Map1(root.value, lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0))),
+          Map1(root.value, lookupF2(Nil, "mod").applyr(CLong(2)) andThen cf.Std.Eq.applyr(CLong(0))),
           root.value,
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
