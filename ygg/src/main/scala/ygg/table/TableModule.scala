@@ -253,7 +253,7 @@ trait TableModule extends TransSpecModule {
 
   sealed trait GroupingSpec {
     def sources: Vector[GroupingSource]
-    def sorted: M[GroupingSpec]
+    def sorted: Need[GroupingSpec]
   }
 
   object GroupingSpec {

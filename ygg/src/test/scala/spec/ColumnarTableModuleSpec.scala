@@ -5,7 +5,6 @@ import ygg.json._
 
 class ColumnarTableModuleSpec
       extends ColumnarTableQspec
-         with TableModuleSpec
          with CrossSpec
          with TransformSpec
          with CompactSpec
@@ -18,7 +17,6 @@ class ColumnarTableModuleSpec
          with SchemasSpec {
 
   "a table dataset" should {
-    "verify bijection from JSON" in checkMappings(this)
     "verify bijection from static JSON" in {
       implicit val gen = sample(schema)
       prop((sd: SampleData) => toJsonSeq(fromJson(sd.data)) must_=== sd.data)
@@ -160,6 +158,7 @@ class ColumnarTableModuleSpec
     }
 
     "in takeRange" >> {
+      // "takeRange commutes as expected"                                                      in testTakeRangeCommutes
       "select the correct rows: trivial case"                                               in testTakeRange
       "select the correct rows when we take past the end of the table"                      in testTakeRangeLarger
       "select the correct rows when we start at an index larger than the size of the table" in testTakeRangeEmpty

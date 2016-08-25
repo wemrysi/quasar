@@ -62,6 +62,8 @@ trait PackageAliases {
   // other outside libs
   type M[+A]  = scalaz.Need[A]
   type Ord[A] = scalaz.Order[A]
+  type Eq[A]  = scalaz.Equal[A]
   type Cmp    = scalaz.Ordering
   val Ord     = scalaz.Order
+  val Eq      = scalaz.Equal
 }

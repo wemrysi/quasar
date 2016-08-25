@@ -83,16 +83,19 @@ trait ScalacheckSupport {
   def mapOfN[K, V](len: Int, k: Gen[K], v: Gen[V]): Gen[sciMap[K, V]] =
     (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
-  def genIndex(size: Int): Gen[Int] = choose(0, size - 1)
-  def genBool: Gen[Boolean]         = oneOf(true, false)
-  def genInt: Gen[Int]              = choose(Int.MinValue, Int.MaxValue)
-  def genLong: Gen[Long]            = choose(Long.MinValue, Long.MaxValue)
-  def genDouble: Gen[Double]        = Arbitrary.arbDouble.arbitrary
-  def genBigInt: Gen[BigInt]        = Arbitrary.arbBigInt.arbitrary
-  def genString: Gen[String]        = Arbitrary.arbString.arbitrary
-  def genIdentifier: Gen[String]    = identifier filter (_ != null)
-  def genPosLong: Gen[Long]         = choose(1L, Long.MaxValue)
-  def genPosInt: Gen[Int]           = choose(1, Int.MaxValue)
+  def genIndex(size: Int): Gen[Int]    = choose(0, size - 1)
+  def genBool: Gen[Boolean]            = oneOf(true, false)
+  def genInt: Gen[Int]                 = choose(Int.MinValue, Int.MaxValue)
+  def genLong: Gen[Long]               = choose(Long.MinValue, Long.MaxValue)
+  def genDouble: Gen[Double]           = Arbitrary.arbDouble.arbitrary
+  def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
+  def genString: Gen[String]           = Arbitrary.arbString.arbitrary
+  def genIdentifier: Gen[String]       = identifier filter (_ != null)
+  def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
+  def genPosInt: Gen[Int]              = choose(1, Int.MaxValue)
+  def genMinus10To10: Gen[Int]         = choose(-10, 10)
+  def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
+  def genOffsetAndLen: Gen[Int -> Int] = (genMinus10To10, 0 upTo 20).zip
 
   // BigDecimal *isn't* arbitrary precision!  AWESOME!!!
   // (and scalacheck's BigDecimal gen will overflow at random)

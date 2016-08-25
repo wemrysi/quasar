@@ -27,7 +27,7 @@ private object JValueInColumnOrder {
   }
 }
 
-class BlockAlignSpec extends quasar.Qspec with TableModuleSpec with BlockLoadSpec {
+class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {

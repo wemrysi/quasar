@@ -11,9 +11,9 @@ object TableTestSupport extends TestSupport with TableGenerators {}
 object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerators {
   def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
 
-  implicit def arbJValue: Arbitrary[JValue]   = Arbitrary(genJValue)
-  implicit def arbJObject: Arbitrary[JObject] = Arbitrary(genJObject)
-  implicit def arbJPath: Arbitrary[JPath]     = Arbitrary(genJPath)
+  implicit def arbJValue: Arbitrary[JValue]         = Arbitrary(genJValue)
+  implicit def arbJObject: Arbitrary[JObject]       = Arbitrary(genJObject)
+  implicit def arbJPath: Arbitrary[JPath]           = Arbitrary(genJPath)
 }
 
 trait TableGenerators {
@@ -70,14 +70,15 @@ trait JsonGenerators {
     1 -> delay(genJArray),
     1 -> delay(genJObject)
   )
+  def genJValueSeq: Gen[Seq[JValue]] = genJValue * (0 upTo 10)
 
   def genIdent: Gen[String]    = alphaLowerChar * choose(3, 8) ^^ (_.mkString)
   def genSimple: Gen[JValue]   = oneOf[JValue](JNull, genJNum, genJBool, genJString)
-  def genSmallInt: Gen[Int]    = choose(0, 5)
+  def gen0To5: Gen[Int]        = choose(0, 5)
   def genJNum: Gen[JNum]       = genBigDecimal ^^ (x => JNum(x))
   def genJBool: Gen[JBool]     = genBool ^^ (x => JBool(x))
   def genJString: Gen[JString] = genIdent ^^ (s => JString(s))
   def genJField: Gen[JField]   = (genIdent, genPosInt, genJValue) >> ((name, id, value) => JField(s"$name$id", value))
-  def genJObject: Gen[JObject] = genJField * genSmallInt ^^ (xs => JObject(xs: _*))
-  def genJArray: Gen[JArray]   = genJValue * genSmallInt ^^ (xs => JArray(xs.toVector))
+  def genJObject: Gen[JObject] = genJField * gen0To5 ^^ (xs => JObject(xs: _*))
+  def genJArray: Gen[JArray]   = genJValue * gen0To5 ^^ (xs => JArray(xs.toVector))
 }

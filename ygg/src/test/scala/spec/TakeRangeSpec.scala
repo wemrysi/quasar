@@ -1,7 +1,8 @@
 package ygg.tests
 
+import ygg.common._
 import scalaz._, Scalaz._
-import TestSupport._
+import JsonTestSupport._
 import ygg.json._
 
 trait TakeRangeSpec extends ColumnarTableQspec {
@@ -37,6 +38,23 @@ trait TakeRangeSpec extends ColumnarTableQspec {
         else sample.data.toSeq.drop(start).take(count)
 
       result must_== expected
+    }
+  }
+
+  def testTakeRangeCommutes: Prop = {
+    implicit val arbRange     = Arbitrary(genOffsetAndLen)
+    implicit val arbJValueSeq = Arbitrary(genJValueSeq)
+
+    prop { (xs: Seq[JValue], offlen: Int -> Int) =>
+      val (start, length) = offlen
+      def doSlice(xs: Seq[JValue]): Seq[JValue] =
+        if (start < 0 || length <= 0) Seq() else xs drop start take length
+
+      checkCommutes(
+        doSlice,
+        _.takeRange(start.toLong, length.toLong),
+        genJValueSeq
+      )
     }
   }
 

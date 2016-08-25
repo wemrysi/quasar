@@ -7,7 +7,7 @@ import ygg.json._
 
 // TODO: mix in a trait rather than defining Table directly
 
-class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
+class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
   import TableModule._
   import trans._
 

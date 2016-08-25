@@ -26,7 +26,7 @@ object Loop {
 }
 
 final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
-  private val m = new ConcurrentHashMap[A, C]()
+  private[this] val m = new ConcurrentHashMap[A, C]()
 
   def iterator: Iterator[A -> C] = source.keysIterator map (a => a -> apply(a))
 
@@ -39,6 +39,7 @@ final class LazyMap[A, B, C](source: Map[A, B], f: B => C) extends Map[A, C] {
       }
     case x => Some(x)
   }
+
   def +[C1 >: C](kv: (A, C1)): Map[A, C1] = iterator.toMap + kv
   def -(a: A): Map[A, C]                  = iterator.toMap - a
 }

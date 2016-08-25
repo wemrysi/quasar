@@ -5,7 +5,7 @@ import scalaz._, Scalaz._
 import ygg.table._
 import ygg.json._
 
-class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule {
+class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
   import trans._
   import TableModule._
 

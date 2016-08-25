@@ -9,6 +9,13 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   import SampleData._
   import trans._
 
+  class TableCommuteTest(f: Seq[JValue] => Seq[JValue], g: Table => Table) extends CommuteTest[Seq[JValue], Table] {
+    def transformR(x: Seq[JValue])  = f(x)
+    def transformS(x: Table)        = g(x)
+    def rToS(x: Seq[JValue]): Table = fromJson(x)
+    def sToR(x: Table): Seq[JValue] = toJson(x).copoint
+  }
+
   type ToSelf[A] = A => A
   type ASD       = Arbitrary[SampleData]
 
@@ -41,6 +48,14 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   def checkSpec(spec: TransSpec1)(expect: ToSelf[Seq[JValue]])(implicit z: ASD): Prop =
     TableProp(sd => TableTest(fromSample(sd), spec, expect(sd.data))).check()
 
+  def checkCommutes(f: Seq[JValue] => Seq[JValue], g: Table => Table, gen: Gen[Seq[JValue]]): Prop = {
+    implicit val za: Arbitrary[Seq[JValue]] = Arbitrary(gen)
+    implicit val ze: Eq[Seq[JValue]]        = Eq.equalA
+    implicit val zs: Show[Seq[JValue]]      = Show.shows(_ mkString ", ")
+
+    new TableCommuteTest(f, g).checkR()
+  }
+
   def checkSpecDefault(spec: TransSpec1)(expect: ToSelf[Seq[JValue]]): Prop =
     checkSpec(spec)(expect)(defaultASD)
 
@@ -67,15 +82,15 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
     def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
+
+    // Deadlock
+    // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[Need, Slice], size: TableSize) = new Table(slices, size)
-
     def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] =
-      abort("not implemented here")
+    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = ???
   }
 
   object Table extends TableCompanion
@@ -190,24 +205,10 @@ trait TableModuleTestSupport extends TableModule {
 
   def fromJson(data: Seq[JValue], maxBlockSize: Option[Int]): Table
 
-  def toJson(dataset: Table): Need[Stream[JValue]] = dataset.toJson.map(_.toStream)
-  def toJsonSeq(table: Table): Seq[JValue]         = toJson(table).copoint
-
-  def fromJson(data: Seq[JValue]): Table                    = fromJson(data, None)
-  def fromJson(data: Seq[JValue], maxBlockSize: Int): Table = fromJson(data, Some(maxBlockSize))
-
+  def toJson(dataset: Table): Need[Stream[JValue]]                         = dataset.toJson.map(_.toStream)
+  def toJsonSeq(table: Table): Seq[JValue]                                 = toJson(table).copoint
+  def fromJson(data: Seq[JValue]): Table                                   = fromJson(data, None)
+  def fromJson(data: Seq[JValue], maxBlockSize: Int): Table                = fromJson(data, Some(maxBlockSize))
   def fromSample(sampleData: SampleData): Table                            = fromJson(sampleData.data, None)
   def fromSample(sampleData: SampleData, maxBlockSize: Option[Int]): Table = fromJson(sampleData.data, maxBlockSize)
-}
-
-trait TableModuleSpec extends quasar.QuasarSpecification {
-  import SampleData._
-
-  def checkMappings(testSupport: TableModuleTestSupport) = {
-    implicit val gen = sample(schema)
-    prop { (sample: SampleData) =>
-      val dataset = testSupport.fromSample(sample)
-      testSupport.toJson(dataset).copoint.toSet must_== sample.data.toSet
-    }
-  }
 }

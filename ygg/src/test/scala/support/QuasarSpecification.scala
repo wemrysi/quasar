@@ -13,7 +13,19 @@ abstract class SequentialQspec extends Qspec {
   sequential
 
 }
-abstract class Qspec extends QuasarSpecification
+abstract class Qspec extends QuasarSpecification {
+  import org.scalacheck.Prop
+
+  trait CommuteTest[R, S] {
+    def transformR(x: R): R
+    def transformS(x: S): S
+    def rToS(x: R): S
+    def sToR(x: S): R
+
+    def checkOneR(x: R)(implicit ze: Equal[R], zs: Show[R]): MatchResult[R]  = transformR(x) must_= sToR(transformS(rToS(x)))
+    def checkR()(implicit za: Arbitrary[R], ze: Equal[R], zs: Show[R]): Prop = prop(checkOneR _)
+  }
+}
 
 trait QuasarSpecification
     extends org.specs2.mutable.SpecLike
@@ -30,7 +42,7 @@ trait QuasarSpecification
   args.report(showtimes = main.ArgProperty(true))
 
   implicit class Specs2ScalazOps[A : Equal : Show](lhs: A) {
-    def must_=(rhs: A) = lhs must equal(rhs)
+    def must_=(rhs: A): MatchResult[A] = lhs must equal(rhs)
   }
 
   /** Allows marking non-deterministically failing tests as such,
