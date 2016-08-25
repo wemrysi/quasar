@@ -12,7 +12,7 @@ class PartitionMergeSpec extends ColumnarTableQspec {
     "concatenate reductions of subsequences" in testPartitionMerge
   }
 
-  private object reducer extends Reducer[String] {
+  private object reducer extends CReducer[String] {
     def reduce(schema: CSchema, range: Range): String = {
       schema.columns(JTextT).head match {
         case col: StrColumn => range map col mkString ";"

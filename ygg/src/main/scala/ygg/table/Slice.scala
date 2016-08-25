@@ -36,7 +36,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     } toSet
   }
 
-  def isDefinedAt(row: Int) = columns.values.exists(_.isDefinedAt(row))
+  def isDefinedAt(row: RowId) = columns.values.exists(_.isDefinedAt(row))
 
   def definedAt: BitSet = doto(Bits())(defined => columns foreach { case (_, col) => defined or col.definedAt(0, size) })
 
@@ -68,7 +68,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
     val cols  = cols0 map { case (_, col)                      => col }
 
-    def inflate[@spec A: CTag](cols: Array[Int => A], row: Int) = {
+    def inflate[@spec A: CTag](cols: Array[Int => A], row: RowId) = {
       val as = new Array[A](cols.length)
       var i  = 0
       while (i < cols.length) {
@@ -78,7 +78,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
       as
     }
 
-    def loopForall[A <: Column](cols: Array[A])(row: Int) = !cols.isEmpty && Loop.forall(cols)(_ isDefinedAt row)
+    def loopForall[A <: Column](cols: Array[A])(row: RowId) = !cols.isEmpty && Loop.forall(cols)(_ isDefinedAt row)
 
     def rhs = tpe0 match {
       case CLong =>
@@ -88,8 +88,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           private val cols: Array[Int => Long] = longcols map (col => col apply _)
 
           val tpe                          = CArrayType(CLong)
-          def isDefinedAt(row: Int)        = loopForall[LongColumn](longcols)(row)
-          def apply(row: Int): Array[Long] = inflate(cols, row)
+          def isDefinedAt(row: RowId)        = loopForall[LongColumn](longcols)(row)
+          def apply(row: RowId): Array[Long] = inflate(cols, row)
         }
       case CDouble =>
         val doublecols = cols.collect { case (col: DoubleColumn) => col }.toArray
@@ -97,8 +97,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           private val cols: Array[Int => Double] = doublecols map (col => col apply _)
 
           val tpe                            = CArrayType(CDouble)
-          def isDefinedAt(row: Int)          = loopForall[DoubleColumn](doublecols)(row)
-          def apply(row: Int): Array[Double] = inflate(cols, row)
+          def isDefinedAt(row: RowId)          = loopForall[DoubleColumn](doublecols)(row)
+          def apply(row: RowId): Array[Double] = inflate(cols, row)
         }
       case CNum =>
         val numcols = cols.collect { case (col: NumColumn) => col }.toArray
@@ -106,8 +106,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           private val cols: Array[Int => BigDecimal] = numcols map (col => col apply _)
 
           val tpe                                = CArrayType(CNum)
-          def isDefinedAt(row: Int)              = loopForall[NumColumn](numcols)(row)
-          def apply(row: Int): Array[BigDecimal] = inflate(cols, row)
+          def isDefinedAt(row: RowId)              = loopForall[NumColumn](numcols)(row)
+          def apply(row: RowId): Array[BigDecimal] = inflate(cols, row)
         }
       case CBoolean =>
         val boolcols = cols.collect { case (col: BoolColumn) => col }.toArray
@@ -115,8 +115,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           private val cols: Array[Int => Boolean] = boolcols map (col => col apply _)
 
           val tpe                             = CArrayType(CBoolean)
-          def isDefinedAt(row: Int)           = loopForall[BoolColumn](boolcols)(row)
-          def apply(row: Int): Array[Boolean] = inflate(cols, row)
+          def isDefinedAt(row: RowId)           = loopForall[BoolColumn](boolcols)(row)
+          def apply(row: RowId): Array[Boolean] = inflate(cols, row)
         }
       case CString =>
         val strcols = cols.collect { case (col: StrColumn) => col }.toArray
@@ -124,8 +124,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           private val cols: Array[Int => String] = strcols map (col => col apply _)
 
           val tpe                            = CArrayType(CString)
-          def isDefinedAt(row: Int)          = loopForall[StrColumn](strcols)(row)
-          def apply(row: Int): Array[String] = inflate(cols, row)
+          def isDefinedAt(row: RowId)          = loopForall[StrColumn](strcols)(row)
+          def apply(row: RowId): Array[String] = inflate(cols, row)
         }
       case _ => abort("unsupported type")
     }
@@ -144,56 +144,56 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(source.size, Map(value match {
       case CString(s) =>
         (ColumnRef.id(CString), new StrColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = s
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = s
         })
       case CBoolean(b) =>
         (ColumnRef.id(CBoolean), new BoolColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = b
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = b
         })
       case CLong(l) =>
         (ColumnRef.id(CLong), new LongColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = l
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = l
         })
       case CDouble(d) =>
         (ColumnRef.id(CDouble), new DoubleColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = d
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = d
         })
       case CNum(n) =>
         (ColumnRef.id(CNum), new NumColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = n
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = n
         })
       case CDate(d) =>
         (ColumnRef.id(CDate), new DateColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = d
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = d
         })
       case CPeriod(p) =>
         (ColumnRef.id(CPeriod), new PeriodColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = p
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = p
         })
       case value: CArray[a] =>
         (ColumnRef.id(value.cType), new HomogeneousArrayColumn[a] {
           val tpe                   = value.cType
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
-          def apply(row: Int)       = value.value
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
+          def apply(row: RowId)       = value.value
         })
       case CNull =>
         (ColumnRef.id(CNull), new NullColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
         })
       case CEmptyObject =>
         (ColumnRef.id(CEmptyObject), new EmptyObjectColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
         })
       case CEmptyArray =>
         (ColumnRef.id(CEmptyArray), new EmptyArrayColumn {
-          def isDefinedAt(row: Int) = source.isDefinedAt(row)
+          def isDefinedAt(row: RowId) = source.isDefinedAt(row)
         })
       case CUndefined => abort("Cannot define a constant undefined value")
     }))
@@ -313,8 +313,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
           val trans = flattenDeleteTree(jtype, ctype, cpath)
           Some((ref, new HomogeneousArrayColumn[a] {
             val tpe                       = ctype
-            def isDefinedAt(row: Int)     = col.isDefinedAt(row)
-            def apply(row: Int): Array[a] = trans(col(row).asInstanceOf[Array[a]]) getOrElse abort("Oh dear, this cannot be happening to me.")
+            def isDefinedAt(row: RowId)     = col.isDefinedAt(row)
+            def apply(row: RowId): Array[a] = trans(col(row).asInstanceOf[Array[a]]) getOrElse abort("Oh dear, this cannot be happening to me.")
           }))
 
         case (ref, col) => Some(ref -> col)
@@ -338,11 +338,11 @@ class SliceOps(private val source: Slice) extends AnyVal {
     // EmptyObjectColumn defined at the row position.
     lazy val emptyObjectColumn = withoutPrefixes get ref map { c =>
       new EmptyObjectColumn {
-        def isDefinedAt(row: Int) = c.isDefinedAt(row) || becomeEmpty(row)
+        def isDefinedAt(row: RowId) = c.isDefinedAt(row) || becomeEmpty(row)
       }
     } getOrElse {
       new EmptyObjectColumn {
-        def isDefinedAt(row: Int) = becomeEmpty(row)
+        def isDefinedAt(row: RowId) = becomeEmpty(row)
       }
     }
 
@@ -397,8 +397,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
       case (ColumnRef(cPath @ CPath(CPathArray, _ *), cType), col: HomogeneousArrayColumn[a]) =>
         (ColumnRef(cPath, cType), new HomogeneousArrayColumn[a] {
           val tpe                   = col.tpe
-          def isDefinedAt(row: Int) = col.isDefinedAt(row)
-          def apply(row: Int) = {
+          def isDefinedAt(row: RowId) = col.isDefinedAt(row)
+          def apply(row: RowId) = {
             val xs = col(row)
             if (index >= xs.length) xs
             else {
@@ -1430,14 +1430,14 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
-  def toRValue(row: Int): RValue = {
+  def toRValue(row: RowId): RValue = {
     columns.foldLeft[RValue](CUndefined) {
       case (rv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) => rv.unsafeInsert(selector, col.cValue(row))
       case (rv, _)                                                     => rv
     }
   }
 
-  def toJValue(row: Int) = {
+  def toJValue(row: RowId) = {
     columns.foldLeft[JValue](JUndefined) {
       case (jv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
         cPathToJPaths(selector, col.cValue(row)).foldLeft(jv) {
@@ -1448,7 +1448,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
-  def toJson(row: Int): Option[JValue] = toJValue(row) match {
+  def toJson(row: RowId): Option[JValue] = toJValue(row) match {
     case JUndefined => None
     case jv         => Some(jv)
   }
@@ -1466,7 +1466,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     rec(0, Vector())
   }
 
-  def toString(row: Int): Option[String] = {
+  def toString(row: RowId): Option[String] = {
     (columns.toList.sortBy(_._1) map { case (ref, col) => ref.toString + ": " + (if (col.isDefinedAt(row)) col.strValue(row) else "(undefined)") }) match {
       case Nil                                         => None
       case l                                           => Some(l.mkString("[", ", ", "]"))

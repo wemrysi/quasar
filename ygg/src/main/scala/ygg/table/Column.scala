@@ -6,16 +6,16 @@ import ygg._, common._, json._, data._
 trait Column {
   val tpe: CType
 
-  def isDefinedAt(row: Int): Boolean
-  def jValue(row: Int): JValue
-  def cValue(row: Int): CValue
-  def strValue(row: Int): String
-  def rowCompare(row1: Int, row2: Int): Int
+  def isDefinedAt(row: RowId): Boolean
+  def jValue(row: RowId): JValue
+  def cValue(row: RowId): CValue
+  def strValue(row: RowId): String
+  def rowCompare(row1: RowId, row2: RowId): Int
 
-  def |>(f1: CF1): Option[Column]           = f1(this)
-  def toString(row: Int): String            = if (isDefinedAt(row)) strValue(row) else "(undefined)"
-  def toString(range: Range): String        = range map (this toString _) mkString ("(", ",", ")")
-  def definedAt(from: Int, to: Int): BitSet = Bits.filteredRange(from, to)(isDefinedAt)
+  def |>(f1: CF1): Option[Column]               = f1(this)
+  def toString(row: RowId): String              = if (isDefinedAt(row)) strValue(row) else "(undefined)"
+  def toString(range: Range): String            = range map (this toString _) mkString ("(", ",", ")")
+  def definedAt(from: RowId, to: RowId): BitSet = Bits.filteredRange(from, to)(isDefinedAt)
 }
 
 object Table

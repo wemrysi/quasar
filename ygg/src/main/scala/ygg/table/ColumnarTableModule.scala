@@ -314,7 +314,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     /**
       * Folds over the table to produce a single value (stored in a singleton table).
       */
-    def reduce[A](reducer: Reducer[A])(implicit monoid: Monoid[A]): M[A] = {
+    def reduce[A](reducer: CReducer[A])(implicit monoid: Monoid[A]): M[A] = {
       def rec(stream: StreamT[M, A], acc: A): M[A] = stream.uncons flatMap {
         case Some((head, tail)) => rec(tail, head |+| acc)
         case None               => Need(acc)
