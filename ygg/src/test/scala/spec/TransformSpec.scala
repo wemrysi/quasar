@@ -1037,7 +1037,7 @@ class TransformSpec extends ColumnarTableQspec {
   private def checkObjectDelete = {
     implicit val gen = sample(objectSchema(_, 3))
 
-    def randomDeletionMask(schema: CValueGenerators.JSchema): Option[JPathField] = {
+    def randomDeletionMask(schema: JSchema): Option[JPathField] = {
       Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) :: _), _) => x })
     }
 

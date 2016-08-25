@@ -5,6 +5,9 @@ import ygg.common._
 import scalaz._, Scalaz._
 
 package object json {
+  type JSchemaElem = ygg.json.JPath -> ygg.table.CType
+  type JSchema     = Seq[JSchemaElem]
+
   type JPathValue   = JPath -> JValue
   type JStringValue = String -> JValue
 

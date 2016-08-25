@@ -4,7 +4,6 @@ import ygg.common._
 import TestSupport._
 import ygg.json._
 import ygg.table._
-import CValueGenerators.JSchema
 
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random

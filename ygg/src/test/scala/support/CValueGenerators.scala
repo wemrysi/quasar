@@ -8,8 +8,6 @@ import ygg.json._
 import ygg.table._
 
 object CValueGenerators {
-  type JSchema = Seq[JPath -> CType]
-
   def inferSchema(data: Seq[JValue]): JSchema = data match {
     case Seq() => Seq()
     case hd +: tl =>
@@ -19,8 +17,6 @@ object CValueGenerators {
 }
 
 trait CValueGenerators {
-  import CValueGenerators._
-
   def genCogroupData: Gen[CogroupData] = (
     for {
       depth           <- choose(1, 2)
@@ -101,7 +97,7 @@ trait CValueGenerators {
     case CPeriod       => abort("undefined")
   }
 
-  def jvalue(schema: Seq[JPath -> CType]): Gen[JValue] = {
+  def jvalue(schema: JSchema): Gen[JValue] = {
     schema.foldLeft(Gen.const[JValue](JUndefined)) {
       case (gen, (jpath, ctype)) =>
         for {
