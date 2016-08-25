@@ -12,6 +12,8 @@ trait TableModule {
   val Table: TableCompanion
 
   trait TableCompanionLike extends ygg.table.TableCompanion {
+    type Table = TableModule.this.Table
+
     def empty: Table
 
     def constString(v: scSet[String]): Table

@@ -1034,8 +1034,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   }
 
   class ExternalTable(slices: StreamT[M, Slice], size: TableSize) extends Table(slices, size) {
-    import Table._
-    import SliceTransform._
+    import Table.{ Table => _, _ }
+    import SliceTransform.composeSliceTransform
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
