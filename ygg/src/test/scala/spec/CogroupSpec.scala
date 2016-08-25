@@ -53,7 +53,7 @@ class CogroupSpec extends ColumnarTableQspec {
       }
   }
 
-  def testCogroup(pair: CogroupData) = {
+  private def testCogroup(pair: CogroupData) = {
     val (l, r)   = pair
     val ltable   = fromSample(l)
     val rtable   = fromSample(r)
@@ -75,7 +75,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testTrivialCogroup(f: Table => Table) = {
+  private def testTrivialCogroup(f: Table => Table) = {
     def recl = toRecord(Array(0L), JArray(JNum(12) :: Nil))
     def recr = toRecord(Array(0L), JArray(JUndefined :: JNum(13) :: Nil))
 
@@ -93,7 +93,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(f(result)) must_=== expected
   }
 
-  def testSimpleCogroup(f: Table => Table = identity[Table]) = {
+  private def testSimpleCogroup(f: Table => Table) = {
     def recl(i: Long)    = toRecord(Array(i), json"""{ "left": ${i.toString} }""")
     def recr(i: Long)    = toRecord(Array(i), json"""{ "right": ${i.toString} }""")
     def recBoth(i: Long) = toRecord(Array(i), json"""{ "left": ${i.toString}, "right": ${i.toString} }""")
@@ -127,7 +127,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(f(result)) must_=== expected
   }
 
-  def testUnionCogroup = {
+  private def testUnionCogroup = {
     def recl(i: Long, j: Long) = toRecord(Array(i), JObject(List(JField("left", JNum(j)))))
     def recr(i: Long, j: Long) = toRecord(Array(i), JObject(List(JField("right", JNum(j)))))
 
@@ -156,7 +156,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testAnotherSimpleCogroup = {
+  private def testAnotherSimpleCogroup = {
     def recl(i: Long)    = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
     def recr(i: Long)    = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
     def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
@@ -184,7 +184,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testAnotherSimpleCogroupSwitched = {
+  private def testAnotherSimpleCogroupSwitched = {
     def recl(i: Long)    = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
     def recr(i: Long)    = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
     def recBoth(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)), JField("right", JString(i.toString)))))
@@ -212,7 +212,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testUnsortedInputs = {
+  private def testUnsortedInputs = {
     def recl(i: Long) = toRecord(Array(i), JObject(List(JField("left", JString(i.toString)))))
     def recr(i: Long) = toRecord(Array(i), JObject(List(JField("right", JString(i.toString)))))
 
@@ -227,14 +227,14 @@ class CogroupSpec extends ColumnarTableQspec {
       )).copoint must throwAn[Exception]
   }
 
-  def testCogroupPathology1 = {
+  private def testCogroupPathology1 = {
     val s1 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "a":[] }""")))
     val s2 = SampleData(Stream(toRecord(Array(1, 1, 1), json"""{ "b":0 }""")))
 
     testCogroup(s1 -> s2)
   }
 
-  def testCogroupSliceBoundaries = {
+  private def testCogroupSliceBoundaries = {
     val s1 = SampleData(
       Stream(
         toRecord(Array(1), json"""{ "ruoh5A25Jaxa":-1.0 }"""),
@@ -268,7 +268,7 @@ class CogroupSpec extends ColumnarTableQspec {
     testCogroup(s1 -> s2)
   }
 
-  def testCogroupPathology2 = {
+  private def testCogroupPathology2 = {
     val s1 = SampleData(
       Stream(
         toRecord(Array(19, 49, 71), JArray(JNum(-4611686018427387904l) :: Nil)),
@@ -322,7 +322,7 @@ class CogroupSpec extends ColumnarTableQspec {
     testCogroup(s1 -> s2)
   }
 
-  def testCogroupPathology3 = {
+  private def testCogroupPathology3 = {
     val s1 = SampleData(jsonMany"""
       { "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }
       { "value":{ "ugsrry":0.0 }, "key":[3.0] }
@@ -356,7 +356,7 @@ class CogroupSpec extends ColumnarTableQspec {
     testCogroup(s1 -> s2)
   }
 
-  def testPartialUndefinedCogroup = {
+  private def testPartialUndefinedCogroup = {
     val ltable = fromJson(
       jsonMany"""
         { "id" : "foo", "val" : 4 }
@@ -387,7 +387,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testLongEqualSpansOnRight = {
+  private def testLongEqualSpansOnRight = {
     val record   = json"""{"key":"Bob","value":42}"""
     val ltable   = fromSample(SampleData(Stream(record)))
     val rtable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
@@ -402,7 +402,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testLongEqualSpansOnLeft = {
+  private def testLongEqualSpansOnLeft = {
     val record   = json"""{"key":"Bob","value":42}"""
     val ltable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val rtable   = fromSample(SampleData(Stream(record)))
@@ -417,7 +417,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testLongEqualSpansOnBoth = {
+  private def testLongEqualSpansOnBoth = {
     val table    = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = ( for (l  <- 0 until 22; r <- 0 until 22) yield json"""{ "left": $l, "right": $r }""" ).toStream
 
@@ -433,7 +433,7 @@ class CogroupSpec extends ColumnarTableQspec {
     toJsonSeq(result) must_=== expected
   }
 
-  def testLongLeftSpanWithIncreasingRight = {
+  private def testLongLeftSpanWithIncreasingRight = {
     val ltable   = fromJson(Stream.tabulate(12)(i => json"""{ "key": "Bob", "value": $i }"""))
     val rtable   = fromJson(jsonMany"""{"key":"Bob", "value":50} {"key":"Charlie", "value":60}""")
     val expected = Seq.tabulate(12)(i => json"""{ "left": $i, "right": 50 }""") :+ json"""{ "right": 60 }"""
