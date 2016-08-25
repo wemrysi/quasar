@@ -39,6 +39,9 @@ trait TableCompanion {
   def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
+trait ColumnarTable extends Table {
+  type Table >: this.type <: ygg.table.ColumnarTable
+}
 trait Table {
   type Table >: this.type <: ygg.table.Table
   type NeedTable = Need[Table]

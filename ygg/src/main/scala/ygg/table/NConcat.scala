@@ -1,7 +1,116 @@
 package ygg.table
 
-import ygg.common._
-import ygg.data._
+import ygg._, common._, data._
+
+object ConcatHelpers {
+  def buildFilters(columns: ColumnMap, size: Int, filter: ColumnMap => ColumnMap, filterEmpty: ColumnMap => ColumnMap) = {
+    val definedBits = filter(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
+    val emptyBits   = filterEmpty(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
+    (definedBits, emptyBits)
+  }
+
+  def buildOuterBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet): BitSet = {
+    (rightEmptyBits & leftEmptyBits) |
+      (rightEmptyBits &~ leftDefinedBits) |
+      (leftEmptyBits &~ rightDefinedBits)
+  }
+
+  def buildInnerBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet) = {
+    val emptyBits    = rightEmptyBits & leftEmptyBits
+    val nonemptyBits = leftDefinedBits & rightDefinedBits
+    (emptyBits, nonemptyBits)
+  }
+
+  def filterArrays(columns: ColumnMap) = columns filter {
+    case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
+    case (ColumnRef.id(CEmptyArray), _)                  => true
+    case _                                               => false
+  }
+
+  def filterEmptyArrays(columns: ColumnMap) = columns filter {
+    case (ColumnRef.id(CEmptyArray), _) => true
+    case _                              => false
+  }
+
+  def collectIndices(columns: ColumnMap) = columns.collect {
+    case (ref @ ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => (i, xs, ref, col)
+  }
+
+  def buildEmptyArrays(emptyBits: BitSet) = Map(ColumnRef.id(CEmptyArray) -> EmptyArrayColumn(emptyBits))
+
+  def buildNonemptyArrays(left: ColumnMap, right: ColumnMap) = {
+    val leftIndices  = collectIndices(left)
+    val rightIndices = collectIndices(right)
+
+    val maxId = if (leftIndices.isEmpty) -1 else leftIndices.map(_._1).max
+    val newCols = (leftIndices map { case (_, _, ref, col) => ref -> col }) ++
+        (rightIndices map { case (i, xs, ref, col) => ColumnRef(CPath(CPathIndex(i + maxId + 1) :: xs.toList), ref.ctype) -> col })
+
+    newCols.toMap
+  }
+
+  def filterObjects(columns: ColumnMap) = columns.filter {
+    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
+    case (ColumnRef.id(CEmptyObject), _)                 => true
+    case _                                               => false
+  }
+
+  def filterEmptyObjects(columns: ColumnMap) = columns.filter {
+    case (ColumnRef.id(CEmptyObject), _) => true
+    case _                               => false
+  }
+
+  def filterFields(columns: ColumnMap) = columns.filter {
+    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
+    case _                                               => false
+  }
+
+  def buildFields(leftColumns: ColumnMap, rightColumns: ColumnMap) =
+    (filterFields(leftColumns), filterFields(rightColumns))
+
+  def buildEmptyObjects(emptyBits: BitSet) = (
+    if (emptyBits.isEmpty) Map()
+    else Map(ColumnRef.id(CEmptyObject) -> EmptyObjectColumn(emptyBits))
+  )
+
+  def buildNonemptyObjects(leftFields: ColumnMap, rightFields: ColumnMap) = {
+    val (leftInner, leftOuter) = leftFields partition {
+      case (ColumnRef(path, _), _)                         =>
+        rightFields exists { case (ColumnRef(path2, _), _) => path == path2 }
+    }
+
+    val (rightInner, rightOuter) = rightFields partition {
+      case (ColumnRef(path, _), _)                        =>
+        leftFields exists { case (ColumnRef(path2, _), _) => path == path2 }
+    }
+
+    val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
+
+    val mergedPairs: Set[ColumnRef -> Column] = innerPaths flatMap { path =>
+      val rightSelection = rightInner filter {
+        case (ColumnRef(path2, _), _) => path == path2
+      }
+
+      val leftSelection = leftInner filter {
+        case (ref @ ColumnRef(path2, _), _) =>
+          path == path2 && !rightSelection.contains(ref)
+      }
+
+      val rightMerged = rightSelection map {
+        case (ref, col) => {
+          if (leftInner contains ref)
+            ref -> cf.UnionRight(leftInner(ref), col).get
+          else
+            ref -> col
+        }
+      }
+
+      rightMerged ++ leftSelection
+    }
+
+    leftOuter ++ rightOuter ++ mergedPairs
+  }
+}
 
 final object NConcat {
   // Closest thing we can get to casting an array. This is completely unsafe.

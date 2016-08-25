@@ -5,39 +5,38 @@ import scalaz._, Scalaz._
 import ygg.cf
 import ygg.json._
 import ygg.data._
+import trans._
+import ConcatHelpers._
 
-trait SliceTransforms extends TableModule with ConcatHelpers {
-
-  import trans._
+trait SliceTransforms extends TableModule {
 
   protected object SliceTransform {
     def identity[A](initial: A) = SliceTransform1.liftM[A](initial, (a: A, s: Slice) => (a, s))
     def left[A](initial: A)     = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sl))
     def right[A](initial: A)    = SliceTransform2.liftM[A](initial, (a: A, sl: Slice, sr: Slice) => (a, sr))
 
-    def composeSliceTransform(spec: TransSpec1): SliceTransform1[_] = {
-      composeSliceTransform2(spec).parallel
-    }
+    def composeSliceTransform(spec: TransSpec1): SliceTransform1[_] = composeSliceTransform2(spec).parallel
 
     // No transform defined herein may reduce the size of a slice. Be it known!
     def composeSliceTransform2(spec: TransSpec[SourceType]): SliceTransform2[_] = {
-      //todo missing case WrapObjectDynamic
       val result = spec match {
-        case Leaf(source) if source == Source || source == SourceLeft =>
-          SliceTransform.left(())
+        case WrapObjectDynamic(left, right)        => ???
+        case Leaf(trans.Source | trans.SourceLeft) => SliceTransform.left(())
+        case Leaf(trans.SourceRight)               => SliceTransform.right(())
 
-        case Leaf(source) if source == SourceRight =>
-          SliceTransform.right(())
-
-        case Map1(source, f) =>
-          composeSliceTransform2(source) map {
-            _ mapRoot f
-          }
-
-        case DeepMap1(source, f) =>
-          composeSliceTransform2(source) map {
-            _ mapColumns f
-          }
+        case ArraySwap(source, index)           => composeSliceTransform2(source) map (_ arraySwap index)
+        case ConstLiteral(value, target)        => composeSliceTransform2(target) map (_ definedConst value)
+        case DeepMap1(source, f)                => composeSliceTransform2(source) map (_ mapColumns f)
+        case DerefArrayStatic(source, element)  => composeSliceTransform2(source) map (_ deref element)
+        case DerefMetadataStatic(source, field) => composeSliceTransform2(source) map (_ deref field)
+        case DerefObjectStatic(source, field)   => composeSliceTransform2(source) map (_ deref field)
+        case IsType(source, tpe)                => composeSliceTransform2(source) map (_ isType tpe)
+        case Map1(source, f)                    => composeSliceTransform2(source) map (_ mapRoot f)
+        case ObjectDelete(source, mask)         => composeSliceTransform2(source) map (_ deleteFields mask)
+        case Typed(source, tpe)                 => composeSliceTransform2(source) map (_ typed tpe)
+        case TypedSubsumes(source, tpe)         => composeSliceTransform2(source) map (_ typedSubsumes tpe)
+        case WrapArray(source)                  => composeSliceTransform2(source) map (_ wrap CPathIndex(0))
+        case WrapObject(source, field)          => composeSliceTransform2(source) map (_ wrap CPathField(field))
 
         case Map2(left, right, f) =>
           val l0 = composeSliceTransform2(left)
@@ -78,7 +77,7 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
             }
           }
 
-        case Equal(left, right) =>
+        case trans.Equal(left, right) =>
           val l0 = composeSliceTransform2(left)
           val r0 = composeSliceTransform2(right)
 
@@ -249,19 +248,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
           }
         }
 
-        case ConstLiteral(value, target) =>
-          composeSliceTransform2(target) map { _.definedConst(value) }
-
-        case WrapObject(source, field) =>
-          composeSliceTransform2(source) map {
-            _ wrap CPathField(field)
-          }
-
-        case WrapArray(source) =>
-          composeSliceTransform2(source) map {
-            _ wrap CPathIndex(0)
-          }
-
         case OuterObjectConcat(objects @ _ *) =>
           if (objects.size == 1) {
             val typed = Typed(objects.head, JObjectUnfixedT)
@@ -398,26 +384,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
             }
           }
 
-        case ObjectDelete(source, mask) =>
-          composeSliceTransform2(source) map {
-            _ deleteFields mask
-          }
-
-        case Typed(source, tpe) =>
-          composeSliceTransform2(source) map {
-            _ typed tpe
-          }
-
-        case TypedSubsumes(source, tpe) =>
-          composeSliceTransform2(source) map {
-            _ typedSubsumes tpe
-          }
-
-        case IsType(source, tpe) =>
-          composeSliceTransform2(source) map {
-            _ isType tpe
-          }
-
         case Scan(source, scanner) =>
           composeSliceTransform2(source) andThen {
             SliceTransform1.liftM[scanner.A](
@@ -427,16 +393,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
                 newState -> Slice(slice.size, newCols)
               }
             )
-          }
-
-        case DerefMetadataStatic(source, field) =>
-          composeSliceTransform2(source) map {
-            _ deref field
-          }
-
-        case DerefObjectStatic(source, field) =>
-          composeSliceTransform2(source) map {
-            _ deref field
           }
 
         case DerefObjectDynamic(source, ref) =>
@@ -450,11 +406,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
             } getOrElse {
               slice
             }
-          }
-
-        case DerefArrayStatic(source, element) =>
-          composeSliceTransform2(source) map {
-            _ deref element
           }
 
         case DerefArrayDynamic(source, ref) =>
@@ -475,11 +426,6 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
             } getOrElse {
               slice
             }
-          }
-
-        case ArraySwap(source, index) =>
-          composeSliceTransform2(source) map {
-            _ arraySwap index
           }
 
         case FilterDefined(source, definedFor, definedness) =>
@@ -998,115 +944,5 @@ trait SliceTransforms extends TableModule with ConcatHelpers {
       def advance(sl: Slice, sr: Slice): M[SliceTransform2[B] -> Slice] =
         st.advance(sl, sr) map { case (st0, s0) => (MappedState2[A, B](st0, to, from), s0) }
     }
-  }
-}
-
-trait ConcatHelpers {
-  def buildFilters(columns: ColumnMap, size: Int, filter: ColumnMap => ColumnMap, filterEmpty: ColumnMap => ColumnMap) = {
-    val definedBits = filter(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
-    val emptyBits   = filterEmpty(columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
-    (definedBits, emptyBits)
-  }
-
-  def buildOuterBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet): BitSet = {
-    (rightEmptyBits & leftEmptyBits) |
-      (rightEmptyBits &~ leftDefinedBits) |
-      (leftEmptyBits &~ rightDefinedBits)
-  }
-
-  def buildInnerBits(leftEmptyBits: BitSet, rightEmptyBits: BitSet, leftDefinedBits: BitSet, rightDefinedBits: BitSet) = {
-    val emptyBits    = rightEmptyBits & leftEmptyBits
-    val nonemptyBits = leftDefinedBits & rightDefinedBits
-    (emptyBits, nonemptyBits)
-  }
-
-  def filterArrays(columns: ColumnMap) = columns filter {
-    case (ColumnRef(CPath(CPathIndex(_), _ @_ *), _), _) => true
-    case (ColumnRef.id(CEmptyArray), _)                  => true
-    case _                                               => false
-  }
-
-  def filterEmptyArrays(columns: ColumnMap) = columns filter {
-    case (ColumnRef.id(CEmptyArray), _) => true
-    case _                              => false
-  }
-
-  def collectIndices(columns: ColumnMap) = columns.collect {
-    case (ref @ ColumnRef(CPath(CPathIndex(i), xs @ _ *), ctype), col) => (i, xs, ref, col)
-  }
-
-  def buildEmptyArrays(emptyBits: BitSet) = Map(ColumnRef.id(CEmptyArray) -> EmptyArrayColumn(emptyBits))
-
-  def buildNonemptyArrays(left: ColumnMap, right: ColumnMap) = {
-    val leftIndices  = collectIndices(left)
-    val rightIndices = collectIndices(right)
-
-    val maxId = if (leftIndices.isEmpty) -1 else leftIndices.map(_._1).max
-    val newCols = (leftIndices map { case (_, _, ref, col) => ref -> col }) ++
-        (rightIndices map { case (i, xs, ref, col) => ColumnRef(CPath(CPathIndex(i + maxId + 1) :: xs.toList), ref.ctype) -> col })
-
-    newCols.toMap
-  }
-
-  def filterObjects(columns: ColumnMap) = columns.filter {
-    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
-    case (ColumnRef.id(CEmptyObject), _)                 => true
-    case _                                               => false
-  }
-
-  def filterEmptyObjects(columns: ColumnMap) = columns.filter {
-    case (ColumnRef.id(CEmptyObject), _) => true
-    case _                               => false
-  }
-
-  def filterFields(columns: ColumnMap) = columns.filter {
-    case (ColumnRef(CPath(CPathField(_), _ @_ *), _), _) => true
-    case _                                               => false
-  }
-
-  def buildFields(leftColumns: ColumnMap, rightColumns: ColumnMap) =
-    (filterFields(leftColumns), filterFields(rightColumns))
-
-  def buildEmptyObjects(emptyBits: BitSet) = (
-    if (emptyBits.isEmpty) Map()
-    else Map(ColumnRef.id(CEmptyObject) -> EmptyObjectColumn(emptyBits))
-  )
-
-  def buildNonemptyObjects(leftFields: ColumnMap, rightFields: ColumnMap) = {
-    val (leftInner, leftOuter) = leftFields partition {
-      case (ColumnRef(path, _), _)                         =>
-        rightFields exists { case (ColumnRef(path2, _), _) => path == path2 }
-    }
-
-    val (rightInner, rightOuter) = rightFields partition {
-      case (ColumnRef(path, _), _)                        =>
-        leftFields exists { case (ColumnRef(path2, _), _) => path == path2 }
-    }
-
-    val innerPaths = Set(leftInner.keys map { _.selector } toSeq: _*)
-
-    val mergedPairs: Set[ColumnRef -> Column] = innerPaths flatMap { path =>
-      val rightSelection = rightInner filter {
-        case (ColumnRef(path2, _), _) => path == path2
-      }
-
-      val leftSelection = leftInner filter {
-        case (ref @ ColumnRef(path2, _), _) =>
-          path == path2 && !rightSelection.contains(ref)
-      }
-
-      val rightMerged = rightSelection map {
-        case (ref, col) => {
-          if (leftInner contains ref)
-            ref -> cf.UnionRight(leftInner(ref), col).get
-          else
-            ref -> col
-        }
-      }
-
-      rightMerged ++ leftSelection
-    }
-
-    leftOuter ++ rightOuter ++ mergedPairs
   }
 }
