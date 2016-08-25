@@ -28,6 +28,15 @@ package trans {
     def value = selectDynamic("value")
     def key   = selectDynamic("key")
   }
+  object rootLeft extends TransSpecBuilder(Leaf(SourceLeft)) {
+    def value = selectDynamic("value")
+    def key   = selectDynamic("key")
+  }
+  object rootRight extends TransSpecBuilder(Leaf(SourceRight)) {
+    def value = selectDynamic("value")
+    def key   = selectDynamic("key")
+  }
+
   class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
     protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
 
@@ -318,14 +327,14 @@ package trans {
     val SortKey = CPathField("sortkey")
 
     object SourceKey {
-      val Single = DerefObjectStatic(Leaf(Source), Key)
-      val Left   = DerefObjectStatic(Leaf(SourceLeft), Key)
-      val Right  = DerefObjectStatic(Leaf(SourceRight), Key)
+      val Single = root.key
+      val Left   = rootLeft.key
+      val Right  = rootRight.key
     }
     object SourceValue {
-      val Single = DerefObjectStatic(Leaf(Source), Value)
-      val Left   = DerefObjectStatic(Leaf(SourceLeft), Value)
-      val Right  = DerefObjectStatic(Leaf(SourceRight), Value)
+      val Single = root.value
+      val Left   = rootLeft.value
+      val Right  = rootRight.value
     }
   }
 }

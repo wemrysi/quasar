@@ -75,7 +75,7 @@ class GrouperSpec extends quasar.Qspec {
     val data    = augmentWithIdentities(set.map(JNum(_)))
     val groupId = newGroupId
 
-    val spec = GroupingSource(fromJson(data), SourceKey.Single, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
@@ -128,9 +128,9 @@ class GrouperSpec extends quasar.Qspec {
     val groupId = newGroupId
 
     val valueTrans =
-      InnerObjectConcat(WrapObject(SourceKey.Single, Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), Value.name))
+      InnerObjectConcat(WrapObject(root.key, Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), Value.name))
 
-    val spec = GroupingSource(fromJson(data), SourceKey.Single, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec = GroupingSource(fromJson(data), root.key, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
@@ -180,7 +180,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val groupId = newGroupId
 
-    val spec = GroupingSource(fromJson(data), SourceKey.Single, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
+    val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
@@ -241,7 +241,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(
       table,
-      SourceKey.Single,
+      root.key,
       Some(TransSpec1.Id),
       groupId,
       (    GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a")))
@@ -278,7 +278,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(
       table,
-      SourceKey.Single,
+      root.key,
       Some(TransSpec1.Id),
       groupId,
       GroupKeySpecOr(
@@ -349,7 +349,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(
       table,
-      SourceKey.Single,
+      root.key,
       Some(TransSpec1.Id),
       groupId,
       GroupKeySpecAnd(
@@ -390,7 +390,7 @@ class GrouperSpec extends quasar.Qspec {
     // data where data.b = 'b | data.a = 12
     val spec = GroupingSource(
       table,
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       groupId,
       GroupKeySpecOr(
@@ -446,10 +446,10 @@ class GrouperSpec extends quasar.Qspec {
     val groupId2 = newGroupId
 
     // t1 where t1 = 'a
-    val spec1 = GroupingSource(table1, SourceKey.Single, Some(SourceValue.Single), groupId1, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec1 = GroupingSource(table1, root.key, Some(SourceValue.Single), groupId1, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     // t2 where t2 = 'a
-    val spec2 = GroupingSource(table2, SourceKey.Single, Some(SourceValue.Single), groupId2, GroupKeySpecSource(tic_a, SourceValue.Single))
+    val spec2 = GroupingSource(table2, root.key, Some(SourceValue.Single), groupId2, GroupKeySpecSource(tic_a, SourceValue.Single))
 
     val intersect = GroupingAlignment(DerefObjectStatic(Leaf(Source), tic_a), DerefObjectStatic(Leaf(Source), tic_a), spec1, spec2, GroupingSpec.Intersection)
 
@@ -506,7 +506,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec1 = GroupingSource(
       table1,
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       groupId1,
       GroupKeySpecAnd(
@@ -515,7 +515,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec2 = GroupingSource(
       table2,
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       groupId2,
       GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
@@ -599,7 +599,7 @@ class GrouperSpec extends quasar.Qspec {
     // spec2' := spec2 where spec2.a = 'a
     val spec1 = GroupingSource(
       table1,
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       groupId1,
       GroupKeySpecOr(
@@ -608,7 +608,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec2 = GroupingSource(
       table2,
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       groupId2,
       GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
@@ -736,7 +736,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val fooSpec = GroupingSource(
       fromJson(foo.toStream),
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       fooGroup,
       GroupKeySpecAnd(
@@ -745,14 +745,14 @@ class GrouperSpec extends quasar.Qspec {
 
     val barSpec = GroupingSource(
       fromJson(bar.toStream),
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       barGroup,
       GroupKeySpecSource(tic_a, DerefObjectStatic(SourceValue.Single, CPathField("a"))))
 
     val bazSpec = GroupingSource(
       fromJson(baz.toStream),
-      SourceKey.Single,
+      root.key,
       Some(SourceValue.Single),
       bazGroup,
       GroupKeySpecSource(tic_b, DerefObjectStatic(SourceValue.Single, CPathField("b"))))

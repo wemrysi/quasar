@@ -220,8 +220,8 @@ class BlockAlignSpec extends quasar.Qspec {
         WrapObject(
           DerefObjectStatic(
             OuterObjectConcat(
-              WrapObject(DerefObjectStatic(root(1), CPathField("000001")), "000000"),
-              WrapObject(DerefObjectStatic(root(1), CPathField("000000")), "000001")
+              WrapObject(root(1).`000001`, "000000"),
+              WrapObject(root(1).`000000`, "000001")
             ),
             CPathField("000000")
           ),

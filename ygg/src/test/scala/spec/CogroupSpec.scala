@@ -65,7 +65,7 @@ class CogroupSpec extends ColumnarTableQspec {
       case Right3(jv)          => jv
     }
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(
@@ -84,7 +84,7 @@ class CogroupSpec extends ColumnarTableQspec {
 
     val expected = Vector(toRecord(Array(0L), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterArrayConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -118,7 +118,7 @@ class CogroupSpec extends ColumnarTableQspec {
       recBoth(8)
     )
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -147,7 +147,7 @@ class CogroupSpec extends ColumnarTableQspec {
       recr(10, 77)
     )
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -175,7 +175,7 @@ class CogroupSpec extends ColumnarTableQspec {
       recBoth(7)
     )
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -203,7 +203,7 @@ class CogroupSpec extends ColumnarTableQspec {
       recBoth(7)
     )
 
-    val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -220,7 +220,7 @@ class CogroupSpec extends ColumnarTableQspec {
     val rtable = fromSample(SampleData(Stream(recr(1), recr(0))))
 
     toJson(
-      ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
+      ltable.cogroup(root.key, root.key, rtable)(
         Leaf(Source),
         Leaf(Source),
         OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
@@ -323,61 +323,66 @@ class CogroupSpec extends ColumnarTableQspec {
   }
 
   def testCogroupPathology3 = {
-    val s1 = SampleData(
-      Stream(
-        json"""{ "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }""",
-        json"""{ "value":{ "ugsrry":0.0 }, "key":[3.0] }""",
-        json"""{ "value":{ "ugsrry":3.323617580854415E+307 }, "key":[5.0] }""",
-        json"""{ "value":{ "ugsrry":-9.458984438931391E+306 }, "key":[6.0] }""",
-        json"""{ "value":{ "ugsrry":1.0 }, "key":[10.0] }""",
-        json"""{ "value":{ "ugsrry":0.0 }, "key":[13.0] }""",
-        json"""{ "value":{ "ugsrry":-3.8439741460685273E+307 }, "key":[14.0] }""",
-        json"""{ "value":{ "ugsrry":5.690895589711475E+307 }, "key":[15.0] }""",
-        json"""{ "value":{ "ugsrry":0.0 }, "key":[16.0] }""",
-        json"""{ "value":{ "ugsrry":-5.567237049482096E+307 }, "key":[17.0] }""",
-        json"""{ "value":{ "ugsrry":-8.988465674311579E+307 }, "key":[18.0] }""",
-        json"""{ "value":{ "ugsrry":2.5882896341488965E+307 }, "key":[22.0] }"""
-      ))
+    val s1 = SampleData(jsonMany"""
+      { "value":{ "ugsrry":3.0961191760668197E+307 }, "key":[2.0] }
+      { "value":{ "ugsrry":0.0 }, "key":[3.0] }
+      { "value":{ "ugsrry":3.323617580854415E+307 }, "key":[5.0] }
+      { "value":{ "ugsrry":-9.458984438931391E+306 }, "key":[6.0] }
+      { "value":{ "ugsrry":1.0 }, "key":[10.0] }
+      { "value":{ "ugsrry":0.0 }, "key":[13.0] }
+      { "value":{ "ugsrry":-3.8439741460685273E+307 }, "key":[14.0] }
+      { "value":{ "ugsrry":5.690895589711475E+307 }, "key":[15.0] }
+      { "value":{ "ugsrry":0.0 }, "key":[16.0] }
+      { "value":{ "ugsrry":-5.567237049482096E+307 }, "key":[17.0] }
+      { "value":{ "ugsrry":-8.988465674311579E+307 }, "key":[18.0] }
+      { "value":{ "ugsrry":2.5882896341488965E+307 }, "key":[22.0] }
+    """.toStream)
 
-    val s2 = SampleData(
-      Stream(
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-40146] }, "key":[2.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-9.44770762864723688E-39073] }, "key":[3.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2.894611552200768372E+19] }, "key":[5.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-2.561276432629787073E-42575] }, "key":[6.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1E-10449] }, "key":[10.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2110233717777347493] }, "key":[13.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[3.039020270015831847E+19] }, "key":[14.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[1E-50000] }, "key":[15.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[-1.296393752892965818E-49982] }, "key":[16.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[4.611686018427387903E+50018] }, "key":[17.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[0E+48881] }, "key":[18.0] }""",
-        json"""{ "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }"""
-      ))
+    val s2 = SampleData(jsonMany"""
+      { "value":{ "fzqJh5csbfsZqgkoi":[-1E-40146] }, "key":[2.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[-9.44770762864723688E-39073] }, "key":[3.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[2.894611552200768372E+19] }, "key":[5.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[-2.561276432629787073E-42575] }, "key":[6.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[-1E-10449] }, "key":[10.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[2110233717777347493] }, "key":[13.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[3.039020270015831847E+19] }, "key":[14.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[1E-50000] }, "key":[15.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[-1.296393752892965818E-49982] }, "key":[16.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[4.611686018427387903E+50018] }, "key":[17.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[0E+48881] }, "key":[18.0] }
+      { "value":{ "fzqJh5csbfsZqgkoi":[2.326724524858976798E-10633] }, "key":[22.0] }
+    """.toStream)
 
     testCogroup(s1 -> s2)
   }
 
   def testPartialUndefinedCogroup = {
-    val ltable = fromSample(SampleData(Stream(json"""{ "id" : "foo", "val" : 4 }""")))
-
-    val rtable = fromSample(
-      SampleData(Stream(json"""{ "id" : "foo", "val" : 2 }""", json"""{ "val" : 3 }""", json"""{ "id" : "foo", "val" : 4 }"""))
+    val ltable = fromJson(
+      jsonMany"""
+        { "id" : "foo", "val" : 4 }
+      """
     )
-
-    val expected = Stream(
-      json"""{ "id": "foo", "left": 4, "right": 2 }""",
-      json"""{ "id": "foo", "left": 4, "right": 4 }"""
+    val rtable = fromJson(
+      jsonMany"""
+        { "id" : "foo", "val" : 2 }
+        { "val" : 3 }
+        { "id" : "foo", "val" : 4 }
+      """
     )
+    val expected = jsonMany"""
+      { "id": "foo", "left": 4, "right": 2 }
+      { "id": "foo", "left": 4, "right": 4 }
+    """
 
-    val keySpec = DerefObjectStatic(Leaf(Source), CPathField("id"))
-    val result = ltable.cogroup(keySpec, keySpec, rtable)(
-      Leaf(Source),
-      Leaf(Source),
+    val result = ltable.cogroup(root.id, root.id, rtable)(
+      root,
+      root,
       OuterObjectConcat(
-        WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("id")), "id"),
-        WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("val")), "left"),
-        WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("val")), "right")))
+        WrapObject(rootLeft.id, "id"),
+        WrapObject(rootLeft.`val`, "left"),
+        WrapObject(rootRight.`val`, "right")
+      )
+    )
 
     toJsonSeq(result) must_=== expected
   }
@@ -388,28 +393,25 @@ class CogroupSpec extends ColumnarTableQspec {
     val rtable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = Stream.tabulate(22)(JNum(_))
 
-    val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
-    val result: Table = ltable.cogroup(keySpec, keySpec, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       WrapObject(Leaf(Source), "blah!"),
       WrapObject(Leaf(Source), "argh!"),
-      DerefObjectStatic(Leaf(SourceRight), CPathField("value"))
+      rootRight.value
     )
 
     toJsonSeq(result) must_=== expected
   }
 
   def testLongEqualSpansOnLeft = {
-    val record = json"""{"key":"Bob","value":42}"""
-    val ltable = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
-    val rtable = fromSample(SampleData(Stream(record)))
-
+    val record   = json"""{"key":"Bob","value":42}"""
+    val ltable   = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
+    val rtable   = fromSample(SampleData(Stream(record)))
     val expected = Stream.tabulate(22)(JNum(_))
 
-    val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
-    val result: Table = ltable.cogroup(keySpec, keySpec, rtable)(
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
       WrapObject(Leaf(Source), "blah!"),
       WrapObject(Leaf(Source), "argh!"),
-      DerefObjectStatic(Leaf(SourceLeft), CPathField("value"))
+      rootLeft.value
     )
 
     toJsonSeq(result) must_=== expected
@@ -419,13 +421,12 @@ class CogroupSpec extends ColumnarTableQspec {
     val table    = fromSample(SampleData(Stream.tabulate(22)(i => json"""{"key":"Bob","value":$i}""")))
     val expected = ( for (l  <- 0 until 22; r <- 0 until 22) yield json"""{ "left": $l, "right": $r }""" ).toStream
 
-    val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
-    val result: Table = table.cogroup(keySpec, keySpec, table)(
+    val result: Table = table.cogroup(root.key, root.key, table)(
       WrapObject(Leaf(Source), "blah!"),
       WrapObject(Leaf(Source), "argh!"),
       InnerObjectConcat(
-        WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("value")), "right"),
-        WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("value")), "left")
+        WrapObject(rootRight.value, "right"),
+        WrapObject(rootLeft.value, "left")
       )
     )
 
@@ -433,31 +434,19 @@ class CogroupSpec extends ColumnarTableQspec {
   }
 
   def testLongLeftSpanWithIncreasingRight = {
-    val ltable = fromSample(SampleData(Stream.tabulate(12) { i =>
-      JParser.parseUnsafe("""{"key":"Bob","value":%d}""" format i)
-    }))
-    val rtable = fromSample(
-      SampleData(
-        Stream(
-          JParser.parseUnsafe("""{"key":"Bob","value":50}"""),
-          JParser.parseUnsafe("""{"key":"Charlie","value":60}""")
-        )))
+    val ltable   = fromJson(Stream.tabulate(12)(i => json"""{ "key": "Bob", "value": $i }"""))
+    val rtable   = fromJson(jsonMany"""{"key":"Bob", "value":50} {"key":"Charlie", "value":60}""")
+    val expected = Seq.tabulate(12)(i => json"""{ "left": $i, "right": 50 }""") :+ json"""{ "right": 60 }"""
 
-    val expected = Stream.tabulate(12) { i =>
-      JParser.parseUnsafe("""{ "left": %d, "right": 50 }""" format i)
-    } ++ Stream(JParser.parseUnsafe("""{ "right": 60 }"""))
-
-    val keySpec = DerefObjectStatic(Leaf(Source), CPathField("key"))
-    val result: Table = ltable.cogroup(keySpec, keySpec, rtable)(
-      WrapObject(DerefObjectStatic(Leaf(Source), CPathField("value")), "left"),
-      WrapObject(DerefObjectStatic(Leaf(Source), CPathField("value")), "right"),
+    val result: Table = ltable.cogroup(root.key, root.key, rtable)(
+      WrapObject(root.value, "left"),
+      WrapObject(root.value, "right"),
       InnerObjectConcat(
-        WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("value")), "right"),
-        WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("value")), "left")
+        WrapObject(rootRight.value, "right"),
+        WrapObject(rootLeft.value, "left")
       )
     )
 
-    val jsonResult = toJson(result).copoint
-    jsonResult must_== expected
+    toJsonSeq(result) must_=== expected
   }
 }

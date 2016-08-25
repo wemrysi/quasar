@@ -1234,7 +1234,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
         }
 
         val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
-        val groupedM                         = groupTable.map(_.transform(DerefObjectStatic(Leaf(Source), CPathField("1")))).flatMap(f)
+        val groupedM                         = groupTable.map(_ transform root.`1`).flatMap(f)
         val groupedStream: StreamT[M, Slice] = StreamT.wrapEffect(groupedM.map(_.slices))
 
         groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)
