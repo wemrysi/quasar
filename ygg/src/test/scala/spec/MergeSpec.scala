@@ -2,7 +2,6 @@ package ygg.tests
 
 import scalaz.{ Source => _, _ }, Scalaz._
 import ygg._, common._, json._, table._, trans._
-import TableModule._
 
 class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
 

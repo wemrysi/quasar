@@ -2,7 +2,6 @@ package ygg.tests
 
 import scalaz.{ Source => _, _ }, Scalaz._
 import ygg._, common._, json._, table._, trans._
-import TableModule._
 
 // TODO: mix in a trait rather than defining Table directly
 

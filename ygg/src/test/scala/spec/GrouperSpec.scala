@@ -4,7 +4,6 @@ import ygg.common._
 import scalaz._, Scalaz._
 import ygg.json._
 import ygg.table._
-import BlockStoreTestModule.module
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -39,7 +38,7 @@ solve 'a, 'b
  */
 
 class GrouperSpec extends quasar.Qspec {
-  import module._
+  import DummyModule.module._
   import trans._
   import constants._
 

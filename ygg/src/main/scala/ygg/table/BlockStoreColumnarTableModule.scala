@@ -2,7 +2,6 @@ package ygg.table
 
 import scalaz.{ Source => _, _}, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
-import TableModule._
 
 import org.mapdb._
 import JDBM._
@@ -963,8 +962,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   }
 
   class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
-    import TableModule._
-
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] = {
@@ -1010,8 +1007,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     * allowed more optimizations when doing things like joins.
     */
   class InternalTable(val slice: Slice) extends Table(singleStreamT(slice), ExactSize(slice.size)) {
-    import TableModule._
-
     def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
       EitherT[M, ExternalTable, InternalTable](Need(\/-(this)))
 

@@ -19,7 +19,6 @@ final class DerefSlice(source: Slice, derefBy: Int =?> CPathNode) extends Slice 
 
 class SliceOps(private val source: Slice) extends AnyVal {
   import Slice._
-  import TableModule._
 
   def size: Int          = source.size
   def isEmpty: Boolean   = size == 0

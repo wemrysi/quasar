@@ -18,6 +18,8 @@ trait Column {
   def definedAt(from: Int, to: Int): BitSet = Bits.filteredRange(from, to)(isDefinedAt)
 }
 
+object Table
+
 trait Table {
   def slices: StreamT[Need, Slice]
 

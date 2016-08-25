@@ -5,8 +5,6 @@ import ygg.common._
 import ygg.table._
 import ygg.json._
 import SampleData._
-import TableModule._
-import BlockStoreTestModule.module
 import CValueGenerators._
 
 /**
@@ -67,7 +65,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlign(sample: SampleData) = {
-    import module._
+    import DummyModule.module._
     import trans.constants._
 
     val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
@@ -149,7 +147,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testAlignSymmetry(i: Int) = {
-    import module._
+    import DummyModule.module._
     import trans._
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
@@ -286,6 +284,7 @@ class BlockAlignSpec extends quasar.Qspec {
   }
 
   private def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
+    import DummyModule.module
     val jvalueOrdering     = Ord[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 

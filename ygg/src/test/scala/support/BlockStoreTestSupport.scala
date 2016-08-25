@@ -115,7 +115,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
     }: _*)
 }
 
-object BlockStoreTestModule {
+object DummyModule {
   object module extends BlockStoreTestModule {
     val projections = Map[Path, Projection]()
   }

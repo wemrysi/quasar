@@ -1,7 +1,6 @@
 package ygg.table
 
 import scalaz._
-import scalaz.syntax.monad._
 import ygg._, common._, json._, trans._
 
 final case class APIKey(value: String) extends AnyVal
@@ -70,35 +69,31 @@ case object InfiniteSize extends TableSize {
   def *(other: TableSize) = InfiniteSize
 }
 
-object TableModule {
-  sealed trait SortOrder
-  sealed trait DesiredSortOrder extends SortOrder {
-    def isAscending: Boolean
-  }
+sealed trait SortOrder
+sealed trait DesiredSortOrder extends SortOrder {
+  def isAscending: Boolean
+}
 
-  case object SortAscending  extends DesiredSortOrder { val isAscending = true  }
-  case object SortDescending extends DesiredSortOrder { val isAscending = false }
+case object SortAscending  extends DesiredSortOrder { val isAscending = true  }
+case object SortDescending extends DesiredSortOrder { val isAscending = false }
 
-  sealed trait JoinOrder
-  object JoinOrder {
-    case object LeftOrder  extends JoinOrder
-    case object RightOrder extends JoinOrder
-    case object KeyOrder   extends JoinOrder
-  }
+sealed trait JoinOrder
+object JoinOrder {
+  case object LeftOrder  extends JoinOrder
+  case object RightOrder extends JoinOrder
+  case object KeyOrder   extends JoinOrder
+}
 
-  sealed trait CrossOrder
-  object CrossOrder {
-    case object CrossLeft      extends CrossOrder
-    case object CrossRight     extends CrossOrder
-    case object CrossLeftRight extends CrossOrder
-    case object CrossRightLeft extends CrossOrder
-  }
+sealed trait CrossOrder
+object CrossOrder {
+  case object CrossLeft      extends CrossOrder
+  case object CrossRight     extends CrossOrder
+  case object CrossLeftRight extends CrossOrder
+  case object CrossRightLeft extends CrossOrder
 }
 
 trait TableModule {
   tableModule =>
-
-  import TableModule._
 
   type Reducer[α] = CReducer[α]
   type RowId      = Int
@@ -215,44 +210,5 @@ trait TableModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
-  }
-
-  sealed trait GroupingSpec {
-    def sources: Vector[GroupingSource]
-    def sorted: Need[GroupingSpec]
-  }
-
-  object GroupingSpec {
-    sealed trait Alignment
-    case object Union        extends Alignment
-    case object Intersection extends Alignment
-  }
-
-  /**
-    * Definition for a single group set and its associated composite key part.
-    *
-    * @param table The target set for the grouping
-    * @param targetTrans The key which will be used by `merge` to access a particular subset of the target
-    * @param groupKeySpec A composite union/intersect overlay on top of transspec indicating the composite key for this target set
-    */
-  /*final*/
-  case class GroupingSource(table: Table, idTrans: trans.TransSpec1, targetTrans: Option[trans.TransSpec1], groupId: GroupId, groupKeySpec: trans.GroupKeySpec)
-      extends GroupingSpec {
-
-    def sources: Vector[GroupingSource] = Vector(this)
-    def sorted: Need[GroupingSource]    = table.sort(root.key) map (t => GroupingSource(t.asInstanceOf, idTrans, targetTrans, groupId, groupKeySpec))
-  }
-
-  /*final*/
-  case class GroupingAlignment(groupKeyLeftTrans: trans.TransSpec1,
-                               groupKeyRightTrans: trans.TransSpec1,
-                               left: GroupingSpec,
-                               right: GroupingSpec,
-                               alignment: GroupingSpec.Alignment)
-      extends GroupingSpec {
-    def sources: Vector[GroupingSource] = left.sources ++ right.sources
-    def sorted: M[GroupingAlignment] = (left.sorted |@| right.sorted) { (t1, t2) =>
-      GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, t1, t2, alignment)
-    }
   }
 }

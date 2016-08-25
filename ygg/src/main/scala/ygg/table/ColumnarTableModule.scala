@@ -41,7 +41,6 @@ object ColumnarTableModule {
 }
 
 trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
-  import TableModule._
   import trans._
 
   type Table <: ColumnarTable
@@ -49,6 +48,17 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
 
   def newScratchDir(): File    = Files.createTempDirectory("quasar").toFile
   def jdbmCommitInterval: Long = 200000l
+
+  def sourcesOf(gs: GroupingSpec): Vector[GroupingSource] = gs match {
+    case x: GroupingSource                       => Vector(x)
+    case GroupingAlignment(_, _, left, right, _) => sourcesOf(left) ++ sourcesOf(right)
+  }
+  def sortedGroupingSpec(gs: GroupingSpec): Need[GroupingSpec] = gs match {
+    case GroupingSource(table, idTrans, targetTrans, groupId, groupKeySpec) =>
+      (table.asInstanceOf[Table]).sort(root.key) map (t => GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec))
+    case GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, left, right, alignment) =>
+      (sortedGroupingSpec(left) |@| sortedGroupingSpec(right))(GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, _, _, alignment))
+  }
 
   trait ColumnarTableCompanion extends TableCompanionLike {
     def apply(slices: StreamT[M, Slice], size: TableSize): Table
@@ -121,11 +131,11 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       case class IndexedSource(groupId: GroupId, index: TableIndex, keySchema: KeySchema)
 
       (for {
-        source              <- grouping.sources
+        source              <- sourcesOf(grouping)
         groupKeyProjections <- mkProjections(source.groupKeySpec)
         disjunctGroupKeyTransSpecs = groupKeyProjections.map { case (key, spec) => spec }
       } yield {
-        TableIndex.createFromTable(source.table, disjunctGroupKeyTransSpecs, source.targetTrans.getOrElse(TransSpec1.Id)).map { index =>
+        TableIndex.createFromTable(source.table.asInstanceOf[Table], disjunctGroupKeyTransSpecs, source.targetTrans.getOrElse(TransSpec1.Id)).map { index =>
           IndexedSource(source.groupId, index, groupKeyProjections.map(_._1))
         }
       }).sequence.flatMap { sourceKeys =>

@@ -250,19 +250,18 @@ package trans {
   object TransSpec1 {
     import constants._
 
-    val Id              = Leaf(Source)
-    val DerefArray0     = Id(0)
-    val DerefArray1     = Id(1)
-    val DerefArray2     = Id(2)
+    val Id              = root.spec
+    val DerefArray0     = root(0)
+    val DerefArray1     = root(1)
+    val DerefArray2     = root(2)
     val PruneToKeyValue = WrapObject(SourceKey.Single, Key.name) inner_++ WrapObject(SourceValue.Single, Value.name)
     val DeleteKeyValue  = Id.delete(Key, Value)
   }
 
-
   object TransSpec2 {
     import constants._
 
-    val LeftId = Leaf(SourceLeft)
+    val LeftId = rootLeft.spec
 
     /** Flips all `SourceLeft`s to `SourceRight`s and vice versa. */
     def flip(spec: TransSpec2): TransSpec2 = TransSpec.mapSources(spec) {
@@ -270,9 +269,9 @@ package trans {
       case SourceRight => SourceLeft
     }
 
-    def DerefArray0(source: Source2) = Leaf(source)(0)
-    def DerefArray1(source: Source2) = Leaf(source)(1)
-    def DerefArray2(source: Source2) = Leaf(source)(2)
+    def DerefArray0(source: Source2) = root(0)
+    def DerefArray1(source: Source2) = root(1)
+    def DerefArray2(source: Source2) = root(2)
 
     val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(Key, Value)
     val DeleteKeyValueRight = Leaf(SourceRight).delete(Key, Value)
