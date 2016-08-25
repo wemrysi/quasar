@@ -96,7 +96,7 @@ trait AggLib extends Library {
 
   val Max = UnaryFunc(
     Reduction,
-    "MAX", 
+    "MAX",
     "Finds the maximum in a set of values",
     Type.Comparable,
     Func.Input1(Type.Comparable),

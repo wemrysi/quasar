@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{LogicalPlan => LP}
+import quasar.fp._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
@@ -31,6 +32,7 @@ trait QScriptHelpers {
   // TODO: Narrow this to QScriptPure
   type QS[A] = QScriptTotal[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
+  val R = implicitly[Const[Read, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
@@ -46,6 +48,36 @@ trait QScriptHelpers {
   def lpRead(path: String): Fix[LP] =
     LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
 
-  def convert(lp: Fix[LP]): Option[Fix[QScriptTotal[Fix, ?]]] =
-    QueryFile.convertToQScript[Fix](lp).toOption.run.copoint
+  // NB: This is the same type as QueryFile.ListContents
+  def listContents: ConvertPath.ListContents[Id] =
+    d => EitherT((
+      if (d ≟ rootDir)
+        Set(
+          DirName("foo").left,
+          DirName("some").left,
+          FileName("bar").right,
+          FileName("city").right,
+          FileName("person").right,
+          FileName("zips").right,
+          FileName("car").right)
+      else if (d ≟ (rootDir </> dir("some")))
+        Set(
+          DirName("foo").left,
+          FileName("bar").right,
+          FileName("city").right,
+          FileName("person").right,
+          FileName("zips").right,
+          FileName("car").right)
+      else
+        Set(
+          FileName("bar").right[DirName],
+          FileName("city").right,
+          FileName("person").right,
+          FileName("zips").right,
+          FileName("car").right)).right.point[Id])
+    
+
+  def convert(lc: Option[ConvertPath.ListContents[Id]], lp: Fix[LP]):
+      Option[Fix[QScriptTotal[Fix, ?]]] =
+    QueryFile.convertToQScript[Fix, Id](lc)(lp).toOption.run.copoint
 }
