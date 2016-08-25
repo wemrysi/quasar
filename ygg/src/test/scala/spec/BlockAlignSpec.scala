@@ -31,9 +31,9 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   implicit val order: Ord[JValue] = JValueInColumnOrder.columnOrder
 
   "align" should {
-    "a simple example" in alignSimple
-    "across slice boundaries" in alignAcrossBoundaries
-    "survive a trivial scalacheck" in checkAlign
+    "a simple example"                                     in alignSimple
+    "across slice boundaries"                              in alignAcrossBoundaries
+    "survive a trivial scalacheck"                         in checkAlign
     "produce the same results irrespective of input order" in testAlignSymmetry(0)
     "produce the same results irrespective of input order" in testAlignSymmetry(1)
     "produce the same results irrespective of input order" in testAlignSymmetry(2)
@@ -49,25 +49,25 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
       //"a dense dataset" in checkLoadDense //scalacheck + numeric columns = pain
     }
     "sort" >> {
-      "fully homogeneous data" in homogeneousSortSample
+      "fully homogeneous data"             in homogeneousSortSample
       "fully homogeneous data with object" in homogeneousSortSampleWithNonexistentSortKey
-      "data with undefined sort keys" in partiallyUndefinedSortSample
-      "heterogeneous sort keys" in heterogeneousSortSample
-      "heterogeneous sort keys case 2" in heterogeneousSortSample2
-      "heterogeneous sort keys ascending" in heterogeneousSortSampleAscending
+      "data with undefined sort keys"      in partiallyUndefinedSortSample
+      "heterogeneous sort keys"            in heterogeneousSortSample
+      "heterogeneous sort keys case 2"     in heterogeneousSortSample2
+      "heterogeneous sort keys ascending"  in heterogeneousSortSampleAscending
       "heterogeneous sort keys descending" in heterogeneousSortSampleDescending
-      "top-level hetereogeneous values" in heterogeneousBaseValueTypeSample
-      "sort with a bad schema" in badSchemaSortSample
-      "merges over three cells" in threeCellMerge
-      "empty input" in emptySort
-      "with uniqueness for keys" in uniqueSort
-
-      "arbitrary datasets" in checkSortDense(SortAscending)
-      "arbitrary datasets descending" in checkSortDense(SortDescending)
+      "top-level hetereogeneous values"    in heterogeneousBaseValueTypeSample
+      "sort with a bad schema"             in badSchemaSortSample
+      "merges over three cells"            in threeCellMerge
+      "empty input"                        in emptySort
+      "with uniqueness for keys"           in uniqueSort
+      "arbitrary datasets"                 in checkSortDense(SortAscending)
+      "arbitrary datasets descending"      in checkSortDense(SortDescending)
+      "something something het sort"       in secondHetSortSample
     }
   }
 
-  def testAlign(sample: SampleData) = {
+  private def testAlign(sample: SampleData) = {
     import module._
     import module.trans.constants._
 
@@ -91,14 +91,14 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     && (leftResult must_=== leftResult2))
   }
 
-  def checkAlign = {
+  private def checkAlign = {
     implicit val gen = sample(objectSchema(_, 3))
     prop { (sample: SampleData) =>
       testAlign(sample.sortBy(_ \ "key"))
     }
   }
 
-  def alignSimple = {
+  private def alignSimple = {
     val data = jsonMany"""
       {"key":[1.0,2.0],"value":{"fr8y":-2.761198250953116839E+14037,"hw":[],"q":2.429467767811669098E+50018}}
       {"key":[2.0,1.0],"value":{"fr8y":8862932465119160.0,"hw":[],"q":-7.06989214308545856E+34226}}
@@ -112,7 +112,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testAlign(sample.sortBy(_ \ "key"))
   }
 
-  def alignAcrossBoundaries = {
+  private def alignAcrossBoundaries = {
     val data = jsonMany"""
       {"key":[4.0,26.0,21.0],"value":{"sp7hpv":{},"xb5hs2ckjajs0k44x":-1.0,"zzTqxfzwzacakwjqeGFcnhpkzd5akfobsg2nxump":[]}}
       {"key":[5.0,39.0,59.0],"value":8.715632723857159E+307}
@@ -149,7 +149,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testAlign(sample.sortBy(_ \ "key"))
   }
 
-  def testAlignSymmetry(i: Int) = {
+  private def testAlignSymmetry(i: Int) = {
     import module._
     import module.trans._
 
@@ -286,7 +286,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     }
   }
 
-  def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
+  private def testSortDense(sample: SampleData, sortOrder: DesiredSortOrder, unique: Boolean, sortKeys: JPath*) = {
     val jvalueOrdering     = Ord[JValue].toScalaOrdering
     val desiredJValueOrder = if (sortOrder.isAscending) jvalueOrdering else jvalueOrdering.reverse
 
@@ -323,7 +323,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     resultTable.size mustEqual ExactSize(sorted.size)
   }
 
-  def checkSortDense(sortOrder: DesiredSortOrder) = {
+  private def checkSortDense(sortOrder: DesiredSortOrder) = {
     implicit val gen = sample(objectSchema(_, 3))
     prop { (sample: SampleData) =>
       {
@@ -335,7 +335,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of sorting on homogeneous data
-  def homogeneousSortSample = {
+  private def homogeneousSortSample = {
     val sampleData = SampleData(
       jsonMany"""
         {"key":[1],"value":{"l":[],"md":"t","u":false,"uid":"joe"}}
@@ -350,7 +350,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of sorting on homogeneous data with objects
-  def homogeneousSortSampleWithNonexistentSortKey = {
+  private def homogeneousSortSampleWithNonexistentSortKey = {
     val sampleData = SampleData(
       jsonMany"""
         {"key":[2],"value":6}
@@ -365,7 +365,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of partially undefined sort key data
-  def partiallyUndefinedSortSample = {
+  private def partiallyUndefinedSortSample = {
     val sampleData = SampleData(
       jsonMany"""
         {"key":[1],"value":{"fa":null,"hW":1.0,"rzp":{},"uid":"ted"}}
@@ -379,7 +379,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testSortDense(sampleData, SortAscending, false, JPath(".uid"), JPath(".hW"))
   }
 
-  def heterogeneousBaseValueTypeSample = {
+  private def heterogeneousBaseValueTypeSample = {
     val sampleData = SampleData(
       jsonMany"""
         {"key":[1],"value":[0,1]}
@@ -393,7 +393,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testSortDense(sampleData, SortAscending, false, JPath(".uid"))
   }
 
-  def badSchemaSortSample = {
+  private def badSchemaSortSample = {
     val data = jsonMany"""
       {"key":[1.0,1.0],"value":{"q":-103811160446995821.5,"u":5.548109504404496E+307,"vxu":[]}}
       {"key":[1.0,2.0],"value":{"q":-8.40213736307813554E+18,"u":8.988465674311579E+307,"vxu":[]}}
@@ -406,7 +406,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of sorting on heterogeneous data
-  def heterogeneousSortSample2 = {
+  private def heterogeneousSortSample2 = {
     val sampleData = SampleData(
       (json"""[
         {"key":[1,4,3],"value":{"b0":["",{"alxk":-1},-5.170005125478374E+307],"y":{"pvbT":[-1458654748381439976,{}]}}},
@@ -419,7 +419,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of sorting on heterogeneous data
-  def heterogeneousSortSampleDescending = {
+  private def heterogeneousSortSampleDescending = {
     val sampleData = SampleData(
       (json"""[
         {"key":[2],"value":{"y":false}},
@@ -431,7 +431,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of sorting on heterogeneous data
-  def heterogeneousSortSampleAscending = {
+  private def heterogeneousSortSampleAscending = {
     val sampleData = SampleData(
       (json"""[
         {"key":[2],"value":{"y":false}},
@@ -443,7 +443,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
   }
 
   // Simple test of heterogeneous sort keys
-  def heterogeneousSortSample = {
+  private def heterogeneousSortSample = {
     val data = jsonMany"""
       {"key":[1,2,2],"value":{"f":{"bn":[null],"wei":1.0},"jmy":4.639428637939817E+307,"ljz":[null,["W"],true],"uid":12}}
       {"key":[2,1,1],"value":{"f":{"bn":[null],"wei":5.615997508833152E+307},"jmy":-2.612503123965922E+307,"ljz":[null,[""],false],"uid":1.5}}
@@ -468,7 +468,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testSortDense(sampleData, SortAscending, false, JPath(".uid"))
   }
 
-  def secondHetSortSample = {
+  private def secondHetSortSample = {
     val data = jsonMany"""
       {"key":[3.0],"value":[1.0,0,{}]}
       {"key":[1.0],"value":{"chl":-1.0,"e":null,"zw1":-4.611686018427387904E-27271}}
@@ -492,7 +492,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
    * once one of the index slices expired. See commit
    * a253d47f3f6d09fd39afc2986c529e84e5443e7f for details
    */
-  def threeCellMerge = {
+  private def threeCellMerge = {
     val data = jsonMany"""
       {"key":[1.0,1.0,11.0],"value":-2355162409801206381}
       {"key":[12.0,10.0,5.0],"value":416748368221569769}
@@ -525,7 +525,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testSortDense(sampleData, SortAscending, false, JPath(".zbtQhnpnun"))
   }
 
-  def uniqueSort = {
+  private def uniqueSort = {
     val sampleData = SampleData(
       jsonMany"""
         { "key" : [2], "value" : { "foo" : 10 } }
@@ -537,7 +537,7 @@ class BlockAlignSpec extends quasar.Qspec with BlockLoadSpec {
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
 
-  def emptySort = {
+  private def emptySort = {
     val sampleData = SampleData(Stream(), Some(1 -> Nil))
     testSortDense(sampleData, SortAscending, false, JPath(".foo"))
   }
