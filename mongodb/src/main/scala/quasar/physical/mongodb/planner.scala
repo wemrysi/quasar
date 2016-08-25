@@ -1100,7 +1100,7 @@ object MongoDbPlanner {
   def plan0[F[_]: Functor: Coalesce: Crush: Crystallize]
     (joinHandler: JoinHandler[F, WorkflowBuilder.M])
     (logical: Fix[LogicalPlan])
-    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: Delay[RenderTree, F])
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
@@ -1151,12 +1151,9 @@ object MongoDbPlanner {
 
     queryContext.model match {
       case `3.2` =>
-        val pl = JoinHandler.pipeline[Workflow3_2F](queryContext.statistics)
-        val mr = JoinHandler.mapReduce[Workflow3_2F]
-        val joinHandler =
-          JoinHandler[Workflow3_2F, WorkflowBuilder.M]((tpe, l, r) =>
-            pl(tpe, l, r) getOrElseF mr(tpe, l, r))
-
+        val joinHandler = JoinHandler.fallback(
+          JoinHandler.pipeline[Workflow3_2F](queryContext.statistics),
+          JoinHandler.mapReduce[Workflow3_2F])
         plan0[Workflow3_2F](joinHandler)(logical)
 
       case _     =>
