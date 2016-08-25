@@ -9,7 +9,7 @@ trait SamplableTableModule extends TableModule {
 
   type Table <: SamplableTable
 
-  trait SamplableTable extends TableLike {
+  trait SamplableTable extends ygg.table.Table {
     self: Table =>
 
     type Table >: this.type <: outer.Table

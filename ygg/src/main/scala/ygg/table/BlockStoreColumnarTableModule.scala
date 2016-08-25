@@ -882,7 +882,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with DummyTable {
+  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with NoSortTable with NoLoadTable {
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =

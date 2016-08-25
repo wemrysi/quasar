@@ -67,6 +67,7 @@ trait PackageAliases {
   type Eq[A]             = scalaz.Equal[A]
   type LazyPairOf[+A]    = Need[A -> A]
   type NeedEitherT[A, B] = scalaz.EitherT[Need, A, B]
+  type NeedStreamT[A]    = scalaz.StreamT[Need, A]
   type M[+A]             = Need[A]
   type Ord[A]            = scalaz.Order[A]
   val Eq                 = scalaz.Equal

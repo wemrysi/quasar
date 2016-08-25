@@ -306,7 +306,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     }
   }
 
-  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable {
+  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends ygg.table.Table with SamplableColumnarTable {
     self: Table =>
 
     type Table >: this.type <: outer.Table
@@ -327,7 +327,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       )
     }
 
-    def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = {
+    def compact(spec: TransSpec1, definedness: Definedness): Table = {
       val specTransform = SliceTransform.composeSliceTransform(spec)
       val compactTransform = {
         SliceTransform.composeSliceTransform(Leaf(Source)).zip(specTransform) { (s1, s2) =>

@@ -26,22 +26,22 @@ trait TableCompanion {
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
 
-trait DummyTable extends Table {
-  override def load(apiKey: APIKey, jtpe: JType): NeedTable                                                                  = ???
-  override def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                             = Need[Table](this)
-  override def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                           = Need[Table](this)
-  override def force: NeedTable                                                                                              = Need[Table](this)
-  override def compact(spec: TransSpec1, definedness: Definedness): Table                                                    = this
-  override def paged(limit: Int): Table                                                                                      = this
-  override def distinct(spec: TransSpec1): Table                                                                             = this
-  override def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
+trait NoLoadTable extends Table {
+  def load(apiKey: APIKey, jtpe: JType): NeedTable = ???
+}
+trait NoGroupTable extends Table {
+  def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
+}
+trait NoSortTable extends Table {
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
+  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
 }
 
 trait Table {
   type Table >: this.type <: ygg.table.Table
   type NeedTable = Need[Table]
 
-  def slices: StreamT[Need, Slice]
+  def slices: NeedStreamT[Slice]
 
   /**
     * Return an indication of table size, if known
@@ -63,7 +63,7 @@ trait Table {
     * Removes all rows in the table for which definedness is satisfied
     * Remaps the indicies.
     */
-  def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table
+  def compact(spec: TransSpec1, definedness: Definedness): Table
 
   /**
     * Performs a one-pass transformation of the keys and values in the table.
@@ -127,6 +127,7 @@ trait Table {
   def canonicalize(length: Int): Table
   def schemas: Need[Set[JType]]
 
+  def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
   def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
 
   def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer]
