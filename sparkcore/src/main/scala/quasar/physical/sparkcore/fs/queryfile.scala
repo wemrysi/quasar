@@ -23,46 +23,47 @@ import quasar.fs.QueryFile
 import quasar.fs.QueryFile._
 import quasar.fs._
 import quasar.Planner._
-import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.effect.Read
 
-import java.io.File
-import java.nio.file._
-
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka._, Recursive.ops._
-import pathy.Path._
 import scalaz._
 import Scalaz._
 import scalaz.concurrent.Task
 
 object queryfile {
 
+  final case class Input(
+    store: RDD[Data] => Task[AFile],
+    fileExists: AFile => Task[Boolean],
+    listContents: ADir => Task[FileSystemError \/ Set[PathSegment]]
+  )
+
   type SparkContextRead[A] = Read[SparkContext, A]
 
-  def chrooted[S[_]](prefix: ADir)(implicit
-    s0: Task :<: S): QueryFile ~> Free[S, ?] =
-    flatMapSNT(interpret) compose chroot.queryFile[QueryFile](prefix)
+  def chrooted[S[_]](input: Input, prefix: ADir)(implicit
+    s0: Task :<: S,
+    s1: SparkContextRead :<: S
+  ): QueryFile ~> Free[S, ?] =
+    flatMapSNT(interpreter(input)) compose chroot.queryFile[QueryFile](prefix)
 
-  def interperter[S[_]](implicit
+  def interpreter[S[_]](input: Input)(implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S
   ): QueryFile ~> Free[S, ?] =
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
-        case FileExists(f) => fileExists(f)
-        case ListContents(dir) => listContents(dir)
+        case FileExists(f) => fileExists(input, f)
+        case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          (QueryFile.convertToQScript(lp).leftMap(planningFailed(lp, _)).traverse(executePlan(_, out, lp))).map(_.join.run.run)
+          (QueryFile.convertToQScript(lp).leftMap(planningFailed(lp, _)).traverse(executePlan(input, _, out, lp))).map(_.join.run.run)
           }
         case _ => ???
       }
     } 
-
-  private def store(rdd: RDD[Data]): Task[AFile] = ???
 
   implicit def composedFunctor[F[_]: Functor, G[_]: Functor]:
       Functor[(F ∘ G)#λ] =
@@ -70,7 +71,7 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
-  private def executePlan[S[_]](qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan])
+  private def executePlan[S[_]](input: Input, qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan])
     (implicit
       s0: Task :<: S,
       read: Read.Ops[SparkContext, S]
@@ -85,36 +86,16 @@ object queryfile {
       injectFT.apply {
         sparkStuff.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => store(rdd).map (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), _))).map(EitherT(_))
+          rdd => input.store(rdd).map (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), _))).map(EitherT(_))
       }
     }.join
   }
 
-  private def fileExists[S[_]](f: AFile)(implicit
+  private def fileExists[S[_]](input: Input, f: AFile)(implicit
     s0: Task :<: S): Free[S, Boolean] =
-    injectFT[Task, S].apply {
-      Task.delay {
-        Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
-      }
-    }
+    injectFT[Task, S].apply (input.fileExists(f))
 
-  private def listContents[S[_]](d: ADir)(implicit
+  private def listContents[S[_]](input: Input, d: ADir)(implicit
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    injectFT[Task, S].apply {
-      Task.delay {
-        val directory = new File(posixCodec.unsafePrintPath(d))
-        if(directory.exists()) {
-          \/.fromTryCatchNonFatal{
-            directory.listFiles.toSet[File].map {
-              case file if file.isFile() => FileName(file.getName()).right[DirName]
-              case directory => DirName(directory.getName()).left[FileName]
-            }
-          }
-            .leftMap {
-            case e =>
-              pathErr(invalidPath(d, e.getMessage()))
-          }
-        } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-      }
-    }
+    injectFT[Task, S].apply(input.listContents(d))
 }
