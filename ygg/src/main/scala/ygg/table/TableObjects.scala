@@ -25,13 +25,6 @@ trait CF2Like {
   def andThen(f1: CF1): CF2
 }
 
-object paths {
-  val Key     = CPathField("key")
-  val Value   = CPathField("value")
-  val Group   = CPathField("group")
-  val SortKey = CPathField("sortkey")
-}
-
 sealed trait Definedness
 case object AnyDefined extends Definedness
 case object AllDefined extends Definedness

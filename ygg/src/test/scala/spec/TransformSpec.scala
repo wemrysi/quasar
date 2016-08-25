@@ -38,6 +38,7 @@ class TransformSpec extends ColumnarTableQspec {
     "perform a simple equality check"                                         in testSimpleEqual
     "perform another simple equality check"                                   in testAnotherSimpleEqual
     "perform yet another simple equality check"                               in testYetAnotherSimpleEqual
+    "perform a simple is-equal check"                                         in testASimpleIsEqual
     "perform a simple not-equal check"                                        in testASimpleNonEqual
 
     "perform a equal-literal check"                                           in checkEqualLiteral
@@ -370,37 +371,16 @@ class TransformSpec extends ColumnarTableQspec {
     results.copoint mustEqual expected
   }
 
-  private def testASimpleNonEqual = {
-    val array: JValue = json"""
-      [{
-        "value":{
-          "value1":-1380814338912438254,
-          "value2":1380814338912438254
-        },
-        "key":[2.0,1.0]
-      }]"""
-
-    val data: Stream[JValue] = array.asArray.elements.toStream
-    val sample               = SampleData(data)
-    val table                = fromSample(sample)
-
-    val results = toJson(table.transform {
-      Equal(
-        root.value.value1,
-        root.value.value2
-      )
-    })
-
-    val expected = data flatMap { jv =>
-      ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
-        case (_, JUndefined) => None
-        case (JUndefined, _) => None
-        case (x, y)          => Some(JBool(x == y))
-      }
-    }
-
-    results.copoint mustEqual expected
-  }
+  private def testASimpleNonEqual = checkSpecData(
+    spec     = Equal(root.value.value1, root.value.value2),
+    data     = jsonMany"""{ "key":[2.0,1.0],"value":{"value1": -72,"value2": 72} }""",
+    expected = Seq(JFalse)
+  )
+  private def testASimpleIsEqual = checkSpecData(
+    spec     = Equal(root.value.value1, root.value.value2),
+    data     = jsonMany"""{ "key":[2.0,1.0],"value":{"value1": 72,"value2": 72} }""",
+    expected = Seq(JTrue)
+  )
 
   private def testEqual(sample: SampleData) = {
     val table = fromSample(sample)
@@ -460,28 +440,12 @@ class TransformSpec extends ColumnarTableQspec {
   }
 
   private def testEqual1 = {
-    val JArray(elements) = json"""[
-      {
-        "value":{
-          "value1":-1503074360046022108,
-          "value2":-1503074360046022108
-        },
-        "key":[1.0]
-      },
-      {
-        "value":[[-1],[],["p",-3.875484961198970156E-18930]],
-        "key":[2.0]
-      },
-      {
-        "value":{
-          "value1":4611686018427387903,
-          "value2":4611686018427387903
-        },
-        "key":[3.0]
-      }
-    ]"""
-
-    testEqual(SampleData(elements.toStream))
+    val data = jsonMany"""
+      {"key":[1.0],"value":{"value1":-1503074360046022108,"value2":-1503074360046022108}}
+      {"key":[2.0],"value":[[-1],[],["p",-3.875484961198970156E-18930]]}
+      {"key":[3.0],"value":{"value1":4611686018427387903,"value2":4611686018427387903}}
+    """
+    testEqual(SampleData(data.toStream))
   }
 
   private def checkEqualLiteral = {

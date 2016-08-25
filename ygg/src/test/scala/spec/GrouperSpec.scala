@@ -128,7 +128,7 @@ class GrouperSpec extends quasar.Qspec {
     val groupId = newGroupId
 
     val valueTrans =
-      InnerObjectConcat(WrapObject(SourceKey.Single, paths.Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), paths.Value.name))
+      InnerObjectConcat(WrapObject(SourceKey.Single, Key.name), WrapObject(Map1(SourceValue.Single, doubleF1), Value.name))
 
     val spec = GroupingSource(fromJson(data), SourceKey.Single, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 

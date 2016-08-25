@@ -220,7 +220,7 @@ package trans {
 
       case DerefMetadataStatic(source, field) => DerefMetadataStatic(deepMap(source)(f), field)
 
-      case DerefObjectStatic(source, field)  => DerefObjectStatic(deepMap(source)(f), field)
+      case DerefObjectStatic(source, field)  => deepMap(source)(f) select field
       case DerefObjectDynamic(left, right)   => DerefObjectDynamic(deepMap(left)(f), deepMap(right)(f))
       case DerefArrayStatic(source, element) => DerefArrayStatic(deepMap(source)(f), element)
       case DerefArrayDynamic(left, right)    => DerefArrayDynamic(deepMap(left)(f), deepMap(right)(f))
@@ -245,12 +245,14 @@ package trans {
     val DerefArray0     = Id(0)
     val DerefArray1     = Id(1)
     val DerefArray2     = Id(2)
-    val PruneToKeyValue = WrapObject(SourceKey.Single, paths.Key.name) inner_++ WrapObject(SourceValue.Single, paths.Value.name)
-    val DeleteKeyValue  = Id.delete(paths.Key, paths.Value)
+    val PruneToKeyValue = WrapObject(SourceKey.Single, Key.name) inner_++ WrapObject(SourceValue.Single, Value.name)
+    val DeleteKeyValue  = Id.delete(Key, Value)
   }
 
 
   object TransSpec2 {
+    import constants._
+
     val LeftId = Leaf(SourceLeft)
 
     /** Flips all `SourceLeft`s to `SourceRight`s and vice versa. */
@@ -263,8 +265,8 @@ package trans {
     def DerefArray1(source: Source2) = Leaf(source)(1)
     def DerefArray2(source: Source2) = Leaf(source)(2)
 
-    val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(paths.Key, paths.Value)
-    val DeleteKeyValueRight = Leaf(SourceRight).delete(paths.Key, paths.Value)
+    val DeleteKeyValueLeft  = Leaf(SourceLeft).delete(Key, Value)
+    val DeleteKeyValueRight = Leaf(SourceRight).delete(Key, Value)
   }
 
   sealed trait GroupKeySpec {
@@ -310,14 +312,16 @@ package trans {
   }
 
   object constants {
-    import paths._
+    val Key     = CPathField("key")
+    val Value   = CPathField("value")
+    val Group   = CPathField("group")
+    val SortKey = CPathField("sortkey")
 
     object SourceKey {
       val Single = DerefObjectStatic(Leaf(Source), Key)
       val Left   = DerefObjectStatic(Leaf(SourceLeft), Key)
       val Right  = DerefObjectStatic(Leaf(SourceRight), Key)
     }
-
     object SourceValue {
       val Single = DerefObjectStatic(Leaf(Source), Value)
       val Left   = DerefObjectStatic(Leaf(SourceLeft), Value)
