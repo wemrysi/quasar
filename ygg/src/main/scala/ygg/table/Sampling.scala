@@ -66,7 +66,7 @@ object Sampling {
 
               (  inserter map (_ toSlice len)
                    map (slice => table.companion(singleStreamT(slice), ExactSize(len)).paged(yggConfig.maxSliceSize))
-                   getOrElse table.newTable(emptyStreamT(), ExactSize(0))
+                   getOrElse table.companion.empty
               ).asInstanceOf[T]
             }
           )

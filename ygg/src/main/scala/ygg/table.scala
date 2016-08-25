@@ -4,12 +4,14 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 package object table {
-  type NeedSlices = StreamT[Need, Slice]
+  type NeedSlices = NeedStreamT[Slice]
   type NeedTable  = Need[Table]
   type RowId      = Int
   type Identity   = Long
   type Identities = Array[Identity]
   type ColumnMap  = Map[ColumnRef, Column]
+
+  val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
 
   def prefixIdentityOrdering(ids1: Identities, ids2: Identities, prefixLength: Int): Cmp = {
     0 until prefixLength foreach { i =>
@@ -20,9 +22,6 @@ package object table {
     }
     EQ
   }
-
-  val IdentitiesOrder: Ord[Identities] = Ord order fullIdentityOrdering
-
   def prefixIdentityOrder(prefixLength: Int): Ord[Identities] =
     Ord order (prefixIdentityOrdering(_, _, prefixLength))
 
@@ -35,14 +34,9 @@ package object table {
   def tupledIdentitiesOrder[A](ord: Ord[Identities]): Ord[Identities -> A] = ord contramap (_._1)
   def valueOrder[A](ord: Ord[A]): Ord[Identities -> A]                     = ord contramap (_._2)
 
-  implicit def liftCF1(f: CF1): CF1Like = new CF1Like {
-    def compose(f1: CF1) = f compose f1
-    def andThen(f1: CF1) = f andThen f1
-  }
-
   implicit def liftCF2(f: CF2) = new CF2Like {
     def applyl(cv: CValue) = CF1("builtin::liftF2::applyl")(f(Column const cv, _))
-    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl")(f(_, Column const cv))
+    def applyr(cv: CValue) = CF1("builtin::liftF2::applyr")(f(_, Column const cv))
     def andThen(f1: CF1)   = CF2("builtin::liftF2::andThen")((c1, c2) => f(c1, c2) flatMap f1.apply)
   }
 }

@@ -1375,7 +1375,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
 
     private def toEvents[A](f: (Slice, RowId) => Option[A]): Need[Stream[A]] = (
-      (self compact Leaf(Source)).slices.toStream map (stream =>
+      (self compact root.spec).slices.toStream map (stream =>
         stream flatMap (slice =>
           0 until slice.size flatMap (i =>
             f(slice, i)

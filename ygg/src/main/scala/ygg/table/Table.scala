@@ -4,23 +4,16 @@ import scalaz._
 import ygg._, common._, json._
 import trans._
 
-trait TableOperations {
-  type Table <: ygg.table.Table
-
-  type NeedTable     = Need[Table]
-  type TableAndSpec1 = Table -> TransSpec1
-
-  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable
-  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]]
-  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
-  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+trait ColumnarTableCompanion[T <: ygg.table.ColumnarTable] extends TableCompanion[T]
+trait ColumnarTable extends Table {
+  type Table >: this.type <: ygg.table.ColumnarTable
 }
 
 trait TableCompanion[T <: ygg.table.Table] {
   type Table = T
   type NeedTable = Need[Table]
 
-  def apply(slices: NeedStreamT[Slice], size: TableSize): Table
+  def apply(slices: NeedSlices, size: TableSize): Table
 
   def empty: Table
   def constString(v: scSet[String]): Table
@@ -39,22 +32,26 @@ trait TableCompanion[T <: ygg.table.Table] {
   def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
-trait ColumnarTable extends Table {
-  type Table >: this.type <: ygg.table.ColumnarTable
+
+object Table {
+  implicit def implicitTableOps(table: Table): TableOps[table.type] = new TableOps(table)
+
+  class TableOps[T <: Table](val table: T) {
+    def compact(spec: TransSpec1): T#Table     = table.compact(spec, AnyDefined)
+    def sort(sortKey: TransSpec1): T#NeedTable = table.sort(sortKey, SortAscending)
+  }
 }
+
 trait Table {
   outer =>
 
+  type NeedTable = Need[Table]
   type Table >: this.type <: ygg.table.Table
   type Companion <: TableCompanion[Table]
 
-  type NeedTable = Need[Table]
-
   def companion: TableCompanion[Table]
 
-  def newTable(slices: NeedStreamT[Slice], size: TableSize): Table = companion(slices, size)
-
-  def slices: NeedStreamT[Slice]
+  def slices: NeedSlices
 
   /**
     * Return an indication of table size, if known
@@ -156,4 +153,16 @@ trait NoGroupTable extends Table {
 trait NoSortTable extends Table {
   def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
   def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
+}
+
+trait TableOperations {
+  type Table <: ygg.table.Table
+
+  type NeedTable     = Need[Table]
+  type TableAndSpec1 = Table -> TransSpec1
+
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]]
+  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
+  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }

@@ -155,9 +155,6 @@ object aligns {
 }
 
 object JDBM {
-  // import org.mapdb._
-  // import JDBM._
-
   type Bytes             = Array[Byte]
   type BtoBEntry         = jMapEntry[Bytes, Bytes]
   type BtoBIterator      = Iterator[BtoBEntry]
