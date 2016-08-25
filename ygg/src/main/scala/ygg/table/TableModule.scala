@@ -4,51 +4,11 @@ import scalaz._
 import ygg._, common._, json._, trans._
 
 trait TableModule {
-  tableModule =>
-
-  type Table <: TableLike
-  type TableCompanion <: TableCompanionLike
-
   val Table: TableCompanion
 
-  trait TableCompanionLike extends ygg.table.TableCompanion {
-    type Table = TableModule.this.Table
+  type Table <: TableLike
+  type TableCompanion <: ygg.table.TableCompanion
 
-    def empty: Table
-
-    def constString(v: scSet[String]): Table
-    def constLong(v: scSet[Long]): Table
-    def constDouble(v: scSet[Double]): Table
-    def constDecimal(v: scSet[BigDecimal]): Table
-    def constDate(v: scSet[DateTime]): Table
-    def constBoolean(v: scSet[Boolean]): Table
-    def constNull: Table
-    def constEmptyObject: Table
-    def constEmptyArray: Table
-
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
-
-    def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table]
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table]
-
-    /**
-      * Joins `left` and `right` together using their left/right key specs. The
-      * final order of the resulting table is dependent on the implementation,
-      * but must be a valid `JoinOrder`. This method should not assume any
-      * particular order of the tables, unlike `cogroup`.
-      */
-    def join(left: Table, right: Table, orderHint: Option[JoinOrder])(leftKeySpec: TransSpec1,
-                                                                             rightKeySpec: TransSpec1,
-                                                                             joinSpec: TransSpec2): M[JoinOrder -> Table]
-
-    /**
-      * Performs a back-end specific cross. Unlike Table#cross, this does not
-      * guarantee a specific implementation (much like Table.join does not).
-      * Hints can be provided on how we'd prefer the table to be crossed, but
-      * the actual cross order is returned as part of the result.
-      */
-    def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
-  }
 
   trait TableLike extends ygg.table.Table {
     this: Table =>

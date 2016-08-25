@@ -60,7 +60,9 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       (sortedGroupingSpec(left) |@| sortedGroupingSpec(right))(GroupingAlignment(groupKeyLeftTrans, groupKeyRightTrans, _, _, alignment))
   }
 
-  trait ColumnarTableCompanion extends TableCompanionLike {
+  trait ColumnarTableCompanion extends ygg.table.TableCompanion {
+    type Table = ColumnarTableModule.this.Table
+
     def apply(slices: StreamT[M, Slice], size: TableSize): Table
 
     def singleton(slice: Slice): Table
@@ -114,7 +116,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge[N[+ _]](grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => N[Table])(implicit nt: N ~> M): M[Table] = {
+    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table] = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]
@@ -224,21 +226,17 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
             Need(TableIndex.joinSubTables(subTableProjections).normalize) // TODO: normalize necessary?
           }
 
-          nt(body(groupKeyTable, map))
+          body(groupKeyTable, map)
         }
 
         // TODO: this can probably be done as one step, but for now
         // it's probably fine.
         val tables: StreamT[M, Table] = StreamT.unfoldM(groupKeys.toList) {
-          case k :: ks =>
-            evaluateGroupKey(k).map(t => Some((t, ks)))
-          case Nil =>
-            Need(None)
+          case k :: ks => evaluateGroupKey(k).map(t => Some((t, ks)))
+          case Nil     => Need(None)
         }
 
-        val slices: StreamT[M, Slice] = tables.flatMap(_.slices)
-
-        Need(Table(slices, UnknownSize))
+        Need(Table(tables flatMap (_.slices), UnknownSize))
       }
     }
 

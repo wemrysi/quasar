@@ -2,6 +2,7 @@ package ygg.table
 
 import scalaz._
 import ygg._, common._, json._
+import trans._
 
 trait TableCompanion {
   type Table <: ygg.table.Table
@@ -17,6 +18,11 @@ trait TableCompanion {
   def constEmptyObject: Table
   def constEmptyArray: Table
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
+
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table]
+  def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table]
+  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): M[JoinOrder -> Table]
+  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
 }
 
 trait Table {
