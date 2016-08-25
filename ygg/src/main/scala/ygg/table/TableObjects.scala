@@ -1,7 +1,6 @@
 package ygg.table
 
-import ygg._
-import trans._
+import ygg._, common._, data._, trans._
 
 object F1Expr {
   def negate         = cf.math.Negate
@@ -136,4 +135,85 @@ final object CrossOrder {
   case object CrossRight     extends CrossOrder
   case object CrossLeftRight extends CrossOrder
   case object CrossRightLeft extends CrossOrder
+}
+
+object aligns {
+  sealed trait AlignState
+  final case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
+  final case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
+  final case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
+  final case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
+
+  sealed trait Span
+  final case object LeftSpan  extends Span
+  final case object RightSpan extends Span
+  final case object NoSpan    extends Span
+
+  sealed trait NextStep
+  final case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
+  final case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
+}
+
+object JDBM {
+  // import org.mapdb._
+  // import JDBM._
+
+  type Bytes             = Array[Byte]
+  type BtoBEntry         = jMapEntry[Bytes, Bytes]
+  type BtoBIterator      = Iterator[BtoBEntry]
+  type BtoBMap           = java.util.SortedMap[Bytes, Bytes]
+  type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
+
+  final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
+
+  type IndexStore = BtoBConcurrentMap
+  type IndexMap   = Map[IndexKey, SliceSorter]
+
+  sealed trait SliceSorter {
+    def name: String
+    def keyRefs: Array[ColumnRef]
+    def valRefs: Array[ColumnRef]
+    def count: Long
+  }
+
+  case class SliceIndex(name: String,
+                        dbFile: File,
+                        storage: IndexStore,
+                        keyRowFormat: RowFormat,
+                        keyComparator: Comparator[Bytes],
+                        keyRefs: Array[ColumnRef],
+                        valRefs: Array[ColumnRef],
+                        count: Long = 0)
+      extends SliceSorter {}
+
+  case class SortedSlice(name: String,
+                         kslice: Slice,
+                         vslice: Slice,
+                         valEncoder: ColumnEncoder,
+                         keyRefs: Array[ColumnRef],
+                         valRefs: Array[ColumnRef],
+                         count: Long = 0)
+      extends SliceSorter {}
+
+  case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
+    val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
+  }
+
+  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): ColumnRef -> ArrayColumn[_] = ((
+     ref.copy(selector = prefix \ ref.selector),
+     ref.ctype match {
+       case CString              => ArrayStrColumn.empty(sliceSize)
+       case CBoolean             => ArrayBoolColumn.empty()
+       case CLong                => ArrayLongColumn.empty(sliceSize)
+       case CDouble              => ArrayDoubleColumn.empty(sliceSize)
+       case CNum                 => ArrayNumColumn.empty(sliceSize)
+       case CDate                => ArrayDateColumn.empty(sliceSize)
+       case CPeriod              => ArrayPeriodColumn.empty(sliceSize)
+       case CNull                => MutableNullColumn.empty()
+       case CEmptyObject         => MutableEmptyObjectColumn.empty()
+       case CEmptyArray          => MutableEmptyArrayColumn.empty()
+       case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
+       case CUndefined           => abort("CUndefined cannot be serialized")
+     }
+  ))
 }

@@ -75,7 +75,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => LazyTable) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson
@@ -130,7 +130,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(fromJson(data), root.key, Some(valueTrans), groupId, GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => LazyTable) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson
@@ -180,7 +180,7 @@ class GrouperSpec extends quasar.Qspec {
 
     val spec = GroupingSource(fromJson(data), root.key, Some(TransSpec1.Id), groupId, GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => LazyTable) =>
       for {
         gs1     <- map(groupId)
         gs1Json <- gs1.toJson

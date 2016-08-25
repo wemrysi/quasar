@@ -90,39 +90,9 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
     // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
   }
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize)                                               = new Table(slices, size)
-    def singleton(slice: Slice)                                                                            = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def apply(slices: StreamT[Need, Slice], size: TableSize): Table                                        = new Table(slices, size)
+    def singleton(slice: Slice): Table                                                                     = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
     def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
-  }
-
-  def streamToString(stream: StreamT[Need, CharBuffer]): String = {
-    def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
-      stream.uncons.flatMap {
-        case None =>
-          Need(sb.toString)
-        case Some((cb, tail)) =>
-          sb.append(cb)
-          loop(tail, sb)
-      }
-    loop(stream, new StringBuilder).copoint
-  }
-
-  def testRenderJson(xs: JValue*) = {
-    def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
-    def minimize(value: JValue): Option[JValue] = value match {
-      case JUndefined       => None
-      case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
-      case JArray(Seq())    => Some(jarray())
-      case JArray(elements) => elements flatMap minimize match { case Seq() => None ; case xs => Some(JArray(xs)) }
-      case v                => Some(v)
-    }
-
-    val table     = fromJson(xs.toVector)
-    val expected  = JArray(xs.toVector)
-    val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
-    val minimized = minimize(expected) getOrElse jarray()
-
-    arrayM.copoint mustEqual minimized
   }
 
   def sanitize(s: String): String = s.toArray.map(c => if (c < ' ') ' ' else c).mkString("")

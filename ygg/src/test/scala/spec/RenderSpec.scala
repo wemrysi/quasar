@@ -1,5 +1,6 @@
 package ygg.tests
 
+import scalaz._, Scalaz._
 import ygg.json._
 
 class RenderSpec extends ColumnarTableQspec {
@@ -26,5 +27,23 @@ class RenderSpec extends ColumnarTableQspec {
 
     "check utf-8 encoding" in prop((s: String) => testRenderJson(json"${ sanitize(s) }"))
     "check long encoding"  in prop((x: Long) => testRenderJson(json"$x"))
+  }
+
+  private def testRenderJson(xs: JValue*) = {
+    def minimizeItem(t: (String, JValue)) = minimize(t._2).map((t._1, _))
+    def minimize(value: JValue): Option[JValue] = value match {
+      case JUndefined       => None
+      case JObject(fields)  => Some(JObject(fields.flatMap(minimizeItem)))
+      case JArray(Seq())    => Some(jarray())
+      case JArray(elements) => elements flatMap minimize match { case Seq() => None ; case xs => Some(JArray(xs)) }
+      case v                => Some(v)
+    }
+
+    val table     = fromJson(xs.toVector)
+    val expected  = JArray(xs.toVector)
+    val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
+    val minimized = minimize(expected) getOrElse jarray()
+
+    arrayM.copoint mustEqual minimized
   }
 }

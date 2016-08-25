@@ -6,6 +6,7 @@ import trans._
 
 trait TableCompanion {
   type Table <: ygg.table.Table
+  type LazyTable = Need[Table]
 
   def empty: Table
   def constString(v: scSet[String]): Table
@@ -19,7 +20,7 @@ trait TableCompanion {
   def constEmptyArray: Table
   def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
 
-  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => M[Table]) => M[Table]): M[Table]
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => LazyTable) => LazyTable): LazyTable
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]]
   def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): M[JoinOrder -> Table]
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
@@ -27,6 +28,7 @@ trait TableCompanion {
 
 trait Table {
   type Table <: ygg.table.Table
+  type LazyTable = Need[Table]
 
   def slices: StreamT[Need, Slice]
 
@@ -39,7 +41,7 @@ trait Table {
     * For each distinct path in the table, load all columns identified by the specified
     * jtype and concatenate the resulting slices into a new table.
     */
-  def load(apiKey: APIKey, tpe: JType): Need[Table]
+  def load(apiKey: APIKey, tpe: JType): LazyTable
 
   /**
     * Folds over the table to produce a single value (stored in a singleton table).
@@ -76,7 +78,7 @@ trait Table {
     * Force the table to a backing store, and provice a restartable table
     * over the results.
     */
-  def force: Need[Table]
+  def force: LazyTable
 
   def paged(limit: Int): Table
 
@@ -90,14 +92,14 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Table]
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable
 
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): Need[Table] = sort(sortKey, sortOrder, unique = false)
-  def sort(sortKey: TransSpec1): Need[Table]                              = sort(sortKey, SortAscending)
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): LazyTable = sort(sortKey, sortOrder, unique = false)
+  def sort(sortKey: TransSpec1): LazyTable                              = sort(sortKey, SortAscending)
 
   def distinct(spec: TransSpec1): Table
   def concat(t2: Table): Table
-  def zip(t2: Table): Need[Table]
+  def zip(t2: Table): LazyTable
   def toArray[A](implicit tpe: CValueType[A]): Table
 
   /**
@@ -112,7 +114,7 @@ trait Table {
     * preserved
     */
   def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => Need[Table]): Need[Table]
+  def partitionMerge(partitionBy: TransSpec1)(f: Table => LazyTable): LazyTable
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def canonicalize(length: Int): Table
   def schemas: Need[Set[JType]]

@@ -46,6 +46,7 @@ trait PackageAliases {
   type ByteBuffer           = java.nio.ByteBuffer
   type CharBuffer           = java.nio.CharBuffer
   type Charset              = java.nio.charset.Charset
+  type Comparator[A]        = java.util.Comparator[A]
   type ExecutionContext     = java.util.concurrent.ExecutorService
   type File                 = java.io.File
   type FileInputStream      = java.io.FileInputStream

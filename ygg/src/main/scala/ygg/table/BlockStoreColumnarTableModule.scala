@@ -1,91 +1,12 @@
 package ygg.table
 
-import scalaz.{ Source => _, _}, Scalaz._, Ordering._
+import scalaz._, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
 
 import org.mapdb._
 import JDBM._
-import java.util.Comparator
 import scala.collection.mutable
 import TransSpec.deepMap
-
-object aligns {
-  sealed trait AlignState
-  case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
-  case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
-  case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
-  case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
-
-  sealed trait Span
-  case object LeftSpan  extends Span
-  case object RightSpan extends Span
-  case object NoSpan    extends Span
-
-  sealed trait NextStep
-  case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
-  case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
-}
-
-object JDBM {
-  type Bytes             = Array[Byte]
-  type BtoBEntry         = jMapEntry[Bytes, Bytes]
-  type BtoBIterator      = Iterator[BtoBEntry]
-  type BtoBMap           = java.util.SortedMap[Bytes, Bytes]
-  type BtoBConcurrentMap = jConcurrentMap[Bytes, Bytes]
-
-  final case class JSlice(firstKey: Bytes, lastKey: Bytes, rows: Int)
-
-  type IndexStore = BtoBConcurrentMap
-  type IndexMap   = Map[IndexKey, SliceSorter]
-
-  sealed trait SliceSorter {
-    def name: String
-    def keyRefs: Array[ColumnRef]
-    def valRefs: Array[ColumnRef]
-    def count: Long
-  }
-
-  case class SliceIndex(name: String,
-                        dbFile: File,
-                        storage: IndexStore,
-                        keyRowFormat: RowFormat,
-                        keyComparator: Comparator[Bytes],
-                        keyRefs: Array[ColumnRef],
-                        valRefs: Array[ColumnRef],
-                        count: Long = 0)
-      extends SliceSorter {}
-
-  case class SortedSlice(name: String,
-                         kslice: Slice,
-                         vslice: Slice,
-                         valEncoder: ColumnEncoder,
-                         keyRefs: Array[ColumnRef],
-                         valRefs: Array[ColumnRef],
-                         count: Long = 0)
-      extends SliceSorter {}
-
-  case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
-    val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
-  }
-
-  def columnFor(prefix: CPath, sliceSize: Int)(ref: ColumnRef): ColumnRef -> ArrayColumn[_] = ((
-     ref.copy(selector = prefix \ ref.selector),
-     ref.ctype match {
-       case CString              => ArrayStrColumn.empty(sliceSize)
-       case CBoolean             => ArrayBoolColumn.empty()
-       case CLong                => ArrayLongColumn.empty(sliceSize)
-       case CDouble              => ArrayDoubleColumn.empty(sliceSize)
-       case CNum                 => ArrayNumColumn.empty(sliceSize)
-       case CDate                => ArrayDateColumn.empty(sliceSize)
-       case CPeriod              => ArrayPeriodColumn.empty(sliceSize)
-       case CNull                => MutableNullColumn.empty()
-       case CEmptyObject         => MutableEmptyObjectColumn.empty()
-       case CEmptyArray          => MutableEmptyArrayColumn.empty()
-       case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(sliceSize)(elemType)
-       case CUndefined           => abort("CUndefined cannot be serialized")
-     }
-  ))
-}
 
 trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   type TableCompanion <: BlockStoreColumnarTableCompanion
@@ -862,7 +783,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                                                                                 rightKeySpec: TransSpec1,
                                                                                 joinSpec: TransSpec2): M[JoinOrder -> Table] = {
 
-      def hashJoin(index: Slice, table: Table, flip: Boolean): M[Table] = {
+      def hashJoin(index: Slice, table: Table, flip: Boolean): LazyTable = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
 
         val initKeyTrans  = composeSliceTransform(tableKeySpec)
@@ -945,7 +866,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
 
-    def load(table: Table, apiKey: APIKey, tpe: JType): Need[Table]
+    def load(table: Table, apiKey: APIKey, tpe: JType): LazyTable
   }
 
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
@@ -989,13 +910,13 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       Need(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Table] = Need(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable = Need(this)
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
     override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
 
-    override def force: M[Table] = Need(this)
+    override def force: LazyTable = Need(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1017,12 +938,12 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] =
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
-    def load(apiKey: APIKey, tpe: JType): Need[Table] = Table.load(this, apiKey, tpe)
+    def load(apiKey: APIKey, tpe: JType): LazyTable = Table.load(this, apiKey, tpe)
 
-    override def force: M[Table] = Need(this)
+    override def force: LazyTable = Need(this)
 
     override def paged(limit: Int): Table = this
 
@@ -1075,11 +996,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Table] = {
-      for {
-        tables <- groupByN(Seq(sortKey), Leaf(Source), sortOrder, unique)
-      } yield (tables.headOption getOrElse Table.empty)
-    }
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable =
+      groupByN(Seq(sortKey), root, sortOrder, unique) map (_.headOption getOrElse Table.empty)
 
     /**
       * Sorts the KV table by ascending or descending order based on a seq of transformations
@@ -1106,14 +1024,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       // in a distinct "row id" for each value to disambiguate it
       val (sourceTrans0, keyTrans0, valueTrans0) = if (!unique) {
         (
-          addGlobalId(Leaf(Source)),
+          addGlobalId(root),
           groupKeys map { kt =>
             OuterObjectConcat(WrapObject(deepMap(kt) { case Leaf(_) => TransSpec1.DerefArray0 }, "0"), WrapObject(TransSpec1.DerefArray1, "1"))
           },
           deepMap(valueSpec) { case Leaf(_) => TransSpec1.DerefArray0 }
         )
       } else {
-        (Leaf(Source), groupKeys, valueSpec)
+        (root.spec, groupKeys, valueSpec)
       }
 
       writeTables(this.transform(sourceTrans0).slices, composeSliceTransform(valueTrans0), keyTrans0 map composeSliceTransform, sortOrder)
