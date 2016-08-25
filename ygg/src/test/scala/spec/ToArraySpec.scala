@@ -22,7 +22,12 @@ package ygg.tests
 import scalaz.syntax.comonad._
 import ygg.json._
 
-trait ToArraySpec extends ColumnarTableQspec {
+class ToArraySpec extends ColumnarTableQspec {
+  "in toArray" >> {
+    "create a single column given two single columns" in testToArrayHomogeneous
+    "create a single column given heterogeneous data" in testToArrayHeterogeneous
+  }
+
   def testToArrayHomogeneous = {
     val data: Stream[JValue] =
       Stream(

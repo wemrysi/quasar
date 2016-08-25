@@ -4,14 +4,22 @@ import scalaz._, Scalaz._
 import ygg.json._
 import org.specs2.matcher.TraversableMatchers._
 
-trait SampleSpec extends ColumnarTableQspec {
+class SampleSpec extends ColumnarTableQspec {
   import trans._
 
-  val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>
+  "in sample" >> {
+     "sample from a dataset" in testSample
+     "return no samples given empty sequence of transspecs" in testSampleEmpty
+     "sample from a dataset given non-identity transspecs" in testSampleTransSpecs
+     "return full set when sample size larger than dataset" in testLargeSampleSize
+     "resurn empty table when sample size is 0" in test0SampleSize
+  }
+
+  lazy val simpleData: Stream[JValue] = Stream.tabulate(100) { i =>
     JObject(JField("id", if (i % 2 == 0) JString(i.toString) else JNum(i)) :: Nil)
   }
 
-  val simpleData2: Stream[JValue] = Stream.tabulate(100) { i =>
+  lazy val simpleData2: Stream[JValue] = Stream.tabulate(100) { i =>
     JObject(
       JField("id", if (i      % 2 == 0) JString(i.toString) else JNum(i)) ::
         JField("value", if (i % 2 == 0) JBool(true) else JNum(i)) ::

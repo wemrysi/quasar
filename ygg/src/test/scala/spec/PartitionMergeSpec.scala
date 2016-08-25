@@ -5,9 +5,12 @@ import ygg.common._
 import ygg.table._
 import ygg.json._
 
-trait PartitionMergeSpec extends ColumnarTableQspec {
-  val trans: TransSpecClasses
+class PartitionMergeSpec extends ColumnarTableQspec {
   import trans._
+
+  "partitionMerge" should {
+    "concatenate reductions of subsequences" in testPartitionMerge
+  }
 
   private object reducer extends Reducer[String] {
     def reduce(schema: CSchema, range: Range): String = {

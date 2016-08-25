@@ -7,11 +7,6 @@ class ColumnarTableModuleSpec
       extends ColumnarTableQspec
          with CrossSpec
          with TransformSpec
-         with CompactSpec
-         with PartitionMergeSpec
-         with ToArraySpec
-         with SampleSpec
-         with DistinctSpec
          with SchemasSpec {
 
   "a table dataset" should {
@@ -138,28 +133,6 @@ class ColumnarTableModuleSpec
       "check cond" in checkCond.pendingUntilFixed
     }
 
-    "in compact" >> {
-      "be the identity on fully defined tables"  in testCompactIdentity
-      "preserve all defined rows"                in testCompactPreserve
-      "have no undefined rows"                   in testCompactRows
-      "have no empty slices"                     in testCompactSlices
-      "preserve all defined key rows"            in testCompactPreserveKey
-      "have no undefined key rows"               in testCompactRowsKey
-      "have no empty key slices"                 in testCompactSlicesKey
-    }
-
-    "in distinct" >> {
-      "be the identity on tables with no duplicate rows"                            in testDistinctIdentity
-      "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices
-      "peform properly again when the same row appears inside two different slices" in testDistinctAcrossSlices2
-      "have no duplicate rows"                                                      in testDistinct
-    }
-
-    "in toArray" >> {
-      "create a single column given two single columns" in testToArrayHomogeneous
-      "create a single column given heterogeneous data" in testToArrayHeterogeneous
-    }
-
     "in concat" >> {
       "concat two tables" in testConcat
     }
@@ -172,17 +145,5 @@ class ColumnarTableModuleSpec
       "don't include undefineds in schema" in testUndefinedsInSchema
       "deal with most expected types" in testAllTypesInSchema
     }
-
-    "in sample" >> {
-       "sample from a dataset" in testSample
-       "return no samples given empty sequence of transspecs" in testSampleEmpty
-       "sample from a dataset given non-identity transspecs" in testSampleTransSpecs
-       "return full set when sample size larger than dataset" in testLargeSampleSize
-       "resurn empty table when sample size is 0" in test0SampleSize
-    }
-  }
-
-  "partitionMerge" should {
-    "concatenate reductions of subsequences" in testPartitionMerge
   }
 }

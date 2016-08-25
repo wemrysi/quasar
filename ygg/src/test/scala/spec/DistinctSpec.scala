@@ -4,9 +4,16 @@ import scalaz._, Scalaz._
 import ygg.json._
 import TestSupport._
 
-trait DistinctSpec extends ColumnarTableQspec {
+class DistinctSpec extends ColumnarTableQspec {
   import SampleData._
   import trans._
+
+  "in distinct" >> {
+    "be the identity on tables with no duplicate rows"                            in testDistinctIdentity
+    "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices
+    "peform properly again when the same row appears inside two different slices" in testDistinctAcrossSlices2
+    "have no duplicate rows"                                                      in testDistinct
+  }
 
   def testDistinctIdentity = {
     implicit val gen: Arbitrary[SampleData] = sort(distinct(sample(schema)))

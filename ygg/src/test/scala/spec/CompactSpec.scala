@@ -7,9 +7,19 @@ import scalaz._, Scalaz._
 import ygg.table._
 import ygg.data._
 
-trait CompactSpec extends ColumnarTableQspec {
+class CompactSpec extends ColumnarTableQspec {
   import SampleData._
   import trans._
+
+  "in compact" >> {
+    "be the identity on fully defined tables"  in testCompactIdentity
+    "preserve all defined rows"                in testCompactPreserve
+    "have no undefined rows"                   in testCompactRows
+    "have no empty slices"                     in testCompactSlices
+    "preserve all defined key rows"            in testCompactPreserveKey
+    "have no undefined key rows"               in testCompactRowsKey
+    "have no empty key slices"                 in testCompactSlicesKey
+  }
 
   def tableStats(table: Table): List[Int -> Int] = table match {
     case cTable: ColumnarTable =>
