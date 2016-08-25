@@ -309,7 +309,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
   abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable {
     self: Table =>
 
-    type Table <: outer.Table
+    type Table >: this.type <: outer.Table
 
     import SliceTransform._
 

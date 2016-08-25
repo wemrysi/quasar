@@ -7,12 +7,7 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
 
   implicit val fid = NaturalTransformation.refl[Need]
 
-  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
-    def load(apiKey: APIKey, jtpe: JType)                                       = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean) = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] =
-      ???
-  }
+  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) with DummyTable
 
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: StreamT[Need, Slice], size: TableSize)                                               = new Table(slices, size)

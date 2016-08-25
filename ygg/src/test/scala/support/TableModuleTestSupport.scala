@@ -83,7 +83,8 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
 
   final class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = Need(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                      = Need(this)
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
 
     // Deadlock

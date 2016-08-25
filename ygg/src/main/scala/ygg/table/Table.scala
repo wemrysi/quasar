@@ -22,12 +22,23 @@ trait TableCompanion {
 
   def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable
   def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]]
-  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): M[JoinOrder -> Table]
-  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
+  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
+  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+}
+
+trait DummyTable extends Table {
+  override def load(apiKey: APIKey, jtpe: JType): NeedTable                                                                  = ???
+  override def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable                                             = Need[Table](this)
+  override def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable                                           = Need[Table](this)
+  override def force: NeedTable                                                                                              = Need[Table](this)
+  override def compact(spec: TransSpec1, definedness: Definedness): Table                                                    = this
+  override def paged(limit: Int): Table                                                                                      = this
+  override def distinct(spec: TransSpec1): Table                                                                             = this
+  override def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
 }
 
 trait Table {
-  type Table <: ygg.table.Table
+  type Table >: this.type <: ygg.table.Table
   type NeedTable = Need[Table]
 
   def slices: StreamT[Need, Slice]
@@ -92,11 +103,8 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable
-
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = sort(sortKey, sortOrder, unique = false)
-  def sort(sortKey: TransSpec1): NeedTable                              = sort(sortKey, SortAscending)
-
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable
+  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable
   def distinct(spec: TransSpec1): Table
   def concat(t2: Table): Table
   def zip(t2: Table): NeedTable
@@ -118,6 +126,9 @@ trait Table {
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def canonicalize(length: Int): Table
   def schemas: Need[Set[JType]]
+
+  def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
+
   def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer]
 
   // for debugging only!!

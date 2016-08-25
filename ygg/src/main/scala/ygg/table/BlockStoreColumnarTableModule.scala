@@ -882,7 +882,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
+  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with DummyTable {
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
@@ -898,22 +898,10 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       loop(slices)
     }
 
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
+    override def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       val xform = transform(valueSpec)
       Need(List.fill(groupKeys.size)(xform))
     }
-
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable = Need(this)
-
-    def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
-
-    override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
-
-    override def force: NeedTable = Need(this)
-
-    override def paged(limit: Int): Table = this
-
-    override def distinct(spec: TransSpec1): Table = this
 
     override def takeRange(startIndex: Long, numberToTake: Long): Table =
       if (startIndex <= 0 && startIndex + numberToTake >= 1) this else Table.empty
@@ -931,8 +919,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable =
-      toExternalTable.sort(sortKey, sortOrder, unique)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable       = toExternalTable.sort(sortKey, sortOrder)
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable = toExternalTable.sortUnique(sortKey, sortOrder)
 
     def load(apiKey: APIKey, tpe: JType): NeedTable = Table.load(this, apiKey, tpe)
 
@@ -988,8 +976,11 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable =
-      groupByN(Seq(sortKey), root, sortOrder, unique) map (_.headOption getOrElse Table.empty)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable =
+      groupByN(Seq(sortKey), root, sortOrder, unique = false) map (_.headOption getOrElse Table.empty)
+
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable =
+      groupByN(Seq(sortKey), root, sortOrder, unique = true) map (_.headOption getOrElse Table.empty)
 
     /**
       * Sorts the KV table by ascending or descending order based on a seq of transformations

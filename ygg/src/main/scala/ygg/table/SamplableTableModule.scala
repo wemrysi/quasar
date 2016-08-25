@@ -12,7 +12,7 @@ trait SamplableTableModule extends TableModule {
   trait SamplableTable extends TableLike {
     self: Table =>
 
-    type Table <: outer.Table
+    type Table >: this.type <: outer.Table
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   }
 }
