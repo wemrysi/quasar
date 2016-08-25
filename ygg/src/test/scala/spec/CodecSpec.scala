@@ -1,7 +1,6 @@
 package ygg.tests
 
 import ygg.common._
-import TestSupport._
 import org.scalacheck.Shrink
 import ygg.data._
 import ByteBufferPool._

@@ -2,12 +2,10 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg.json._
-import TestSupport._
+import ygg.table.trans._
+import SampleData._
 
 class DistinctSpec extends ColumnarTableQspec {
-  import SampleData._
-  import ygg.table.trans._
-
   "in distinct" >> {
     "be the identity on tables with no duplicate rows"                            in testDistinctIdentity
     "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices

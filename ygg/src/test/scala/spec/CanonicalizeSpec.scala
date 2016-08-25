@@ -2,7 +2,6 @@ package ygg.tests
 
 import ygg.table._
 import scalaz._, Scalaz._
-import TestSupport._
 import ygg.json._
 
 class CanonicalizeSpec extends ColumnarTableQspec {

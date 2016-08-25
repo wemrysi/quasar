@@ -2,7 +2,6 @@ package ygg.tests
 
 import ygg.common._
 import scalaz._, Scalaz._
-import TestSupport._
 import ygg.json._
 import ygg.table._
 import BlockStoreTestModule.module

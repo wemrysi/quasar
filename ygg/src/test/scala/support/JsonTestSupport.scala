@@ -1,19 +1,19 @@
 package ygg.tests
 
 import ygg.common._
-import TestSupport._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
 import ygg.json._
 import ygg.data._
 
-object TableTestSupport extends TestSupport with TableGenerators {}
+object TableTestSupport extends TableGenerators {}
 
-object JsonTestSupport extends TestSupport with JsonGenerators with TableGenerators {
+object JsonTestSupport extends JsonGenerators with TableGenerators {
   def arb[A](implicit z: Arbitrary[A]): Arbitrary[A] = z
 
   implicit def arbJValue: Arbitrary[JValue]         = Arbitrary(genJValue)
   implicit def arbJObject: Arbitrary[JObject]       = Arbitrary(genJObject)
   implicit def arbJPath: Arbitrary[JPath]           = Arbitrary(genJPath)
+  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)
 }
 
 trait TableGenerators {

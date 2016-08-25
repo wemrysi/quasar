@@ -2,7 +2,6 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg._, common._, table._, json._
-import TestSupport._
 import scala.util.Random
 
 class TransformSpec extends ColumnarTableQspec {

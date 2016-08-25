@@ -1,13 +1,12 @@
-package ygg.tests
+package ygg.tests.pkg
 
 import ygg.common._
 import ygg.data._
 import scala.collection.mutable.Builder
 
-object TestSupport extends TestSupport
-trait TestSupport extends ScalacheckSupport with SpecsSupport {
-  implicit def arbBigDecimal: Arbitrary[BigDecimal] = Arbitrary(genBigDecimal)
-}
+// object TestSupport extends TestSupport
+
+trait TestsPackage extends ScalacheckSupport with SpecsSupport
 
 trait SpecsSupport {
   import org.specs2._, matcher._

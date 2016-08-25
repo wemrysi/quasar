@@ -2,7 +2,6 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg.json._
-import TestSupport._
 import ygg.table._
 
 class CrossSpec extends ColumnarTableQspec {

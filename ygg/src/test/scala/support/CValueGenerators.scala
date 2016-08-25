@@ -2,7 +2,6 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg.common._
-import TestSupport._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
 import ygg.json._
 import ygg.table._
