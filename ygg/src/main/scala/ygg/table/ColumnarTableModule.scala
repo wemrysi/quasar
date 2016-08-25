@@ -10,7 +10,7 @@ final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
 }
 
-trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
+trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesModule {
   outer =>
 
   import trans._
@@ -273,12 +273,14 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     }
   }
 
-  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends SamplableColumnarTable {
+  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
-    type Table >: this.type <: outer.Table
+    type Table = outer.Table
 
     import SliceTransform._
+
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = Sampling.sample[Table](self, sampleSize, specs)
 
     /**
       * Folds over the table to produce a single value (stored in a singleton table).

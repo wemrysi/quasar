@@ -3,10 +3,11 @@ package ygg.table
 import ygg.common._
 import scalaz._, Scalaz._
 import trans._
-import SamplableColumnarTableModule._
 
-object SamplableColumnarTableModule {
-  def rng: scala.util.Random = scala.util.Random
+object Sampling {
+  private def rng: scala.util.Random = scala.util.Random
+
+  private case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
 
   /**
     * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =
@@ -18,10 +19,7 @@ object SamplableColumnarTableModule {
     * Of course, the hope is that this will not be used once we get efficient
     * sampling in that runs in O(m lg n) time.
     */
-  def sampleNoCake[T <: ygg.table.Table](table: T, sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[T]] = {
-    // import table._
-
-    case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
+  def sample[T <: ygg.table.Table](table: T, sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[T]] = {
 
     def build(states: List[SampleState], slices: StreamT[M, Slice]): Need[List[T]] = {
       slices.uncons flatMap {
@@ -194,21 +192,5 @@ object SamplableColumnarTableModule {
         else dest.defined.clear(to)
       )
     }
-  }
-}
-
-trait SamplableColumnarTableModule extends TableModule {
-  outer =>
-
-  // outer: ColumnarTableModule with SliceTransforms =>
-
-  // type Table <: ColumnarTable
-
-  trait SamplableColumnarTable extends ygg.table.Table {
-    self: Table =>
-
-    type Table = outer.Table
-
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[Table]] = sampleNoCake[Table](self, sampleSize, specs)
   }
 }
