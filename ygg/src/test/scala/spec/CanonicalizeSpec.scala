@@ -1,22 +1,3 @@
-/*
- *  ____    ____    _____    ____    ___     ____
- * |  _ \  |  _ \  | ____|  / ___|  / _/    / ___|        Precog (R)
- * | |_) | | |_) | |  _|   | |     | |  /| | |  _         Advanced Analytics Engine for NoSQL Data
- * |  __/  |  _ <  | |___  | |___  |/ _| | | |_| |        Copyright (C) 2010 - 2013 SlamData, Inc.
- * |_|     |_| \_\ |_____|  \____|   /__/   \____|        All Rights Reserved.
- *
- * This program is free software: you can redistribute it and/or modify it under the terms of the
- * GNU Affero General Public License as published by the Free Software Foundation, either version
- * 3 of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
- * the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along with this
- * program. If not, see <http://www.gnu.org/licenses/>.
- *
- */
 package ygg.tests
 
 import ygg.table._
@@ -24,30 +5,36 @@ import scalaz._, Scalaz._
 import TestSupport._
 import ygg.json._
 
-trait CanonicalizeSpec extends ColumnarTableQspec {
+class CanonicalizeSpec extends ColumnarTableQspec {
   import SampleData._
 
-  val table = {
-    val JArray(elements) = JParser.parseFromString("""[
-      {"foo":1},
-      {"foo":2},
-      {"foo":3},
-      {"foo":4},
-      {"foo":5},
-      {"foo":6},
-      {"foo":7},
-      {"foo":8},
-      {"foo":9},
-      {"foo":10},
-      {"foo":11},
-      {"foo":12},
-      {"foo":13},
-      {"foo":14}
-    ]""").fold(throw _, identity)
-
-    val sample = SampleData(elements.toStream)
-    fromSample(sample)
+  "in canonicalize" >> {
+    "return the correct slice sizes using scalacheck" in checkCanonicalize
+    "return the slice size in correct bound using scalacheck with range" in checkBoundedCanonicalize
+    "return the correct slice sizes in a trivial case" in testCanonicalize
+    "return the correct slice sizes given length zero" in testCanonicalizeZero
+    "return the correct slice sizes along slice boundaries" in testCanonicalizeBoundary
+    "return the correct slice sizes greater than slice boundaries" in testCanonicalizeOverBoundary
+    "return empty table when given empty table" in testCanonicalizeEmpty
+    "remove slices of size zero" in testCanonicalizeEmptySlices
   }
+
+  lazy val table: Table = fromJson(jsonMany"""
+    {"foo":1}
+    {"foo":2}
+    {"foo":3}
+    {"foo":4}
+    {"foo":5}
+    {"foo":6}
+    {"foo":7}
+    {"foo":8}
+    {"foo":9}
+    {"foo":10}
+    {"foo":11}
+    {"foo":12}
+    {"foo":13}
+    {"foo":14}
+  """)
 
   def checkBoundedCanonicalize = {
     implicit val gen = sample(schema)
