@@ -4,27 +4,14 @@ import ygg.common._
 import scalaz._, Scalaz._
 import trans._
 
-trait SamplableTableModule extends TableModule {
-  outer =>
-
-  type Table <: SamplableTable
-
-  trait SamplableTable extends ygg.table.Table {
-    self: Table =>
-
-    type Table >: this.type <: outer.Table
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
-  }
-}
-
-trait SamplableColumnarTableModule extends SamplableTableModule {
+trait SamplableColumnarTableModule extends TableModule {
   outer: ColumnarTableModule with SliceTransforms =>
 
   def rng: scala.util.Random = scala.util.Random
 
-  type Table <: ColumnarTable with SamplableTable
+  type Table <: ColumnarTable
 
-  trait SamplableColumnarTable extends SamplableTable {
+  trait SamplableColumnarTable extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
@@ -49,7 +36,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule {
               case SampleState(maybePrevInserters, len0, transform) =>
                 transform advance origSlice map {
                   case (nextTransform, slice) => {
-                    val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice)
+                    val inserter = maybePrevInserters map { _.withSource(slice) } getOrElse RowInserter(sampleSize, slice, scmMap())
 
                     val defined = slice.definedAt
 
@@ -103,7 +90,7 @@ trait SamplableColumnarTableModule extends SamplableTableModule {
     }
   }
 
-  private case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]] = scmMap.empty) {
+  private case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]]) {
     import RowInserter._
 
     def toSlice(maxSize: Int): Slice = Slice(size min maxSize, cols.toMap)

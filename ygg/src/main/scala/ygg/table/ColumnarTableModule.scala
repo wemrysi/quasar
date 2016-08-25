@@ -1373,9 +1373,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       collectSchemas(Set.empty, slices)
     }
 
-    // def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer] =
-    //   ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
-
     def toStrings: Need[Stream[String]] = toEvents(_ toString _)
     def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
 

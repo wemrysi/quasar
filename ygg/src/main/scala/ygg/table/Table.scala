@@ -4,9 +4,23 @@ import scalaz._
 import ygg._, common._, json._
 import trans._
 
+trait TableOperations {
+  type Table <: ygg.table.Table
+
+  type NeedTable     = Need[Table]
+  type TableAndSpec1 = Table -> TransSpec1
+
+  def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable
+  def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]]
+  def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
+  def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
+}
+
 trait TableCompanion {
   type Table <: ygg.table.Table
   type NeedTable = Need[Table]
+
+  def apply(slices: NeedStreamT[Slice], size: TableSize): Table
 
   def empty: Table
   def constString(v: scSet[String]): Table
