@@ -38,15 +38,20 @@ package trans {
   }
 
   class TransSpecBuilder[A <: SourceType](val spec: TransSpec[A]) extends Dynamic {
-    protected def next[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A] = new TransSpecBuilder(x)
+    type This    = TransSpec[A]
+    type Builder = TransSpecBuilder[A]
 
-    def map1(fn: CF1): TransSpecBuilder[A]               = next(Map1(spec, fn))
-    def isType(tp: JType): TransSpecBuilder[A]           = next(IsType(spec, tp))
-    def apply(index: Int): TransSpecBuilder[A]           = next(DerefArrayStatic(spec, CPathIndex(index)))
-    def delete(fields: CPathField*): TransSpecBuilder[A] = next(ObjectDelete(spec, fields.toSet))
-    def select(field: CPathField): TransSpecBuilder[A]   = next(DerefObjectStatic(spec, field))
-    def select(name: String): TransSpecBuilder[A]        = select(CPathField(name))
-    def selectDynamic(name: String): TransSpecBuilder[A] = select(name)
+    protected def next[A <: SourceType](x: This): Builder = new TransSpecBuilder(x)
+
+    def deepMap(pf: PartialFunction[This, This]): Builder = next(TransSpec.deepMap(spec)(pf))
+    def deepMap1(fn: CF1): Builder                        = next(DeepMap1(spec, fn))
+    def map1(fn: CF1): Builder                            = next(Map1(spec, fn))
+    def isType(tp: JType): Builder                        = next(IsType(spec, tp))
+    def apply(index: Int): Builder                        = next(DerefArrayStatic(spec, CPathIndex(index)))
+    def delete(fields: CPathField*): Builder              = next(ObjectDelete(spec, fields.toSet))
+    def select(field: CPathField): Builder                = next(DerefObjectStatic(spec, field))
+    def select(name: String): Builder                     = select(CPathField(name))
+    def selectDynamic(name: String): Builder              = select(name)
   }
 
   sealed trait TransSpec[+A <: SourceType]  extends AnyRef
@@ -154,50 +159,35 @@ package trans {
       result getOrElse leaf
     }
 
-    def mapSources[A <: SourceType, B <: SourceType](spec: TransSpec[A])(f: A => B): TransSpec[B] = {
-      spec match {
-        case Leaf(source)                      => Leaf(f(source))
-        case trans.ConstLiteral(value, target) => trans.ConstLiteral(value, mapSources(target)(f))
-
-        case trans.Filter(source, pred) => trans.Filter(mapSources(source)(f), mapSources(pred)(f))
-        case trans.FilterDefined(source, definedFor, definedness) =>
-          trans.FilterDefined(mapSources(source)(f), mapSources(definedFor)(f), definedness)
-
-        case Scan(source, scanner) => Scan(mapSources(source)(f), scanner)
-        // case MapWith(source, mapper) => MapWith(mapSources(source)(f), mapper)
-
-        case trans.Map1(source, f1)      => trans.Map1(mapSources(source)(f), f1)
-        case trans.DeepMap1(source, f1)  => trans.DeepMap1(mapSources(source)(f), f1)
-        case trans.Map2(left, right, f2) => trans.Map2(mapSources(left)(f), mapSources(right)(f), f2)
-
-        case trans.OuterObjectConcat(objects @ _ *) => trans.OuterObjectConcat(objects.map(mapSources(_)(f)): _*)
-        case trans.InnerObjectConcat(objects @ _ *) => trans.InnerObjectConcat(objects.map(mapSources(_)(f)): _*)
-        case trans.ObjectDelete(source, fields)     => trans.ObjectDelete(mapSources(source)(f), fields)
-        case trans.InnerArrayConcat(arrays @ _ *)   => trans.InnerArrayConcat(arrays.map(mapSources(_)(f)): _*)
-        case trans.OuterArrayConcat(arrays @ _ *)   => trans.OuterArrayConcat(arrays.map(mapSources(_)(f)): _*)
-
-        case trans.WrapObject(source, field)      => trans.WrapObject(mapSources(source)(f), field)
-        case trans.WrapObjectDynamic(left, right) => trans.WrapObjectDynamic(mapSources(left)(f), mapSources(right)(f))
-        case trans.WrapArray(source)              => trans.WrapArray(mapSources(source)(f))
-
-        case DerefMetadataStatic(source, field) => DerefMetadataStatic(mapSources(source)(f), field)
-
-        case DerefObjectStatic(source, field)  => DerefObjectStatic(mapSources(source)(f), field)
-        case DerefObjectDynamic(left, right)   => DerefObjectDynamic(mapSources(left)(f), mapSources(right)(f))
-        case DerefArrayStatic(source, element) => DerefArrayStatic(mapSources(source)(f), element)
-        case DerefArrayDynamic(left, right)    => DerefArrayDynamic(mapSources(left)(f), mapSources(right)(f))
-
-        case trans.ArraySwap(source, index) => trans.ArraySwap(mapSources(source)(f), index)
-
-        case Typed(source, tpe)         => Typed(mapSources(source)(f), tpe)
-        case TypedSubsumes(source, tpe) => TypedSubsumes(mapSources(source)(f), tpe)
-        case IsType(source, tpe)        => IsType(mapSources(source)(f), tpe)
-
-        case trans.Equal(left, right)                  => trans.Equal(mapSources(left)(f), mapSources(right)(f))
-        case trans.EqualLiteral(source, value, invert) => trans.EqualLiteral(mapSources(source)(f), value, invert)
-
-        case trans.Cond(pred, left, right) => trans.Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
-      }
+    def mapSources[A <: SourceType, B <: SourceType](spec: TransSpec[A])(f: A => B): TransSpec[B] = spec match {
+      case Leaf(source)                                   => Leaf(f(source))
+      case ConstLiteral(value, target)                    => ConstLiteral(value, mapSources(target)(f))
+      case Filter(source, pred)                           => Filter(mapSources(source)(f), mapSources(pred)(f))
+      case FilterDefined(source, definedFor, definedness) => FilterDefined(mapSources(source)(f), mapSources(definedFor)(f), definedness)
+      case Scan(source, scanner)                          => Scan(mapSources(source)(f), scanner)
+      case Map1(source, f1)                               => Map1(mapSources(source)(f), f1)
+      case DeepMap1(source, f1)                           => DeepMap1(mapSources(source)(f), f1)
+      case Map2(left, right, f2)                          => Map2(mapSources(left)(f), mapSources(right)(f), f2)
+      case OuterObjectConcat(objects @ _ *)               => OuterObjectConcat(objects.map(mapSources(_)(f)): _*)
+      case InnerObjectConcat(objects @ _ *)               => InnerObjectConcat(objects.map(mapSources(_)(f)): _*)
+      case ObjectDelete(source, fields)                   => ObjectDelete(mapSources(source)(f), fields)
+      case InnerArrayConcat(arrays @ _ *)                 => InnerArrayConcat(arrays.map(mapSources(_)(f)): _*)
+      case OuterArrayConcat(arrays @ _ *)                 => OuterArrayConcat(arrays.map(mapSources(_)(f)): _*)
+      case WrapObject(source, field)                      => WrapObject(mapSources(source)(f), field)
+      case WrapObjectDynamic(left, right)                 => WrapObjectDynamic(mapSources(left)(f), mapSources(right)(f))
+      case WrapArray(source)                              => WrapArray(mapSources(source)(f))
+      case DerefMetadataStatic(source, field)             => DerefMetadataStatic(mapSources(source)(f), field)
+      case DerefObjectStatic(source, field)               => DerefObjectStatic(mapSources(source)(f), field)
+      case DerefObjectDynamic(left, right)                => DerefObjectDynamic(mapSources(left)(f), mapSources(right)(f))
+      case DerefArrayStatic(source, element)              => DerefArrayStatic(mapSources(source)(f), element)
+      case DerefArrayDynamic(left, right)                 => DerefArrayDynamic(mapSources(left)(f), mapSources(right)(f))
+      case ArraySwap(source, index)                       => ArraySwap(mapSources(source)(f), index)
+      case Typed(source, tpe)                             => Typed(mapSources(source)(f), tpe)
+      case TypedSubsumes(source, tpe)                     => TypedSubsumes(mapSources(source)(f), tpe)
+      case IsType(source, tpe)                            => IsType(mapSources(source)(f), tpe)
+      case Equal(left, right)                             => Equal(mapSources(left)(f), mapSources(right)(f))
+      case EqualLiteral(source, value, invert)            => EqualLiteral(mapSources(source)(f), value, invert)
+      case Cond(pred, left, right)                        => Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
     }
 
     def deepMap[A <: SourceType](spec: TransSpec[A])(f: PartialFunction[TransSpec[A], TransSpec[A]]): TransSpec[A] = spec match {

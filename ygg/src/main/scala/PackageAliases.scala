@@ -4,7 +4,6 @@ import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
   // scala stdlib
-  type PairOf[+A]             = A -> A
   type ->[+A, +B]             = Tuple2[A, B]
   type =?>[-A, +B]            = scala.PartialFunction[A, B]
   type ArrayBuffer[A]         = scm.ArrayBuffer[A]
@@ -12,6 +11,7 @@ trait PackageAliases {
   type CBF[-From, -Elem, +To] = scala.collection.generic.CanBuildFrom[From, Elem, To]
   type CTag[A]                = scala.reflect.ClassTag[A]
   type ListBuffer[A]          = scm.ListBuffer[A]
+  type PairOf[+A]             = A -> A
   type Regex                  = scala.util.matching.Regex
   type Try[+A]                = scala.util.Try[A]
   type Vec[+A]                = scala.Vector[A]
@@ -62,10 +62,11 @@ trait PackageAliases {
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
   // other outside libs
-  type M[+A]  = scalaz.Need[A]
-  type Ord[A] = scalaz.Order[A]
-  type Eq[A]  = scalaz.Equal[A]
-  type Cmp    = scalaz.Ordering
-  val Ord     = scalaz.Order
-  val Eq      = scalaz.Equal
+  type Cmp            = scalaz.Ordering
+  type Eq[A]          = scalaz.Equal[A]
+  type LazyPairOf[+A] = scalaz.Need[A -> A]
+  type M[+A]          = scalaz.Need[A]
+  type Ord[A]         = scalaz.Order[A]
+  val Eq              = scalaz.Equal
+  val Ord             = scalaz.Order
 }

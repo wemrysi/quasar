@@ -6,6 +6,7 @@ import java.nio.file._
 
 package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
   def vec[A](xs: A*): Vec[A] = xs.toVector
+  def mutableQueue[A: Ord](xs: A*): scala.collection.mutable.PriorityQueue[A] = scala.collection.mutable.PriorityQueue(xs: _*)
 
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p

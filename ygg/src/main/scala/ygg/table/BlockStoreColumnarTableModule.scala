@@ -2,11 +2,8 @@ package ygg.table
 
 import scalaz._, Scalaz._, Ordering._
 import ygg._, common._, data._, json._, trans._
-
 import org.mapdb._
 import JDBM._
-import scala.collection.mutable
-import TransSpec.deepMap
 
 trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   type TableCompanion <: BlockStoreColumnarTableCompanion
@@ -72,9 +69,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       def cells: Iterable[Cell]
       def compare(cl: Cell, cr: Cell): Ordering
 
-      implicit lazy val ordering = new scala.math.Ordering[Cell] {
-        def compare(c1: Cell, c2: Cell) = self.compare(c1, c2).toInt
-      }
+      lazy val ordering = Ord.order[Cell](compare(_, _))
     }
 
     object CellMatrix {
@@ -156,13 +151,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         // to this requires more significant rework than can be undertaken
         // right now.
         val cellMatrix = CellMatrix(cells)(keyf)
-        val ordering =
+
+        val queue = mutableQueue(cells.toSeq: _*)(
           if (inputSortOrder.isAscending)
-            cellMatrix.ordering.reverse
+            cellMatrix.ordering.reverseOrder
           else
             cellMatrix.ordering
+        )
 
-        val queue = mutable.PriorityQueue(cells.toSeq: _*)(ordering)
 
         val (finishedSize, expired) = consumeToBoundary(queue, cellMatrix, 0)
         if (expired.isEmpty) {
@@ -278,7 +274,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                              right: StreamT[M, Slice],
                              rightKeyTrans: SliceTransform1[B],
                              leftWriteState: JDBMState,
-                             rightWriteState: JDBMState): M[Table -> Table] = {
+                             rightWriteState: JDBMState): LazyPairOf[Table] = {
 
         // We will *always* have a lhead and rhead, because if at any point we
         // run out of data, we'll still be hanging on to the last slice on the
@@ -295,7 +291,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
             rstate: B,
             leftWriteState: JDBMState,
             rightWriteState: JDBMState
-        ): M[JDBMState -> JDBMState] = {
+        ): LazyPairOf[JDBMState] = {
 
           @tailrec
           def buildFilters(comparator: RowComparator, lidx: Int, lsize: Int, lacc: BitSet, ridx: Int, rsize: Int, racc: BitSet, span: Span): NextStep = {
@@ -392,9 +388,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                        rstate: B,
                        rkey: Slice,
                        leftWriteState: JDBMState,
-                       rightWriteState: JDBMState): M[JDBMState -> JDBMState] = nextStep match {
+                       rightWriteState: JDBMState): LazyPairOf[JDBMState] = nextStep match {
             case MoreLeft(span, leq, ridx, req) =>
-              def next(lbs: JDBMState, rbs: JDBMState): M[JDBMState -> JDBMState] = ltail.uncons flatMap {
+              def next(lbs: JDBMState, rbs: JDBMState): Need[JDBMState -> JDBMState] = ltail.uncons flatMap {
                 case Some((lhead0, ltail0)) =>
                   ///println("Continuing on left; not emitting right.")
                   val nextState = (span: @unchecked) match {
@@ -431,7 +427,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
               }
 
             case MoreRight(span, lidx, leq, req) =>
-              def next(lbs: JDBMState, rbs: JDBMState): M[JDBMState -> JDBMState] = rtail.uncons flatMap {
+              def next(lbs: JDBMState, rbs: JDBMState): Need[JDBMState -> JDBMState] = rtail.uncons flatMap {
                 case Some((rhead0, rtail0)) =>
                   //println("Continuing on right.")
                   val nextState = (span: @unchecked) match {
@@ -1025,10 +1021,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       val (sourceTrans0, keyTrans0, valueTrans0) = if (!unique) {
         (
           addGlobalId(root),
-          groupKeys map { kt =>
-            OuterObjectConcat(WrapObject(deepMap(kt) { case Leaf(_) => TransSpec1.DerefArray0 }, "0"), WrapObject(TransSpec1.DerefArray1, "1"))
-          },
-          deepMap(valueSpec) { case Leaf(_) => TransSpec1.DerefArray0 }
+          groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1"))),
+          valueSpec deepMap { case Leaf(_) => TransSpec1.DerefArray0 } spec
         )
       } else {
         (root.spec, groupKeys, valueSpec)
