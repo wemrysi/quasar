@@ -29,13 +29,6 @@ import quasar.Data._
 import quasar.DataCodec
 import quasar.console
 
-import java.io._
-import java.nio.file.{Files, Paths}
-import java.lang.{ System}
-
-import org.specs2.ScalaCheck
-import org.specs2.mutable.Specification
-import pathy.Path.posixCodec
 import scalaz._, Scalaz._, concurrent.Task
 import org.apache.spark._
 
@@ -242,47 +235,5 @@ class ReadFileSpec extends quasar.Qspec with TempFSSugars {
     val config = new SparkConf().setMaster(master).setAppName(this.getClass().getName())
     new SparkContext(config)
   }
-
-  type Content = List[String]
-
-  private def withTempFile[C](createIt: Option[Content] = None)(run: AFile => Task[C]): C = {
-
-    def genTempFilePath: Task[AFile] = Task.delay {
-      val path = System.getProperty("java.io.tmpdir") +
-      "/" + scala.util.Random.nextInt().toString + ".tmp"
-      sandboxAbs(posixCodec.parseAbsFile(path).get)
-    }
-
-    def createFile(filePath: AFile): Task[Unit] = Task.delay {
-      createIt.foreach { content =>
-        val file = toNioPath(filePath).toFile()
-        val writer = new PrintWriter(file)
-        content.foreach {
-          line => writer.write(line + "\n")
-        }
-        writer.flush()
-        writer.close()
-      }
-    }
-
-    def deleteFile(file: AFile): Task[Unit] = Task.delay {
-      Files.delete(Paths.get(posixCodec.unsafePrintPath(file)))
-    }
-
-    val execution: Task[C] = for {
-      filePath <- genTempFilePath
-      _ <- createFile(filePath)
-      result <- run(filePath).onFinish {
-        _ => deleteFile(filePath)
-      }
-    } yield result
-
-    execution.unsafePerformSync
-  }
-
-  private def toNioPath(path: APath) =
-    Paths.get(posixCodec.unsafePrintPath(path))
-
-
 
 }

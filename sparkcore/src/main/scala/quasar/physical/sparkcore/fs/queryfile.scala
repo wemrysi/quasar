@@ -43,6 +43,10 @@ object queryfile {
 
   type SparkContextRead[A] = Read[SparkContext, A]
 
+  def chrooted[S[_]](prefix: ADir)(implicit
+    s0: Task :<: S): QueryFile ~> Free[S, ?] =
+    flatMapSNT(interpret) compose chroot.queryFile[QueryFile](prefix)
+
   def interperter[S[_]](implicit
     s0: Task :<: S,
     s1: SparkContextRead :<: S

@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.Data
 import quasar.DataCodec
 import quasar.fp.ι
+import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.fs.PathError._
@@ -45,6 +46,13 @@ object readfile {
   )
 
   import ReadFile.ReadHandle
+
+  def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
+    s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
+    s1: Read[SparkContext, ?] :<: S,
+    s2: MonotonicSeq :<: S
+  ): ReadFile ~> Free[S, ?] =
+    flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](input: Input[S])(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,

@@ -14,22 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * Copyright 2014–2016 SlamData Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
@@ -42,7 +26,7 @@ import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
-
+import java.io.FileNotFoundException
 
 import org.apache.commons.io.FileUtils
 import pathy.Path._
@@ -51,6 +35,11 @@ import Scalaz._
 import scalaz.concurrent.Task
 
 object managefile {
+
+  def chrooted[S[_]](prefix: ADir)(implicit
+    s0: Task :<: S
+  ): ManageFile ~> Free[S, ?] =
+    flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
 
   def interpret[S[_]](implicit
     s0: Task :<: S
@@ -89,8 +78,7 @@ object managefile {
       val deleted = FileUtils.deleteQuietly(toNioPath(dst).toFile())
       FileUtils.moveFile(toNioPath(src).toFile(), toNioPath(dst).toFile)
     } .leftMap {
-      case e =>
-        pathErr(invalidPath(dst, e.getMessage()))
+      case e => ioFailed(e.getMessage())
     }.void
   }
 
@@ -100,37 +88,29 @@ object managefile {
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
     }
       .leftMap {
-      case e => pathErr(invalidPath(dst, e.getMessage()))
+      case e => ioFailed(e.getMessage())
     }.void
   }
 
   private def delete[S[_]](path: APath)(implicit
     s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = {
-    val task: Task[FileSystemError \/ Unit] = Task.delay {
-      \/.fromTryCatchNonFatal(Files.delete(toNioPath(path)))
+  ): Free[S, FileSystemError \/ Unit] = injectFT[Task, S].apply(
+    Task.delay {
+      \/.fromTryCatchNonFatal(FileUtils.forceDelete(toNioPath(path).toFile()))
         .leftMap {
-        case e: NoSuchFileException => pathErr(pathNotFound(path))
-        case e: DirectoryNotEmptyException => pathErr(pathNotFound(path))
+        case e: FileNotFoundException => pathErr(pathNotFound(path))
         case e => pathErr(invalidPath(path, e.getMessage()))
       }
     }
-    injectFT[Task, S].apply(task)
-  }
-
+  )
+  
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
-  ): Free[S, FileSystemError \/ AFile] = {
-
-    injectFT[Task, S].apply{
-      Task.delay {
-        val random = scala.util.Random.nextInt().toString
-        val parent = maybeFile(near)
-          .map(fileParent(_))
-          .fold(near.asInstanceOf[ADir])(parent => parent)
+  ): Free[S, FileSystemError \/ AFile] = injectFT[Task, S].apply{
+    Task.delay {
+      val parent: ADir = refineType(near).fold(d => d, fileParent(_))
+      val random = scala.util.Random.nextInt().toString
         (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
-      }
     }
   }
-
 }

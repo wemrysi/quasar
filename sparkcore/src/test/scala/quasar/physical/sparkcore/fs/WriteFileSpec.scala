@@ -27,9 +27,7 @@ import quasar.effect._
 
 import java.io._
 
-import pathy.Path.posixCodec
 import pathy.Path._
-import org.specs2.ScalaCheck
 import scalaz._, Scalaz._, concurrent.Task
 
 class WriteFileSpec extends quasar.Qspec with TempFSSugars {
