@@ -4,7 +4,7 @@ import ygg.common._
 import scalaz._, Scalaz._
 import ygg.data._
 
-trait IndicesModule extends TransSpecModule with SliceTransforms { self: ColumnarTableModule =>
+trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
 
   // we will warn for tables with >1M rows.
   final def InMemoryLimit = 1000000L

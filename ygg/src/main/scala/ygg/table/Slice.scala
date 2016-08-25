@@ -1,7 +1,6 @@
 package ygg.table
 
 import ygg.cf
-import TransSpecModule._
 import ygg.common._
 import scalaz.{ =?> => _, _ }, Ordering._
 import ygg.macros.Spire._

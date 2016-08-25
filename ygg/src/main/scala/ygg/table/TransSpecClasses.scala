@@ -2,7 +2,6 @@ package ygg.table
 
 import ygg.common._
 import ygg.json._
-import TransSpecModule._
 
 package object trans {
   type TransSpec1 = TransSpec[Source1]

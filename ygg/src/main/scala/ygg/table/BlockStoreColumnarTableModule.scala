@@ -964,7 +964,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
   class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
     import TableModule._
-    import TransSpecModule._
 
     // TODO assert that this table only has one row
 

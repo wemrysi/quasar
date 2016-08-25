@@ -31,4 +31,15 @@ package object table {
 
   def tupledIdentitiesOrder[A](ord: Ord[Identities]): Ord[Identities -> A] = ord contramap (_._1)
   def valueOrder[A](ord: Ord[A]): Ord[Identities -> A]                     = ord contramap (_._2)
+
+  implicit def liftCF1(f: CF1): CF1Like = new CF1Like {
+    def compose(f1: CF1) = f compose f1
+    def andThen(f1: CF1) = f andThen f1
+  }
+
+  implicit def liftCF2(f: CF2) = new CF2Like {
+    def applyl(cv: CValue) = CF1("builtin::liftF2::applyl")(f(Column const cv, _))
+    def applyr(cv: CValue) = CF1("builtin::liftF2::applyl")(f(_, Column const cv))
+    def andThen(f1: CF1)   = CF2("builtin::liftF2::andThen")((c1, c2) => f(c1, c2) flatMap f1.apply)
+  }
 }

@@ -1,7 +1,6 @@
 package ygg.table
 
 import ygg.json._
-import TransSpecModule._
 
 /** Stub for a de-caked version. Not in use yet.
  */

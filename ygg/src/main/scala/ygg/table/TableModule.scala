@@ -71,8 +71,6 @@ case object InfiniteSize extends TableSize {
 }
 
 object TableModule {
-  val paths = TransSpecModule.paths
-
   sealed trait SortOrder
   sealed trait DesiredSortOrder extends SortOrder {
     def isAscending: Boolean
@@ -97,7 +95,7 @@ object TableModule {
   }
 }
 
-trait TableModule extends TransSpecModule {
+trait TableModule {
   tableModule =>
 
   import TableModule._
@@ -149,8 +147,6 @@ trait TableModule extends TransSpecModule {
 
   trait TableLike extends ygg.table.Table {
     this: Table =>
-
-    import TransSpecModule._
 
     /**
       * For each distinct path in the table, load all columns identified by the specified
