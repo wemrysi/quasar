@@ -5,7 +5,7 @@ import TransSpecModule._
 
 /** Stub for a de-caked version. Not in use yet.
  */
-trait TransformClasses[A <: SourceType] {
+trait TransformClasses[A <: trans.SourceType] {
   sealed trait TransSpec  extends AnyRef
   sealed trait ObjectSpec extends TransSpec
   sealed trait ArraySpec  extends TransSpec

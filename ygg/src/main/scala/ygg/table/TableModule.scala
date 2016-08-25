@@ -1,9 +1,8 @@
 package ygg.table
 
-import ygg.common._
 import scalaz._
 import scalaz.syntax.monad._
-import ygg.json._
+import ygg._, common._, json._, trans._
 
 final case class APIKey(value: String) extends AnyVal
 
@@ -112,7 +111,6 @@ trait TableModule extends TransSpecModule {
   val Table: TableCompanion
 
   trait TableCompanionLike extends ygg.table.TableCompanion {
-    import trans._
     def empty: Table
 
     def constString(v: scSet[String]): Table
@@ -152,7 +150,6 @@ trait TableModule extends TransSpecModule {
   trait TableLike extends ygg.table.Table {
     this: Table =>
 
-    import trans._
     import TransSpecModule._
 
     /**
@@ -245,8 +242,6 @@ trait TableModule extends TransSpecModule {
   /*final*/
   case class GroupingSource(table: Table, idTrans: trans.TransSpec1, targetTrans: Option[trans.TransSpec1], groupId: GroupId, groupKeySpec: trans.GroupKeySpec)
       extends GroupingSpec {
-
-    import trans._
 
     def sources: Vector[GroupingSource] = Vector(this)
     def sorted: Need[GroupingSource]    = table.sort(root.key) map (t => GroupingSource(t.asInstanceOf, idTrans, targetTrans, groupId, groupKeySpec))

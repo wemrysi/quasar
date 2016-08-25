@@ -4,21 +4,9 @@ import ygg.common._
 import ygg.json._
 import TransSpecModule._
 
-sealed trait SourceType       extends AnyRef
-sealed trait Source1          extends SourceType
-sealed trait Source2          extends SourceType
-final case object Source      extends Source1
-final case object SourceLeft  extends Source2
-final case object SourceRight extends Source2
-
 package object trans {
-  val Source      = ygg.table.Source  // scalaz conflict
   type TransSpec1 = TransSpec[Source1]
   type TransSpec2 = TransSpec[Source2]
-
-  type TableTransSpec[+A <: SourceType] = Map[CPathField, TransSpec[A]]
-  type TableTransSpec1                  = TableTransSpec[Source1]
-  type TableTransSpec2                  = TableTransSpec[Source2]
 
   implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {
     def inner_++(x: TransSpec[A], xs: TransSpec[A]*): InnerObjectConcat[A] = InnerObjectConcat(spec +: x +: xs: _*)
@@ -30,6 +18,13 @@ package object trans {
 }
 
 package trans {
+  sealed trait SourceType       extends AnyRef
+  sealed trait Source1          extends SourceType
+  sealed trait Source2          extends SourceType
+  final case object Source      extends Source1
+  final case object SourceLeft  extends Source2
+  final case object SourceRight extends Source2
+
   object root extends TransSpecBuilder(Leaf(Source)) {
     def value = selectDynamic("value")
     def key   = selectDynamic("key")

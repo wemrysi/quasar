@@ -1,14 +1,10 @@
 package ygg.tests
 
-import ygg.common._
-import scalaz._, Scalaz._
-import ygg.json._
-import ygg.table._
+import scalaz.{ Source => _, _ }, Scalaz._
+import ygg._, common._, json._, table._, trans._
 
 trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStoreColumnarTableModule {
   def projections: Map[Path, Projection]
-
-  import trans._
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
     def load(table: Table, apiKey: APIKey, tpe: JType): Need[Table] = {

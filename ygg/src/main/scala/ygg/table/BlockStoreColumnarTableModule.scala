@@ -1,16 +1,14 @@
 package ygg.table
 
-import ygg.common._
-import scalaz._, Scalaz._, Ordering._
-import ygg.cf
-import ygg.data._
-import ygg.json._
+import scalaz.{ Source => _, _}, Scalaz._, Ordering._
+import ygg._, common._, data._, json._, trans._
 import TableModule._
 
 import org.mapdb._
 import JDBM._
 import java.util.Comparator
 import scala.collection.mutable
+import TransSpec.deepMap
 
 object JDBM {
   type Bytes             = Array[Byte]
@@ -74,9 +72,6 @@ object JDBM {
 }
 
 trait BlockStoreColumnarTableModule extends ColumnarTableModule {
-  import trans._
-  import TransSpec.deepMap
-
   type TableCompanion <: BlockStoreColumnarTableCompanion
 
   protected class MergeEngine[KeyType, BlockData <: BlockProjectionData[KeyType]] {
@@ -1047,7 +1042,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   class ExternalTable(slices: StreamT[M, Slice], size: TableSize) extends Table(slices, size) {
     import Table._
     import SliceTransform._
-    import trans._
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
