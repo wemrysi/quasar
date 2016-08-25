@@ -40,7 +40,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
     }
   }
 
-  trait TableCompanion extends BaseBlockStoreTestTableCompanion
+  trait TableCompanion extends SliceColumnarTableCompanion
 
   object Table extends TableCompanion
 
@@ -85,8 +85,6 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
       }
     }
   }
-
-  trait BaseBlockStoreTestTableCompanion extends SliceColumnarTableCompanion
 
   def userMetadataView(apiKey: APIKey) = ???
 

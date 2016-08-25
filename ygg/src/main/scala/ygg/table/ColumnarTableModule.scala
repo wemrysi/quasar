@@ -41,6 +41,8 @@ object ColumnarTableModule {
 }
 
 trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
+  outer =>
+
   import trans._
 
   type Table <: ColumnarTable
@@ -61,7 +63,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion {
-    type Table = ColumnarTableModule.this.Table
+    type Table = outer.Table
 
     def apply(slices: StreamT[M, Slice], size: TableSize): Table
 
@@ -306,6 +308,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
 
   abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends TableLike with SamplableColumnarTable {
     self: Table =>
+
+    type Table <: outer.Table
 
     import SliceTransform._
 

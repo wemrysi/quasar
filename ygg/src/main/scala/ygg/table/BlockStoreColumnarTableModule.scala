@@ -9,6 +9,23 @@ import java.util.Comparator
 import scala.collection.mutable
 import TransSpec.deepMap
 
+object aligns {
+  sealed trait AlignState
+  case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
+  case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
+  case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
+  case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
+
+  sealed trait Span
+  case object LeftSpan  extends Span
+  case object RightSpan extends Span
+  case object NoSpan    extends Span
+
+  sealed trait NextStep
+  case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
+  case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
+}
+
 object JDBM {
   type Bytes             = Array[Byte]
   type BtoBEntry         = jMapEntry[Bytes, Bytes]
@@ -309,23 +326,10 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       }
     }
 
-    def singleton(slice: Slice) = new SingletonTable(slice :: emptyStreamT[Slice])
+    def singleton(slice: Slice) = new SingletonTable(singleStreamT(slice))
 
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): M[Table -> Table] = {
-      sealed trait AlignState
-      case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
-      case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
-      case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
-      case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
-
-      sealed trait Span
-      case object LeftSpan  extends Span
-      case object RightSpan extends Span
-      case object NoSpan    extends Span
-
-      sealed trait NextStep
-      case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
-      case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = {
+      import aligns._
 
       // we need a custom row comparator that ignores the global ID introduced to prevent elimination of
       // duplicate rows in the write to JDBM
@@ -653,10 +657,10 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       val initState = JDBMState.empty("alignSpace")
 
       writeStreams(
-        reduceSlices(sourceLeft.slices),
-        composeSliceTransform(addGlobalId(alignOnL)),
-        reduceSlices(sourceRight.slices),
-        composeSliceTransform(addGlobalId(alignOnR)),
+        reduceSlices(sourceL.slices),
+        composeSliceTransform(addGlobalId(alignL)),
+        reduceSlices(sourceR.slices),
+        composeSliceTransform(addGlobalId(alignR)),
         initState,
         initState)
     }

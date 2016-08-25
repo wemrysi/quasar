@@ -15,9 +15,9 @@ class MergeSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with In
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize)                                                           = new Table(slices, size)
-    def singleton(slice: Slice)                                                                                        = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = ???
+    def apply(slices: StreamT[Need, Slice], size: TableSize)                                               = new Table(slices, size)
+    def singleton(slice: Slice)                                                                            = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
   }
 
   object Table extends TableCompanion

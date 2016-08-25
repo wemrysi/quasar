@@ -4,6 +4,7 @@ import scala.collection.{ mutable => scm, immutable => sci }
 
 trait PackageAliases {
   // scala stdlib
+  type PairOf[+A]             = A -> A
   type ->[+A, +B]             = Tuple2[A, B]
   type =?>[-A, +B]            = scala.PartialFunction[A, B]
   type ArrayBuffer[A]         = scm.ArrayBuffer[A]

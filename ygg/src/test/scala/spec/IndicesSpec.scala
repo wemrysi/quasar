@@ -8,17 +8,14 @@ import ygg._, common._, json._, table._, trans._
 class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
-    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = ???
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
+    def load(apiKey: APIKey, jtpe: JType)                                                                                       = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                 = ???
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
   }
-
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize) = new Table(slices, size)
-
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = abort("not implemented here")
+    def apply(slices: StreamT[Need, Slice], size: TableSize)                                               = new Table(slices, size)
+    def singleton(slice: Slice)                                                                            = new Table(singleStreamT(slice), ExactSize(1))
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
   }
 
   object Table extends TableCompanion

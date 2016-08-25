@@ -5,19 +5,29 @@ import scalaz._, Scalaz._
 import trans._
 
 trait SamplableTableModule extends TableModule {
+  outer =>
+
   type Table <: SamplableTable
 
-  trait SamplableTable extends TableLike { self: Table =>
+  trait SamplableTable extends TableLike {
+    self: Table =>
+
+    type Table <: outer.Table
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   }
 }
 
-trait SamplableColumnarTableModule extends SamplableTableModule { self: ColumnarTableModule with SliceTransforms =>
+trait SamplableColumnarTableModule extends SamplableTableModule {
+  outer: ColumnarTableModule with SliceTransforms =>
+
   def rng: scala.util.Random = scala.util.Random
 
   type Table <: ColumnarTable with SamplableTable
 
-  trait SamplableColumnarTable extends SamplableTable { self: Table =>
+  trait SamplableColumnarTable extends SamplableTable {
+    self: Table =>
+
+    type Table = outer.Table
 
     /**
       * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =

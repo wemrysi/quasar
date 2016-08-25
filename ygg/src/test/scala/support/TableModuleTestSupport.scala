@@ -4,10 +4,16 @@ import scalaz._, Scalaz._
 import ygg._, common._, data._, json._, table._, trans._
 
 abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
+  self =>
+
   import SampleData._
 
   type ToSelf[A] = A => A
   type ASD       = Arbitrary[SampleData]
+  type TTable    = Table { type Table = self.Table }
+
+  /* Oh cake, my cake, the crimes you make me commit */
+  private implicit def ttable(x: Table): TTable = x.asInstanceOf[TTable]
 
   class TableCommuteTest(f: Seq[JValue] => Seq[JValue], g: Table => Table) extends CommuteTest[Seq[JValue], Table] {
     def transformR(x: Seq[JValue])  = f(x)
@@ -31,8 +37,8 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   case class TableTestFun(table: Table, fun: Table => Table, expected: Seq[JValue]) {
     def check(): MatchResult[Seq[JValue]] = (toJson(fun(table)).copoint: Seq[JValue]) must_=== expected
   }
-  case class TableTest(table: Table, spec: TransSpec1, expected: Seq[JValue]) {
-    def check(): MatchResult[Seq[JValue]] = (toJson(table transform spec).copoint: Seq[JValue]) must_=== expected
+  case class TableTest(table: TTable, spec: TransSpec1, expected: Seq[JValue]) {
+    def check(): MatchResult[Seq[JValue]] = toJsonSeq(table transform spec) must_=== expected
   }
   case class TableProp(f: SampleData => TableTest) {
     def check()(implicit z: ASD): Prop = prop((sd: SampleData) => f(sd).check())
@@ -71,7 +77,11 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
 }
 
 abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTestSupport {
-  class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  outer =>
+
+  final object Table extends TableCompanion
+
+  final class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = Need(this)
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
@@ -79,14 +89,11 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
     // Deadlock
     // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
   }
-
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize) = new Table(slices, size)
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
-    def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): Need[Table -> Table] = ???
+    def apply(slices: StreamT[Need, Slice], size: TableSize)                                               = new Table(slices, size)
+    def singleton(slice: Slice)                                                                            = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
+    def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
   }
-
-  object Table extends TableCompanion
 
   def streamToString(stream: StreamT[Need, CharBuffer]): String = {
     def loop(stream: StreamT[Need, CharBuffer], sb: StringBuilder): Need[String] =
@@ -122,6 +129,7 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
 }
 
 trait TableModuleTestSupport extends TableModule {
+  outer =>
 
   def lookupScanner(namespace: List[String], name: String): Scanner = {
     val lib = Map[String, Scanner](
