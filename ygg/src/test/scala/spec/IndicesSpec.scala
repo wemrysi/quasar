@@ -1,18 +1,14 @@
 package ygg.tests
 
-import ygg.common._
-import scalaz._, Scalaz._
-import ygg.table._
-import ygg.json._
+import scalaz.{ Source => _, _ }, Scalaz._
+import ygg._, common._, json._, table._, trans._
+import TableModule._
 
 // TODO: mix in a trait rather than defining Table directly
 
 class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
-  import TableModule._
-  import trans._
 
   class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
-    import trans._
     def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean)                                                     = ???
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???

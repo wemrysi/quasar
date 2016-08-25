@@ -2,20 +2,17 @@ package ygg.table
 
 import ygg.common._
 import scalaz._, Scalaz._
+import trans._
 
 trait SamplableTableModule extends TableModule {
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>
-    import trans._
     def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]]
   }
 }
 
 trait SamplableColumnarTableModule extends SamplableTableModule { self: ColumnarTableModule with SliceTransforms =>
-
-  import trans._
-
   def rng: scala.util.Random = scala.util.Random
 
   type Table <: ColumnarTable with SamplableTable

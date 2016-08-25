@@ -58,7 +58,7 @@ object SampleData extends CValueGenerators {
     val builder = cbf()
 
     for (t <- c)
-      if (Random.nextDouble < freq)
+      if (randomDouble < freq)
         builder += t
 
     builder.result
@@ -79,7 +79,7 @@ object SampleData extends CValueGenerators {
   }
 
   def undefineRows(sample: Arbitrary[SampleData]): Arbitrary[SampleData] = sample ^^ { sd =>
-    val rows = sd.data map (row => if (Random.nextDouble < 0.25) JUndefined else row)
+    val rows = sd.data map (row => if (randomDouble < 0.25) JUndefined else row)
     SampleData(rows, sd.schema)
   }
 

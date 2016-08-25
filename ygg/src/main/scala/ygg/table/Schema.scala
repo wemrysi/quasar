@@ -1,8 +1,6 @@
 package ygg.table
 
-import ygg.common._
-import ygg.json._
-import ygg.data._
+import ygg._, common._, json._, data._
 
 object Schema {
   def ctypes(jtype: JType): Set[CType] = jtype match {
@@ -42,8 +40,8 @@ object Schema {
   }
 
   def sample(jtype: JType, size: Int): Option[JType] = {
-    val paths                        = flatten(jtype, Nil) groupBy { _.selector } toSeq
-    val sampledPaths: Seq[ColumnRef] = scala.util.Random.shuffle(paths).take(size) flatMap { _._2 }
+    val paths                        = flatten(jtype, Nil) groupBy { _.selector } toVector
+    val sampledPaths: Seq[ColumnRef] = paths.shuffle take size flatMap (_._2)
 
     mkType(sampledPaths)
   }

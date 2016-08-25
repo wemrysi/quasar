@@ -69,7 +69,7 @@ class CompactSpec extends ColumnarTableQspec {
         val sz = slice.size
         val bs =
           (
-            if (numSlices > 1 && Random.nextDouble < 0.25)
+            if (numSlices > 1 && randomDouble < 0.25)
               Bits()
             else
               Bits(0 until sz filter (_ => randomDouble < 0.75))
@@ -89,11 +89,11 @@ class CompactSpec extends ColumnarTableQspec {
         val maskedSlice = colRef.map { colRef =>
           val col = slice.columns(colRef)
           val maskedCol =
-            if (numSlices > 1 && Random.nextDouble < 0.25)
+            if (numSlices > 1 && randomDouble < 0.25)
               (col |> cf.filter(0, slice.size, new BitSet)).get
             else {
               val retained = (0 until slice.size).map { (x: Int) =>
-                if (scala.util.Random.nextDouble < 0.75) Some(x) else None
+                if (randomDouble < 0.75) Some(x) else None
               }.flatten
               (col |> cf.filter(0, slice.size, Bits(retained))).get
             }
