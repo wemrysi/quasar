@@ -19,7 +19,7 @@ package quasar.physical.marklogic.xquery
 import quasar.Predef._
 
 final case class XQuery(override val toString: String) extends scala.AnyVal {
-  def apply(predicate: XQuery): XQuery = XQuery(s"${this}[$predicate]")
+  def apply(predicate: XQuery): XQuery = XQuery(s"$this[$predicate]")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
   def +(other: XQuery): XQuery = XQuery(s"$this + $other")
   def and(other: XQuery): XQuery = XQuery(s"$this and $other")
