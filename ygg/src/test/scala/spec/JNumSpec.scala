@@ -40,6 +40,7 @@ class JNumSpec extends quasar.Qspec {
   val b10: JNum = JNum(BigDecimal("0.0000000999999999999999999"))
   val b11: JNum = JNum(BigDecimal("0.00000001"))
   val b12: JNum = JNum(BigDecimal("0.0000000100000000000000001"))
+
   val nums: List[JNum] = (
       s1 :: s2 :: s3 :: s4 ::
         n1 :: n2 :: n3 :: n4 :: n5 :: n6 ::

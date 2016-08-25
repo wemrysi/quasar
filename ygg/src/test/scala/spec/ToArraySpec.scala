@@ -1,6 +1,5 @@
 package ygg.tests
 
-import scalaz.syntax.comonad._
 import ygg.json._
 
 class ToArraySpec extends ColumnarTableQspec {
@@ -9,37 +8,22 @@ class ToArraySpec extends ColumnarTableQspec {
     "create a single column given heterogeneous data" in testToArrayHeterogeneous
   }
 
-  def testToArrayHomogeneous = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JNum(23.4)) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(12.4)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JNum(-12.4)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil))
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
-    val results = toJson(table.toArray[Double])
-
-    val expected = Stream(JArray(JNum(23.4) :: Nil), JArray(JNum(12.4) :: Nil), JArray(JNum(-12.4) :: Nil))
-
-    results.copoint must_== expected
-  }
-
-  def testToArrayHeterogeneous = {
-    val data: Stream[JValue] =
-      Stream(
-        JObject(JField("value", JObject(JField("foo", JNum(23.4)) :: JField("bar", JString("a")) :: Nil)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("foo", JNum(23.4)) :: JField("bar", JNum(18.8)) :: Nil)) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil),
-        JObject(JField("value", JObject(JField("bar", JNum(44.4)) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil))
-
-    val sample = SampleData(data)
-    val table  = fromSample(sample)
-
-    val results = toJson(table.toArray[Double])
-
-    val expected = Stream(JArray(JNum(18.8) :: JNum(23.4) :: Nil))
-
-    results.copoint must_== expected
-  }
+  private def testToArrayHomogeneous = checkTableFun(
+    fun = _.toArray[Double],
+    data = jsonMany"""
+      { "value": 23.4, "key": [ 1 ] }
+      { "value": 12.4, "key": [ 2 ] }
+      { "value": -12.4, "key": [ 3 ] }
+    """,
+    expected = jsonMany"[ 23.4 ] [ 12.4 ] [ -12.4 ]"
+  )
+  private def testToArrayHeterogeneous = checkTableFun(
+    fun = _.toArray[Double],
+    data = jsonMany"""
+      {"key":[1],"value":{"bar":18.8,"foo":23.4}}
+      {"key":[2],"value":{"bar":"a","foo":23.4}}
+      {"key":[3],"value":{"bar":44.4}}
+    """,
+    expected = jsonMany"[ 18.8, 23.4 ]"
+  )
 }
