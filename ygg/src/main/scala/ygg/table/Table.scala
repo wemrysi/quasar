@@ -25,18 +25,6 @@ trait TableCompanion {
   def join(left: Table, right: Table, orderHint: Option[JoinOrder])(lspec: TransSpec1, rspec: TransSpec1, joinSpec: TransSpec2): Need[JoinOrder -> Table]
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
-
-trait NoLoadTable extends Table {
-  def load(apiKey: APIKey, jtpe: JType): NeedTable = ???
-}
-trait NoGroupTable extends Table {
-  def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
-}
-trait NoSortTable extends Table {
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
-  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
-}
-
 trait Table {
   type Table >: this.type <: ygg.table.Table
   type NeedTable = Need[Table]
@@ -130,8 +118,17 @@ trait Table {
   def compact(spec: TransSpec1): Table     = compact(spec, AnyDefined)
   def sort(sortKey: TransSpec1): NeedTable = sort(sortKey, SortAscending)
 
-  def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer]
-
   // for debugging only!!
   def toJson: Need[Stream[JValue]]
+}
+
+trait NoLoadTable extends Table {
+  def load(apiKey: APIKey, jtpe: JType): NeedTable = ???
+}
+trait NoGroupTable extends Table {
+  def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
+}
+trait NoSortTable extends Table {
+  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)
+  def sortUnique(sortKey: TransSpec1, order: DesiredSortOrder): NeedTable = Need[Table](this)
 }

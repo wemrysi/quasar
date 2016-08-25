@@ -882,7 +882,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with NoSortTable with NoLoadTable {
+  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with NoSortTable {
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
@@ -897,6 +897,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
       loop(slices)
     }
+
+    def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
     override def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = {
       val xform = transform(valueSpec)

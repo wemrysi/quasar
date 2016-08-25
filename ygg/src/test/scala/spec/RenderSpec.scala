@@ -2,6 +2,7 @@ package ygg.tests
 
 import scalaz._, Scalaz._
 import ygg.json._
+import ygg.table.Render
 
 class RenderSpec extends ColumnarTableQspec {
   import SampleData._
@@ -41,7 +42,7 @@ class RenderSpec extends ColumnarTableQspec {
 
     val table     = fromJson(xs.toVector)
     val expected  = JArray(xs.toVector)
-    val arrayM    = table.renderJson("[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
+    val arrayM    = Render.renderTable(table, "[", ",", "]").foldLeft("")(_ + _.toString).map(JParser.parseUnsafe)
     val minimized = minimize(expected) getOrElse jarray()
 
     arrayM.copoint mustEqual minimized

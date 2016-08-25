@@ -11,35 +11,6 @@ final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
 }
 
-object ColumnarTableModule {
-  def renderJson(slices: StreamT[M, Slice], prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
-    def wrap(stream: StreamT[M, CharBuffer]) = {
-      if (prefix == "" && suffix == "") stream
-      else if (suffix == "") charBuffer(prefix) :: stream
-      else if (prefix == "") stream ++ singleStreamT(charBuffer(suffix))
-      else charBuffer(prefix) :: (stream ++ singleStreamT(charBuffer(suffix)))
-    }
-
-    def foldFlatMap(slices: StreamT[M, Slice], rendered: Boolean): StreamT[M, CharBuffer] = {
-      StreamT[M, CharBuffer](slices.step map {
-        case StreamT.Yield(slice, tail) =>
-          val (stream, rendered2) = slice.renderJson(delimiter)
-          val stream2             = if (rendered && rendered2) charBuffer(delimiter) :: stream else stream
-
-          StreamT.Skip(stream2 ++ foldFlatMap(tail(), rendered || rendered2))
-
-        case StreamT.Skip(tail) =>
-          StreamT.Skip(foldFlatMap(tail(), rendered))
-
-        case StreamT.Done =>
-          StreamT.Done
-      })
-    }
-
-    wrap(foldFlatMap(slices, false))
-  }
-}
-
 trait ColumnarTableModule extends TableModule with SliceTransforms with SamplableColumnarTableModule with IndicesModule {
   outer =>
 
@@ -1402,8 +1373,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       collectSchemas(Set.empty, slices)
     }
 
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer] =
-      ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
+    // def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[Need, CharBuffer] =
+    //   ColumnarTableModule.renderJson(slices, prefix, delimiter, suffix)
 
     def toStrings: Need[Stream[String]] = toEvents(_ toString _)
     def toJson: Need[Stream[JValue]]    = toEvents(_ toJson _)
