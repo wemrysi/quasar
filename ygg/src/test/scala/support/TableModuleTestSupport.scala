@@ -9,15 +9,15 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   import SampleData._
   import trans._
 
+  type ToSelf[A] = A => A
+  type ASD       = Arbitrary[SampleData]
+
   class TableCommuteTest(f: Seq[JValue] => Seq[JValue], g: Table => Table) extends CommuteTest[Seq[JValue], Table] {
     def transformR(x: Seq[JValue])  = f(x)
     def transformS(x: Table)        = g(x)
     def rToS(x: Seq[JValue]): Table = fromJson(x)
     def sToR(x: Table): Seq[JValue] = toJson(x).copoint
   }
-
-  type ToSelf[A] = A => A
-  type ASD       = Arbitrary[SampleData]
 
   implicit class SampleDataOps(private val sd: SampleData) {
     def fieldHead = sd.schema.get._2.head._1.head.get
