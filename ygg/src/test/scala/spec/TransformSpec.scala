@@ -8,22 +8,116 @@ import ygg.json._
 
 import scala.util.Random
 
-trait TransformSpec extends TableQspec {
+class TransformSpec extends ColumnarTableQspec {
   import CValueGenerators._
   import SampleData._
   import trans._
 
-  def checkTransformLeaf = checkSpecDefault(Fn.source)(identity)
-  def checkMap1          = checkSpecDefault(Fn.valueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
-  def checkMetaDeref     = checkSpecDefault(DerefMetadataStatic(Fn.source, CPathMeta("foo")))(_ => Nil)
-  def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
+  "in transform" >> {
+    "perform the identity transform"                                          in checkTransformLeaf
 
-  def testMap1IntLeaf: Prop = checkSpecData(
+    "perform a trivial map1"                                                  in testMap1IntLeaf
+    "perform deepmap1 using numeric coercion"                                 in testDeepMap1CoerceToDouble
+    "perform map1 using numeric coercion"                                     in testMap1CoerceToDouble
+    "fail to map1 into array and object"                                      in testMap1ArrayObject
+    "perform a less trivial map1"                                             in checkMap1.pendingUntilFixed
+
+    "give the identity transform for the trivial 'true' filter"               in checkTrueFilter
+    "give the identity transform for a nontrivial filter"                     in checkFilter.pendingUntilFixed
+    "give a transformation for a big decimal and a long"                      in testMod2Filter
+
+    "perform an object dereference"                                           in checkObjectDeref
+    "perform an array dereference"                                            in checkArrayDeref
+    "perform metadata dereference on data without metadata"                   in checkMetaDeref
+
+    "perform a trivial map2 add"                                              in checkMap2Add.pendingUntilFixed
+    "perform a trivial map2 eq"                                               in checkMap2Eq
+    "perform a map2 add over but not into arrays and objects"                 in testMap2ArrayObject
+
+    "perform a trivial equality check"                                        in checkEqualSelf
+    "perform a trivial equality check on an array"                            in checkEqualSelfArray
+    "perform a slightly less trivial equality check"                          in checkEqual
+    "test a failing equality example"                                         in testEqual1
+    "perform a simple equality check"                                         in testSimpleEqual
+    "perform another simple equality check"                                   in testAnotherSimpleEqual
+    "perform yet another simple equality check"                               in testYetAnotherSimpleEqual
+    "perform a simple not-equal check"                                        in testASimpleNonEqual
+
+    "perform a equal-literal check"                                           in checkEqualLiteral
+    "perform a not-equal-literal check"                                       in checkNotEqualLiteral
+
+    "wrap the results of a transform inside an object as the specified field" in checkWrapObject
+    "give the identity transform for self-object concatenation"               in checkObjectConcatSelf
+    "use a right-biased overwrite strategy when object concat conflicts"      in checkObjectConcatOverwrite
+    "test inner object concat with a single boolean"                          in testObjectConcatSingletonNonObject
+    "test inner object concat with a boolean and an empty object"             in testObjectConcatTrivial
+    "concatenate dissimilar objects"                                          in checkObjectConcat
+    "test inner object concat join semantics"                                 in testInnerObjectConcatJoinSemantics
+    "test inner object concat with empty objects"                             in testInnerObjectConcatEmptyObject
+    "test outer object concat with empty objects"                             in testOuterObjectConcatEmptyObject
+    "test inner object concat with undefined"                                 in testInnerObjectConcatUndefined
+    "test outer object concat with undefined"                                 in testOuterObjectConcatUndefined
+    "test inner object concat with empty"                                     in testInnerObjectConcatLeftEmpty
+    "test outer object concat with empty"                                     in testOuterObjectConcatLeftEmpty
+
+    "concatenate dissimilar arrays"                                           in checkArrayConcat
+    "inner concatenate arrays with undefineds"                                in testInnerArrayConcatUndefined
+    "outer concatenate arrays with undefineds"                                in testOuterArrayConcatUndefined
+    "inner concatenate arrays with empty arrays"                              in testInnerArrayConcatEmptyArray
+    "outer concatenate arrays with empty arrays"                              in testOuterArrayConcatEmptyArray
+    "inner array concatenate when one side is not an array"                   in testInnerArrayConcatLeftEmpty
+    "outer array concatenate when one side is not an array"                   in testOuterArrayConcatLeftEmpty
+
+    "delete elements according to a JType"                     in checkObjectDelete
+    "delete only field of object without removing from array"  in checkObjectDeleteWithoutRemovingArray
+    "perform a basic IsType transformation"                    in testIsTypeTrivial
+    "perform an IsType transformation on numerics"             in testIsTypeNumeric
+    "perform an IsType transformation on trivial union"        in testIsTypeUnionTrivial
+    "perform an IsType transformation on union"                in testIsTypeUnion
+    "perform an IsType transformation on nested unfixed types" in testIsTypeUnfixed
+    "perform an IsType transformation on objects"              in testIsTypeObject
+    "perform an IsType transformation on unfixed objects"      in testIsTypeObjectUnfixed
+    "perform an IsType transformation on unfixed arrays"       in testIsTypeArrayUnfixed
+    "perform an IsType transformation on empty objects"        in testIsTypeObjectEmpty
+    "perform an IsType transformation on empty arrays"         in testIsTypeArrayEmpty
+    "perform a check on IsType"                                in checkIsType
+
+    "perform a trivial type-based filter"                      in checkTypedTrivial
+    "perform a less trivial type-based filter"                 in checkTyped
+    "perform a type-based filter across slice boundaries"      in testTypedAtSliceBoundary
+    "perform a trivial heterogeneous type-based filter"        in testTypedHeterogeneous
+    "perform a trivial object type-based filter"               in testTypedObject
+    "retain all object members when typed to unfixed object"   in testTypedObjectUnfixed
+    "perform another trivial object type-based filter"         in testTypedObject2
+    "perform a trivial array type-based filter"                in testTypedArray
+    "perform another trivial array type-based filter"          in testTypedArray2
+    "perform yet another trivial array type-based filter"      in testTypedArray3
+    "perform a fourth trivial array type-based filter"         in testTypedArray4
+    "perform a trivial number type-based filter"               in testTypedNumber
+    "perform another trivial number type-based filter"         in testTypedNumber2
+    "perform a filter returning the empty set"                 in testTypedEmpty
+
+    "perform a summation scan case 1"                          in testTrivialScan
+    "perform a summation scan of heterogeneous data"           in testHetScan
+    "perform a summation scan"                                 in checkScan
+    "perform dynamic object deref"                             in testDerefObjectDynamic
+    "perform an array swap"                                    in checkArraySwap
+    "replace defined rows with a constant"                     in checkConst
+
+    "check cond" in checkCond.pendingUntilFixed
+  }
+
+  private def checkTransformLeaf = checkSpecDefault(Fn.source)(identity)
+  private def checkMap1          = checkSpecDefault(Fn.valueIsEven("value"))(_ map (_ \ "value") collect { case JNum(x) => JBool(x % 2 == 0) })
+  private def checkMetaDeref     = checkSpecDefault(DerefMetadataStatic(Fn.source, CPathMeta("foo")))(_ => Nil)
+  private def checkTrueFilter    = checkSpecDefault(Fn.constantTrue)(identity)
+
+  private def testMap1IntLeaf: Prop = checkSpecData(
     spec     = Map1(Fn.source, F1Expr.negate),
     data     = -10 to 10 map (n => json"$n"),
     expected = -10 to 10 map (n => json"${-n}")
   )
-  def testMap1ArrayObject: Prop = checkSpecData(
+  private def testMap1ArrayObject: Prop = checkSpecData(
     spec = Map1(root.value, F1Expr.negate),
     data = jsonMany"""
       {"key":[1],"value":{"foo":12}}
@@ -33,7 +127,7 @@ trait TransformSpec extends TableQspec {
     expected = Seq(json"-20")
   )
 
-  def testDeepMap1CoerceToDouble: Prop = checkSpecData(
+  private def testDeepMap1CoerceToDouble: Prop = checkSpecData(
     spec = DeepMap1(root.value, F1Expr.coerceToDouble),
     data = jsonMany"""
       {"key":[1],"value":12}
@@ -46,7 +140,7 @@ trait TransformSpec extends TableQspec {
     expected = json"""[ 12, 34.5, 31.9, { "baz": 31 }, 20 ]""".asArray.elements
   )
 
-  def testMap1CoerceToDouble: Prop = checkSpecData(
+  private def testMap1CoerceToDouble: Prop = checkSpecData(
     spec = Map1(root.value, F1Expr.coerceToDouble),
     data = jsonMany"""
       {"key":[1],"value":12}
@@ -59,12 +153,12 @@ trait TransformSpec extends TableQspec {
     expected = json"""[ 12, 34.5, 31.9, 20 ]""".asArray.elements
   )
 
-  def checkFilter = {
+  private def checkFilter = {
     val spec = Filter(Fn.source, Fn.valueIsEven("value"))
     checkSpecDefault(spec)(_ map (_ \ "value") filter { case JNum(x) => x % 2 == 0 ; case _ => false })
   }
 
-  def testMod2Filter = checkSpecDataId(
+  private def testMod2Filter = checkSpecDataId(
     spec = Filter(Fn.source, Fn.valueIsEven("value")),
     data = jsonMany"""
       { "value":-6.846973248137671E+307, "key":[7.0] }
@@ -72,7 +166,7 @@ trait TransformSpec extends TableQspec {
     """
   )
 
-  def checkObjectDeref: Prop = {
+  private def checkObjectDeref: Prop = {
     implicit val gen = sample(objectSchema(_, 3))
     TableProp(sd =>
       TableTest(
@@ -83,7 +177,7 @@ trait TransformSpec extends TableQspec {
     ).check()
   }
 
-  def checkArrayDeref: Prop = {
+  private def checkArrayDeref: Prop = {
     implicit val gen = sample(arraySchema(_, 3))
     TableProp(sd =>
       TableTest(
@@ -94,7 +188,7 @@ trait TransformSpec extends TableQspec {
     ).check()
   }
 
-  def checkMap2Eq: Prop = {
+  private def checkMap2Eq: Prop = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CDouble, JPath("value2") -> CLong))
     TableProp(sd =>
       TableTest(
@@ -110,7 +204,7 @@ trait TransformSpec extends TableQspec {
     ).check()
   }
 
-  def checkMap2Add = {
+  private def checkMap2Add = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -133,7 +227,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testMap2ArrayObject = checkSpecData(
+  private def testMap2ArrayObject = checkSpecData(
     spec = Map2(root.value1, root.value2, lookupF2(Nil, "add")),
     data = jsonMany"""
       {"value1":{"foo":12},"value2":[1]}
@@ -145,7 +239,7 @@ trait TransformSpec extends TableQspec {
     expected = Seq(JNum(80))
   )
 
-  def checkEqualSelf = {
+  private def checkEqualSelf = {
     implicit val gen = defaultASD
     prop { (sample: SampleData) =>
       val table    = fromSample(sample)
@@ -156,7 +250,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def checkEqualSelfArray = {
+  private def checkEqualSelfArray = {
     val data: Seq[JValue]  = json"""[[9,10,11]]""".asArray.elements map (k => json"""{ "key": [0], "value": $k }""")
     val data2: Seq[JValue] = List(json"""{"key":[],"value":[9,10,11]}""")
 
@@ -180,7 +274,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_=== expected.toStream
   }
 
-  def testSimpleEqual = {
+  private def testSimpleEqual = {
     val array: JValue = json"""
       [{
         "value":{
@@ -212,7 +306,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testAnotherSimpleEqual = {
+  private def testAnotherSimpleEqual = {
     val array: JValue = json"""
       [{
         "value":{
@@ -241,7 +335,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testYetAnotherSimpleEqual = {
+  private def testYetAnotherSimpleEqual = {
     val array: JValue = json"""
       [{
         "value":{
@@ -279,7 +373,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testASimpleNonEqual = {
+  private def testASimpleNonEqual = {
     val array: JValue = json"""
       [{
         "value":{
@@ -311,7 +405,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testEqual(sample: SampleData) = {
+  private def testEqual(sample: SampleData) = {
     val table = fromSample(sample)
     val results = toJson(table.transform {
       Equal(
@@ -330,7 +424,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def checkEqual = {
+  private def checkEqual = {
     def hasVal1Val2(jv: JValue): Boolean = (jv \? ".value.value1").nonEmpty && (jv \? ".value.value2").nonEmpty
 
     val genBase: Gen[SampleData] = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong)).arbitrary
@@ -368,7 +462,7 @@ trait TransformSpec extends TableQspec {
     prop(testEqual _)
   }
 
-  def testEqual1 = {
+  private def testEqual1 = {
     val JArray(elements) = json"""[
       {
         "value":{
@@ -393,7 +487,7 @@ trait TransformSpec extends TableQspec {
     testEqual(SampleData(elements.toStream))
   }
 
-  def checkEqualLiteral = {
+  private def checkEqualLiteral = {
     implicit val gen: Arbitrary[SampleData] = sample(_ => Seq(JPath("value1") -> CLong)) ^^ (sd =>
       SampleData(
         sd.data.zipWithIndex map {
@@ -425,7 +519,7 @@ trait TransformSpec extends TableQspec {
       results.copoint must_=== expected
     }
   }
-  def checkNotEqualLiteral = {
+  private def checkNotEqualLiteral = {
     val genBase: Gen[SampleData] = sample(_ => Seq(JPath("value1") -> CLong)).arbitrary
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
@@ -468,15 +562,15 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def checkWrapObject = checkSpec(WrapObject(Leaf(Source), "foo"))(_ map (jv =>  jobject("foo" -> jv)))(defaultASD)
+  private def checkWrapObject = checkSpec(WrapObject(Leaf(Source), "foo"))(_ map (jv =>  jobject("foo" -> jv)))(defaultASD)
 
-  def checkObjectConcatSelf = {
+  private def checkObjectConcatSelf = {
     implicit val gen = defaultASD
     checkSpec(InnerObjectConcat(root, root))(identity)
     checkSpec(OuterObjectConcat(root, root))(identity)
   }
 
-  def testObjectConcatSingletonNonObject = {
+  private def testObjectConcatSingletonNonObject = {
     val table        = fromJson(Seq(JTrue))
     val resultsInner = toJsonSeq(table transform InnerObjectConcat(root))
     val resultsOuter = toJsonSeq(table transform OuterObjectConcat(root))
@@ -485,7 +579,7 @@ trait TransformSpec extends TableQspec {
     resultsOuter must beEmpty
   }
 
-  def testObjectConcatTrivial = {
+  private def testObjectConcatTrivial = {
     val table        = fromJson(Seq(JTrue, jobject()))
     val resultsInner = toJsonSeq(table transform InnerObjectConcat(root))
     val resultsOuter = toJsonSeq(table transform OuterObjectConcat(root))
@@ -518,7 +612,7 @@ trait TransformSpec extends TableQspec {
   }
 
 
-  def testInnerObjectConcatEmptyObject = {
+  private def testInnerObjectConcatEmptyObject = {
     val result = testConcatEmptyObject(InnerObjectConcat(root.foo, root.bar))
     val expected = jsonMany"""
       {"ack":12}
@@ -536,7 +630,7 @@ trait TransformSpec extends TableQspec {
     result must_=== expected
   }
 
-  def testOuterObjectConcatEmptyObject = {
+  private def testOuterObjectConcatEmptyObject = {
     val result = testConcatEmptyObject(OuterObjectConcat(root.foo, root.bar))
     val expected: Stream[JValue] = jsonMany"""
       {"ack":12}
@@ -558,7 +652,7 @@ trait TransformSpec extends TableQspec {
     result must_=== expected
   }
 
-  def testInnerObjectConcatUndefined = {
+  private def testInnerObjectConcatUndefined = {
     val data = jsonMany"""
       {"foo": {"baz": 4}, "bar": {"ack": 12}}
       {"foo": {"baz": 5}}
@@ -577,7 +671,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_=== expected
   }
 
-  def testOuterObjectConcatUndefined = {
+  private def testOuterObjectConcatUndefined = {
     val data = jsonMany"""
       {"foo": {"baz": 4}, "bar": {"ack": 12}}
       {"foo": {"baz": 5}}
@@ -599,7 +693,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_=== expected
   }
 
-  def testInnerObjectConcatLeftEmpty = {
+  private def testInnerObjectConcatLeftEmpty = {
     val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
@@ -619,7 +713,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testOuterObjectConcatLeftEmpty = {
+  private def testOuterObjectConcatLeftEmpty = {
     val data = jsonMany"""
       {"foo": 4, "bar": 12}
       {"foo": 5}
@@ -638,7 +732,7 @@ trait TransformSpec extends TableQspec {
     toJsonSeq(table transform spec) must_=== expected
   }
 
-  def checkObjectConcat = {
+  private def checkObjectConcat = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -674,7 +768,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def checkObjectConcatOverwrite = {
+  private def checkObjectConcatOverwrite = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -703,7 +797,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testInnerObjectConcatJoinSemantics = {
+  private def testInnerObjectConcatJoinSemantics = {
     val data   = Stream(JObject(Map("a" -> JNum(42))))
     val sample = SampleData(data)
     val table  = fromSample(sample)
@@ -719,7 +813,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual Stream()
   }
 
-  def checkArrayConcat = {
+  private def checkArrayConcat = {
     implicit val gen = sample(_ => Seq(JPath("[0]") -> CLong, JPath("[1]") -> CLong))
     prop { (sample0: SampleData) =>
       /***
@@ -759,7 +853,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testInnerArrayConcatUndefined = {
+  private def testInnerArrayConcatUndefined = {
     val elements = jsonMany"""
       {"foo": 4, "bar": 12}
       {"foo": 5}
@@ -776,7 +870,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_=== expected
   }
 
-  def testOuterArrayConcatUndefined = {
+  private def testOuterArrayConcatUndefined = {
     val data = jsonMany"""
       {"foo": 4, "bar": 12}
       {"foo": 5}
@@ -795,7 +889,7 @@ trait TransformSpec extends TableQspec {
     toJsonSeq(table transform spec) mustEqual expected
   }
 
-  def testInnerArrayConcatEmptyArray = {
+  private def testInnerArrayConcatEmptyArray = {
     val JArray(elements) = json"""[
       {"foo": [], "bar": [12]},
       {"foo": [], "bar": [12, 13]},
@@ -838,7 +932,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testOuterArrayConcatEmptyArray = {
+  private def testOuterArrayConcatEmptyArray = {
     val JArray(elements) = json"""[
       {"foo": [], "bar": [12]},
       {"foo": [], "bar": [12, 13]},
@@ -885,7 +979,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testInnerArrayConcatLeftEmpty = {
+  private def testInnerArrayConcatLeftEmpty = {
     val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
@@ -905,7 +999,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def testOuterArrayConcatLeftEmpty = {
+  private def testOuterArrayConcatLeftEmpty = {
     val JArray(elements) = json"""[
       {"foo": 4, "bar": 12},
       {"foo": 5},
@@ -925,7 +1019,7 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def checkObjectDeleteWithoutRemovingArray = checkSpecData(
+  private def checkObjectDeleteWithoutRemovingArray = checkSpecData(
     spec = ObjectDelete(Leaf(Source), Set(CPathField("foo"))),
     data = jsonMany"""
       {"foo": 4, "bar": 12}
@@ -943,7 +1037,7 @@ trait TransformSpec extends TableQspec {
     """
   )
 
-  def checkObjectDelete = {
+  private def checkObjectDelete = {
     implicit val gen = sample(objectSchema(_, 3))
 
     def randomDeletionMask(schema: CValueGenerators.JSchema): Option[JPathField] = {
@@ -965,7 +1059,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testIsTypeNumeric = checkSpecData(
+  private def testIsTypeNumeric = checkSpecData(
     spec     = root isType JNumberT,
     expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue),
     data     = jsonMany"""
@@ -983,7 +1077,7 @@ trait TransformSpec extends TableQspec {
     """
   )
 
-  def testIsTypeUnionTrivial = checkSpecData(
+  private def testIsTypeUnionTrivial = checkSpecData(
     spec     = root isType JUnionT(JNumberT, JNullT),
     expected = Seq(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue),
     data     = jsonMany"""
@@ -1001,7 +1095,7 @@ trait TransformSpec extends TableQspec {
     """
   )
 
-  def testIsTypeUnion = {
+  private def testIsTypeUnion = {
     val jtpe = JType.Object(
       "value" -> JType.Object(
         "foo" -> JUnionT(JNumberT, JTextT),
@@ -1028,7 +1122,7 @@ trait TransformSpec extends TableQspec {
     )
   }
 
-  def testIsTypeUnfixed = {
+  private def testIsTypeUnfixed = {
     val jtpe = JType.Object(
       "value" -> JType.Object("foo" -> JNumberT, "bar" -> JObjectUnfixedT),
       "key"   -> JArrayUnfixedT
@@ -1052,7 +1146,7 @@ trait TransformSpec extends TableQspec {
     )
   }
 
-  def testIsTypeObject = {
+  private def testIsTypeObject = {
     val jtpe = JType.Object("value" -> JNumberT, "key" -> JArrayUnfixedT)
     checkSpecData(
       spec     = root isType jtpe,
@@ -1072,7 +1166,7 @@ trait TransformSpec extends TableQspec {
     )
   }
 
-  def testIsTypeObjectEmpty = {
+  private def testIsTypeObjectEmpty = {
     val JArray(elements) = json"""[
       [],
       1,
@@ -1096,7 +1190,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testIsTypeArrayEmpty = {
+  private def testIsTypeArrayEmpty = {
     val JArray(elements) = json"""[
       [],
       1,
@@ -1120,7 +1214,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testIsTypeObjectUnfixed = {
+  private def testIsTypeObjectUnfixed = {
     val JArray(elements) = json"""[
       [],
       1,
@@ -1144,7 +1238,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testIsTypeArrayUnfixed = {
+  private def testIsTypeArrayUnfixed = {
     val JArray(elements) = json"""[
       [],
       1,
@@ -1168,7 +1262,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testIsTypeTrivial = {
+  private def testIsTypeTrivial = {
     val JArray(elements) = json"""[
       {"key":[2,1,1],"value":[]},
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
@@ -1179,7 +1273,7 @@ trait TransformSpec extends TableQspec {
     testIsType(sample)
   }
 
-  def testIsType(sample: SampleData) = {
+  private def testIsType(sample: SampleData) = {
     val (_, schema) = sample.schema.getOrElse(0 -> List())
     val cschema     = schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
@@ -1201,12 +1295,12 @@ trait TransformSpec extends TableQspec {
     results.copoint mustEqual expected
   }
 
-  def checkIsType = {
+  private def checkIsType = {
     implicit val gen = defaultASD
     prop(testIsType _).set(minTestsOk = 10000)
   }
 
-  def checkTypedTrivial = {
+  private def checkTypedTrivial = {
     implicit val gen = sample(_ => Seq(JPath("value1") -> CLong, JPath("value2") -> CBoolean, JPath("value3") -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -1241,7 +1335,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testTyped(sample: SampleData) = {
+  private def testTyped(sample: SampleData) = {
     val (_, schema) = sample.schema.getOrElse(0 -> List())
     val cschema     = schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
@@ -1261,12 +1355,12 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def checkTyped = {
+  private def checkTyped = {
     implicit val gen = defaultASD
     prop(testTyped _)
   }
 
-  def testTypedAtSliceBoundary = {
+  private def testTypedAtSliceBoundary = {
     val JArray(data) = json"""[
       { "value":{ "n":{ } }, "key":[1,1,1] },
       { "value":{ "lvf":2123699568254154891, "vbeu":false, "dAc":4611686018427387903 }, "key":[1,1,3] },
@@ -1286,7 +1380,7 @@ trait TransformSpec extends TableQspec {
     testTyped(sample)
   }
 
-  def testTypedHeterogeneous = {
+  private def testTypedHeterogeneous = {
     val JArray(elements) = json"""[
       {"key":[1], "value":"value1"},
       {"key":[2], "value":23}
@@ -1305,7 +1399,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testTypedObject = {
+  private def testTypedObject = {
     val JArray(elements) = json"""[
       {"key":[1, 3], "value": {"foo": 23}},
       {"key":[2, 4], "value": {}}
@@ -1326,7 +1420,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testTypedObject2 = {
+  private def testTypedObject2 = {
     val data: Stream[JValue] =
       Stream(JObject(List(JField("value", JObject(List(JField("foo", JBool(true)), JField("bar", JNum(77))))), JField("key", JArray(List(JNum(1)))))))
     val sample = SampleData(data)
@@ -1340,7 +1434,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testTypedObjectUnfixed = {
+  private def testTypedObjectUnfixed = {
     val data: Stream[JValue] =
       Stream(JObject(List(JField("value", JArray(List(JNum(2), JBool(true)))))), JObject(List(JField("value", JObject(List())))))
     val sample = SampleData(data)
@@ -1354,7 +1448,7 @@ trait TransformSpec extends TableQspec {
     resultStream must_== data
   }
 
-  def testTypedArray = {
+  private def testTypedArray = {
     val JArray(data) = json"""[
       {"key": [1, 2], "value": [2, true] },
       {"key": [3, 4], "value": {} }
@@ -1374,7 +1468,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testTypedArray2 = {
+  private def testTypedArray2 = {
     val JArray(data) = json"""[
       {"key": [1], "value": [2, true] }
     ]"""
@@ -1396,7 +1490,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testTypedArray3 = {
+  private def testTypedArray3 = {
     val data: Stream[JValue] =
       Stream(
         JObject(List(JField("value", JArray(List(JArray(List()), JNum(23), JNull))), JField("key", JArray(List(JNum(1)))))),
@@ -1416,7 +1510,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expectedResult(data, included)
   }
 
-  def testTypedArray4 = {
+  private def testTypedArray4 = {
     val data: Stream[JValue] =
       Stream(
         JObject(List(JField("value", JArray(List(JNum(2.4), JNum(12), JBool(true), JArray(List())))), JField("key", JArray(List(JNum(1)))))),
@@ -1437,7 +1531,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expectedResult(data, included)
   }
 
-  def testTypedNumber = {
+  private def testTypedNumber = {
     val JArray(data) = json"""[
       {"key": [1, 2], "value": 23 },
       {"key": [3, 4], "value": "foo" }
@@ -1458,7 +1552,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testTypedNumber2 = {
+  private def testTypedNumber2 = {
     val data: Stream[JValue] =
       Stream(
         JObject(List(JField("value", JNum(23)), JField("key", JArray(List(JNum(1), JNum(3)))))),
@@ -1475,7 +1569,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def testTypedEmpty = {
+  private def testTypedEmpty = {
     val JArray(data) = json"""[ {"key":[1], "value":{"foo":[]}} ]"""
     val sample       = SampleData(data.toStream)
     val table        = fromSample(sample)
@@ -1489,7 +1583,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testTrivialScan = {
+  private def testTrivialScan = {
     val data = JObject(JField("value", JNum(BigDecimal("2705009941739170689"))) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil) #::
         JObject(JField("value", JString("")) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil) #::
           Stream.empty
@@ -1512,7 +1606,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def testHetScan = {
+  private def testHetScan = {
     val data = JObject(JField("value", JNum(12)) :: JField("key", JArray(JNum(1) :: Nil)) :: Nil) #::
         JObject(JField("value", JNum(10)) :: JField("key", JArray(JNum(2) :: Nil)) :: Nil) #::
           JObject(JField("value", JArray(JNum(13) :: Nil)) :: JField("key", JArray(JNum(3) :: Nil)) :: Nil) #::
@@ -1536,7 +1630,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected.toStream
   }
 
-  def checkScan = {
+  private def checkScan = {
     implicit val gen = sample(_ => Seq(NoJPath -> CLong))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -1557,7 +1651,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def testDerefObjectDynamic = {
+  private def testDerefObjectDynamic = {
     val data = JObject(JField("foo", JNum(1)) :: JField("ref", JString("foo")) :: Nil) #::
         JObject(JField("bar", JNum(2)) :: JField("ref", JString("bar")) :: Nil) #::
           JObject(JField("baz", JNum(3)) :: JField("ref", JString("baz")) :: Nil) #:: Stream.empty[JValue]
@@ -1569,7 +1663,7 @@ trait TransformSpec extends TableQspec {
     results.copoint must_== expected
   }
 
-  def checkArraySwap = {
+  private def checkArraySwap = {
     implicit val gen = sample(arraySchema(_, 3))
     prop { (sample0: SampleData) =>
       /***
@@ -1603,7 +1697,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def checkConst = {
+  private def checkConst = {
     implicit val gen = undefineRowsForColumn(
       sample(_ => Seq(JPath("field") -> CLong)),
       JPath("value") \ "field"
@@ -1622,7 +1716,7 @@ trait TransformSpec extends TableQspec {
     }
   }
 
-  def checkCond = {
+  private def checkCond = {
     implicit val gen = sample(_ => Gen.const(Seq(NoJPath -> CLong)))
     prop { (sample: SampleData) =>
       val table = fromSample(sample)
@@ -1644,7 +1738,7 @@ trait TransformSpec extends TableQspec {
     }.set(minTestsOk = 200)
   }
 
-  def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
+  private def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
     data map { jv =>
       val filtered = jv.flattenWithPath filter {
         case (JPath(JPathField("value") :: tail), leaf) =>
