@@ -1,6 +1,5 @@
 package ygg.tests
 
-import scalaz._, Scalaz._
 import ygg.json._
 import ygg.table.trans._
 import SampleData._
@@ -17,16 +16,13 @@ class DistinctSpec extends ColumnarTableQspec {
     implicit val gen: Arbitrary[SampleData] = sort(distinct(sample(schema)))
 
     prop { (sample: SampleData) =>
-      val table         = fromSample(sample)
-      val distinctTable = table.distinct(Leaf(Source))
-      val result        = toJson(distinctTable)
-
-      result.copoint must_=== sample.data
+      val table  = fromSample(sample)
+      toJsonSeq(table distinct root) must_=== sample.data
     }
   }
 
   def testDistinctAcrossSlices = {
-    val data: Seq[JValue] = jsonMany"""
+    val data = jsonMany"""
       {"key":[1,1],"value":{}}
       {"key":[1,1],"value":{}}
       {"key":[2,1],"value":{}}
@@ -34,14 +30,12 @@ class DistinctSpec extends ColumnarTableQspec {
       {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
       {"key":[1,2],"value":{"em":[{"fbk":-1,"l":210574764564691780},[[],""]],"fzz":false,"z3y":[{"o":[],"tv":false,"wd":null},{"in0":[],"sry":{}}]}}
     """
-    val table  = fromJson(data, maxBlockSize = 5)
-    val result = toJson(table distinct Leaf(Source))
-
-    result.copoint must_=== data.distinct.toStream
+    val table = fromJson(data, maxBlockSize = 5)
+    toJsonSeq(table distinct root) must_=== data.distinct.toStream
   }
 
   def testDistinctAcrossSlices2 = {
-    val data: Seq[JValue] = jsonMany"""
+    val data = jsonMany"""
       {"key":[1.0,1.0],"value":{"elxk7vv":-8.988465674311579E+307}}
       {"key":[1.0,1.0],"value":{"elxk7vv":-8.988465674311579E+307}}
       {"key":[2.0,4.0],"value":{"elxk7vv":-6.465000919622952E+307}}
@@ -56,20 +50,16 @@ class DistinctSpec extends ColumnarTableQspec {
       {"key":[8.0,1.0],"value":[[]]}
       {"key":[8.0,4.0],"value":[[]]}
     """
-    val table  = fromJson(data, maxBlockSize = 5)
-    val result = toJson(table distinct Leaf(Source))
+    val table = fromJson(data, maxBlockSize = 5)
 
-    (result.copoint: Seq[JValue]) must_=== data.distinct
+    toJsonSeq(table distinct root) must_=== data.distinct
   }
 
   def testDistinct = {
     implicit val gen = sort(duplicateRows(sample(schema)))
     prop { (sample: SampleData) =>
-      val table    = fromSample(sample)
-      val result   = toJson(table distinct Leaf(Source))
-      val expected = sample.data.distinct
-
-      result.copoint must_=== expected.toStream
+      val table = fromSample(sample)
+      toJsonSeq(table distinct root) must_=== sample.data.distinct
     }
   }
 }
