@@ -1,6 +1,5 @@
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
 import JsonTestSupport._
 import ygg.json._
@@ -34,7 +33,7 @@ class TakeRangeSpec extends ColumnarTableQspec {
     {"key":[8],"value":"ack5"}
   """).toStream
 
-  def checkTakeRange = {
+  private def checkTakeRange = {
     implicit val gen: Arbitrary[SampleData] = sample(schema)
 
     prop { (sample: SampleData) =>
@@ -54,7 +53,8 @@ class TakeRangeSpec extends ColumnarTableQspec {
     }
   }
 
-  def testTakeRangeCommutes: Prop = {
+  /***
+  private def testTakeRangeCommutes: Prop = {
     implicit val arbRange = Arbitrary(genOffsetAndLen)
 
     prop { (offlen: Int -> Int) =>
@@ -69,43 +69,44 @@ class TakeRangeSpec extends ColumnarTableQspec {
       )
     }
   }
+  ***/
 
-  def testTakeRange = checkTableFun(
+  private def testTakeRange = checkTableFun(
     fun      = _.takeRange(1, 2),
     data     = jsonFourValues,
     expected = jsonFourValues.slice(1, 3)
   )
-  def testTakeRangeNegStart = checkTableFun(
+  private def testTakeRangeNegStart = checkTableFun(
     fun      = _.takeRange(-1, 5),
     data     = jsonFourValues,
     expected = Seq()
   )
-  def testTakeRangeNegTake = checkTableFun(
+  private def testTakeRangeNegTake = checkTableFun(
     fun      = _.takeRange(2, -3),
     data     = jsonFourValues,
     expected = Seq()
   )
-  def testTakeRangeLarger = checkTableFun(
+  private def testTakeRangeLarger = checkTableFun(
     fun      = _.takeRange(2, 17),
     data     = jsonFourValues,
     expected = jsonFourValues.slice(2, 4)
   )
-  def testTakeRangeEmpty = checkTableFun(
+  private def testTakeRangeEmpty = checkTableFun(
     fun      = _.takeRange(6, 17),
     data     = jsonFourValues,
     expected = Seq()
   )
-  def testTakeRangeAcrossSlices = checkTableFun(
+  private def testTakeRangeAcrossSlices = checkTableFun(
     fun      = _.takeRange(1, 6),
     table    = fromSample(SampleData(jsonEightValues), Some(5)),
     expected = jsonEightValues.slice(1, 7)
   )
-  def testTakeRangeSecondSlice = checkTableFun(
+  private def testTakeRangeSecondSlice = checkTableFun(
     fun      = _.takeRange(5, 2),
     table    = fromSample(SampleData(jsonEightValues), Some(5)),
     expected = jsonEightValues.slice(5, 7)
   )
-  def testTakeRangeFirstSliceOnly = checkTableFun(
+  private def testTakeRangeFirstSliceOnly = checkTableFun(
     fun      = _.takeRange(0, 5),
     table    = fromSample(SampleData(jsonEightValues), Some(5)),
     expected = jsonEightValues.slice(0, 5)
