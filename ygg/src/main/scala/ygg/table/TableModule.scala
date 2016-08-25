@@ -152,8 +152,6 @@ trait TableModule extends TransSpecModule {
   trait TableLike extends ygg.table.Table {
     this: Table =>
 
-    val trans: tableModule.trans.type = tableModule.trans
-
     import trans._
     import TransSpecModule._
 

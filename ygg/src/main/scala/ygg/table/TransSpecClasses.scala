@@ -11,9 +11,7 @@ final case object Source      extends Source1
 final case object SourceLeft  extends Source2
 final case object SourceRight extends Source2
 
-class TransSpecClasses {
-  trans =>
-
+package object trans {
   val Source      = ygg.table.Source  // scalaz conflict
   type TransSpec1 = TransSpec[Source1]
   type TransSpec2 = TransSpec[Source2]
@@ -22,6 +20,16 @@ class TransSpecClasses {
   type TableTransSpec1                  = TableTransSpec[Source1]
   type TableTransSpec2                  = TableTransSpec[Source2]
 
+  implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {
+    def inner_++(x: TransSpec[A], xs: TransSpec[A]*): InnerObjectConcat[A] = InnerObjectConcat(spec +: x +: xs: _*)
+    def outer_++(x: TransSpec[A], xs: TransSpec[A]*): OuterObjectConcat[A] = OuterObjectConcat(spec +: x +: xs: _*)
+  }
+
+  implicit def transSpecBuilder[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A]       = new TransSpecBuilder(x)
+  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
+}
+
+package trans {
   object root extends TransSpecBuilder(Leaf(Source)) {
     def value = selectDynamic("value")
     def key   = selectDynamic("key")
@@ -37,13 +45,6 @@ class TransSpecClasses {
     def select(name: String): TransSpecBuilder[A]        = select(CPathField(name))
     def selectDynamic(name: String): TransSpecBuilder[A] = select(name)
   }
-  implicit class TransSpecOps[A <: SourceType](val spec: TransSpec[A]) {
-    def inner_++(x: TransSpec[A], xs: TransSpec[A]*): InnerObjectConcat[A] = InnerObjectConcat(spec +: x +: xs: _*)
-    def outer_++(x: TransSpec[A], xs: TransSpec[A]*): OuterObjectConcat[A] = OuterObjectConcat(spec +: x +: xs: _*)
-  }
-
-  implicit def transSpecBuilder[A <: SourceType](x: TransSpec[A]): TransSpecBuilder[A]       = new TransSpecBuilder(x)
-  implicit def transSpecBuilderResult[A <: SourceType](x: TransSpecBuilder[A]): TransSpec[A] = x.spec
 
   sealed trait TransSpec[+A <: SourceType]  extends AnyRef
   sealed trait ObjectSpec[+A <: SourceType] extends TransSpec[A]

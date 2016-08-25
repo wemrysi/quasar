@@ -6,7 +6,7 @@ import TestSupport._
 
 class DistinctSpec extends ColumnarTableQspec {
   import SampleData._
-  import trans._
+  import ygg.table.trans._
 
   "in distinct" >> {
     "be the identity on tables with no duplicate rows"                            in testDistinctIdentity

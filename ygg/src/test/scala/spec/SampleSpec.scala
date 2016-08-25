@@ -5,7 +5,7 @@ import ygg.json._
 import org.specs2.matcher.TraversableMatchers._
 
 class SampleSpec extends ColumnarTableQspec {
-  import trans._
+  import ygg.table.trans._
 
   "in sample" >> {
      "sample from a dataset"                                in testSample

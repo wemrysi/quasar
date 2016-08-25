@@ -3,7 +3,6 @@ package ygg.table
 import ygg.cf
 
 trait TransSpecModule {
-  object trans extends TransSpecClasses
   import trans.{ Leaf, Filter, Equal, root }
 
   implicit def liftF1(f1: CF1): CF1Like

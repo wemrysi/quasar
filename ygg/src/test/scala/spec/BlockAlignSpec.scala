@@ -68,7 +68,7 @@ class BlockAlignSpec extends quasar.Qspec {
 
   private def testAlign(sample: SampleData) = {
     import module._
-    import module.trans.constants._
+    import trans.constants._
 
     val lstream  = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 => v }
     val rstream  = sample.data.zipWithIndex collect { case (v, i) if i % 3 == 0 => v }
@@ -150,7 +150,7 @@ class BlockAlignSpec extends quasar.Qspec {
 
   private def testAlignSymmetry(i: Int) = {
     import module._
-    import module.trans._
+    import trans._
 
     def test(ltable: Table, alignOnL: TransSpec1, rtable: Table, alignOnR: TransSpec1) = {
       val (ljsondirect, rjsondirect) = (for {

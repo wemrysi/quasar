@@ -113,8 +113,6 @@ trait Table {
   def toJson: Need[Stream[JValue]]
 }
 trait TableCompanion {
-  // val trans: TransSpecClasses
-
   def empty: Table
   def constString(v: scSet[String]): Table
   def constLong(v: scSet[Long]): Table
