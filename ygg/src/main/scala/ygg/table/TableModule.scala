@@ -99,6 +99,8 @@ object TableModule {
 }
 
 trait TableModule extends TransSpecModule {
+  tableModule =>
+
   import TableModule._
 
   type Reducer[α] = CReducer[α]
@@ -109,7 +111,7 @@ trait TableModule extends TransSpecModule {
 
   val Table: TableCompanion
 
-  trait TableCompanionLike {
+  trait TableCompanionLike extends ygg.table.TableCompanion {
     import trans._
     def empty: Table
 
@@ -147,25 +149,19 @@ trait TableModule extends TransSpecModule {
     def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): M[CrossOrder -> Table]
   }
 
-  trait TableLike { this: Table =>
+  trait TableLike extends ygg.table.Table {
+    this: Table =>
+
+    val trans: tableModule.trans.type = tableModule.trans
+
     import trans._
     import TransSpecModule._
-
-    /**
-      * Return an indication of table size, if known
-      */
-    def size: TableSize
 
     /**
       * For each distinct path in the table, load all columns identified by the specified
       * jtype and concatenate the resulting slices into a new table.
       */
     def load(apiKey: APIKey, tpe: JType): Need[Table]
-
-    /**
-      * Folds over the table to produce a single value (stored in a singleton table).
-      */
-    def reduce[A: Monoid](reducer: Reducer[A]): M[A]
 
     /**
       * Removes all rows in the table for which definedness is satisfied
@@ -194,14 +190,6 @@ trait TableModule extends TransSpecModule {
     def cross(that: Table)(spec: TransSpec2): Table
 
     /**
-      * Force the table to a backing store, and provice a restartable table
-      * over the results.
-      */
-    def force: M[Table]
-
-    def paged(limit: Int): Table
-
-    /**
       * Sorts the KV table by ascending or descending order of a transformation
       * applied to the rows.
       *
@@ -222,8 +210,6 @@ trait TableModule extends TransSpecModule {
 
     def zip(t2: Table): M[Table]
 
-    def toArray[A](implicit tpe: CValueType[A]): Table
-
     /**
       * Sorts the KV table by ascending or descending order based on a seq of transformations
       * applied to the rows.
@@ -238,17 +224,6 @@ trait TableModule extends TransSpecModule {
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]]
 
     def partitionMerge(partitionBy: TransSpec1)(f: Table => M[Table]): M[Table]
-
-    def takeRange(startIndex: Long, numberToTake: Long): Table
-
-    def canonicalize(length: Int): Table
-
-    def schemas: Need[Set[JType]]
-
-    def renderJson(prefix: String = "", delimiter: String = "\n", suffix: String = ""): StreamT[M, CharBuffer]
-
-    // for debugging only!!
-    def toJson: Need[Stream[JValue]]
   }
 
   sealed trait GroupingSpec {
@@ -272,13 +247,11 @@ trait TableModule extends TransSpecModule {
   /*final*/
   case class GroupingSource(table: Table, idTrans: trans.TransSpec1, targetTrans: Option[trans.TransSpec1], groupId: GroupId, groupKeySpec: trans.GroupKeySpec)
       extends GroupingSpec {
+
+    import trans._
+
     def sources: Vector[GroupingSource] = Vector(this)
-    def sorted: M[GroupingSource] =
-      for {
-        t <- table.sort(trans.DerefObjectStatic(trans.Leaf(Source), CPathField("key")))
-      } yield {
-        GroupingSource(t, idTrans, targetTrans, groupId, groupKeySpec)
-      }
+    def sorted: Need[GroupingSource]    = table.sort(root.key) map (t => GroupingSource(t.asInstanceOf, idTrans, targetTrans, groupId, groupKeySpec))
   }
 
   /*final*/

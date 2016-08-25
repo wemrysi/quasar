@@ -19,13 +19,7 @@ trait Column {
 }
 
 trait Table {
-  val trans: TransSpecClasses
-
-  import trans._
-  import TransSpecModule._
-  import TableModule._
-
-  def slices: Stream[Need[Slice]]
+  def slices: StreamT[Need, Slice]
 
   /**
     * Return an indication of table size, if known
@@ -47,27 +41,27 @@ trait Table {
     * Removes all rows in the table for which definedness is satisfied
     * Remaps the indicies.
     */
-  def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table
+  // def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table
 
   /**
     * Performs a one-pass transformation of the keys and values in the table.
     * If the key transform is not identity, the resulting table will have
     * unknown sort order.
     */
-  def transform(spec: TransSpec1): Table
+  // def transform(spec: TransSpec1): Table
 
   /**
     * Cogroups this table with another table, using equality on the specified
     * transformation on rows of the table.
     */
-  def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
+  // def cogroup(leftKey: TransSpec1, rightKey: TransSpec1, that: Table)(left: TransSpec1, right: TransSpec1, both: TransSpec2): Table
 
   /**
     * Performs a full cartesian cross on this table with the specified table,
     * applying the specified transformation to merge the two tables into
     * a single table.
     */
-  def cross(that: Table)(spec: TransSpec2): Table
+  // def cross(that: Table)(spec: TransSpec2): Table
 
   /**
     * Force the table to a backing store, and provice a restartable table
@@ -87,14 +81,14 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Table]
+  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Table]
 
-  def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): Need[Table] = sort(sortKey, sortOrder, unique = false)
-  def sort(sortKey: TransSpec1): Need[Table]                              = sort(sortKey, SortAscending)
+  // def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): Need[Table] = sort(sortKey, sortOrder, unique = false)
+  // def sort(sortKey: TransSpec1): Need[Table]                              = sort(sortKey, SortAscending)
 
-  def distinct(spec: TransSpec1): Table
-  def concat(t2: Table): Table
-  def zip(t2: Table): Need[Table]
+  // def distinct(spec: TransSpec1): Table
+  // def concat(t2: Table): Table
+  // def zip(t2: Table): Need[Table]
   def toArray[A](implicit tpe: CValueType[A]): Table
 
   /**
@@ -108,8 +102,8 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
-  def partitionMerge(partitionBy: TransSpec1)(f: Table => Need[Table]): Need[Table]
+  // def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
+  // def partitionMerge(partitionBy: TransSpec1)(f: Table => Need[Table]): Need[Table]
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def canonicalize(length: Int): Table
   def schemas: Need[Set[JType]]
@@ -119,7 +113,7 @@ trait Table {
   def toJson: Need[Stream[JValue]]
 }
 trait TableCompanion {
-  val trans: TransSpecClasses
+  // val trans: TransSpecClasses
 
   def empty: Table
   def constString(v: scSet[String]): Table
@@ -131,7 +125,7 @@ trait TableCompanion {
   def constNull: Table
   def constEmptyObject: Table
   def constEmptyArray: Table
-  def fromRValues(values: Seq[RValue]): Table
+  def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int]): Table
 }
 
 

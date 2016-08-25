@@ -12,15 +12,8 @@ sealed trait Slice {
   def size: Int
   def columns: ColumnMap
 }
-final class DirectSlice(
-    val size: Int,
-    val columns: ColumnMap
-) extends Slice
-
-final class DerefSlice(
-    source: Slice,
-    derefBy: Int =?> CPathNode
-) extends Slice {
+final case class DirectSlice(size: Int, columns: ColumnMap) extends Slice
+final class DerefSlice(source: Slice, derefBy: Int =?> CPathNode) extends Slice {
   val size    = source.size
   val columns = source dereferencedColumns derefBy
 }
