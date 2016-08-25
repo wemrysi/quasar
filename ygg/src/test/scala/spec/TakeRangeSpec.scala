@@ -5,8 +5,21 @@ import scalaz._, Scalaz._
 import JsonTestSupport._
 import ygg.json._
 
-trait TakeRangeSpec extends ColumnarTableQspec {
+class TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._
+
+  "in takeRange" >> {
+    // "takeRange commutes as expected"                                                      in testTakeRangeCommutes
+    "select the correct rows: trivial case"                                               in testTakeRange
+    "select the correct rows when we take past the end of the table"                      in testTakeRangeLarger
+    "select the correct rows when we start at an index larger than the size of the table" in testTakeRangeEmpty
+    "select the correct rows across slice boundary"                                       in testTakeRangeAcrossSlices
+    "select the correct rows: second slice"                                               in testTakeRangeSecondSlice
+    "select the first slice"                                                              in testTakeRangeFirstSliceOnly
+    "select nothing with a negative starting index"                                       in testTakeRangeNegStart
+    "select nothing with a negative number to take"                                       in testTakeRangeNegTake
+    "select the correct rows using scalacheck"                                            in checkTakeRange
+  }
 
   private def jsonFourValues = jsonMany"""
     {"key":[1],"value":"foo"}
@@ -42,10 +55,9 @@ trait TakeRangeSpec extends ColumnarTableQspec {
   }
 
   def testTakeRangeCommutes: Prop = {
-    implicit val arbRange     = Arbitrary(genOffsetAndLen)
-    implicit val arbJValueSeq = Arbitrary(genJValueSeq)
+    implicit val arbRange = Arbitrary(genOffsetAndLen)
 
-    prop { (xs: Seq[JValue], offlen: Int -> Int) =>
+    prop { (offlen: Int -> Int) =>
       val (start, length) = offlen
       def doSlice(xs: Seq[JValue]): Seq[JValue] =
         if (start < 0 || length <= 0) Seq() else xs drop start take length

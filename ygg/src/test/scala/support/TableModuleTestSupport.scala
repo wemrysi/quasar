@@ -50,8 +50,8 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
 
   def checkCommutes(f: Seq[JValue] => Seq[JValue], g: Table => Table, gen: Gen[Seq[JValue]]): Prop = {
     implicit val za: Arbitrary[Seq[JValue]] = Arbitrary(gen)
-    implicit val ze: Eq[Seq[JValue]]        = Eq.equalA
-    implicit val zs: Show[Seq[JValue]]      = Show.shows(_ mkString ", ")
+    implicit val ze: Eq[Seq[JValue]]        = Eq.equal((x, y) => (x corresponds y)(_ == _))
+    implicit val zs: Show[Seq[JValue]]      = Show.shows(_.toString)
 
     new TableCommuteTest(f, g).checkR()
   }

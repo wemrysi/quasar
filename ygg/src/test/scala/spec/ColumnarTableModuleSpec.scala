@@ -8,7 +8,6 @@ class ColumnarTableModuleSpec
          with CrossSpec
          with TransformSpec
          with CompactSpec
-         with TakeRangeSpec
          with CanonicalizeSpec
          with PartitionMergeSpec
          with ToArraySpec
@@ -155,19 +154,6 @@ class ColumnarTableModuleSpec
       "peform properly when the same row appears inside two different slices"       in testDistinctAcrossSlices
       "peform properly again when the same row appears inside two different slices" in testDistinctAcrossSlices2
       "have no duplicate rows"                                                      in testDistinct
-    }
-
-    "in takeRange" >> {
-      // "takeRange commutes as expected"                                                      in testTakeRangeCommutes
-      "select the correct rows: trivial case"                                               in testTakeRange
-      "select the correct rows when we take past the end of the table"                      in testTakeRangeLarger
-      "select the correct rows when we start at an index larger than the size of the table" in testTakeRangeEmpty
-      "select the correct rows across slice boundary"                                       in testTakeRangeAcrossSlices
-      "select the correct rows: second slice"                                               in testTakeRangeSecondSlice
-      "select the first slice"                                                              in testTakeRangeFirstSliceOnly
-      "select nothing with a negative starting index"                                       in testTakeRangeNegStart
-      "select nothing with a negative number to take"                                       in testTakeRangeNegTake
-      "select the correct rows using scalacheck"                                            in checkTakeRange
     }
 
     "in toArray" >> {
