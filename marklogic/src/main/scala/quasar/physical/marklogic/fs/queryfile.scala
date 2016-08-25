@@ -38,6 +38,7 @@ object queryfile {
   import FileSystemError._, PathError._
   import MarkLogicPlanner._
 
+  // TODO: Still need to implement ExecutePlan.
   def interpret[S[_]](
     resultsChunkSize: Positive
   )(implicit

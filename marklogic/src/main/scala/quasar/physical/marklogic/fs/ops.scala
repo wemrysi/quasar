@@ -57,6 +57,8 @@ object ops {
       copts
     }
 
+    // NB: Ensures all the filenames are the same length, regardless of
+    //     the value of their sequence number, so that they compare properly.
     val seqFmt = {
       val width = ceil(log(data.size.toDouble) / log(16)).toInt
       if (width === 0) "" else s"%0${width}x"
