@@ -118,7 +118,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
     /**
       * Merge controls the iteration over the table of group key values.
       */
-    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => LazyTable) => LazyTable): LazyTable = {
+    def merge(grouping: GroupingSpec)(body: (RValue, GroupId => NeedTable) => NeedTable): NeedTable = {
       import GroupKeySpec.{ dnf, toVector }
 
       type Key       = Seq[RValue]
@@ -210,12 +210,12 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
 
         val groupKeys: Set[Key] = unionOfIntersections(indicesGroupedBySource)
 
-        // given a groupKey, return an LazyTable which represents running
+        // given a groupKey, return an NeedTable which represents running
         // the evaluator on that subgroup.
-        def evaluateGroupKey(groupKey: Key): LazyTable = {
+        def evaluateGroupKey(groupKey: Key): NeedTable = {
           val groupKeyTable = jValueFromGroupKey(groupKey, fullSchema)
 
-          def map(gid: GroupId): LazyTable = {
+          def map(gid: GroupId): NeedTable = {
             val subTableProjections = (sourceKeys
               .filter(_.groupId == gid)
               .map { indexedSource =>
@@ -346,7 +346,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       Table(Table.transformStream(composeSliceTransform(spec), slices), this.size)
     }
 
-    def force: LazyTable = {
+    def force: NeedTable = {
       def loop(slices: StreamT[M, Slice], acc: List[Slice], size: Long): M[List[Slice] -> Long] = slices.uncons flatMap {
         case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
         case Some((_, tail))                       => loop(tail, acc, size)
@@ -387,7 +387,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       * then since the zipping is done per slice, this can produce a result that is
       * different than if the tables were normalized.
       */
-    def zip(t2: Table): LazyTable = {
+    def zip(t2: Table): NeedTable = {
       def rec(slices1: StreamT[M, Slice], slices2: StreamT[M, Slice]): StreamT[M, Slice] = {
         StreamT(slices1.uncons flatMap {
           case Some((head1, tail1)) =>
@@ -1169,7 +1169,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
       * In order to call partitionMerge, the table must be sorted according to
       * the values specified by the partitionBy transspec.
       */
-    def partitionMerge(partitionBy: TransSpec1)(f: Table => LazyTable): LazyTable = {
+    def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable = {
       // Find the first element that compares LT
       @tailrec def findEnd(compare: Int => Ordering, imin: Int, imax: Int): Int = {
         val minOrd = compare(imin)
@@ -1197,8 +1197,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with Samplabl
         }
       }
 
-      def subTable(comparatorGen: Slice => (Int => Ordering), slices: StreamT[M, Slice]): LazyTable = {
-        def subTable0(slices: StreamT[M, Slice], subSlices: StreamT[M, Slice], size: Int): LazyTable = {
+      def subTable(comparatorGen: Slice => (Int => Ordering), slices: StreamT[M, Slice]): NeedTable = {
+        def subTable0(slices: StreamT[M, Slice], subSlices: StreamT[M, Slice], size: Int): NeedTable = {
           slices.uncons flatMap {
             case Some((head, tail)) =>
               val headComparator = comparatorGen(head)

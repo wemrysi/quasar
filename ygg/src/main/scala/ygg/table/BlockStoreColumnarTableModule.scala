@@ -779,7 +779,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                                                                                 rightKeySpec: TransSpec1,
                                                                                 joinSpec: TransSpec2): M[JoinOrder -> Table] = {
 
-      def hashJoin(index: Slice, table: Table, flip: Boolean): LazyTable = {
+      def hashJoin(index: Slice, table: Table, flip: Boolean): NeedTable = {
         val (indexKeySpec, tableKeySpec) = if (flip) (rightKeySpec, leftKeySpec) else (leftKeySpec, rightKeySpec)
 
         val initKeyTrans  = composeSliceTransform(tableKeySpec)
@@ -862,7 +862,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       } else super.join(left1, right1, orderHint)(leftKeySpec, rightKeySpec, joinSpec)
     }
 
-    def load(table: Table, apiKey: APIKey, tpe: JType): LazyTable
+    def load(table: Table, apiKey: APIKey, tpe: JType): NeedTable
   }
 
   abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
@@ -874,7 +874,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       * less than `limit` rows, it will be converted to an `InternalTable`,
       * otherwise it will stay an `ExternalTable`.
       */
-    def toInternalTable(limit: Int = yggConfig.maxSliceSize): EitherT[M, ExternalTable, InternalTable]
+    def toInternalTable(limit: Int = yggConfig.maxSliceSize): NeedEitherT[ExternalTable, InternalTable]
 
     /**
       * Forces a table to an external table, possibly de-optimizing it.
@@ -885,11 +885,8 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
   class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) {
     // TODO assert that this table only has one row
 
-    def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] = {
-      EitherT[M, ExternalTable, InternalTable](slices.toStream map { slices1 =>
-        \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))
-      })
-    }
+    def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
+      EitherT[Need, ExternalTable, InternalTable](slices.toStream map (slices1 => \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))))
 
     def toRValue: M[RValue] = {
       def loop(stream: StreamT[M, Slice]): M[RValue] = stream.uncons flatMap {
@@ -906,13 +903,13 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       Need(List.fill(groupKeys.size)(xform))
     }
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable = Need(this)
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable = Need(this)
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
     override def compact(spec: TransSpec1, definedness: Definedness = AnyDefined): Table = this
 
-    override def force: LazyTable = Need(this)
+    override def force: NeedTable = Need(this)
 
     override def paged(limit: Int): Table = this
 
@@ -928,19 +925,18 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     * allowed more optimizations when doing things like joins.
     */
   class InternalTable(val slice: Slice) extends Table(singleStreamT(slice), ExactSize(slice.size)) {
-    def toInternalTable(limit: Int): EitherT[M, ExternalTable, InternalTable] =
-      EitherT[M, ExternalTable, InternalTable](Need(\/-(this)))
+    def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
+      EitherT[Need, ExternalTable, InternalTable](Need(\/-(this)))
 
     def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): M[Seq[Table]] =
       toExternalTable.groupByN(groupKeys, valueSpec, sortOrder, unique)
 
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable =
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable =
       toExternalTable.sort(sortKey, sortOrder, unique)
 
-    def load(apiKey: APIKey, tpe: JType): LazyTable = Table.load(this, apiKey, tpe)
+    def load(apiKey: APIKey, tpe: JType): NeedTable = Table.load(this, apiKey, tpe)
 
-    override def force: LazyTable = Need(this)
-
+    override def force: NeedTable         = Need(this)
     override def paged(limit: Int): Table = this
 
     override def takeRange(startIndex0: Long, numberToTake0: Long): Table = {
@@ -960,7 +956,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
 
     def load(apiKey: APIKey, tpe: JType) = Table.load(this, apiKey, tpe)
 
-    def toInternalTable(limit0: Int): EitherT[M, ExternalTable, InternalTable] = {
+    def toInternalTable(limit0: Int): NeedEitherT[ExternalTable, InternalTable] = {
       val limit = limit0.toLong
 
       def acc(slices: StreamT[M, Slice], buffer: List[Slice], size: Long): M[ExternalTable \/ InternalTable] = {
@@ -992,7 +988,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       *
       * @see quasar.ygg.TableModule#sort(TransSpec1, DesiredSortOrder, Boolean)
       */
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): LazyTable =
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): NeedTable =
       groupByN(Seq(sortKey), root, sortOrder, unique) map (_.headOption getOrElse Table.empty)
 
     /**
@@ -1011,24 +1007,27 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       }
     }
 
-    protected def writeSorted(groupKeys: Seq[TransSpec1],
-                              valueSpec: TransSpec1,
-                              sortOrder: DesiredSortOrder,
-                              unique: Boolean): M[List[String] -> IndexMap] = {
+    private def writeSorted(keys: Seq[TransSpec1], spec: TransSpec1, sort: DesiredSortOrder, uniq: Boolean): M[List[String] -> IndexMap] = uniq match {
+      case false => writeSortedNonUnique(keys, spec, sort)
+      case true  => writeSortedUnique(keys, spec, sort)
+    }
 
-      // If we don't want unique key values (e.g. preserve duplicates), we need to add
-      // in a distinct "row id" for each value to disambiguate it
-      val (sourceTrans0, keyTrans0, valueTrans0) = if (!unique) {
-        (
-          addGlobalId(root),
-          groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1"))),
-          valueSpec deepMap { case Leaf(_) => TransSpec1.DerefArray0 } spec
-        )
-      } else {
-        (root.spec, groupKeys, valueSpec)
-      }
+    private def writeSortedUnique(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[List[String] -> IndexMap] =
+      writeTables(
+        this transform root.spec slices,
+        composeSliceTransform(valueSpec),
+        groupKeys map composeSliceTransform,
+        order
+      )
 
-      writeTables(this.transform(sourceTrans0).slices, composeSliceTransform(valueTrans0), keyTrans0 map composeSliceTransform, sortOrder)
+    private def writeSortedNonUnique(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder): Need[List[String] -> IndexMap] = {
+      val keys1 = groupKeys map (kt => OuterObjectConcat(WrapObject(kt deepMap { case Leaf(_) => root(0) } spec, "0"), WrapObject(root(1), "1")))
+      writeTables(
+        this transform addGlobalId(root.spec) slices,
+        composeSliceTransform(valueSpec deepMap { case Leaf(_) => TransSpec1.DerefArray0 } spec),
+        keys1 map composeSliceTransform,
+        order
+      )
     }
   }
 }

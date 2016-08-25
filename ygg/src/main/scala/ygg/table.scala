@@ -4,7 +4,7 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 package object table {
-  type LazyTable  = Need[Table]
+  type NeedTable  = Need[Table]
   type RowId      = Int
   type Identity   = Long
   type Identities = Array[Identity]

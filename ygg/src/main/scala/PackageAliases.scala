@@ -1,6 +1,7 @@
 package ygg.pkg
 
 import scala.collection.{ mutable => scm, immutable => sci }
+import scalaz.Need
 
 trait PackageAliases {
   // scala stdlib
@@ -62,11 +63,12 @@ trait PackageAliases {
   type jMapEntry[K, V]      = java.util.Map.Entry[K, V]
 
   // other outside libs
-  type Cmp            = scalaz.Ordering
-  type Eq[A]          = scalaz.Equal[A]
-  type LazyPairOf[+A] = scalaz.Need[A -> A]
-  type M[+A]          = scalaz.Need[A]
-  type Ord[A]         = scalaz.Order[A]
-  val Eq              = scalaz.Equal
-  val Ord             = scalaz.Order
+  type Cmp               = scalaz.Ordering
+  type Eq[A]             = scalaz.Equal[A]
+  type LazyPairOf[+A]    = Need[A -> A]
+  type NeedEitherT[A, B] = scalaz.EitherT[Need, A, B]
+  type M[+A]             = Need[A]
+  type Ord[A]            = scalaz.Order[A]
+  val Eq                 = scalaz.Equal
+  val Ord                = scalaz.Order
 }
