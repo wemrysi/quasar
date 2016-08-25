@@ -106,16 +106,11 @@ object managefile {
   
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
-  ): Free[S, FileSystemError \/ AFile] = {
-
-    injectFT[Task, S].apply{
-      Task.delay {
-        val random = scala.util.Random.nextInt().toString
-        val parent = maybeFile(near)
-          .map(fileParent(_))
-          .fold(near.asInstanceOf[ADir])(parent => parent)
+  ): Free[S, FileSystemError \/ AFile] = injectFT[Task, S].apply{
+    Task.delay {
+      val parent: ADir = refineType(near).fold(d => d, fileParent(_))
+      val random = scala.util.Random.nextInt().toString
         (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
-      }
     }
   }
 }
