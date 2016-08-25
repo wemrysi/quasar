@@ -13,7 +13,7 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[Need, Slice] = {
+        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): NeedSlices = {
           StreamT.unfoldM[Need, Slice, Option[proj.Key]](None) { key =>
             proj.getBlockAfter(key, constraints).map { b =>
               b.map {

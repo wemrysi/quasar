@@ -100,7 +100,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       }
     }
 
-    def mergeProjections(inputSortOrder: DesiredSortOrder, cellStates: Stream[CellState])(keyf: Slice => Iterable[CPath]): StreamT[M, Slice] = {
+    def mergeProjections(inputSortOrder: DesiredSortOrder, cellStates: Stream[CellState])(keyf: Slice => Iterable[CPath]): NeedSlices = {
 
       // dequeues all equal elements from the head of the queue
       @inline
@@ -236,7 +236,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       Scan(WrapArray(spec), addGlobalIdScanner)
     }
 
-    def apply(slices: StreamT[M, Slice], size: TableSize): Table = {
+    def apply(slices: NeedSlices, size: TableSize): Table = {
       size match {
         case ExactSize(1) => new SingletonTable(slices)
         case _            => new ExternalTable(slices, size)
@@ -269,9 +269,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       }
 
       // this method exists only to skolemize A and B
-      def writeStreams[A, B](left: StreamT[M, Slice],
+      def writeStreams[A, B](left: NeedSlices,
                              leftKeyTrans: SliceTransform1[A],
-                             right: StreamT[M, Slice],
+                             right: NeedSlices,
                              rightKeyTrans: SliceTransform1[B],
                              leftWriteState: JDBMState,
                              rightWriteState: JDBMState): LazyPairOf[Table] = {
@@ -282,10 +282,10 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         def step(
             state: AlignState,
             lhead: Slice,
-            ltail: StreamT[M, Slice],
+            ltail: NeedSlices,
             stepleq: BitSet,
             rhead: Slice,
-            rtail: StreamT[M, Slice],
+            rtail: NeedSlices,
             stepreq: BitSet,
             lstate: A,
             rstate: B,
@@ -587,9 +587,9 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       * of all the slices. At some point this should lazily chunk the slices into
       * fixed sizes so that we can individually sort/merge.
       */
-    protected def reduceSlices(slices: StreamT[M, Slice]): StreamT[M, Slice] = {
-      def rec(ss: List[Slice], slices: StreamT[M, Slice]): StreamT[M, Slice] = {
-        StreamT[M, Slice](slices.uncons map {
+    protected def reduceSlices(slices: NeedSlices): NeedSlices = {
+      def rec(ss: List[Slice], slices: NeedSlices): NeedSlices = {
+        StreamT[Need, Slice](slices.uncons map {
           case Some((head, tail)) => StreamT.Skip(rec(head :: ss, tail))
           case None if ss.isEmpty => StreamT.Done
           case None               => StreamT.Yield(Slice.concat(ss.reverse), emptyStreamT())
@@ -599,11 +599,11 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       rec(Nil, slices)
     }
 
-    def writeTables(slices: StreamT[M, Slice],
+    def writeTables(slices: NeedSlices,
                     valueTrans: SliceTransform1[_],
                     keyTrans: Seq[SliceTransform1[_]],
                     sortOrder: DesiredSortOrder): M[List[String] -> IndexMap] = {
-      def write0(slices: StreamT[M, Slice], state: WriteState): M[List[String] -> IndexMap] = {
+      def write0(slices: NeedSlices, state: WriteState): M[List[String] -> IndexMap] = {
         slices.uncons flatMap {
           case Some((slice, tail)) =>
             writeSlice(slice, state, sortOrder) flatMap { write0(tail, _) }
@@ -785,7 +785,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
         val initKeyTrans  = composeSliceTransform(tableKeySpec)
         val initJoinTrans = composeSliceTransform2(joinSpec)
 
-        def joinWithHash(stream: StreamT[M, Slice], keyTrans: SliceTransform1[_], joinTrans: SliceTransform2[_], hashed: HashedSlice): StreamT[M, Slice] = {
+        def joinWithHash(stream: NeedSlices, keyTrans: SliceTransform1[_], joinTrans: SliceTransform2[_], hashed: HashedSlice): NeedSlices = {
 
           StreamT(stream.uncons flatMap {
             case Some((head, tail)) =>
@@ -865,7 +865,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def load(table: Table, apiKey: APIKey, tpe: JType): NeedTable
   }
 
-  abstract class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  abstract class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
     def companion = Table
 
     /**
@@ -883,14 +883,14 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toExternalTable: ExternalTable = new ExternalTable(slices, size)
   }
 
-  class SingletonTable(slices0: StreamT[M, Slice]) extends Table(slices0, ExactSize(1)) with NoSortTable {
+  class SingletonTable(slices0: NeedSlices) extends Table(slices0, ExactSize(1)) with NoSortTable {
     // TODO assert that this table only has one row
 
     def toInternalTable(limit: Int): NeedEitherT[ExternalTable, InternalTable] =
       EitherT[Need, ExternalTable, InternalTable](slices.toStream map (slices1 => \/-(new InternalTable(Slice.concat(slices1.toList).takeRange(0, 1)))))
 
     def toRValue: M[RValue] = {
-      def loop(stream: StreamT[M, Slice]): M[RValue] = stream.uncons flatMap {
+      def loop(stream: NeedSlices): M[RValue] = stream.uncons flatMap {
         case Some((head, tail)) if head.size > 0 => Need(head.toRValue(0))
         case Some((_, tail))                     => loop(tail)
         case None                                => Need(CUndefined)
@@ -941,7 +941,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     }
   }
 
-  class ExternalTable(slices: StreamT[M, Slice], size: TableSize) extends Table(slices, size) {
+  class ExternalTable(slices: NeedSlices, size: TableSize) extends Table(slices, size) {
     import Table.{ Table => _, _ }
     import SliceTransform.composeSliceTransform
 
@@ -950,7 +950,7 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
     def toInternalTable(limit0: Int): NeedEitherT[ExternalTable, InternalTable] = {
       val limit = limit0.toLong
 
-      def acc(slices: StreamT[M, Slice], buffer: List[Slice], size: Long): M[ExternalTable \/ InternalTable] = {
+      def acc(slices: NeedSlices, buffer: List[Slice], size: Long): M[ExternalTable \/ InternalTable] = {
         slices.uncons flatMap {
           case Some((head, tail)) =>
             val size0 = size + head.size

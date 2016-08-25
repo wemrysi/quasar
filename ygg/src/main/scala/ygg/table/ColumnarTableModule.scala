@@ -32,7 +32,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
   }
 
   trait ColumnarTableCompanion extends ygg.table.TableCompanion[outer.Table] {
-    def apply(slices: StreamT[M, Slice], size: TableSize): Table
+    def apply(slices: NeedSlices, size: TableSize): Table
 
     def singleton(slice: Slice): Table
 
@@ -59,8 +59,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     def constEmptyObject: Table                   = constSingletonTable(CEmptyObject, new InfiniteColumn with EmptyObjectColumn)
     def constEmptyArray: Table                    = constSingletonTable(CEmptyArray, new InfiniteColumn with EmptyArrayColumn)
 
-    def transformStream[A](sliceTransform: SliceTransform1[A], slices: StreamT[M, Slice]): StreamT[M, Slice] = {
-      def stream(state: A, slices: StreamT[M, Slice]): StreamT[M, Slice] = StreamT(
+    def transformStream[A](sliceTransform: SliceTransform1[A], slices: NeedSlices): NeedSlices = {
+      def stream(state: A, slices: NeedSlices): NeedSlices = StreamT(
         for {
           head <- slices.uncons
 
@@ -273,7 +273,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     }
   }
 
-  abstract class ColumnarTable(val slices: StreamT[M, Slice], val size: TableSize) extends ygg.table.Table {
+  abstract class ColumnarTable(val slices: NeedSlices, val size: TableSize) extends ygg.table.Table {
     self: Table =>
 
     type Table = outer.Table
@@ -316,7 +316,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     }
 
     def force: NeedTable = {
-      def loop(slices: StreamT[M, Slice], acc: List[Slice], size: Long): M[List[Slice] -> Long] = slices.uncons flatMap {
+      def loop(slices: NeedSlices, acc: List[Slice], size: Long): M[List[Slice] -> Long] = slices.uncons flatMap {
         case Some((slice, tail)) if slice.size > 0 => loop(tail, slice.materialized :: acc, size + slice.size)
         case Some((_, tail))                       => loop(tail, acc, size)
         case None                                  => Need(acc.reverse -> size)
@@ -357,7 +357,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
       * different than if the tables were normalized.
       */
     def zip(t2: Table): NeedTable = {
-      def rec(slices1: StreamT[M, Slice], slices2: StreamT[M, Slice]): StreamT[M, Slice] = {
+      def rec(slices1: NeedSlices, slices2: NeedSlices): NeedSlices = {
         StreamT(slices1.uncons flatMap {
           case Some((head1, tail1)) =>
             slices2.uncons map {
@@ -381,7 +381,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     }
 
     def toArray[A](implicit tpe: CValueType[A]): Table = {
-      val slices2: StreamT[M, Slice] = slices map { _.toArray[A] }
+      val slices2: NeedSlices = slices map { _.toArray[A] }
       Table(slices2, size)
     }
 
@@ -408,7 +408,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           }
       }
 
-      def step(sliceSize: Int, acc: List[Slice], stream: StreamT[M, Slice]): M[StreamT.Step[Slice, StreamT[M, Slice]]] = {
+      def step(sliceSize: Int, acc: List[Slice], stream: NeedSlices): M[StreamT.Step[Slice, NeedSlices]] = {
         stream.uncons flatMap {
           case Some((head, tail)) =>
             if (head.size == 0) {
@@ -527,7 +527,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                   /** The current slice to be operated upon. */
                                   data: Slice,
                                   /** The remainder of the stream to be operated upon. */
-                                  tail: StreamT[M, Slice])
+                                  tail: NeedSlices)
 
       sealed trait NextStep[A, B]
       case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
@@ -551,7 +551,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                        stbr: SliceTransform2[BR]) = {
 
         sealed trait CogroupState
-        case class EndLeft(lr: LR, lhead: Slice, ltail: StreamT[M, Slice]) extends CogroupState
+        case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices) extends CogroupState
         case class Cogroup(lr: LR,
                            rr: RR,
                            br: BR,
@@ -560,7 +560,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                            rightStart: Option[SlicePosition[RK]],
                            rightEnd: Option[SlicePosition[RK]])
             extends CogroupState
-        case class EndRight(rr: RR, rhead: Slice, rtail: StreamT[M, Slice]) extends CogroupState
+        case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
         case object CogroupDone                                             extends CogroupState
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
@@ -912,10 +912,10 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
       * a single table.
       */
     def cross(that: Table)(spec: TransSpec2): Table = {
-      def cross0[A](transform: SliceTransform2[A]): M[StreamT[M, Slice]] = {
-        case class CrossState(a: A, position: Int, tail: StreamT[M, Slice])
+      def cross0[A](transform: SliceTransform2[A]): M[NeedSlices] = {
+        case class CrossState(a: A, position: Int, tail: NeedSlices)
 
-        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[A -> StreamT[M, Slice]] = {
+        def crossBothSingle(lhead: Slice, rhead: Slice)(a0: A): M[A -> NeedSlices] = {
 
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
@@ -961,7 +961,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           }
         }
 
-        def crossLeftSingle(lhead: Slice, right: StreamT[M, Slice])(a0: A): StreamT[M, Slice] = {
+        def crossLeftSingle(lhead: Slice, right: NeedSlices)(a0: A): NeedSlices = {
           def step(state: CrossState): M[Option[Slice -> CrossState]] = {
             if (state.position < lhead.size) {
               state.tail.uncons flatMap {
@@ -984,7 +984,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           StreamT.unfoldM(CrossState(a0, 0, right))(step _)
         }
 
-        def crossRightSingle(left: StreamT[M, Slice], rhead: Slice)(a0: A): StreamT[M, Slice] = {
+        def crossRightSingle(left: NeedSlices, rhead: Slice)(a0: A): NeedSlices = {
           StreamT(left.uncons flatMap {
             case Some((lhead, ltail0)) =>
               crossBothSingle(lhead, rhead)(a0) map {
@@ -997,7 +997,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           })
         }
 
-        def crossBoth(ltail: StreamT[M, Slice], rtail: StreamT[M, Slice]): StreamT[M, Slice] = {
+        def crossBoth(ltail: NeedSlices, rtail: NeedSlices): NeedSlices = {
           // This doesn't carry the Transform's state around, so, I think it is broken.
           ltail.flatMap(crossLeftSingle(_, rtail)(transform.initial))
         }
@@ -1068,7 +1068,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
       */
     def distinct(spec: TransSpec1): Table = {
       def distinct0[T](id: SliceTransform1[Option[Slice]], filter: SliceTransform1[T]): Table = {
-        def stream(state: (Option[Slice], T), slices: StreamT[M, Slice]): StreamT[M, Slice] = StreamT(
+        def stream(state: (Option[Slice], T), slices: NeedSlices): NeedSlices = StreamT(
           for {
             head <- slices.uncons
 
@@ -1105,7 +1105,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
     }
 
     def takeRange(startIndex: Long, numberToTake: Long): Table = {
-      def loop(stream: StreamT[M, Slice], readSoFar: Long): M[StreamT[M, Slice]] = stream.uncons flatMap {
+      def loop(stream: NeedSlices, readSoFar: Long): M[NeedSlices] = stream.uncons flatMap {
         // Prior to first needed slice, so skip
         case Some((head, tail)) if (readSoFar + head.size) < (startIndex + 1) => loop(tail, readSoFar + head.size)
         // Somewhere in between, need to transition to splitting/reading
@@ -1114,7 +1114,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         case _ => Need(emptyStreamT())
       }
 
-      def inner(stream: StreamT[M, Slice], takenSoFar: Long, sliceStartIndex: Int): M[StreamT[M, Slice]] = stream.uncons flatMap {
+      def inner(stream: NeedSlices, takenSoFar: Long, sliceStartIndex: Int): M[NeedSlices] = stream.uncons flatMap {
         case Some((head, tail)) if takenSoFar < numberToTake => {
           val needed = head.takeRange(sliceStartIndex, (numberToTake - takenSoFar).toInt)
           inner(tail, takenSoFar + (head.size - (sliceStartIndex)), 0).map(needed :: _)
@@ -1166,8 +1166,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         }
       }
 
-      def subTable(comparatorGen: Slice => (Int => Ordering), slices: StreamT[M, Slice]): NeedTable = {
-        def subTable0(slices: StreamT[M, Slice], subSlices: StreamT[M, Slice], size: Int): NeedTable = {
+      def subTable(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices): NeedTable = {
+        def subTable0(slices: NeedSlices, subSlices: NeedSlices, size: Int): NeedTable = {
           slices.uncons flatMap {
             case Some((head, tail)) =>
               val headComparator = comparatorGen(head)
@@ -1186,7 +1186,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         subTable0(slices, emptyStreamT(), 0)
       }
 
-      def dropAndSplit(comparatorGen: Slice => (Int => Ordering), slices: StreamT[M, Slice], spanStart: Int): StreamT[M, Slice] = StreamT.wrapEffect {
+      def dropAndSplit(comparatorGen: Slice => (Int => Ordering), slices: NeedSlices, spanStart: Int): NeedSlices = StreamT.wrapEffect {
         slices.uncons map {
           case Some((head, tail)) =>
             val headComparator = comparatorGen(head)
@@ -1202,7 +1202,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         }
       }
 
-      def stepPartition(head: Slice, spanStart: Int, tail: StreamT[M, Slice]): StreamT[M, Slice] = {
+      def stepPartition(head: Slice, spanStart: Int, tail: NeedSlices): NeedSlices = {
         val comparatorGen = (s: Slice) => {
           val rowComparator = Slice.rowComparatorFor(head, s) { s0 =>
             s0.columns.keys collect {
@@ -1216,7 +1216,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
 
         val groupTable                       = subTable(comparatorGen, head.drop(spanStart) :: tail)
         val groupedM                         = groupTable.map(_ transform root.`1`).flatMap(f)
-        val groupedStream: StreamT[M, Slice] = StreamT.wrapEffect(groupedM.map(_.slices))
+        val groupedStream: NeedSlices = StreamT.wrapEffect(groupedM.map(_.slices))
 
         groupedStream ++ dropAndSplit(comparatorGen, head :: tail, spanStart)
       }
@@ -1321,7 +1321,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
       }
 
       // Collects all possible schemas from some slices.
-      def collectSchemas(schemas: Set[JType], slices: StreamT[M, Slice]): M[Set[JType]] = {
+      def collectSchemas(schemas: Set[JType], slices: NeedSlices): M[Set[JType]] = {
         def buildMasks(cols: Array[Column], sliceSize: Int): List[RawBitSet] = {
           import java.util.Arrays.copyOf
           val mask = RawBitSet.create(cols.length)

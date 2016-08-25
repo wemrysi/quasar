@@ -1,7 +1,7 @@
 package ygg.table
 
-import ygg.common._
 import scalaz._, Scalaz._
+import ygg.common._
 import trans._
 
 object Sampling {
@@ -21,7 +21,7 @@ object Sampling {
     */
   def sample[T <: ygg.table.Table](table: T, sampleSize: Int, specs: Seq[TransSpec1]): Need[Seq[T]] = {
 
-    def build(states: List[SampleState], slices: StreamT[M, Slice]): Need[List[T]] = {
+    def build(states: List[SampleState], slices: NeedSlices): Need[List[T]] = {
       slices.uncons flatMap {
         case Some((origSlice, tail)) =>
           val nextStates = states map {

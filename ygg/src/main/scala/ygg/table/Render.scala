@@ -13,7 +13,7 @@ object Render {
       else charBuffer(prefix) :: (stream ++ singleStreamT(charBuffer(suffix)))
     }
 
-    def foldFlatMap(slices: StreamT[M, Slice], rendered: Boolean): StreamT[M, CharBuffer] = {
+    def foldFlatMap(slices: NeedSlices, rendered: Boolean): StreamT[M, CharBuffer] = {
       StreamT[M, CharBuffer](slices.step map {
         case StreamT.Skip(tail)         => StreamT.Skip(foldFlatMap(tail(), rendered))
         case StreamT.Done               => StreamT.Done

@@ -17,7 +17,7 @@ trait ProjectionLike {
     */
   def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]]): Need[Option[BlockProjectionData[Key]]]
 
-  def getBlockStream(columns: Option[Set[ColumnRef]]): StreamT[Need, Slice] = {
+  def getBlockStream(columns: Option[Set[ColumnRef]]): NeedSlices = {
     StreamT.unfoldM[Need, Slice, Option[Key]](None) { key =>
       getBlockAfter(key, columns) map {
         _ map { case BlockProjectionData(_, maxKey, block) => (block, Some(maxKey)) }

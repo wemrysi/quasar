@@ -81,18 +81,13 @@ abstract class ColumnarTableQspec extends TableQspec with ColumnarTableModuleTes
 
   final object Table extends TableCompanion
 
-  final class Table(slices: StreamT[Need, Slice], size: TableSize) extends ColumnarTable(slices, size) {
-    def companion                                                                                                                   = Table
-    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                      = Need(this)
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                = Need(this)
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
-
+  final class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) with NoLoadTable with NoSortTable with NoGroupTable {
+    def companion = Table
     // Deadlock
     // override def toString = toJson.value.mkString("TABLE{ ", ", ", "}")
   }
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[Need, Slice], size: TableSize): Table                                        = new Table(slices, size)
+    def apply(slices: NeedSlices, size: TableSize): Table                                        = new Table(slices, size)
     def singleton(slice: Slice): Table                                                                     = new Table(slice :: StreamT.empty[Need, Slice], ExactSize(1))
     def align(sourceL: Table, alignL: TransSpec1, sourceR: Table, alignR: TransSpec1): Need[PairOf[Table]] = ???
   }
