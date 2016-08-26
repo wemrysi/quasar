@@ -186,7 +186,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, sparkcore,
+  mongodb, skeleton, postgresql, marklogic, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -244,6 +244,7 @@ lazy val main = project
     mongodb,
     skeleton,
     postgresql,
+    marklogic,
     core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
@@ -262,6 +263,14 @@ lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val marklogic = project
+  .settings(name := "quasar-marklogic-internal")
+  .dependsOn(core % BothScopes)
+  .settings(commonSettings)
+  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val postgresql = project

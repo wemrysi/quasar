@@ -80,10 +80,10 @@ package object mount {
     type ViewHandles = Map[ReadFile.ReadHandle, ResultSet]
 
     def toTask(initial: ViewHandles): Task[ViewState ~> Task] =
-      TaskRef(initial) map KeyValueStore.fromTaskRef
+      TaskRef(initial) map KeyValueStore.impl.fromTaskRef
 
     def toState[S](l: Lens[S, ViewHandles]): ViewState ~> State[S, ?] =
-      KeyValueStore.toState[State[S,?]](l)
+      KeyValueStore.impl.toState[State[S,?]](l)
   }
 
   type ViewFileSystem0[A] = Coproduct[MonotonicSeq, FileSystem, A]
