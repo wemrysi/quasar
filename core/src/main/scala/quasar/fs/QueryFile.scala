@@ -58,22 +58,35 @@ object QueryFile {
         .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
   }
 
+  /** A variant of convertToQScript that takes advantage of an existing QueryFile
+    * implementation.
+    */
+  def algConvertToQScript
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
+    (lp: T[LogicalPlan])
+    (implicit QF: QueryFile.Ops[S]):
+      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] =
+    convertToQScript[T, Free[S, ?]]((QF.ls(_: ADir)).some)(lp)
+
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
-    lp: T[LogicalPlan]
-  ): PlannerErrT[PhaseResultW, T[QS[T, ?]]] = {
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
+    f: Option[ConvertPath.ListContents[M]])(
+    lp: T[LogicalPlan]):
+      EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
     val optimize = new Optimize[T]
 
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
-    val qs = optimizeEval(lp)(optimize.applyAll).map(
-      _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+    val qs =
+      (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
+        optimize.eliminateProjections(f)).map(
+        _.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
-    EitherT(Writer(
-      qs.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
-      qs))
+    EitherT(WriterT(qs.run.map(qq => (
+      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq))))
   }
 
   /** The result of the query is stored in an output file

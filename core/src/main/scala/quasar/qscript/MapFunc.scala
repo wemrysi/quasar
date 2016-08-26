@@ -616,15 +616,29 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](str: String): Free[MapFunc[T, ?], A] =
       Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Str[T[EJson]](str)).embed))
 
-    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]): Option[String] = mf.run.fold ({
-      _ => None
-    }, {
-      case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
-        case ejson.Str(str) => str.some
+    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
+        Option[String] =
+      mf.run.fold({
+        _ => None
+      }, {
+        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+          case ejson.Str(str) => str.some
+          case _ => None
+        }
         case _ => None
-      }
-      case _ => None
-    })
+      })
+
+    def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]):
+        Option[String] =
+      mf.resume.fold({
+        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+          case ejson.Str(str) => str.some
+          case _ => None
+        }
+        case _ => None
+      }, {
+        _ => None
+      })
   }
 }
 

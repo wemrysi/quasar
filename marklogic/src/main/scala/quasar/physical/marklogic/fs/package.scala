@@ -17,7 +17,6 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
-import quasar.Data
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp._
 import quasar.fp.free._
@@ -94,7 +93,8 @@ package object fs {
         rc.close.void
 
       def nextChunk(rc: ResultCursor) =
-        rc.nextChunk.map(_.foldLeft(Vector[Data]())((ds, x) =>
-          ds :+ xdmitem.toData(x)))
+        TV.map(rc.nextChunk)(xdmitem.toData)
+
+      val TV = Functor[Task].compose[Vector]
     }
 }

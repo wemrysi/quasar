@@ -23,7 +23,7 @@ import scalaz._
 sealed abstract class XQuery {
   import XQuery._
 
-  def apply(predicate: XQuery): XQuery = XQuery(s"${this}[$predicate]")
+  def apply(predicate: XQuery): XQuery = XQuery(s"$this[$predicate]")
   def unary_- : XQuery = XQuery(s"-$this")
   def -(other: XQuery): XQuery = XQuery(s"$this - $other")
   def +(other: XQuery): XQuery = XQuery(s"$this + $other")

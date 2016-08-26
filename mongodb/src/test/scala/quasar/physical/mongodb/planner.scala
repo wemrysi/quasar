@@ -2876,7 +2876,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.Doc(
-            BsonField.Name("_id") -> Selector.Neq(Bson.Null))),
+            BsonField.Name("_id") -> Selector.Exists(true))),
           $project(reshape("left" -> $$ROOT)),
           $lookup(
             CollectionName("zips2"),
@@ -3021,13 +3021,49 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $match(Selector.Doc(
-          BsonField.Name("id") -> Selector.Neq(Bson.Null))),
+          BsonField.Name("id") -> Selector.Exists(true))),
         $project(reshape("left" -> $$ROOT)),
         $lookup(
           CollectionName("bar"),
           BsonField.Name("left") \ BsonField.Name("id"),
           BsonField.Name("foo_id"),
           BsonField.Name("right")),
+        $unwind(DocField(BsonField.Name("right"))),
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+    }
+
+    "plan simple inner equi-join with expression ($lookup)" in {
+      plan(
+        "select foo.name, bar.address from foo join bar on lower(foo.id) = bar.foo_id") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "foo")),
+        $project(reshape(
+          "left" -> $$ROOT,
+          "__tmp0" -> $toLower($field("id"))),
+          IgnoreId),
+        $lookup(
+          CollectionName("bar"),
+          BsonField.Name("__tmp0"),
+          BsonField.Name("foo_id"),
+          BsonField.Name("right")),
+        $project(reshape(
+          "left" -> $field("left"),
+          "right" -> $field("right"))),
         $unwind(DocField(BsonField.Name("right"))),
         $project(reshape(
           "name" ->
@@ -3096,7 +3132,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           false).op)
     }
 
-    "plan simple left equi-join" in {
+    "plan simple left equi-join (map-reduce)" in {
       plan(
         "select foo.name, bar.address " +
           "from foo left join bar on foo.id = bar.foo_id") must
@@ -3138,6 +3174,68 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               IgnoreId)),
           false).op)
     }
+
+    "plan simple left equi-join ($lookup)" in {
+      plan(
+        "select foo.name, bar.address " +
+          "from foo left join bar on foo.id = bar.foo_id") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "foo")),
+        $project(reshape("left" -> $$ROOT)),
+        $lookup(
+          CollectionName("bar"),
+          BsonField.Name("left") \ BsonField.Name("id"),
+          BsonField.Name("foo_id"),
+          BsonField.Name("right")),
+        $unwind(DocField(BsonField.Name("right"))),  // FIXME: need to preserve docs with no match
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+    }.pendingUntilFixed("TODO: left/right joins in $lookup")
+
+    "plan simple right equi-join ($lookup)" in {
+      plan(
+        "select foo.name, bar.address " +
+          "from foo right join bar on foo.id = bar.foo_id") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "bar")),
+        $project(reshape("right" -> $$ROOT)),
+        $lookup(
+          CollectionName("foo"),
+          BsonField.Name("right") \ BsonField.Name("foo_id"),
+          BsonField.Name("id"),
+          BsonField.Name("left")),
+        $unwind(DocField(BsonField.Name("left"))),  // FIXME: need to preserve docs with no match
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+    }.pendingUntilFixed("TODO: left/right joins in $lookup")
 
     "plan 3-way right equi-join (map-reduce)" in {
       plan2_6(
@@ -3209,6 +3307,66 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                     $literal(Bson.Undefined))),
               IgnoreId)),
           true).op)
+    }
+
+    "plan 3-way equi-join ($lookup)" in {
+      plan(
+        "select foo.name, bar.address, baz.zip " +
+          "from foo join bar on foo.id = bar.foo_id " +
+          "join baz on bar.id = baz.bar_id") must
+        beWorkflow(chain[Workflow](
+          $read(collection("db", "foo")),
+          $match(Selector.Doc(
+            BsonField.Name("id") -> Selector.Exists(true))),
+          $project(reshape("left" -> $$ROOT)),
+          $lookup(
+            CollectionName("bar"),
+            BsonField.Name("left") \ BsonField.Name("id"),
+            BsonField.Name("foo_id"),
+            BsonField.Name("right")),
+          $unwind(DocField(BsonField.Name("right"))),
+          $match(Selector.Doc(
+            BsonField.Name("right") \ BsonField.Name("id") -> Selector.Exists(true))),
+          $project(reshape("left" -> $$ROOT)),
+          $lookup(
+            CollectionName("baz"),
+            BsonField.Name("left") \ BsonField.Name("right") \ BsonField.Name("id"),
+            BsonField.Name("bar_id"),
+            BsonField.Name("right")),
+          $unwind(DocField(BsonField.Name("right"))),
+          $project(reshape(
+            "name" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                  $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $cond(
+                  $and(
+                    $lte($literal(Bson.Doc(ListMap())), $field("left", "left")),
+                    $lt($field("left", "left"), $literal(Bson.Arr(Nil)))),
+                  $field("left", "left", "name"),
+                  $literal(Bson.Undefined)),
+                $literal(Bson.Undefined)),
+            "address" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                  $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $cond(
+                  $and(
+                    $lte($literal(Bson.Doc(ListMap())), $field("left", "right")),
+                    $lt($field("left", "right"), $literal(Bson.Arr(Nil)))),
+                  $field("left", "right", "address"),
+                  $literal(Bson.Undefined)),
+                $literal(Bson.Undefined)),
+            "zip" ->
+              $cond(
+                $and(
+                  $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                  $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $field("right", "zip"),
+                $literal(Bson.Undefined))),
+            IgnoreId)))
     }
 
     "plan join with multiple conditions" in {

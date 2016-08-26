@@ -45,9 +45,7 @@ object managefile {
           case MoveScenario.DirToDir(src, dst)   => moveDir(src, dst, semantics)
         }).into[S]
 
-      def checkMoveSemantics(
-        src: APath, dst: APath, sem: MoveSemantics
-      ): FileSystemErrT[SessionIO, Unit] =
+      def checkMoveSemantics(dst: APath, sem: MoveSemantics): FileSystemErrT[SessionIO, Unit] =
         EitherT(sem match {
           case MoveSemantics.Overwrite =>
             ().right[FileSystemError].point[SessionIO]
@@ -64,9 +62,10 @@ object managefile {
         })
 
       def moveFile(src: AFile, dst: AFile, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] =
-        ops.exists(src).ifM(
-          (checkMoveSemantics(src, dst, sem) *> ops.moveFile(src, dst).liftM[FileSystemErrT]).run,
-          pathErr(pathNotFound(src)).left[Unit].point[SessionIO])
+        ifExists(src)((
+          checkMoveSemantics(dst, sem) *>
+          ops.moveFile(src, dst).liftM[FileSystemErrT]
+        ).run)
 
       def moveDir(src: ADir, dst: ADir, sem: MoveSemantics): SessionIO[FileSystemError \/ Unit] = {
         def moveContents(src0: ADir, dst0: ADir): SessionIO[Unit] =
@@ -75,21 +74,18 @@ object managefile {
             f => ops.moveFile(src0 </> file1(f), dst0 </> file1(f)))))
 
         def doMove =
-          checkMoveSemantics(src, dst, sem)        *>
+          checkMoveSemantics(dst, sem)                 *>
           moveContents(src, dst).liftM[FileSystemErrT] *>
           ops.deleteDir(src).liftM[FileSystemErrT]
 
-        ops.exists(src).ifM(
-          doMove.run,
-          pathErr(pathNotFound(src)).left[Unit].point[SessionIO])
+        ifExists(src)(doMove.run)
       }
 
       def delete(path: APath): Free[S, FileSystemError \/ Unit] =
-        lift(ops.exists(path).ifM(
+        lift(ifExists(path)(
           refineType(path)
             .fold(ops.deleteDir, ops.deleteFile)
-            .map(_.right[FileSystemError]),
-          pathErr(pathNotFound(path)).left[Unit].point[SessionIO]
+            .map(_.right[FileSystemError])
         )).into[S]
 
       def tempFile(path: APath): Free[S, FileSystemError \/ AFile] =
@@ -104,5 +100,11 @@ object managefile {
         lift(SessionIO.liftT(
           Task.delay("temp-" + Random.alphanumeric.take(10).mkString)
         )).into[S]
+
+      def ifExists[A](
+        path: APath)(
+        thenDo: => SessionIO[FileSystemError \/ A]
+      ): SessionIO[FileSystemError \/ A] =
+        ops.exists(path).ifM(thenDo, pathErr(pathNotFound(path)).left[A].point[SessionIO])
     }
 }

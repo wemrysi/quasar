@@ -59,10 +59,16 @@ object uuid {
     *   `toSequentialString(a) < toSequentialString(b) == true`
     *
     * returns None if the given UUID is not Type-1.
+    *
+    * See https://www.ietf.org/rfc/rfc4122.txt
     */
   def toSequentialString(uuid: UUID): Option[String] =
     if (uuid.version === 1) {
       val parts = uuid.toString.split("-")
+      // ORIGINAL:   time.low-time.mid-ver.time.high-clockseq-node
+      // SEQUENTIAL: ver.time.high-time.mid-time.low-clockseq-node
+      // NB: The original hyphens are elided as the result no longer purports
+      //     to be a UUID.
       Some(s"${parts(2)}${parts(1)}${parts(0)}${parts(3)}${parts(4)}")
     } else None
 }

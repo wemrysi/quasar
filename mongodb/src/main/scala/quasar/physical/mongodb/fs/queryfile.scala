@@ -50,7 +50,7 @@ object queryfile {
                   (implicit C: DataCursor[MongoDbIO, C])
                   : QueryFile ~> MongoQuery[C, ?] = {
 
-    new QueryFileInterpreter(execMongo, MongoDbPlanner.plan)
+    new QueryFileInterpreter(execMongo, (lp, qc) => MongoDbPlanner.plan(lp, qc).leftMap(FileSystemError.planningFailed(lp, _)))
   }
 
   def interpretQ[C](execMongo: WorkflowExecutor[MongoDbIO, C])
@@ -87,12 +87,11 @@ final case class QueryContext(
 
 private final class QueryFileInterpreter[C](
   execMongo: WorkflowExecutor[MongoDbIO, C],
-  plan: (Fix[LogicalPlan], QueryContext) => EitherT[Writer[PhaseResults, ?], Planner.PlannerError, workflow.Crystallized[workflow.WorkflowF]])(
+  plan: (Fix[LogicalPlan], QueryContext) => EitherT[Writer[PhaseResults, ?], FileSystemError, workflow.Crystallized[workflow.WorkflowF]])(
   implicit C: DataCursor[MongoDbIO, C]
 ) extends (QueryFile ~> queryfileTypes.MongoQuery[C, ?]) {
 
   import QueryFile._
-  import Planner.{PlannerError => PPlannerError}
   import quasar.physical.mongodb.workflow._
   import FileSystemError._, fsops._
   import Recursive.ops._
@@ -176,7 +175,7 @@ private final class QueryFileInterpreter[C](
 
   ////
 
-  private type PlanR[A]       = EitherT[Writer[PhaseResults, ?], PPlannerError, A]
+  private type PlanR[A]       = EitherT[Writer[PhaseResults, ?], FileSystemError, A]
   private type MongoLogWF[A]  = PhaseResultT[MQ, A]
   private type MongoLogWFR[A] = FileSystemErrT[MongoLogWF, A]
 
@@ -240,7 +239,7 @@ private final class QueryFileInterpreter[C](
   private def convertPlanR(lp: Fix[LogicalPlan]): PlanR ~> MongoLogWFR =
     new (PlanR ~> MongoLogWFR) {
       def apply[A](pa: PlanR[A]) = {
-        val r = pa.leftMap(planningFailed(lp, _)).run.run
+        val r = pa.run.run
         val f: MongoLogWF[FileSystemError \/ A] = WriterT(r.point[MQ])
         EitherT(f)
       }

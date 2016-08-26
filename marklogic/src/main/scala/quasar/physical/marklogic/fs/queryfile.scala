@@ -38,6 +38,7 @@ object queryfile {
   import FileSystemError._, PathError._
   import MarkLogicPlanner._
 
+  // TODO: Still need to implement ExecutePlan.
   def interpret[S[_]](
     resultsChunkSize: Positive
   )(implicit
@@ -47,38 +48,43 @@ object queryfile {
     S3: MLResultHandles :<: S,
     S4: MonotonicSeq :<: S
   ): QueryFile ~> Free[S, ?] = {
-    def plannedLP[F[_]: Monad, A](
+    def plannedLP[A](
       lp: Fix[LogicalPlan])(
-      f: XQuery => F[A]
-    ): F[(PhaseResults, FileSystemError \/ A)] = {
+      f: XQuery => ContentSourceIO[A]
+    ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import EitherT.eitherTMonad
 
-      val hoist_ = Hoist[PlannerErrT].hoist(Hoist[PhaseResultT].hoist(pointNT[F]))
+      val hoist_ = Hoist[PlannerErrT].hoist(Hoist[PhaseResultT].hoist(pointNT[ContentSourceIO]))
 
       def phase(xqy: XQuery): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
+      val listContents: ConvertPath.ListContents[ContentSourceIO] =
+        adir => ContentSourceIO.runSessionIO(ops.ls(adir)).liftM[FileSystemErrT]
+
       val planning = for {
-        qs  <- hoist_(convertToQScript(lp))
+        qs  <- convertToQScript(some(listContents))(lp)
         xqy <- hoist_(qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
-        a   <- WriterT.put(f(xqy))(phase(xqy)).liftM[PlannerErrT]
+                 .leftMap(planningFailed(lp, _))
+        a   <- WriterT.put(f(xqy))(phase(xqy)).liftM[FileSystemErrT]
       } yield a
 
-      planning.leftMap(planningFailed(lp, _)).run.run
+      lift(planning.run.run).into[S]
     }
 
     def exec(lp: Fix[LogicalPlan], out: AFile) =
-      plannedLP(lp)(κ(out.point[Free[S, ?]]))
+      plannedLP(lp)(κ(out.point[ContentSourceIO]))
 
     def eval(lp: Fix[LogicalPlan]) =
-      lift(plannedLP(lp)(xqy => ContentSourceIO.resultCursor(
-        SessionIO.evaluateQuery_(xqy),
-        resultsChunkSize
-      ))).into[S]
+      plannedLP(lp)(xqy =>
+        ContentSourceIO.resultCursor(
+          SessionIO.evaluateQuery_(xqy),
+          resultsChunkSize))
 
     def explain(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(xqy => ExecutionPlan(FsType, xqy.toString).point[Free[S, ?]])
+      plannedLP(lp)(xqy =>
+        ExecutionPlan(FsType, xqy.toString).point[ContentSourceIO])
 
     def exists(file: AFile): Free[S, Boolean] =
       lift(ops.exists(file)).into[S]

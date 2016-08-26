@@ -21,7 +21,7 @@ import quasar.RenderTree
 
 import matryoshka._
 import monocle.macros.Lenses
-import pathy._, Path._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 // TODO: Abstract Read over the backend’s preferred path representation.
@@ -31,7 +31,7 @@ import scalaz._, Scalaz._
 object Read {
   implicit def equal: Equal[Read] = Equal.equalBy(_.path)
   implicit def show: Show[Read] =
-    Show.show(Cord("Read(") ++ _.path.show ++ Cord(")"))
+    Show.show(r => Cord("Read(") ++ posixCodec.printPath(r.path) ++ Cord(")"))
 
   implicit def renderTree: RenderTree[Read] = RenderTree.fromShow("Read")
 }

@@ -278,10 +278,10 @@ package object sql {
 
   private val astType = "AST" :: Nil
 
-  implicit def ExprRelationRenderTree: RenderTree ~> λ[α => RenderTree[SqlRelation[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[SqlRelation[α]]]) {
-      def apply[α](ra: RenderTree[α]) = new RenderTree[SqlRelation[α]] {
-        def render(r: SqlRelation[α]): RenderedTree = r match {
+  implicit def ExprRelationRenderTree: Delay[RenderTree, SqlRelation] =
+    new Delay[RenderTree, SqlRelation] {
+      def apply[A](ra: RenderTree[A]) = new RenderTree[SqlRelation[A]] {
+        def render(r: SqlRelation[A]): RenderedTree = r match {
           case IdentRelationAST(name, alias) =>
             val aliasString = alias.cata(" as " + _, "")
             Terminal("IdentRelation" :: astType, Some(name + aliasString))
@@ -300,13 +300,13 @@ package object sql {
       }
     }
 
-  implicit val SqlRenderTree: RenderTree ~> λ[α => RenderTree[Sql[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[Sql[α]]]) {
-      def apply[α](ra: RenderTree[α]): RenderTree[Sql[α]] = new RenderTree[Sql[α]] {
-        def renderCase(c: Case[α]): RenderedTree =
+  implicit val SqlRenderTree: Delay[RenderTree, Sql] =
+    new Delay[RenderTree, Sql] {
+      def apply[A](ra: RenderTree[A]): RenderTree[Sql[A]] = new RenderTree[Sql[A]] {
+        def renderCase(c: Case[A]): RenderedTree =
           NonTerminal("Case" :: astType, None, ra.render(c.cond) :: ra.render(c.expr) :: Nil)
 
-        def render(n: Sql[α]) = n match {
+        def render(n: Sql[A]) = n match {
           case Select(isDistinct, projections, relations, filter, groupBy, orderBy) =>
             val nt = "Select" :: astType
             NonTerminal(nt,
