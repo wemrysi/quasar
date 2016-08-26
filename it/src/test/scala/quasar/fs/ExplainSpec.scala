@@ -18,34 +18,48 @@ package quasar.fs
 
 import quasar.Predef._
 
+import pathy.Path._
+import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
 class ExplainSpec
   extends FileSystemTest[FileSystem](FileSystemTest.allFsUT)
   with quasar.CompilerHelpers {
 
-  def explainQuery(sql: String, fsut: FileSystemUT[FileSystem]) =
+  import FileSystemTest.oneDoc
+
+  val query  = QueryFile.Ops[FileSystem]
+  val write  = WriteFile.Ops[FileSystem]
+  val manage = ManageFile.Ops[FileSystem]
+
+  val dataFile: AFile = rootDir </> dir("explain") </> file("data")
+  val dataStr: String = posixCodec.printPath(dataFile)
+
+  def explainQuery(sql: String, fs: FileSystemUT[FileSystem]) =
     s"QUERY: $sql" >> {
       val result =
-        QueryFile.Ops[FileSystem]
+        query
           .explain(fullCompileExp(sql))
           .run.run
 
-      fsut.testInterpM(result).map { case (phases, disj) =>
+      fs.testInterpM(result).map { case (phases, disj) =>
         disj.fold(
-          err => pending(err.shows),
-          _ => pending(phases.mkString("\n\n")))
+          err => ko(err.shows).toResult,
+          _   => pending(phases.mkString("\n\n")))
       }.unsafePerformSync
     }
 
   fileSystemShould { fs =>
+    step(runT(fs.setupInterpM)(write.saveThese(dataFile, oneDoc).void).runVoid)
+
     "Explain Queries" should {
 
-//    explainQuery("select * from `/foo`", fs)
+      explainQuery(s"select * from `$dataStr`", fs)
 
-      explainQuery("select * from `/foo/bar/baz` limit 10", fs)
+      explainQuery(s"select * from `$dataStr` limit 10", fs)
 
-//    explainQuery("select baz.foo[*] from `/foo/bar/baz`", fs)
     }
+
+    step(runT(fs.setupInterpM)(manage.delete(dataFile)).runVoid)
   }
 }
