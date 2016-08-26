@@ -1,8 +1,7 @@
 package ygg.table
 
-import ygg.common._
 import scalaz._, Scalaz._
-import ygg.json._
+import ygg._, common._, json._
 
 sealed trait CPath {
   def nodes: Vec[CPathNode]

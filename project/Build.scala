@@ -1,8 +1,8 @@
-package xygg.build
+package xygg
 
 import sbt._, Keys._
 
-object Build {
+object YggBuild {
   val BothScopes = "compile->compile;test->test"
 
   def scalazVersion     = "7.2.5"
@@ -137,7 +137,7 @@ object Build {
     // testForkedParallel in Test :=  true,
 
     def setup: Project = (
-      serialTests.stdPlugins.crossSourceDirs.allWarnings.fatalWarnings.fixConsole also (
+      serialTests.stdPlugins.crossSourceDirs.allWarnings.fixConsole also (
                exportJars :=  false,
              organization :=  "com.precog",
                   version :=  "0.1",

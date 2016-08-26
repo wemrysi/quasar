@@ -1,4 +1,4 @@
-import xygg.build.Build._
+import xygg._, YggBuild._
 
 lazy val root = project.root.setup.noArtifacts aggregate (macros, ygg) dependsOn (ygg % BothScopes) also (
   initialCommands in console := "import ygg._, common._, json._, data._, table._"
@@ -6,7 +6,9 @@ lazy val root = project.root.setup.noArtifacts aggregate (macros, ygg) dependsOn
 
 lazy val macros = project.setup also macroDependencies
 
-lazy val ygg = project.setup dependsOn macros deps (yggDependencies: _*)
+lazy val ygg = project.setup dependsOn macros deps (yggDependencies: _*) also (
+  sourceGenerators in Compile += Boilerplate.generate.taskValue
+)
 
 lazy val benchmark = project.setup dependsOn (ygg % BothScopes) enablePlugins JmhPlugin also (
                 fork in Test :=  true,
