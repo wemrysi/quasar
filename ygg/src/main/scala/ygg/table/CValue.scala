@@ -40,8 +40,6 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
   )
 }
 sealed trait CType extends Serializable {
-  def readResolve(): CType
-
   def typeIndex: Int = this match {
     case CUndefined    => 0
     case CBoolean      => 1
@@ -65,7 +63,6 @@ sealed abstract class CNullType extends CType with CValue {
 sealed abstract class CValueType[A: CTag] extends CType {
   val classTag: CTag[A] = implicitly[CTag[A]]
 
-  def readResolve(): CValueType[A]
   def apply(a: A): CWrappedValue[A]
   def order(a: A, b: A): Cmp
 }
@@ -213,7 +210,6 @@ object CValue {
 }
 
 object CType {
-  def readResolve() = CType
   def of(v: CValue): CType = v.cType
 
   def canCompare(t1: CType, t2: CType): Boolean = (t1 == t2) || {
@@ -296,8 +292,6 @@ case object CArray {
 case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()(elemType.classTag.wrap) {
   type tpe = A
 
-  def readResolve() = CArrayType(elemType.readResolve())
-
   def apply(value: Array[A]) = CArray(value, this)
 
   def order(as: Array[A], bs: Array[A]): Ordering =
@@ -310,7 +304,6 @@ case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()
 case class CString(value: String) extends CWrappedValue[String]
 
 case object CString extends CValueType[String] {
-  def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
 }
 
@@ -325,7 +318,6 @@ case object CFalse extends CBoolean(false)
 object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)           = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean)        = Some(cbool.value)
-  def readResolve()                   = CBoolean
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)
 }
 
@@ -335,7 +327,6 @@ object CBoolean extends CValueType[Boolean] {
 case class CLong(value: Long) extends CNumericValue[Long]
 
 case object CLong extends CNumericType[Long] {
-  def readResolve()             = CLong
   def order(v1: Long, v2: Long) = longInstance.order(v1, v2)
   def bigDecimalFor(v: Long)    = decimal(v)
 }
@@ -343,7 +334,6 @@ case object CLong extends CNumericType[Long] {
 case class CDouble(value: Double) extends CNumericValue[Double]
 
 case object CDouble extends CNumericType[Double] {
-  def readResolve()                 = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
   def bigDecimalFor(v: Double)      = decimal(v.toString)
 }
@@ -351,7 +341,6 @@ case object CDouble extends CNumericType[Double] {
 case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal]
 
 case object CNum extends CNumericType[BigDecimal] {
-  def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
   def bigDecimalFor(v: BigDecimal)          = v
 }
@@ -362,30 +351,16 @@ case object CNum extends CNumericType[BigDecimal] {
 case class CDate(value: DateTime) extends CWrappedValue[DateTime]
 
 case object CDate extends CValueType[DateTime] {
-  def readResolve()                     = CDate
   def order(v1: DateTime, v2: DateTime) = ???
 }
 
 case class CPeriod(value: Period) extends CWrappedValue[Period]
 
 case object CPeriod extends CValueType[Period] {
-  def readResolve()                 = CPeriod
   def order(v1: Period, v2: Period) = ???
 }
 
-//
-// Null / Undef
-//
-case object CNull extends CNullType {
-  def readResolve() = CNull
-}
-
-case object CEmptyObject extends CNullType {
-  def readResolve() = CEmptyObject
-}
-case object CEmptyArray extends CNullType {
-  def readResolve() = CEmptyArray
-}
-case object CUndefined extends CNullType {
-  def readResolve() = CUndefined
-}
+final case object CNull extends CNullType
+final case object CEmptyObject extends CNullType
+final case object CEmptyArray extends CNullType
+final case object CUndefined extends CNullType

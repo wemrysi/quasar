@@ -10,7 +10,7 @@ trait ColumnEncoder {
 }
 
 trait ColumnDecoder {
-  def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0): Unit
+  def decodeToRow(row: Int, src: Array[Byte], offset: Int): Unit
 }
 
 trait RowFormat {
@@ -21,7 +21,9 @@ trait RowFormat {
   def ColumnDecoder(cols: Seq[ArrayColumn[_]]): ColumnDecoder
 
   def encode(cValues: List[CValue]): Array[Byte]
-  def decode(bytes: Array[Byte], offset: Int = 0): List[CValue]
+  def decode(bytes: Array[Byte], offset: Int): List[CValue]
+
+  def decode(bytes: Array[Byte]): List[CValue] = decode(bytes, offset = 0)
 
   def compare(a: Array[Byte], b: Array[Byte]): Int = {
     val selectors = columnRefs map (_.selector)
@@ -47,32 +49,16 @@ object RowFormat {
   val byteBufferPool = ByteBufferPool()
 
   def forSortingKey(columnRefs: Seq[ColumnRef]): RowFormat = SortingKeyRowFormatV1(columnRefs)
+  def forValues(columnRefs: Seq[ColumnRef]): RowFormat     = ValueRowFormatV1(columnRefs)
 
-  def forValues(columnRefs: Seq[ColumnRef]): RowFormat = ValueRowFormatV1(columnRefs)
-
-  case class ValueRowFormatV1(_columnRefs: Seq[ColumnRef]) extends ValueRowFormat with RowFormatCodecs {
-    // This is really stupid, but required to work w/ JDBM.
-    @transient lazy val columnRefs: Seq[ColumnRef] = _columnRefs map { ref =>
-      ref.copy(ctype = ref.ctype.readResolve())
-    }
-
+  case class ValueRowFormatV1(columnRefs: Seq[ColumnRef]) extends ValueRowFormat with RowFormatCodecs {
     // TODO Get this from somewhere else?
     def pool = byteBufferPool
   }
-
-  case class SortingKeyRowFormatV1(_columnRefs: Seq[ColumnRef]) extends RowFormatCodecs with SortingRowFormat {
-    @transient lazy val columnRefs: Seq[ColumnRef] = _columnRefs map { ref =>
-      ref.copy(ctype = ref.ctype.readResolve())
-    }
-
+  case class SortingKeyRowFormatV1(columnRefs: Seq[ColumnRef]) extends RowFormatCodecs with SortingRowFormat {
     def pool = byteBufferPool
   }
-
-  case class IdentitiesRowFormatV1(_columnRefs: Seq[ColumnRef]) extends IdentitiesRowFormat {
-    @transient lazy val columnRefs: Seq[ColumnRef] = _columnRefs map { ref =>
-      ref.copy(ctype = ref.ctype.readResolve())
-    }
-  }
+  case class IdentitiesRowFormatV1(columnRefs: Seq[ColumnRef]) extends IdentitiesRowFormat
 }
 
 trait RowFormatSupport { self: StdCodecs =>
@@ -334,7 +320,7 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
     }(collection.breakOut)
 
     new ColumnDecoder {
-      def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
+      def decodeToRow(row: Int, src: Array[Byte], offset: Int) {
         val buf       = byteBuffer(src, offset, src.length - offset)
         val undefined = buf.read[RawBitSet]
         @tailrec
@@ -539,7 +525,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
       }
 
     new ColumnDecoder {
-      def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
+      def decodeToRow(row: Int, src: Array[Byte], offset: Int) {
         val buf = byteBuffer(src, offset, src.length - offset)
 
         @tailrec
@@ -582,7 +568,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
     } yield bytes)
   }
 
-  def decode(bytes: Array[Byte], offset: Int = 0): List[CValue] = {
+  def decode(bytes: Array[Byte], offset: Int): List[CValue] = {
     val buf = byteBuffer(bytes)
 
     def readForSelector(cTypes: List[CType]): List[CValue] = {
@@ -911,7 +897,7 @@ trait IdentitiesRowFormat extends RowFormat {
     })(collection.breakOut)
 
     new ColumnDecoder {
-      def decodeToRow(row: Int, src: Array[Byte], offset: Int = 0) {
+      def decodeToRow(row: Int, src: Array[Byte], offset: Int) {
 
         @inline
         @tailrec

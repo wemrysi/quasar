@@ -102,7 +102,7 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
         val columnEncoder = rowFormat.ColumnEncoder(columns)
 
         val cId: List[CValue] = id map (CLong(_))
-        columnDecoder.decodeToRow(0, rowFormat.encode(cId))
+        columnDecoder.decodeToRow(0, rowFormat.encode(cId), offset = 0)
 
         verify(cId :: Nil, columns)
 
@@ -165,7 +165,7 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
           // Fill up the columns with the values from the rows.
           rows.zipWithIndex foreach {
             case (vals, row) =>
-              columnDecoder.decodeToRow(row, rowFormat.encode(vals))
+              columnDecoder.decodeToRow(row, rowFormat.encode(vals), offset = 0)
           }
 
           verify(rows, columns)
