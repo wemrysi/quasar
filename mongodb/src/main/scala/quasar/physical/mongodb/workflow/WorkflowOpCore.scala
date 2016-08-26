@@ -982,7 +982,7 @@ object WorkflowOpCoreF {
           NonTerminal(nt, None,
             exprs.toList.map {
               case MapExpr(e)  => NonTerminal("Map" :: nt, None, List(e.render))
-	      case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
+        case FlatExpr(e) => NonTerminal("Flatten" :: nt, None, List(e.render))
             } :+
               Terminal("Scope" :: nt, Some((scope ∘ (_.toJs.pprint(2))).toString)))
         case $ReduceF(_, fn, scope) =>

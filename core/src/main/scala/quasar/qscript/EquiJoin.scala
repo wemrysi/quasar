@@ -16,7 +16,9 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar.fp._
+import quasar.RenderTree
 
 import matryoshka._
 import matryoshka.patterns._
@@ -71,6 +73,9 @@ object EquiJoin {
       }
     }
 
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, EquiJoin[T, ?]] =
+    RenderTree.delayFromShow
+
   implicit def traverse[T[_[_]]]: Traverse[EquiJoin[T, ?]] =
     new Traverse[EquiJoin[T, ?]] {
       def traverseImpl[G[_]: Applicative, A, B](
@@ -87,8 +92,8 @@ object EquiJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], EquiJoin[IT, ?], Hole],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], Hole]) =
+        p1: EnvT[Ann[T], EquiJoin[IT, ?], Unit],
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], Unit]) =
         // TODO: merge two joins with different combine funcs
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }

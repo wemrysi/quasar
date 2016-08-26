@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -88,6 +89,10 @@ object ProjectBucket {
         }
     }
 
+  implicit def renderTree[T[_[_]]: ShowT]:
+      Delay[RenderTree, ProjectBucket[T, ?]] =
+    RenderTree.delayFromShow
+
   implicit def mergeable[T[_[_]]: Corecursive: EqualT]:
       Mergeable.Aux[T, ProjectBucket[T, ?]] =
     new Mergeable[ProjectBucket[T, ?]] {
@@ -96,8 +101,8 @@ object ProjectBucket {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], Hole],
-        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], Hole]) =
+        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit],
+        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit]) =
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 

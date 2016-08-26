@@ -62,7 +62,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
   val RootTarget: TargetT = DeadEndTarget(Root)
 
-  type Envs = List[Target[Hole]]
+  type Envs = List[Target[Unit]]
 
   case class ZipperSides(
     lSide: FreeMap[T],
@@ -77,12 +77,12 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     sides: ZipperSides,
     tails: ZipperTails)
 
-  def linearize[F[_]: Functor: Foldable]: Algebra[F, List[F[Hole]]] =
-    fl => fl.map(_ => SrcHole: Hole) :: fl.fold
+  def linearize[F[_]: Functor: Foldable]: Algebra[F, List[F[Unit]]] =
+    fl => fl.void :: fl.fold
 
   def linearizeEnv[E, F[_]: Functor: Foldable]:
-      Algebra[EnvT[E, F, ?], List[EnvT[E, F, Hole]]] =
-    fl => fl.map(_ => SrcHole: Hole) :: fl.lower.fold
+      Algebra[EnvT[E, F, ?], List[EnvT[E, F, Unit]]] =
+    fl => fl.void :: fl.lower.fold
 
 
   def delinearizeInner[A]: Coalgebra[Target, List[Target[A]]] = {
@@ -96,17 +96,17 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case h :: t => h.map(_ => t).right
   }
 
-  val consZipped: Algebra[ListF[Target[Hole], ?], ZipperAcc] = {
+  val consZipped: Algebra[ListF[Target[Unit], ?], ZipperAcc] = {
     case NilF() => ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
   val zipper: ElgotCoalgebra[
       ZipperAcc \/ ?,
-      ListF[Target[Hole], ?],
+      ListF[Target[Unit], ?],
       (ZipperSides, ZipperTails)] = {
     case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[Hole], (ZipperSides, ZipperTails)]](
+      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[Unit], (ZipperSides, ZipperTails)]](
         ZipperAcc(Nil, zs, zt).left) {
         case SrcMerge(inn, lmf, rmf) =>
           ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
@@ -128,11 +128,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     val leftF =
       foldIso(CoEnv.freeIso[Hole, Target])
-        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Hole] >>> (CoEnv(_))))
+        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
 
     val rightF =
       foldIso(CoEnv.freeIso[Hole, Target])
-        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Hole] >>> (CoEnv(_))))
+        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
 
     val commonSrc: T[Target] =
       common.reverse.ana[T, Target](delinearizeInner)

@@ -288,8 +288,8 @@ object MongoDbIO {
   def collectionStatistics(coll: Collection): MongoDbIO[CollectionStatistics] = {
     val cmd = Bson.Doc(ListMap("collStats" -> coll.collection.bson))
 
-    def intValue(doc: BsonDocument, field: String): String \/ Long =
-      \/.fromTryCatchNonFatal(Option(doc.getInt32(field)).map(_.longValue) \/>
+    def longValue(doc: BsonDocument, field: String): String \/ Long =
+      \/.fromTryCatchNonFatal(Option(doc.getNumber(field)).map(_.longValue) \/>
         s"expected field: $field").fold(_.getMessage.left, ι)
 
     def booleanValue(doc: BsonDocument, field: String): Boolean =
@@ -297,8 +297,8 @@ object MongoDbIO {
 
     runCommand(coll.database, cmd).map(doc =>
       (for {
-        count    <- intValue(doc, "count")
-        dataSize <- intValue(doc, "size")
+        count    <- longValue(doc, "count")
+        dataSize <- longValue(doc, "size")
         sharded  =  booleanValue(doc, "sharded")
       } yield CollectionStatistics(count, dataSize, sharded)))
         .flatMap(_.fold(

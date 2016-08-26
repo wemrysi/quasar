@@ -42,29 +42,51 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  type QS[A] = QScriptTotal[Fix, A]
+  type QS[T[_[_]], A] = QScriptTotal[T, A]
 
-  val transform = new Transform[Fix, QS]
-  val optimize = new Optimize[Fix]
+  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] (
+    lp: T[LogicalPlan])(
+    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]):
+      PlannerError \/ T[QS[T, ?]] = {
+    val transform = new Transform[T, QS[T, ?]]
 
-  def optimizeEval(
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
     //       so we don’t duplicate work.
-    eval: QS[Fix[QS]] => QS[Fix[QS]]):
-      Fix[LogicalPlan] => PlannerError \/ Fix[QS] =
-    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
+    lp.transCata(orOriginal(Optimizer.elideLets[T]))
       .transCataM(transform.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QS].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QS, Fix[QS]]).lower) ⋙ eval))
+      EnvT((EmptyAnn[T], Inject[QScriptCore[T, ?], QS[T, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
+  }
+
+  /** A variant of convertToQScript that takes advantage of an existing QueryFile
+    * implementation.
+    */
+  def algConvertToQScript
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
+    (lp: T[LogicalPlan])
+    (implicit QF: QueryFile.Ops[S]):
+      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] =
+    convertToQScript[T, Free[S, ?]]((QF.ls(_: ADir)).some)(lp)
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QS] = { lp =>
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
+    f: Option[ConvertPath.ListContents[M]])(
+    lp: T[LogicalPlan]):
+      EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+    val optimize = new Optimize[T]
+
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
-    optimizeEval(optimize.applyAll)(lp).map(
-      _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+    val qs =
+      (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
+        optimize.eliminateProjections(f)).map(
+        _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+
+    EitherT(WriterT(qs.run.map(qq => (
+      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq))))
   }
 
   /** The result of the query is stored in an output file

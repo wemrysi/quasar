@@ -72,11 +72,10 @@ object Main {
 
     console.setConsoleCallback(new AeshConsoleCallback() {
       override def execute(input: ConsoleOperation): Int = {
-        val command = Command.parse(input.getBuffer.trim)
-        command match {
+        Command.parse(input.getBuffer.trim) match {
           case Command.Exit =>
             console.stop()
-          case _            =>
+          case command      =>
             f(command).foldMap(i).run.unsafePerformSync.valueOr(
               err => console.getShell.out.println("Quasar error: " + err))
         }

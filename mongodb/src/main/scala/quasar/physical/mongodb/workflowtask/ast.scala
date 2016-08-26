@@ -23,6 +23,7 @@ import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
 import quasar.physical.mongodb.workflow._
 import MapReduce._
 
+import matryoshka.Delay
 import scalaz._, Scalaz._
 
 /** A WorkflowTask approximately represents one request to MongoDB. */
@@ -78,9 +79,9 @@ object WorkflowTaskF {
         }
     }
 
-  implicit val renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
-      def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
+  implicit val renderTree: Delay[RenderTree, WorkflowTaskF] =
+    new Delay[RenderTree, WorkflowTaskF] {
+      def apply[A](ra: RenderTree[A]) = new RenderTree[WorkflowTaskF[A]] {
         val RC = RenderTree[Collection]
         val RO = RenderTree[WorkflowF[Unit]]
         val RJ = RenderTree[Js]
@@ -88,7 +89,7 @@ object WorkflowTaskF {
 
         val WorkflowTaskNodeType = "WorkflowTask" :: "Workflow" :: Nil
 
-        def render(task: WorkflowTaskF[α]) = task match {
+        def render(task: WorkflowTaskF[A]) = task match {
           case PureTaskF(bson) => Terminal("PureTask" :: WorkflowTaskNodeType,
             Some(bson.toString))
           case ReadTaskF(value) => RC.render(value).copy(nodeType = "ReadTask" :: WorkflowTaskNodeType)
