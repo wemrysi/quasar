@@ -5,43 +5,134 @@ import scalaz._, Scalaz._, Ordering._
 import ygg.json._
 import ygg.macros.Spire._
 
-sealed trait RValue { self =>
-  def toJValue: JValue
+sealed trait RValue
+final case class RObject(fields: Map[String, RValue]) extends RValue
+final case class RArray(elements: Vec[RValue]) extends RValue
 
-  def \(fieldName: String): RValue
+sealed trait CValue extends RValue {
+  type Type <: CType
+  def cType: Type
+}
+sealed trait CWrappedValue[A] extends CValue {
+  type Type = CValueType[A]
 
-  def unsafeInsert(path: CPath, value: RValue): RValue = {
-    RValue.unsafeInsert(self, path, value)
-  }
+  def value: A
+  def cType: Type = ((this: CWrappedValue[_]) match {
+    case CArray(_, tpe) => tpe
+    case CString(_)     => CString
+    case CBoolean(_)    => CBoolean
+    case CLong(_)       => CLong
+    case CDouble(_)     => CDouble
+    case CNum(_)        => CNum
+    case CDate(_)       => CDate
+    case CPeriod(_)     => CPeriod
+  }).asInstanceOf[Type]
+}
+sealed trait CNumericValue[A] extends CWrappedValue[A] {
+  final override def hashCode = 12
 
-  def flattenWithPath: Vector[CPath.AndValue] = {
-    def flatten0(path: CPath)(value: RValue): Vector[CPath.AndValue] = value match {
-      case RObject(fields) if fields.isEmpty => Vector(path -> CEmptyObject)
-      case RArray(elems) if elems.isEmpty    => Vector(path -> CEmptyArray)
-      case RObject(fields)                   => fields.toVector flatMap { case (name, value) => flatten0(path \ name)(value) }
-      case RArray(elems)                     => elems.toVector.zipWithIndex flatMap { case (value, idx) => flatten0(path \ idx)(value) }
-      case v: CValue                         => Vector(path -> v)
+  def toCNum: CNum = CNum(
+    (this: CNumericValue[_]) match {
+      case CLong(x)   => decimal(x)
+      case CDouble(x) => decimal(x.toString)
+      case CNum(x)    => x
     }
+  )
+}
+sealed trait CType extends Serializable {
+  def readResolve(): CType
 
-    flatten0(CPath.Identity)(self)
+  def typeIndex: Int = this match {
+    case CUndefined    => 0
+    case CBoolean      => 1
+    case CString       => 2
+    case CLong         => 4
+    case CDouble       => 6
+    case CNum          => 7
+    case CEmptyObject  => 8
+    case CEmptyArray   => 9
+    case CArrayType(_) => 10 // TODO: Should this account for the element type?
+    case CNull         => 11
+    case CDate         => 12
+    case CPeriod       => 13
   }
 }
 
+sealed abstract class CNullType extends CType with CValue {
+  type Type = CNullType
+  def cType: CNullType = this
+}
+sealed abstract class CValueType[A: CTag] extends CType {
+  val classTag: CTag[A] = implicitly[CTag[A]]
+
+  def readResolve(): CValueType[A]
+  def apply(a: A): CWrappedValue[A]
+  def order(a: A, b: A): Cmp
+}
+sealed abstract class CNumericType[A: CTag] extends CValueType[A] {
+  def bigDecimalFor(a: A): BigDecimal
+}
+
 object RValue {
+  implicit class RValueOps(private val self: RValue) {
+    def toJValue: JValue = self match {
+      case RObject(fields) => JObject(fields mapValues (_.toJValue) toMap)
+      case RArray(xs)      => JArray(xs map (_.toJValue))
+      case CString(x)      => JString(x)
+      case CBoolean(x)     => JBool(x)
+      case CLong(x)        => JNum(x)
+      case CDouble(x)      => JNum(x)
+      case CNum(x)         => JNum(x)
+      case CEmptyArray     => jarray()
+      case CEmptyObject    => jobject()
+      case CNull           => JNull
+      case CUndefined      => JUndefined
+      case CDate(x)        => JString(x.toString)
+      case CPeriod(x)      => JString(x.toString)
+      case CArray(_, _)    => abort("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
+    }
+    def \(name: String): RValue = self match {
+      case RObject(fields) => fields(name)
+      case _               => CUndefined
+    }
+
+    def unsafeInsert(path: CPath, value: RValue): RValue = RValue.unsafeInsert(self, path, value)
+
+    def flattenWithPath: Vec[CPath.AndValue] = {
+      def flatten0(path: CPath)(value: RValue): Vec[CPath.AndValue] = value match {
+        case RObject(fields) if fields.isEmpty => Vec(path -> CEmptyObject)
+        case RArray(elems) if elems.isEmpty    => Vec(path -> CEmptyArray)
+        case RObject(fields)                   => fields.toVector flatMap { case (name, value) => flatten0(path \ name)(value) }
+        case RArray(elems)                     => elems.zipWithIndex flatMap { case (value, idx) => flatten0(path \ idx)(value) }
+        case v: CValue                         => Vec(path -> v)
+      }
+
+      flatten0(CPath.Identity)(self)
+    }
+  }
   def fromJValue(jv: JValue): RValue = jv match {
     case JObject(fields)  => RObject(fields mapValues fromJValue toMap)
-    case JArray(elements) => RArray(elements map fromJValue toList)
-    case other            => CType.toCValue(other)
+    case JArray(elements) => RArray(elements map fromJValue)
+    case JString(s)       => CString(s)
+    case JBool(b)         => CBoolean(b)
+    case JNull            => CNull
+    case JNum(bd)         => fromJNum(bd)
+  }
+  def fromJNum(d: BigDecimal): CValue = {
+    def asLong   = Try(CLong(d.toLongExact)).toOption
+    def asDouble = Try(decimal(d.toDouble.toString)).toOption collect { case `d` => CDouble(d.toDouble) }
+
+    asLong orElse asDouble getOrElse CNum(d)
   }
 
   def unsafeInsert(rootTarget: RValue, rootPath: CPath, rootValue: RValue): RValue = {
     def rec(target: RValue, path: CPath, value: RValue): RValue = {
       if ((target == CNull || target == CUndefined) && path == CPath.Identity) value
       else {
-        def arrayInsert(l: List[RValue], i: Int, rem: CPath, v: RValue): List[RValue] = {
-          def update(l: List[RValue], j: Int): List[RValue] = l match {
+        def arrayInsert(l: Vec[RValue], i: Int, rem: CPath, v: RValue): Vec[RValue] = {
+          def update(l: Vec[RValue], j: Int): Vec[RValue] = l match {
             case x +: xs => (if (j == i) rec(x, rem, v) else x) +: update(xs, j + 1)
-            case Nil     => Nil
+            case Seq()   => Vec()
           }
 
           update(l.padTo(i + 1, CUndefined), 0)
@@ -92,48 +183,21 @@ object RValue {
   }
 }
 
-case class RObject(fields: Map[String, RValue]) extends RValue {
-  def toJValue                     = JObject(fields mapValues (_.toJValue) toMap)
-  def \(fieldName: String): RValue = fields(fieldName)
-}
-
 object RObject {
-  val empty                                    = new RObject(Map.empty)
-  def apply(fields: (String, RValue)*): RValue = new RObject(Map(fields: _*))
+  val empty: RObject                           = new RObject(Map.empty)
+  def apply(fields: (String, RValue)*): RValue = new RObject(fields.toMap)
 }
-
-case class RArray(elements: List[RValue]) extends RValue {
-  def toJValue                     = JArray(elements map { _.toJValue } toVector)
-  def \(fieldName: String): RValue = CUndefined
-}
-
 object RArray {
-  val empty                            = new RArray(Nil)
-  def apply(elements: RValue*): RValue = new RArray(elements.toList)
+  val empty: RArray                    = new RArray(Vec())
+  def apply(elements: RValue*): RValue = new RArray(elements.toVector)
 }
-
-sealed trait CValue extends RValue {
-  def cType: CType
-  def \(fieldName: String): RValue = CUndefined
-}
-
-sealed trait CNullValue extends CValue { self: CNullType =>
-  def cType: CNullType = self
-}
-
-sealed trait CWrappedValue[A] extends CValue {
-  def cType: CValueType[A]
-  def value: A
-  def toJValue = cType.jValueFor(value)
-}
-
-sealed trait CNumericValue[A] extends CWrappedValue[A] {
-  final override def hashCode = 12
-  def cType: CNumericType[A]
-  def toCNum: CNum = CNum(cType.bigDecimalFor(value))
+object CWrappedValue {
+  def unapply[A](x: CWrappedValue[A]): Some[A] = Some(x.value)
 }
 
 object CValue {
+  def apply[A](a: A)(implicit A: CValueType[A]): CWrappedValue[A] = A(a)
+
   implicit val CValueOrder: Ord[CValue] = Ord order {
     case (CString(as), CString(bs))                                                   => as ?|? bs
     case (CBoolean(ab), CBoolean(bb))                                                 => ab ?|? bb
@@ -144,52 +208,20 @@ object CValue {
     case (CPeriod(ad), CPeriod(bd))                                                   => ad.toDuration ?|? bd.toDuration
     case (CArray(as, CArrayType(atpe)), CArray(bs, CArrayType(btpe))) if atpe == btpe => as.toStream.map(x => atpe(x): CValue) ?|? bs.toStream.map(x => btpe(x))
     case (a: CNumericValue[_], b: CNumericValue[_])                                   => (a.toCNum: CValue) ?|? b.toCNum
-    case (a, b)                                                                       => a.cType ?|? b.cType
+    case (a, b)                                                                       => (a.cType: CType) ?|? b.cType
   }
-}
-
-sealed trait CType extends Serializable {
-  def readResolve(): CType
-  def isNumeric: Boolean = false
-
-  @inline
-  private[table] final def typeIndex = this match {
-    case CUndefined    => 0
-    case CBoolean      => 1
-    case CString       => 2
-    case CLong         => 4
-    case CDouble       => 6
-    case CNum          => 7
-    case CEmptyObject  => 8
-    case CEmptyArray   => 9
-    case CArrayType(_) => 10 // TODO: Should this account for the element type?
-    case CNull         => 11
-    case CDate         => 12
-    case CPeriod       => 13
-  }
-}
-
-sealed trait CNullType extends CType with CNullValue
-
-sealed abstract class CValueType[A: CTag] extends CType {
-  val classTag: CTag[A] = implicitly[CTag[A]]
-
-  def readResolve(): CValueType[A]
-  def apply(a: A): CWrappedValue[A]
-  def order(a: A, b: A): Cmp
-  def jValueFor(a: A): JValue
-}
-
-sealed abstract class CNumericType[A: CTag] extends CValueType[A] {
-  override def isNumeric: Boolean = true
-  def bigDecimalFor(a: A): BigDecimal
 }
 
 object CType {
   def readResolve() = CType
   def of(v: CValue): CType = v.cType
 
-  def canCompare(t1: CType, t2: CType): Boolean = (t1 == t2) || (t1.isNumeric && t2.isNumeric)
+  def canCompare(t1: CType, t2: CType): Boolean = (t1 == t2) || {
+    (t1, t2) match {
+      case (_: CNumericType[_], _: CNumericType[_]) => true
+      case _                                        => false
+    }
+  }
 
   def unify(t1: CType, t2: CType): Option[CType] = (t1, t2) match {
     case _ if t1 == t2                                    => Some(t1)
@@ -198,53 +230,15 @@ object CType {
     case _                                                => None
   }
 
-  // TODO Should return Option[CValue]... is this even used?
-  // Yes; it is used only in RoutingTable.scala
-  def toCValue(jval: JValue): CValue = (jval: @unchecked) match {
-    case JString(s)    => CString(s)
-    case JBool(b)      => CBoolean(b)
-    case JNull         => CNull
-    case JObject.empty => CEmptyObject
-    case JArray.empty  => CEmptyArray
-    case JNum(d) =>
-      forJValue(jval) match {
-        case Some(CLong)   => CLong(d.toLong)
-        case Some(CDouble) => CDouble(d.toDouble)
-        case _             => CNum(d)
-      }
-    case JArray(_) =>
-      abort("TODO: Allow for homogeneous JArrays -> CArray.")
-  }
-
   @inline
   final def forJValue(jval: JValue): Option[CType] = jval match {
-    case JBool(_) => Some(CBoolean)
-
-    case JNum(d) => {
-      lazy val isLong = try {
-        d.toLongExact
-        true
-      } catch {
-        case _: ArithmeticException => false
-      }
-
-      lazy val isDouble = (try decimal(d.toDouble.toString) == d
-      catch { case _: NumberFormatException | _: ArithmeticException => false })
-
-      if (isLong)
-        Some(CLong)
-      else if (isDouble)
-        Some(CDouble)
-      else
-        Some(CNum)
-    }
-
+    case JBool(_)      => Some(CBoolean)
+    case JNum(d)       => Some(RValue.fromJNum(d).cType)
     case JString(_)    => Some(CString)
     case JNull         => Some(CNull)
-    case JArray(Seq()) => Some(CEmptyArray)
+    case JArray.empty  => Some(CEmptyArray)
     case JObject.empty => Some(CEmptyObject)
-    case JArray.empty  => None // TODO Allow homogeneous JArrays -> CType
-    case _             => None
+    case _             => None // TODO Allow homogeneous JArrays -> CType
   }
 
   implicit val CTypeOrder: Ord[CType] = Order order {
@@ -271,11 +265,8 @@ object CValueType {
 //
 // Homogeneous arrays
 //
-case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
-  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = {
-    if (as.length != bs.length)
-      return false
-
+case class CArray[A](value: Array[A], arrayType: CArrayType[A]) extends CWrappedValue[Array[A]] {
+  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = (as.length == bs.length) && {
     cforRange(0 until as.length){ i =>
       if (as(i) != bs(i))
         return false
@@ -292,11 +283,9 @@ case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValu
   }
 
   override def equals(that: Any): Boolean = that match {
-    case v @ CArray(_, thatCType) if cType == thatCType => equiv(value, v.value, cType.elemType)
-    case _                                              => false
+    case v @ CArray(_, thatType) if thatType == arrayType => equiv(value, v.value, arrayType.elemType)
+    case _                                                => false
   }
-
-  override def toString: String = value.mkString("CArray(Array(", ", ", "), " + cType.toString + ")")
 }
 
 case object CArray {
@@ -311,35 +300,24 @@ case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()
 
   def apply(value: Array[A]) = CArray(value, this)
 
-  def order(as: Array[A], bs: Array[A]) =
-    (as zip bs) map {
-      case (a, b) =>
-        elemType.order(a, b)
-    } find (_ != EQ) getOrElse Ordering.fromInt(as.size - bs.size)
-
-  def jValueFor(as: Array[A]) =
-    abort("HOMOGENEOUS ARRAY ESCAPING! ALERT! ALERT!")
+  def order(as: Array[A], bs: Array[A]): Ordering =
+    (as, bs).zipped map ((x, y) => elemType.order(x, y)) find (_ != EQ) getOrElse (as.length ?|? bs.length)
 }
 
 //
 // Strings
 //
-case class CString(value: String) extends CWrappedValue[String] {
-  val cType = CString
-}
+case class CString(value: String) extends CWrappedValue[String]
 
 case object CString extends CValueType[String] {
   def readResolve()                 = CString
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
-  def jValueFor(s: String)          = JString(s)
 }
 
 //
 // Booleans
 //
-sealed abstract class CBoolean(val value: Boolean) extends CWrappedValue[Boolean] {
-  val cType = CBoolean
-}
+sealed abstract class CBoolean(val value: Boolean) extends CWrappedValue[Boolean]
 
 case object CTrue  extends CBoolean(true)
 case object CFalse extends CBoolean(false)
@@ -349,90 +327,65 @@ object CBoolean extends CValueType[Boolean] {
   def unapply(cbool: CBoolean)        = Some(cbool.value)
   def readResolve()                   = CBoolean
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)
-  def jValueFor(v: Boolean)           = JBool(v)
 }
 
 //
 // Numerics
 //
-case class CLong(value: Long) extends CNumericValue[Long] {
-  val cType = CLong
-}
+case class CLong(value: Long) extends CNumericValue[Long]
 
 case object CLong extends CNumericType[Long] {
-  def readResolve()              = CLong
-  def order(v1: Long, v2: Long)  = longInstance.order(v1, v2)
-  def jValueFor(v: Long): JValue = JNum(bigDecimalFor(v))
-  def bigDecimalFor(v: Long)     = decimal(v)
+  def readResolve()             = CLong
+  def order(v1: Long, v2: Long) = longInstance.order(v1, v2)
+  def bigDecimalFor(v: Long)    = decimal(v)
 }
 
-case class CDouble(value: Double) extends CNumericValue[Double] {
-  val cType = CDouble
-}
+case class CDouble(value: Double) extends CNumericValue[Double]
 
 case object CDouble extends CNumericType[Double] {
   def readResolve()                 = CDouble
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
-  def jValueFor(v: Double)          = JNum(bigDecimalFor(v))
   def bigDecimalFor(v: Double)      = decimal(v.toString)
 }
 
-case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal] {
-  val cType = CNum
-}
+case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal]
 
 case object CNum extends CNumericType[BigDecimal] {
   def readResolve()                         = CNum
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
-  def jValueFor(v: BigDecimal)              = JNum(v)
   def bigDecimalFor(v: BigDecimal)          = v
 }
 
 //
 // Dates and Periods
 //
-case class CDate(value: DateTime) extends CWrappedValue[DateTime] {
-  val cType = CDate
-}
+case class CDate(value: DateTime) extends CWrappedValue[DateTime]
 
 case object CDate extends CValueType[DateTime] {
   def readResolve()                     = CDate
   def order(v1: DateTime, v2: DateTime) = ???
-  def jValueFor(v: DateTime)            = JString(v.toString)
 }
 
-case class CPeriod(value: Period) extends CWrappedValue[Period] {
-  val cType = CPeriod
-}
+case class CPeriod(value: Period) extends CWrappedValue[Period]
 
 case object CPeriod extends CValueType[Period] {
   def readResolve()                 = CPeriod
   def order(v1: Period, v2: Period) = ???
-  def jValueFor(v: Period)          = JString(v.toString)
 }
 
 //
-// Nulls
+// Null / Undef
 //
-case object CNull extends CNullType with CNullValue {
+case object CNull extends CNullType {
   def readResolve() = CNull
-  def toJValue      = JNull
 }
 
-case object CEmptyObject extends CNullType with CNullValue {
+case object CEmptyObject extends CNullType {
   def readResolve() = CEmptyObject
-  def toJValue      = jobject()
 }
-
-case object CEmptyArray extends CNullType with CNullValue {
+case object CEmptyArray extends CNullType {
   def readResolve() = CEmptyArray
-  def toJValue      = jarray()
 }
-
-//
-// Undefined
-//
-case object CUndefined extends CNullType with CNullValue {
+case object CUndefined extends CNullType {
   def readResolve() = CUndefined
-  def toJValue      = JUndefined
 }

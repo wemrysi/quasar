@@ -566,8 +566,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
     }
 
     val writes: ByteBufferPool.State[List[Unit]] = cvals.map {
-      case v: CNullValue =>
-        writeFlagFor[ByteBufferPool.State](v.cType)
+      case v: CNullType => writeFlagFor[ByteBufferPool.State](v.cType)
 
       case v: CWrappedValue[_] =>
         for {

@@ -179,7 +179,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         })
       case value: CArray[a] =>
         (ColumnRef.id(value.cType), new HomogeneousArrayColumn[a] {
-          val tpe                   = value.cType
+          val tpe                     = value.cType.asInstanceOf[CArrayType[a]]
           def isDefinedAt(row: RowId) = source.isDefinedAt(row)
           def apply(row: RowId)       = value.value
         })
@@ -312,7 +312,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
         case (ref @ ColumnRef(cpath, ctype: CArrayType[a]), col: HomogeneousArrayColumn[_]) if ctype == col.tpe =>
           val trans = flattenDeleteTree(jtype, ctype, cpath)
           Some((ref, new HomogeneousArrayColumn[a] {
-            val tpe                       = ctype
+            val tpe                         = ctype
             def isDefinedAt(row: RowId)     = col.isDefinedAt(row)
             def apply(row: RowId): Array[a] = trans(col(row).asInstanceOf[Array[a]]) getOrElse abort("Oh dear, this cannot be happening to me.")
           }))
@@ -495,8 +495,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
       case AllDefined =>
         doto(new ArrayIntList) { acc =>
           val (numCols, otherCols) = cols partition {
-            case (ColumnRef(_, ctype), _) =>
-              ctype.isNumeric
+            case (ColumnRef(_, _: CNumericType[_]), _) => true
+            case (ColumnRef(_, _), _)                  => false
           }
 
           val grouped = numCols groupBy { case (ColumnRef(cpath, _), _) => cpath }

@@ -34,7 +34,7 @@ trait HomogeneousArrayColumn[@spec(Boolean, Long, Double) A] extends Column with
     loop(tpe)
   }
 
-  override def jValue(row: Int)   = tpe.jValueFor(this(row))
+  override def jValue(row: Int)   = CArray(apply(row), tpe).toJValue
   override def cValue(row: Int)   = tpe(this(row))
   override def strValue(row: Int) = this(row) mkString ("[", ",", "]")
 
