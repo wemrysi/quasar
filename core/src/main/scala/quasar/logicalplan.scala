@@ -85,13 +85,13 @@ object LogicalPlan {
         }
     }
   implicit val RenderTreeLogicalPlan:
-      RenderTree ~> λ[α => RenderTree[LogicalPlan[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[LogicalPlan[α]]]) {
-      def apply[α](ra: RenderTree[α]): RenderTree[LogicalPlan[α]] =
-        new RenderTree[LogicalPlan[α]] {
+      Delay[RenderTree, LogicalPlan] =
+    new Delay[RenderTree, LogicalPlan] {
+      def apply[A](ra: RenderTree[A]): RenderTree[LogicalPlan[A]] =
+        new RenderTree[LogicalPlan[A]] {
           val nodeType = "LogicalPlan" :: Nil
 
-          def render(v: LogicalPlan[α]) = v match {
+          def render(v: LogicalPlan[A]) = v match {
             // NB: a couple of special cases for readability
             case ConstantF(Data.Str(str)) => Terminal("Str" :: "Constant" :: nodeType, Some(str.shows))
             case InvokeFUnapply(structural.ObjectProject, Sized(expr, name)) =>

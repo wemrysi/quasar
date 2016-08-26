@@ -25,6 +25,7 @@ import quasar.std.StdLib
 import quasar.std.StdLib._
 
 import matryoshka._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
@@ -33,7 +34,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
-       convert(LP.Constant(Data.Bool(true))) must
+       convert(listContents.some, LP.Constant(Data.Bool(true))) must
        equal(
          QC.inj(Map(RootR, BoolLit(true))).embed.some)
     }
@@ -41,6 +42,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
       convert(
+        listContents.some,
         LP.Constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
           Data.Obj(ListMap("0" -> Data.Int(3))))))) must
@@ -48,39 +50,54 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a simple read" in {
-      convert(lpRead("/foo")) must
+      convert(listContents.some, lpRead("/foo/bar")) must
       equal(
         SP.inj(LeftShift(
-          RootR,
-          ProjectFieldR(HoleF, StrLit("foo")),
+          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("foo") </> file("bar")))).embed,
+          HoleF,
+          Free.point(RightSide))).embed.some)
+    }
+
+    // FIXME: This can be simplified to a Union of the Reads - the LeftShift
+    //        cancels out the MakeMaps.
+    "convert a directory read" in {
+      convert(listContents.some, lpRead("/foo")) must
+      equal(
+        SP.inj(LeftShift(
+          SP.inj(Union(RootR,
+            Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
+            Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+              Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF))))),
+              Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+                Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
+                Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+                  Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
+                  Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))))))))))))).embed,
+          HoleF,
           Free.point(RightSide))).embed.some)
     }
 
     "convert a squashed read" in {
       // "select * from foo"
-      convert(identity.Squash(lpRead("/foo"))) must
+      convert(listContents.some, identity.Squash(lpRead("/foo/bar"))) must
       equal(
         SP.inj(LeftShift(
-          RootR,
-          ProjectFieldR(HoleF, StrLit("foo")),
+          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("foo") </> file("bar")))).embed,
+          HoleF,
           Free.point(RightSide))).embed.some)
     }
 
     "convert a simple read with path projects" in {
-      convert(lpRead("/some/foo/bar")) must
+      convert(listContents.some, lpRead("/some/bar/car")) must
       equal(
         SP.inj(LeftShift(
-          RootR,
-          ProjectFieldR(
-            ProjectFieldR(
-              ProjectFieldR(HoleF, StrLit("some")),
-              StrLit("foo")),
-            StrLit("bar")),
+          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("some") </> file("bar")))).embed,
+          ProjectFieldR(HoleF, StrLit("car")),
           Free.point(RightSide))).embed.some)
     }
 
     "convert a basic invoke" in {
-      convert(math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
+      convert(None, math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
       equal(
         TJ.inj(ThetaJoin(
           RootR,
@@ -113,6 +130,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert project object and make object" in {
       convert(
+        None,
         identity.Squash(
           makeObj(
             "name" -> structural.ObjectProject(
@@ -130,13 +148,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a basic reduction" in {
-      convert(agg.Sum[FLP](lpRead("/person"))) must
+      convert(
+        listContents.some,
+        agg.Sum[FLP](lpRead("/person"))) must
       equal(
         QC.inj(Reduce(
           SP.inj(LeftShift(
-            QC.inj(Map(
-              RootR,
-              ProjectFieldR(HoleF, StrLit("person")))).embed,
+            R.inj(Const[Read, Fix[QS]](Read(rootDir </> file("person")))).embed,
             Free.roll(ZipMapKeys(HoleF)),
             Free.roll(ConcatArrays(
               Free.roll(MakeArray(Free.point(LeftSide))),
@@ -152,6 +170,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a basic reduction wrapped in an object" in {
       // "select sum(height) from person"
       convert(
+        None,
         makeObj(
           "0" ->
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))) must
@@ -176,6 +195,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a flatten array" in {
       // "select loc[:*] from zips",
       convert(
+        None,
         makeObj(
           "loc" ->
             structural.FlattenArray[FLP](
@@ -196,6 +216,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       convert(
+        None,
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
@@ -216,6 +237,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert a read shift array" in pending {
       convert(
+        None,
         LP.Let('x, lpRead("/foo/bar"),
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
@@ -229,6 +251,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a shift/unshift array" in pending {
       // "select [loc[_:] * 10 ...] from zips",
       convert(
+        None,
         makeObj(
           "0" ->
             structural.UnshiftArray[FLP](
@@ -255,20 +278,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a filter" in pending {
       // "select * from foo where bar between 1 and 10"
       convert(
+        listContents.some,
         StdLib.set.Filter[FLP](
-          lpRead("/foo"),
+          lpRead("/bar"),
           relations.Between[FLP](
-            structural.ObjectProject(lpRead("/foo"), LP.Constant(Data.Str("bar"))),
+            structural.ObjectProject(lpRead("/bar"), LP.Constant(Data.Str("baz"))),
             LP.Constant(Data.Int(1)),
             LP.Constant(Data.Int(10))))) must
       equal(
         QC.inj(Filter(
           SP.inj(LeftShift(
-            RootR,
-            ProjectFieldR(HoleF, StrLit("foo")),
+            R.inj(Const[Read, Fix[QS]](Read(rootDir </> file("bar")))).embed,
+            HoleF,
             Free.point(RightSide))).embed,
           Free.roll(Between(
-            ProjectFieldR(HoleF, StrLit("bar")),
+            ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
             IntLit(10))))).embed.some)
     }
@@ -277,6 +301,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert magical query" in pending {
       // "select * from person, car",
       convert(
+        None,
         LP.Let('__tmp0,
           StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
           identity.Squash[FLP](
@@ -305,7 +330,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ObjectProject[FLP](
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
-      convert(lp) must equal(
+      convert(None, lp) must equal(
         QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
     }
   }

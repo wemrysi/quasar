@@ -92,6 +92,10 @@ object ReduceFuncs {
   final case class Min[A](a: A)          extends ReduceFunc[A]
   final case class Max[A](a: A)          extends ReduceFunc[A]
   final case class Avg[A](a: A)          extends ReduceFunc[A]
+  /** This is intended to be the “cheapest” way to get a single value out of a
+    * set, where it doesn’t matter which one (usually used in the case where all
+    * entries are known to be the same).
+    */
   final case class Arbitrary[A](a: A)    extends ReduceFunc[A]
   final case class UnshiftArray[A](a: A) extends ReduceFunc[A]
   final case class UnshiftMap[A](a1: A, a2: A) extends ReduceFunc[A]
