@@ -162,10 +162,10 @@ object QScriptCore {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], QScriptCore[IT, ?], Hole],
-        p2: EnvT[Ann[T], QScriptCore[IT, ?], Hole]) =
+        p1: EnvT[Ann[T], QScriptCore[IT, ?], Unit],
+        p2: EnvT[Ann[T], QScriptCore[IT, ?], Unit]) =
         (p1, p2) match {
-          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Hole], FreeMap[IT]](p1, left, right).some
+          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](p1, left, right).some
           case (EnvT((Ann(b1, v1), Map(_, m1))),
                 EnvT((Ann(_,  v2), Map(_, m2)))) =>
             // TODO: optimize cases where one side is a subset of the other
@@ -173,7 +173,7 @@ object QScriptCore {
             val (buck, newBuckets) = concatBuckets(b1.map(_ >> m1))
             val (full, buckAccess, valAccess) = concat(buck, mf)
             SrcMerge(
-              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map(SrcHole, full): QScriptCore[T, Hole])),
+              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map((), full): QScriptCore[T, Unit])),
               lv,
               rv).some
 
@@ -186,14 +186,14 @@ object QScriptCore {
             val mapR = bucket2 >> right
 
             (mapL ≟ mapR).option(
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Hole], FreeMap[IT]](
+              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](
                 EnvT((Ann(b1, HoleF),
-                  Reduce(SrcHole,
+                  Reduce((),
                     mapL,
                     // FIXME: Concat these things!
                     func1, // for { f1 <- funcL; f2 <- funcR } yield f1 ++ f2,
                     rep1 // newRep
-                  ): QScriptCore[T, Hole])),
+                  ): QScriptCore[T, Unit])),
                 HoleF, // lrep,
                 HoleF // rrep
               ))

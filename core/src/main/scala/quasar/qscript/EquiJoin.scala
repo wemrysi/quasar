@@ -16,6 +16,7 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar.fp._
 import quasar.RenderTree
 
@@ -91,8 +92,8 @@ object EquiJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], EquiJoin[IT, ?], Hole],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], Hole]) =
+        p1: EnvT[Ann[T], EquiJoin[IT, ?], Unit],
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], Unit]) =
         // TODO: merge two joins with different combine funcs
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }

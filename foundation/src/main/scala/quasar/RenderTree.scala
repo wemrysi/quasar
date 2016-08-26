@@ -376,7 +376,7 @@ object RenderTree extends RenderTreeInstances {
       def render(v: Fix[F]) = RF(fix[F]).render(v.unFix)
     }
 
-  implicit def cofree[F[_], A: RenderTree](implicit RF: RenderTree ~> λ[α => RenderTree[F[α]]]):
+  implicit def cofree[F[_], A: RenderTree](implicit RF: Delay[RenderTree, F]):
       RenderTree[Cofree[F, A]] =
     new RenderTree[Cofree[F, A]] {
       def render(t: Cofree[F, A]) = {

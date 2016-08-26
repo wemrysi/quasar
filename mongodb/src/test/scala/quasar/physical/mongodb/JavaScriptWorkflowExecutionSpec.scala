@@ -125,6 +125,20 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           |""".stripMargin)
     }
 
+    "write count followed by limit to JS" in {
+      val wf = chain(
+        $read[WorkflowF](collection("db", "zips")),
+        $group[WorkflowF](
+          Grouped(ListMap(
+            BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
+          $literal(Bson.Null).right),
+        $limit[WorkflowF](11))
+
+      toJS(wf) must beRightDisjunction(
+        """db.zips.count();
+          |""".stripMargin)
+    }
+
     "write simple distinct to JS" in {
       val wf = chain(
         $read[WorkflowF](collection("db", "zips")),

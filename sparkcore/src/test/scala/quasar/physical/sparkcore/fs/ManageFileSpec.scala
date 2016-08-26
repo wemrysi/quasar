@@ -24,16 +24,19 @@ import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fs._
 import quasar.fs.ManageFile.MoveSemantics
+import quasar.effect.Failure
 
 import org.specs2.ScalaCheck
 import org.specs2.scalaz._
 import pathy.Path._
-import scalaz._, Scalaz._, concurrent.Task
+import scalaz.{Failure => _, _}
+import Scalaz._
+import scalaz.concurrent.Task
 
 class ManageFileSpec extends QuasarSpecification with ScalaCheck with DisjunctionMatchers
     with TempFSSugars {
 
-  type Eff[A] = Task[A]
+  type Eff[A] = Coproduct[Task, PhysErr, A]
 
   "managefile" should {
     "delete" should {
@@ -500,8 +503,24 @@ class ManageFileSpec extends QuasarSpecification with ScalaCheck with Disjunctio
       Task[FileSystemError \/ C] =
     program.run.foldMap(interpreter)
 
-  private def interpreter: ManageFile ~> Task =
-    local.managefile.interpret[Eff] andThen foldMapNT(NaturalTransformation.refl[Task])
+  private def interpreter: ManageFile ~> Task = {
+
+    import Failure.Fail
+
+    val errorInter: PhysErr ~> Task =
+      new (PhysErr ~> Task) {
+        def apply[A](perr: PhysErr[A]): Task[A] = perr match {
+          case Fail(er) => Task.delay {
+            throw er.cause
+          }
+        }
+      }
+
+    def inner: Eff ~> Task =
+      NaturalTransformation.refl[Task] :+: errorInter
+
+    local.managefile.interpret[Eff] andThen foldMapNT(inner)
+  }
 
   private def define[C]
     (defined: ManageFile.Ops[ManageFile] => FileSystemErrT[Free[ManageFile, ?], C])

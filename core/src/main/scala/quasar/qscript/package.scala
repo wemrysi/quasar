@@ -37,8 +37,7 @@ package object qscript {
   private type CommonPathable[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
-  /** Statically known path components. Provided to filesystems for potential
-    * conversion to `Read`.
+  /** Statically known path components potentially converted to Read.
     */
   type Pathable[T[_[_]], A] =
     Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]

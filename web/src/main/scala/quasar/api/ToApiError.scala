@@ -96,10 +96,6 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         e.toApiError
       case PlanningFailed(lp, e) =>
         e.toApiError :+ ("logicalPlan" := lp.render)
-      case IOError(r) =>
-        fromMsg_(
-          InternalServerError withReason "Failed to perform IO",
-          s"Reason: $r")
       case UnknownReadHandle(ReadHandle(path, id)) =>
         apiError(
           InternalServerError withReason "Unknown read handle.",
