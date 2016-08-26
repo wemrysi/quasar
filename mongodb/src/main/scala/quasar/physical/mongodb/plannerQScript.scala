@@ -506,6 +506,241 @@ object MongoDbQScriptPlanner {
     }
   }
 
+  /** Need this until the old connector goes away and we can redefine `Selector`
+    * as `Selector[A, B]`, where `A` is the field type (naturally `BsonField`),
+    * and `B` is the recursive parameter.
+    */
+  type PartialSelector = Partial[BsonField, Selector]
+
+  /**
+   * The selector phase tries to turn expressions into MongoDB selectors -- i.e.
+   * Mongo query expressions. Selectors are only used for the filtering pipeline
+   * op, so it's quite possible we build more stuff than is needed (but it
+   * doesn't matter, unneeded annotations will be ignored by the pipeline
+   * phase).
+   *
+   * Like the expression op phase, this one requires bson field annotations.
+   *
+   * Most expressions cannot be turned into selector expressions without using
+   * the "\$where" operator, which allows embedding JavaScript
+   * code. Unfortunately, using this operator turns filtering into a full table
+   * scan. We should do a pass over the tree to identify partial boolean
+   * expressions which can be turned into selectors, factoring out the leftovers
+   * for conversion using \$where.
+   */
+  def selector[T[_[_]]: Recursive: ShowT]:
+      GAlgebra[(T[MapFunc[T, ?]], ?), MapFunc[T, ?], OutputM[PartialSelector]] = { node =>
+    import MapFuncs._
+
+    type Output = OutputM[PartialSelector]
+
+    object IsBson {
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
+        v._1.project match {
+          case Nullary(b) => b.cataM(BsonCodec.fromEJson).toOption
+          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
+          // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
+          // case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
+          case _ => None
+        }
+    }
+
+    object IsBool {
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Boolean] =
+        v match {
+          case IsBson(Bson.Bool(b)) => b.some
+          case _                    => None
+        }
+    }
+
+    object IsText {
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[String] =
+        v match {
+          case IsBson(Bson.Text(str)) => Some(str)
+          case _                      => None
+        }
+    }
+
+    object IsDate {
+      def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.Date] =
+        v._1.project match {
+          case Nullary(d @ Data.Date(_)) => Some(d)
+          case _                         => None
+        }
+    }
+
+    val relFunc: MapFunc[T, _] => Option[Bson => Selector.Condition] = {
+      case Eq(_, _)  => Some(Selector.Eq)
+      case Neq(_, _) => Some(Selector.Neq)
+      case Lt(_, _)  => Some(Selector.Lt)
+      case Lte(_, _) => Some(Selector.Lte)
+      case Gt(_, _)  => Some(Selector.Gt)
+      case Gte(_, _) => Some(Selector.Gte)
+      case _         => None
+    }
+
+    val default: PartialSelector = (
+      { case List(field) =>
+        Selector.Doc(ListMap(
+          field -> Selector.Expr(Selector.Eq(Bson.Bool(true)))))
+      },
+      List(Here))
+
+    def invoke(func: MapFunc[T, (T[MapFunc[T, ?]], Output)]): Output = {
+      /**
+        * All the relational operators require a field as one parameter, and
+        * BSON literal value as the other parameter. So we have to try to
+        * extract out both a field annotation and a selector and then verify
+        * the selector is actually a BSON literal value before we can
+        * construct the relational operator selector. If this fails for any
+        * reason, it just means the given expression cannot be represented
+        * using MongoDB's query operators, and must instead be written as
+        * Javascript using the "$where" operator.
+        */
+      def relop
+        (x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))
+        (f: Bson => Selector.Condition, r: Bson => Selector.Condition):
+          Output =
+        (x, y) match {
+          case (_, IsBson(v2)) =>
+            \/-(({ case List(f1) => Selector.Doc(ListMap(f1 -> Selector.Expr(f(v2)))) }, List(There(0, Here))))
+          case (IsBson(v1), _) =>
+            \/-(({ case List(f2) => Selector.Doc(ListMap(f2 -> Selector.Expr(r(v1)))) }, List(There(1, Here))))
+
+          case (_, _) => -\/(InternalError(node.map(_._1).shows))
+        }
+
+      def relDateOp1(f: Bson.Date => Selector.Condition, date: Data.Date, g: Data.Date => Data.Timestamp, index: Int): Output =
+        \/-((
+          { case x :: Nil => Selector.Doc(x -> f(Bson.Date(g(date).value))) },
+          List(There(index, Here))))
+
+      def relDateOp2(conj: (Selector, Selector) => Selector, f1: Bson.Date => Selector.Condition, f2: Bson.Date => Selector.Condition, date: Data.Date, g1: Data.Date => Data.Timestamp, g2: Data.Date => Data.Timestamp, index: Int): Output =
+        \/-((
+          { case x :: Nil =>
+            conj(
+              Selector.Doc(x -> f1(Bson.Date(g1(date).value))),
+              Selector.Doc(x -> f2(Bson.Date(g2(date).value))))
+          },
+          List(There(index, Here))))
+
+      def invoke2Nel(x: Output, y: Output)(f: (Selector, Selector) => Selector):
+          Output =
+        (x ⊛ y) { case ((f1, p1), (f2, p2)) =>
+          ({ case list =>
+            f(f1(list.take(p1.size)), f2(list.drop(p1.size)))
+          },
+            p1.map(There(0, _)) ++ p2.map(There(1, _)))
+        }
+
+      val flip: MapFunc[T, _] => Option[MapFunc[T, _]] = {
+        case Eq(a, b)  => Some(Eq(a, b))
+        case Neq(a, b) => Some(Neq(a, b))
+        case Lt(a, b)  => Some(Gt(a, b))
+        case Lte(a, b) => Some(Gte(a, b))
+        case Gt(a, b)  => Some(Lt(a, b))
+        case Gte(a, b) => Some(Lte(a, b))
+        case And(a, b) => Some(And(a, b))
+        case Or(a, b)  => Some(Or(a, b))
+        case _         => None
+      }
+
+      def reversibleRelop(x: (T[MapFunc[T, ?]], Output), y: (T[MapFunc[T, ?]], Output))(f: MapFunc[T, _]): Output =
+        (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError("couldn’t decipher operation")))
+
+      func match {
+        case Nullary(_)   => \/-(default)
+
+        case Gt(_, IsDate(d2))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
+        case Lt(IsDate(d1), _)  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
+
+        case Lt(_, IsDate(d2))  => relDateOp1(Selector.Lt,  d2, date.startOfDay, 0)
+        case Gt(IsDate(d1), _)  => relDateOp1(Selector.Lt,  d1, date.startOfDay, 1)
+
+        case Gte(_, IsDate(d2)) => relDateOp1(Selector.Gte, d2, date.startOfDay, 0)
+        case Lte(IsDate(d1), _) => relDateOp1(Selector.Gte, d1, date.startOfDay, 1)
+
+        case Lte(_, IsDate(d2)) => relDateOp1(Selector.Lt,  d2, date.startOfNextDay, 0)
+        case Gte(IsDate(d1), _) => relDateOp1(Selector.Lt,  d1, date.startOfNextDay, 1)
+
+        case Eq(_, IsDate(d2)) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d2, date.startOfDay, date.startOfNextDay, 0)
+        case Eq(IsDate(d1), _) => relDateOp2(Selector.And(_, _), Selector.Gte, Selector.Lt, d1, date.startOfDay, date.startOfNextDay, 1)
+
+        case Neq(_, IsDate(d2)) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d2, date.startOfDay, date.startOfNextDay, 0)
+        case Neq(IsDate(d1), _) => relDateOp2(Selector.Or(_, _), Selector.Lt, Selector.Gte, d1, date.startOfDay, date.startOfNextDay, 1)
+
+        case Eq(a, b)  => reversibleRelop(a, b)(func)
+        case Neq(a, b) => reversibleRelop(a, b)(func)
+        case Lt(a, b)  => reversibleRelop(a, b)(func)
+        case Lte(a, b) => reversibleRelop(a, b)(func)
+        case Gt(a, b)  => reversibleRelop(a, b)(func)
+        case Gte(a, b) => reversibleRelop(a, b)(func)
+
+        case Within(a, b) =>
+          relop(a, b)(
+            Selector.In.apply _,
+            x => Selector.ElemMatch(\/-(Selector.In(Bson.Arr(List(x))))))
+
+        case Search(_, IsText(patt), IsBool(b)) =>
+          \/-(({ case List(f1) =>
+            Selector.Doc(ListMap(f1 -> Selector.Expr(Selector.Regex(patt, b, true, false, false)))) },
+            List(There(0, Here))))
+
+        case Between(_, IsBson(lower), IsBson(upper)) =>
+          \/-(({ case List(f) => Selector.And(
+            Selector.Doc(f -> Selector.Gte(lower)),
+            Selector.Doc(f -> Selector.Lte(upper)))
+          },
+            List(There(0, Here))))
+
+        case And(a, b) => invoke2Nel(a._2, b._2)(Selector.And.apply _)
+        case Or(a, b) => invoke2Nel(a._2, b._2)(Selector.Or.apply _)
+        case Not((_, v)) =>
+          v.map { case (sel, inputs) => (sel andThen (_.negate), inputs.map(There(0, _))) }
+
+        case Guard(_, typ, cont, _) =>
+          def selCheck: Type => Option[BsonField => Selector] =
+            generateTypeCheck[BsonField, Selector](Selector.Or(_, _)) {
+              case Type.Null => ((f: BsonField) =>  Selector.Doc(f -> Selector.Type(BsonType.Null)))
+              case Type.Dec => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Dec)))
+              case Type.Int =>
+                ((f: BsonField) => Selector.Or(
+                  Selector.Doc(f -> Selector.Type(BsonType.Int32)),
+                  Selector.Doc(f -> Selector.Type(BsonType.Int64))))
+              case Type.Int ⨿ Type.Dec ⨿ Type.Interval =>
+                ((f: BsonField) =>
+                  Selector.Or(
+                    Selector.Doc(f -> Selector.Type(BsonType.Int32)),
+                    Selector.Doc(f -> Selector.Type(BsonType.Int64)),
+                    Selector.Doc(f -> Selector.Type(BsonType.Dec))))
+              case Type.Str => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Text)))
+              case Type.Obj(_, _) =>
+                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Doc)))
+              case Type.Binary =>
+                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Binary)))
+              case Type.Id =>
+                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.ObjectId)))
+              case Type.Bool => ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Bool)))
+              case Type.Date =>
+                ((f: BsonField) => Selector.Doc(f -> Selector.Type(BsonType.Date)))
+            }
+          selCheck(typ).fold[OutputM[PartialSelector]](
+            -\/(InternalError(node.map(_._1).shows)))(
+            f =>
+            \/-(cont._2.fold[PartialSelector](
+              κ(({ case List(field) => f(field) }, List(There(0, Here)))),
+              { case (f2, p2) =>
+                ({ case head :: tail => Selector.And(f(head), f2(tail)) },
+                  There(0, Here) :: p2.map(There(1, _)))
+              })))
+
+        case _ => -\/(InternalError(node.map(_._1).shows))
+      }
+    }
+
+    invoke(node) <+> \/-(default)
+  }
+
   trait Planner[F[_]] {
     type IT[G[_]]
 
