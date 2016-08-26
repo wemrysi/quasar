@@ -212,7 +212,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array" in pending {
+    "convert a constant shift array" in {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (1,2,3); select * from foo"
       convert(
@@ -233,9 +233,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
           Free.point(RightSide))).embed.some)
-    }
+    }.pendingUntilFixed
 
-    "convert a read shift array" in pending {
+    "convert a read shift array" in {
       convert(
         None,
         LP.Let('x, lpRead("/foo/bar"),
@@ -246,9 +246,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
               structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))) must
       equal(RootR.some) // TODO incorrect expectation
-    }
+    }.pendingUntilFixed
 
-    "convert a shift/unshift array" in pending {
+    "convert a shift/unshift array" in {
       // "select [loc[_:] * 10 ...] from zips",
       convert(
         None,
@@ -273,9 +273,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0)))))).embed.some)
-    }
+    }.pendingUntilFixed
 
-    "convert a filter" in pending {
+    "convert a filter" in {
       // "select * from foo where bar between 1 and 10"
       convert(
         listContents.some,
@@ -295,10 +295,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
             IntLit(10))))).embed.some)
-    }
+    }.pendingUntilFixed
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
-    "convert magical query" in pending {
+    "convert magical query" in {
       // "select * from person, car",
       convert(
         None,
@@ -309,9 +309,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))) must
       equal(RootR.some) // TODO incorrect expectation
-    }
+    }.pendingUntilFixed
 
-    "convert basic join with explicit join condition" in pending {
+    "convert basic join with explicit join condition" in {
       //"select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
 
       val lp = LP.Let('__tmp0, lpRead("/foo"),
@@ -332,6 +332,6 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                   LP.Constant(Data.Str("address")))))))
       convert(None, lp) must equal(
         QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
-    }
+    }.pendingUntilFixed
   }
 }
