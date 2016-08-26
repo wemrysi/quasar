@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
+import quasar.effect.Failure
 import quasar.fs._
 import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
@@ -26,36 +27,36 @@ import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
 
 import java.nio.file._
+import java.lang.Exception
 import java.io.FileNotFoundException
+import scala.util.control.NonFatal
 
 import org.apache.commons.io.FileUtils
 import pathy.Path._
-import scalaz._
+import scalaz.{Failure => _, _}
 import Scalaz._
 import scalaz.concurrent.Task
 
 object managefile {
 
   def chrooted[S[_]](prefix: ADir)(implicit
-    s0: Task :<: S
+    s0: Task :<: S,
+    s1: PhysErr :<: S
   ): ManageFile ~> Free[S, ?] =
     flatMapSNT(interpret) compose chroot.manageFile[ManageFile](prefix)
 
   def interpret[S[_]](implicit
-    s0: Task :<: S
+    s0: Task :<: S,
+    s1: PhysErr :<: S
   ): ManageFile ~> Free[S, ?] =
     new (ManageFile ~> Free[S, ?]) {
       def apply[A](mf: ManageFile[A]): Free[S, A] = mf match {
         case Move(FileToFile(sf, df), semantics) =>
-          injectFT[Task, S].apply{
-            ensureMoveSemantics(sf, df, doesPathExist, semantics)
-              .fold(fse => Task.now(fse.left), moveFile(sf, df)).join
-          }
+          (ensureMoveSemantics(sf, df, doesPathExist, semantics).toLeft(()) *>
+            moveFile(sf, df).liftM[FileSystemErrT]).run
         case Move(DirToDir(sd, dd), semantics) =>
-          injectFT[Task, S].apply{
-            ensureMoveSemantics(sd, dd, doesPathExist, semantics)
-              .fold(fse => Task.now(fse.left), moveDir(sd, dd)).join
-          }
+          (ensureMoveSemantics(sd, dd, doesPathExist, semantics).toLeft(()) *>
+            moveDir(sd, dd).liftM[FileSystemErrT]).run
         case Delete(path) => delete(path)
         case TempFile(near) => tempFile(near)
       }
@@ -69,27 +70,36 @@ object managefile {
     maybeUnboxed.map(sandboxAbs(_))
   }
 
-  private def doesPathExist: APath => Task[Boolean] = path => Task.delay {
+  private def doesPathExist[S[_]](implicit
+    s0: Task :<: S
+  ): APath => Free[S, Boolean] = path => lift(Task.delay {
     Files.exists(toNioPath(path))
-  }
+  }).into[S]
 
-  private def moveFile(src: AFile, dst: AFile): Task[FileSystemError \/ Unit] = Task.delay {
-    \/.fromTryCatchNonFatal {
+  private def moveFile[S[_]](src: AFile, dst: AFile)(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Free[S, Unit] = {
+    val move: Task[PhysicalError \/ Unit] = Task.delay {
       val deleted = FileUtils.deleteQuietly(toNioPath(dst).toFile())
       FileUtils.moveFile(toNioPath(src).toFile(), toNioPath(dst).toFile)
-    } .leftMap {
-      case e => ioFailed(e.getMessage())
-    }.void
+    }.as(().right[PhysicalError]).handle {
+      case NonFatal(ex : Exception) => UnhandledFSError(ex).left[Unit]
+    }
+    Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
 
-  private def moveDir(src: ADir, dst: ADir): Task[FileSystemError \/ Unit] = Task.delay {
-    \/.fromTryCatchNonFatal{
+  private def moveDir[S[_]](src: ADir, dst: ADir)(implicit
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Free[S, Unit] = {
+
+    val move: Task[PhysicalError \/ Unit] = Task.delay {
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
-    }
-      .leftMap {
-      case e => ioFailed(e.getMessage())
-    }.void
+    }.as(().right[PhysicalError])
+
+    Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
 
   private def delete[S[_]](path: APath)(implicit

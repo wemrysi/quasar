@@ -27,7 +27,6 @@ import quasar.fp.free._
 import quasar.fp.numeric._
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import scalaz.stream.Process
 
 object impl {
@@ -65,17 +64,17 @@ object impl {
     }
   }
 
-  def ensureMoveSemantics[S[_]](
+  def ensureMoveSemantics[F[_] : Monad] (
     src: APath,
     dst: APath,
-    fExists: APath => Task[Boolean],
-    semantics: MoveSemantics): OptionT[Task, FileSystemError] = {
+    fExists: APath => F[Boolean],
+    semantics: MoveSemantics): OptionT[F, FileSystemError] = {
 
-    OptionT[Task, FileSystemError](
+    OptionT[F, FileSystemError](
       fExists(src).flatMap { srcExists =>
         if(srcExists) {
           semantics match {
-            case Overwrite => Task.now(None)
+            case Overwrite => none.point[F]
             case FailIfExists =>
               fExists(dst).map { dstExists =>
                 if(dstExists) Some(PathErr(pathExists(dst))) else None
@@ -86,7 +85,7 @@ object impl {
               }
           }
         }
-        else Task.now(Some(PathErr(pathNotFound(src))))
+        else some(pathErr(pathNotFound(src))).point[F]
       }
     )
   }

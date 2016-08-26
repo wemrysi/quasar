@@ -39,12 +39,14 @@ package object local {
   type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
   type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
-  type Eff[A] = Coproduct[MonotonicSeq, Eff2, A]
+  type Eff3[A] = Coproduct[PhysErr, Eff2, A]
+  type Eff[A]  = Coproduct[MonotonicSeq, Eff3, A]
 
   final case class SparkFSDef[S[_]](run: Free[Eff, ?] ~> Free[S, ?], close: Free[S, Unit])
 
   private def sparkFsDef[S[_]](sparkConf: SparkConf)(implicit
-    S0: Task :<: S
+    S0: Task :<: S,
+    S1: PhysErr :<: S
   ): Free[S, SparkFSDef[S]] = {
 
     val genSc = Task.delay {
@@ -56,15 +58,14 @@ package object local {
       TaskRef(Map.empty[WriteHandle, PrintWriter]) |@|
       genSc) {
       (genState, sparkCursors, printWriters, sc) =>
-        val taskInter: Eff ~> Task = MonotonicSeq.fromTaskRef(genState) :+:
-          NaturalTransformation.refl[Task] :+:
-          KeyValueStore.fromTaskRef[WriteHandle, PrintWriter](printWriters) :+:
-          KeyValueStore.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) :+:
-            Read.constant[Task, SparkContext](sc)
+      val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
+        injectNT[PhysErr, S] :+:
+        injectNT[Task, S]  :+:
+        (KeyValueStore.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
+        (KeyValueStore.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
+        (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
-        val sInter: Eff ~> S = taskInter andThen injectNT[Task, S]
-
-      SparkFSDef(mapSNT[Eff, S](sInter), lift(Task.delay(sc.stop())).into[S])
+      SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
   }
 

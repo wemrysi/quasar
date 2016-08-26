@@ -43,8 +43,6 @@ object FileSystemError {
   ) extends FileSystemError
   final case class PathErr private (e: PathError)
       extends FileSystemError
-  final case class IOError private (reason: String)
-      extends FileSystemError
   final case class PlanningFailed private (
     lp: Fix[LogicalPlan],
     err: PlannerError
@@ -76,10 +74,6 @@ object FileSystemError {
   val planningFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], PlannerError)] {
     case PlanningFailed(lp, e) => (lp, e)
   } (PlanningFailed.tupled)
-
-  val ioFailed = Prism.partial[FileSystemError, String] {
-    case IOError(reason) => reason
-  } (IOError)
 
   val unknownResultHandle = Prism.partial[FileSystemError, ResultHandle] {
     case UnknownResultHandle(h) => h
@@ -113,8 +107,6 @@ object FileSystemError {
         s"Plan execution failed: $rsn, cause=${c.map(_.cause.getMessage)}"
       case PathErr(e) =>
         e.shows
-      case IOError(r) =>
-        s"IO failed, reason='$r'"
       case PlanningFailed(_, e) =>
         e.shows
       case UnknownResultHandle(h) =>
