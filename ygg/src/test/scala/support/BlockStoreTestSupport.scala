@@ -27,12 +27,10 @@ trait BlockStoreTestModule extends ColumnarTableModuleTestSupport with BlockStor
         val stream = projections.foldLeft(StreamT.empty[Need, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
           val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList).toSet)
+            Some(Schema.flatten(tpe, struct.toVector).toSet)
           }
 
-          acc ++ StreamT.wrapEffect(constraints map { c =>
-            slices(proj, c)
-          })
+          acc ++ StreamT.wrapEffect(constraints map (slices(proj, _)))
         }
 
         Table(stream, ExactSize(totalLength))

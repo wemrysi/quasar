@@ -105,7 +105,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
 
   "flattenWithPath for values produces a single value with the identity path" in {
     val test     = json"1" //JNum(1)
-    val expected = vec(NoJPath -> test)
+    val expected = Vec(NoJPath -> test)
 
     test.flattenWithPath must_=== expected
   }
@@ -207,7 +207,7 @@ class JsonASTSpec extends quasar.SequentialQspec {
     val insertProp = (jv: JValue, p: JPath, toSet: JValue) => {
       (!badPath(jv, p) && (jv(p) == JUndefined)) ==> {
         (jv, p.nodes) match {
-          case (JObject(_), JPathField(_) :: _) | (JArray(_), JPathIndex(_) :: _) | (JNull | JUndefined, _) =>
+          case (JObject(_), JPathField(_) +: _) | (JArray(_), JPathIndex(_) +: _) | (JNull | JUndefined, _) =>
             ((p == NoJPath) && (jv.unsafeInsert(p, toSet) == toSet)) ||
               (jv.unsafeInsert(p, toSet).get(p) == toSet)
 

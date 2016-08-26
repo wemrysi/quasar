@@ -7,7 +7,7 @@ final case class Path private (components: Vector[String]) {
   def path: String            = (components mkString "/").replaceAll("/+", "/")
   def length: Int             = components.length
   def parent: Path            = if (isEmpty) this else Path(components.init)
-  def ancestors: Vector[Path] = if (isEmpty) vec() else parent +: parent.ancestors
+  def ancestors: Vector[Path] = if (isEmpty) Vec() else parent +: parent.ancestors
 
   def isEqualOrParentOf(that: Path) = that.components startsWith this.components
 
@@ -21,7 +21,7 @@ final case class Path private (components: Vector[String]) {
 }
 
 object Path {
-  val Root = new Path(vec())
+  val Root = new Path(Vec())
 
   private def cleanPath(string: String): String = string.replaceAll("^/|/$", "").replaceAll("/+", "/")
 

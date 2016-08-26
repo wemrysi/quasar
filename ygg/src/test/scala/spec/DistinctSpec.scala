@@ -1,6 +1,5 @@
 package ygg.tests
 
-import ygg.json._
 import ygg.table.trans._
 import SampleData._
 

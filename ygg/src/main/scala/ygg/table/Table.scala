@@ -33,6 +33,7 @@ trait TableCompanion[T <: ygg.table.Table] {
   def cross(left: Table, right: Table, orderHint: Option[CrossOrder])(spec: TransSpec2): Need[CrossOrder -> Table]
 }
 
+/***
 object Table {
   implicit def implicitTableOps(table: Table): TableOps[table.type] = new TableOps(table)
 
@@ -41,6 +42,7 @@ object Table {
     def sort(sortKey: TransSpec1): T#NeedTable = table.sort(sortKey, SortAscending)
   }
 }
+***/
 
 trait Table {
   outer =>

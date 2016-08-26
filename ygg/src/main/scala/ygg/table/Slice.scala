@@ -626,9 +626,9 @@ class SliceOps(private val source: Slice) extends AnyVal {
           scalaz.Order.order(cmp _)
 
         case Right(cols) =>
-          val paths     = cols.keys.toList
-          val traversal = CPathTraversal(paths)
-          traversal.rowOrder(paths, cols)
+          val paths     = cols.keys.toSeq
+          val traversal = CPathTraversal(paths.toList)
+          traversal.rowOrder(paths.toList, cols)
       }
     }
 
@@ -834,19 +834,19 @@ class SliceOps(private val source: Slice) extends AnyVal {
     (0 until size).map(i => prefix + " " + toJson(i)).mkString("\n")
   }
 
-  def cPathToJPaths(cpath: CPath, value: CValue): List[JPath -> CValue] = {
+  def cPathToJPaths(cpath: CPath, value: CValue): Vec[JPath -> CValue] = {
     import ygg.json._
 
-    def add(c: JPathNode, xs: List[JPath -> CValue]): List[JPath -> CValue] =
+    def add(c: JPathNode, xs: Vec[JPath -> CValue]): Vec[JPath -> CValue] =
       xs map { case (path, value) => (JPath(c :: path.nodes), value) }
 
     (cpath.nodes, value) match {
-      case (Nil, _)                            => List(NoJPath -> value)
-      case (CPathField(name) :: tail, _)       => add(JPathField(name), cPathToJPaths(CPath(tail), value))
-      case (CPathIndex(i) :: tail, _)          => add(JPathIndex(i), cPathToJPaths(CPath(tail), value))
-      case (CPathArray :: tail, es: CArray[_]) =>
+      case (Seq(), _)                          => Vec(NoJPath -> value)
+      case (CPathField(name) +: tail, _)       => add(JPathField(name), cPathToJPaths(CPath(tail), value))
+      case (CPathIndex(i) +: tail, _)          => add(JPathIndex(i), cPathToJPaths(CPath(tail), value))
+      case (CPathArray +: tail, es: CArray[_]) =>
         val CArrayType(elemType) = es.cType
-        es.value.toList.zipWithIndex flatMap { case (e, i) => add(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
+        es.value.toVector.zipWithIndex flatMap { case (e, i) => add(JPathIndex(i), cPathToJPaths(CPath(tail), elemType(e))) }
       case (path, _) => abort("Bad news, bob! " + path)
     }
   }
@@ -968,12 +968,13 @@ object Slice {
   }
 
   def rowComparatorFor(s1: Slice, s2: Slice)(keyf: Slice => Iterable[CPath]): RowComparator = {
-    val paths     = (keyf(s1) ++ keyf(s2)).toList
-    val traversal = CPathTraversal(paths)
+    val paths     = (keyf(s1) ++ keyf(s2)).toVector
+    val traversal = CPathTraversal(paths.toList)
     val lCols     = s1.columns groupBy (_._1.selector) map { case (path, m) => path -> m.values.toSet }
     val rCols     = s2.columns groupBy (_._1.selector) map { case (path, m) => path -> m.values.toSet }
-    val allPaths  = (lCols.keys ++ rCols.keys).toList
+    val allPaths  = lCols.keys ++ rCols.keys toList
     val order     = traversal.rowOrder(allPaths, lCols, Some(rCols))
+
     new RowComparator {
       def compare(r1: Int, r2: Int): Ordering = order.order(r1, r2)
     }

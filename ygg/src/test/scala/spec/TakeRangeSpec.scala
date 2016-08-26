@@ -1,7 +1,6 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg.json._
 
 class TakeRangeSpec extends ColumnarTableQspec {
   import SampleData._

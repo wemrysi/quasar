@@ -48,19 +48,19 @@ trait TableGenerators {
 
 trait JsonGenerators {
   def badPath(jv: JValue, p: JPath): Boolean = (jv, p.nodes) match {
-    case (JArray(_), JPathField(_) :: _)   => true
-    case (JObject(_), JPathIndex(_) :: _)  => true
-    case (_, Nil)                          => false
-    case (_, JPathField(name) :: xs)       => badPath(jv \ name, JPath(xs))
-    case (JArray(ns), JPathIndex(i) :: xs) => (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(jarray(), JPath(xs))
-    case (_, JPathIndex(i) :: xs)          => (i != 0) || badPath(jarray(), JPath(xs))
+    case (JArray(_), JPathField(_) +: _)   => true
+    case (JObject(_), JPathIndex(_) +: _)  => true
+    case (_, Seq())                        => false
+    case (_, JPathField(name) +: xs)       => badPath(jv \ name, JPath(xs))
+    case (JArray(ns), JPathIndex(i) +: xs) => (i > ns.length) || (i < ns.length && badPath(ns(i), JPath(xs))) || badPath(jarray(), JPath(xs))
+    case (_, JPathIndex(i) +: xs)          => (i != 0) || badPath(jarray(), JPath(xs))
   }
 
   def genJPathNode: Gen[JPathNode] = frequency(
     1 -> (choose(0, 10) ^^ JPathIndex),
     9 -> (genIdent ^^ JPathField)
   )
-  def genJPath: Gen[JPath] = genJPathNode * choose(0, 10) ^^ (JPath(_))
+  def genJPath: Gen[JPath] = genJPathNode * choose(0, 10) ^^ (xs => JPath(xs: _*))
 
   /** The delay wrappers are needed because we generate
     *  JValues recursively.

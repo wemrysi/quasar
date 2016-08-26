@@ -41,7 +41,7 @@ object Render {
           val ColumnRef(selector, ctype) = ref
 
           selector.nodes match {
-            case CPathField(name) :: tail => {
+            case CPathField(name) +: tail => {
               target match {
                 case SchemaNode.Obj(nodes) => {
                   val subTarget = nodes get name getOrElse SchemaNode.Union(Set())
@@ -64,7 +64,7 @@ object Render {
               }
             }
 
-            case CPathIndex(idx) :: tail => {
+            case CPathIndex(idx) +: tail => {
               target match {
                 case SchemaNode.Arr(map) => {
                   val subTarget = map get idx getOrElse SchemaNode.Union(Set())
@@ -87,11 +87,11 @@ object Render {
               }
             }
 
-            case CPathMeta(_) :: _ => target
+            case CPathMeta(_) +: _ => target
 
-            case CPathArray :: _ => ???
+            case CPathArray +: _ => ???
 
-            case Nil => {
+            case Vec() => {
               val node = SchemaNode.Leaf(ctype, col)
 
               target match {

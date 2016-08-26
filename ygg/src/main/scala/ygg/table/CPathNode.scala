@@ -4,8 +4,8 @@ import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
 sealed trait CPathNode {
-  def \(that: CPath): CPath     = CPath(this :: that.nodes)
-  def \(that: CPathNode): CPath = CPath(this :: that :: Nil)
+  def \(that: CPath): CPath     = CPath(this +: that.nodes)
+  def \(that: CPathNode): CPath = CPath(Vec(this, that))
   final override def toString = this match {
     case CPathField(name)  => s".$name"
     case CPathMeta(name)   => s"@$name"

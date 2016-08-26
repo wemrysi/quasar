@@ -3,6 +3,7 @@ package ygg
 import jawn._
 import ygg.common._
 import scalaz._, Scalaz._
+import ygg.macros.Json._
 
 package object json {
   type JSchemaElem = ygg.json.JPath -> ygg.table.CType
@@ -27,11 +28,6 @@ package object json {
     "key" : $ids,
     "value" : $jv
   }"""
-
-  implicit final class JsonStringContext(sc: StringContext) {
-    def json(args: Any*): JValue             = macro ygg.macros.JsonMacros.jsonInterpolatorImpl
-    def jsonMany(args: Any*): Vector[JValue] = macro ygg.macros.JsonMacros.jsonManyInterpolatorImpl
-  }
 
   implicit class AsyncParserOps[A](p: AsyncParser[A])(implicit z: Facade[A]) {
     type R = AsyncParse[A] -> AsyncParser[A]
@@ -95,15 +91,13 @@ package object json {
   implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)
   implicit def liftJPath(path: String): JPath          = JPath(path)
 
-  implicit val JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
-  implicit val JPathNodeOrdering                = JPathNodeOrder.toScalaOrdering
-  implicit val JPathOrder: Order[JPath]         = Order orderBy (_.nodes)
-  implicit val JPathOrdering                    = JPathOrder.toScalaOrdering
+  implicit def JPathNodeOrder: Order[JPathNode] = Order orderBy (x => x.optName -> x.optIndex)
+  implicit def JPathOrder: Order[JPath]         = Order orderBy (_.nodes.toList) /* .toList VERY IMPORTANT */
 
   implicit val JObjectMergeMonoid = new Monoid[JObject] {
     val zero = JObject(Nil)
 
-    def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asInstanceOf[JObject]
+    def append(v1: JObject, v2: => JObject): JObject = v1.merge(v2).asObject
   }
 
   private[json] def buildString(f: StringBuilder => Unit): String = {
@@ -121,9 +115,9 @@ package object json {
     def tail: JPath                  = JPath(nodes.tail)
     def path: String                 = x.to_s
 
-    def ancestors: List[JPath] = {
-      def loop(path: JPath, acc: List[JPath]): List[JPath] = path.parent.fold(acc)(p => loop(p, p :: acc))
-      loop(x, Nil).reverse
+    def ancestors: Vec[JPath] = {
+      def loop(path: JPath, acc: Vec[JPath]): Vec[JPath] = path.parent.fold(acc)(p => loop(p, p +: acc))
+      loop(x, Vec()).reverse
     }
 
     def \(that: JPath): JPath   = JPath(nodes ++ that.nodes)
@@ -134,17 +128,17 @@ package object json {
     def \:(that: Int): JPath    = JPath(JPathIndex(that) +: nodes)
 
     def dropPrefix(p: JPath): Option[JPath] = {
-      def remainder(nodes: List[JPathNode], toDrop: List[JPathNode]): Option[JPath] = {
+      def remainder(nodes: Seq[JPathNode], toDrop: Seq[JPathNode]): Option[JPath] = {
         nodes match {
-          case x :: xs =>
+          case x +: xs =>
             toDrop match {
-              case `x` :: ys => remainder(xs, ys)
-              case Nil       => Some(JPath(nodes))
+              case `x` +: ys => remainder(xs, ys)
+              case Seq()     => Some(JPath(nodes: _*))
               case _         => None
             }
 
-          case Nil =>
-            if (toDrop.isEmpty) Some(JPath(nodes))
+          case Seq() =>
+            if (toDrop.isEmpty) Some(JPath(nodes: _*))
             else None
         }
       }
@@ -152,20 +146,20 @@ package object json {
       remainder(nodes, p.nodes)
     }
     def extract(jvalue: JValue): JValue = {
-      def extract0(path: List[JPathNode], d: JValue): JValue = path match {
-        case Nil                     => d
-        case JPathField(name) :: tl  => extract0(tl, d \ name)
-        case JPathIndex(index) :: tl => extract0(tl, d(index))
+      def extract0(path: Seq[JPathNode], d: JValue): JValue = path match {
+        case Seq()                   => d
+        case JPathField(name) +: tl  => extract0(tl, d \ name)
+        case JPathIndex(index) +: tl => extract0(tl, d(index))
       }
       extract0(nodes, jvalue)
     }
-    def expand(jvalue: JValue): List[JPath] = {
-      def expand0(current: List[JPathNode], right: List[JPathNode], d: JValue): List[JPath] = right match {
-        case Nil                            => JPath(current) :: Nil
-        case (hd @ JPathIndex(index)) :: tl => expand0(current :+ hd, tl, jvalue(index))
-        case (hd @ JPathField(name)) :: tl  => expand0(current :+ hd, tl, jvalue \ name)
+    def expand(jvalue: JValue): Seq[JPath] = {
+      def expand0(current: Seq[JPathNode], right: Seq[JPathNode], d: JValue): Seq[JPath] = right match {
+        case Seq()                          => Seq(JPath(current: _*))
+        case (hd @ JPathIndex(index)) +: tl => expand0(current :+ hd, tl, jvalue(index))
+        case (hd @ JPathField(name)) +: tl  => expand0(current :+ hd, tl, jvalue \ name)
       }
-      expand0(Nil, nodes, jvalue)
+      expand0(Vec(), nodes, jvalue)
     }
   }
 
@@ -178,8 +172,8 @@ package object json {
       case JPathIndex(x) => Some(x)
       case _             => None
     }
-    def \(that: JPath)     = JPath(x :: that.nodes)
-    def \(that: JPathNode) = JPath(x :: that :: Nil)
+    def \(that: JPath)     = JPath(x +: that.nodes)
+    def \(that: JPathNode) = JPath(x, that)
   }
 
   implicit class JObjectOps(private val x: JObject) {
@@ -213,7 +207,7 @@ package object json {
   }
 
   private def unflattenArray(elements: Seq[JPathValue]): JArray =
-    elements.foldLeft(JArray(Vector()))((arr, t) => arr.set(t._1, t._2).asArray)
+    elements.foldLeft(JArray(Vec()))((arr, t) => arr.set(t._1, t._2).asArray)
 
   private def unflattenObject(elements: Seq[JPathValue]): JObject =
     elements.foldLeft(JObject(Nil))((obj, t) => obj.set(t._1, t._2).asObject)
@@ -271,7 +265,7 @@ package object json {
       def find(json: JValue): Vector[JValue] = json match {
         case JObject(l) =>
           l.foldLeft(Vector[JValue]()) {
-            case (acc, (`nameToFind`, v)) => v :: acc ::: find(v)
+            case (acc, (`nameToFind`, v)) => v +: acc ::: find(v)
             case (acc, (_, v))            => acc ::: find(v)
           }
 
@@ -299,8 +293,8 @@ package object json {
         else {
           def arrayInsert(l: Vector[JValue], i: Int, rem: JPath, v: JValue): Vector[JValue] = {
             def update(l: Vector[JValue], j: Int): Vector[JValue] = l match {
-              case x +: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
-              case Seq()   => Vector.empty
+              case x +: xs => (if (j == i) rec(x, rem, v) else x) +: update(xs, j + 1)
+              case Seq()   => Vec()
             }
 
             update(l.padTo(i + 1, JUndefined), 0)
@@ -318,26 +312,26 @@ package object json {
           target match {
             case obj @ JObject(fields) =>
               path.nodes match {
-                case JPathField(name) :: nodes =>
+                case JPathField(name) +: nodes =>
                   val (child, rest) = obj.partitionField(name)
                   rest + JField(name, rec(child, JPath(nodes), value))
 
-                case JPathIndex(_) :: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-                case Nil                => fail()
+                case JPathIndex(_) +: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+                case Seq()                => fail()
               }
 
             case arr @ JArray(elements) =>
               path.nodes match {
-                case JPathIndex(index) :: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
-                case JPathField(_) :: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
-                case Nil                        => fail()
+                case JPathIndex(index) +: nodes => JArray(arrayInsert(elements, index, JPath(nodes), value))
+                case JPathField(_) +: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+                case Seq()                        => fail()
               }
 
             case JNull | JUndefined =>
               path.nodes match {
-                case Nil                => value
-                case JPathIndex(_) :: _ => rec(jarray(), path, value)
-                case JPathField(_) :: _ => rec(jobject(), path, value)
+                case Seq()                => value
+                case JPathIndex(_) +: _ => rec(jarray(), path, value)
+                case JPathField(_) +: _ => rec(jobject(), path, value)
               }
 
             case x =>
@@ -355,7 +349,7 @@ package object json {
       else {
         def arraySet(l: Vector[JValue], i: Int, rem: JPath, v: JValue): Vector[JValue] = {
           def update(l: Vector[JValue], j: Int): Vector[JValue] = l match {
-            case x +: xs => (if (j == i) x.set(rem, v) else x) :: update(xs, j + 1)
+            case x +: xs => (if (j == i) x.set(rem, v) else x) +: update(xs, j + 1)
             case Seq()   => Vector.empty
           }
 
@@ -365,7 +359,7 @@ package object json {
         self match {
           case obj @ JObject(fields) =>
             path.nodes match {
-              case JPathField(name) :: nodes =>
+              case JPathField(name) +: nodes =>
                 val (child, rest) = obj.partitionField(name)
                 rest + JField(name, child.set(JPath(nodes), value))
 
@@ -375,7 +369,7 @@ package object json {
 
           case arr @ JArray(elements) =>
             path.nodes match {
-              case JPathIndex(index) :: nodes =>
+              case JPathIndex(index) +: nodes =>
                 JArray(arraySet(elements, index, JPath(nodes), value))
               case x =>
                 abort("Arrays have no fields: attempted to set " + path + " on " + self)
@@ -383,16 +377,16 @@ package object json {
 
           case _ =>
             path.nodes match {
-              case Nil                => value
-              case JPathIndex(_) :: _ => jarray().set(path, value)
-              case JPathField(_) :: _ => jobject().set(path, value)
+              case Seq()                => value
+              case JPathIndex(_) +: _ => jarray().set(path, value)
+              case JPathField(_) +: _ => jobject().set(path, value)
             }
         }
       }
 
     def delete(path: JPath): Option[JValue] = {
       path.nodes match {
-        case JPathField(name) :: xs =>
+        case JPathField(name) +: xs =>
           self match {
             case JObject.Fields(fields) =>
               Some(
@@ -407,13 +401,13 @@ package object json {
             case unmodified => Some(unmodified)
           }
 
-        case JPathIndex(idx) :: xs =>
+        case JPathIndex(idx) +: xs =>
           self match {
             case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
             case unmodified       => Some(unmodified)
           }
 
-        case Nil => None
+        case Seq() => None
       }
     }
 
@@ -422,7 +416,7 @@ package object json {
     def children: Iterable[JValue] = self match {
       case JObject(fields) => fields.values
       case JArray(l)       => l
-      case _               => List.empty
+      case _               => Vec()
     }
 
     /** Return a combined value by folding over JSON by applying a function <code>f</code>
@@ -499,7 +493,7 @@ package object json {
         case JObject(l) =>
           f(p, JObject(l.flatMap { f =>
             val v2 = rec(p \ f._1, f._2)
-            if (!v2.isDefined) Nil else JField(f._1, v2) :: Nil
+            if (!v2.isDefined) Nil else JField(f._1, v2) +: Nil
 
           }))
 
@@ -509,7 +503,7 @@ package object json {
             JArray(l.zipWithIndex.flatMap(t =>
               rec(p \ t._2, t._1) match {
                 case JUndefined => Nil
-                case x          => x :: Nil
+                case x          => x +: Nil
             })))
 
         case x => f(p, x)
@@ -532,7 +526,7 @@ package object json {
             JObject(l.flatMap {
               case (k, v) =>
                 val v2 = rec(p \ k, v)
-                if (v2 == JUndefined) Nil else JField(k, v2) :: Nil
+                if (v2 == JUndefined) Nil else JField(k, v2) +: Nil
             })
 
           case JArray(l) =>
@@ -540,7 +534,7 @@ package object json {
               case (e, idx) =>
                 rec(p \ idx, e) match {
                   case JUndefined => Nil
-                  case x          => x :: Nil
+                  case x          => x +: Nil
                 }
             })
 
@@ -565,9 +559,9 @@ package object json {
       */
     def replace(target: JPath, replacer: JValue => JValue): JValue = {
       def replace0(target: JPath, j: JValue): JValue = target.nodes match {
-        case Nil => replacer(j)
+        case Seq() => replacer(j)
 
-        case head :: tail =>
+        case head +: tail =>
           head match {
             case JPathField(name1) =>
               j match {
@@ -589,7 +583,7 @@ package object json {
                   val middle = replace0(JPath(tail: _*), split._2.head)
                   val suffix = split._2.drop(1)
 
-                  JArray(prefix ++ (middle :: suffix))
+                  JArray(prefix ++ (middle +: suffix))
 
                 case jvalue => jvalue
               }
@@ -626,12 +620,12 @@ package object json {
     /** Return a List of all elements which matches the given predicate.
       */
     def filter(p: JValue => Boolean): Vector[JValue] =
-      foldDown(Vector[JValue]())((acc, e) => if (p(e)) e :: acc else acc).reverse
+      foldDown(Vector[JValue]())((acc, e) => if (p(e)) e +: acc else acc).reverse
 
     def withFilter(p: JValue => Boolean): Vector[JValue] = filter(p)
 
     def flatten: Vector[JValue] =
-      foldDown(Vector[JValue]())((acc, e) => e :: acc).reverse
+      foldDown(Vector[JValue]())((acc, e) => e +: acc).reverse
 
     /** Flattens the JValue down to a list of path to simple JValue primitive.
       */

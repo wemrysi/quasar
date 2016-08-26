@@ -1,13 +1,13 @@
 package ygg.table
 
 import ygg.common._
-import scalaz._, Scalaz._, Ordering._
+import scalaz._, Scalaz._
 import ygg.json._
 
 sealed trait CPath {
-  def nodes: List[CPathNode]
+  def nodes: Vec[CPathNode]
 }
-private[table] case class CPathClass(nodes: List[CPathNode]) extends CPath {
+private[table] case class CPathClass(nodes: Vec[CPathNode]) extends CPath {
   override def toString: String = if (nodes.isEmpty) "." else nodes mkString ""
 }
 
@@ -19,29 +19,29 @@ object CPath {
 
   type AndValue = CPath -> CValue
 
-  def apply(l: List[CPathNode]): CPath = CPathClass(l)
-  def apply(n: CPathNode*): CPath      = apply(n.toList)
-  def apply(path: JPath): CPath        = apply(
-    path.nodes map {
+  def apply(l: Vec[CPathNode]): CPath = CPathClass(l)
+  def apply(n: CPathNode*): CPath     = apply(n.toVector)
+  def apply(path: JPath): CPath       = apply(
+    path.nodes.toVector map {
       case JPathField(name) => CPathField(name)
       case JPathIndex(idx)  => CPathIndex(idx)
     }
   )
 
-  def unapplySeq(path: CPath): Option[List[CPathNode]]  = Some(path.nodes)
-  def unapplySeq(path: String): Option[List[CPathNode]] = Some(apply(path).nodes)
+  def unapplySeq(path: CPath): Option[Vec[CPathNode]]  = Some(path.nodes)
+  def unapplySeq(path: String): Option[Vec[CPathNode]] = Some(apply(path).nodes)
 
   implicit def apply(path: String): CPath = {
-    def parse0(segments: List[String], acc: List[CPathNode]): List[CPathNode] = segments match {
-      case Nil                               => acc
-      case head :: tail if head.trim.isEmpty => parse0(tail, acc)
-      case "[*]" :: tail                     => parse0(tail, CPathArray :: acc)
-      case IndexPattern(index) :: tail       => parse0(tail, CPathIndex(index.toInt) :: acc)
-      case name :: tail                      => parse0(tail, CPathField(name) :: acc)
+    def parse0(segments: Vec[String], acc: Vec[CPathNode]): Vec[CPathNode] = segments match {
+      case Vec()                             => acc
+      case head +: tail if head.trim.isEmpty => parse0(tail, acc)
+      case "[*]" +: tail                     => parse0(tail, CPathArray +: acc)
+      case IndexPattern(index) +: tail       => parse0(tail, CPathIndex(index.toInt) +: acc)
+      case name +: tail                      => parse0(tail, CPathField(name) +: acc)
     }
 
     val properPath = if (path.startsWith(".")) path else "." + path
-    apply(parse0(PathPattern.split(properPath).toList, Nil).reverse: _*)
+    apply(parse0(PathPattern.split(properPath).toVector, Vec()).reverse: _*)
   }
 
   trait CPathTree[A]
@@ -96,18 +96,7 @@ object CPath {
 
   implicit def singleNodePath(node: CPathNode): CPath = CPath(node)
 
-  implicit val CPathOrder: Ord[CPath] = Ord order { (v1, v2) =>
-    def compare0(n1: List[CPathNode], n2: List[CPathNode]): Cmp = (n1, n2) match {
-      case (Nil, Nil) => EQ
-      case (Nil, _)   => LT
-      case (_, Nil)   => GT
-      case (n1 :: ns1, n2 :: ns2) =>
-        val ncomp = Ord[CPathNode].order(n1, n2)
-        if (ncomp != EQ) ncomp else compare0(ns1, ns2)
-    }
-
-    compare0(v1.nodes, v2.nodes)
-  }
+  implicit val CPathOrder: Ord[CPath] = Ord.orderBy(_.nodes.toList) /* toList VERY IMPORTANT */
 
   implicit class CPathOps(private val self: CPath) extends AnyVal {
     import self.nodes

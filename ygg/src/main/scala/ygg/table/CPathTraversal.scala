@@ -25,7 +25,7 @@ sealed trait CPathTraversal { self =>
 
     def plan0(t: CPathTraversal, paths: List[List[CPathNode] -> List[CPathNode]], idx: Int): CPathComparator = t match {
       case Done =>
-        val validPaths = paths map { case (_, nodes) => CPath(nodes.reverse) }
+        val validPaths = paths map { case (_, nodes) => CPath(nodes.reverse.toVector) }
 
         def makeCols(pathToCol: Map[CPath, Set[Column]]): Array[CPath -> Column] = {
           validPaths.flatMap({ path =>
@@ -132,7 +132,7 @@ sealed trait CPathTraversal { self =>
     }
 
     val indices  = new Array[Int](self.arrayDepth)
-    val pathComp = plan0(self, cpaths map (_.nodes -> Nil), 0)
+    val pathComp = plan0(self, cpaths.toList map (_.nodes.toList -> Nil), 0)
 
     scalaz.Order.order[Int]((row1, row2) => Ordering fromInt pathComp.compare(row1, row2, indices).toInt)
   }
@@ -232,7 +232,7 @@ object CPathTraversal {
         case _                                                      => false
       }
 
-      loop(ps, path.nodes)
+      loop(ps, path.nodes.toList)
     }
 
     implicit object CPathPositionOrder extends Ord[CPathPosition] {
@@ -254,7 +254,7 @@ object CPathTraversal {
     /**
       * Returns a `p` as a positioned CPath.
       */
-    def position(p: CPath): List[CPathPosition] = p.nodes map {
+    def position(p: CPath): List[CPathPosition] = p.nodes.toList map {
       case CPathArray => CPathRange(Set(CPathArray), 0, None)
       case node       => CPathPoint(node)
     }

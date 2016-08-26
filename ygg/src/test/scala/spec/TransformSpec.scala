@@ -1001,7 +1001,7 @@ class TransformSpec extends ColumnarTableQspec {
     implicit val gen = sample(objectSchema(_, 3))
 
     def randomDeletionMask(schema: JSchema): Option[JPathField] = {
-      Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) :: _), _) => x })
+      Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) +: _), _) => x })
     }
 
     prop { (sample: SampleData) =>
@@ -1460,12 +1460,13 @@ class TransformSpec extends ColumnarTableQspec {
 
     val jtpe = JObjectFixedT(Map("value" -> JArrayFixedT(Map(0 -> JArrayFixedT(Map()), 1 -> JArrayFixedT(Map()), 2 -> JNullT)), "key" -> JArrayUnfixedT))
 
-    val results = toJson(table.transform {
-      Typed(Leaf(Source), jtpe)
-    })
+    val results = toJson(table transform Typed(root, jtpe))
 
-    val included: Map[JPath, Set[CType]] =
-      Map(JPath(List(JPathIndex(0))) -> Set(CEmptyArray), JPath(List(JPathIndex(1))) -> Set(CEmptyArray), JPath(List(JPathIndex(2))) -> Set(CNull))
+    val included: Map[JPath, Set[CType]] = Map(
+      JPath(0) -> Set[CType](CEmptyArray),
+      JPath(1) -> Set[CType](CEmptyArray),
+      JPath(2) -> Set[CType](CNull)
+    )
 
     results.copoint must_== expectedResult(data, included)
   }
@@ -1483,10 +1484,11 @@ class TransformSpec extends ColumnarTableQspec {
     val results = toJson(table.transform(Typed(Leaf(Source), jtpe)))
 
     val included: Map[JPath, Set[CType]] = Map(
-      JPath(List(JPathIndex(0))) -> Set(CNum),
-      JPath(List(JPathIndex(1))) -> Set(CNum),
-      JPath(List(JPathIndex(2))) -> Set(CBoolean),
-      JPath(List(JPathIndex(3))) -> Set(CEmptyArray))
+      JPath(0) -> Set[CType](CNum),
+      JPath(1) -> Set[CType](CNum),
+      JPath(2) -> Set[CType](CBoolean),
+      JPath(3) -> Set[CType](CEmptyArray)
+    )
 
     results.copoint must_== expectedResult(data, included)
   }
@@ -1701,7 +1703,7 @@ class TransformSpec extends ColumnarTableQspec {
   private def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
     data map { jv =>
       val filtered = jv.flattenWithPath filter {
-        case (JPath(JPathField("value") :: tail), leaf) =>
+        case (JPath(JPathField("value") +: tail), leaf) =>
           included get JPath(tail) exists { ctpes =>
             // if an object or array is nonempty, then leaf is a nonempty object and
             // consequently can't conform to any leaf type.
@@ -1715,7 +1717,7 @@ class TransformSpec extends ColumnarTableQspec {
             }
           }
 
-        case (JPath(JPathField("key") :: _), _) => true
+        case (JPath(JPathField("key") +: _), _) => true
         case _                                  => abort("Unexpected JValue schema for " + jv)
       }
 

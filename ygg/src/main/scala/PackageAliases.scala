@@ -36,6 +36,7 @@ trait PackageAliases {
   val ListBuffer              = scm.ListBuffer
   val ScalaFailure            = scala.util.Failure
   val Try                     = scala.util.Try
+  val Vec                     = scala.Vector
   val scmMap                  = scm.HashMap
   val scmSet                  = scm.HashSet
 

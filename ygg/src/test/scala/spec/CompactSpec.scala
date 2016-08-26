@@ -35,9 +35,9 @@ class CompactSpec extends ColumnarTableQspec {
   }
 
   private def mkDeref(path: CPath): TransSpec1 = {
-    def mkDeref0(nodes: List[CPathNode]): TransSpec1 = nodes match {
-      case (f: CPathField) :: rest => DerefObjectStatic(mkDeref0(rest), f)
-      case (i: CPathIndex) :: rest => DerefArrayStatic(mkDeref0(rest), i)
+    def mkDeref0(nodes: Seq[CPathNode]): TransSpec1 = nodes match {
+      case (f: CPathField) +: rest => DerefObjectStatic(mkDeref0(rest), f)
+      case (i: CPathIndex) +: rest => DerefArrayStatic(mkDeref0(rest), i)
       case _                       => Leaf(Source)
     }
 

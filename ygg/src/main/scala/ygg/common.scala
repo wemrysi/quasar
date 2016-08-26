@@ -5,7 +5,6 @@ import ygg.data._
 import java.nio.file._
 
 package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
-  def vec[A](xs: A*): Vec[A] = xs.toVector
   def mutableQueue[A: Ord](xs: A*): scala.collection.mutable.PriorityQueue[A] = scala.collection.mutable.PriorityQueue(xs: _*)
 
   implicit class jPathOps(private val p: jPath) {
@@ -14,9 +13,10 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
   }
 
   implicit class YggScalaVectorOps[A](private val xs: Vec[A]) {
-    def :::(that: Vector[A]): Vec[A] = that ++ xs
-    def ::(head: A): Vec[A]          = head +: xs
-    def shuffle: Vec[A]              = scala.util.Random.shuffle(xs)
+    def reverse_:::(that: Vec[A]): Vec[A] = that.reverse ++ xs
+    def :::(that: Vector[A]): Vec[A]      = that ++ xs
+    def ::(head: A): Vec[A]               = head +: xs
+    def shuffle: Vec[A]                   = scala.util.Random.shuffle(xs)
   }
   implicit class YggScalaMapOps[A, B](source: Map[A, B]) {
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)

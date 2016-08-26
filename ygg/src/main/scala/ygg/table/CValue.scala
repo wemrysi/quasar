@@ -40,7 +40,7 @@ object RValue {
       else {
         def arrayInsert(l: List[RValue], i: Int, rem: CPath, v: RValue): List[RValue] = {
           def update(l: List[RValue], j: Int): List[RValue] = l match {
-            case x :: xs => (if (j == i) rec(x, rem, v) else x) :: update(xs, j + 1)
+            case x +: xs => (if (j == i) rec(x, rem, v) else x) +: update(xs, j + 1)
             case Nil     => Nil
           }
 
@@ -50,11 +50,11 @@ object RValue {
         target match {
           case obj @ RObject(fields) =>
             path.nodes match {
-              case CPathField(name) :: nodes =>
+              case CPathField(name) +: nodes =>
                 val (child, rest) = (fields.get(name).getOrElse(CUndefined), fields - name)
                 RObject(rest + (name -> rec(child, CPath(nodes), value)))
 
-              case CPathIndex(_) :: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathIndex(_) +: _ => abort("Objects are not indexed: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
                 abort(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
@@ -63,8 +63,8 @@ object RValue {
 
           case arr @ RArray(elements) =>
             path.nodes match {
-              case CPathIndex(index) :: nodes => RArray(arrayInsert(elements, index, CPath(nodes), value))
-              case CPathField(_) :: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
+              case CPathIndex(index) +: nodes => RArray(arrayInsert(elements, index, CPath(nodes), value))
+              case CPathField(_) +: _         => abort("Arrays have no fields: attempted to insert " + value + " at " + rootPath + " on " + rootTarget)
               case _ =>
                 abort(
                   "RValue insert would overwrite existing data: " + target + " cannot be rewritten to " + value + " at " + path +
@@ -73,11 +73,11 @@ object RValue {
 
           case CNull | CUndefined =>
             path.nodes match {
-              case Nil                => value
-              case CPathIndex(_) :: _ => rec(RArray.empty, path, value)
-              case CPathField(_) :: _ => rec(RObject.empty, path, value)
-              case CPathArray :: _    => ???
-              case CPathMeta(_) :: _  => ???
+              case Vec()              => value
+              case CPathIndex(_) +: _ => rec(RArray.empty, path, value)
+              case CPathField(_) +: _ => rec(RObject.empty, path, value)
+              case CPathArray +: _    => ???
+              case CPathMeta(_) +: _  => ???
             }
 
           case x =>

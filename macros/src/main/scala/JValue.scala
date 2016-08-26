@@ -106,10 +106,10 @@ object JNum {
   def unapply(value: JNum): Option[BigDecimal] = Try(value.toBigDecimal).toOption
 }
 final object JObject {
-  val empty = JObject(Nil)
+  val empty: JObject = JObject(Vec())
 
   object Fields {
-    def unapply(m: JObject): Some[Vector[JField]] = Some(m.fields.toVector map (x => JField(x)))
+    def unapply(m: JObject): Some[Vec[JField]] = Some(m.fields.toVector map (x => JField(x)))
   }
 
   def apply(fields: Traversable[JField]): JObject = JObject(fields.map(_.toTuple).toMap)

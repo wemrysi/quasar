@@ -1291,20 +1291,20 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           case CUndefined             => abort("not supported")
         }
 
-        def fresh(paths: List[CPathNode], leaf: JType): Option[JType] = paths match {
-          case CPathField(field) :: paths => fresh(paths, leaf) map (tpe => JType.Object(field -> tpe))
-          case CPathIndex(i) :: paths     => fresh(paths, leaf) map (tpe => JType.Indexed(i -> tpe))
-          case CPathArray :: paths        => fresh(paths, leaf) map (tpe => JArrayHomogeneousT(tpe))
-          case CPathMeta(field) :: _      => None
-          case Nil                        => Some(leaf)
+        def fresh(paths: Seq[CPathNode], leaf: JType): Option[JType] = paths match {
+          case CPathField(field) +: paths => fresh(paths, leaf) map (tpe => JType.Object(field -> tpe))
+          case CPathIndex(i) +: paths     => fresh(paths, leaf) map (tpe => JType.Indexed(i -> tpe))
+          case CPathArray +: paths        => fresh(paths, leaf) map (tpe => JArrayHomogeneousT(tpe))
+          case CPathMeta(field) +: _      => None
+          case Seq()                      => Some(leaf)
         }
 
-        def merge(schema: Option[JType], paths: List[CPathNode], leaf: JType): Option[JType] = (schema, paths) match {
-          case (Some(JObjectFixedT(fields)), CPathField(field) :: paths) =>
+        def merge(schema: Option[JType], paths: Seq[CPathNode], leaf: JType): Option[JType] = (schema, paths) match {
+          case (Some(JObjectFixedT(fields)), CPathField(field) +: paths) =>
             merge(fields get field, paths, leaf) map { tpe =>
               JObjectFixedT(fields + (field -> tpe))
             } orElse schema
-          case (Some(JArrayFixedT(indices)), CPathIndex(idx) :: paths) =>
+          case (Some(JArrayFixedT(indices)), CPathIndex(idx) +: paths) =>
             merge(indices get idx, paths, leaf) map { tpe =>
               JArrayFixedT(indices + (idx -> tpe))
             } orElse schema

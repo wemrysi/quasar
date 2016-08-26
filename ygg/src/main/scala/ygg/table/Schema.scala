@@ -40,22 +40,19 @@ object Schema {
   }
 
   def sample(jtype: JType, size: Int): Option[JType] = {
-    val paths                        = flatten(jtype, Nil) groupBy { _.selector } toVector
+    val paths                        = flatten(jtype, Vec()) groupBy { _.selector } toVector
     val sampledPaths: Seq[ColumnRef] = paths.shuffle take size flatMap (_._2)
 
     mkType(sampledPaths)
   }
 
-  def flatten(jtype: JType, refsOriginal: List[ColumnRef]): Set[ColumnRef] = {
-    def buildPath(nodes: List[CPathNode], refs: List[ColumnRef], jType: JType): List[ColumnRef] = jType match {
-      case JArrayFixedT(indices) if indices.isEmpty =>
-        ColumnRef(CPath(nodes.reverse), CEmptyArray) :: Nil
-
-      case JObjectFixedT(fields) if fields.isEmpty =>
-        ColumnRef(CPath(nodes.reverse), CEmptyObject) :: Nil
+  def flatten(jtype: JType, refsOriginal: Vec[ColumnRef]): Set[ColumnRef] = {
+    def buildPath(nodes: Vec[CPathNode], refs: Vec[ColumnRef], jType: JType): Vec[ColumnRef] = jType match {
+      case JArrayFixedT(indices) if indices.isEmpty => Vec(ColumnRef(CPath(nodes.reverse), CEmptyArray))
+      case JObjectFixedT(fields) if fields.isEmpty  => Vec(ColumnRef(CPath(nodes.reverse), CEmptyObject))
 
       case JArrayFixedT(indices) =>
-        indices.toList.flatMap {
+        indices.toVector flatMap {
           case (idx, tpe) =>
             val refs0 = refs collect {
               case ColumnRef(CPath(CPathIndex(`idx`), rest @ _ *), ctype) =>
@@ -65,7 +62,7 @@ object Schema {
         }
 
       case JObjectFixedT(fields) => {
-        fields.toList.flatMap {
+        fields.toVector flatMap {
           case (field, tpe) =>
             val refs0 = refs collect {
               case ColumnRef(CPath(CPathField(`field`), rest @ _ *), ctype) =>
@@ -77,18 +74,14 @@ object Schema {
 
       case JArrayUnfixedT =>
         refs collect {
-          case ColumnRef(p @ CPath(CPathIndex(i), rest @ _ *), ctype) =>
-            ColumnRef(CPath(nodes.reverse) \ p, ctype)
-          case ColumnRef(CPath(), CEmptyArray) =>
-            ColumnRef(CPath(nodes.reverse), CEmptyArray)
+          case ColumnRef(p @ CPath(CPathIndex(i), rest @ _ *), ctype) => ColumnRef(CPath(nodes.reverse) \ p, ctype)
+          case ColumnRef(CPath(), CEmptyArray)                        => ColumnRef(CPath(nodes.reverse), CEmptyArray)
         }
 
       case JObjectUnfixedT =>
         refs collect {
-          case ColumnRef(p @ CPath(CPathField(i), rest @ _ *), ctype) =>
-            ColumnRef(CPath(nodes.reverse) \ p, ctype)
-          case ColumnRef(CPath(), CEmptyObject) =>
-            ColumnRef(CPath(nodes.reverse), CEmptyObject)
+          case ColumnRef(p @ CPath(CPathField(i), rest @ _ *), ctype) => ColumnRef(CPath(nodes.reverse) \ p, ctype)
+          case ColumnRef(CPath(), CEmptyObject)                       => ColumnRef(CPath(nodes.reverse), CEmptyObject)
         }
 
       case JArrayHomogeneousT(tpe) =>
@@ -100,28 +93,17 @@ object Schema {
 
       case JNumberT =>
         val path = CPath(nodes.reverse)
-        ColumnRef(path, CLong: CType) :: ColumnRef(path, CDouble) :: ColumnRef(path, CNum) :: Nil
+        Vec(ColumnRef(path, CLong: CType), ColumnRef(path, CDouble), ColumnRef(path, CNum))
 
-      case JTextT =>
-        ColumnRef(CPath(nodes.reverse), CString) :: Nil
-
-      case JBooleanT =>
-        ColumnRef(CPath(nodes.reverse), CBoolean) :: Nil
-
-      case JDateT =>
-        ColumnRef(CPath(nodes.reverse), CDate) :: Nil
-
-      case JPeriodT =>
-        ColumnRef(CPath(nodes.reverse), CPeriod) :: Nil
-
-      case JNullT =>
-        ColumnRef(CPath(nodes.reverse), CNull) :: Nil
-
-      case JUnionT(ltpe, rtpe) =>
-        buildPath(nodes, refs, ltpe) ++ buildPath(nodes, refs, rtpe)
+      case JTextT              => Vec(ColumnRef(CPath(nodes.reverse), CString))
+      case JBooleanT           => Vec(ColumnRef(CPath(nodes.reverse), CBoolean))
+      case JDateT              => Vec(ColumnRef(CPath(nodes.reverse), CDate))
+      case JPeriodT            => Vec(ColumnRef(CPath(nodes.reverse), CPeriod))
+      case JNullT              => Vec(ColumnRef(CPath(nodes.reverse), CNull))
+      case JUnionT(ltpe, rtpe) => buildPath(nodes, refs, ltpe) ++ buildPath(nodes, refs, rtpe)
     }
 
-    buildPath(Nil, refsOriginal, jtype).toSet
+    buildPath(Vec(), refsOriginal, jtype).toSet
   }
 
   private def fromCValueType(t: CValueType[_]): Option[JType] = t match {

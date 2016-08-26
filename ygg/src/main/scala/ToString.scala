@@ -1,4 +1,4 @@
-package ygg.api
+package ygg.common
 
 trait ToString {
   def to_s: String

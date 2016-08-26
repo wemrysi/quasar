@@ -10,7 +10,7 @@ class JPathSpec extends quasar.Qspec {
       prop((p: JPath) => JPath(p.toString) == p)
     }
     "forgivingly parse initial field name without leading dot" in {
-      JPath("foo.bar").nodes must_=== List[JPathNode]("foo", "bar")
+      Seq[JPathNode]("foo", "bar") must_=== JPath("foo.bar").nodes
     }
   }
 
@@ -55,11 +55,11 @@ class JPathSpec extends quasar.Qspec {
 
   "Ancestors" should {
     "return two ancestors" in {
-      JPath(".foo.bar.baz").ancestors must_=== List(JPath(".foo.bar"), JPath(".foo"), NoJPath)
+      Seq(JPath(".foo.bar"), JPath(".foo"), NoJPath) must_=== JPath(".foo.bar.baz").ancestors
     }
 
     "return empty list for identity" in {
-      NoJPath.ancestors must_=== Nil
+      Seq[JPath]() must_=== NoJPath.ancestors
     }
   }
 
@@ -75,7 +75,7 @@ class JPathSpec extends quasar.Qspec {
 
   "Ordering" should {
     "sort according to nodes names/indexes" in {
-      val test = List[JPath](
+      val test = Vec[JPath](
         "[1]",
         "[0]",
         "a",
@@ -88,7 +88,7 @@ class JPathSpec extends quasar.Qspec {
         "b[10].a[0]",
         "b[10].a[0].a"
       )
-      val expected = List(1, 0, 2, 3, 4, 6, 5, 9, 10, 7, 8) map test
+      val expected = Vec(1, 0, 2, 3, 4, 6, 5, 9, 10, 7, 8) map test
 
       test.sorted must_=== expected
     }

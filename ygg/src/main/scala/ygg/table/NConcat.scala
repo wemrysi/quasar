@@ -43,8 +43,10 @@ object ConcatHelpers {
     val rightIndices = collectIndices(right)
 
     val maxId = if (leftIndices.isEmpty) -1 else leftIndices.map(_._1).max
-    val newCols = (leftIndices map { case (_, _, ref, col) => ref -> col }) ++
-        (rightIndices map { case (i, xs, ref, col) => ColumnRef(CPath(CPathIndex(i + maxId + 1) :: xs.toList), ref.ctype) -> col })
+    val newCols = (
+         (leftIndices map { case (_, _, ref, col) => ref -> col })
+      ++ (rightIndices map { case (i, xs, ref, col) => ColumnRef(CPath(CPathIndex(i + maxId + 1) +: xs.toVector), ref.ctype) -> col })
+    )
 
     newCols.toMap
   }
