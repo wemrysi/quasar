@@ -2910,6 +2910,47 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           IgnoreId)))
     }
 
+    "plan simple inner equi-join with pre-filtering ($lookup)" in {
+      plan(
+        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where bar.rating >= 4") must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "bar")),
+        $match(
+          Selector.And(
+            isNumeric(BsonField.Name("rating")),
+            Selector.Doc(
+              BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))))),
+        $project(reshape(
+          "right" -> $$ROOT,
+          "__tmp2" -> $field("foo_id")),
+          ExcludeId),
+        $lookup(
+          CollectionName("foo"),
+          BsonField.Name("__tmp2"),
+          BsonField.Name("id"),
+          BsonField.Name("left")),
+        $project(reshape(
+          "right" -> $field("right"),
+          "left" -> $field("left"))),
+        $unwind(DocField(BsonField.Name("left"))),
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+    }
+
     "plan simple outer equi-join with wildcard" in {
       plan("select * from foo full join bar on foo.id = bar.foo_id") must
       beWorkflow(

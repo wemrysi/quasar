@@ -1,0 +1,1 @@
+- [#1364] accept any source at all on one side for $lookup
