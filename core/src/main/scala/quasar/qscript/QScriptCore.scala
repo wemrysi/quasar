@@ -217,8 +217,8 @@ object QScriptCore {
               src,
               // NB: all single-bucket reductions should reduce on `null`
               normBuck.resume.fold({
-                case Nullary(_) => MapFuncs.NullLit[T, Hole]()
-                case _          => normBuck
+                case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
+                case _                    => normBuck
               }, κ(normBuck)),
               reducers.map(_.map(normalizeMapFunc(_))),
               normalizeMapFunc(repair))

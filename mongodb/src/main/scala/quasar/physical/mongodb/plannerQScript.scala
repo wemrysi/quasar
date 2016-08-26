@@ -105,7 +105,7 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     {
-      case Nullary(v1) =>
+      case Constant(v1) =>
         v1.cataM(BsonCodec.fromEJson).bimap(
           κ(NonRepresentableEJson(v1.shows)),
           $literal(_))
@@ -271,7 +271,10 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     {
-      case Nullary(v1) => v1.cata(Data.fromEJson).toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> NonRepresentableEJson(v1.shows)
+      case Constant(v1) => v1.cata(Data.fromEJson).toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> NonRepresentableEJson(v1.shows)
+      // FIXME: Not correct
+      case Undefined() => (({ case Nil => JsFn.const(ident("undefined")) }, Nil): PartialJs).right
+      case Now() => ???
 
       case Length(a1) =>
         Arity1(a1)(expr => Call(ident("NumberLong"), List(Select(expr, "length"))))
@@ -537,7 +540,7 @@ object MongoDbQScriptPlanner {
     object IsBson {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Bson] =
         v._1.project match {
-          case Nullary(b) => b.cataM(BsonCodec.fromEJson).toOption
+          case Constant(b) => b.cataM(BsonCodec.fromEJson).toOption
           // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
           // case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
           // case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
@@ -564,7 +567,7 @@ object MongoDbQScriptPlanner {
     object IsDate {
       def unapply(v: (T[MapFunc[T, ?]], Output)): Option[Data.Date] =
         v._1.project match {
-          case Nullary(d @ Data.Date(_)) => Some(d)
+          case Constant(d @ Data.Date(_)) => Some(d)
           case _                         => None
         }
     }
@@ -649,7 +652,7 @@ object MongoDbQScriptPlanner {
         (relFunc(f) ⊛ flip(f).flatMap(relFunc))(relop(x, y)(_, _)).getOrElse(-\/(InternalError("couldn’t decipher operation")))
 
       func match {
-        case Nullary(_)   => \/-(default)
+        case Constant(_)        => \/-(default)
 
         case Gt(_, IsDate(d2))  => relDateOp1(Selector.Gte, d2, date.startOfNextDay, 0)
         case Lt(IsDate(d1), _)  => relDateOp1(Selector.Gte, d1, date.startOfNextDay, 1)
