@@ -1,0 +1,26 @@
+{
+  "name": "join the results of a pair of sub-queries",
+
+  "backends": {
+    "mongodb_read_only": "pending",
+    "postgresql":        "pending"
+  },
+
+  "data": "../zips.data",
+
+  "query": "select t1.city, t1.popCA, t2.popMA from
+            (select city, sum(pop) as popCA from `../zips`
+              where state = \"CA\" group by city
+              order by sum(pop) desc limit 200) as t1
+            join
+            (select city, sum(pop) as popMA from `../zips`
+              where state = \"MA\" group by city
+              order by sum(pop) desc limit 200) as t2
+            on t1.city = t2.city",
+
+  "predicate": "containsExactly",
+  "expected": [
+    { "city": "CONCORD",    "popCA": 115027, "popMA": 17076 },
+    { "city": "WILMINGTON", "popCA":  49178, "popMA": 17647 }
+  ]
+}
