@@ -118,10 +118,9 @@ class ZipSpecs extends quasar.Qspec {
       z.map(_.size).sum.runLog.unsafePerformSync(0) must beBetween(MinExpectedSize, MaxExpectedSize)
     }
 
-    "zip many large files of random bytes (10 GB)" in {
-      // NB: comment this to verify the heap is not consumed
-      skipped("too slow to run every time (~2 minutes)")
-
+    // NB: un-skip this to verify the heap is not consumed. It's too slow to run
+    // every time (~2 minutes).
+    "zip many large files of random bytes (10 GB)" in skipped {
       val Files = 10*1000
       val MaxExpectedSize = 100L*1000L*1000L
       val MinExpectedSize = MaxExpectedSize / 2
