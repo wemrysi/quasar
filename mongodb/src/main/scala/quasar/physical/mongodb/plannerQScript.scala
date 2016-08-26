@@ -105,7 +105,7 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     {
-      case Nullary(v1) =>
+      case Constant(v1) =>
         v1.cataM(BsonCodec.fromEJson).bimap(
           κ(NonRepresentableEJson(v1.shows)),
           $literal(_))
@@ -271,7 +271,10 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     {
-      case Nullary(v1) => v1.cata(Data.fromEJson).toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> NonRepresentableEJson(v1.shows)
+      case Constant(v1) => v1.cata(Data.fromEJson).toJs.map[PartialJs](js => ({ case Nil => JsFn.const(js) }, Nil)) \/> NonRepresentableEJson(v1.shows)
+      // FIXME: Not correct
+      case Undefined() => (({ case Nil => JsFn.const(ident("undefined")) }, Nil): PartialJs).right
+      case Now() => ???
 
       case Length(a1) =>
         Arity1(a1)(expr => Call(ident("NumberLong"), List(Select(expr, "length"))))
