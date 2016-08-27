@@ -20,49 +20,48 @@ import org.specs2.execute.Result
 import quasar.Predef._
 import quasar.fs.SpecialStr
 
-import org.specs2.scalaz._
-import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck._
 
-class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with DisjunctionMatchers {
+class CollectionSpec extends quasar.Qspec {
+  import CollectionUtil._
 
   "Collection.fromFile" should {
 
     "handle simple name" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo")) must
-        beRightDisjunction(Collection("db", "foo"))
+        beRightDisjunction(collection("db", "foo"))
     }
 
     "handle simple relative path" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar")) must
-        beRightDisjunction(Collection("db", "foo.bar"))
+        beRightDisjunction(collection("db", "foo.bar"))
     }
 
     "escape leading '.'" in {
       Collection.fromFile(rootDir </> dir("db") </> file(".hidden")) must
-        beRightDisjunction(Collection("db", "\\.hidden"))
+        beRightDisjunction(collection("db", "\\.hidden"))
     }
 
     "escape '.' with path separators" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar.baz")) must
-        beRightDisjunction(Collection("db", "foo.bar\\.baz"))
+        beRightDisjunction(collection("db", "foo.bar\\.baz"))
     }
 
     "escape '$'" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo$")) must
-        beRightDisjunction(Collection("db", "foo\\d"))
+        beRightDisjunction(collection("db", "foo\\d"))
     }
 
     "escape '\\'" in {
       Collection.fromFile(rootDir </> dir("db") </> file("foo\\bar")) must
-        beRightDisjunction(Collection("db", "foo\\\\bar"))
+        beRightDisjunction(collection("db", "foo\\\\bar"))
     }
 
     "accept path with 120 characters" in {
       val longName = Stream.continually("A").take(117).mkString
       Collection.fromFile(rootDir </> dir("db") </> file(longName)) must
-        beRightDisjunction(Collection("db", longName))
+        beRightDisjunction(collection("db", longName))
     }
 
     "reject path longer than 120 characters" in {
@@ -77,7 +76,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
 
     "preserve space" in {
       Collection.fromFile(rootDir </> dir("db") </> dir("foo") </> file("bar baz")) must
-        beRightDisjunction(Collection("db", "foo.bar baz"))
+        beRightDisjunction(collection("db", "foo.bar baz"))
     }
 
     "reject path with db but no collection" in {
@@ -86,27 +85,27 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
 
     "escape space in db name" in {
       Collection.fromFile(rootDir </> dir("db 1") </> file("foo")) must
-        beRightDisjunction(Collection("db+1", "foo"))
+        beRightDisjunction(collection("db+1", "foo"))
     }
 
     "escape leading dot in db name" in {
       Collection.fromFile(rootDir </> dir(".trash") </> file("foo")) must
-        beRightDisjunction(Collection("~trash", "foo"))
+        beRightDisjunction(collection("~trash", "foo"))
     }
 
     "escape MongoDB-reserved chars in db name" in {
       Collection.fromFile(rootDir </> dir("db/\\\"") </> file("foo")) must
-        beRightDisjunction(Collection("db%div%esc%quot", "foo"))
+        beRightDisjunction(collection("db%div%esc%quot", "foo"))
     }
 
     "escape Windows-only MongoDB-reserved chars in db name" in {
       Collection.fromFile(rootDir </> dir("db*<>:|?") </> file("foo")) must
-        beRightDisjunction(Collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
+        beRightDisjunction(collection("db%mul%lt%gt%colon%bar%qmark", "foo"))
     }
 
     "escape escape characters in db name" in {
       Collection.fromFile(rootDir </> dir("db%+~") </> file("foo")) must
-        beRightDisjunction(Collection("db%%%add%tilde", "foo"))
+        beRightDisjunction(collection("db%%%add%tilde", "foo"))
     }
 
     "fail with sequence of escapes exceeding maximum length" in {
@@ -136,7 +135,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
         Collection.fromFile(f).fold(
           err => scala.sys.error(err.toString),
           coll => {
-            Result.foreach(" ./\\*<>:|?") { c => coll.databaseName.toList must not(contain(c)) }
+            Result.foreach(" ./\\*<>:|?") { c => coll.database.value.toList must not(contain(c)) }
           })
       }
     }.set(maxSize = 5)
@@ -159,7 +158,7 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
 
   "Collection.prefixFromDir" should {
     "return a collection prefix" in {
-      Collection.prefixFromDir(rootDir </> dir("foo") </> dir("bar")) must beRightDisjunction("bar.")
+      Collection.prefixFromDir(rootDir </> dir("foo") </> dir("bar")) must beRightDisjunction(CollectionName("bar"))
     }
 
     "reject path without collection" in {
@@ -174,52 +173,52 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
   "Collection.asFile" should {
 
     "handle simple name" in {
-      Collection("db", "foo").asFile must_==
+      collection("db", "foo").asFile must_==
         rootDir </> dir("db") </> file("foo")
     }
 
     "handle simple path" in {
-      Collection("db", "foo.bar").asFile must_==
+      collection("db", "foo.bar").asFile must_==
         rootDir </> dir("db") </> dir("foo") </> file("bar")
     }
 
     "preserve space" in {
-      Collection("db", "foo.bar baz").asFile must_==
+      collection("db", "foo.bar baz").asFile must_==
         rootDir </> dir("db") </> dir("foo") </> file("bar baz")
     }
 
     "unescape leading '.'" in {
-      Collection("db", "\\.hidden").asFile must_==
+      collection("db", "\\.hidden").asFile must_==
         rootDir </> dir("db") </> file(".hidden")
     }
 
     "unescape '$'" in {
-      Collection("db", "foo\\d").asFile must_==
+      collection("db", "foo\\d").asFile must_==
         rootDir </> dir("db") </> file("foo$")
     }
 
     "unescape '\\'" in {
-      Collection("db", "foo\\\\bar").asFile must_==
+      collection("db", "foo\\\\bar").asFile must_==
         rootDir </> dir("db") </> file("foo\\bar")
     }
 
     "unescape '.' with path separators" in {
-      Collection("db", "foo.bar\\.baz").asFile must_==
+      collection("db", "foo.bar\\.baz").asFile must_==
         rootDir </> dir("db") </> dir("foo") </> file("bar.baz")
     }
 
     "ignore slash" in {
-      Collection("db", "foo/bar").asFile must_==
+      collection("db", "foo/bar").asFile must_==
         rootDir </> dir("db") </> file("foo/bar")
     }
 
     "ignore unrecognized escape in database name" in {
-      Collection("%foo", "bar").asFile must_==
+      collection("%foo", "bar").asFile must_==
         rootDir </> dir("%foo") </> file("bar")
     }
 
     "not explode on empty collection name" in {
-      Collection("foo", "").asFile must_==
+      collection("foo", "").asFile must_==
         rootDir </> dir("foo") </> file("")
     }
   }
@@ -231,4 +230,10 @@ class CollectionSpec extends quasar.QuasarSpecification with ScalaCheck with Dis
       name.map(Collection.dirNameFromDbName(_)) must beRightDisjunction(DirName(db.str))
     }
   }.set(maxSize = 20)
+}
+
+object CollectionUtil {
+  // NB: _not_ validating these strings at all
+  def collection(dbName: String, collectionName: String): Collection =
+    Collection(DatabaseName(dbName), CollectionName(collectionName))
 }

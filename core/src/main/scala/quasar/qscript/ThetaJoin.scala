@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.RenderTree
 import quasar.fp._
 
 import matryoshka._
@@ -61,7 +62,6 @@ object ThetaJoin {
         f(fa.src) ∘ (ThetaJoin(_, fa.lBranch, fa.rBranch, fa.on, fa.f, fa.combine))
     }
 
-
   implicit def show[T[_[_]]: ShowT]: Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
       def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
@@ -76,6 +76,9 @@ object ThetaJoin {
       }
     }
 
+  implicit def renderTree[T[_[_]]: ShowT]: Delay[RenderTree, ThetaJoin[T, ?]] =
+    RenderTree.delayFromShow
+
   implicit def mergeable[T[_[_]]: EqualT]: Mergeable.Aux[T, ThetaJoin[T, ?]] =
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
@@ -83,8 +86,8 @@ object ThetaJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Hole],
-        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Hole]) =
+        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Unit],
+        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Unit]) =
         // TODO: merge two joins with different combine funcs
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
@@ -106,4 +109,3 @@ object ThetaJoin {
       }
     }
 }
-

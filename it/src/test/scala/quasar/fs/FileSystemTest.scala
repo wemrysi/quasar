@@ -31,7 +31,7 @@ import scala.Either
 import monocle.Optional
 import monocle.function.Index
 import monocle.std.vector._
-import org.specs2.specification.core.Fragments
+import org.specs2.specification.core.Fragment
 import org.specs2.execute.{Failure => _, _}
 import pathy.Path._
 import scalaz.{EphemeralStream => EStream, Optional => _, Failure => _, _}, Scalaz._
@@ -48,15 +48,15 @@ import scalaz.stream.Process
   */
 abstract class FileSystemTest[S[_]](
   val fileSystems: Task[IList[FileSystemUT[S]]]
-) extends quasar.QuasarSpecification {
+) extends quasar.Qspec {
 
-  args.report(showtimes = true)
+  sequential
 
   type F[A]      = Free[S, A]
   type FsTask[A] = FileSystemErrT[Task, A]
   type Run       = F ~> Task
 
-  def fileSystemShould(examples: FileSystemUT[S] => Fragments): Unit =
+  def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
       s"${fs.name.name} FileSystem" should examples(fs)
 
@@ -86,6 +86,9 @@ abstract class FileSystemTest[S[_]](
 
   implicit class RunFsTask[A](fst: FsTask[A]) {
     import Leibniz.===
+
+    def run_\/ : FileSystemError \/ A =
+      fst.run.unsafePerformSync
 
     def runEither: Either[FileSystemError, A] =
       fst.run.unsafePerformSync.toEither
@@ -128,7 +131,8 @@ object FileSystemTest {
   def externalFsUT = TestConfig.externalFileSystems {
     fsTestConfig(mongodb.fs.MongoDBFsType, mongodb.fs.mongoDbFileSystemDef) orElse
     fsTestConfig(skeleton.fs.FsType, skeleton.fs.definition)                orElse
-    fsTestConfig(postgresql.fs.FsType, postgresql.fs.definition)
+    fsTestConfig(postgresql.fs.FsType, postgresql.fs.definition)            orElse
+    fsTestConfig(marklogic.fs.FsType, marklogic.fs.definition)
   }
 
   def localFsUT: Task[IList[FileSystemUT[FileSystem]]] =
@@ -151,7 +155,7 @@ object FileSystemTest {
 
       val mounting: Mounting ~> Task = {
         val toPhysFs = KvsMounter.interpreter[Task, PhysFsEff](
-          KeyValueStore.fromTaskRef(cfgsRef), hfsRef, mntdRef)
+          KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
         foldMapNT(reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
           .compose(toPhysFs)

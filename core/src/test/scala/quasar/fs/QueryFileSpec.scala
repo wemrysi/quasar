@@ -20,20 +20,13 @@ import quasar.Predef._
 import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
 import quasar.fp._
 import quasar.scalacheck._
-import quasar.specs2._
 
-import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
 
-class QueryFileSpec
-  extends quasar.QuasarSpecification
-  with ScalaCheck
-  with FileSystemFixture
-  with DisjunctionMatchers {
-
+class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
 

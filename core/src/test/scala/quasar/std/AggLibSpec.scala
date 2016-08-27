@@ -19,16 +19,14 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Data, Func, Type}
 import quasar.DataArbitrary, DataArbitrary._
-import quasar.specs2.ValidationMatchers
 
-import org.specs2.ScalaCheck
 import org.threeten.bp.Duration
 import scalaz.scalacheck.ScalazArbitrary._
 import scalaz.NonEmptyList
 import scalaz.std.anyVal._
 import scalaz.syntax.foldable1._
 
-class AggLibSpec extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers {
+class AggLibSpec extends quasar.Qspec {
   import AggLib._
 
   "Arbitrary" should {

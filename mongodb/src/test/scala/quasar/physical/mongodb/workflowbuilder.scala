@@ -17,30 +17,26 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar._, Planner._
 import quasar.fp._
-import quasar._; import Planner._
 import quasar.javascript._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
-import quasar.specs2._
 
 import matryoshka._, FunctorT.ops._, Recursive.ops._
 import scalaz._, Scalaz._
+import quasar.specs2.QuasarMatchers._
 
-class WorkflowBuilderSpec
-    extends quasar.QuasarSpecification
-    with DisjunctionMatchers
-    with TreeMatchers {
-  import Workflow._
+class WorkflowBuilderSpec extends quasar.Qspec {
   import WorkflowBuilder._
-  import IdHandling._
-  import quasar.physical.mongodb.accumulator._
-  import quasar.physical.mongodb.expression._
+  import CollectionUtil._
 
   val builder = WorkflowBuilder.Ops[WorkflowF]
   import builder._
 
-  val readZips = read(Collection("db", "zips"))
+  val readZips = read(collection("db", "zips"))
   def pureInt(n: Int) = pure(Bson.Int32(n))
 
   implicit val workflowEqual: Equal[Fix[WorkflowF]] = Equal.equalA
@@ -48,13 +44,13 @@ class WorkflowBuilderSpec
   "WorkflowBuilder" should {
 
     "make simple read" in {
-      val op = build(read(Collection("db", "zips"))).evalZero
+      val op = build(read(collection("db", "zips"))).evalZero
 
-      op must beRightDisjunction($read[WorkflowF](Collection("db", "zips")))
+      op must beRightDisjunction($read[WorkflowF](collection("db", "zips")))
     }
 
     "make simple projection" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city  <- lift(projectField(read, "city"))
         city2 =  makeObject(city, "city")
@@ -62,14 +58,14 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("city") -> \/-($field("city")))),
           IgnoreId)))
     }
 
     "make nested expression in single step" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city  <- lift(projectField(read, "city"))
         state <- lift(projectField(read, "state"))
@@ -80,13 +76,13 @@ class WorkflowBuilderSpec
 
       op must beRightDisjOrDiff(
         DocBuilder(
-          builder.read(Collection("db", "zips")),
+          builder.read(collection("db", "zips")),
           ListMap(BsonField.Name("0") ->
             \/-($concat($concat($field("city"), $literal(Bson.Text(", "))), $field("state"))))))
     }
 
     "make nested expression under shape preserving in single step" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         pop   <- lift(projectField(read, "pop"))
         filtered = filter(read, List(pop), { case p :: Nil => Selector.Doc(p -> Selector.Lt(Bson.Int32(1000))) })
@@ -100,17 +96,17 @@ class WorkflowBuilderSpec
       op must beRightDisjOrDiff(
         ShapePreservingBuilder(
           DocBuilder(
-            builder.read(Collection("db", "zips")),
+            builder.read(collection("db", "zips")),
             ListMap(BsonField.Name("0") ->
               \/-($concat($concat($field("city"), $literal(Bson.Text(", "))), $field("state"))))),
           List(ExprBuilder(
-            builder.read(Collection("db", "zips")),
+            builder.read(collection("db", "zips")),
             \/-($field("pop")))),
           { case f :: Nil => $match[WorkflowF](Selector.Doc(f -> Selector.Lt(Bson.Int32(1000)))) }))
     }
 
     "combine array with constant value" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val pureArr = pure(Bson.Arr(List(Bson.Int32(0), Bson.Int32(1))))
       val op = (for {
         city   <- lift(projectField(read, "city"))
@@ -122,7 +118,7 @@ class WorkflowBuilderSpec
     }
 
     "elide array with known projection" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city   <- lift(projectField(read, "city"))
         state  <- lift(projectField(read, "state"))
@@ -134,7 +130,7 @@ class WorkflowBuilderSpec
     }
 
     "error with out-of-bounds projection" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city   <- lift(projectField(read, "city"))
         state  <- lift(projectField(read, "state"))
@@ -162,7 +158,7 @@ class WorkflowBuilderSpec
     }
 
     "merge reads" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city   <- lift(projectField(read, "city"))
         pop    <- lift(projectField(read, "pop"))
@@ -173,7 +169,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-          $read(Collection("db", "zips")),
+          $read(collection("db", "zips")),
           $project(Reshape(ListMap(
             BsonField.Name("city") -> \/-($field("city")),
             BsonField.Name("pop")  -> \/-($field("pop")))),
@@ -181,7 +177,7 @@ class WorkflowBuilderSpec
     }
 
     "sorted" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         key  <- lift(projectField(read, "city"))
         sort =  sortBy(read, List(key), SortDir.Ascending :: Nil)
@@ -189,14 +185,14 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Ascending))))
     }
 
     "merge index projections" in {
       import jscore._
 
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         l    <- lift(projectField(read, "loc").flatMap(projectIndex(_, 1)))
         r    <- lift(projectField(read, "enemies").flatMap(projectIndex(_, 0)))
@@ -207,7 +203,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
           "long" ->
             Access(Select(ident("x"), "loc"),
@@ -219,7 +215,7 @@ class WorkflowBuilderSpec
     }
 
     "group on multiple fields" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city    <- lift(projectField(read, "city"))
         state   <- lift(projectField(read, "state"))
@@ -229,7 +225,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $group(
           Grouped(ListMap(
             BsonField.Name("__tmp0") -> $sum($field("pop")))),
@@ -243,7 +239,7 @@ class WorkflowBuilderSpec
     }
 
     "distinct" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         proj <- lift(projectField(read, "city"))
         city =  makeObject(proj, "city")
@@ -252,7 +248,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-          $read(Collection("db", "zips")),
+          $read(collection("db", "zips")),
           $project(Reshape(ListMap(
             BsonField.Name("city") -> \/-($field("city")))),
             IgnoreId),
@@ -263,7 +259,7 @@ class WorkflowBuilderSpec
     }
 
     "distinct after group" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city1   <- lift(projectField(read, "city"))
         grouped =  groupBy(read, List(city1))
@@ -277,7 +273,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $group(
           Grouped(ListMap(
             BsonField.Name("total") -> $sum($$ROOT),
@@ -294,7 +290,7 @@ class WorkflowBuilderSpec
     }
 
     "distinct and sort with intervening op" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city   <- lift(projectField(read, "city"))
         state  <- lift(projectField(read, "state"))
@@ -311,7 +307,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(chain[Workflow](
-        $read(Collection("db", "zips")),
+        $read(collection("db", "zips")),
         $project(Reshape(ListMap(
           BsonField.Name("city") -> \/-($field("city")),
           BsonField.Name("state") -> \/-($field("state")))),
@@ -333,7 +329,7 @@ class WorkflowBuilderSpec
     }
 
     "group in proj" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         pop     <- lift(projectField(read, "pop"))
         grouped =  groupBy(pop, List(pure(Bson.Int32(1))))
@@ -343,7 +339,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("total") -> $sum($field("pop")))),
@@ -351,7 +347,7 @@ class WorkflowBuilderSpec
     }
 
     "group constant in proj" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         one <- expr1(read)(κ($literal(Bson.Int32(1))))
         obj =  makeObject(reduce(groupBy(one, List(one)))($sum(_)), "total")
@@ -359,7 +355,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("total") -> $sum($literal(Bson.Int32(1))))),
@@ -367,7 +363,7 @@ class WorkflowBuilderSpec
     }
 
     "group in two projs" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         one   <- expr1(read)(κ($literal(Bson.Int32(1))))
         cp    =  makeObject(reduce(one)($sum(_)), "count")
@@ -380,7 +376,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("count") -> $sum($literal(Bson.Int32(1))),
@@ -389,7 +385,7 @@ class WorkflowBuilderSpec
     }
 
     "group on a field" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city    <- lift(projectField(read, "city"))
         pop     <- lift(projectField(read, "pop"))
@@ -400,7 +396,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("total") -> $sum($field("pop")))),
@@ -408,7 +404,7 @@ class WorkflowBuilderSpec
     }
 
     "group on a field, with un-grouped projection" in {
-      val read = builder.read(Collection("db", "zips"))
+      val read = builder.read(collection("db", "zips"))
       val op = (for {
         city    <- lift(projectField(read, "city"))
         grouped =  groupBy(read, List(city))
@@ -422,7 +418,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("total") -> $sum($field("pop")),
@@ -432,7 +428,7 @@ class WorkflowBuilderSpec
     }
 
     "group in expression" in {
-      val read    = builder.read(Collection("db", "zips"))
+      val read    = builder.read(collection("db", "zips"))
       val grouped = groupBy(read, List(pure(Bson.Int32(1))))
       val op = (for {
         pop     <- lift(projectField(grouped, "pop"))
@@ -443,7 +439,7 @@ class WorkflowBuilderSpec
       } yield rez).evalZero
 
       op must beRightDisjOrDiff(
-        chain[Workflow]($read(Collection("db", "zips")),
+        chain[Workflow]($read(collection("db", "zips")),
           $group(
             Grouped(ListMap(
               BsonField.Name("__tmp2") -> $sum($field("pop")))),
@@ -455,7 +451,7 @@ class WorkflowBuilderSpec
     }
 
     "not flatten with nested exprs" in {
-      val read    = builder.read(Collection("db", "zips"))
+      val read    = builder.read(collection("db", "zips"))
       val op = (for {
         check0 <- expr1(read)($cond($literal(Bson.Bool(true)), _, $literal(Bson.Int32(0))))
         loc    <- lift(projectField(check0, "loc"))
@@ -470,7 +466,7 @@ class WorkflowBuilderSpec
 
       op must beRightDisjOrDiff(
         chain[Workflow](
-          $read(Collection("db", "zips")),
+          $read(collection("db", "zips")),
           $project(
             Reshape(ListMap(
               BsonField.Name("__tmp0") -> $cond($literal(Bson.Bool(true)), $$ROOT, $literal(Bson.Int32(0))).right,
@@ -497,7 +493,7 @@ class WorkflowBuilderSpec
     }
 
     "normalize" should {
-      val readFoo = CollectionBuilder($read[WorkflowF](Collection("db", "foo")), Root(), None)
+      val readFoo = CollectionBuilder($read[WorkflowF](collection("db", "foo")), Root(), None)
 
       "collapse simple reference to JS" in {
         val w = DocBuilder[WorkflowF](
@@ -642,7 +638,7 @@ class WorkflowBuilderSpec
         String =
       RO.render(op).draw.mkString("\n")
 
-    val read = builder.read(Collection("db", "zips"))
+    val read = builder.read(collection("db", "zips"))
 
     "render in-process group" in {
       val grouped = groupBy(read, List(pure(Bson.Int32(1))))

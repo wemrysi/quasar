@@ -1,0 +1,2 @@
+- add knownFiles transformation
+- add optimization that collapses two Filters into one

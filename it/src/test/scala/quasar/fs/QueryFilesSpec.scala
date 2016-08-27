@@ -21,7 +21,6 @@ import quasar.fp._
 
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.stream._
 
 class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
   import FileSystemTest._, FileSystemError._, PathError._
@@ -50,18 +49,17 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
                     write.save(f2, anotherDoc.toProcess).drain
         execT(fs.setupInterpM, setup).runVoid
 
-        val p = query.ls(d1).liftM[Process]
-                  .flatMap(ns => Process.emitAll(ns.toVector))
+        val p = query.ls(d1)
 
-        runLogT(fs.testInterpM, p)
+        runT(fs.testInterpM)(p)
           .runEither must beRight(containTheSameElementsAs(expectedNodes))
       }
 
       // TODO: Our chrooting prevents this from working, maybe we need a
       //       spec that does no chrooting and writes no files?
-      "listing root dir should succeed" >> todo /* {
-        runT(run)(query.ls(rootDir)).runEither must beRight
-      } */
+      "listing root dir should succeed" >> pending {
+        runT(fs.testInterpM)(query.ls(rootDir)).runEither must beRight
+      }
 
       "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")
@@ -77,18 +75,17 @@ class QueryFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) 
                     write.save(f2, anotherDoc.toProcess).drain
         execT(fs.setupInterpM, setup).runVoid
 
-        val p = query.ls(d).liftM[Process]
-                   .flatMap(ns => Process.emitAll(ns.toVector))
+        val p = query.ls(d)
 
         val preDelete = List[PathSegment](FileName("f1").right, FileName("f2").right)
 
-        (runLogT(fs.testInterpM, p)
-          .runEither must beRight(containTheSameElementsAs(preDelete)))
+        runT(fs.testInterpM)(p)
+          .runEither must beRight(containTheSameElementsAs(preDelete))
 
         runT(fs.setupInterpM)(manage.delete(f1)).runVoid
 
-        (runT(fs.testInterpM)(query.ls(d))
-          .runEither must beRight(containTheSameElementsAs(preDelete.tail)))
+        runT(fs.testInterpM)(p)
+          .runEither must beRight(containTheSameElementsAs(preDelete.tail))
       }
 
       step(deleteForQuery(fs.setupInterpM).runVoid)

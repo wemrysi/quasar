@@ -20,11 +20,7 @@ import quasar.Predef._
 import quasar.{Func, TypeArbitrary}
 import quasar.fp._
 
-
-import org.specs2.ScalaCheck
-import org.specs2.scalaz._
-
-class SetSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
+class SetSpec extends quasar.Qspec with TypeArbitrary {
   import SetLib._
   import quasar.Data
   import quasar.Type

@@ -30,12 +30,11 @@ import quasar.std._, IdentityLib.Squash, StdLib._, set._
 import eu.timepit.refined.auto._
 import matryoshka.{free => _, _}
 import monocle.macros.Lenses
-import org.specs2.ScalaCheck
 import pathy.{Path => PPath}, PPath._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Failure => _, _}, Scalaz._
 
-class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with TreeMatchers {
+class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   import TraceFS._
   import FileSystemError._
   import Mounting.PathTypeMismatch
@@ -72,7 +71,7 @@ class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with
   type VFS[A]         = ErrsT[VSS, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
-    free.foldMapNT(KeyValueStore.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
+    free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
   def runViewFileSystem[F[_]](
     runFileSystem: FileSystem ~> F
@@ -84,7 +83,7 @@ class ViewFileSystemSpec extends quasar.QuasarSpecification with ScalaCheck with
       runMounting[F],
       Failure.toError[F, Errs] compose Failure.mapError[PathTypeMismatch, Errs](_.right),
       Failure.toError[F, Errs] compose Failure.mapError[MountingError, Errs](_.left),
-      KeyValueStore.toState[F](VS.handles),
+      KeyValueStore.impl.toState[F](VS.handles),
       MonotonicSeq.toState[F](VS.seq),
       runFileSystem)
 

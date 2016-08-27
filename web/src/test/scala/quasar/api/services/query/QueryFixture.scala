@@ -30,10 +30,9 @@ import org.specs2.matcher._, MustMatchers._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import quasar.api.PathUtils._
 
 object queryFixture {
-  import quasar.api.PathUtils.pathUri
-
   type Eff0[A] = Coproduct[FileSystemFailure, FileSystem, A]
   type Eff[A]  = Coproduct[Task, Eff0, A]
 

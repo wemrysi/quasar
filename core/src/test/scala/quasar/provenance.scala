@@ -19,7 +19,7 @@ package quasar
 import quasar.Predef._
 import pathy.Path._
 
-class ProvenanceSpec extends quasar.QuasarSpecification {
+class ProvenanceSpec extends quasar.Qspec {
   import SemanticAnalysis._
   import Provenance._
   import sql._

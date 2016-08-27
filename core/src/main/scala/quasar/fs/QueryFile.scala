@@ -42,23 +42,52 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  val qscript = new Transform[Fix, QScriptTotal[Fix, ?]]
-  val optimize = new Optimize[Fix]
+  type QS[T[_[_]], A] = QScriptTotal[T, A]
+
+  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
+    lp: T[LogicalPlan])(
+    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]
+  ): PlannerError \/ T[QS[T, ?]] = {
+    val transform = new Transform[T, QS[T, ?]]
+
+    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
+    //       so we don’t duplicate work.
+    lp.transCata(orOriginal(Optimizer.elideLets[T]))
+      .transCataM(transform.lpToQScript).map(qs =>
+      EnvT((EmptyAnn[T], Inject[QScriptCore[T, ?], QS[T, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
+        .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
+  }
+
+  /** A variant of convertToQScript that takes advantage of an existing QueryFile
+    * implementation.
+    */
+  def algConvertToQScript
+    [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
+    (lp: T[LogicalPlan])
+    (implicit QF: QueryFile.Ops[S]):
+      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] =
+    convertToQScript[T, Free[S, ?]]((QF.ls(_: ADir)).some)(lp)
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  val convertToQScript: Fix[LogicalPlan] => PlannerError \/ Fix[QScriptTotal[Fix, ?]] =
-    // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
-    //       so we don’t duplicate work.
-    _.transCata(orOriginal(Optimizer.elideLets[Fix]))
-      .transCataM(qscript.lpToQScript).map(qs =>
-      EnvT((EmptyAnn[Fix], Inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]].inj(quasar.qscript.Map(qs, qs.project.ask.values)))).embed
-        .transCata(((_: EnvT[Ann[Fix], QScriptTotal[Fix, ?], Fix[QScriptTotal[Fix, ?]]]).lower) ⋙ optimize.applyAll)
-        // TODO: Rather than explicitly applying multiple times, we should apply
-        //       repeatedly until unchanged.
-        .transCata(optimize.applyAll)
-        .transCata(optimize.applyAll))
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
+    f: Option[ConvertPath.ListContents[M]])(
+    lp: T[LogicalPlan]):
+      EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+    val optimize = new Optimize[T]
+
+    // TODO: Rather than explicitly applying multiple times, we should apply
+    //       repeatedly until unchanged.
+    val qs =
+      (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
+        optimize.eliminateProjections(f)).map(
+        _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+
+    EitherT(WriterT(qs.run.map(qq => (
+      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq))))
+  }
 
   /** The result of the query is stored in an output file
     * instead of being returned to the user immidiately.
@@ -95,12 +124,12 @@ object QueryFile {
     * information to the user about how a given query would be evaluated on
     * this filesystem implementation.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class Explain(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ExecutionPlan)]
 
-  /** This operation lists the names of all the immidiate children of the supplied directory
+  /** This operation lists the names of all the immediate children of the supplied directory
     * in the filesystem.
     */
     /* TODO: While this is a bit better in one dimension here in `QueryFile`,

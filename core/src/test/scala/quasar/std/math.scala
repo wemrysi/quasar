@@ -20,17 +20,14 @@ import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
 
-
 import matryoshka.Fix
 import org.scalacheck.Arbitrary
-import org.specs2.scalaz._
-import org.specs2.ScalaCheck
 import org.threeten.bp.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
+class MathSpec extends quasar.Qspec with TypeArbitrary {
   import MathLib._
   import quasar.Type
   import quasar.Type.Const

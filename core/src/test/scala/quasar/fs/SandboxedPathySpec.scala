@@ -20,13 +20,11 @@ import quasar.Predef._
 import quasar.fs.PathArbitrary._
 import quasar.fs.SandboxedPathy._
 
-import org.specs2.ScalaCheck
-import org.specs2.scalaz._
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._, Scalaz._
 
-class SandboxedPathySpec extends quasar.QuasarSpecification with DisjunctionMatchers with ScalaCheck {
+class SandboxedPathySpec extends quasar.Qspec {
 
   "rootSubPath" should {
     "returns the correct sub path" >> prop { (d: ADir, p: RPath) =>

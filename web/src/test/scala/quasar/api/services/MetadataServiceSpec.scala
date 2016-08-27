@@ -32,11 +32,11 @@ import matryoshka.Fix
 import monocle.Lens
 import org.http4s._
 import org.http4s.argonaut._
-import org.specs2.ScalaCheck
 import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz.{Lens => _, _}
 import scalaz.concurrent.Task
+import quasar.api.PathUtils._
 
 object MetadataFixture {
 
@@ -52,7 +52,7 @@ object MetadataFixture {
     new (Mounting ~> Task) {
       type F[A] = State[Map[APath, MountConfig], A]
       val mntr = Mounter.trivial[MountConfigs]
-      val kvf = KeyValueStore.toState[F](Lens.id[Map[APath, MountConfig]])
+      val kvf = KeyValueStore.impl.toState[F](Lens.id[Map[APath, MountConfig]])
       def apply[A](ma: Mounting[A]) =
         Task.now(mntr(ma).foldMap(kvf).eval(mnts))
     }
@@ -62,7 +62,7 @@ object MetadataFixture {
       liftMT[Task, ResponseT] compose (runQuery(mem) :+: runMount(mnts)))
 }
 
-class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
+class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import metadata.FsNode
   import VariablesArbitrary._, ExprArbitrary._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
@@ -105,6 +105,7 @@ class MetadataServiceSpec extends quasar.QuasarSpecification with ScalaCheck wit
         service(s.state, Map())(Request(uri = pathUri(s.dir)))
           .as[Json].unsafePerformSync must_== Json("children" := childNodes.sorted)
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+        .flakyTest("scalacheck: 'Gave up after only 2 passed tests'")
 
       "and mounts when any children happen to be mount points" >> prop { (
         fName: FileName,

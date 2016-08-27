@@ -25,8 +25,9 @@ import quasar.std._
 import matryoshka._
 import scalaz._, Scalaz._
 import pathy.Path._
+import org.specs2.matcher.MustThrownMatchers._
 
-trait CompilerHelpers extends quasar.QuasarSpecification with TermLogicalPlanMatchers {
+trait CompilerHelpers extends TermLogicalPlanMatchers {
   import StdLib._
   import structural._
   import LogicalPlan._

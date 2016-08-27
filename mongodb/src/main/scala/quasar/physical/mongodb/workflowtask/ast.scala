@@ -19,16 +19,16 @@ package quasar.physical.mongodb.workflowtask
 import quasar.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
-import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector, Workflow}
+import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
+import quasar.physical.mongodb.workflow._
+import MapReduce._
 
+import matryoshka.Delay
 import scalaz._, Scalaz._
 
 /** A WorkflowTask approximately represents one request to MongoDB. */
 sealed trait WorkflowTaskF[A]
 object WorkflowTaskF {
-  import Workflow._
-  import MapReduce._
-
   /** A task that returns a necessarily small amount of raw data. */
   final case class PureTaskF[A](value: Bson) extends WorkflowTaskF[A]
 
@@ -79,9 +79,9 @@ object WorkflowTaskF {
         }
     }
 
-  implicit val renderTree: RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]] =
-    new (RenderTree ~> λ[α => RenderTree[WorkflowTaskF[α]]]) {
-      def apply[α](ra: RenderTree[α]) = new RenderTree[WorkflowTaskF[α]] {
+  implicit val renderTree: Delay[RenderTree, WorkflowTaskF] =
+    new Delay[RenderTree, WorkflowTaskF] {
+      def apply[A](ra: RenderTree[A]) = new RenderTree[WorkflowTaskF[A]] {
         val RC = RenderTree[Collection]
         val RO = RenderTree[WorkflowF[Unit]]
         val RJ = RenderTree[Js]
@@ -89,7 +89,7 @@ object WorkflowTaskF {
 
         val WorkflowTaskNodeType = "WorkflowTask" :: "Workflow" :: Nil
 
-        def render(task: WorkflowTaskF[α]) = task match {
+        def render(task: WorkflowTaskF[A]) = task match {
           case PureTaskF(bson) => Terminal("PureTask" :: WorkflowTaskNodeType,
             Some(bson.toString))
           case ReadTaskF(value) => RC.render(value).copy(nodeType = "ReadTask" :: WorkflowTaskNodeType)

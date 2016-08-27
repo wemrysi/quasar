@@ -37,8 +37,7 @@ package object qscript {
   private type CommonPathable[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
 
-  /** Statically known path components. Provided to filesystems for potential
-    * conversion to `Read`.
+  /** Statically known path components potentially converted to Read.
     */
   type Pathable[T[_[_]], A] =
     Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
@@ -85,6 +84,9 @@ package object qscript {
 
   import MapFunc._
   import MapFuncs._
+
+  def EquiJF[T[_[_]]]: JoinFunc[T] =
+    Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
       (FreeMap[T], List[FreeMap[T]]) =

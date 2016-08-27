@@ -179,21 +179,47 @@ object MapFunc {
             Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
               ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
+
         case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Nullary(field))))) =>
           as.collectFirst {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
             case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Nullary(src)))), Embed(value))))) if field ≟ src =>
               value
-            case Embed(CoEnv(\/-(Nullary(Embed(Inj(ejson.Map(m))))))) =>
+            case Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
               }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
           }
+
+        // elide Nil array on the left
+        case ConcatArrays(
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil))))))),
+          Embed(CoEnv(\/-(rhs)))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+
+        // elide Nil array on the right
+        case ConcatArrays(
+          Embed(CoEnv(\/-(lhs))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+
+        // elide Nil map on the left
+        case ConcatMaps(
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil))))))),
+          Embed(CoEnv(\/-(rhs)))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+
+        // elide Nil map on the right
+        case ConcatMaps(
+          Embed(CoEnv(\/-(lhs))),
+          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
+            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+
         case _ => None
       })
   }
@@ -261,7 +287,6 @@ object MapFunc {
         //  ternary
         case Between(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Between(_, _, _))
         case Cond(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Cond(_, _, _))
-        case Like(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Like(_, _, _))
         case Search(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Search(_, _, _))
         case Substring(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Substring(_, _, _))
         case Guard(a1, tpe, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Guard(_, tpe, _, _))
@@ -326,7 +351,6 @@ object MapFunc {
         //  ternary
         case (Between(a1, a2, a3), Between(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Cond(a1, a2, a3), Cond(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
-        case (Like(a1, a2, a3), Like(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => atpe ≟ btpe && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
@@ -394,7 +418,6 @@ object MapFunc {
         //  ternary
         case Between(a1, a2, a3) => Cord("Between(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Cond(a1, a2, a3) => Cord("Cond(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
-        case Like(a1, a2, a3) => Cord("Like(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Search(a1, a2, a3) => Cord("Search(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Substring(a1, a2, a3) => Cord("Substring(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Guard(a1, tpe, a2, a3) => Cord("Guard(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
@@ -462,7 +485,6 @@ object MapFunc {
     {
       case relations.Between => Between(_, _, _)
       case relations.Cond    => Cond(_, _, _)
-      case string.Like       => Like(_, _, _)
       case string.Search     => Search(_, _, _)
       case string.Substring  => Substring(_, _, _)
     }
@@ -518,7 +540,6 @@ object MapFuncs {
   @Lenses final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Like[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
   @Lenses final case class Substring[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
 
@@ -532,9 +553,20 @@ object MapFuncs {
   @Lenses final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
   // helpers & QScript-specific
+  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
+    * `{ k1: k1, k2: k2, ...}`.
+    */
   @Lenses final case class DupMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns an array of `[v1, v2, ...]` into an array of `[0, 1, ...]`.
+    */
   @Lenses final case class DupArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
+    * `{ k1: [k1, v1], k2: [k2, v2], ...}`.
+    */
   @Lenses final case class ZipMapKeys[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Turns an array of `[v1, v2, ...]` into an array of
+    * `[[0, v1], [1, v2], ...]`.
+    */
   @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
 
@@ -584,15 +616,29 @@ object MapFuncs {
     def apply[T[_[_]]: Corecursive, A](str: String): Free[MapFunc[T, ?], A] =
       Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Str[T[EJson]](str)).embed))
 
-    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]): Option[String] = mf.run.fold ({
-      _ => None
-    }, {
-      case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
-        case ejson.Str(str) => str.some
+    def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
+        Option[String] =
+      mf.run.fold({
+        _ => None
+      }, {
+        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+          case ejson.Str(str) => str.some
+          case _ => None
+        }
         case _ => None
-      }
-      case _ => None
-    })
+      })
+
+    def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]):
+        Option[String] =
+      mf.resume.fold({
+        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+          case ejson.Str(str) => str.some
+          case _ => None
+        }
+        case _ => None
+      }, {
+        _ => None
+      })
   }
 }
 

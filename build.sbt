@@ -2,7 +2,7 @@ import github.GithubPlugin._
 import quasar.project._
 import quasar.project.build._
 
-import java.lang.Integer
+import java.lang.{ String, Integer }
 import scala.{Boolean, List, Predef, None, Some, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
@@ -43,7 +43,6 @@ lazy val buildSettings = Seq(
   },
   autoCompilerPlugins := true,
   autoAPIMappings := true,
-  exportJars := true,
   resolvers ++= Seq(
     Resolver.sonatypeRepo("releases"),
     Resolver.sonatypeRepo("snapshots"),
@@ -128,8 +127,20 @@ lazy val publishSettings = Seq(
   )
 )
 
+lazy val assemblySettings = Seq(
+  test in assembly := {},
+
+  assemblyMergeStrategy in assembly := {
+    case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
+    case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
+    case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
+
+    case other => (assemblyMergeStrategy in assembly).value apply other
+  }
+)
+
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings
+lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
 // Include to also publish a project's tests
 lazy val publishTestsSettings = Seq(
@@ -144,13 +155,10 @@ lazy val noPublishSettings = Seq(
   publishArtifact := false
 )
 
-lazy val oneJarSettings =
-  com.github.retronym.SbtOneJar.oneJarSettings ++
-  githubSettings ++
-  Seq(
-    GithubKeys.assets := { Seq(oneJar.value) },
+lazy val githubReleaseSettings =
+  githubSettings ++ Seq(
+    GithubKeys.assets := Seq(assembly.value),
     GithubKeys.repoSlug := "quasar-analytics/quasar",
-
     releaseVersionFile := file("version.sbt"),
     releaseUseGlobalVersion := true,
     releaseProcess := Seq[ReleaseStep](
@@ -159,13 +167,17 @@ lazy val oneJarSettings =
       runTest,
       setReleaseVersion,
       commitReleaseVersion,
-      pushChanges))
+      pushChanges)
+  )
 
-lazy val isCIBuild = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isCIBuild        = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
+lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
+lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(aggregate in assembly := false)
   .aggregate(
         foundation,
 //     / / | | \ \
@@ -174,7 +186,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, // sparkcore,
+  mongodb, skeleton, postgresql, marklogic, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -191,7 +203,9 @@ lazy val foundation = project
   .settings(publishTestsSettings)
   .settings(libraryDependencies ++= Dependencies.foundation,
     isCIBuild := sys.env contains "TRAVIS",
-    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild),
+    isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
+    exclusiveTestTag := "exclusive",
+    buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
     buildInfoPackage := "quasar.build")
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
@@ -205,7 +219,6 @@ lazy val effect = project
   .settings(name := "quasar-effect-internal")
   .dependsOn(foundation % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.effect)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
@@ -228,10 +241,11 @@ lazy val core = project
 lazy val main = project
   .settings(name := "quasar-main-internal")
   .dependsOn(
-    mongodb    % BothScopes,
-    skeleton   % BothScopes,
-//  sparkcore  % BothScopes,
-    postgresql % BothScopes)
+    mongodb,
+    skeleton,
+    postgresql,
+    marklogic,
+    core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
   .enablePlugins(AutomateHeaderPlugin)
@@ -251,21 +265,27 @@ lazy val skeleton = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogic = project
+  .settings(name := "quasar-marklogic-internal")
+  .dependsOn(core % BothScopes)
+  .settings(commonSettings)
+  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
+  .settings(libraryDependencies ++= Dependencies.marklogic)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
-/* FIXME: Disabled because it breaks the Travis build
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies +=
-    "org.apache.spark" % "spark-core_2.11" % "1.6.2")
+  .settings(libraryDependencies ++= Dependencies.sparkcore)
   .enablePlugins(AutomateHeaderPlugin)
-*/
 
 
 // frontends
@@ -276,10 +296,10 @@ lazy val sparkcore = project
 
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(main % BothScopes)
+  .dependsOn(main, foundation % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
-  .settings(oneJarSettings)
+  .settings(githubReleaseSettings)
   .settings(
     fork in run := true,
     connectInput in run := true,
@@ -288,10 +308,10 @@ lazy val repl = project
 
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(main % BothScopes)
+  .dependsOn(main, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
-  .settings(oneJarSettings)
+  .settings(githubReleaseSettings)
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
@@ -301,9 +321,10 @@ lazy val web = project
 
 lazy val it = project
   .configs(ExclusiveTests)
-  .dependsOn(web % BothScopes)
+  .dependsOn(web, core % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
+  .settings(libraryDependencies ++= Dependencies.web)
   // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
   .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)

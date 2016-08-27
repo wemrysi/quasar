@@ -33,7 +33,7 @@ import scalaz.syntax.either._
 import scalaz.std.list._
 import shapeless.{Data => _, Coproduct => _, _}
 
-class HierarchicalFileSystemSpec extends quasar.QuasarSpecification with FileSystemFixture {
+class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory.InMemState, FileSystemError._, PathError._
   import hierarchical.MountedResultH
   import ManageFile.MoveSemantics, QueryFile.ResultHandle, LogicalPlan._
@@ -76,7 +76,7 @@ class HierarchicalFileSystemSpec extends quasar.QuasarSpecification with FileSys
       MonotonicSeq.toState[MountedFs](seq)
 
     val handlesNT: MountedResultH ~> MountedFs =
-      KeyValueStore.toState[MountedFs](handles)
+      KeyValueStore.impl.toState[MountedFs](handles)
 
     seqNT :+: handlesNT :+: NaturalTransformation.refl
   }

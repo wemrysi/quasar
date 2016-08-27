@@ -20,13 +20,10 @@ import quasar.Func
 import quasar.Predef._
 import quasar.TypeArbitrary
 
-
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
-import org.specs2.scalaz._
-import org.specs2.ScalaCheck
 import scalaz.Validation, Validation.FlatMap._
 
-class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with TypeArbitrary with ValidationMatchers {
+class RelationsSpec extends quasar.Qspec with TypeArbitrary {
   import RelationsLib._
   import quasar.Type
   import quasar.Type.Const
@@ -35,6 +32,8 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
   import quasar.Data.Int
   import quasar.Data.Null
   import quasar.Data.Str
+
+  val comparisonOps = Gen.oneOf(Eq, Neq, Lt, Lte, Gt, Gte)
 
   "RelationsLib" should {
 
@@ -129,7 +128,7 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
       expr must beSuccessful(Const(Int(3)))
     }
 
-    "find lub for coalesce with int" in {
+    "find lub for coalesce with int" >> {
       val expr = Coalesce.tpe(Func.Input2(Type.Int, Type.Int))
       expr must beSuccessful(Type.Int)
     }
@@ -142,26 +141,21 @@ class RelationsSpec extends quasar.QuasarSpecification with ScalaCheck with Type
         expr must beSuccessful(Type.lub(t1, t2))
     }.pendingUntilFixed // When t1 is Const, we need to match that
 
-    val comparisonOps = Gen.oneOf(Eq, Neq, Lt, Lte, Gt, Gte)
-
-    "flip comparison ops" !
-      Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
+    "flip comparison ops" >> Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
         case (func, left, right) =>
           flip(func).map(
             _.tpe(Func.Input2(Type.Const(Int(right)), Type.Const(Int(left))))) must
             beSome(func.tpe(Func.Input2(Type.Const(Int(left)), Type.Const(Int(right)))))
     }
 
-    "flip boolean ops" !
-      Prop.forAll(Gen.oneOf(And, Or), arbitrary[Boolean], arbitrary[Boolean]) {
+    "flip boolean ops" >> Prop.forAll(Gen.oneOf(And, Or), arbitrary[Boolean], arbitrary[Boolean]) {
         case (func, left, right) =>
           flip(func).map(
             _.tpe(Func.Input2(Type.Const(Bool(right)), Type.Const(Bool(left))))) must
             beSome(func.tpe(Func.Input2(Type.Const(Bool(left)), Type.Const(Bool(right)))))
     }
 
-    "negate comparison ops" !
-      Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
+    "negate comparison ops" >> Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {
         case (func, left, right) =>
           RelationsLib.negate(func).map(
             _.tpe(Func.Input2(Type.Const(Int(left)), Type.Const(Int(right))))) must

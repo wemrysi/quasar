@@ -32,10 +32,9 @@ import argonaut.Argonaut._
 import org.http4s._
 import org.http4s.headers._
 import org.http4s.server.middleware.GZip
-import org.specs2.specification.core.Fragments
+import org.specs2.specification.core.Fragment
 import org.specs2.execute.AsResult
 import org.specs2.matcher.MatchResult
-import org.specs2.ScalaCheck
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import pathy.scalacheck.PathyArbitrary._
@@ -50,8 +49,9 @@ import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
 import shapeless.tag.@@
+import quasar.api.PathUtils._
 
-class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with FileSystemFixture with Http4s with PathUtils {
+class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import Fixture._, InMemory._, JsonPrecision._, JsonFormat._
   import FileSystemFixture.{ReadWriteT, ReadWrites, amendWrites}
   import PathError.{pathExists, pathNotFound}
@@ -274,7 +274,7 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {
-      def testBoth[A](test: org.http4s.Method => Fragments) = {
+      def testBoth[A](test: org.http4s.Method => Fragment) = {
         "POST" should {
           test(org.http4s.Method.POST)
         }
@@ -403,28 +403,28 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             val preciseLine2 = Json("b" := Json("$time" := "12:34:56"))
             val readableLine2 = Json("b" := "12:34:56")
             "when formatted with one json object per line" >> {
-              "Precise" ! {
+              "Precise" >> {
                 accept(List(line1, preciseLine2).map(PreciseJson(_)), expectedData)
               }
-              "Readable" ! {
+              "Readable" >> {
                 accept(List(line1, readableLine2).map(ReadableJson(_)), expectedData)
               }
             }
             "when formatted as a single json array" >> {
-              "Precise" ! {
+              "Precise" >> {
                 accept(PreciseJson(Json.array(line1, preciseLine2)), expectedData)
               }
-              "Readable" ! {
+              "Readable" >> {
                 accept(ReadableJson(Json.array(line1, readableLine2)), expectedData)
               }
             }
             "when having multiple lines containing arrays" >> {
               val arbitraryValue = 3
               def replicate[A](a: A) = Applicative[Id].replicateM[A](arbitraryValue, a)
-              "Precise" ! {
+              "Precise" >> {
                 accept(PreciseJson(Json.array(replicate(Json.array(line1, preciseLine2)): _*)), replicate(Data.Arr(expectedData)))
               }
-              "Readable" ! {
+              "Readable" >> {
                 accept(ReadableJson(Json.array(replicate(Json.array(line1, readableLine2)): _*)), replicate(Data.Arr(expectedData)))
               }
             }
@@ -559,7 +559,8 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
             (err.detail("path") must beSome)
           },
           newState = Unchanged)
-      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      }.set(minTestsOk = 10).flakyTest("Gave up after only 1 passed tests. 10 tests were discarded.")
+      // NB: this test is slow because NonEmptyDir instances are still relatively large
     }
     "DELETE" >> {
       "be 204 with existing file" >> prop { filesystem: SingleFileMemState =>
@@ -576,6 +577,8 @@ class DataServiceSpec extends quasar.QuasarSpecification with ScalaCheck with Fi
         response.status must_== Status.NoContent
         ref.unsafePerformSync.contents must_== Map() // The filesystem no longer contains that folder
       }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+       .flakyTest("scalacheck: 'Gave up after only 1 passed tests. 11 tests were discarded.'")
+
       "be 404 with missing file" >> prop { file: AbsFile[Sandboxed] =>
         val request = Request(uri = pathUri(file), method = Method.DELETE)
         val response = service(emptyMem)(request).unsafePerformSync

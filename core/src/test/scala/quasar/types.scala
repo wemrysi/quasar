@@ -18,16 +18,15 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.specs2._
+import quasar.specs2._, QuasarMatchers._
 
 import scala.Right
 
 import argonaut._, Argonaut._
-import org.specs2.ScalaCheck
 import argonaut.JsonScalaz._
 import scalaz.Scalaz._
 
-class TypesSpec extends quasar.QuasarSpecification with ScalaCheck with ValidationMatchers {
+class TypesSpec extends quasar.Qspec {
   import Type._
   import TypeArbitrary._, DataArbitrary._
 

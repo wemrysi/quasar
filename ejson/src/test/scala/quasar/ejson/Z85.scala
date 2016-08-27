@@ -23,7 +23,7 @@ import org.typelevel.discipline.specs2.mutable._
 import scalaz._, Scalaz._
 import scodec.bits._
 
-class Z85Specs extends quasar.QuasarSpecification with Discipline {
+class Z85Specs extends org.specs2.mutable.SpecificationLike with Discipline { // with quasar.QuasarSpecification with Discipline {
   implicit val arbitraryByteVectors: Arbitrary[ByteVector] =
     Arbitrary(Arbitrary.arbitrary[List[Byte]].map(ByteVector(_)))
 
