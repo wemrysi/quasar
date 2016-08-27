@@ -30,7 +30,7 @@ object cts {
     XQuery(s"cts:and-query${mkSeq_(query, queryOrOptions: _*)}")
 
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
-    XQuery(s"cts:directory-query($uri, ${mkSeq(urisOrDepth)})")
+    XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")
 
   def documentOrder(direction: XQuery): XQuery =
     XQuery(s"cts:document-order($direction)")

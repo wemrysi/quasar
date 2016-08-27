@@ -50,12 +50,6 @@ object AsXQuery {
       }
     }
 
-  implicit val objAsXQuery: AsXQuery[Obj] =
-    new AsXQuery[Obj] {
-      val asXQuery: Algebra[Obj, XQuery] =
-        obj => map.new_(obj.value.toList.map { case (k, v) => map.entry(k.xs, v) })
-    }
-
   implicit val extensionAsXQuery: AsXQuery[Extension] =
     new AsXQuery[Extension] {
       val asXQuery: Algebra[Extension, XQuery] = {

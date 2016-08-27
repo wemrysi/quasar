@@ -66,6 +66,16 @@ sealed abstract class XQuery {
   def is(other: XQuery): XQuery = XQuery(s"$this is $other")
   def <<(other: XQuery): XQuery = XQuery(s"$this << $other")
   def >>(other: XQuery): XQuery = XQuery(s"$this >> $other")
+
+  // TODO: Accept a list of namespaces? Or somehow gather namespaces used in
+  //       constructing the query in order to be able to output them here.
+  def toQuery: String =
+    s"""
+      xquery version "1.0-ml";
+      declare namespace ejson = "http://quasar-analytics.org/ejson";
+
+      $this
+    """
 }
 
 object XQuery {

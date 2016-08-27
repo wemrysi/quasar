@@ -58,6 +58,9 @@ object fn {
   def map(f: XQuery, seq: XQuery): XQuery =
     XQuery(s"fn:map($f, $seq)")
 
+  def nodeName(node: XQuery): XQuery =
+    XQuery(s"fn:node-name($node)")
+
   def not(bool: XQuery): XQuery =
     XQuery(s"fn:not($bool)")
 

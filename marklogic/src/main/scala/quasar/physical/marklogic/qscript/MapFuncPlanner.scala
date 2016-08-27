@@ -25,11 +25,12 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
+import scalaz.IList
 import scalaz.std.option._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
-  import expr.if_
+  import expr.{for_, if_}
 
   def apply[T[_[_]]: Recursive: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
     case Nullary(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
@@ -68,14 +69,24 @@ object MapFuncPlanner {
     case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len))
 
     // structural
-    // TODO: Currently experimenting with sequence as Array, might not work.
-    case MakeArray(x) => x
-    case ConcatArrays(x, y) => mkSeq_(x, y)
+    case MakeArray(x) => ejson.singletonArray(x)
+    case MakeMap(k, v) => ejson.singletonMap(k, v)
+    case ConcatArrays(x, y) => ejson.arrayConcat(x, y)
     case ProjectField(src, field) => src `/` field
-    case ProjectIndex(seq, idx) => seq(idx + 1.xqy)
+    // TODO: Handle complex 'idx' expressions, this only works with literals
+    case ProjectIndex(arr, idx) =>
+      arr `/` s"child::${ejson.arrayEltName}[$idx + 1]".xs `/` "child::node()".xs
 
     // other
     case Range(x, y) => x to y
+
+    case ZipMapKeys(m) =>
+      ejson.mkMap(
+        for_("$e" -> m `/` ejson.mapEntryName.xs)
+          .let_(
+            "$k" -> "$e".xqy `/` ejson.mapKeyName.xs `/` "child::node()".xs,
+            "$v" -> "$e".xqy `/` ejson.mapValueName.xs `/` "child:node()".xs)
+          .return_(ejson.mkMapEntry("$k".xqy, ejson.mkArray(IList("$k".xqy, "$v".xqy)))))
 
     case mapFunc => s"(: ${mapFunc.shows} :)()".xqy
   }

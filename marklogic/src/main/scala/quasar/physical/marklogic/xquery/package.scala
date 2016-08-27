@@ -35,4 +35,7 @@ package object xquery {
 
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
+
+  def xmlElement(name: String, content: String): String =
+    s"<$name>$content</$name>"
 }
