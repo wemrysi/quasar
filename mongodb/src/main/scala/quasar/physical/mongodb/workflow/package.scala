@@ -255,9 +255,9 @@ package object workflow {
     def apply[A <: WorkflowOp3_2F[_]](op: A) = {
       (op match {
         case $LookupF(src, from, lf, ff, as) =>
-          // NB: rewrite only the source reference; the foreignField is not part of
-          // the workflow at this point
-          $LookupF(src, from, applyFieldName(lf), ff, as)
+          // NB: rewrite only the source reference; the foreignField is not part
+          // of the workflow at this point
+          $LookupF(src, from, applyFieldName(lf), ff, applyFieldName(as))
         case _ => op
       }).asInstanceOf[A]
     }
