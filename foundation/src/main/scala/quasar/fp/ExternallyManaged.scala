@@ -14,21 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.fp
 
 import quasar.Predef._
-import quasar.fp._
 
 import monocle.Iso
 import scalaz._
 
-sealed abstract class Hole
+/** Used for a normally-recursive parameter that has been “externalized”. E.g.,
+  * `Tree[LogicalPlan[ExternallyManaged]]` vs `Fix[LogicalPlan]`. This indicates
+  * that the recursive structure is intact, but is handled by some containing
+  * structure (`Tree`, in that example).
+  */
+sealed abstract class ExternallyManaged
 
-final case object SrcHole extends Hole
+case object Extern extends ExternallyManaged
 
-object Hole {
-  def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
+object ExternallyManaged {
+  def unit = Iso[ExternallyManaged, Unit](κ(()))(κ(Extern))
 
-  implicit val equal: Equal[Hole] = Equal.equalRef
-  implicit val show: Show[Hole] = Show.showFromToString
+  implicit val equal: Equal[ExternallyManaged] = Equal.equalRef
+  implicit val show: Show[ExternallyManaged] = Show.showFromToString
 }

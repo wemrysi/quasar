@@ -1,0 +1,1 @@
+- Add `ExternallyManaged` to replace some usages of `Unit`.
