@@ -40,6 +40,9 @@ object fn {
   def doc(uri: XQuery): XQuery =
     XQuery(s"fn:doc($uri)")
 
+  def error(err: XQuery, desc: Option[XQuery] = None, errObj: Option[XQuery] = None): XQuery =
+    XQuery(s"fn:error(${err}${asArg(desc)}${asArg(errObj)})")
+
   def exists(seq: XQuery): XQuery =
     XQuery(s"fn:exists($seq)")
 
@@ -90,6 +93,9 @@ object fn {
 
   def tokenize(input: XQuery, pattern: XQuery, flags: Option[XQuery] = None): XQuery =
     XQuery(s"fn:tokenize($input, ${pattern}${asArg(flags)})")
+
+  def trace(value: XQuery, label: XQuery): XQuery =
+    XQuery(s"fn:trace($value, $label)")
 
   val True: XQuery =
     XQuery("fn:true()")

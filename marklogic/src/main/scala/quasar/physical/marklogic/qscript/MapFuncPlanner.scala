@@ -25,12 +25,11 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
-import scalaz.IList
 import scalaz.std.option._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
-  import expr.{for_, if_}
+  import expr.{if_, let_}
 
   def apply[T[_[_]]: Recursive: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
     case Nullary(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
@@ -72,21 +71,26 @@ object MapFuncPlanner {
     case MakeArray(x) => ejson.singletonArray(x)
     case MakeMap(k, v) => ejson.singletonMap(k, v)
     case ConcatArrays(x, y) => ejson.arrayConcat(x, y)
+
+    // TODO: Handle EJson map as well as XML nodes
     case ProjectField(src, field) => src `/` field
-    // TODO: Handle complex 'idx' expressions, this only works with literals
+
+    // TODO: Handle complex 'idx' expressions, this likely only works with literals, could use 'let' but
+    //       will need some namegen to avoid shadowing.
     case ProjectIndex(arr, idx) =>
       arr `/` s"child::${ejson.arrayEltName}[$idx + 1]".xs `/` "child::node()".xs
 
     // other
     case Range(x, y) => x to y
 
+    // TODO: What about standard XML docs here? OR do we just only support "maps" with string keys to start
+    // TODO: Namegen to avoid 'src' name shadowing
     case ZipMapKeys(m) =>
-      ejson.mkMap(
-        for_("$e" -> m `/` ejson.mapEntryName.xs)
-          .let_(
-            "$k" -> "$e".xqy `/` ejson.mapKeyName.xs `/` "child::node()".xs,
-            "$v" -> "$e".xqy `/` ejson.mapValueName.xs `/` "child:node()".xs)
-          .return_(ejson.mkMapEntry("$k".xqy, ejson.mkArray(IList("$k".xqy, "$v".xqy)))))
+      let_("$src" -> m) return_ {
+        if_(ejson.isMap("$src".xqy))
+        .then_ { ejson.zipMapKeys("$src".xqy) }
+        .else_ { local.qError("Not an EJson Map.".xs) }
+      }
 
     case mapFunc => s"(: ${mapFunc.shows} :)()".xqy
   }

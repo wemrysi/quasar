@@ -23,7 +23,7 @@ import scalaz.syntax.foldable._
 
 // TODO: Optimize using XQuery seq as much as possible.
 object ejson {
-  import syntax._
+  import syntax._, expr.for_
 
   val nsUri: String =
     "http://quasar-analytics.org/ejson"
@@ -74,6 +74,14 @@ object ejson {
 
   def singletonMap(key: XQuery, value: XQuery): XQuery =
     mkMap(mkMapEntry(key, value))
+
+  def zipMapKeys(emap: XQuery): XQuery =
+    mkMap(
+      for_("$e" -> emap `/` mapEntryName.xs)
+      .let_(
+        "$k" -> "$e".xqy `/` mapKeyName.xs `/` "child::node()".xs,
+        "$v" -> "$e".xqy `/` mapValueName.xs `/` "child:node()".xs)
+      .return_(mkMapEntry("$k".xqy, mkArray(IList("$k".xqy, "$v".xqy)))))
 
   ////
 

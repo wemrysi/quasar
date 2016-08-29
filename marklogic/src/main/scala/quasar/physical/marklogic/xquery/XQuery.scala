@@ -72,7 +72,8 @@ sealed abstract class XQuery {
   def toQuery: String =
     s"""
       xquery version "1.0-ml";
-      declare namespace ejson = "http://quasar-analytics.org/ejson";
+      declare namespace ejson  = "http://quasar-analytics.org/ejson";
+      declare namespace quasar = "http://quasar-analytics.org/quasar";
 
       $this
     """
