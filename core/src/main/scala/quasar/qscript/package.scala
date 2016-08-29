@@ -24,7 +24,7 @@ import scala.Predef.implicitly
 import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import scalaz._, Scalaz._
+import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /** Here we no longer care about provenance. Backends can’t do anything with
   * it, so we simply represent joins and crosses directly. This also means that
@@ -89,12 +89,16 @@ package object qscript {
     Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
-      (FreeMap[T], List[FreeMap[T]]) =
-    (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
-      buckets.zipWithIndex.map(p =>
-        Free.roll(ProjectIndex[T, FreeMap[T]](
-          HoleF[T],
-          IntLit[T, Hole](p._2)))))
+      Option[(FreeMap[T], NEL[FreeMap[T]])] =
+    buckets match {
+      case Nil => None
+      case head :: tail =>
+        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
+          NEL(head, tail).zipWithIndex.map(p =>
+            Free.roll(ProjectIndex[T, FreeMap[T]](
+              HoleF[T],
+              IntLit[T, Hole](p._2))))).some
+    }
 
   def concat[T[_[_]]: Corecursive, A](
     l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):
