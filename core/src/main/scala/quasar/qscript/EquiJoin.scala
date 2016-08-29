@@ -92,8 +92,8 @@ object EquiJoin {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], EquiJoin[IT, ?], Unit],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) =
         // TODO: merge two joins with different combine funcs
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }

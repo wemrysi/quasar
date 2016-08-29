@@ -108,8 +108,8 @@ object SourcedPathable {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Unit],
-        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged]) =
         // TODO: Merge two LeftShifts with different repair functions
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }

@@ -26,13 +26,15 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
-/** Here we no longer care about provenance. Backends can’t do anything with
-  * it, so we simply represent joins and crosses directly. This also means that
-  * we don’t need to model certain things – project_d is just a data-level
-  * function, nest_d & swap_d only modify provenance and so are irrelevant
-  * here, and autojoin_d has been replaced with a lower-level join operation
-  * that doesn’t include the cross portion.
+/** The various representations of an arbitrary query, as seen by the filesystem
+  * connectors, along with the operations for dealing with them.
   */
+// NB: Here we no longer care about provenance. Backends can’t do anything with
+//     it, so we simply represent joins and crosses directly. This also means
+//     that we don’t need to model certain things – project_d is just a
+//     data-level function, nest_d & swap_d only modify provenance and so are
+//     irrelevant here, and autojoin_d has been replaced with a lower-level join
+//     operation that doesn’t include the cross portion.
 package object qscript {
   private type CommonPathable[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
