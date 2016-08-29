@@ -18,7 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.{PhaseResults,PhaseResult, LogicalPlan, Data}
-import quasar.qscript.QScriptTotal
+import quasar.qscript._
 import quasar.fs.QueryFile
 import quasar.fs.QueryFile._
 import quasar.fs._
@@ -59,7 +59,9 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          (QueryFile.convertToQScript(lp).leftMap(planningFailed(lp, _)).traverse(executePlan(input, _, out, lp))).map(_.join.run.run)
+          // TODO this must be implemented at some point
+          val listContents: Option[ConvertPath.ListContents[Id]] = None
+          (QueryFile.convertToQScript(listContents)(lp).traverse(executePlan(input, _, out, lp))).map(_.join.run.run)
           }
         case _ => ???
       }
