@@ -206,7 +206,7 @@ object MongoDbQScriptPlanner {
       //     short-circuit when given the wrong type. However, our guards may be
       //     more restrictive than the operation, in which case we still want to
       //     short-circuit, so …
-      case Guard(expr, typ, cont) => ???
+      case Guard(expr, typ, cont, fallback) => ???
 
       case DupArrayIndices(_) => ???
       case DupMapKeys(_)      => ???
@@ -466,7 +466,7 @@ object MongoDbQScriptPlanner {
       case ProjectIndex(a1, a2)  => Arity2(a1, a2)(Access(_, _))
       case DeleteField(a1, a2)  => ???
 
-      case Guard(expr, typ, cont) => /*
+      case Guard(expr, typ, cont, fallback) =>
         val jsCheck: Type => Option[JsCore => JsCore] =
           generateTypeCheck[JsCore, JsCore](BinOp(jscore.Or, _, _)) {
             case Type.Null             => isNull
@@ -488,16 +488,15 @@ object MongoDbQScriptPlanner {
         jsCheck(typ).fold[OutputM[PartialJs]](
           -\/(InternalError("uncheckable type")))(
           f =>
-          (HasJs(expr) ⊛ HasJs(cont)) {
-            case ((f1, p1), (f2, p2)) =>
+          (HasJs(expr) ⊛ HasJs(cont) ⊛ HasJs(fallback)) {
+            case ((f1, p1), (f2, p2), (f3, p3)) =>
               ({ case list => JsFn(JsFn.defaultName,
                 If(f(f1(list.take(p1.size))(Ident(JsFn.defaultName))),
                   f2(list.drop(p1.size).take(p2.size))(Ident(JsFn.defaultName)),
                   f3(list.drop(p1.size + p2.size))(Ident(JsFn.defaultName))))
               },
-                p1.map(There(0, _)) ++ p2.map(There(1, _)))
+                p1.map(There(0, _)) ++ p2.map(There(1, _)) ++ p3.map(There(2, _)))
           })
-          */ ???
 
       case DupArrayIndices(_) => ???
       case DupMapKeys(_)      => ???
@@ -724,7 +723,7 @@ object MongoDbQScriptPlanner {
 
   def elideMoreGeneralGuards[T[_[_]]](subType: Type):
       FreeMap[T] => PlannerError \/ FreeMap[T] = {
-    case free @ Roll(MapFuncs.Guard(Point(SrcHole), typ, cont)) =>
+    case free @ Roll(MapFuncs.Guard(Point(SrcHole), typ, cont, _)) =>
       if (typ.contains(subType)) cont.right
       else if (!subType.contains(typ))
         InternalError("can only contain " + subType + ", but a(n) " + typ + " is expected").left
