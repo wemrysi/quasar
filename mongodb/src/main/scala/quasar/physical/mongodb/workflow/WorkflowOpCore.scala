@@ -491,11 +491,9 @@ object $MapF {
     mapKeyVal(("key", ident), Js.Ident("key"), transform)
   val mapNOP = mapMap("value", Js.Ident("value"))
 
-  def finalizerFn(fn: Js.Expr) =
+  def finalizerFn(fn: JsFn) =
     Js.AnonFunDecl(List("key", "value"),
-      List(Js.Return(Js.Access(
-        Js.Call(fn, List(Js.Ident("key"), Js.Ident("value"))),
-        Js.Num(1, false)))))
+      List(Js.Return(fn(jscore.Ident(jscore.Name("value"))).toJs)))
 
   def mapFn(fn: Js.Expr) =
     Js.AnonFunDecl(Nil,
