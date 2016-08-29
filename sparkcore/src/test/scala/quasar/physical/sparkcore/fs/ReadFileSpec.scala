@@ -81,7 +81,7 @@ class ReadFileSpec extends quasar.Qspec {
 
     MonotonicSeq.fromTaskRef(genState) :+:
     NaturalTransformation.refl[Task] :+:
-    KeyValueStore.fromTaskRef[ReadHandle, SparkCursor](kvsState) :+:
+    KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](kvsState) :+:
     Read.constant[Task, SparkContext](sc)
   }
 

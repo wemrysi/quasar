@@ -44,10 +44,10 @@ object QueryFile {
 
   type QS[T[_[_]], A] = QScriptTotal[T, A]
 
-  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] (
+  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
     lp: T[LogicalPlan])(
-    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]):
-      PlannerError \/ T[QS[T, ?]] = {
+    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]
+  ): PlannerError \/ T[QS[T, ?]] = {
     val transform = new Transform[T, QS[T, ?]]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something

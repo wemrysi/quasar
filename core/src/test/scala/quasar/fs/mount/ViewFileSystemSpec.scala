@@ -71,7 +71,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
   type VFS[A]         = ErrsT[VSS, A]
 
   def runMounting[F[_]](implicit F: MonadState[F, VS]): Mounting ~> F =
-    free.foldMapNT(KeyValueStore.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
+    free.foldMapNT(KeyValueStore.impl.toState[F](VS.mountConfigs)) compose Mounter.trivial[MountConfigs]
 
   def runViewFileSystem[F[_]](
     runFileSystem: FileSystem ~> F
@@ -83,7 +83,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       runMounting[F],
       Failure.toError[F, Errs] compose Failure.mapError[PathTypeMismatch, Errs](_.right),
       Failure.toError[F, Errs] compose Failure.mapError[MountingError, Errs](_.left),
-      KeyValueStore.toState[F](VS.handles),
+      KeyValueStore.impl.toState[F](VS.handles),
       MonotonicSeq.toState[F](VS.seq),
       runFileSystem)
 

@@ -77,7 +77,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
       )
 
       val meff: MEff ~> Task =
-        reflNT[Task] :+: KeyValueStore.fromTaskRef(configsRef)
+        reflNT[Task] :+: KeyValueStore.impl.fromTaskRef(configsRef)
 
       val effR: Eff ~> ResponseOr =
         liftMT[Task, ResponseT]              :+:
