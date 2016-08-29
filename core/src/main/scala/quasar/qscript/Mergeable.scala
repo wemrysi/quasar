@@ -27,6 +27,17 @@ import scalaz._, Scalaz._
 @typeclass trait Mergeable[F[_]] {
   type IT[F[_]]
 
+  // `fm1` and `fm2` provide access to two unknown targets X and Y.
+  // `a1` and `a2` are the two sources to be merged.
+  //
+  // This function merges `a1` and `a2` into a common source, providing access
+  // through that common source to X and Y.
+  //
+  // In general, if `a1` and `a2` are equal, we cannot simply return
+  // `SrcMerge(a1, fm1, fm2)` because the `Hole` in `fm1` and `fm2` reference
+  // some unknown source and do not reference `a1`. In this case, our source
+  // merging has converged (at least for this iteration), but `fm1` and `fm2` still
+  // reference the old common source (which is not known to us here).
   def mergeSrcs(
     fm1: FreeMap[IT],
     fm2: FreeMap[IT],
@@ -45,6 +56,8 @@ object Mergeable {
       // NB: I think it is true that the buckets on p1 and p2 _must_ be equal
       //     for us to even get to this point, so we can always pick one
       //     arbitrarily for the result.
+      //
+      //     Also, note that we can optimize the `(p1 ≟ p2)` case in the `Const` case.
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
