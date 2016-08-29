@@ -17,9 +17,10 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.qscript.MapFuncs._
+import quasar.Planner.{NoFilesFound, PlannerError}
 import quasar.fp._
 import quasar.fs._
+import quasar.qscript.MapFuncs._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import matryoshka.patterns._
@@ -125,21 +126,17 @@ object ConvertPath extends ConvertPathInstances {
     _.run.fold(allDescendents[T, M, G](f).apply(_), fa => List(F(fa)).point[M])
 
   def union[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
-    (elems: List[F[T[F]]])
+    (elems: NonEmptyList[F[T[F]]])
     (implicit
       DE: Const[DeadEnd, ?] :<: F,
       SP: SourcedPathable[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
-      : FileSystemError \/ F[T[F]] =
-    elems match {
-      case h :: t =>
-        t.foldRight(
-          h)(
-          (elem, acc) => SP.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
-            elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
-            acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g)))))).right
-      case Nil => FileSystemError.readFailed("Nil", "found no files").left
-    }
+      : F[T[F]] =
+    elems.tail.foldRight(
+      elems.head)(
+      (elem, acc) => SP.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
+        elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
+        acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))))))
 
   /** Applied after the backend-supplied function, to convert the files into
     * reads and combine them as necessary.
@@ -152,8 +149,11 @@ object ConvertPath extends ConvertPathInstances {
              SP: SourcedPathable[T, ?] :<: G,
              QC: QScriptCore[T, ?] :<: G, 
              FI: G :<: QScriptTotal[T, ?]):
-      AlgebraicTransformM[T, EitherT[M, FileSystemError, ?], Pathed[F, ?], G] =
-    p => EitherT(p.traverseM(readFile[T, M, F, G](f).apply) ∘ union[T, G])
+      AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
+    p => EitherT(p.traverseM(readFile[T, M, F, G](f).apply) ∘ {
+      case Nil    => NoFilesFound(p.foldMap(_.run.fold(List(_), κ(Nil)))).left
+      case h :: t => union[T, G](NonEmptyList.nel(h, t.toIList)).right
+    })
 
   def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Functor]
     (src: T[Pathed[F, ?]], branch: FreeQS[T])
@@ -170,7 +170,8 @@ object ConvertPath extends ConvertPathInstances {
         ginterpretM(
           κ(FunctorT[T].transCata[Pathed[F, ?], Pathed[QScriptTotal[T, ?], ?]](src)(_.map(coEnvHmap(_)(FI))).point[EitherT[M, FileSystemError, ?]]),
           transformToAlgebra[T, Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(f)))) >>=
-      (TraverseT[T].transCataM[EitherT[M, FileSystemError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](f)))) ∘ (_.convertTo[Free[?[_], Hole]])
+      (TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](f)).leftMap(FileSystemError.qscriptPlanningFailed(_)))) ∘
+      (_.convertTo[Free[?[_], Hole]])
   }
 
   def convertBranchingOp
@@ -200,18 +201,9 @@ object ConvertPath extends ConvertPathInstances {
       def convertPath[M[_]: Monad](f: ListContents[M]):
           StaticPathTransformation[T, M, SourcedPathable[T, ?], G] = {
         case Union(src, lb, rb)
-            // FIXME: Replace this inequality with a boolean
-            if None != Recursive[T].project[Pathed[G, ?]](src.copoint).find(_.run.isLeft) =>
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             SP.inj(Union(s, l, r)))
-        // case LeftShift(src, HoleF, repair)
-        //     if src.project.find(_.isLeft) && repair.run ≟ RightSide.right =>
-        //   src.project.map(_.run).separate.bimap(
-        //     _.traverseM(d => listContents(d).map(_.map(_.bimap(
-        //       d </> dir1(_),
-        //       d </> file1(_))))),
-        //     q => List(CoEnv(LeftShift(q.map(qs => CoEnv(qs.right[ADir])).embed, HoleF, repair).right)).point[M])
-
         case sp => EitherT(List(CoEnv(SP.inj(sp).right[ADir])).right.point[M])
       }
     }
@@ -227,13 +219,11 @@ object ConvertPath extends ConvertPathInstances {
 
       def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, QScriptCore[T, ?], G] = {
         case Take(src, lb, rb)
-            // FIXME: Replace this inequality with a boolean
-            if None != Recursive[T].project[Pathed[G, ?]](src.copoint).find(_.run.isLeft) =>
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             QC.inj(Take(s, l, r)))
         case Drop(src, lb, rb)
-            // FIXME: Replace this inequality with a boolean
-            if None != Recursive[T].project[Pathed[G, ?]](src.copoint).find(_.run.isLeft) =>
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             QC.inj(Drop(s, l, r)))
         case qc => EitherT(List(CoEnv(QC.inj(qc).right[ADir])).right.point[M])
@@ -260,8 +250,7 @@ object ConvertPath extends ConvertPathInstances {
 
       def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, ThetaJoin[T, ?], G] = {
         case ThetaJoin(src, lb, rb, on, jType, combine)
-            // FIXME: Replace this inequality with a boolean
-            if None != Recursive[T].project[Pathed[G, ?]](src.copoint).find(_.run.isLeft) =>
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
           }
@@ -278,8 +267,7 @@ object ConvertPath extends ConvertPathInstances {
 
       def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, EquiJoin[T, ?], G] = {
         case EquiJoin(src, lb, rb, lk, rk, jType, combine)
-            // FIXME: Replace this inequality with a boolean
-            if None != Recursive[T].project[Pathed[G, ?]](src.copoint).find(_.run.isLeft) =>
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, lk, rk, jType, combine)))
           }

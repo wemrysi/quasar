@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.Planner.PlannerError
 import quasar.fp._
 import quasar.fs.{ADir, FileSystemError}
 import quasar.qscript.ConvertPath.{ListContents, Pathed, postPathify}
@@ -58,7 +59,7 @@ import simulacrum.typeclass
       Traverse[List].compose(Traverse[CoEnv[ADir, F, ?]])
 
     _.transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?]](CP.convertPath[M](g)) >>=
-      (TraverseT[IT].transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?], G](_)(postPathify[IT, M, F, G](g)))
+      (TraverseT[IT].transCataM[EitherT[M, PlannerError, ?], Pathed[F, ?], G](_)(postPathify[IT, M, F, G](g)).leftMap(FileSystemError.qscriptPlanningFailed(_)))
     }
 }
 
