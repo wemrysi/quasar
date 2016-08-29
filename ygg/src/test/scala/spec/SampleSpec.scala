@@ -1,7 +1,7 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg.json._
+import ygg._, common._, json._
 import org.specs2.matcher.TraversableMatchers._
 
 class SampleSpec extends ColumnarTableQspec {

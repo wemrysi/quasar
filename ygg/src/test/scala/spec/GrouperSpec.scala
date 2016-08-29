@@ -1,9 +1,8 @@
 package ygg.tests
 
-import ygg.common._
 import scalaz._, Scalaz._
-import ygg.json._
-import ygg.table._
+import ygg._, common._, json._, table._
+import scala.Predef.identity
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -618,8 +617,8 @@ class GrouperSpec extends quasar.Qspec {
     var firstMerge = 0L
 
     val result = Table.merge(intersection) { (key, map) =>
-      if (firstMerge == 0) firstMerge = System.currentTimeMillis
-      val start = System.currentTimeMillis
+      if (firstMerge == 0) firstMerge = systemMillis
+      val start = systemMillis
       for {
         gs1     <- map(groupId1)
         gs2     <- map(groupId2)
@@ -646,7 +645,7 @@ class GrouperSpec extends quasar.Qspec {
           Stream(JObject(JField("key", key.toJValue(tic_aj)) ::
             JField("value", JNum(gs1Json.size + gs2Json.size)) :: Nil)))
 
-        elapsed += (System.currentTimeMillis - start)
+        elapsed += (systemMillis - start)
         result
       }
     }

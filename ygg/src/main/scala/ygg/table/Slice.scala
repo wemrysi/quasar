@@ -1,11 +1,25 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
-import ygg.cf
-import ygg.common._
+import ygg._, common._, json._, data._
 import scalaz.{ =?> => _, _ }, Ordering._
 import ygg.macros.Spire._
-import ygg.json._
-import ygg.data._
+import scala.math.min
 
 sealed trait Slice {
   def size: Int
@@ -54,7 +68,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
 
   def mapColumns(f: CF1): Slice =
     Slice(source.size, {
-      val resultColumns: Seq[ColumnRef -> Column] = for {
+      val resultColumns: scSeq[ColumnRef -> Column] = for {
         (ref, col) <- source.columns.toSeq
         result     <- f(col)
       } yield (ref.copy(ctype = result.tpe), result)
@@ -356,7 +370,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     Slice(size, source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) })
 
   def typedSubsumes(jtpe: JType): Slice = {
-    val tuples: Seq[CPath -> CType] = source.columns.map({ case (ColumnRef(path, ctpe), _) => (path, ctpe) })(collection.breakOut)
+    val tuples: Seq[CPath -> CType] = source.columns.map({ case (ColumnRef(path, ctpe), _) => (path, ctpe) })(breakOut)
     val columns = if (Schema.subsumes(tuples, jtpe)) {
       source.columns filter { case (ColumnRef(path, ctpe), _) => Schema.requiredBy(jtpe, path, ctpe) }
     } else {
@@ -374,7 +388,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     * then on a row-by-row basis, using a BitSet, we use `Schema.findTypes(...)` to determine the Boolean values
     */
   def isType(jtpe: JType): Slice = {
-    val pathsAndTypes: Seq[CPath -> CType] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
+    val pathsAndTypes: scSeq[CPath -> CType] = source.columns.toSeq map { case (ColumnRef(selector, ctype), _) => (selector, ctype) }
     // we cannot just use subsumes because there could be rows with undefineds in them
     val subsumes    = Schema.subsumes(pathsAndTypes, jtpe)
     val definedBits = (source.columns).values.map(_.definedAt(0, size)).reduceOption(_ | _) getOrElse new BitSet
@@ -489,7 +503,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
     val retained = definedness match {
       case AnyDefined =>
         doto(new ArrayIntList) { acc =>
-          cforRange(0 until filter.size)(i => if (cols.values exists (_ isDefinedAt i)) acc.add(i))
+          cforRange(0 until filter.size)(i => if (cols.values exists (_ isDefinedAt i)) discard(acc.add(i)))
         }
 
       case AllDefined =>
@@ -506,7 +520,8 @@ class SliceOps(private val source: Slice) extends AnyVal {
             def numBool   = numBools reduce (_ && _)
             def otherBool = otherCols.values.toArray forall (_ isDefinedAt i)
 
-            if (otherBool && numBool) acc.add(i)
+            if (otherBool && numBool)
+              discard(acc.add(i))
           }
         }
     }
@@ -663,7 +678,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
           case (ColumnRef(path, tpe), col) if path hasPrefix prefix =>
             (ColumnRef(CPathIndex(i) \ path, tpe), col)
         }
-    })(collection.breakOut))
+    })(breakOut))
 
     source sortWith (keySlice, sortOrder = SortAscending) _1
   }
@@ -688,7 +703,7 @@ class SliceOps(private val source: Slice) extends AnyVal {
   )
 
   def takeRange(start: Int, len: Int): Slice = {
-    val take = math.min(size, start + len) - start
+    val take = min(size, start + len) - start
     Slice(take, source.columns lazyMapValues (_ |> cf.RemapFilter(_ < take, start) get))
   }
 

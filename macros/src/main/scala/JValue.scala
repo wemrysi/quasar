@@ -1,12 +1,30 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.json
 
-import ast._
+import quasar.Predef._
+import ygg.macros._
 import scalaz._, Scalaz._, Ordering._
 import scalaz.{ Order => Ord }
 import scala.util.Try
 import scala.util.Sorting.quickSort
 import java.lang.Double.isInfinite
 import scala.annotation.tailrec
+import scala.{ collection => sc }
 import JValue._
 
 /**
@@ -23,16 +41,16 @@ sealed trait JValue {
     case _: JObject         => 7
   }
 
-  final override def toString: String = ast.CanonicalRenderer render this
+  final override def toString: String = CanonicalRenderer render this
   final override def hashCode: Int = this match {
     case JBool(x)   => x.##
     case JNum(x)    => x.##
     case JString(s) => s.##
     case JArray(x)  => x.##
     case JObject(x) => x.##
-    case _          => System identityHashCode this
+    case _          => java.lang.System identityHashCode this
   }
-  final override def equals(other: Any) = other match {
+  final override def equals(other: scala.Any) = other match {
     case x: JValue => (this eq x) || (JValue.Order.order(this, x) == EQ)
     case _         => false
   }
@@ -112,8 +130,8 @@ final object JObject {
     def unapply(m: JObject): Some[Vec[JField]] = Some(m.fields.toVector map (x => JField(x)))
   }
 
-  def apply(fields: Traversable[JField]): JObject = JObject(fields.map(_.toTuple).toMap)
-  def apply(fields: JField*): JObject             = JObject(fields.map(_.toTuple).toMap)
+  def apply(fields: sc.Traversable[JField]): JObject = JObject(fields.map(_.toTuple).toMap)
+  def apply(fields: JField*): JObject                = JObject(fields.map(_.toTuple).toMap)
 }
 final object JArray extends (Vector[JValue] => JArray) {
   val empty = JArray(Vector.empty)
@@ -121,7 +139,7 @@ final object JArray extends (Vector[JValue] => JArray) {
   def apply(vals: List[JValue]): JArray = JArray(vals.toVector)
   def apply(vals: JValue*): JArray      = JArray(vals.toVector)
 }
-final case class JField(name: String, value: JValue) extends Product2[String, JValue] {
+final case class JField(name: String, value: JValue) extends scala.Product2[String, JValue] {
   def _1                    = name
   def _2                    = value
   def toTuple: JStringValue = name -> value

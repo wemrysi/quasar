@@ -1,12 +1,28 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.data
+
+import ygg._, common._
+import scalaz._
 
 import java.nio.ByteBuffer
 import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
 import java.util.concurrent.atomic.AtomicLong
 import java.lang.ref.SoftReference
-
-import ygg.common._
-import scalaz._
 
 /**
   * A `Monad` for working with `ByteBuffer`s.
@@ -56,9 +72,8 @@ final class ByteBufferPool(val capacity: Int) {
     * Releases a `ByteBuffer` back into the pool for re-use later on.
     */
   def release(buffer: ByteBuffer): Unit = {
-    if (!(fixedBufferQueue offer buffer)) {
-      flexBufferQueue offer (new SoftReference(buffer))
-    }
+    if (!(fixedBufferQueue offer buffer))
+      discard(flexBufferQueue offer (new SoftReference(buffer)))
   }
 
   def toStream: Stream[ByteBuffer] = Stream.continually(acquire)

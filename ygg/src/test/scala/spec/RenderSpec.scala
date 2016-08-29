@@ -1,7 +1,7 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg.json._
+import ygg._, common._, json._
 import ygg.table.Render
 
 class RenderSpec extends ColumnarTableQspec {

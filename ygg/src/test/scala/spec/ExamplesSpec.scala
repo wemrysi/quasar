@@ -1,8 +1,7 @@
 package ygg.tests
 
-import ygg.common._
+import ygg._, common._, json._
 import Examples._
-import ygg.json._
 
 class ExamplesSpec extends quasar.Qspec {
   import JParser._

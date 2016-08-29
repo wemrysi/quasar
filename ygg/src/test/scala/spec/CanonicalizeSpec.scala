@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.table._
+import ygg._, common._, table._
 import scalaz._, Scalaz._
 
 class CanonicalizeSpec extends ColumnarTableQspec {
@@ -85,7 +85,7 @@ class CanonicalizeSpec extends ColumnarTableQspec {
   }
 
   def testCanonicalizeZero = {
-    table.canonicalize(0) must throwA[IllegalArgumentException]
+    table.canonicalize(0) must throwA[java.lang.AssertionError]
   }
 
   def testCanonicalizeBoundary = {

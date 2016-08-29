@@ -1,8 +1,6 @@
 package ygg.tests
 
-import ygg.common._
-import ygg.table._
-import ygg.json._
+import ygg._, common._, json._, table._
 
 class SchemaSpec extends quasar.Qspec {
   "cpath" should {

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.data
 
 import ygg.common._
@@ -10,7 +26,7 @@ import ygg.common._
   *
   * No objects were allocated in the making of this film.
   */
-final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
+final class RingDeque[@spec(Boolean, Int, Long, Double, Float, Short) A: CTag](_bound: Int) {
   val bound = _bound + 1
 
   private val ring  = new Array[A](bound)
@@ -25,7 +41,7 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
     result
   }
 
-  def pushFront(a: A) {
+  def pushFront(a: A): Unit = {
     moveFront(-1)
     ring(front) = a
   }
@@ -35,7 +51,7 @@ final class RingDeque[@specialized(Boolean, Int, Long, Double, Float, Short) A: 
     ring(rotate(back, -1))
   }
 
-  def pushBack(a: A) {
+  def pushBack(a: A): Unit = {
     ring(rotate(back, -1)) = a
     moveBack(1)
   }

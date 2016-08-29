@@ -1,12 +1,27 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg
 
 import scalaz._, Scalaz._, Ordering._
 import ygg.data._
 import java.nio.file._
+import java.lang.Comparable
 
-package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
-  def mutableQueue[A: Ord](xs: A*): scala.collection.mutable.PriorityQueue[A] = scala.collection.mutable.PriorityQueue(xs: _*)
-
+package object common extends quasar.Predef with pkg.PackageTime with pkg.PackageAliases with pkg.PackageMethods {
   implicit class jPathOps(private val p: jPath) {
     def slurpBytes(): Array[Byte] = Files readAllBytes p
     def slurpString(): String     = new String(slurpBytes, Utf8Charset)
@@ -21,11 +36,8 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
   implicit class YggScalaMapOps[A, B](source: Map[A, B]) {
     def lazyMapValues[C](f: B => C): Map[A, C] = new LazyMap[A, B, C](source, f)
   }
-  implicit class YggScalaMapOpsCC[K, V, CC[B] <: Traversable[B]](left: Map[K, CC[V]]) {
-    type Middle[V1] = Either3[V, CC[V] -> CC[V1], V1]
 
-    def cogroup[V1, That](right: Map[K, CC[V1]])(implicit cbf: CBF[_, K -> Middle[V1], That]): That = new Cogrouped(left, right) build
-  }
+  def cogroup[K, V, V1, CC[X] <: scIterable[X]](ls: scMap[K, CC[V]], rs: scMap[K, CC[V1]]): CoGroupResult[K, V, V1, CC] = Cogrouped(ls, rs).build
 
   implicit class YggByteBufferOps(private val bb: ByteBuffer) {
     def read[A](implicit z: Codec[A]): A = z read bb
@@ -50,6 +62,13 @@ package object common extends pkg.PackageTime with pkg.PackageAliases with pkg.P
   implicit class QuasarAnyOps[A](private val x: A) extends AnyVal {
     def |>[B](f: A => B): B       = f(x)
     def unsafeTap(f: A => Any): A = doto(x)(f)
+  }
+
+  implicit class EitherOps[A, B](private val x: Either[A, B]) extends AnyVal {
+    def mapRight[C](f: B => C): Either[A, C] = x match {
+      case Left(n)  => Left(n)
+      case Right(n) => Right(f(n))
+    }
   }
 
   implicit class BitSetOperations(private val bs: BitSet) extends AnyVal {

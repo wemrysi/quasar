@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg.common._
@@ -39,7 +55,7 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
     }
   )
 }
-sealed trait CType extends Serializable {
+sealed trait CType {
   def typeIndex: Int = this match {
     case CUndefined    => 0
     case CBoolean      => 1
@@ -261,7 +277,7 @@ object CValueType {
 //
 // Homogeneous arrays
 //
-case class CArray[A](value: Array[A], arrayType: CArrayType[A]) extends CWrappedValue[Array[A]] {
+final case class CArray[A](value: Array[A], arrayType: CArrayType[A]) extends CWrappedValue[Array[A]] {
   private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = (as.length == bs.length) && {
     cforRange(0 until as.length){ i =>
       if (as(i) != bs(i))
@@ -289,19 +305,21 @@ case object CArray {
     CArray(as, CArrayType(elemType))
 }
 
-case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()(elemType.classTag.wrap) {
+final case class CArrayType[A](elemType: CValueType[A]) extends CValueType[Array[A]]()(elemType.classTag.wrap) {
   type tpe = A
 
   def apply(value: Array[A]) = CArray(value, this)
 
-  def order(as: Array[A], bs: Array[A]): Ordering =
-    (as, bs).zipped map ((x, y) => elemType.order(x, y)) find (_ != EQ) getOrElse (as.length ?|? bs.length)
+  def order(as: Array[A], bs: Array[A]): Ordering = {
+    val zs = for ((x, y) <- as zip bs) yield elemType.order(x, y)
+    zs find (_ != EQ) getOrElse (as.length ?|? bs.length)
+  }
 }
 
 //
 // Strings
 //
-case class CString(value: String) extends CWrappedValue[String]
+final case class CString(value: String) extends CWrappedValue[String]
 
 case object CString extends CValueType[String] {
   def order(s1: String, s2: String) = stringInstance.order(s1, s2)
@@ -324,21 +342,21 @@ object CBoolean extends CValueType[Boolean] {
 //
 // Numerics
 //
-case class CLong(value: Long) extends CNumericValue[Long]
+final case class CLong(value: Long) extends CNumericValue[Long]
 
 case object CLong extends CNumericType[Long] {
   def order(v1: Long, v2: Long) = longInstance.order(v1, v2)
   def bigDecimalFor(v: Long)    = decimal(v)
 }
 
-case class CDouble(value: Double) extends CNumericValue[Double]
+final case class CDouble(value: Double) extends CNumericValue[Double]
 
 case object CDouble extends CNumericType[Double] {
   def order(v1: Double, v2: Double) = doubleInstance.order(v1, v2)
   def bigDecimalFor(v: Double)      = decimal(v.toString)
 }
 
-case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal]
+final case class CNum(value: BigDecimal) extends CNumericValue[BigDecimal]
 
 case object CNum extends CNumericType[BigDecimal] {
   def order(v1: BigDecimal, v2: BigDecimal) = bigDecimalOrder.order(v1, v2)
@@ -348,13 +366,13 @@ case object CNum extends CNumericType[BigDecimal] {
 //
 // Dates and Periods
 //
-case class CDate(value: DateTime) extends CWrappedValue[DateTime]
+final case class CDate(value: DateTime) extends CWrappedValue[DateTime]
 
 case object CDate extends CValueType[DateTime] {
   def order(v1: DateTime, v2: DateTime) = ???
 }
 
-case class CPeriod(value: Period) extends CWrappedValue[Period]
+final case class CPeriod(value: Period) extends CWrappedValue[Period]
 
 case object CPeriod extends CValueType[Period] {
   def order(v1: Period, v2: Period) = ???

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import scalaz._, Scalaz._
@@ -6,7 +22,7 @@ import ygg._, common._, json._
 sealed trait CPath {
   def nodes: Vec[CPathNode]
 }
-private[table] case class CPathClass(nodes: Vec[CPathNode]) extends CPath {
+private[table] final case class CPathClass(nodes: Vec[CPathNode]) extends CPath {
   override def toString: String = if (nodes.isEmpty) "." else nodes mkString ""
 }
 
@@ -44,20 +60,21 @@ object CPath {
   }
 
   trait CPathTree[A]
-  case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
-  case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
-  case class LeafNode[A](value: A)                                        extends CPathTree[A]
+  final case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
+  final case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
+  final case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]
+  final case class LeafNode[A](value: A)                                        extends CPathTree[A]
 
-  case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
+  final case class PathWithLeaf[A](path: Seq[CPathNode], value: A) {
     val size: Int = path.length
   }
 
   def makeStructuredTree[A](pathsAndValues: Seq[CPath -> A]) = {
     def inner[A](paths: Seq[PathWithLeaf[A]]): Seq[CPathTree[A]] = {
       if (paths.size == 1 && paths.head.size == 0) {
-        List(LeafNode(paths.head.value))
-      } else {
+        Vec(LeafNode(paths.head.value))
+      }
+      else {
         val filtered = paths filterNot { case PathWithLeaf(path, _)  => path.isEmpty }
         val grouped  = filtered groupBy { case PathWithLeaf(path, _) => path.head }
 
@@ -72,7 +89,7 @@ object CPath {
               case _                   => abort("CPathArray and CPathMeta not supported")
             }
         }
-        result
+        result.toVector
       }
     }
 

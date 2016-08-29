@@ -1,5 +1,6 @@
 package quasar
 
+import ygg.common._
 import org.specs2.main
 import org.specs2.matcher._
 import org.specs2.execute._

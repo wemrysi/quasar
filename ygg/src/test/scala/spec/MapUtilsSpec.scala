@@ -1,7 +1,6 @@
 package ygg.tests
 
-import ygg.data._
-import ygg.common._
+import ygg._, common._, data._
 import scalaz._, Either3._
 
 class MapUtilsSpec extends quasar.Qspec {
@@ -11,7 +10,8 @@ class MapUtilsSpec extends quasar.Qspec {
 
   "cogroup" should {
     "produce left, right and middle cases" in prop { (left: IntMap, right: IntMap) =>
-      val result     = left cogroup right
+      val result = cogroup(left, right)
+
       val leftKeys   = left.keySet -- right.keySet
       val rightKeys  = right.keySet -- left.keySet
       val middleKeys = left.keySet & right.keySet
@@ -32,7 +32,7 @@ class MapUtilsSpec extends quasar.Qspec {
 }
 
 class RingDequeSpec extends quasar.Qspec {
-  implicit val params = set(minTestsOk = 200, workers = Runtime.getRuntime.availableProcessors)
+  implicit val params = set(minTestsOk = 200, workers = java.lang.Runtime.getRuntime.availableProcessors)
 
   "unsafe ring deque" should {
     "implement prepend" in prop { (xs: List[Int], x: Int) =>

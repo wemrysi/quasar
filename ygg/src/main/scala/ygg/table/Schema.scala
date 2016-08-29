@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg._, common._, json._, data._
@@ -27,7 +43,7 @@ object Schema {
     case _         => Set.empty
   }
 
-  def cpath(jtype: JType): Seq[CPath] = {
+  def cpath(jtype: JType): Vec[CPath] = {
     val cpaths = jtype match {
       case JArrayFixedT(indices)                           => indices flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) } toSeq
       case JObjectFixedT(fields)                           => fields flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) } toSeq
@@ -36,12 +52,12 @@ object Schema {
       case _                                               => Nil
     }
 
-    cpaths sorted
+    cpaths.sorted.toVector
   }
 
   def sample(jtype: JType, size: Int): Option[JType] = {
-    val paths                        = flatten(jtype, Vec()) groupBy { _.selector } toVector
-    val sampledPaths: Seq[ColumnRef] = paths.shuffle take size flatMap (_._2)
+    val paths                          = flatten(jtype, Vec()) groupBy { _.selector } toVector
+    val sampledPaths: scSeq[ColumnRef] = paths.shuffle take size flatMap (_._2)
 
     mkType(sampledPaths)
   }
@@ -138,7 +154,7 @@ object Schema {
     * value is true if the given row subsumes the provided `jtpe`
     */
   def findTypes(jtpe: JType, seenPath: CPath, cols: ColumnMap, size: Int): Int => Boolean = {
-    def handleRoot(providedCTypes: Seq[CType], cols: ColumnMap) = {
+    def handleRoot(providedCTypes: scSeq[CType], cols: ColumnMap) = {
       val filteredCols = cols filter {
         case (ColumnRef(path, ctpe), _) =>
           path == seenPath && providedCTypes.contains(ctpe)
@@ -189,7 +205,7 @@ object Schema {
         emptyBits(row)
     }
 
-    def combineFixedResults(results: Seq[Int => Boolean]): Int => Boolean = { (row: Int) =>
+    def combineFixedResults(results: scSeq[Int => Boolean]): Int => Boolean = { (row: Int) =>
       results.foldLeft(true) { case (bool, fcn) => bool && fcn(row) }
     }
 
@@ -209,7 +225,7 @@ object Schema {
         if (fields.isEmpty) {
           handleEmpty(CEmptyObject, cols)
         } else {
-          val results: Seq[Int => Boolean] = fields.toSeq map {
+          val results: scSeq[Int => Boolean] = fields.toSeq map {
             case (field, tpe) =>
               val seenPath0 = CPath(seenPath.nodes :+ CPathField(field))
               findTypes(tpe, seenPath0, cols, size)
@@ -222,7 +238,7 @@ object Schema {
         if (elements.isEmpty) {
           handleEmpty(CEmptyArray, cols)
         } else {
-          val results: Seq[Int => Boolean] = elements.toSeq map {
+          val results: scSeq[Int => Boolean] = elements.toSeq map {
             case (idx, tpe) =>
               val seenPath0 = CPath(seenPath.nodes :+ CPathIndex(idx))
               findTypes(tpe, seenPath0, cols, size)
@@ -247,7 +263,7 @@ object Schema {
     * Constructs a JType corresponding to the supplied sequence of ColumnRefs. Returns None if the
     * supplied sequence is empty.
     */
-  def mkType(ctpes: Seq[ColumnRef]): Option[JType] = {
+  def mkType(ctpes: scSeq[ColumnRef]): Option[JType] = {
 
     val primitives = ctpes flatMap {
       case ColumnRef.id(t: CValueType[_]) => fromCValueType(t)
@@ -345,29 +361,26 @@ object Schema {
     * Tests whether the supplied sequence contains all the (CPath, CType) pairs that are
     * included by the supplied JType.
     */
-  def subsumes(ctpes: Seq[CPath -> CType], jtpe: JType): Boolean = jtpe match {
+  def subsumes(ctpes: scSeq[CPath -> CType], jtpe: JType): Boolean = jtpe match {
     case JNumberT =>
       ctpes.exists {
         case (CPath.Identity, CLong | CDouble | CNum) => true
         case _                                        => false
       }
 
-    case JTextT => ctpes.contains(CPath.Identity -> CString)
+    case JTextT    => ctpes.contains(CPath.Identity -> CString)
+    case JBooleanT => ctpes.contains(CPath.Identity -> CBoolean)
+    case JNullT    => ctpes.contains(CPath.Identity -> CNull)
+    case JDateT    => ctpes.contains(CPath.Identity -> CDate)
+    case JPeriodT  => ctpes.contains(CPath.Identity -> CPeriod)
 
-    case JBooleanT => ctpes.contains(CPath.Identity, CBoolean)
-
-    case JNullT => ctpes.contains(CPath.Identity, CNull)
-
-    case JDateT   => ctpes.contains(CPath.Identity, CDate)
-    case JPeriodT => ctpes.contains(CPath.Identity, CPeriod)
-
-    case JObjectUnfixedT if ctpes.contains(CPath.Identity, CEmptyObject) => true
+    case JObjectUnfixedT if ctpes.contains(CPath.Identity -> CEmptyObject) => true
     case JObjectUnfixedT =>
       ctpes.exists {
         case (CPath(CPathField(_), _ *), _) => true
         case _                              => false
       }
-    case JObjectFixedT(fields) if fields.isEmpty => ctpes.contains(CPath.Identity, CEmptyObject)
+    case JObjectFixedT(fields) if fields.isEmpty => ctpes.contains(CPath.Identity -> CEmptyObject)
     case JObjectFixedT(fields) => {
       val keys = fields.keySet
       keys.forall { key =>
@@ -375,14 +388,14 @@ object Schema {
       }
     }
 
-    case JArrayUnfixedT if ctpes.contains(CPath.Identity, CEmptyArray) => true
+    case JArrayUnfixedT if ctpes.contains(CPath.Identity -> CEmptyArray) => true
     case JArrayUnfixedT =>
       ctpes.exists {
         case (CPath(CPathArray, _ *), _)    => true
         case (CPath(CPathIndex(_), _ *), _) => true
         case _                              => false
       }
-    case JArrayFixedT(elements) if elements.isEmpty => ctpes.contains(CPath.Identity, CEmptyArray)
+    case JArrayFixedT(elements) if elements.isEmpty => ctpes.contains(CPath.Identity -> CEmptyArray)
     case JArrayFixedT(elements) => {
       val indices = elements.keySet
       indices.forall { i =>

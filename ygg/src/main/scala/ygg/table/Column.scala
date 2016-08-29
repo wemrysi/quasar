@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import scalaz.{ =?> => _, _ }, Ordering._
 import ygg._, common._, json._, data._
+import NumericComparisons._
 
 trait Column {
   val tpe: CType
@@ -130,7 +147,7 @@ trait BoolColumn extends Column with (Int => Boolean) {
   override val tpe                        = CBoolean
   override def jValue(row: Int)           = JBool(this(row))
   override def cValue(row: Int)           = CBoolean(this(row))
-  override def strValue(row: Int): String = String.valueOf(this(row))
+  override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "BoolColumn"
 }
 
@@ -150,23 +167,23 @@ object BoolColumn {
 
 trait LongColumn extends Column with (Int => Long) {
   def apply(row: Int): Long
-  def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = compare(apply(row1), apply(row2))
 
   override val tpe                        = CLong
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CLong(this(row))
-  override def strValue(row: Int): String = String.valueOf(this(row))
+  override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "LongColumn"
 }
 
 trait DoubleColumn extends Column with (Int => Double) {
   def apply(row: Int): Double
-  def rowCompare(row1: Int, row2: Int): Int = apply(row1) compare apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = compare(apply(row1), apply(row2))
 
   override val tpe                        = CDouble
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CDouble(this(row))
-  override def strValue(row: Int): String = String.valueOf(this(row))
+  override def strValue(row: Int): String = java.lang.String.valueOf(this(row))
   override def toString                   = "DoubleColumn"
 }
 

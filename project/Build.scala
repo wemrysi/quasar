@@ -123,6 +123,7 @@ object YggBuild {
     def fixConsole: Project                           = also(inBoth(scalacOptions in console in _ := consoleArgs))
     def scalacPlugins(ms: ModuleID*): Project         = also(ms.toList map (m => addCompilerPlugin(m)))
     def stdPlugins: Project                           = scalacPlugins(kindProjector, macroParadise)
+    def noImports: Project                            = scalacArgs("-Yno-imports")
 
     // Without serialTests:
     //

@@ -1,8 +1,9 @@
 package ygg.tests
 
-import ygg.common._
 import org.scalacheck.Shrink
-import ygg.table._
+import ygg._, common._, table._
+import scala.Predef.assert
+import scala.math.Ordering
 
 class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   import Arbitrary._
@@ -75,7 +76,7 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   private def identityCols(len: Int): List[ColumnRef] =
     (0 until len).map({ i =>
       ColumnRef(CPath(CPathIndex(i)), CLong)
-    })(scala.collection.breakOut)
+    })(breakOut)
 
   "IdentitiesRowFormat" should {
     "round-trip CLongs" in {

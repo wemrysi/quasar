@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.table._
+import ygg._, common._, table._
 
 class FNSpec extends quasar.Qspec {
   "function implementations" >> {

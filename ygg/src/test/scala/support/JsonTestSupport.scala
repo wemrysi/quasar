@@ -1,9 +1,8 @@
 package ygg.tests
 
-import ygg.common._
 import Gen.{ alphaLowerChar, oneOf, frequency, delay }
-import ygg.json._
-import ygg.data._
+import ygg._, common._, json._
+import ygg.data.Bits
 
 object TableTestSupport extends TableGenerators {}
 

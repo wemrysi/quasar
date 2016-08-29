@@ -1,7 +1,6 @@
 package ygg.tests
 
-import ygg.common._
-import ygg.json._
+import ygg._, common._, json._
 import scalaz._, Scalaz._
 
 class JNumSpec extends quasar.Qspec {

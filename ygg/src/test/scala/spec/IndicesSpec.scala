@@ -8,11 +8,11 @@ import ygg._, common._, json._, table._, trans._
 class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with IndicesModule {
 
   class Table(slices: NeedSlices, size: TableSize) extends ColumnarTable(slices, size) {
-    def companion = Table
-    def load(apiKey: APIKey, jtpe: JType)                                                                                       = ???
-    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                  = ???
-    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                            = ???
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = ???
+    def companion                                                                                                                   = Table
+    def load(apiKey: APIKey, jtpe: JType)                                                                                           = ???
+    def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                      = ???
+    def sortUnique(sortKey: TransSpec1, sortOrder: DesiredSortOrder)                                                                = ???
+    def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = ???
   }
   trait TableCompanion extends ColumnarTableCompanion {
     def apply(slices: NeedSlices, size: TableSize)                                                         = new Table(slices, size)
@@ -65,7 +65,7 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
     }
 
     "determine unique groupkey sets" in {
-      index.getUniqueKeys() must_== Set[Seq[RValue]](
+      index.getUniqueKeys() must_== Set[scSeq[RValue]](
         Array(CLong(1), CLong(2)),
         Array(CLong(2), CLong(2)),
         Array(CString("foo"), CString("bar")),
@@ -75,10 +75,10 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
       )
     }
 
-    def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
+    def subtableSet(index: TableIndex, ids: scSeq[Int], vs: scSeq[RValue]): Set[RValue] =
       index.getSubTable(ids, vs).toJson.copoint.toSet.map(RValue.fromJValue)
 
-    def test(vs: Seq[RValue], result: Set[RValue]) =
+    def test(vs: scSeq[RValue], result: Set[RValue]) =
       subtableSet(index, Array(0, 1), vs) must_== result
 
     "generate subtables based on groupkeys" in {
@@ -127,7 +127,7 @@ class IndicesSpec extends quasar.Qspec with ColumnarTableModuleTestSupport with 
 
     "efficiently combine to produce unions" in {
 
-      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
+      def tryit(tpls: (TableIndex, scSeq[Int], Seq[RValue])*)(expected: JValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }

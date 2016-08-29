@@ -1,10 +1,8 @@
 package ygg.tests
 
 import scalaz._, Scalaz._
-import ygg.common._
+import ygg._, common._, json._, table._
 import Gen.{ containerOfN, frequency, alphaStr, listOfN, identifier, oneOf, delay }
-import ygg.json._
-import ygg.table._
 
 object CValueGenerators {
   def inferSchema(data: Seq[JValue]): JSchema = data match {
@@ -22,7 +20,7 @@ trait CValueGenerators {
       cschema         <- Gen.oneOf(arraySchema(depth, 2), objectSchema(depth, 2))
       (idCount, data) <- genEventColumns(cschema)
     } yield {
-      val lschema = Bifunctor[Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet } _1
+      val lschema = Bifunctor[scala.Tuple2].umap(cschema.splitAt(cschema.size / 2)) { _.map(_._1).toSet } _1
       val (l, r) = data map {
         case (ids, values) =>
           val (d1, d2) = values.partition { case (cpath, _) => lschema.contains(cpath) }
@@ -137,7 +135,7 @@ trait CValueGenerators {
 trait JdbmCValueGenerators {
   def maxArrayDepth = 3
 
-  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List, Seq[CValue]](size, values.map(_.toSeq))
+  def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[scSeq[CValue]]] = containerOfN[List, scSeq[CValue]](size, values.map(_.toSeq))
 
   private def genNonArrayCValueType: Gen[CValueType[_]] = Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum, CDate)
 

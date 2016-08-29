@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import scalaz._, Scalaz._
@@ -26,11 +42,12 @@ class ColumnIndices private (val paths: Vector[String]) {
     if (paths.nonEmpty) {
       sb append (paths mkString ",")
       sb append "\r\n"
+      ()
     }
   }
 }
 object ColumnIndices {
-  def fromPaths(ps: Traversable[String]): ColumnIndices = new ColumnIndices(ps.toVector.sorted)
+  def fromPaths(ps: scTraversable[String]): ColumnIndices = new ColumnIndices(ps.toVector.sorted)
 }
 
 trait Scanner {
@@ -237,7 +254,7 @@ abstract class ArraySetColumn[T <: Column](val tpe: CType, protected val backing
 
 object ArraySetColumn {
   def apply[T <: Column](ctype: CType, columnSet: Array[T]): Column = {
-    assert(columnSet.length != 0)
+    scala.Predef.assert(columnSet.length != 0)
     ctype match {
       case CString =>
         new ArraySetColumn[StrColumn](ctype, columnSet.map(_.asInstanceOf[StrColumn])) with StrColumn {

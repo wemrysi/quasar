@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.json._
+import ygg._, common._, json._
 
 object MergeDiffData {
   /** Diff **/

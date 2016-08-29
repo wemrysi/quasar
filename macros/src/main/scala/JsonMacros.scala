@@ -1,10 +1,28 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.macros
 
+import quasar.Predef._
 import scala.collection.{ mutable => scm }
 import scala.reflect.macros.blackbox._
 import jawn._
 import java.nio.file._
 import java.util.UUID
+import scala.Any
 
 abstract class TreeFacades[C <: Context](val c: C) {
   outer =>
@@ -128,7 +146,7 @@ class JsonMacros(val c: Context) {
           fail("Invalid arguments to json interpolator")
 
         parse(
-          (stringParts, uuids).zipped map ((part, uuid) => part + "\"" + uuid + "\"") mkString ("", "", stringParts.last),
+          ( for ((part, uuid) <- stringParts zip uuids) yield part + "\"" + uuid + "\"" ) mkString ("", "", stringParts.last),
           facades.create(keys.toMap, values.toMap)
         )
 
@@ -138,7 +156,7 @@ class JsonMacros(val c: Context) {
 
   object JsonMacroSingle extends JsonMacroBase {
     def parse(json: String, facade: MacroFacade): Tree =
-      JParser.parse(json)(facade).fold(fail, identity)
+      JParser.parse(json)(facade).fold(fail, x => x)
   }
   object JsonMacroMany extends JsonMacroBase {
     def parse(json: String, facade: MacroFacade): Tree =
@@ -154,7 +172,7 @@ class JsonMacros(val c: Context) {
     def stringKey(s: String): Tree = q"$s"
     def newBuilder[A]() = new Builder[A] {
       val buf            = scm.ListBuffer[A]()
-      def +=(x: A): Unit = buf += x
+      def +=(x: A): Unit = { buf += x ; () }
       def result: M[A]   = buf.result
     }
 

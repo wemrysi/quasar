@@ -1,8 +1,7 @@
 package ygg.tests
 
-import ygg.common._
 import JsonTestSupport._
-import ygg.json._
+import ygg._, common._, json._
 
 class JPathSpec extends quasar.Qspec {
   "Parser" should {

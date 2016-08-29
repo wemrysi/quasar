@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import scalaz._, Scalaz._
 import ygg._, common._, data._
+import java.lang.Character.{ codePointAt, forDigit }
 
 object Render {
   def renderTable(table: Table, prefix: String, delimiter: String, suffix: String): StreamT[Need, CharBuffer] = {
@@ -207,10 +224,10 @@ object Render {
         // we have the schema, now emit
 
         var buffer = charBuffer(BufferSize)
-        val vector = new ArrayBuffer[CharBuffer](math.max(1, size / 10))
+        val vector = new ArrayBuffer[CharBuffer](scala.math.max(1, size / 10))
 
         @inline
-        def checkPush(length: Int) {
+        def checkPush(length: Int): Unit = {
           if (buffer.remaining < length) {
             buffer.flip()
             vector += buffer
@@ -220,35 +237,38 @@ object Render {
         }
 
         @inline
-        def push(c: Char) {
+        def push(c: Char): Unit = {
           checkPush(1)
           buffer.put(c)
+          ()
         }
 
         @inline
-        def pushStr(str: String) {
+        def pushStr(str: String): Unit = {
           checkPush(str.length)
           buffer.put(str)
+          ()
         }
 
         val in      = new RingDeque[String](depth + 1)
         val inFlags = new RingDeque[Boolean](depth + 1)
 
         @inline
-        def pushIn(str: String, flag: Boolean) {
+        def pushIn(str: String, flag: Boolean): Unit = {
           in.pushBack(str)
           inFlags.pushBack(flag)
         }
 
         @inline
-        def popIn() {
+        def popIn(): Unit = {
           in.popBack()
           inFlags.popBack()
+          ()
         }
 
         @inline
         @tailrec
-        def flushIn() {
+        def flushIn(): Unit = {
           if (!in.isEmpty) {
             val str = in.popFront()
 
@@ -269,7 +289,7 @@ object Render {
 
         @inline
         @tailrec
-        def renderString(str: String, idx: Int = 0) {
+        def renderString(str: String, idx: Int = 0): Unit = {
           if (idx == 0) {
             push('"')
           }
@@ -289,7 +309,7 @@ object Render {
               case c => {
                 if ((c >= '\u0000' && c < '\u001f') || (c >= '\u0080' && c < '\u00a0') || (c >= '\u2000' && c < '\u2100')) {
                   pushStr("\\u")
-                  pushStr("%04x".format(Character.codePointAt(str, idx)))
+                  pushStr("%04x".format(codePointAt(str, idx)))
                 } else {
                   push(c)
                 }
@@ -303,7 +323,7 @@ object Render {
         }
 
         @inline
-        def renderLong(ln: Long) {
+        def renderLong(ln: Long): Unit = {
 
           @inline
           @tailrec
@@ -320,9 +340,9 @@ object Render {
 
           @inline
           @tailrec
-          def renderPositive(ln: Long, power: Long) {
+          def renderPositive(ln: Long, power: Long): Unit = {
             if (power > 0) {
-              val c = Character.forDigit((ln / power % 10).toInt, 10)
+              val c = forDigit((ln / power % 10).toInt, 10)
               push(c)
               renderPositive(ln, power / 10)
             }
@@ -332,6 +352,7 @@ object Render {
             val MinString = "-9223372036854775808"
             checkPush(MinString.length)
             buffer.put(MinString)
+            ()
           } else if (ln == 0) {
             push('0')
           } else if (ln < 0) {
@@ -346,22 +367,24 @@ object Render {
 
         // TODO is this a problem?
         @inline
-        def renderDouble(d: Double) {
+        def renderDouble(d: Double): Unit = {
           val str = d.toString
           checkPush(str.length)
           buffer.put(str)
+          ()
         }
 
         // TODO is this a problem?
         @inline
-        def renderNum(d: BigDecimal) {
+        def renderNum(d: BigDecimal): Unit = {
           val str = d.toString
           checkPush(str.length)
           buffer.put(str)
+          ()
         }
 
         @inline
-        def renderBoolean(b: Boolean) {
+        def renderBoolean(b: Boolean): Unit = {
           if (b) {
             pushStr("true")
           } else {
@@ -370,32 +393,32 @@ object Render {
         }
 
         @inline
-        def renderNull() {
+        def renderNull(): Unit = {
           pushStr("null")
         }
 
         @inline
-        def renderEmptyObject() {
+        def renderEmptyObject(): Unit = {
           pushStr("{}")
         }
 
         @inline
-        def renderEmptyArray() {
+        def renderEmptyArray(): Unit = {
           pushStr("[]")
         }
 
         @inline
-        def renderDate(date: DateTime) {
+        def renderDate(date: DateTime): Unit = {
           renderString(date.toString)
         }
 
         @inline
-        def renderPeriod(period: Period) {
+        def renderPeriod(period: Period): Unit = {
           renderString(period.toString)
         }
 
         @inline
-        def renderArray[A](array: Array[A]) {
+        def renderArray[A](array: Array[A]): Unit = {
           renderString(array.deep.toString)
         }
 

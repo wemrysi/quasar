@@ -52,7 +52,7 @@ class CPathTraversalSpec extends quasar.Qspec {
       case (i, x) =>
         column(i) = x
     }
-    builder(Bits(defined), column)
+    builder(Bits(defined.toVector), column)
   }
 
   "rowOrder" should {

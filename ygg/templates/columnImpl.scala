@@ -11,7 +11,7 @@ trait ${{TYPE}}Column extends Column with (${{ROWID}} => ${{TYPE}}) {
   final val tpe: CType                                        = C${{TYPE}}
   final def jValue(row: ${{ROWID}}): JValue                   = JNum(apply(row))
   final def cValue(row: ${{ROWID}}): CWrappedValue[${{TYPE}}] = C${{TYPE}}(apply(row))
-  final def strValue(row: ${{ROWID}}): String                 = String.valueOf(apply(row))
+  final def strValue(row: ${{ROWID}}): String                 = java.lang.String.valueOf(apply(row))
   override def toString: String                               = "${{TYPE}}Column"
 }
 

@@ -1,6 +1,22 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.data
 
-import ygg.common._
+import ygg._, common._
 import java.util.Arrays.fill
 import java.lang.Integer.bitCount
 import ygg.macros.Spire._
@@ -34,16 +50,16 @@ object RawBitSet {
     }
   }
 
-  final def set(bits: Array[Int], i: Int) {
+  final def set(bits: Array[Int], i: Int): Unit = {
     val pos = i >>> 5
     if (pos < bits.length) {
       bits(pos) |= (1 << (i & 0x1F))
     } else {
-      throw new IndexOutOfBoundsException("Bit %d is out of range." format i)
+      throw new java.lang.IndexOutOfBoundsException("Bit %d is out of range." format i)
     }
   }
 
-  final def clear(bits: Array[Int], i: Int) {
+  final def clear(bits: Array[Int], i: Int): Unit = {
     val pos = i >>> 5
     if (pos < bits.length) {
       bits(pos) &= ~(1 << (i & 0x1F))
@@ -60,7 +76,7 @@ object RawBitSet {
 
     @inline
     @tailrec
-    def loopInts(bitsIndex: Int, intsIndex: Int) {
+    def loopInts(bitsIndex: Int, intsIndex: Int): Unit = {
       if (bitsIndex < len) {
         loopInts(bitsIndex + 1, loopBits(bits(bitsIndex), 0, 0, intsIndex))
       }

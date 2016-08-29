@@ -1,8 +1,25 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 import scala.collection.mutable
+import scala.math.{ min, max }
 
 /**
   * Represents a way to traverse a list of CPaths in sorted order. This takes
@@ -30,7 +47,7 @@ sealed trait CPathTraversal { self =>
         def makeCols(pathToCol: Map[CPath, Set[Column]]): Array[CPath -> Column] = {
           validPaths.flatMap({ path =>
             pathToCol.getOrElse(path, Set.empty).toList map ((path, _))
-          })(collection.breakOut)
+          })(breakOut)
         }
 
         val lCols = makeCols(left)
@@ -38,7 +55,7 @@ sealed trait CPathTraversal { self =>
 
         val comparators: Array[CPathComparator] = (for ((lPath, lCol) <- lCols; (rPath, rCol) <- rCols) yield {
           CPathComparator(lPath, lCol, rPath, rCol)
-        })(collection.breakOut)
+        })(breakOut)
 
         // Return the first column in the array defined at the row, or -1 if none are defined for that row
         @inline def firstDefinedIndexFor(columns: Array[CPath -> Column], row: Int): Int = {
@@ -66,7 +83,7 @@ sealed trait CPathTraversal { self =>
         }
 
       case Sequence(ts) =>
-        val comparators: Array[CPathComparator] = ts.map(plan0(_, paths, idx))(collection.breakOut)
+        val comparators: Array[CPathComparator] = ts.map(plan0(_, paths, idx))(breakOut)
 
         new CPathComparator {
           def compare(r1: Int, r2: Int, indices: Array[Int]): MaybeOrdering = {
@@ -152,10 +169,10 @@ sealed trait CPathTraversal { self =>
 
 object CPathTraversal {
 
-  case object Done                                                    extends CPathTraversal
-  case class Sequence(traversals: List[CPathTraversal])               extends CPathTraversal
-  case class Select(path: CPathNode, next: CPathTraversal)            extends CPathTraversal
-  case class Loop(start: Int, end: Option[Int], tail: CPathTraversal) extends CPathTraversal
+  final case object Done                                                    extends CPathTraversal
+  final case class Sequence(traversals: List[CPathTraversal])               extends CPathTraversal
+  final case class Select(path: CPathNode, next: CPathTraversal)            extends CPathTraversal
+  final case class Loop(start: Int, end: Option[Int], tail: CPathTraversal) extends CPathTraversal
 
   def apply(p: CPath): CPathTraversal = p.nodes.foldRight(Done: CPathTraversal)(Select(_, _))
 
@@ -217,8 +234,8 @@ object CPathTraversal {
   }
 
   private sealed trait CPathPosition
-  private case class CPathPoint(node: CPathNode)                                     extends CPathPosition
-  private case class CPathRange(nodes: Set[CPathNode], start: Int, end: Option[Int]) extends CPathPosition
+  private final case class CPathPoint(node: CPathNode)                                     extends CPathPosition
+  private final case class CPathRange(nodes: Set[CPathNode], start: Int, end: Option[Int]) extends CPathPosition
 
   private object CPathPosition {
 
@@ -321,7 +338,7 @@ object CPathTraversal {
                 rss0
             }
 
-            loop(ps, qs, CPathRange(ns1 ++ ns2, math.max(l1, l2), ^(r1, r2)(math.min(_, _)) orElse r1 orElse r2) :: is, rss1)
+            loop(ps, qs, CPathRange(ns1 ++ ns2, max(l1, l2), ^(r1, r2)(min(_, _)) orElse r1 orElse r2) :: is, rss1)
 
           case (ps, qs) =>
             List(is reverse_::: ps, is reverse_::: qs)

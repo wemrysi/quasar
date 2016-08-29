@@ -1,10 +1,25 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
-import ygg.common._
 import scalaz._, Scalaz._, Ordering._
+import ygg._, common._, data._, json._
 import ygg.cf.{ Remap, Empty }
-import ygg.data._
-import ygg.json._
+import scala.math.{ min, max }
 
 final case class SliceId(id: Int) {
   def +(n: Int): SliceId = SliceId(id + n)
@@ -114,8 +129,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
 
         val indicesGroupedBySource = sourceKeys.groupBy(_.groupId).mapValues(_.map(y => (y.index, y.keySchema)).toSeq).values.toSeq
 
-        def unionOfIntersections(indicesGroupedBySource: Seq[Seq[TableIndex -> KeySchema]]): Set[Key] = {
-          def allSourceDNF[T](l: Seq[Seq[T]]): Seq[Seq[T]] = {
+        def unionOfIntersections(indicesGroupedBySource: scSeq[scSeq[TableIndex -> KeySchema]]): Set[Key] = {
+          def allSourceDNF[T](l: scSeq[scSeq[T]]): scSeq[scSeq[T]] = {
             l match {
               case Seq(hd) => hd.map(Seq(_))
               case Seq(hd, tl @ _ *) => {
@@ -372,7 +387,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         })
       }
 
-      val resultSize = EstimateSize(0, size.maxSize min t2.size.maxSize)
+      val resultSize = EstimateSize(0, min(size.maxSize, t2.size.maxSize))
       Need(Table(rec(slices, t2.slices), resultSize))
 
       // todo investigate why the code below makes all of RandomLibSpecs explode
@@ -394,7 +409,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
       */
     def canonicalize(length: Int): Table = canonicalize(length, length)
     def canonicalize(minLength: Int, maxLength: Int): Table = {
-      require(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
+      scala.Predef.assert(maxLength > 0 && minLength >= 0 && maxLength >= minLength, "length bounds must be positive and ordered")
 
       def concat(rslices: List[Slice]): Slice = rslices.reverse match {
         case Nil          => Slice.empty
@@ -417,7 +432,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
 
             } else if (sliceSize + head.size >= minLength) {
               // We emit a slice, but the last slice added may fall on a stream boundary.
-              val splitAt = math.min(head.size, maxLength - sliceSize)
+              val splitAt = min(head.size, maxLength - sliceSize)
               if (splitAt < head.size) {
                 val (prefix, suffix) = head.split(splitAt)
                 val slice            = concat(prefix :: acc)
@@ -464,6 +479,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           rbuf.add(-1)
           leqbuf.add(-1)
           reqbuf.add(-1)
+          ()
         }
 
         @inline def advanceRight(rpos: Int): Unit = {
@@ -471,6 +487,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           rbuf.add(rpos)
           leqbuf.add(-1)
           reqbuf.add(-1)
+          ()
         }
 
         @inline def advanceBoth(lpos: Int, rpos: Int): Unit = {
@@ -479,6 +496,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           rbuf.add(-1)
           leqbuf.add(lpos)
           reqbuf.add(rpos)
+          ()
         }
 
         def cogrouped[LR, RR, BR](lslice: Slice,
@@ -502,7 +520,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
             val (rs0, rx) = pairR
             val (bs0, bx) = pairB
 
-            assert(lx.size == rx.size && rx.size == bx.size)
+            scala.Predef.assert(lx.size == rx.size && rx.size == bx.size)
             val resultSlice = lx zip rx zip bx
 
             (resultSlice, ls0, rs0, bs0)
@@ -530,20 +548,20 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                   tail: NeedSlices)
 
       sealed trait NextStep[A, B]
-      case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
-      case class SplitRight[A, B](rpos: Int) extends NextStep[A, B]
-      case class NextCartesianLeft[A, B](left: SlicePosition[A],
+      final case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
+      final case class SplitRight[A, B](rpos: Int) extends NextStep[A, B]
+      final case class NextCartesianLeft[A, B](left: SlicePosition[A],
                                          right: SlicePosition[B],
                                          rightStart: Option[SlicePosition[B]],
                                          rightEnd: Option[SlicePosition[B]])
           extends NextStep[A, B]
-      case class NextCartesianRight[A, B](left: SlicePosition[A],
+      final case class NextCartesianRight[A, B](left: SlicePosition[A],
                                           right: SlicePosition[B],
                                           rightStart: Option[SlicePosition[B]],
                                           rightEnd: Option[SlicePosition[B]])
           extends NextStep[A, B]
-      case class SkipRight[A, B](left: SlicePosition[A], rightEnd: SlicePosition[B])                                  extends NextStep[A, B]
-      case class RestartRight[A, B](left: SlicePosition[A], rightStart: SlicePosition[B], rightEnd: SlicePosition[B]) extends NextStep[A, B]
+      final case class SkipRight[A, B](left: SlicePosition[A], rightEnd: SlicePosition[B])                                  extends NextStep[A, B]
+      final case class RestartRight[A, B](left: SlicePosition[A], rightStart: SlicePosition[B], rightEnd: SlicePosition[B]) extends NextStep[A, B]
       def cogroup0[LK, RK, LR, RR, BR](stlk: SliceTransform1[LK],
                                        strk: SliceTransform1[RK],
                                        stlr: SliceTransform1[LR],
@@ -551,8 +569,8 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                        stbr: SliceTransform2[BR]) = {
 
         sealed trait CogroupState
-        case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices) extends CogroupState
-        case class Cogroup(lr: LR,
+        final case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices) extends CogroupState
+        final case class Cogroup(lr: LR,
                            rr: RR,
                            br: BR,
                            left: SlicePosition[LK],
@@ -560,12 +578,11 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                            rightStart: Option[SlicePosition[RK]],
                            rightEnd: Option[SlicePosition[RK]])
             extends CogroupState
-        case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
+        final case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
         case object CogroupDone                                             extends CogroupState
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
         def step(state: CogroupState): M[Option[Slice -> CogroupState]] = {
-
           // step0 is the inner monadic recursion needed to cross slice boundaries within the emission of a slice
           def step0(lr: LR,
                     rr: RR,
@@ -573,9 +590,9 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                     leftPosition: SlicePosition[LK],
                     rightPosition: SlicePosition[RK],
                     rightStart0: Option[SlicePosition[RK]],
-                    rightEnd0: Option[SlicePosition[RK]])(
-              ibufs: IndexBuffers = new IndexBuffers(leftPosition.key.size, rightPosition.key.size)): M[Option[Slice -> CogroupState]] = {
+                    rightEnd0: Option[SlicePosition[RK]]): Need[Option[Slice -> CogroupState]] = {
 
+            val ibufs = new IndexBuffers(leftPosition.key.size, rightPosition.key.size)
             val SlicePosition(lSliceId, lpos0, lkstate, lkey, lhead, ltail) = leftPosition
             val SlicePosition(rSliceId, rpos0, rkstate, rkey, rhead, rtail) = rightPosition
 
@@ -800,7 +817,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                 }
 
               case SkipRight(left, rightEnd) =>
-                step0(lr, rr, br, left, rightEnd, None, None)()
+                step0(lr, rr, br, left, rightEnd, None, None)
 
               case RestartRight(left, rightStart, rightEnd) =>
                 ibufs.cogrouped(
@@ -831,7 +848,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
               }
 
             case Cogroup(lr, rr, br, left, right, rightReset, rightEnd) =>
-              step0(lr, rr, br, left, right, rightReset, rightEnd)()
+              step0(lr, rr, br, left, right, rightReset, rightEnd)
 
             case EndRight(rr, data, tail) =>
               strr.f(rr, data) flatMap {
@@ -920,7 +937,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
           // We try to fill out the slices as much as possible, so we work with
           // several rows from the left at a time.
 
-          val lrowsPerSlice = math.max(1, yggConfig.maxSliceSize / rhead.size)
+          val lrowsPerSlice = max(1, yggConfig.maxSliceSize / rhead.size)
           val sliceSize     = lrowsPerSlice * rhead.size
 
           // Note that this is still memory efficient, as the columns are re-used
@@ -930,7 +947,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
             case (accM, offset) =>
               accM flatMap {
                 case (a, acc) =>
-                  val rows = math.min(sliceSize, (lhead.size - offset) * rhead.size)
+                  val rows = min(sliceSize, (lhead.size - offset) * rhead.size)
 
                   val lslice = Slice(
                     rows,
@@ -1040,9 +1057,9 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
 
       // TODO: We should be able to fully compute the size of the result above.
       val newSize = (size, that.size) match {
-        case (ExactSize(l), ExactSize(r))         => TableSize(l max r, l * r)
-        case (EstimateSize(ln, lx), ExactSize(r)) => TableSize(ln max r, lx * r)
-        case (ExactSize(l), EstimateSize(rn, rx)) => TableSize(l max rn, l * rx)
+        case (ExactSize(l), ExactSize(r))         => TableSize(max(l, r), l * r)
+        case (EstimateSize(ln, lx), ExactSize(r)) => TableSize(max(ln, r), lx * r)
+        case (ExactSize(l), EstimateSize(rn, rx)) => TableSize(max(l, rn), l * rx)
         case _                                    => UnknownSize // Bail on anything else for now (see above TODO)
       }
 
@@ -1122,7 +1139,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
         case _ => Need(emptyStreamT())
       }
 
-      def calcNewSize(current: Long): Long = ((current - startIndex) max 0) min numberToTake
+      def calcNewSize(current: Long): Long = min(max(current - startIndex, 0), numberToTake)
 
       val newSize = size match {
         case ExactSize(sz)            => ExactSize(calcNewSize(sz))
@@ -1386,7 +1403,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
   }
 }
 
-case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
+final case class EnormousCartesianException(left: TableSize, right: TableSize) extends RuntimeException {
   override def getMessage =
     "cannot evaluate cartesian of sets with size %s and %s".format(left, right)
 }

@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.table._
+import ygg._, common._, table._
 
 class PathSpec extends quasar.Qspec {
   "rollups for a path" should {

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import scalaz._
@@ -133,7 +149,7 @@ trait Table {
     * we assign a unique row ID as part of the key so that multiple equal values are
     * preserved
     */
-  def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[Seq[Table]]
+  def groupByN(groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]]
   def partitionMerge(partitionBy: TransSpec1)(f: Table => NeedTable): NeedTable
   def takeRange(startIndex: Long, numberToTake: Long): Table
   def canonicalize(length: Int): Table
@@ -150,7 +166,7 @@ trait NoLoadTable extends Table {
   def load(apiKey: APIKey, jtpe: JType): NeedTable = ???
 }
 trait NoGroupTable extends Table {
-  def groupByN(keys: Seq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[Seq[Table]] = Need(Nil)
+  def groupByN(keys: scSeq[TransSpec1], spec: TransSpec1, order: DesiredSortOrder, unique: Boolean): Need[scSeq[Table]] = Need(Nil)
 }
 trait NoSortTable extends Table {
   def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder): NeedTable   = Need[Table](this)

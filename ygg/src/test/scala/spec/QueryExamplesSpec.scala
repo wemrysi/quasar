@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.json._
+import ygg._, common._, json._
 
 class QueryExamplesSpec extends quasar.Qspec {
   "List of IPs" in {

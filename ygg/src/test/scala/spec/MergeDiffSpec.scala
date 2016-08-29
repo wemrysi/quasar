@@ -1,7 +1,7 @@
 package ygg.tests
 
 import MergeDiffData._
-import ygg.json._
+import ygg._, common._, json._
 
 class MergeDiffSpec extends quasar.Qspec {
   "Merge example" in {

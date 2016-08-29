@@ -1,7 +1,6 @@
 package ygg.tests
 
-import ygg.json._
-import ygg.table._
+import ygg._, common._, json._, table._
 import trans._
 import CPath._
 

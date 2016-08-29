@@ -1,10 +1,26 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg.common._
 import java.io.{ DataInput, DataOutput }
 import org.mapdb._
 
-object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
+object ByteArraySerializer extends Serializer[Array[Byte]] {
 
   @tailrec
   private def writePackedInt(out: DataOutput, n: Int): Unit =
@@ -30,7 +46,7 @@ object ByteArraySerializer extends Serializer[Array[Byte]] with Serializable {
   def deserialize(input: DataInput2, available: Int): Array[Byte] = warn(s"deserialize($input, $available)")(???)
   def serialize(out: DataOutput2, value: Array[Byte]): Unit       = warn(s"serialize($out, $value)")(???)
 
-  def serialize(out: DataOutput, bytes: Array[Byte]) {
+  def serialize(out: DataOutput, bytes: Array[Byte]): Unit = {
     writePackedInt(out, bytes.length)
     out.write(bytes)
   }

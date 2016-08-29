@@ -1,6 +1,6 @@
 package ygg.tests
 
-import ygg.table.trans._
+import ygg._, common._, table._, trans._
 import SampleData._
 
 class DistinctSpec extends ColumnarTableQspec {

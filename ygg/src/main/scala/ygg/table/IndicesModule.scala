@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg.common._
@@ -24,7 +40,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
     /**
       * Return the set of values we've seen for this group key.
       */
-    def getUniqueKeys(): Set[Seq[RValue]] =
+    def getUniqueKeys(): Set[scSeq[RValue]] =
       // Union the sets we get from our slice indices.
       indices flatMap (_.getUniqueKeys()) toSet
 
@@ -32,7 +48,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * Return the subtable where each group key in keyIds is set to
       * the corresponding value in keyValues.
       */
-    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]): Table = {
+    def getSubTable(keyIds: scSeq[Int], keyValues: scSeq[RValue]): Table = {
       // Each slice index will build us a slice, so we just return a
       // table of those slices.
       //
@@ -70,7 +86,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * Despite being in M, the TableIndex will be eagerly constructed
       * as soon as the underlying slices are available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
+    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
 
       def accumulate(buf: ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
         stream.uncons flatMap {
@@ -101,12 +117,12 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * the table, since it's assumed that all indices have the same
       * value spec.
       */
-    def joinSubTables(tpls: List[(TableIndex, Seq[Int], Seq[RValue])]): Table = {
+    def joinSubTables(tpls: List[(TableIndex, scSeq[Int], scSeq[RValue])]): Table = {
 
       // Filter out negative integers. This allows the caller to do
       // arbitrary remapping of their own Seq[RValue] by filtering
       // values they don't want.
-      val params: List[Seq[Int] -> Seq[RValue]] = tpls.map {
+      val params: List[scSeq[Int] -> scSeq[RValue]] = tpls.map {
         case (index, ns, jvs) =>
           val (ns2, jvs2) = ns.zip(jvs).filter(_._1 >= 0).unzip
           (ns2, jvs2)
@@ -148,7 +164,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
   class SliceIndex(
       private[table] val vals: scmMap[Int, scmSet[RValue]],
       private[table] val dict: scmMap[(Int, RValue), ArrayIntList],
-      private[table] val keyset: scmSet[Seq[RValue]],
+      private[table] val keyset: scmSet[scSeq[RValue]],
       private[table] val valueSlice: Slice
   ) {
 
@@ -164,13 +180,13 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
     /**
       * Return the set of value combinations we've seen.
       */
-    def getUniqueKeys(): Set[Seq[RValue]] = keyset.toSet
+    def getUniqueKeys(): Set[scSeq[RValue]] = keyset.toSet
 
     /**
       * Return the subtable where each group key in keyIds is set to
       * the corresponding value in keyValues.
       */
-    def getSubTable(keyIds: Seq[Int], keyValues: Seq[RValue]): Table =
+    def getSubTable(keyIds: scSeq[Int], keyValues: scSeq[RValue]): Table =
       buildSubTable(getRowsForKeys(keyIds, keyValues))
 
     private def intersectBuffers(as: ArrayIntList, bs: ArrayIntList): ArrayIntList = {
@@ -202,7 +218,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
     /**
       * Returns the rows specified by the given group key values.
       */
-    private[table] def getRowsForKeys(keyIds: Seq[Int], keyValues: Seq[RValue]): ArrayIntList = {
+    private[table] def getRowsForKeys(keyIds: scSeq[Int], keyValues: scSeq[RValue]): ArrayIntList = {
       var rows: ArrayIntList = dict.getOrElse((keyIds(0), keyValues(0)), emptyBuffer)
       var i: Int             = 1
       while (i < keyIds.length && !rows.isEmpty) {
@@ -238,7 +254,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
     def empty = new SliceIndex(
       scmMap[Int, scmSet[RValue]](),
       scmMap[(Int, RValue), ArrayIntList](),
-      scmSet[Seq[RValue]](),
+      scmSet[scSeq[RValue]](),
       Slice.empty
     )
 
@@ -250,7 +266,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * Despite being in M, the SliceIndex will be eagerly constructed
       * as soon as the underlying Slice is available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
+    def createFromTable(table: Table, groupKeys: scSeq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
 
       val sts = groupKeys.map(composeSliceTransform).toArray
       val vt  = composeSliceTransform(valueSpec)
@@ -275,7 +291,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       val n       = slice.size
       val vals    = scmMap[Int, scmSet[RValue]]()
       val dict    = scmMap[(Int, RValue), ArrayIntList]()
-      val keyset  = scmSet[Seq[RValue]]()
+      val keyset  = scmSet[scSeq[RValue]]()
 
       readKeys(slice, sts) flatMap { keys =>
         // build empty initial jvalue sets for our group keys
@@ -421,7 +437,7 @@ trait IndicesModule extends SliceTransforms { self: ColumnarTableModule =>
       * the slice since it's assumed that all slices have the same
       * value spec.
       */
-    def joinSubSlices(tpls: List[(SliceIndex, (Seq[Int], Seq[RValue]))]): Slice =
+    def joinSubSlices(tpls: List[(SliceIndex, (scSeq[Int], scSeq[RValue]))]): Slice =
       tpls match {
         case Nil =>
           abort("empty slice") // FIXME

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.pkg
 
 import java.nio.file._
@@ -6,21 +22,32 @@ import scala.collection.{ mutable => scm, immutable => sci }
 import java.io.{ ByteArrayOutputStream, BufferedInputStream }
 import scalaz.{ Need, StreamT }
 
-trait PackageMethods { self: PackageAliases =>
+trait PackageMethods {
+  self: ygg.common.`package`.type =>
 
   def Cmp(n: Int): Cmp                                = scalaz.Ordering fromInt n
   def emptyStreamT[A](): StreamT[Need, A]             = StreamT.empty[Need, A]
   def singleStreamT[A](value: => A): StreamT[Need, A] = value :: emptyStreamT[A]()
 
-  def scmSet[A](): scmSet[A]                                    = scm.HashSet[A]()
-  def sciQueue[A](): sciQueue[A]                                = sci.Queue[A]()
-  def sciTreeMap[K: Ordering, V](xs: (K, V)*): sciTreeMap[K, V] = sci.TreeMap[K, V](xs: _*)
-  def jclass[A: CTag]: jClass                                   = ctag[A].runtimeClass.asInstanceOf[jClass]
-  def jPath(path: String): jPath                                = Paths get path
-  def jclassLoader[A: CTag]: ClassLoader                        = jclass[A].getClassLoader
-  def jResource[A: CTag](name: String): InputStream             = jResource(jclass[A], name)
-  def jResource(c: jClass, name: String): InputStream           = c getResourceAsStream name
-  def newScratchDir(): File                                     = Files.createTempDirectory("ygg").toFile
+  def breakOut[From, T, To](implicit b: CBF[Nothing, T, To]): CBF[From, T, To] =
+    scala.collection.breakOut[From, T, To](b)
+
+  def scmSet[A](): scmSet[A]                                      = scm.HashSet[A]()
+  def sciQueue[A](): sciQueue[A]                                  = sci.Queue[A]()
+  def sciTreeMap[K: smOrdering, V](xs: (K, V)*): sciTreeMap[K, V] = sci.TreeMap[K, V](xs: _*)
+  def jclass[A: CTag]: jClass                                     = ctag[A].runtimeClass.asInstanceOf[jClass]
+  def jPath(path: String): jPath                                  = Paths get path
+  def jclassLoader[A: CTag]: ClassLoader                          = jclass[A].getClassLoader
+  def jResource[A: CTag](name: String): InputStream               = jResource(jclass[A], name)
+  def jResource(c: jClass, name: String): InputStream             = c getResourceAsStream name
+  def newScratchDir(): File                                       = Files.createTempDirectory("ygg").toFile
+  def systemMillis(): Long                                        = java.lang.System.currentTimeMillis()
+  def implicitly[A](implicit z: A): A                             = z
+  def discard[A](value: A): Unit                                  = () // for avoiding "discarding non-Unit value" warnings
+  def mutableQueue[A: Ord](xs: A*): scmPriorityQueue[A]           = scmPriorityQueue(xs: _*)
+
+  def systemArraycopy(src: AnyRef, srcPos: Int, dest: AnyRef, destPos: Int, length: Int): Unit =
+    java.lang.System.arraycopy(src, srcPos, dest, destPos, length)
 
   def warn[A](msg: String)(value: => A): A = {
     java.lang.System.err.println(msg)

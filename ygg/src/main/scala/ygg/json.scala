@@ -1,3 +1,19 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg
 
 import jawn._
@@ -306,7 +322,7 @@ package object json {
               |Initial call was
               |  $rootValue \\ $rootPath := $rootValue
               |""".stripMargin.trim
-            sys error msg
+            abort(msg)
           }
 
           target match {
@@ -632,7 +648,7 @@ package object json {
     def flattenWithPath: Vector[JPathValue] = {
       def flatten0(path: JPath)(value: JValue): Vector[JPathValue] = value match {
         case JObject.empty | JArray.empty => Vector(path -> value)
-        case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(collection.breakOut)
+        case JObject(fields)              => fields.flatMap({ case (k, v) => flatten0(path \ k)(v) })(breakOut)
         case JArray(elements)             => elements.zipWithIndex.flatMap({ case (element, index) => flatten0(path \ index)(element) })
         case JUndefined                   => Vector()
         case leaf                         => Vector(path -> leaf)

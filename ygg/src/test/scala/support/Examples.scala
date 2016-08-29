@@ -1,5 +1,7 @@
 package ygg.tests
 
+import ygg.common._
+
 object Examples {
   val symbols = json"""{"f1":"foo","f2":"bar"}"""
 

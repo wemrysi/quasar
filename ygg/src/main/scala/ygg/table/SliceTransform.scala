@@ -1,12 +1,33 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
-import ygg.common._
+import ygg._, common._, data._, json._, trans._
+// import ygg._, data._, json._, trans._
 import scalaz._, Scalaz._
-import ygg.cf
-import ygg.json._
-import ygg.data._
-import trans._
 import ConcatHelpers._
+import scala.Predef.assert
+
+// import scala.Predef._
+// import common.{ ->, breakOut, List, abort, Int, Array, Boolean, Unit, Either, Left, Right, ::, Nil,
+//   YggScalaMapOpsCC, YggScalaMapOps, BitSetOperations
+// }
+// import scala.Predef.assert
+// import scala.Predef.{ List => _, Map => _, Set => _, _ }
 
 trait SliceTransforms extends TableModule
 
@@ -78,8 +99,8 @@ object SliceTransform {
         }
 
       case trans.Equal(left, right) =>
-        val l0 = composeSliceTransform2(left)
-        val r0 = composeSliceTransform2(right)
+        val l0: SliceTransform2[_] = composeSliceTransform2(left)
+        val r0: SliceTransform2[_] = composeSliceTransform2(right)
 
         /*
          * 1. split each side into numeric and non-numeric columns
@@ -125,7 +146,10 @@ object SliceTransform {
               case _                                         => true
             }
 
-            val groupedNonNum = (leftNonNum mapValues { _ :: Nil }) cogroup (rightNonNum mapValues { _ :: Nil })
+            val groupedNonNum = cogroup(
+              (leftNonNum mapValues (s => List(s))),
+              (rightNonNum mapValues (s => List(s)))
+            )
 
             val simplifiedGroupNonNum = groupedNonNum map {
               case (_, Left3(column))                        => Left(column)
@@ -150,24 +174,18 @@ object SliceTransform {
               case Right((left, right)) =>
                 new FuzzyEqColumn(left, right)
 
-            })(collection.breakOut)
+            }).toArray
 
             // numeric stuff
 
-            def stripTypes(cols: ColumnMap) = {
+            def stripTypes(cols: ColumnMap): Map[CPath, Set[Column]] = {
               cols.foldLeft(Map[CPath, Set[Column]]()) {
-                case (acc, (ColumnRef(path, _), column)) => {
-                  val set = acc get path map { _ + column } getOrElse Set(column)
-                  acc.updated(path, set)
-                }
+                case (acc, (ColumnRef(path, _), column)) =>
+                  acc.updated(path, acc.getOrElse(path, Set()) + column)
               }
             }
 
-            val leftNumMulti  = stripTypes(leftNum)
-            val rightNumMulti = stripTypes(rightNum)
-
-            val groupedNum = leftNumMulti cogroup rightNumMulti
-
+            val groupedNum = cogroup(stripTypes(leftNum), stripTypes(rightNum))
             val simplifiedGroupedNum = groupedNum map {
               case (_, Left3(column))  => Left(column): Either[Column, (Set[Column], Set[Column])]
               case (_, Right3(column)) => Left(column): Either[Column, (Set[Column], Set[Column])]
@@ -188,7 +206,7 @@ object SliceTransform {
                   new FuzzyEqColumn(l, r)
                 }).toArray
                 new OrLotsColumn(tests)
-            })(collection.breakOut)
+            })(breakOut)
 
             val unifiedNonNum = new AndLotsColumn(testedNonNum)
             val unifiedNum    = new AndLotsColumn(testedNum)
@@ -446,12 +464,14 @@ object SliceTransform {
           Slice(size, {
             predS.columns get ColumnRef.id(CBoolean) map {
               predC =>
-                val leftMask = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
-
+                val leftMask  = predC.asInstanceOf[BoolColumn].asBitSet(false, size)
                 val rightMask = predC.asInstanceOf[BoolColumn].asBitSet(true, size)
                 rightMask.flip(0, size)
 
-                val grouped = (leftS.columns mapValues { _ :: Nil }) cogroup (rightS.columns mapValues { _ :: Nil })
+                val grouped = cogroup(
+                  leftS.columns mapValues (s => List(s)),
+                  rightS.columns mapValues (s => List(s))
+                )
 
                 val joined: ColumnMap = grouped.map({
                   case (ref, Left3(col))  => ref -> cf.filter(0, size, leftMask)(col).get
@@ -463,7 +483,7 @@ object SliceTransform {
                     ref -> cf.MaskedUnion(leftMask)(left2, right2).get // safe because types are grouped
                   }
                   case (_, x) => abort("Unexpected: " + x)
-                })(collection.breakOut)
+                })(breakOut)
 
                 joined
             } getOrElse Map()
@@ -668,15 +688,15 @@ object SliceTransform1 {
   }
 
   private[table] case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
-    val f: (A, Slice) => M[A -> Slice] = { case (a, s) => Need(f0(a, s)) }
-    def advance(s: Slice): M[SliceTransform1[A] -> Slice] =
+    val f: (A, Slice) => Need[A -> Slice] = { case (a, s) => Need(f0(a, s)) }
+    def advance(s: Slice): Need[SliceTransform1[A] -> Slice] =
       Need({ (a: A) =>
         SliceTransform1S[A](a, f0)
       } <-: f0(initial, s))
   }
 
-  private[table] case class SliceTransform1M[A](initial: A, f: (A, Slice) => M[A -> Slice]) extends SliceTransform1[A] {
-    def advance(s: Slice): M[SliceTransform1[A] -> Slice] = apply(s) map {
+  private[table] case class SliceTransform1M[A](initial: A, f: (A, Slice) => Need[A -> Slice]) extends SliceTransform1[A] {
+    def advance(s: Slice): Need[SliceTransform1[A] -> Slice] = apply(s) map {
       case (next, slice) =>
         (SliceTransform1M[A](next, f), slice)
     }
@@ -686,7 +706,7 @@ object SliceTransform1 {
       extends SliceTransform1[(A, B, C)] {
     def initial: (A, B, C) = (before.initial, transM.initial, after.initial)
 
-    val f: ((A, B, C), Slice) => M[((A, B, C), Slice)] = {
+    val f: ((A, B, C), Slice) => Need[((A, B, C), Slice)] = {
       case ((a0, b0, c0), s) =>
         val (a, slice0) = before.f0(a0, s)
         transM.f(b0, slice0) map {
@@ -696,7 +716,7 @@ object SliceTransform1 {
         }
     }
 
-    def advance(s: Slice): M[SliceTransform1[(A, B, C)] -> Slice] = apply(s) map {
+    def advance(s: Slice): Need[SliceTransform1[(A, B, C)] -> Slice] = apply(s) map {
       case ((a, b, c), slice) =>
         val transM0 = SliceTransform1M(b, transM.f)
         (SliceTransform1SMS[A, B, C](before.copy(initial = a), transM0, after.copy(initial = c)), slice)
@@ -705,10 +725,10 @@ object SliceTransform1 {
 
   private[table] case class MappedState1[A, B](st: SliceTransform1[A], to: A => B, from: B => A) extends SliceTransform1[B] {
     def initial: B = to(st.initial)
-    def f: (B, Slice) => M[B -> Slice] = { (b, s) =>
+    def f: (B, Slice) => Need[B -> Slice] = { (b, s) =>
       st.f(from(b), s) map (to <-: _)
     }
-    def advance(s: Slice): M[SliceTransform1[B] -> Slice] =
+    def advance(s: Slice): Need[SliceTransform1[B] -> Slice] =
       st.advance(s) map { case (st0, s0) => (MappedState1[A, B](st0, to, from), s0) }
   }
 }
@@ -717,10 +737,10 @@ protected sealed trait SliceTransform2[A] {
   import SliceTransform2._
 
   def initial: A
-  def f: (A, Slice, Slice) => M[A -> Slice]
-  def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice]
+  def f: (A, Slice, Slice) => Need[A -> Slice]
+  def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A] -> Slice]
 
-  def apply(sl: Slice, sr: Slice): M[A -> Slice] = f(initial, sl, sr)
+  def apply(sl: Slice, sr: Slice): Need[A -> Slice] = f(initial, sl, sr)
 
   def mapState[B](f: A => B, g: B => A): SliceTransform2[B] =
     MappedState2[A, B](this, f, g)
@@ -823,7 +843,7 @@ object SliceTransform2 {
   import SliceTransform1._
 
   def liftM[A](init: A, f: (A, Slice, Slice) => (A, Slice)): SliceTransform2[A]        = SliceTransform2S(init, f)
-  def apply[A](init: A, f: (A, Slice, Slice) => M[A -> Slice]): SliceTransform2[A]     = SliceTransform2M(init, f)
+  def apply[A](init: A, f: (A, Slice, Slice) => Need[A -> Slice]): SliceTransform2[A]  = SliceTransform2M(init, f)
   private def mapS[A](st: SliceTransform2S[A])(f: Slice => Slice): SliceTransform2S[A] = SliceTransform2S(st.initial, ((a, sl, sr) => st.f0(a, sl, sr) :-> f))
 
   private def map[A](st: SliceTransform2[A])(f: Slice => Slice): SliceTransform2[A] = st match {
@@ -882,15 +902,15 @@ object SliceTransform2 {
   }
 
   private case class SliceTransform2S[A](initial: A, f0: (A, Slice, Slice) => (A, Slice)) extends SliceTransform2[A] {
-    val f: (A, Slice, Slice) => M[A -> Slice] = { case (a, sl, sr) => Need(f0(a, sl, sr)) }
-    def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice] =
+    val f: (A, Slice, Slice) => Need[A -> Slice] = { case (a, sl, sr) => Need(f0(a, sl, sr)) }
+    def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A] -> Slice] =
       Need({ (a: A) =>
         SliceTransform2S[A](a, f0)
       } <-: f0(initial, sl, sr))
   }
 
-  private case class SliceTransform2M[A](initial: A, f: (A, Slice, Slice) => M[A -> Slice]) extends SliceTransform2[A] {
-    def advance(sl: Slice, sr: Slice): M[SliceTransform2[A] -> Slice] = apply(sl, sr) map {
+  private case class SliceTransform2M[A](initial: A, f: (A, Slice, Slice) => Need[A -> Slice]) extends SliceTransform2[A] {
+    def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A] -> Slice] = apply(sl, sr) map {
       case (next, slice) =>
         (SliceTransform2M[A](next, f), slice)
     }
@@ -899,13 +919,13 @@ object SliceTransform2 {
   private case class SliceTransform2SM[A, B](before: SliceTransform2S[A], after: SliceTransform1[B]) extends SliceTransform2[A -> B] {
     def initial: (A, B) = (before.initial, after.initial)
 
-    val f: ((A, B), Slice, Slice) => M[((A, B), Slice)] = {
+    val f: ((A, B), Slice, Slice) => Need[((A, B), Slice)] = {
       case ((a0, b0), sl0, sr0) =>
         val (a, s0) = before.f0(a0, sl0, sr0)
         after.f(b0, s0) map { case (b, s) => ((a, b), s) }
     }
 
-    def advance(sl: Slice, sr: Slice): M[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
+    def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
       case ((a, b), slice) =>
         val after0 = SliceTransform1M(b, after.f)
         (SliceTransform2SM[A, B](before.copy(initial = a), after0), slice)
@@ -915,7 +935,7 @@ object SliceTransform2 {
   private case class SliceTransform2MS[A, B](before: SliceTransform2[A], after: SliceTransform1S[B]) extends SliceTransform2[A -> B] {
     def initial: (A, B) = (before.initial, after.initial)
 
-    val f: ((A, B), Slice, Slice) => M[((A, B), Slice)] = {
+    val f: ((A, B), Slice, Slice) => Need[((A, B), Slice)] = {
       case ((a0, b0), sl0, sr0) =>
         before.f(a0, sl0, sr0) map {
           case (a, s0) =>
@@ -924,7 +944,7 @@ object SliceTransform2 {
         }
     }
 
-    def advance(sl: Slice, sr: Slice): M[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
+    def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A -> B] -> Slice] = apply(sl, sr) map {
       case ((a, b), slice) =>
         val before0 = SliceTransform2M(a, before.f)
         (SliceTransform2MS[A, B](before0, after.copy(initial = b)), slice)
@@ -933,10 +953,10 @@ object SliceTransform2 {
 
   private case class MappedState2[A, B](st: SliceTransform2[A], to: A => B, from: B => A) extends SliceTransform2[B] {
     def initial: B = to(st.initial)
-    def f: (B, Slice, Slice) => M[B -> Slice] = { (b, sl, sr) =>
+    def f: (B, Slice, Slice) => Need[B -> Slice] = { (b, sl, sr) =>
       st.f(from(b), sl, sr) map (to <-: _)
     }
-    def advance(sl: Slice, sr: Slice): M[SliceTransform2[B] -> Slice] =
+    def advance(sl: Slice, sr: Slice): Need[SliceTransform2[B] -> Slice] =
       st.advance(sl, sr) map { case (st0, s0) => (MappedState2[A, B](st0, to, from), s0) }
   }
 }

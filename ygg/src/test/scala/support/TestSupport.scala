@@ -66,7 +66,7 @@ trait ScalacheckSupport {
     }
   }
 
-  def containerOfAtMostN[C[X] <: Traversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
+  def containerOfAtMostN[C[X] <: scTraversable[X], A](maxSize: Int, g: Gen[A])(implicit b: Buildable[A, C[A]]): Gen[C[A]] =
     sized(size => for (n <- choose(0, size min maxSize); c <- containerOfN[C, A](n, g)) yield c)
 
   def arrayOf[A: CTag](gen: Gen[A]): Gen[Array[A]] = vectorOf(gen) ^^ (_.toArray)

@@ -1,10 +1,6 @@
 package ygg.tests
 
-import ygg.common._
-import ygg.json._
-import ygg.table._
-
-import scala.collection.generic.CanBuildFrom
+import ygg._, common._, json._, table._
 import scala.util.Random
 
 final case class SampleData(data: Stream[JValue], schema: Option[Int -> JSchema] = None) {
@@ -39,7 +35,7 @@ object SampleData extends CValueGenerators {
     }
   )
 
-  def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
+  def distinctBy[T, C[X] <: Seq[X], S](c: C[T])(key: T => S)(implicit cbf: CBF[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
     val seen    = scmSet[S]()
 
@@ -53,7 +49,7 @@ object SampleData extends CValueGenerators {
     builder.result
   }
 
-  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CanBuildFrom[C[T], T, C[T]]): C[T] = {
+  def randomSubset[T, C[X] <: Seq[X], S](c: C[T], freq: Double)(implicit cbf: CBF[C[T], T, C[T]]): C[T] = {
     val builder = cbf()
 
     for (t <- c)

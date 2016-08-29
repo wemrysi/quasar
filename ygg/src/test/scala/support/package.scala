@@ -1,6 +1,6 @@
 package ygg
 
-import ygg.common._
+import common._
 import ygg.macros.Json
 
 package object tests extends ygg.tests.pkg.TestsPackage {

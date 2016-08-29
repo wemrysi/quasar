@@ -18,7 +18,7 @@ class SliceSpec extends quasar.Qspec {
     val byCPath = columnsByCPath(slice)
     (0 until slice.size).map({ row =>
       (extractCValues(cpaths.map(byCPath).toList, row), extractCValues(byCPath.values.toList, row))
-    })(collection.breakOut)
+    })(breakOut)
   }
 
   private def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)

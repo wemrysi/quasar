@@ -1,10 +1,10 @@
 package ygg.tests
 
-import ygg.common._
-import ygg.json._
+import ygg._, common._, json._
 import java.net.URLDecoder
 import scalaz._
 import JsonTestSupport._
+import scala.Predef.assert
 
 class JsonParserSpec extends quasar.Qspec {
   import JParser._
@@ -120,9 +120,9 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
       sb.append("]")
       val data = sb.toString.getBytes("UTF-8")
       val bb   = byteBuffer(data)
-      val t0   = System.currentTimeMillis
+      val t0   = systemMillis
       JParser.parseFromByteBuffer(bb)
-      val ms = System.currentTimeMillis() - t0
+      val ms = systemMillis() - t0
       (1, data.length, ms)
     }
 
@@ -134,9 +134,9 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
       }
       val data        = sb.toString.getBytes("UTF-8")
       val bb          = byteBuffer(data)
-      val t0          = System.currentTimeMillis
+      val t0          = systemMillis
       val Success(js) = JParser.parseManyFromByteBuffer(bb)
-      val ms          = System.currentTimeMillis() - t0
+      val ms          = systemMillis() - t0
       (js.length, data.length, ms)
     }
 
@@ -159,7 +159,7 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
       var p     = parser
       var seen  = 0
       var bytes = 0
-      val t0    = System.currentTimeMillis
+      val t0    = systemMillis
 
       while (i <= completeChunks) {
         val (AsyncParse(errors, results), parser) = if (i <= completeChunks) {
@@ -181,7 +181,7 @@ class ArrayUnwrappingSpec extends quasar.Qspec {
         i += 1
       }
 
-      val ms = System.currentTimeMillis() - t0
+      val ms = systemMillis() - t0
       (seen, bytes, ms)
     }
 

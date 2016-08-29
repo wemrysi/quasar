@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.table
 
 import ygg.common._
 import scalaz._, Ordering._
+import scala.math.{ abs, signum }
 
 /**
   * Compare values of different types.
@@ -61,8 +78,8 @@ object NumericComparisons {
     if (b.toLong == bl) {
       if (a < b) -1 else if (a == b) 0 else 1
     } else {
-      val error = math.abs(b * 2.220446049250313E-16)
-      if (a < b - error) -1 else if (a > b + error) 1 else bl.signum
+      val error = abs(b * 2.220446049250313E-16)
+      if (a < b - error) -1 else if (a > b + error) 1 else signum(bl).toInt
     }
   }
 
@@ -83,7 +100,7 @@ object NumericComparisons {
     else 0
   }
 
-  @inline def eps(b: Double): Double = math.abs(b * 2.220446049250313E-16)
+  @inline def eps(b: Double): Double = abs(b * 2.220446049250313E-16)
 
   def approxCompare(a: Double, b: Double): Int = {
     val aError = eps(a)
@@ -92,7 +109,7 @@ object NumericComparisons {
   }
 
   @inline def order(a: Long, b: Long): Cmp             = if (a < b) LT else if (a == b) EQ else GT
-  @inline def order(a: Double, b: Double): Cmp         = if (a < b) LT else if (a == b) EQ else GT
+  @inline def order(a: Double, b: Double): Cmp         = if (a < b) LT else if (a == b) EQ else GT // XXX classic mistake ignoring NaN
   @inline def order(a: Long, b: Double): Cmp           = Cmp(compare(a, b))
   @inline def order(a: Double, b: Long): Cmp           = Cmp(compare(a, b))
   @inline def order(a: Long, b: BigDecimal): Cmp       = Cmp(compare(a, b))
