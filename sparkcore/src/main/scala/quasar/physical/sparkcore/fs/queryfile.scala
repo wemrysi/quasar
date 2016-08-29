@@ -37,6 +37,7 @@ import scalaz.concurrent.Task
 object queryfile {
 
   final case class Input(
+    fromFile: (SparkContext, AFile) => RDD[String],
     store: RDD[Data] => Task[AFile],
     fileExists: AFile => Task[Boolean],
     listContents: ADir => Task[FileSystemError \/ Set[PathSegment]]
@@ -73,17 +74,16 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
-  private def executePlan[S[_]](input: Input, qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan])
-    (implicit
-      s0: Task :<: S,
-      read: Read.Ops[SparkContext, S]
-    ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
+  private def executePlan[S[_]](input: Input, qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
+    s0: Task :<: S,
+    read: Read.Ops[SparkContext, S]
+  ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
     val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptTotal[Fix, ?]]]
 
     read.asks { sc =>
       val sparkStuff: PlannerError \/ RDD[Data] =
-        qs.cataM(total.plan).eval(sc)
+        qs.cataM(total.plan(input.fromFile)).eval(sc)
 
       injectFT.apply {
         sparkStuff.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](

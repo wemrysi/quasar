@@ -26,11 +26,15 @@ import quasar.fs.FileSystemError._
 import java.io.File
 import java.nio.file._
 
+import org.apache.spark._
 import org.apache.spark.rdd._
 import pathy.Path._
 import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
+
+  def fromFile(sc: SparkContext, file: AFile): RDD[String] =
+    sc.textFile(posixCodec.unsafePrintPath(file))
 
   def store(rdd: RDD[Data]): Task[AFile] = ???
 
@@ -54,5 +58,5 @@ object queryfile {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
   }
 
-  def input: Input = Input(store _, fileExists _, listContents _)
+  def input: Input = Input(fromFile _, store _, fileExists _, listContents _)
 }

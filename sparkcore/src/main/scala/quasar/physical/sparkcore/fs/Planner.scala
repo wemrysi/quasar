@@ -24,17 +24,17 @@ import quasar._
 import quasar.Planner._
 import quasar.fp._
 import quasar.qscript._
+import quasar.fs._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka._
-import pathy.Path._
 import scalaz._, Scalaz._
 
 @typeclass trait Planner[F[_]] {
   type IT[G[_]]
-  
-  def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], F, RDD[Data]]
+
+  def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], F, RDD[Data]]
   // F[RDD[Data]] => StateT[..., RDD[Data]]
 }
 
@@ -47,20 +47,17 @@ object Planner {
     new Planner[Const[DeadEnd, ?]] {
       type IT[G[_]] = T[G]
       
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], Const[DeadEnd, ?], RDD[Data]] = ???
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], Const[DeadEnd, ?], RDD[Data]] = ???
     }
 
   implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
     new Planner[Const[Read, ?]] {
       type IT[G[_]] = T[G]
-      def plan =
-        // is it?
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]) =
         (qs: Const[Read, RDD[Data]]) => {
           StateT((sc: SparkContext) => {
             val filePath = qs.getConst.path
-            val rdd = sc.
-              textFile(posixCodec.unsafePrintPath(filePath)).
-              map { raw =>
+            val rdd = fromFile(sc, filePath).map { raw =>
                 DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
               }
             (sc, rdd).right[PlannerError]
@@ -72,7 +69,7 @@ object Planner {
       Planner.Aux[T, SourcedPathable[T, ?]] =
     new Planner[SourcedPathable[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], SourcedPathable[T,?], RDD[Data]] = {
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], SourcedPathable[T,?], RDD[Data]] = {
         case LeftShift(src, struct, repair) => ???
         case Union(src, lBranch, rBranch) => ???
       }
@@ -82,7 +79,7 @@ object Planner {
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], QScriptCore[T, ?], RDD[Data]] = {
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           ???
         case Reduce(src, bucket, reducers, repair) =>
@@ -102,21 +99,21 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], EquiJoin[T, ?], RDD[Data]] = ???      
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], EquiJoin[T, ?], RDD[Data]] = ???      
     }
   
   // TODO: Remove this instance
   implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
     new Planner[ThetaJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = ???
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = ???
     }
   
   // TODO: Remove this instance
   implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
     new Planner[ProjectBucket[T, ?]] {
       type IT[G[_]] = T[G]
-            def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], ProjectBucket[T, ?], RDD[Data]] = ???
+            def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], ProjectBucket[T, ?], RDD[Data]] = ???
     }
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
@@ -124,6 +121,6 @@ object Planner {
       Planner.Aux[T, Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
       type IT[G[_]] = T[G]
-      def plan: AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan, G.plan)
+      def plan(fromFile: (SparkContext, AFile) => RDD[String]): AlgebraM[StateT[PlannerError \/ ?, SparkContext, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 }
