@@ -223,12 +223,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+          Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
           Free.point(RightSide))).embed.some)
         // TODO optimize to eliminate `MakeArray`
         //SP.inj(LeftShift(
         //  RootR,
-        //  Free.roll(Nullary(
+        //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
         //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
         //  Free.point(RightSide))).embed
@@ -248,13 +248,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         SP.inj(LeftShift(
           RootR,
           Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
-            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
           Free.point(RightSide))).embed.some)
         // TODO optimize to eliminate `MakeArray`
         //SP.inj(LeftShift(
         //  RootR,
-        //  Free.roll(Nullary(
+        //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
         //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
         //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
@@ -278,14 +278,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           RootR,
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
-              Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
-            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
+              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
           Free.point(RightSide))).embed.some)
         // TODO optimize to eliminate `MakeArray`
         //SP.inj(LeftShift(
         //  RootR,
-        //  Free.roll(Nullary(
+        //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
         //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
         //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
