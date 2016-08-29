@@ -466,11 +466,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
 
-  def fromData[T[_[_]]: Corecursive](data: Data): PlannerError \/ T[EJson] = {
-    data.hyloM[PlannerError \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
-      interpretM[PlannerError \/ ?, EJson, Data, T[EJson]](
-        NonRepresentableData(_).left,
-        _.embed.right[PlannerError]),
+  def fromData[T[_[_]]: Corecursive](data: Data): Data \/ T[EJson] = {
+    data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
+      interpretM[Data \/ ?, EJson, Data, T[EJson]](
+        _.left,
+        _.embed.right),
       Data.toEJson[EJson].apply(_).right)
   }
 
@@ -484,12 +484,17 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
-      fromData(data).map(d =>
+      fromData(data).fold(
+        {
+          case Data.NA => Undefined[T, FreeMap[T]]().right
+          case d => NonRepresentableData(d).left
+        },
+        Constant[T, FreeMap[T]](_).right) ∘ (mf =>
         EnvT((
           EmptyAnn[T],
           QC.inj(Map(
             RootTarget.embed,
-            Free.roll[MapFunc[T, ?], Hole](Nullary[T, FreeMap[T]](d)))))))
+            Free.roll[MapFunc[T, ?], Hole](mf))))))
 
     case LogicalPlan.FreeF(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[TargetT]
@@ -664,7 +669,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           src,
           rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
           rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
-          Free.roll(Nullary(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
+          Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
           LeftOuter,
           Free.point(LeftSide))))).right
 
