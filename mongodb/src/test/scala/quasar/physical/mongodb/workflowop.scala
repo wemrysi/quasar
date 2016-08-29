@@ -656,7 +656,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
           Js.Access(Js.Ident("value"), Js.Num(0, false))),
           ListMap()),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
-        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
@@ -670,8 +670,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
-              Js.Ident("value"))))),
+            finalizer = Some($MapF.finalizerFn(JsFn.identity))),
           None))
     }
 
@@ -688,7 +687,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             Js.AnonElem(List(Js.Ident("key"), Js.Ident("value"))))))),
           ListMap()),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
-        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
@@ -703,8 +702,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
-              Js.Ident("value"))))),
+            finalizer = Some($MapF.finalizerFn(JsFn.identity))),
           None))
     }
 
@@ -717,7 +715,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
         $sort(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
         $limit(100),
         $reduce($ReduceF.reduceFoldLeft, ListMap()),
-        $map($MapF.mapMap("value", Js.Ident("value")), ListMap())))) must
+        $simpleMap(NonEmptyList(MapExpr(JsFn.identity)), ListMap())))) must
       beTree[WorkflowTask](
         MapReduceTask(
           ReadTask(collection("db", "zips")),
@@ -730,8 +728,7 @@ class WorkflowSpec extends quasar.Qspec with TreeMatchers {
             inputSort =
               Some(NonEmptyList(BsonField.Name("city") -> SortDir.Descending)),
             limit = Some(100),
-            finalizer = Some($MapF.finalizerFn($MapF.mapMap("value",
-              Js.Ident("value"))))),
+            finalizer = Some($MapF.finalizerFn(JsFn.identity))),
           None))
     }
 

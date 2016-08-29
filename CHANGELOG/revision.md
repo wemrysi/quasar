@@ -1,3 +1,2 @@
-- [1288, 1289, 1290] MarkLogic non-queryable FileSystem
-  - Implements all FileSystem algebra terms except for QueryFile.{ExecutePlan, EvaluatePlan, Explain}
-  - Adds inital framework for executing queries on MarkLogic, though none are supported yet
+- More general NameGenerator instances
+  - Tidy up MongoDB name gen to use a CollectionName prefix

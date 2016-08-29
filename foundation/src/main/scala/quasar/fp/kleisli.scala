@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.fp
 
-import quasar.Predef._
-import quasar.fp._
-
-import monocle.Iso
 import scalaz._
 
-sealed abstract class Hole
-
-final case object SrcHole extends Hole
-
-object Hole {
-  def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
-
-  implicit val equal: Equal[Hole] = Equal.equalRef
-  implicit val show: Show[Hole] = Show.showFromToString
+trait KleisliInstances {
+  implicit def kleisliMonadState[F[_], S, R](implicit F: MonadState[F, S]): MonadState[Kleisli[F, R, ?], S] =
+    new MonadState[Kleisli[F, R, ?], S] {
+      def init = Kleisli(κ(F.init))
+      def get = Kleisli(κ(F.get))
+      def put(s: S) = Kleisli(κ(F.put(s)))
+      def point[A](a: => A) = Kleisli(κ(F.point(a)))
+      override def map[A, B](fa: Kleisli[F, R, A])(f: A => B) = fa map f
+      def bind[A, B](fa: Kleisli[F, R, A])(f: A => Kleisli[F, R, B]) = fa flatMap f
+    }
 }
+
+object kleisli extends KleisliInstances
