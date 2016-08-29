@@ -212,7 +212,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
     }
 
-    "convert a constant shift array of size one" in pending {
+    "convert a constant shift array of size one" in {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (7); select * from foo"
       convert(
@@ -223,13 +223,18 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(Nullary(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+          Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
           Free.point(RightSide))).embed.some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Nullary(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+        //  Free.point(RightSide))).embed
     }
 
-    "convert a constant shift array of size two" in pending {
+    "convert a constant shift array of size two" in {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (7,8); select * from foo"
       convert(
@@ -242,14 +247,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(Nullary(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
           Free.point(RightSide))).embed.some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Nullary(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+        //  Free.point(RightSide))).embed
     }
 
-    "convert a constant shift array of size three" in pending {
+    "convert a constant shift array of size three" in {
       // this query never makes it to LP->QS transform because it's a constant value
       // "foo := (7,8,9); select * from foo"
       convert(
@@ -264,12 +276,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(Nullary(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+              Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+            Free.roll(MakeArray(Free.roll(Nullary(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
           Free.point(RightSide))).embed.some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Nullary(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
+        //  Free.point(RightSide))).embed
     }
 
     "convert a read shift array" in pending {
