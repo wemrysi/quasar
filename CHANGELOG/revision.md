@@ -1,0 +1,3 @@
+- Fix `Data.NA` breaking QScript conversion.
+- rename `Nullary` MapFunc to `Constant`
+- add `Undefined` and `Now` MapFuncs
