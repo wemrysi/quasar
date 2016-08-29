@@ -101,8 +101,8 @@ object ProjectBucket {
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit],
-        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], Unit]) =
+        p1: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) =
         (p1 ≟ p2).option(SrcMerge(p1, left, right))
     }
 

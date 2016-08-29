@@ -227,7 +227,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         SP.inj(LeftShift(
           RootR,
-          Free.roll(Nullary(
+          Free.roll(Constant(
             CommonEJson.inj(ejson.Arr(List(
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](1)).embed,
               ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
