@@ -48,8 +48,8 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 object MapFunc {
   import MapFuncs._
 
-  /** Returns a List that maps element-by-element to a MapFunc array. If we can’t
-    * statically determine _all_ of the elements, it doesn’t match.
+  /** Returns a List that maps element-by-element to a MapFunc array. If we
+    * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
@@ -98,10 +98,10 @@ object MapFunc {
       }
   }
 
-  // TODO subtyping is preventing embeding of MapFuncs
-  /** This returns the set of exressions that are concatted together. It can
-    * include statically known pieces, like MakeArray and Constant(Arr), but also
-    * arbitrary expressions that may evaluate to an array of any size.
+  // TODO: subtyping is preventing embedding of MapFuncs
+  /** This returns the set of expressions that are concatenated together. It can
+    * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
+    * also arbitrary expressions that may evaluate to an array of any size.
     */
   object ConcatArraysN {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
@@ -500,9 +500,13 @@ object MapFunc {
 // TODO we should statically verify that these have a `DimensionalEffect` of `Mapping`
 object MapFuncs {
   // nullary
+  /** A value that is statically known.
+    */
   @Lenses final case class Constant[T[_[_]], A](ejson: T[EJson]) extends Nullary[T, A]
+  /** A value that doesn’t exist. Most operations on `Undefined` should evaluate
+    * to `Undefined`. See [[IfUndefined]] for the exception.
+    */
   @Lenses final case class Undefined[T[_[_]], A]() extends Nullary[T, A]
-  @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
 
   // array
   @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
@@ -515,6 +519,10 @@ object MapFuncs {
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time.
+    */
+  @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
+
 
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
@@ -533,6 +541,8 @@ object MapFuncs {
   @Lenses final case class Lte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Gt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Gte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  /** This “catches” [[Undefined]] values and replaces them with a value.
+    */
   @Lenses final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
@@ -580,7 +590,8 @@ object MapFuncs {
     */
   @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-
+  /** A conditional specifically for checking that `a1` satisfies `pattern`.
+    */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]
 
