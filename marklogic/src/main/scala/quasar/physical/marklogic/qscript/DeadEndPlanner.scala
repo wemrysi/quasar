@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -25,7 +26,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class DeadEndPlanner extends MarkLogicPlanner[Const[DeadEnd, ?]] {
-  val plan: AlgebraM[Planning, Const[DeadEnd, ?], XQuery] = {
-    case Const(Root) => mkSeq_("/".xqy).point[Planning]
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[DeadEnd, ?], XQuery] = {
+    case Const(Root) => mkSeq_("/".xqy).point[PlanningT[F, ?]]
   }
 }

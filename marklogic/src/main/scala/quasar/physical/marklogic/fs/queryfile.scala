@@ -18,13 +18,12 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.SKI.κ
-import quasar.{LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, PlannerErrT}
+import quasar.{LogicalPlan, PhaseResult, PhaseResults}
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
-import quasar.fp.pointNT
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery.XQuery
@@ -55,22 +54,20 @@ object queryfile {
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import EitherT.eitherTMonad
 
-      val hoist_ = Hoist[PlannerErrT].hoist(Hoist[PhaseResultT].hoist(pointNT[ContentSourceIO]))
-
       def phase(xqy: XQuery): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
-      val listContents: ConvertPath.ListContents[ContentSourceIO] =
-        adir => ContentSourceIO.runSessionIO(ops.ls(adir)).liftM[FileSystemErrT]
+      val listContents: ConvertPath.ListContents[Free[S, ?]] =
+        adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        xqy <- hoist_(qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan))
+        xqy <- qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[Free[S, ?]])
                  .leftMap(planningFailed(lp, _))
-        a   <- WriterT.put(f(xqy))(phase(xqy)).liftM[FileSystemErrT]
+        a   <- WriterT.put(lift(f(xqy)).into[S])(phase(xqy)).liftM[FileSystemErrT]
       } yield a
 
-      lift(planning.run.run).into[S]
+      planning.run.run
     }
 
     def exec(lp: Fix[LogicalPlan], out: AFile) =

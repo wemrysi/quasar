@@ -17,9 +17,10 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.NameGenerator
 
-import scalaz._, Id.Id
-import scalaz.syntax.foldable._
+import scalaz._
+import scalaz.syntax.apply._
 
 // TODO: Optimize using XQuery seq as much as possible.
 object ejson {
@@ -54,12 +55,14 @@ object ejson {
   def isMap(item: XQuery): XQuery =
     fn.nodeName(item) === mapQName
 
-  def mkArray[F[_]: Foldable](items: F[XQuery]): XQuery = {
-    def mkArrayElt(item: XQuery): XQuery =
-      XQuery(xmlElement(arrayEltName, s"{$item}"))
+  def mapLeftShift(map: XQuery): XQuery =
+    map `/` mapEntryName.xs `/` mapValueName.xs `/` "child::node()".xs
 
-    XQuery(xmlElement(arrayName, items.toList.map(mkArrayElt).mkString))
-  }
+  def mkArray(elements: XQuery): XQuery =
+    XQuery(xmlElement(arrayName, s"{$elements}"))
+
+  def mkArrayElt(item: XQuery): XQuery =
+    XQuery(xmlElement(arrayEltName, s"{$item}"))
 
   def mkMap(entries: XQuery): XQuery =
     XQuery(xmlElement(mapName, s"{$entries}"))
@@ -70,18 +73,21 @@ object ejson {
       xmlElement(mapValueName, s"{$value}")))
 
   def singletonArray(item: XQuery): XQuery =
-    mkArray[Id](item)
+    mkArray(mkArrayElt(item))
 
   def singletonMap(key: XQuery, value: XQuery): XQuery =
     mkMap(mkMapEntry(key, value))
 
-  def zipMapKeys(emap: XQuery): XQuery =
-    mkMap(
-      for_("$e" -> emap `/` mapEntryName.xs)
-      .let_(
-        "$k" -> "$e".xqy `/` mapKeyName.xs `/` "child::node()".xs,
-        "$v" -> "$e".xqy `/` mapValueName.xs `/` "child:node()".xs)
-      .return_(mkMapEntry("$k".xqy, mkArray(IList("$k".xqy, "$v".xqy)))))
+  def zipMapKeys[F[_]: NameGenerator: Apply](emap: XQuery): F[XQuery] =
+    (freshVar[F] |@| freshVar[F] |@| freshVar[F])((e, k, v) =>
+      mkMap(
+        for_(
+          e -> emap `/` mapEntryName.xs)
+        .let_(
+          k -> e.xqy `/` mapKeyName.xs `/` "child::node()".xs,
+          v -> e.xqy `/` mapValueName.xs `/` "child:node()".xs)
+        .return_(
+          mkMapEntry(k.xqy, mkArray(mkSeq_(mkArrayElt(k.xqy), mkArrayElt(v.xqy)))))))
 
   ////
 

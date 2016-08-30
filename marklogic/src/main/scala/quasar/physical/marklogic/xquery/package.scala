@@ -17,6 +17,7 @@
 package quasar.physical.marklogic
 
 import quasar.Predef._
+import quasar.NameGenerator
 
 import scalaz._
 import scalaz.std.string._
@@ -29,6 +30,9 @@ package object xquery {
 
   def asArg(opt: Option[XQuery]): String =
     opt.map(", " + _.toString).orZero
+
+  def freshVar[F[_]: NameGenerator: Functor]: F[String] =
+    NameGenerator[F].prefixedName("$v")
 
   def mkSeq[F[_]: Foldable](fa: F[XQuery]): XQuery =
     XQuery(s"(${fa.toList.map(_.toString).intercalate(", ")})")

@@ -18,6 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.SKI.κ
+import quasar.effect.MonotonicSeq
 
 import simulacrum.typeclass
 import scalaz._
@@ -48,6 +49,11 @@ sealed abstract class NameGeneratorInstances extends NameGeneratorInstances0 {
   implicit def sequenceNameGenerator[F[_]](implicit F: MonadState[F, Long]): NameGenerator[F] =
     new NameGenerator[F] {
       def freshName = F.bind(F.get)(n => F.put(n + 1) as n.toString)
+    }
+
+  implicit def monotonicSeqNameGenerator[S[_]](implicit S: MonotonicSeq :<: S): NameGenerator[Free[S, ?]] =
+    new NameGenerator[Free[S, ?]] {
+      def freshName = MonotonicSeq.Ops[S].next map (_.toString)
     }
 }
 

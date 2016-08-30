@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
+import quasar.NameGenerator
 import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -26,38 +27,47 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
-  import expr.{func, if_, let_, emptySeq}
+  import expr.{func, if_, let_}
 
-  val plan: AlgebraM[Planning, QScriptCore[T, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
-      mapFuncXQuery(f, src).point[Planning]
+      liftP(mapFuncXQuery[T, F](f, src))
 
     case Reduce(src, bucket, reducers, repair) =>
-      XQuery(s"((: REDUCE :)$src)").point[Planning]
+      XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
 
     case Sort(src, bucket, order) =>
-      XQuery(s"((: SORT :)$src)").point[Planning]
+      XQuery(s"((: SORT :)$src)").point[PlanningT[F, ?]]
 
     case Filter(src, f) =>
-      fn.filter(func("$x") { mapFuncXQuery(f, "$x".xqy) }, src)
-        .point[Planning]
+      liftP(for {
+        x <- freshVar[F]
+        p <- mapFuncXQuery(f, x.xqy)
+      } yield fn.filter(func(x) { p }, src))
 
     // NB: XQuery sequences use 1-based indexing.
     case Take(src, from, count) =>
-      (rebaseXQuery(from, "$src".xqy) |@| rebaseXQuery(count, "$src".xqy))((fm, ct) =>
-        let_("$src" -> src) return_ { "$src".xqy((fm + 1.xqy).seq to ct) })
+      for {
+        x   <- liftP(freshVar[F])
+        fm  <- rebaseXQuery(from, x.xqy)
+        ct  <- rebaseXQuery(count, x.xqy)
+      } yield let_(x -> src) return_ x.xqy((fm + 1.xqy).seq to ct)
 
     case Drop(src, from, count) =>
-      (rebaseXQuery(from, emptySeq) |@| rebaseXQuery(count, emptySeq))((fm, ct) =>
-        let_("$x" -> src) return_ {
-          if_ (fm eq 0.xqy)
-            .then_ {
-              fn.subsequence("$x".xqy, ct)
-            } else_ {
-              mkSeq_(
-                fn.subsequence("$x".xqy, 1.xqy, some(fm)),
-                fn.subsequence("$x".xqy, ct))
-            }
-        })
+      for {
+        x  <- liftP(freshVar[F])
+        fm <- rebaseXQuery(from, x.xqy)
+        ct <- rebaseXQuery(count, x.xqy)
+      } yield {
+        let_(x -> src) return_ {
+          if_ (fm eq 0.xqy) then_ {
+            fn.subsequence(x.xqy, ct)
+          } else_ {
+            mkSeq_(
+              fn.subsequence(x.xqy, 1.xqy, some(fm)),
+              fn.subsequence(x.xqy, ct))
+          }
+        }
+      }
   }
 }
