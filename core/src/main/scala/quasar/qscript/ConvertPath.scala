@@ -115,7 +115,7 @@ object ConvertPath extends ConvertPathInstances {
       ADir => M[List[F[T[F]]]] =
     dir => listContents(dir).run.flatMap(_.fold(
       κ(List.empty[F[T[F]]].point[M]),
-      _.toList.traverseM(_.fold(
+      ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
         d => allDescendents[T, M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
         f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
 
