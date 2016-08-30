@@ -22,7 +22,7 @@ import quasar.fp._
 import quasar.physical.marklogic.ejson.AsXQuery
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
 import scalaz.std.option._
@@ -32,7 +32,7 @@ object MapFuncPlanner {
   import expr.{if_, let_}
 
   def apply[T[_[_]]: Recursive: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
-    case Nullary(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
+    case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
 
     // array
     case Length(arr) => fn.count(arr)
