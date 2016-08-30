@@ -1,7 +1,24 @@
+/*
+ * Copyright 2014–2016 SlamData Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ygg.tests
 
 import ygg._, common._, json._
 import scalaz._, Scalaz._
+import ygg.table.NumericComparisons._
 
 class JNumSpec extends quasar.Qspec {
   val s1: JNum = JNumStr("123.456")
@@ -55,9 +72,9 @@ class JNumSpec extends quasar.Qspec {
 
     tpls sliding 2 forall {
       case (j1, b1, d1, n1) :: (j2, b2, d2, n2) :: Nil =>
-        (b1 compare b2) must be_<(1)
-        (d1 compare d2) must be_<(1)
-        (n1 compare n2) must be_<(1)
+        compare(b1, b2) must be_<(1)
+        compare(d1, d2) must be_<(1)
+        compare(n1, n2) must be_<(1)
 
       case _ => abort("invalid starting data")
     }
