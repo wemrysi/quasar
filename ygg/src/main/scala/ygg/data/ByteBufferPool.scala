@@ -23,6 +23,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{ BlockingQueue, ArrayBlockingQueue, LinkedBlockingQueue }
 import java.util.concurrent.atomic.AtomicLong
 import java.lang.ref.SoftReference
+import ByteBufferPool._
 
 /**
   * A `Monad` for working with `ByteBuffer`s.
@@ -78,61 +79,60 @@ final class ByteBufferPool(val capacity: Int) {
 
   def toStream: Stream[ByteBuffer] = Stream.continually(acquire)
 
-  def run[A](a: ByteBufferPool.State[A]): A = a.eval((this, Nil))
+  def run[A](a: Pool[A]): A = a.eval(PoolData(this, Vec())).run
 }
 
 object ByteBufferPool {
-  type State[A] = scalaz.State[ByteBufferPool -> List[ByteBuffer], A]
+  import Free._
+
+  final case class PoolData(pool: ByteBufferPool, buffers: Vec[ByteBuffer]) {
+    def _1 = pool
+    def _2 = buffers
+  }
+  type Pool[A] = StateT[Trampoline, PoolData, A]
+
+  implicit object PoolMonad extends ByteBufferMonad[Pool] {
+    // equivalent to: StateT[Trampoline, PoolData, A](s => Free.pure((s, a)))
+    def point[A](a: => A): Pool[A]                        = StateT stateT a
+    def bind[A, B](fa: Pool[A])(f: A => Pool[B]): Pool[B] = StateT(s =>
+      s match {
+        case PoolData(p, bs) => ???
+      }
+    )
+
+    def getBuffer(min: Int): Pool[ByteBuffer] = acquire(min)
+  }
 
   def apply(): ByteBufferPool = new ByteBufferPool(16 * 1024)
-
-  implicit object ByteBufferPoolMonad extends ByteBufferMonad[ByteBufferPool.State] with Monad[ByteBufferPool.State] {
-
-    def point[A](a: => A): ByteBufferPool.State[A] = State.state(a)
-
-    def bind[A, B](fa: ByteBufferPool.State[A])(f: A => ByteBufferPool.State[B]): ByteBufferPool.State[B] =
-      State(s =>
-        fa(s) match {
-          case (s, a) => f(a)(s)
-      })
-
-    def getBuffer(min: Int): ByteBufferPool.State[ByteBuffer] = ByteBufferPool.acquire(min)
-  }
 
   /**
     * Acquire a `ByteBuffer` and add it to the state.
     */
-  def acquire(min: Int): ByteBufferPool.State[ByteBuffer] = State {
-    case (pool, buffers @ (buf :: _)) if buf.remaining() >= min =>
-      ((pool, buffers), buf)
-
-    case (pool, buffers) =>
-      val buf = pool.acquire
-      ((pool, buf :: buffers), buf)
+  def acquire(min: Int): Pool[ByteBuffer] = StateT {
+    case PoolData(pool, buffers @ (buf +: _)) if buf.remaining() >= min => pure(PoolData(pool, buffers) -> buf)
+    case PoolData(pool, buffers)                                        => pure(pool.acquire |> (buf => PoolData(pool, buf +: buffers) -> buf))
   }
 
-  def acquire: ByteBufferPool.State[ByteBuffer] = acquire(512)
+  def acquire: Pool[ByteBuffer] = acquire(512)
 
   /**
     * Reverses the state (list of `ByteBuffer`s) and returns an `Array[Byte]` of
     * the contiguous bytes in all the buffers.
     */
-  def flipBytes: ByteBufferPool.State[Array[Byte]] = State {
-    case (pool, sreffub) =>
-      val buffers = sreffub.reverse
-      ((pool, buffers), getBytesFrom(buffers))
+  def flipBytes: Pool[Array[Byte]] = StateT {
+    case PoolData(pool, revBufs) => pure(revBufs.reverse |> (bufs => PoolData(pool, bufs) -> getBytesFrom(bufs)))
   }
 
   /**
     * Removes and releases all `ByteBuffer`s in the state to the pool.
     */
-  def release: ByteBufferPool.State[Unit] = State {
-    case (pool, buffers) =>
-      buffers foreach (pool.release(_))
-      ((pool, Nil), ())
+  def release: Pool[Unit] = StateT {
+    case pd @ PoolData(pool, buffers) =>
+      buffers foreach (pool release _)
+      pure(pd -> (()))
   }
 
-  def getBytesFrom(buffers: List[ByteBuffer]): Array[Byte] = {
+  def getBytesFrom(buffers: Vec[ByteBuffer]): Array[Byte] = {
     val size = buffers.foldLeft(0) { (size, buf) =>
       buf.flip()
       size + buf.remaining()

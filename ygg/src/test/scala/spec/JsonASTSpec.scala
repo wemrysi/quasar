@@ -208,8 +208,10 @@ class JsonASTSpec extends quasar.SequentialQspec {
     (v1 ?|? v2) must_=== GT
   }
 
-  "Properly --> subclasses of JValue" in {
-    JNumStr("1.234").asNum.isInstanceOf[JNum] mustEqual true
+  "Properly downcast subclasses of JValue" in {
+    JNumStr("1.234").asNum.isInstanceOf[JNum] must_=== true
+    jarray(jobject()).asArray.isInstanceOf[JArray] must_=== true
+    jobject("a" -> JString("b")).asObject.isInstanceOf[JObject] must_=== true
   }
 
   def runArbitraryPathSpec = {

@@ -85,22 +85,22 @@ trait Codec[@spec(Boolean, Long, Double) A] { self =>
     * The returned set of `ByteBuffer`s is in reverse order, so that calls
     * to `writeAll` can be chained by passing in the previous result to `used`.
     */
-  def writeAll(a: A)(acquire: () => ByteBuffer, used: List[ByteBuffer]): List[ByteBuffer] = {
+  def writeAll(a: A)(acquire: () => ByteBuffer, used: Vec[ByteBuffer]): Vec[ByteBuffer] = {
     @inline
-    @tailrec def loop(s: Option[S], buffers: List[ByteBuffer]): List[ByteBuffer] = s match {
+    @tailrec def loop(s: Option[S], buffers: Vec[ByteBuffer]): Vec[ByteBuffer] = s match {
       case None => buffers
       case Some(s) =>
         val buf = acquire()
-        loop(writeMore(s, buf), buf :: buffers)
+        loop(writeMore(s, buf), buf +: buffers)
     }
 
     used match {
-      case buffers @ (buf :: _) if buf.remaining() >= minSize(a) =>
+      case buffers @ (buf +: _) if buf.remaining() >= minSize(a) =>
         loop(writeInit(a, buf), buffers)
 
       case buffers =>
         val buf = acquire()
-        loop(writeInit(a, buf), buf :: buffers)
+        loop(writeInit(a, buf), buf +: buffers)
     }
   }
 
@@ -156,7 +156,7 @@ object Codec {
     import ByteBufferPool._
 
     byteBufferPool.run(for {
-      _     <- codec.write[ByteBufferPool.State](a)
+      _     <- codec.write[ByteBufferPool.Pool](a)
       bytes <- flipBytes
       _     <- release
     } yield bytes)
