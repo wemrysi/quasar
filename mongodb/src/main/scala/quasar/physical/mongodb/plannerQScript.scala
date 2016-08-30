@@ -200,7 +200,7 @@ object MongoDbQScriptPlanner {
       //     short-circuit when given the wrong type. However, our guards may be
       //     more restrictive than the operation, in which case we still want to
       //     short-circuit, so …
-      case Guard(expr, typ, cont, fallback) => unimplemented
+      case Guard(_, _, cont, _) => cont.right
 
       case DupArrayIndices(_) => unimplemented
       case DupMapKeys(_)      => unimplemented
