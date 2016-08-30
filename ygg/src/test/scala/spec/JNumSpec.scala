@@ -19,6 +19,7 @@ package ygg.tests
 import ygg._, common._, json._
 import scalaz._, Scalaz._
 import ygg.table.NumericComparisons._
+import org.specs2.matcher.MustMatchers._
 
 class JNumSpec extends quasar.Qspec {
   val s1: JNum = JNumStr("123.456")

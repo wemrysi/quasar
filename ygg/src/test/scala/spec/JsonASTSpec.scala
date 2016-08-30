@@ -21,7 +21,9 @@ import ygg._, common._, json._
 import JsonTestSupport._
 import scala.Predef.identity
 
-class JsonASTSpec extends quasar.SequentialQspec {
+class JsonASTSpec extends quasar.Qspec {
+  sequential
+
   "JObjects equal even fields order is different" in {
     implicit val gen = Arbitrary(vectorOfN(15, genJField))
     prop((fs: Vector[JField]) => jobject(fs: _*) must_=== jobject(fs.shuffle: _*))

@@ -61,9 +61,10 @@ class CanonicalizeSpec extends ColumnarTableQspec {
       val canonicalizedTable = table.canonicalize(minLength, maxLength)
       val slices             = canonicalizedTable.slices.toStream.copoint map (_.size)
       if (size > 0) {
-        slices.init must contain(like[Int]({ case size: Int => size must beBetween(minLength, maxLength) })).forall
+        slices.init foreach (_ must beBetween(minLength, maxLength))
         slices.last must be_<=(maxLength)
-      } else {
+      }
+      else {
         slices must haveSize(0)
       }
     }

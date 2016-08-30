@@ -20,6 +20,7 @@ import org.scalacheck.Shrink
 import ygg._, common._, table._
 import scala.Predef.assert
 import scala.math.Ordering
+import org.specs2.matcher.MatchersImplicits._
 
 class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
   import Arbitrary._
@@ -186,7 +187,7 @@ class RowFormatSpec extends quasar.Qspec with JdbmCValueGenerators {
 
           rows.zipWithIndex forall {
             case (vals, row) =>
-              rowFormat.decode(columnEncoder.encodeFromRow(row)) must_== vals
+              rowFormat.decode(columnEncoder.encodeFromRow(row)) must_=== vals
           }
         }
       }.flakyTest

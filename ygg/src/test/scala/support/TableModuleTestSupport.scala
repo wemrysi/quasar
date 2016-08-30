@@ -31,6 +31,16 @@ abstract class TableQspec extends quasar.Qspec with TableModuleTestSupport {
   /* Oh cake, my cake, the crimes you make me commit */
   private implicit def ttable(x: Table): TTable = x.asInstanceOf[TTable]
 
+  trait CommuteTest[R, S] {
+    def transformR(x: R): R
+    def transformS(x: S): S
+    def rToS(x: R): S
+    def sToR(x: S): R
+
+    def checkOneR(x: R)(implicit ze: Eq[R], zs: Show[R]): MatchResult[R]  = transformR(x) must_= sToR(transformS(rToS(x)))
+    def checkR()(implicit za: Arbitrary[R], ze: Eq[R], zs: Show[R]): Prop = prop(checkOneR _)
+  }
+
   class TableCommuteTest(f: Seq[JValue] => Seq[JValue], g: Table => Table) extends CommuteTest[Seq[JValue], Table] {
     def transformR(x: Seq[JValue])  = f(x)
     def transformS(x: Table)        = g(x)

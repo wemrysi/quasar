@@ -19,6 +19,7 @@ package ygg.tests
 import scalaz._, Scalaz._
 import ygg._, common._, json._, table._
 import scala.Predef.identity
+import org.specs2.matcher.MatchersImplicits._
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
