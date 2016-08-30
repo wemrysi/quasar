@@ -23,7 +23,7 @@ import trans._
 object Sampling {
   private def rng: scala.util.Random = scala.util.Random
 
-  private case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
+  private final case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
 
   /**
     * A one-pass algorithm for sampling. This runs in time O(H_n*m^2 + n) =
@@ -94,7 +94,7 @@ object Sampling {
     build(states.toList, table.slices)
   }
 
-  private case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]]) {
+  private final case class RowInserter(size: Int, slice: Slice, cols: scmMap[ColumnRef, ArrayColumn[_]]) {
     import RowInserter._
 
     def toSlice(maxSize: Int): Slice = Slice(size min maxSize, cols.toMap)

@@ -69,14 +69,14 @@ object RowFormat {
   def forSortingKey(columnRefs: Seq[ColumnRef]): RowFormat = SortingKeyRowFormatV1(columnRefs)
   def forValues(columnRefs: Seq[ColumnRef]): RowFormat     = ValueRowFormatV1(columnRefs)
 
-  case class ValueRowFormatV1(columnRefs: Seq[ColumnRef]) extends ValueRowFormat with RowFormatCodecs {
+  final case class ValueRowFormatV1(columnRefs: Seq[ColumnRef]) extends ValueRowFormat with RowFormatCodecs {
     // TODO Get this from somewhere else?
     def pool = byteBufferPool
   }
-  case class SortingKeyRowFormatV1(columnRefs: Seq[ColumnRef]) extends RowFormatCodecs with SortingRowFormat {
+  final case class SortingKeyRowFormatV1(columnRefs: Seq[ColumnRef]) extends RowFormatCodecs with SortingRowFormat {
     def pool = byteBufferPool
   }
-  case class IdentitiesRowFormatV1(columnRefs: Seq[ColumnRef]) extends IdentitiesRowFormat
+  final case class IdentitiesRowFormatV1(columnRefs: Seq[ColumnRef]) extends IdentitiesRowFormat
 }
 
 trait RowFormatSupport { self: StdCodecs =>

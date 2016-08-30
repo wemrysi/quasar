@@ -73,80 +73,80 @@ package trans {
   sealed trait ObjectSpec[+A <: SourceType] extends TransSpec[A]
   sealed trait ArraySpec[+A <: SourceType]  extends TransSpec[A]
 
-  case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
+  final case class Leaf[+A <: SourceType](source: A) extends TransSpec[A] //done
 
-  case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A] //done
+  final case class Filter[+A <: SourceType](source: TransSpec[A], predicate: TransSpec[A]) extends TransSpec[A] //done
 
   // Adds a column to the output in the manner of scanLeft
-  case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A] //done
+  final case class Scan[+A <: SourceType](source: TransSpec[A], scanner: Scanner) extends TransSpec[A] //done
 
-  case class Map1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
+  final case class Map1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
 
-  case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
+  final case class DeepMap1[+A <: SourceType](source: TransSpec[A], f: CF1) extends TransSpec[A] //done
 
   // apply a function to the cartesian product of the transformed left and right subsets of columns
-  case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: CF2) extends TransSpec[A] //done
+  final case class Map2[+A <: SourceType](left: TransSpec[A], right: TransSpec[A], f: CF2) extends TransSpec[A] //done
 
   // Perform the specified transformation on the all sources, and then create a new set of columns
   // containing all the resulting columns.
-  case class InnerObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
+  final case class InnerObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
 
-  case class OuterObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
+  final case class OuterObjectConcat[+A <: SourceType](objects: TransSpec[A]*) extends ObjectSpec[A] //done
 
-  case class ObjectDelete[+A <: SourceType](source: TransSpec[A], fields: Set[CPathField]) extends TransSpec[A]
+  final case class ObjectDelete[+A <: SourceType](source: TransSpec[A], fields: Set[CPathField]) extends TransSpec[A]
 
-  case class InnerArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
+  final case class InnerArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
 
-  case class OuterArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
+  final case class OuterArrayConcat[+A <: SourceType](arrays: TransSpec[A]*) extends ArraySpec[A] //done
 
   // Take the output of the specified TransSpec and prefix all of the resulting selectors with the
   // specified field.
-  case class WrapObject[+A <: SourceType](source: TransSpec[A], field: String) extends ObjectSpec[A] //done
+  final case class WrapObject[+A <: SourceType](source: TransSpec[A], field: String) extends ObjectSpec[A] //done
 
-  case class WrapObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
+  final case class WrapObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
-  case class WrapArray[+A <: SourceType](source: TransSpec[A]) extends ArraySpec[A] //done
+  final case class WrapArray[+A <: SourceType](source: TransSpec[A]) extends ArraySpec[A] //done
 
-  case class DerefObjectStatic[+A <: SourceType](source: TransSpec[A], field: CPathField) extends TransSpec[A] //done
+  final case class DerefObjectStatic[+A <: SourceType](source: TransSpec[A], field: CPathField) extends TransSpec[A] //done
 
-  case class DerefMetadataStatic[+A <: SourceType](source: TransSpec[A], field: CPathMeta) extends TransSpec[A]
+  final case class DerefMetadataStatic[+A <: SourceType](source: TransSpec[A], field: CPathMeta) extends TransSpec[A]
 
-  case class DerefObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+  final case class DerefObjectDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
 
-  case class DerefArrayStatic[+A <: SourceType](source: TransSpec[A], element: CPathIndex) extends TransSpec[A] //done
+  final case class DerefArrayStatic[+A <: SourceType](source: TransSpec[A], element: CPathIndex) extends TransSpec[A] //done
 
-  case class DerefArrayDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+  final case class DerefArrayDynamic[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
 
-  case class ArraySwap[+A <: SourceType](source: TransSpec[A], index: Int) extends TransSpec[A]
+  final case class ArraySwap[+A <: SourceType](source: TransSpec[A], index: Int) extends TransSpec[A]
 
   // Filter out all the source columns whose selector and CType are not specified by the supplied JType
-  case class Typed[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+  final case class Typed[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
 
   // Filter out all the source columns whose selector and CType are not specified by the supplied JType
   // if the set of columns does not cover the JType specified, this will return the empty slice.
-  case class TypedSubsumes[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+  final case class TypedSubsumes[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
 
   // return a Boolean column
   // returns true for a given row when all of the columns specified by the supplied JType are defined
-  case class IsType[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
+  final case class IsType[+A <: SourceType](source: TransSpec[A], tpe: JType) extends TransSpec[A] // done
 
-  case class Equal[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
+  final case class Equal[+A <: SourceType](left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A] //done
 
-  case class EqualLiteral[+A <: SourceType](left: TransSpec[A], right: CValue, invert: Boolean) extends TransSpec[A]
+  final case class EqualLiteral[+A <: SourceType](left: TransSpec[A], right: CValue, invert: Boolean) extends TransSpec[A]
 
   // target is the transspec that provides defineedness information. The resulting table will be defined
   // and have the constant value wherever a row provided by the target transspec has at least one member
   // that is not undefined
-  case class ConstLiteral[+A <: SourceType](value: CValue, target: TransSpec[A]) extends TransSpec[A]
+  final case class ConstLiteral[+A <: SourceType](value: CValue, target: TransSpec[A]) extends TransSpec[A]
 
-  case class FilterDefined[+A <: SourceType](source: TransSpec[A], definedFor: TransSpec[A], definedness: Definedness) extends TransSpec[A]
+  final case class FilterDefined[+A <: SourceType](source: TransSpec[A], definedFor: TransSpec[A], definedness: Definedness) extends TransSpec[A]
 
-  case class Cond[+A <: SourceType](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
+  final case class Cond[+A <: SourceType](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
   object TransSpec {
     import CPath._
 
-    def concatChildren[A <: SourceType](tree: CPathTree[Int], leaf: TransSpec[A] = Leaf(Source)): TransSpec[A] = {
+    def concatChildren[A <: SourceType](tree: CPathTree[Int], leaf: TransSpec[A]): TransSpec[A] = {
       def createSpecs(trees: Seq[CPathTree[Int]]): Seq[TransSpec[A]] = trees map { child =>
         (child match {
           case node @ RootNode(seq)                  => concatChildren(node, leaf)
@@ -293,9 +293,9 @@ package trans {
     * @param key The key which will be used by `merge` to access this particular tic-variable (which may be refined by more than one `GroupKeySpecSource`)
     * @param spec A transform which defines this key part as a function of the source table in `GroupingSource`.
     */
-  case class GroupKeySpecSource(key: CPathField, spec: TransSpec1)    extends GroupKeySpec
-  case class GroupKeySpecAnd(left: GroupKeySpec, right: GroupKeySpec) extends GroupKeySpec
-  case class GroupKeySpecOr(left: GroupKeySpec, right: GroupKeySpec)  extends GroupKeySpec
+  final case class GroupKeySpecSource(key: CPathField, spec: TransSpec1)    extends GroupKeySpec
+  final case class GroupKeySpecAnd(left: GroupKeySpec, right: GroupKeySpec) extends GroupKeySpec
+  final case class GroupKeySpecOr(left: GroupKeySpec, right: GroupKeySpec)  extends GroupKeySpec
 
   object GroupKeySpec {
     def dnf(keySpec: GroupKeySpec): GroupKeySpec = {

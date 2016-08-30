@@ -845,10 +845,6 @@ class SliceOps(private val source: Slice) extends AnyVal {
     }
   }
 
-  def toJsonString(prefix: String = ""): String = {
-    (0 until size).map(i => prefix + " " + toJson(i)).mkString("\n")
-  }
-
   def cPathToJPaths(cpath: CPath, value: CValue): Vec[JPath -> CValue] = {
     import ygg.json._
 

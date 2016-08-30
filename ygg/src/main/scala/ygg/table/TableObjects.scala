@@ -190,26 +190,24 @@ object JDBM {
     def count: Long
   }
 
-  case class SliceIndex(name: String,
+  final case class SliceIndex(name: String,
                         dbFile: File,
                         storage: IndexStore,
                         keyRowFormat: RowFormat,
                         keyComparator: Comparator[Bytes],
                         keyRefs: Array[ColumnRef],
                         valRefs: Array[ColumnRef],
-                        count: Long = 0)
-      extends SliceSorter {}
+                        count: Long) extends SliceSorter
 
-  case class SortedSlice(name: String,
+  final case class SortedSlice(name: String,
                          kslice: Slice,
                          vslice: Slice,
                          valEncoder: ColumnEncoder,
                          keyRefs: Array[ColumnRef],
                          valRefs: Array[ColumnRef],
-                         count: Long = 0)
-      extends SliceSorter {}
+                         count: Long) extends SliceSorter
 
-  case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
+  final case class IndexKey(streamId: String, keyRefs: List[ColumnRef], valRefs: List[ColumnRef]) {
     val name = streamId + ";krefs=" + keyRefs.mkString("[", ",", "]") + ";vrefs=" + valRefs.mkString("[", ",", "]")
   }
 

@@ -275,7 +275,7 @@ object Render {
             val flag = inFlags.popFront()
 
             if (flag) {
-              renderString(str)
+              renderString(str, 0)
             } else {
               checkPush(str.length)
               buffer.put(str)
@@ -289,7 +289,7 @@ object Render {
 
         @inline
         @tailrec
-        def renderString(str: String, idx: Int = 0): Unit = {
+        def renderString(str: String, idx: Int): Unit = {
           if (idx == 0) {
             push('"')
           }
@@ -327,7 +327,7 @@ object Render {
 
           @inline
           @tailrec
-          def power10(ln: Long, seed: Long = 1): Long = {
+          def power10(ln: Long, seed: Long): Long = {
             // note: we could be doing binary search here
 
             if (seed * 10 < 0) // overflow
@@ -359,9 +359,9 @@ object Render {
             push('-')
 
             val ln2 = ln * -1
-            renderPositive(ln2, power10(ln2))
+            renderPositive(ln2, power10(ln2, seed = 1))
           } else {
-            renderPositive(ln, power10(ln))
+            renderPositive(ln, power10(ln, seed = 1))
           }
         }
 
@@ -409,17 +409,17 @@ object Render {
 
         @inline
         def renderDate(date: DateTime): Unit = {
-          renderString(date.toString)
+          renderString(date.toString, 0)
         }
 
         @inline
         def renderPeriod(period: Period): Unit = {
-          renderString(period.toString)
+          renderString(period.toString, 0)
         }
 
         @inline
         def renderArray[A](array: Array[A]): Unit = {
-          renderString(array.deep.toString)
+          renderString(array.deep.toString, 0)
         }
 
         def traverseSchema(row: Int, schema: SchemaNode): Boolean = schema match {
@@ -530,7 +530,7 @@ object Render {
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderString(specCol(row))
+                  renderString(specCol(row), 0)
                   true
                 } else {
                   false

@@ -633,8 +633,6 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                         // catch input-out-of-order errors early
                         rightEnd match {
                           case None =>
-                            //println("lhead\n" + lkey.toJsonString())
-                            //println("rhead\n" + rkey.toJsonString())
                             abort(
                               "Inputs are not sorted; value on the left exceeded value on the right at the end of equal span. lpos = %d, rpos = %d"
                                 .format(lpos, rpos))

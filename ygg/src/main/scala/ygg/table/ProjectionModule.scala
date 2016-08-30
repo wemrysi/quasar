@@ -19,7 +19,7 @@ package ygg.table
 import ygg._, common._
 import scalaz._, Scalaz._
 
-case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
+final case class BlockProjectionData[Key](minKey: Key, maxKey: Key, data: Slice)
 
 trait ProjectionLike {
   type Key

@@ -400,31 +400,24 @@ package object json {
         }
       }
 
-    def delete(path: JPath): Option[JValue] = {
-      path.nodes match {
-        case JPathField(name) +: xs =>
-          self match {
-            case JObject.Fields(fields) =>
-              Some(
-                JObject(fields flatMap {
-                  case JField(`name`, value) =>
-                    value.delete(JPath(xs: _*)) map { v =>
-                      JField(name, v)
-                    }
-                  case unmodified => Some(unmodified)
-                })
-              )
-            case unmodified => Some(unmodified)
-          }
+    def delete(path: JPath): Option[JValue] = path.nodes match {
+      case JPathField(name) +: xs =>
+        self match {
+          case JObject.Fields(fields) => Some(
+            JObject(fields flatMap {
+              case JField(`name`, value) => value.delete(JPath(xs: _*)).fold(Vec[JField]())(v => Vec(JField(name, v)))
+              case x                     => Vec(x)
+            }: _*)
+          )
+          case unmodified => Some(unmodified)
+        }
+      case JPathIndex(idx) +: xs =>
+        self match {
+          case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
+          case unmodified       => Some(unmodified)
+        }
 
-        case JPathIndex(idx) +: xs =>
-          self match {
-            case JArray(elements) => Some(JArray(elements.zipWithIndex.flatMap { case (v, i) => if (i == idx) v.delete(JPath(xs: _*)) else Some(v) }))
-            case unmodified       => Some(unmodified)
-          }
-
-        case Seq() => None
-      }
+      case scSeq() => None
     }
 
     /** Return direct child elements.

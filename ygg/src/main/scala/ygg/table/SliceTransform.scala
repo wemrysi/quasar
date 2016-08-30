@@ -687,7 +687,7 @@ object SliceTransform1 {
     }
   }
 
-  private[table] case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
+  private[table] final case class SliceTransform1S[A](initial: A, f0: (A, Slice) => (A, Slice)) extends SliceTransform1[A] {
     val f: (A, Slice) => Need[A -> Slice] = { case (a, s) => Need(f0(a, s)) }
     def advance(s: Slice): Need[SliceTransform1[A] -> Slice] =
       Need({ (a: A) =>
@@ -695,14 +695,14 @@ object SliceTransform1 {
       } <-: f0(initial, s))
   }
 
-  private[table] case class SliceTransform1M[A](initial: A, f: (A, Slice) => Need[A -> Slice]) extends SliceTransform1[A] {
+  private[table] final case class SliceTransform1M[A](initial: A, f: (A, Slice) => Need[A -> Slice]) extends SliceTransform1[A] {
     def advance(s: Slice): Need[SliceTransform1[A] -> Slice] = apply(s) map {
       case (next, slice) =>
         (SliceTransform1M[A](next, f), slice)
     }
   }
 
-  private[table] case class SliceTransform1SMS[A, B, C](before: SliceTransform1S[A], transM: SliceTransform1[B], after: SliceTransform1S[C])
+  private[table] final case class SliceTransform1SMS[A, B, C](before: SliceTransform1S[A], transM: SliceTransform1[B], after: SliceTransform1S[C])
       extends SliceTransform1[(A, B, C)] {
     def initial: (A, B, C) = (before.initial, transM.initial, after.initial)
 
@@ -723,7 +723,7 @@ object SliceTransform1 {
     }
   }
 
-  private[table] case class MappedState1[A, B](st: SliceTransform1[A], to: A => B, from: B => A) extends SliceTransform1[B] {
+  private[table] final case class MappedState1[A, B](st: SliceTransform1[A], to: A => B, from: B => A) extends SliceTransform1[B] {
     def initial: B = to(st.initial)
     def f: (B, Slice) => Need[B -> Slice] = { (b, s) =>
       st.f(from(b), s) map (to <-: _)
@@ -901,7 +901,7 @@ object SliceTransform2 {
     }
   }
 
-  private case class SliceTransform2S[A](initial: A, f0: (A, Slice, Slice) => (A, Slice)) extends SliceTransform2[A] {
+  private final case class SliceTransform2S[A](initial: A, f0: (A, Slice, Slice) => (A, Slice)) extends SliceTransform2[A] {
     val f: (A, Slice, Slice) => Need[A -> Slice] = { case (a, sl, sr) => Need(f0(a, sl, sr)) }
     def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A] -> Slice] =
       Need({ (a: A) =>
@@ -909,14 +909,14 @@ object SliceTransform2 {
       } <-: f0(initial, sl, sr))
   }
 
-  private case class SliceTransform2M[A](initial: A, f: (A, Slice, Slice) => Need[A -> Slice]) extends SliceTransform2[A] {
+  private final case class SliceTransform2M[A](initial: A, f: (A, Slice, Slice) => Need[A -> Slice]) extends SliceTransform2[A] {
     def advance(sl: Slice, sr: Slice): Need[SliceTransform2[A] -> Slice] = apply(sl, sr) map {
       case (next, slice) =>
         (SliceTransform2M[A](next, f), slice)
     }
   }
 
-  private case class SliceTransform2SM[A, B](before: SliceTransform2S[A], after: SliceTransform1[B]) extends SliceTransform2[A -> B] {
+  private final case class SliceTransform2SM[A, B](before: SliceTransform2S[A], after: SliceTransform1[B]) extends SliceTransform2[A -> B] {
     def initial: (A, B) = (before.initial, after.initial)
 
     val f: ((A, B), Slice, Slice) => Need[((A, B), Slice)] = {
@@ -932,7 +932,7 @@ object SliceTransform2 {
     }
   }
 
-  private case class SliceTransform2MS[A, B](before: SliceTransform2[A], after: SliceTransform1S[B]) extends SliceTransform2[A -> B] {
+  private final case class SliceTransform2MS[A, B](before: SliceTransform2[A], after: SliceTransform1S[B]) extends SliceTransform2[A -> B] {
     def initial: (A, B) = (before.initial, after.initial)
 
     val f: ((A, B), Slice, Slice) => Need[((A, B), Slice)] = {
@@ -951,7 +951,7 @@ object SliceTransform2 {
     }
   }
 
-  private case class MappedState2[A, B](st: SliceTransform2[A], to: A => B, from: B => A) extends SliceTransform2[B] {
+  private final case class MappedState2[A, B](st: SliceTransform2[A], to: A => B, from: B => A) extends SliceTransform2[B] {
     def initial: B = to(st.initial)
     def f: (B, Slice, Slice) => Need[B -> Slice] = { (b, sl, sr) =>
       st.f(from(b), sl, sr) map (to <-: _)

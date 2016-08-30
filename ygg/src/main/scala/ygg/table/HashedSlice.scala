@@ -68,14 +68,12 @@ private final class SliceHasher(slice: Slice) {
       ColumnHasher(ref, col)
   }
 
-  @tailrec private final def hashOf(row: Int, i: Int = 0, hc: Int = 0): Int = {
+  @tailrec private final def hashOf(row: Int, i: Int, hc: Int): Int = (
     if (i >= hashers.length) hc
-    else {
-      hashOf(row, i + 1, hc ^ hashers(i).hash(row))
-    }
-  }
+    else hashOf(row, i + 1, hc ^ hashers(i).hash(row))
+  )
 
-  def hash(row: Int): Int = hashOf(row)
+  def hash(row: Int): Int = hashOf(row, 0, 0)
 }
 
 /**

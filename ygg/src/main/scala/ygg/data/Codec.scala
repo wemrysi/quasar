@@ -523,7 +523,7 @@ object Codec {
       }
     }
   }
-  case class ArrayCodec[@spec(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
+  final case class ArrayCodec[@spec(Boolean, Long, Double) A: CTag](elemCodec: Codec[A]) extends Codec[Array[A]] {
     type S = Either[Array[A], (elemCodec.S, Array[A], Int)]
 
     override def minSize(as: Array[A]): Int = 5

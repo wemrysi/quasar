@@ -33,7 +33,7 @@ class ConcatSpec extends ColumnarTableQspec {
             IndexNode(CPathIndex(2), Seq(LeafNode(2))))),
         FieldNode(CPathField("foo"), Seq(LeafNode(0)))))
 
-    val result = TransSpec.concatChildren(tree)
+    val result = TransSpec.concatChildren(tree, Leaf(Source))
 
     val expected = InnerObjectConcat(
       WrapObject(

@@ -19,7 +19,7 @@ package ygg.table
 import ygg.common._
 import scalaz.Scalaz._
 
-case class ColumnRef(selector: CPath, ctype: CType)
+final case class ColumnRef(selector: CPath, ctype: CType)
 
 object ColumnRef {
   object id {
