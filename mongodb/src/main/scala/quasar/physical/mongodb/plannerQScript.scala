@@ -728,11 +728,8 @@ object MongoDbQScriptPlanner {
                  ev: Show[WorkflowBuilder[WF]],
                  WB: WorkflowBuilder.Ops[WF]) = {
         case LeftShift(src, struct, repair) => unimplemented
-        // (src ⊛ getJsFn(struct) ⊛ getJsMerge(repair))(
-        //   (wb, js, jm) =>
-        //   WB.jsExpr(
-        //     List(wb, WB.flattenMap(WB.jsExpr1(wb, js))),
-        //     jm))
+        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
+        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
         case Union(src, lBranch, rBranch) => unimplemented
       }
     }
@@ -746,27 +743,25 @@ object MongoDbQScriptPlanner {
         implicit I: WorkflowOpCoreF :<: WF,
                  ev: Show[WorkflowBuilder[WF]],
                  WB: WorkflowBuilder.Ops[WF]) = {
-        case qscript.Map(src, f) =>
-          (getExpr(f).map(_.right[JsFn]) <+> getJsFn(f).map(_.left[Expression]))
-            .map(ExprBuilder(src, _)).liftM[GenT]
+        case qscript.Map(src, f) => getExprBuilder(src, f).liftM[GenT]
         case Reduce(src, bucket, reducers, repair) =>
-          (getJsFn(bucket) ⊛
+          (getExprBuilder(src, bucket) ⊛
             reducers.traverse(_.traverse(getExpr[T])) ⊛
             getJsRed(repair))((b, red, rep) =>
             ExprBuilder(
               GroupBuilder(src,
-                List(ExprBuilder(src, b.left)),
+                List(b),
                 Contents.Doc(red.zipWithIndex.map(ai =>
                   (BsonField.Name(ai._2.toString),
                     accumulator(ai._1).left[Expression])).toListMap)),
               rep.left)).liftM[GenT]
         case Sort(src, bucket, order) =>
           val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
-          keys.traverse(getJsFn[T]).map(ks =>
-            WB.sortBy(src, ks.map(WB.jsExpr1(src, _)), dirs)).liftM[GenT]
+          keys.traverse(getExprBuilder(src, _))
+            .map(WB.sortBy(src, _, dirs)).liftM[GenT]
         case Filter(src, f) =>
-          getJsFn(f).map(js =>
-            WB.filter(src, List(WB.jsExpr1(src, js)), {
+          getExprBuilder(src, f).map(cond =>
+            WB.filter(src, List(cond), {
               case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
             })).liftM[GenT]
         case Take(src, from, count) =>
@@ -793,8 +788,8 @@ object MongoDbQScriptPlanner {
           // FIXME: we should take advantage of the already merged srcs
           (rebaseWB(joinHandler, qs.lBranch, qs.src) ⊛
             rebaseWB(joinHandler, qs.rBranch, qs.src) ⊛
-            getExpr(qs.lKey).map(e => ExprBuilder(qs.src, e.right)).liftM[GenT] ⊛
-            getExpr(qs.rKey).map(e => ExprBuilder(qs.src, e.right)).liftM[GenT])(
+            getExprBuilder(qs.src, qs.lKey).liftM[GenT] ⊛
+            getExprBuilder(qs.src, qs.rKey).liftM[GenT])(
             (lb, rb, lk, rk) =>
             joinHandler.run(
               qs.f match {
@@ -851,6 +846,12 @@ object MongoDbQScriptPlanner {
 
   def getJsFn[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[JsFn] =
     processMapFunc(fm)(κ(jscore.Ident(JsFn.defaultName))) ∘ (JsFn(JsFn.defaultName, _))
+
+  def getExprBuilder[T[_[_]]: Recursive: ShowT, WF[_]]
+    (src: WorkflowBuilder[WF], fm: FreeMap[T]):
+      OutputM[WorkflowBuilder[WF]] =
+    (getExpr(fm).map(_.right[JsFn]) <+> getJsFn(fm).map(_.left[Expression])) ∘
+      (ExprBuilder(src, _))
 
   def getJsMerge[T[_[_]]: Recursive: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):
       OutputM[JsFn] =
@@ -971,8 +972,8 @@ object MongoDbQScriptPlanner {
           ).apply(tf) ∘
             Normalizable[QScriptTotal[T, ?]].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
-      wf1  <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
-      wf2  <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
+      wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
+      wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
     } yield wf2).evalZero
   }
 
