@@ -25,6 +25,7 @@ import quasar.fs.mount.{Mounts, hierarchical}
 import quasar.sql, sql.{Query, Sql}
 
 import java.io.{File => JFile, FileInputStream}
+import scala.concurrent.duration._
 import scala.io.Source
 import scala.util.matching.Regex
 
@@ -113,7 +114,7 @@ abstract class QueryRegressionTest[S[_]](
                         (p => verifyDataExists(dataFile(p)))))
       data =  testQuery(DataDir </> fileParent(loc), test.query, test.variables)
       res  <- verifyResults(test.expected, data, run)
-    } yield res).unsafePerformSync
+    } yield res).timed(5.minutes).unsafePerformSync
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {

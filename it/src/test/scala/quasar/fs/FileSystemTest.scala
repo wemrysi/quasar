@@ -27,7 +27,6 @@ import quasar.physical._
 import quasar.regression.{interpretHfsIO, HfsIO}
 
 import scala.Either
-import scala.concurrent.duration._
 
 import monocle.Optional
 import monocle.function.Index
@@ -59,20 +58,12 @@ abstract class FileSystemTest[S[_]](
 
   def fileSystemShould(examples: FileSystemUT[S] => Fragment): Unit =
     fileSystems.map(_ traverse_[Id] { fs =>
-      val timedFs = fs.copy(
-        testInterp = timed(5.minutes) compose fs.testInterp,
-        setupInterp = timed(1.minutes) compose fs.setupInterp)
+      s"${fs.name.name} FileSystem" should examples(fs)
 
-      s"${fs.name.name} FileSystem" should examples(timedFs)
-
-      step(timedFs.close.unsafePerformSync)
+      step(fs.close.unsafePerformSync)
 
       ()
     }).unsafePerformSync
-
-  def timed(timeout: Duration): Task ~> Task = new (Task ~> Task) {
-    def apply[A](fa: Task[A]): Task[A] = fa.timed(timeout)
-  }
 
   def runT(run: Run): FileSystemErrT[F, ?] ~> FsTask =
     Hoist[FileSystemErrT].hoist(run)
