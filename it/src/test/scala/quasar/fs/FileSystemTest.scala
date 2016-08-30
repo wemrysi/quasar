@@ -70,7 +70,7 @@ abstract class FileSystemTest[S[_]](
       ()
     }).unsafePerformSync
 
-  val timed(timeout: Duration): Task ~> Task = new (Task ~> Task) {
+  def timed(timeout: Duration): Task ~> Task = new (Task ~> Task) {
     def apply[A](fa: Task[A]): Task[A] = fa.timed(timeout)
   }
 
