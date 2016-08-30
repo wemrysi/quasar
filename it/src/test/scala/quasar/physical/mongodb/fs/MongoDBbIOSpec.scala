@@ -83,5 +83,19 @@ class MongoDbIOSpec extends QuasarSpecification {
         stats.sharded  must beFalse
       }).unsafePerformSync
     }
+
+    "get the default index on _id" in {
+      (for {
+        coll <- tempColl
+        _    <- insert(
+                  coll,
+                  List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)
+        idxs <- indexes(coll).run(testClient)
+        _    <- dropCollection(coll).run(setupClient)
+      } yield {
+        // NB: this index is not marked "unique", counter-intuitively
+        idxs must_=== Set(Index("_id_", NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending), false))
+      }).unsafePerformSync
+    }
   }
 }
