@@ -20,10 +20,8 @@ import quasar.Predef._
 import quasar.fp.TaskRef
 
 import monocle.Lens
-import scalaz.{Lens => _, _}
+import scalaz.{Lens => _, _}, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.syntax.monad._
-import scalaz.syntax.id._
 
 /** Provides the ability to read, write and delete from a store of values
   * indexed by keys.
@@ -75,8 +73,8 @@ object KeyValueStore {
 
     /** Associate `update` with the given key if the current value at the key
       * is `expect`, passing `None` for `expect` indicates that they key is
-      * expected not to be associated with a value. Returns whether the value
-      * was updated.
+      * expected not to be associated with a value.
+      * @return whether the value was updated.
       */
     def compareAndPut(k: K, expect: Option[V], update: V): F[Boolean] =
       lift(CompareAndPut(k, expect, update))
@@ -115,92 +113,97 @@ object KeyValueStore {
       new Ops[K, V, S]
   }
 
-  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `Task`, given a
-    * `TaskRef[Map[K, V]]`.
-    */
-  def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
-    new (KeyValueStore[K, V, ?] ~> Task) {
-      val toST = toState[State[Map[K,V],?]](Lens.id[Map[K,V]])
-      def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
-        ref.modifyS(toST(fa).run)
+  object impl {
+
+    def empty[K, V]: Task[KeyValueStore[K,V, ?] ~> Task] = TaskRef(Map.empty[K,V]).map(fromTaskRef[K,V](_))
+
+    /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `Task`, given a
+      * `TaskRef[Map[K, V]]`.
+      */
+    def fromTaskRef[K, V](ref: TaskRef[Map[K, V]]): KeyValueStore[K, V, ?] ~> Task =
+      new (KeyValueStore[K, V, ?] ~> Task) {
+        val toST = toState[State[Map[K,V],?]](Lens.id[Map[K,V]])
+        def apply[C](fa: KeyValueStore[K, V, C]): Task[C] =
+          ref.modifyS(toST(fa).run)
+      }
+
+    /** Interpret `KeyValueStore[K, V, ?]` into `AtomicRef[Map[K, V], ?]`, plus Free.
+      * Usage: `toAtomicRef[K, V]()`. */
+    object toAtomicRef {
+      def apply[K, V]: Aux[K, V] = new Aux[K, V]
+
+      final class Aux[K, V] {
+        type Ref[A] = AtomicRef[Map[K, V], A]
+
+        val R = AtomicRef.Ops[Map[K, V], Ref]
+
+        def apply(): KeyValueStore[K, V, ?] ~> Free[Ref, ?] =
+          new (KeyValueStore[K, V, ?] ~> Free[Ref, ?]) {
+            def apply[A](m: KeyValueStore[K, V, A]) = m match {
+              case Keys() =>
+                R.get.map(_.keys.toVector)
+
+              case Get(path) =>
+                R.get.map(_.get(path))
+
+              case Put(path, cfg) =>
+                R.modify(_ + (path -> cfg)).void
+
+              case CompareAndPut(path, expect, update) =>
+                R.modifyS(m =>
+                  if (m.get(path) == expect) (m + (path -> update), true)
+                  else (m, false))
+
+              case Delete(path) =>
+                R.modify(_ - path).void
+            }
+          }
+      }
     }
 
-  /** Interpret `KeyValueStore[K, V, ?]` into `AtomicRef[Map[K, V], ?]`, plus Free.
-    * Usage: `toAtomicRef[K, V]()`. */
-  object toAtomicRef {
-    def apply[K, V]: Aux[K, V] = new Aux[K, V]
+    /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `F[S, ?]`,
+      * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
+      *
+      * NB: Uses partial application of `F[_, _]` for better type inference, usage:
+      *   `toState[F](lens)`
+      */
+    object toState {
+      def apply[F[_]]: Aux[F] =
+        new Aux[F]
 
-    final class Aux[K, V] {
-      type Ref[A] = AtomicRef[Map[K, V], A]
+      final class Aux[F[_]] {
+        def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
+                          : KeyValueStore[K, V, ?] ~> F =
+          new(KeyValueStore[K, V, ?] ~> F) {
+            def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {
+              case CompareAndPut(k, expect, update) =>
+                lookup(k) flatMap { cur =>
+                  if (cur == expect)
+                    modify(_ + (k -> update)).as(true)
+                  else
+                    F.point(false)
+                }
 
-      val R = AtomicRef.Ops[Map[K, V], Ref]
+              case Delete(key) =>
+                modify(_ - key)
 
-      def apply(): KeyValueStore[K, V, ?] ~> Free[Ref, ?] =
-        new (KeyValueStore[K, V, ?] ~> Free[Ref, ?]) {
-          def apply[A](m: KeyValueStore[K, V, A]) = m match {
-            case Keys() =>
-              R.get.map(_.keys.toVector)
+              case Keys() =>
+                F.gets(s => l.get(s).keys.toVector)
 
-            case Get(path) =>
-              R.get.map(_.get(path))
+              case Get(key) =>
+                lookup(key)
 
-            case Put(path, cfg) =>
-              R.modify(_ + (path -> cfg)).void
+              case Put(key, value) =>
+                modify(_ + (key -> value))
+            }
 
-            case CompareAndPut(path, expect, update) =>
-              R.modifyS(m =>
-                if (m.get(path) == expect) (m + (path -> update), true)
-                else (m, false))
+            def lookup(k: K): F[Option[V]] =
+              F.gets(s => l.get(s).get(k))
 
-            case Delete(path) =>
-              R.modify(_ - path).void
+            def modify(f: Map[K, V] => Map[K, V]): F[Unit] =
+              F.modify(l.modify(f))
           }
-        }
-    }
-  }
-
-  /** Returns an interpreter of `KeyValueStore[K, V, ?]` into `F[S, ?]`,
-    * given a `Lens[S, Map[K, V]]` and `MonadState[F, S]`.
-    *
-    * NB: Uses partial application of `F[_, _]` for better type inference, usage:
-    *   `toState[F](lens)`
-    */
-  object toState {
-    def apply[F[_]]: Aux[F] =
-      new Aux[F]
-
-    final class Aux[F[_]] {
-      def apply[K, V, S](l: Lens[S, Map[K, V]])(implicit F: MonadState[F, S])
-                        : KeyValueStore[K, V, ?] ~> F =
-        new(KeyValueStore[K, V, ?] ~> F) {
-          def apply[A](fa: KeyValueStore[K, V, A]): F[A] = fa match {
-            case CompareAndPut(k, expect, update) =>
-              lookup(k) flatMap { cur =>
-                if (cur == expect)
-                  modify(_ + (k -> update)).as(true)
-                else
-                  F.point(false)
-              }
-
-            case Delete(key) =>
-              modify(_ - key)
-
-            case Keys() =>
-              F.gets(s => l.get(s).keys.toVector)
-
-            case Get(key) =>
-              lookup(key)
-
-            case Put(key, value) =>
-              modify(_ + (key -> value))
-          }
-
-          def lookup(k: K): F[Option[V]] =
-            F.gets(s => l.get(s).get(k))
-
-          def modify(f: Map[K, V] => Map[K, V]): F[Unit] =
-            F.modify(l.modify(f))
-        }
+      }
     }
   }
 }

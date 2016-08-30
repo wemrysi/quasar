@@ -42,6 +42,9 @@ object Read {
     def asks[A](f: R => A): F[A] =
     ask map f
 
+    def asksM[A](f: R => F[A]): F[A] =
+    ask flatMap f
+
     /** Evaluate a computation in a modified environment. */
     def local(f: R => R): F ~> F = {
       val g: Read[R, ?] ~> F = injectFT compose contramapR(f)

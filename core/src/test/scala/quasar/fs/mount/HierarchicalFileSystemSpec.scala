@@ -76,7 +76,7 @@ class HierarchicalFileSystemSpec extends quasar.Qspec with FileSystemFixture {
       MonotonicSeq.toState[MountedFs](seq)
 
     val handlesNT: MountedResultH ~> MountedFs =
-      KeyValueStore.toState[MountedFs](handles)
+      KeyValueStore.impl.toState[MountedFs](handles)
 
     seqNT :+: handlesNT :+: NaturalTransformation.refl
   }
