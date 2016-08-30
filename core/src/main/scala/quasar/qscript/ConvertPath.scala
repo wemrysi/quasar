@@ -132,8 +132,7 @@ object ConvertPath extends ConvertPathInstances {
       SP: SourcedPathable[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
       : F[T[F]] =
-    elems.tail.foldRight(
-      elems.head)(
+    elems.foldRight1(
       (elem, acc) => SP.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
         elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
         acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))))))
