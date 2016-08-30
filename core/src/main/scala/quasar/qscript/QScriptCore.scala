@@ -65,7 +65,8 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
-  *     LeftShift(Map(_.sort, Reduce(_ :: _, ???))
+  *     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
+  *               RightSide)
   * but backends tend to provide sort directly, so this avoids backends having
   * to recognize the pattern. We could provide an algebra
   *     (Sort :+: QScript)#λ => QScript
@@ -77,7 +78,8 @@ object ReduceIndex {
   order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
-/** Eliminates some values from a dataset, based on the result of FilterFunc.
+/** Eliminates some values from a dataset, based on the result of `f` (which
+  * must evaluate to a boolean value for each element in the set).
   */
 @Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
@@ -111,7 +113,7 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
-          case Map(a, func)       => f(a) ∘ (Map[T, B](_, func))
+          case Map(a, func)               => f(a) ∘ (Map[T, B](_, func))
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))

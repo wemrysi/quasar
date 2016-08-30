@@ -168,7 +168,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => TJ.inj(x)
   }
 
-  def simplifyProjections:
+  def simplifyProjection:
       ProjectBucket[T, ?] ~> QScriptCore[T, ?] =
     new (ProjectBucket[T, ?] ~> QScriptCore[T, ?]) {
       def apply[A](proj: ProjectBucket[T, A]) = proj match {
@@ -177,6 +177,60 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         case BucketIndex(src, value, index) =>
           Map(src, Free.roll(MapFuncs.ProjectIndex(value, index)))
       }
+    }
+
+  def simplifyJoin[F[_]: Functor]
+    (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+      ThetaJoin[T, T[F]] => F[T[F]] =
+    tj => {
+      // TODO: This can potentially rewrite conditions to try to get left and right
+      //       references on distinct sides.
+      def alignCondition(l: JoinFunc[T], r: JoinFunc[T]):
+          Option[(FreeMap[T], FreeMap[T])] =
+        if (l.element(LeftSide) && r.element(RightSide) &&
+          !l.element(RightSide) && !r.element(LeftSide))
+          (l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
+        else if (l.element(RightSide) && r.element(LeftSide) &&
+          !l.element(LeftSide) && !r.element(RightSide))
+          (r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
+        else None
+
+      def separateConditions(fm: JoinFunc[T]):
+          (List[(FreeMap[T], FreeMap[T])], Option[JoinFunc[T]]) = fm.resume match {
+        case -\/(And(a, b)) =>
+          val (fir, sec) = (separateConditions(a), separateConditions(b))
+          (fir._1 ++ sec._1,
+            fir._2.fold(
+              sec._2)(
+              f => sec._2.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
+        case -\/(Eq(l, r)) =>
+          alignCondition(l, r).fold[(List[(FreeMap[T], FreeMap[T])], Option[JoinFunc[T]])](
+            (Nil, fm.some))(
+            pair => (List(pair), None))
+        case _ => (Nil, fm.some)
+      }
+
+      def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
+        jf >>= {
+          case LeftSide  => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0)))
+          case RightSide => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))
+        }
+
+      val (sides, filter) = separateConditions(tj.on)
+      val (lSide, rSide) = sides.unzip
+      QC.inj(Map(filter.foldLeft(
+        EJ.inj(EquiJoin(
+          tj.src,
+          tj.lBranch,
+          tj.rBranch,
+          ConcatArraysN(lSide.map(e => Free.roll(MakeArray[T, FreeMap[T]](e)))),
+          ConcatArraysN(rSide.map(e => Free.roll(MakeArray[T, FreeMap[T]](e)))),
+          tj.f,
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.point(LeftSide))),
+            Free.roll(MakeArray(Free.point(RightSide))))))).embed)(
+        (ej, filt) => QC.inj(Filter(ej, mergeSides(filt))).embed),
+        mergeSides(tj.combine)))
     }
 
   def coalesceQC[F[_]: Functor, G[_]: Functor](
@@ -389,8 +443,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    // FIXME: only apply simplifyProjections after pathify
-    (quasar.fp.free.injectedNT[F](simplifyProjections).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
+    // FIXME: only apply `simplifyProjection` after pathify
+    (quasar.fp.free.injectedNT[F](simplifyProjection).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
@@ -436,6 +490,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
     res.map(
       _.transAna(
-        quasar.fp.free.injectedNT[QScriptTotal[T, ?]](simplifyProjections).apply(_: QScriptTotal[T, ?][T[QScriptTotal[T, ?]]])))
+        quasar.fp.free.injectedNT[QScriptTotal[T, ?]](simplifyProjection).apply(_: QScriptTotal[T, ?][T[QScriptTotal[T, ?]]])))
   }
 }
