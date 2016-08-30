@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-package ygg
+package ygg.macros
 
 import quasar.Predef._
-import scala.util._
+import scala.{ Any, StringContext }
+import scala.language.experimental.{ macros => mmmms }
+import ygg.json._
 
-package object macros {
-  type ->[+A, +B] = (A, B)
-  type Vec[+A]    = scala.Vector[A]
-  val Vec         = scala.Vector
-
-  def doTry[A](body: => A): Try[A] = Try(body)
-
-  implicit class TryOps[A](private val x: Try[A]) extends AnyVal {
-    def |(expr: => A): A = fold(_ => expr, x => x)
-    def fold[B](f: Throwable => B, g: A => B): B = x match {
-      case Success(x) => g(x)
-      case Failure(t) => f(t)
-    }
+object Json {
+  implicit final class JsonStringContext(sc: StringContext) {
+    def json(args: Any*): JValue             = macro ygg.macros.JsonMacros.jsonInterpolatorImpl
+    def jsonMany(args: Any*): Vector[JValue] = macro ygg.macros.JsonMacros.jsonManyInterpolatorImpl
   }
 }

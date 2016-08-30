@@ -16,7 +16,7 @@
 
 package ygg.tests
 
-import ygg._, common._, data._
+import ygg._, common._
 import scalaz._, Either3._
 
 class MapUtilsSpec extends quasar.Qspec {
@@ -45,70 +45,4 @@ class MapUtilsSpec extends quasar.Qspec {
       result must haveSize(leftContrib.length + rightContrib.length + middleContrib.length)
     }
   }
-}
-
-class RingDequeSpec extends quasar.Qspec {
-  implicit val params = set(minTestsOk = 200, workers = java.lang.Runtime.getRuntime.availableProcessors)
-
-  "unsafe ring deque" should {
-    "implement prepend" in prop { (xs: List[Int], x: Int) =>
-      val result = fromList(xs, xs.length + 1)
-      result.pushFront(x)
-
-      result.toList must_=== (x +: xs)
-    }
-
-    "implement append" in prop { (xs: List[Int], x: Int) =>
-      val result = fromList(xs, xs.length + 1)
-      result.pushBack(x)
-
-      result.toList must_=== (xs :+ x)
-    }
-
-    "implement popFront" in prop { (xs: List[Int], x: Int) =>
-      val result = fromList(xs, xs.length + 1)
-      result.pushFront(x)
-
-      result.popFront() must_=== x
-      result.toList must_=== xs
-    }
-
-    "implement popBack" in prop { (xs: List[Int], x: Int) =>
-      val result = fromList(xs, xs.length + 1)
-      result.pushBack(x)
-
-      result.popBack() must_=== x
-      result.toList must_=== xs
-    }
-
-    "implement length" in prop { xs: List[Int] =>
-      fromList(xs, xs.length + 10).length must_=== xs.length
-      fromList(xs, xs.length).length must_=== xs.length
-    }
-
-    "satisfy identity" in prop { xs: List[Int] =>
-      fromList(xs, xs.length).toList must_=== xs
-    }
-
-    "append a full list following a half-appending" in prop { xs: List[Int] =>
-      val deque = new RingDeque[Int](xs.length)
-      xs take (xs.length / 2) foreach deque.pushBack
-      (0 until (xs.length / 2)) foreach { _ =>
-        deque.popFront()
-      }
-      xs foreach deque.pushBack
-      deque.toList must_=== xs
-    }
-
-    "reverse a list by prepending" in prop { xs: List[Int] =>
-      val deque = new RingDeque[Int](xs.length)
-      xs foreach deque.pushFront
-      deque.toList must_=== xs.reverse
-    }
-  }
-
-  private def fromList(xs: List[Int], bound: Int): RingDeque[Int] =
-    xs.foldLeft(new RingDeque[Int](bound)) { (deque, x) =>
-      deque pushBack x; deque
-    }
 }
