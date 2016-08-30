@@ -20,7 +20,9 @@ import quasar.Predef._
 
 import scalaz.NonEmptyList
 
-final case class Index(name: String, key: NonEmptyList[(BsonField, IndexType)], unique: Boolean)
+final case class Index(name: String, key: NonEmptyList[(BsonField, IndexType)], unique: Boolean) {
+  def primary: BsonField = key.head._1
+}
 
 sealed abstract class IndexType(bson: Bson)
 object IndexType {

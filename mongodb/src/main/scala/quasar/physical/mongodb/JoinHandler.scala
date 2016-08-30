@@ -56,7 +56,8 @@ object JoinHandler {
     * the aggregation pipeline.
     */
   def pipeline[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (stats: Collection => Option[CollectionStatistics])
+    (stats: Collection => Option[CollectionStatistics],
+      indexes: Collection => Option[Set[Index]])
     (implicit
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
@@ -69,6 +70,14 @@ object JoinHandler {
     /** True if the collection is definitely known to be unsharded. */
     def unsharded(coll: Collection): Boolean =
       stats(coll).cata(!_.sharded, false)
+
+    /** Check for an index which can be used for lookups on a certain field. The
+      * field must appear first in the key for the index to apply.
+      */
+    def indexed(coll: Collection, field: BsonField): Boolean =
+      indexes(coll).cata(
+        _.exists(_.primary ≟ field),
+        false)
 
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
       case $read(Collection(db, _)) => db.some
@@ -142,25 +151,25 @@ object JoinHandler {
 
     (tpe, left, right) match {
       case (set.InnerJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
-            if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
       // case (set.LeftOuterJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
-      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
       //   ???
 
       case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
-            if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
       // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
-      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
       //   ???
 
       case _ => OptionT.none
