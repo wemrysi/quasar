@@ -62,7 +62,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
   val RootTarget: TargetT = DeadEndTarget(Root)
 
-  type Envs = List[Target[Unit]]
+  type Envs = List[Target[ExternallyManaged]]
 
   case class ZipperSides(
     lSide: FreeMap[T],
@@ -77,12 +77,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     sides: ZipperSides,
     tails: ZipperTails)
 
-  def linearize[F[_]: Functor: Foldable]: Algebra[F, List[F[Unit]]] =
-    fl => fl.void :: fl.fold
+  def linearize[F[_]: Functor: Foldable]:
+      Algebra[F, List[F[ExternallyManaged]]] =
+    fl => fl.as[ExternallyManaged](Extern) :: fl.fold
 
   def linearizeEnv[E, F[_]: Functor: Foldable]:
-      Algebra[EnvT[E, F, ?], List[EnvT[E, F, Unit]]] =
-    fl => fl.void :: fl.lower.fold
+      Algebra[EnvT[E, F, ?], List[EnvT[E, F, ExternallyManaged]]] =
+    fl => fl.as[ExternallyManaged](Extern) :: fl.lower.fold
 
 
   def delinearizeInner[A]: Coalgebra[Target, List[Target[A]]] = {
@@ -93,20 +94,20 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def delinearizeTargets[F[_]: Functor, A]:
       ElgotCoalgebra[Hole \/ ?, Target, List[Target[A]]] = {
     case Nil    => SrcHole.left[Target[List[Target[A]]]]
-    case h :: t => h.map(_ => t).right
+    case h :: t => h.map(κ(t)).right
   }
 
-  val consZipped: Algebra[ListF[Target[Unit], ?], ZipperAcc] = {
+  val consZipped: Algebra[ListF[Target[ExternallyManaged], ?], ZipperAcc] = {
     case NilF() => ZipperAcc(Nil, ZipperSides(HoleF[T], HoleF[T]), ZipperTails(Nil, Nil))
     case ConsF(head, ZipperAcc(acc, sides, tails)) => ZipperAcc(head :: acc, sides, tails)
   }
 
   val zipper: ElgotCoalgebra[
       ZipperAcc \/ ?,
-      ListF[Target[Unit], ?],
+      ListF[Target[ExternallyManaged], ?],
       (ZipperSides, ZipperTails)] = {
     case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
-      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[Unit], (ZipperSides, ZipperTails)]](
+      mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[ExternallyManaged], (ZipperSides, ZipperTails)]](
         ZipperAcc(Nil, zs, zt).left) {
         case SrcMerge(inn, lmf, rmf) =>
           ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
@@ -128,11 +129,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     val leftF =
       foldIso(CoEnv.freeIso[Hole, Target])
-        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
+        .get(lTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
 
     val rightF =
       foldIso(CoEnv.freeIso[Hole, Target])
-        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, Unit] >>> (CoEnv(_))))
+        .get(rTail.reverse.ana[T, CoEnv[Hole, Target, ?]](delinearizeTargets[F, ExternallyManaged] >>> (CoEnv(_))))
 
     val commonSrc: T[Target] =
       common.reverse.ana[T, Target](delinearizeInner)
@@ -465,11 +466,11 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
 
-  def fromData[T[_[_]]: Corecursive](data: Data): PlannerError \/ T[EJson] = {
-    data.hyloM[PlannerError \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
-      interpretM[PlannerError \/ ?, EJson, Data, T[EJson]](
-        NonRepresentableData(_).left,
-        _.embed.right[PlannerError]),
+  def fromData[T[_[_]]: Corecursive](data: Data): Data \/ T[EJson] = {
+    data.hyloM[Data \/ ?, CoEnv[Data, EJson, ?], T[EJson]](
+      interpretM[Data \/ ?, EJson, Data, T[EJson]](
+        _.left,
+        _.embed.right),
       Data.toEJson[EJson].apply(_).right)
   }
 
@@ -483,12 +484,17 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
-      fromData(data).map(d =>
+      fromData(data).fold(
+        {
+          case Data.NA => Undefined[T, FreeMap[T]]().right
+          case d => NonRepresentableData(d).left
+        },
+        Constant[T, FreeMap[T]](_).right) ∘ (mf =>
         EnvT((
           EmptyAnn[T],
           QC.inj(Map(
             RootTarget.embed,
-            Free.roll[MapFunc[T, ?], Hole](Nullary[T, FreeMap[T]](d)))))))
+            Free.roll[MapFunc[T, ?], Hole](mf))))))
 
     case LogicalPlan.FreeF(name) =>
       (Planner.UnboundVariable(name): PlannerError).left[TargetT]
@@ -663,7 +669,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           src,
           rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
           rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
-          Free.roll(Nullary(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
+          Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
           LeftOuter,
           Free.point(LeftSide))))).right
 

@@ -130,13 +130,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>  // both sides are a Map
-            (mf1.resume, mf2.resume) match { // if both sides are Nullary, we hit the first case
-              case (-\/(Nullary(_)), _) =>
+            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
+              case (-\/(Constant(_)), _) =>
                 rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
                 }))).getOrElse(TJ.inj(x))
-              case (_, -\/(Nullary(_))) =>
+              case (_, -\/(Constant(_))) =>
                 rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
@@ -145,7 +145,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
             }
           case (Some(Map(\/-(SrcHole), mf1)), _) =>  // left side is a Map
             mf1.resume match {
-              case -\/(Nullary(_)) =>
+              case -\/(Constant(_)) =>
                 rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
@@ -154,7 +154,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
             }
           case (_, Some(Map(\/-(SrcHole), mf2))) =>  // right side is a Map
             mf2.resume match {
-              case -\/(Nullary(_)) =>
+              case -\/(Constant(_)) =>
                 rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
