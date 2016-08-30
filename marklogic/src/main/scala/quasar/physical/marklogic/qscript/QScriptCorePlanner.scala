@@ -36,7 +36,16 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
       XQuery(s"((: REDUCE :)$src)").point[Planning]
 
     case Sort(src, bucket, order) =>
-      XQuery(s"((: SORT :)$src)").point[Planning]
+      // TODO: Use NameGen when merged
+      val tempValName = "orderByTempVal"
+      val tempValXQuery = s"$$$tempValName".xqy
+      val xQueryOrder = order.map { case (func, sortDir) =>
+        (mapFuncXQuery(func, tempValXQuery), SortDirection.fromQScript(sortDir))
+      }
+      expr
+        .for_((tempValName, src))
+        .orderBy((mapFuncXQuery(bucket, tempValXQuery), SortDirection.Ascending), xQueryOrder: _*)
+        .return_(tempValXQuery).point[Planning]
 
     case Filter(src, f) =>
       fn.filter(func("$x") { mapFuncXQuery(f, "$x".xqy) }, src)
