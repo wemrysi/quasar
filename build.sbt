@@ -184,14 +184,13 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, marklogic, sparkcore,
+  mongodb, skeleton, postgresql, marklogic, sparkcore, macros, ygg,
 //      \ \ | / /
           main,
 //        /  \
       repl,   web,
 //        \  /
            it)
-  .enablePlugins(AutomateHeaderPlugin)
 
 // common components
 
