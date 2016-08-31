@@ -55,8 +55,8 @@ sealed abstract class SourcedPathable[T[_[_]], A] {
   repair: JoinFunc[T])
     extends SourcedPathable[T, A]
 
-/** Creates a new dataset, |a|+|b|, containing all of the entries from each of
-  * the input sets, without any indication of which set they came from.
+/** Creates a new dataset that contains the elements from the datasets created
+  * by each branch. Duplicate values should be eliminated.
   */
 @Lenses final case class Union[T[_[_]], A](
   src: A,

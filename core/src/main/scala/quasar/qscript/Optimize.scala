@@ -29,6 +29,12 @@ import matryoshka._,
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _}, Scalaz._, Inject._, Leibniz._
 
+// NB: Helper types for `simplifyJoin`.
+private final case class EquiJoinKey[T[_[_]]]
+  (left: FreeMap[T], right: FreeMap[T])
+private final case class SimplifiedJoinCondition[T[_[_]]]
+  (keys: List[EquiJoinKey[T]], filter: Option[JoinFunc[T]])
+
 class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   // TODO: These optimizations should give rise to various property tests:
@@ -179,36 +185,41 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       }
     }
 
+  /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
+    * connectors to implement. It potentially adds a [[Filter]] iff there are
+    * conditions in the [[ThetaJoin]] that can not be handled by an
+    * [[EquiJoin]].
+    */
   def simplifyJoin[F[_]: Functor]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
       ThetaJoin[T, T[F]] => F[T[F]] =
     tj => {
       // TODO: This can potentially rewrite conditions to try to get left and right
       //       references on distinct sides.
-      def alignCondition(l: JoinFunc[T], r: JoinFunc[T]):
-          Option[(FreeMap[T], FreeMap[T])] =
+      def alignCondition(l: JoinFunc[T], r: JoinFunc[T]): Option[EquiJoinKey[T]] =
         if (l.element(LeftSide) && r.element(RightSide) &&
           !l.element(RightSide) && !r.element(LeftSide))
-          (l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
+          EquiJoinKey(l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
         else if (l.element(RightSide) && r.element(LeftSide) &&
           !l.element(LeftSide) && !r.element(RightSide))
-          (r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
+          EquiJoinKey(r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
         else None
 
-      def separateConditions(fm: JoinFunc[T]):
-          (List[(FreeMap[T], FreeMap[T])], Option[JoinFunc[T]]) = fm.resume match {
-        case -\/(And(a, b)) =>
-          val (fir, sec) = (separateConditions(a), separateConditions(b))
-          (fir._1 ++ sec._1,
-            fir._2.fold(
-              sec._2)(
-              f => sec._2.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
-        case -\/(Eq(l, r)) =>
-          alignCondition(l, r).fold[(List[(FreeMap[T], FreeMap[T])], Option[JoinFunc[T]])](
-            (Nil, fm.some))(
-            pair => (List(pair), None))
-        case _ => (Nil, fm.some)
-      }
+      def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
+        fm.resume match {
+          case -\/(And(a, b)) =>
+            val (fir, sec) = (separateConditions(a), separateConditions(b))
+            SimplifiedJoinCondition(
+              fir.keys ++ sec.keys,
+              fir.filter.fold(
+                sec.filter)(
+                f => sec.filter.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
+          case -\/(Eq(l, r)) =>
+            alignCondition(l, r).fold(
+              SimplifiedJoinCondition(Nil, fm.some))(
+              pair => SimplifiedJoinCondition(List(pair), None))
+          case _ => SimplifiedJoinCondition(Nil, fm.some)
+        }
 
       def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
         jf >>= {
@@ -216,15 +227,14 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
           case RightSide => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))
         }
 
-      val (sides, filter) = separateConditions(tj.on)
-      val (lSide, rSide) = sides.unzip
+      val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
       QC.inj(Map(filter.foldLeft(
         EJ.inj(EquiJoin(
           tj.src,
           tj.lBranch,
           tj.rBranch,
-          ConcatArraysN(lSide.map(e => Free.roll(MakeArray[T, FreeMap[T]](e)))),
-          ConcatArraysN(rSide.map(e => Free.roll(MakeArray[T, FreeMap[T]](e)))),
+          ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))),
+          ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))),
           tj.f,
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.point(LeftSide))),
