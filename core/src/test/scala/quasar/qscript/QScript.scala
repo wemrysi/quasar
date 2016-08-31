@@ -228,26 +228,63 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide)))))).some)
     }
 
-    "convert a constant shift array" in pending {
+    "convert a constant shift array of size one" in pending {
       // this query never makes it to LP->QS transform because it's a constant value
-      // "foo := (1,2,3); select * from foo"
+      // "foo := (7); select * from foo"
+      convert(
+        None,
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))) must
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
+          Free.roll(Constant(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+          Free.point(RightSide)))).some)
+    }
+
+    "convert a constant shift array of size two" in pending {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8); select * from foo"
+      convert(
+        None,
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.ArrayConcat[FLP](
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))) must
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
+          Free.roll(Constant(
+            CommonEJson.inj(ejson.Arr(List(
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+          Free.point(RightSide)))).some)
+    }
+
+    "convert a constant shift array of size three" in pending {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8,9); select * from foo"
       convert(
         None,
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(1))),
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(2)))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))) must
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(8)))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))) must
       equal(chain(
         RootR,
         SP.inj(LeftShift((),
           Free.roll(Constant(
             CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](1)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
+              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
           Free.point(RightSide)))).some)
     }
 
