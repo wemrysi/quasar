@@ -18,10 +18,11 @@ package quasar
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.PathError
+import quasar.fs.{ADir, PathError}
 
 import matryoshka._
 import monocle.Prism
+import pathy.Path.posixCodec
 import scalaz._, Scalaz._
 
 object Planner {
@@ -64,6 +65,15 @@ object Planner {
 
   final case class UnboundVariable(name: Symbol) extends PlannerError {
     def message = s"The variable “$name” is unbound at a use site."
+  }
+
+  final case class NoFilesFound(dirs: List[ADir]) extends PlannerError {
+    def message = dirs.map(posixCodec.printPath) match {
+      case Nil => "No paths provided to read from."
+      case ds  =>
+        "None of these directories contain any files to read from: " ++
+          ds.mkString(", ")
+      }
   }
 
   final case class InternalError(message: String) extends PlannerError

@@ -553,7 +553,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         QC.inj(Take(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
-          Free.roll(left).mapSuspension(FI))))).right
+          Free.roll(right).mapSuspension(FI))))).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -564,7 +564,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         QC.inj(Drop(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
-          Free.roll(left).mapSuspension(FI))))).right
+          Free.roll(right).mapSuspension(FI))))).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
