@@ -26,6 +26,7 @@ import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._, string._ // TODO: remove this
@@ -760,7 +761,7 @@ object MongoDbQScriptPlanner {
              ev: Show[WorkflowBuilder[WF]],
              WB: WorkflowBuilder.Ops[WF],
              R: RenderTree[Fix[WF]]):
-      EitherT[Writer[PhaseResults, ?], FileSystemError, Crystallized[WF]] = {
+      EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WF]] = {
     val optimize = new Optimize[T]
 
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
@@ -769,14 +770,14 @@ object MongoDbQScriptPlanner {
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
     type PlanT[X[_], A] = EitherT[X, FileSystemError, A]
-    type W[A]           = Writer[PhaseResults, A]
+    type W[A]           = WriterT[MongoDbIO, PhaseResults, A]
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
         val result = PhaseResult.Tree(label, RenderTree[A].render(a))
-        (Writer(Vector(result), a): W[A]).liftM[PlanT].liftM[GenT]
+        (WriterT((Vector(result): PhaseResults, a).point[MongoDbIO])).liftM[PlanT].liftM[GenT]
       }
 
     def swizzle[A](sa: StateT[PlannerError \/ ?, NameGen, A]): M[A] =
@@ -788,7 +789,7 @@ object MongoDbQScriptPlanner {
     val P = scala.Predef.implicitly[Planner.Aux[T, QScriptTotal[T, ?]]]
 
     (for {
-      qs  <- QueryFile.convertToQScript[T, Id](None)(lp).liftM[StateT[?[_], NameGen, ?]]
+      qs  <- QueryFile.convertToQScript[T, MongoDbIO](listContents.some)(lp).liftM[StateT[?[_], NameGen, ?]]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
@@ -813,7 +814,7 @@ object MongoDbQScriptPlanner {
     */
   def plan[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
     logical: T[LogicalPlan], queryContext: fs.QueryContext):
-      EitherT[Writer[PhaseResults, ?], FileSystemError, Crystallized[WorkflowF]] = {
+      EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WorkflowF]] = {
     import MongoQueryModel._
 
     queryContext.model match {

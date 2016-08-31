@@ -27,10 +27,9 @@ import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._
 import com.mongodb.async.client.MongoClient
-import matryoshka.{Fix, Recursive}
+import matryoshka.Fix
 import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.stream.{Writer => _, _}
 import scalaz.concurrent.Task
 
 object queryfileTypes {
@@ -50,7 +49,7 @@ object queryfile {
                   (implicit C: DataCursor[MongoDbIO, C])
                   : QueryFile ~> MongoQuery[C, ?] = {
 
-    new QueryFileInterpreter(execMongo, (lp, qc) => MongoDbPlanner.plan(lp, qc).leftMap(FileSystemError.planningFailed(lp, _)))
+    new QueryFileInterpreter(execMongo, (lp, qc) => EitherT(WriterT(MongoDbPlanner.plan(lp, qc).leftMap(FileSystemError.planningFailed(lp, _)).run.run.point[MongoDbIO])))
   }
 
   def interpretQ[C](execMongo: WorkflowExecutor[MongoDbIO, C])
@@ -87,14 +86,13 @@ final case class QueryContext(
 
 private final class QueryFileInterpreter[C](
   execMongo: WorkflowExecutor[MongoDbIO, C],
-  plan: (Fix[LogicalPlan], QueryContext) => EitherT[Writer[PhaseResults, ?], FileSystemError, workflow.Crystallized[workflow.WorkflowF]])(
+  plan: (Fix[LogicalPlan], QueryContext) => EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, workflow.Crystallized[workflow.WorkflowF]])(
   implicit C: DataCursor[MongoDbIO, C]
 ) extends (QueryFile ~> queryfileTypes.MongoQuery[C, ?]) {
 
   import QueryFile._
   import quasar.physical.mongodb.workflow._
-  import FileSystemError._, fsops._
-  import Recursive.ops._
+  import FileSystemError._
   import queryfileTypes._
 
   // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
@@ -150,22 +148,7 @@ private final class QueryFileInterpreter[C](
     } yield ep).run.run
 
     case ListContents(dir) =>
-      (dirName(dir) match {
-        case Some(_) =>
-          collectionsInDir(dir)
-            .map(_ foldMap (collectionPathSegment(dir) andThen (_.toSet)))
-            .run
-
-        case None if depth(dir) == 0 =>
-          MongoDbIO.collections
-            .map(collectionPathSegment(dir))
-            .pipe(process1.stripNone)
-            .runLog
-            .map(_.toSet.right[FileSystemError])
-
-        case None =>
-          nonExistentParent[Set[PathSegment]](dir).run
-      }).liftM[QRT]
+      listContents(dir).run.liftM[QRT]
 
     case FileExists(file) =>
       Collection.fromFile(file).fold(
@@ -175,7 +158,7 @@ private final class QueryFileInterpreter[C](
 
   ////
 
-  private type PlanR[A]       = EitherT[Writer[PhaseResults, ?], FileSystemError, A]
+  private type PlanR[A]       = EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, A]
   private type MongoLogWF[A]  = PhaseResultT[MQ, A]
   private type MongoLogWFR[A] = FileSystemErrT[MongoLogWF, A]
 
@@ -240,7 +223,7 @@ private final class QueryFileInterpreter[C](
     new (PlanR ~> MongoLogWFR) {
       def apply[A](pa: PlanR[A]) = {
         val r = pa.run.run
-        val f: MongoLogWF[FileSystemError \/ A] = WriterT(r.point[MQ])
+        val f: MongoLogWF[FileSystemError \/ A] = WriterT(r.liftM[QueryRT[?[_], C, ?]])
         EitherT(f)
       }
     }
