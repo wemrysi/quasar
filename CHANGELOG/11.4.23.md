@@ -1,0 +1,2 @@
+- More general NameGenerator instances
+  - Tidy up MongoDB name gen to use a CollectionName prefix

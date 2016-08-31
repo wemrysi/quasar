@@ -96,6 +96,8 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         e.toApiError
       case PlanningFailed(lp, e) =>
         e.toApiError :+ ("logicalPlan" := lp.render)
+      case QScriptPlanningFailed(e) =>
+        e.toApiError
       case UnknownReadHandle(ReadHandle(path, id)) =>
         apiError(
           InternalServerError withReason "Unknown read handle.",
@@ -244,6 +246,11 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
       case UnboundVariable(v) =>
         fromMsg_(
           InternalServerError withReason "Unbound variable.", v.toString)
+      case NoFilesFound(dirs) =>
+        fromMsg(
+          BadRequest withReason "No files to read from.",
+          err.message,
+          "dirs" := dirs.map(posixCodec.printPath))
     })
   }
 

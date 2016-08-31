@@ -37,8 +37,9 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
        val run = liftFG(opt.elideNopMap[QS])
 
        QueryFile.optimizeEval(query)(run).toOption must
-       equal(
-         QC.inj(Map(RootR, BoolLit(true))).embed.some)
+         equal(chain(
+           RootR,
+           QC.inj(Map((), BoolLit(true)))).some)
     }
 
     "optimize a basic read" in {
@@ -52,11 +53,11 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val query = lpRead("/foo")
 
       QueryFile.optimizeEval(query)(run).toOption must
-      equal(
-        SP.inj(LeftShift(
-          RootR,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
     }
 
     "simplify a ThetaJoin" in {

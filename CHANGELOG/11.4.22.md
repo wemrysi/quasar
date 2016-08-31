@@ -1,0 +1,4 @@
+- improvements to MongoDB-QScript connector
+  - Selector algebra
+  - simplified JS algebra
+  - always attempt ExprOp before JS

@@ -1,0 +1,1 @@
+- Do not concat an empty array when there are no buckets.
