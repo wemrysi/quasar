@@ -56,7 +56,7 @@ object ReduceIndex {
   *
   * @group MRA
   */
- // TODO: type level guarantees about indexing with `repair` into `reducers`
+// TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -225,8 +225,8 @@ object QScriptCore {
               src,
               // NB: all single-bucket reductions should reduce on `null`
               normBuck.resume.fold({
-                case Nullary(_) => MapFuncs.NullLit[T, Hole]()
-                case _          => normBuck
+                case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
+                case _                    => normBuck
               }, κ(normBuck)),
               reducers.map(_.map(normalizeMapFunc(_))),
               normalizeMapFunc(repair))

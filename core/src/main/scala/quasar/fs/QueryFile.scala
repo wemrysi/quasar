@@ -58,8 +58,8 @@ object QueryFile {
         .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
   }
 
-  /** A variant of convertToQScript that takes advantage of an existing QueryFile
-    * implementation.
+  /** A variant of convertToQScript that takes advantage of an existing
+    * QueryFile implementation.
     */
   def algConvertToQScript
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
@@ -75,17 +75,20 @@ object QueryFile {
     f: Option[ConvertPath.ListContents[M]])(
     lp: T[LogicalPlan]):
       EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+    val transform = new Transform[T, QS[T, ?]]
     val optimize = new Optimize[T]
 
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
     val qs =
       (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
-        optimize.eliminateProjections(f)).map(
+        optimize.eliminateProjections[M, QScriptTotal[T, ?]](f)).map(
         _.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
     EitherT(WriterT(qs.run.map(qq => (
-      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq.fold(
+        κ(Vector()),
+        a => Vector(PhaseResult.Tree("QScript", a.cata(transform.linearize).reverse.render))),
       qq))))
   }
 

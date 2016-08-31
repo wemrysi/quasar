@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import quasar.Predef.{List, Long, String, Vector}
+import quasar.Predef.{List, String, Vector}
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
@@ -50,9 +50,6 @@ package object quasar {
   type EnvErrT[F[_], A] = EitherT[F, EnvironmentError, A]
 
   type PlannerErrT[F[_], A] = EitherT[F, Planner.PlannerError, A]
-
-  type SeqNameGeneratorT[F[_], A] = StateT[F, Long, A]
-  type SaltedSeqNameGeneratorT[F[_], A] = ReaderT[SeqNameGeneratorT[F, ?], String, A]
 
   private def phase[A: RenderTree](label: String, r: SemanticErrors \/ A):
       CompileM[A] =
