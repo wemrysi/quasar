@@ -164,8 +164,10 @@ trait FileSystemFixture {
 object FileSystemFixture {
   import ReadFile._, WriteFile._
 
-  type Reads      = List[FileSystemError \/ Vector[Data]]
-  type Writes     = List[Vector[FileSystemError]]
+  type ErrOrData  = FileSystemError \/ Vector[Data]
+  type Errors     = Vector[FileSystemError]
+  type Reads      = List[ErrOrData]
+  type Writes     = List[Errors]
   type ReadWrites = (Reads, Writes)
 
   type ReadWriteT[F[_], A] = StateT[F, ReadWrites, A]
@@ -214,21 +216,11 @@ object FileSystemFixture {
 
   ////
 
-  private val readsL: ReadWrites @> Reads =
-    Lens.firstLens
+  private val readsL: ReadWrites      @>  Reads     = Lens.firstLens
+  private val nextReadL: ReadWrites   @?> ErrOrData = PLens.listHeadPLens <=< ~readsL
+  private val restReadsL: ReadWrites  @?> Reads     = PLens.listTailPLens <=< ~readsL
 
-  private val nextReadL: ReadWrites @?> (FileSystemError \/ Vector[Data]) =
-    PLens.listHeadPLens <=< ~readsL
-
-  private val restReadsL: ReadWrites @?> (List[FileSystemError \/ Vector[Data]]) =
-    PLens.listTailPLens <=< ~readsL
-
-  private val writesL: ReadWrites @> Writes =
-    Lens.secondLens
-
-  private val nextWriteL: ReadWrites @?> Vector[FileSystemError] =
-    PLens.listHeadPLens <=< ~writesL
-
-  private val restWritesL: ReadWrites @?> List[Vector[FileSystemError]] =
-    PLens.listTailPLens <=< ~writesL
+  private val writesL: ReadWrites     @>  Writes    = Lens.secondLens
+  private val nextWriteL: ReadWrites  @?> Errors    = PLens.listHeadPLens <=< ~writesL
+  private val restWritesL: ReadWrites @?> Writes    = PLens.listTailPLens <=< ~writesL
 }
