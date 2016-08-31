@@ -248,6 +248,7 @@ lazy val main = project
     core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
+  .settings(initialCommands in console := "import quasar._, main._, scalaz._, Scalaz._")
   .enablePlugins(AutomateHeaderPlugin)
 
 def setup(p: Project): Project = (
@@ -267,8 +268,11 @@ lazy val mongodb = project
 
 lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(core % BothScopes, ygg % BothScopes, macros)
   .settings(commonSettings)
+  .settings(scalacOptions ++= Seq("-language:_"))
+  .settings(initialCommands in console := "import quasar._, fs._, scalaz._, Scalaz._, physical._, skeleton._")
+  .settings(wartremoverWarnings in (Compile, compile) -= Wart.Null)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project

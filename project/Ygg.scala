@@ -26,7 +26,7 @@ object Ygg {
   )
 
   def ygg(p: Project): Project = ( p
-    .dependsOn('core % BothScopes, 'macros)
+    .dependsOn('foundation % BothScopes, 'macros)
     .settings(name := "quasar-ygg-internal")
     .settings(scalacOptions ++= Seq("-language:_"))
     .settings(libraryDependencies ++= Dependencies.ygg)

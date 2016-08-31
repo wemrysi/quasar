@@ -25,13 +25,32 @@ import scalaz.concurrent.Task
 package object fs {
   val FsType = FileSystemType("skeleton")
 
-  def query[S[_]]: QueryFile ~> Free[S, ?] = Empty.queryFile[Free[S, ?]]
-  def read[S[_]]: ReadFile ~> Free[S, ?] = Empty.readFile[Free[S, ?]]
-  def write[S[_]]: WriteFile ~> Free[S, ?] = Empty.writeFile[Free[S, ?]]
+  // object QueryFile {
+  //   ResultHandle(run: Long)
+  //
+  //   ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
+  //   EvaluatePlan(lp: Fix[LogicalPlan])
+  //   More(h: ResultHandle)
+  //   Close(h: ResultHandle)
+  //   Explain(lp: Fix[LogicalPlan])
+  //   ListContents(dir: ADir)
+  //   FileExists(file: AFile)
+  // }
+  //
+  // object ReadFile {
+  //   ReadHandle(file: AFile, id: Long)
+  //
+  //   Open(file: AFile, offset: Natural, limit: Option[Positive])
+  //   Read(h: ReadHandle)
+  //   Close(h: ReadHandle)
+  // }
+
+  def query[S[_]]: QueryFile ~> Free[S, ?]   = Empty.queryFile[Free[S, ?]]
+  def read[S[_]]: ReadFile ~> Free[S, ?]     = Empty.readFile[Free[S, ?]]
+  def write[S[_]]: WriteFile ~> Free[S, ?]   = Empty.writeFile[Free[S, ?]]
   def manage[S[_]]: ManageFile ~> Free[S, ?] = Empty.manageFile[Free[S, ?]]
 
-  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S):
-      FileSystemDef[Free[S, ?]] =
+  def definition[S[_]](implicit S0: Task :<: S, S1: PhysErr :<: S): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
         FileSystemDef.DefinitionResult[Free[S, ?]](
