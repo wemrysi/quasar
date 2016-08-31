@@ -130,7 +130,7 @@ package object workflow {
         I.inj($SortF(src, sort2 ⊹ sort1)).some
       case $limit(src, count) => src.project match {
         case $limit(src0, count0) =>
-          I.inj($LimitF(src0, count0 min count)).some
+          I.inj($LimitF(src0, scala.math.min(count0, count))).some
         case $skip(src0, count0) =>
           I.inj($SkipF(I.inj($LimitF(src0, count0 + count)).embed, count0)).some
         case _ => None
