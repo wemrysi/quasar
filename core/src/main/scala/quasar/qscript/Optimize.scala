@@ -130,13 +130,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>  // both sides are a Map
-            (mf1.resume, mf2.resume) match { // if both sides are Nullary, we hit the first case
-              case (-\/(Nullary(_)), _) =>
+            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
+              case (-\/(Constant(_)), _) =>
                 rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
                 }))).getOrElse(TJ.inj(x))
-              case (_, -\/(Nullary(_))) =>
+              case (_, -\/(Constant(_))) =>
                 rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
@@ -145,7 +145,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
             }
           case (Some(Map(\/-(SrcHole), mf1)), _) =>  // left side is a Map
             mf1.resume match {
-              case -\/(Nullary(_)) =>
+              case -\/(Constant(_)) =>
                 rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => mf1
                   case RightSide => HoleF
@@ -154,7 +154,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
             }
           case (_, Some(Map(\/-(SrcHole), mf2))) =>  // right side is a Map
             mf2.resume match {
-              case -\/(Nullary(_)) =>
+              case -\/(Constant(_)) =>
                 rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
                   case LeftSide  => HoleF
                   case RightSide => mf2
@@ -231,14 +231,35 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => QC.inj(x)
   }
 
+  def swapMapCount[F[_], G[_]: Functor]
+    (GtoF: G ~> (Option ∘ F)#λ)
+    (implicit QC: QScriptCore[T, ?] :<: F)
+      : QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
+    case x @ Map(Embed(src), mf) =>
+      (GtoF(src) >>= QC.prj).fold[QScriptCore[T, T[G]]] (
+        x)(
+        {
+          case Drop(innerSrc, lb, rb) =>
+            Drop(innerSrc,
+              Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
+              rb)
+          case Take(innerSrc, lb, rb) =>
+            Take(innerSrc,
+              Free.roll(Inject[QScriptCore[T, ?], QScriptTotal[T, ?]].inj(Map(lb, mf))),
+              rb)
+          case _ => x
+        })
+    case x => x
+  }
+
   def simplifyQC[F[_]: Functor, G[_]: Functor](
     FtoG: F ~> G)(
     implicit DE: Const[DeadEnd, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
-      QScriptCore[T, T[G]] => F[T[G]] = {
+      QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
     case Map(src, f) if f.length ≟ 0 =>
-      QC.inj(Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f))
-    case x => QC.inj(x)
+      Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f)
+    case x => x
   }
 
   def simplifySP[F[_]: Functor, G[_]: Functor](
@@ -374,8 +395,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
       liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
       liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
-      liftFG(simplifyQC[F, F](NaturalTransformation.refl[F])) ⋙
+      liftFF(simplifyQC[F, F](NaturalTransformation.refl[F])) ⋙
       liftFG(simplifySP[F, F](optionIdF[F])) ⋙
+      liftFF(swapMapCount[F, F](optionIdF[F])) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
@@ -398,8 +420,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       // FIXME: currently interferes with elideConstantJoin
-      // liftFG(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
+      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
       liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
