@@ -111,7 +111,7 @@ trait StringLib extends Library {
   val Search = TernaryFunc(
     Mapping,
     "search",
-    "Determines if a string value matches a regular expresssion. If the third argument is true, then it is a case-insensitive match.",
+    "Determines if a string value matches a regular expression. If the third argument is true, then it is a case-insensitive match.",
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
@@ -161,7 +161,7 @@ trait StringLib extends Library {
     noSimplification,
     partialTyper[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
-        Type.Const (Data.Str(str.toUpperCase))
+        Type.Const(Data.Str(str.toUpperCase))
       case Sized(Type.Str) => Type.Str
     },
     basicUntyper)
