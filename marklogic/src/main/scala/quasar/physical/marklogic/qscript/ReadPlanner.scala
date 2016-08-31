@@ -27,10 +27,16 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
+  import expr.{for_, if_}
+
   def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[Read, ?], XQuery] = {
     case Const(Read(absFile)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
-      cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)).point[PlanningT[F, ?]]
+
+      liftP((freshVar[F] |@| freshVar[F])((d, c) =>
+        for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
+        .let_(c -> d.xqy `/` "child::node()".xs)
+        .return_ { if_ (json.isObject(c.xqy)) then_ json.transformFromJson(c.xqy) else_ c.xqy }))
   }
 }

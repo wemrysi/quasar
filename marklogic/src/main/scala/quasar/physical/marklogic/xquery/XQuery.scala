@@ -72,6 +72,7 @@ sealed abstract class XQuery {
   def toQuery: String =
     s"""
       xquery version "1.0-ml";
+      import module namespace json = "http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
       declare namespace ejson  = "http://quasar-analytics.org/ejson";
       declare namespace quasar = "http://quasar-analytics.org/quasar";
 

@@ -27,11 +27,25 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class SourcedPathablePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
+  import expr.{for_, let_}
+
   def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], SourcedPathable[T, ?], XQuery] = {
     case LeftShift(src, struct, repair) =>
-      s"((: LeftShift :)$src)".xqy.point[PlanningT[F, ?]]
+      liftP(for {
+        s       <- freshVar[F]
+        l       <- freshVar[F]
+        r       <- freshVar[F]
+        extract <- mapFuncXQuery(struct, s.xqy)
+        lshift  <- local.leftShift(l.xqy)
+        merge   <- mergeXQuery(repair, l.xqy, r.xqy)
+      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge)
 
+    // TODO: Should duplicates be preserved?
     case Union(src, lBranch, rBranch) =>
-      s"((: Union :)$src)".xqy.point[PlanningT[F, ?]]
+      for {
+        s <- liftP(freshVar[F])
+        l <- rebaseXQuery(lBranch, s.xqy)
+        r <- rebaseXQuery(rBranch, s.xqy)
+      } yield let_(s -> src) return_ mkSeq_(l, r)
   }
 }

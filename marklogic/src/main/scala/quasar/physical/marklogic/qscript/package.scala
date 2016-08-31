@@ -59,6 +59,12 @@ package object qscript {
   def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](fm: FreeMap[T], src: XQuery): F[XQuery] =
     planMapFunc[T, F, Hole](fm)(κ(src))
 
+  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+    planMapFunc[T, F, JoinSide](jf) {
+      case LeftSide  => l
+      case RightSide => r
+    }
+
   def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad, A](
     freeMap: Free[MapFunc[T, ?], A])(
     recover: A => XQuery

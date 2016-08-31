@@ -40,6 +40,9 @@ object fn {
   def doc(uri: XQuery): XQuery =
     XQuery(s"fn:doc($uri)")
 
+  def empty(seq: XQuery): XQuery =
+    XQuery(s"fn:empty($seq)")
+
   def error(err: XQuery, desc: Option[XQuery] = None, errObj: Option[XQuery] = None): XQuery =
     XQuery(s"fn:error(${err}${asArg(desc)}${asArg(errObj)})")
 

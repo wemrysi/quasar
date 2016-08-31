@@ -24,7 +24,7 @@ import scalaz.syntax.apply._
 
 // TODO: Optimize using XQuery seq as much as possible.
 object ejson {
-  import syntax._, expr.for_
+  import syntax._, expr.{element, for_, func, let_}
 
   val nsUri: String =
     "http://quasar-analytics.org/ejson"
@@ -43,11 +43,19 @@ object ejson {
   val mapKeyQName  : XQuery = ejsonQName(mapKeyName)
   val mapValueQName: XQuery = ejsonQName(mapValueName)
 
-  def arrayConcat(arr1: XQuery, arr2: XQuery): XQuery =
-    XQuery(xmlElement(arrayName, s"{${mkSeq_(arr1 `/` arrayEltName.xs, arr2 `/` arrayEltName.xs)}}"))
+  def arrayConcat[F[_]: NameGenerator: Apply](arr1: XQuery, arr2: XQuery): F[XQuery] =
+    (freshVar[F] |@| freshVar[F])((x, y) =>
+      mkSeq_(let_(
+        x -> arr1,
+        y -> arr2
+      ) return_ {
+        mkArray(mkSeq_(
+          x.xqy `/` arrayEltName.xs,
+          y.xqy `/` arrayEltName.xs))
+      }))
 
   def arrayLeftShift(arr: XQuery): XQuery =
-    arr `/` arrayEltName.xs `/` "child::node()".xs
+    mkSeq_(arr) `/` arrayEltName.xs `/` "child::node()".xs
 
   def isArray(item: XQuery): XQuery =
     fn.nodeName(item) === arrayQName
@@ -56,21 +64,34 @@ object ejson {
     fn.nodeName(item) === mapQName
 
   def mapLeftShift(map: XQuery): XQuery =
-    map `/` mapEntryName.xs `/` mapValueName.xs `/` "child::node()".xs
+    mkSeq_(map) `/` mapEntryName.xs `/` mapValueName.xs `/` "child::node()".xs
+
+  def mapLookup[F[_]: NameGenerator: Apply](map: XQuery, key: XQuery): F[XQuery] =
+    (freshVar[F] |@| freshVar[F])((m, k) =>
+      let_(m -> map, k -> key) return_ {
+        (m.xqy `/` mapEntryName.xs)(mapKeyName.xqy === k.xqy) `/` mapValueName.xs `/` "child::node()".xs
+      })
 
   def mkArray(elements: XQuery): XQuery =
-    XQuery(xmlElement(arrayName, s"{$elements}"))
+    element { arrayName.xs } { elements }
 
   def mkArrayElt(item: XQuery): XQuery =
-    XQuery(xmlElement(arrayEltName, s"{$item}"))
+    element { arrayEltName.xs } { item }
 
   def mkMap(entries: XQuery): XQuery =
-    XQuery(xmlElement(mapName, s"{$entries}"))
+    element { mapName.xs } { entries }
 
   def mkMapEntry(key: XQuery, value: XQuery): XQuery =
-    XQuery(xmlElement(mapEntryName,
-      xmlElement(mapKeyName, s"{$key}") +
-      xmlElement(mapValueName, s"{$value}")))
+    element { mapEntryName.xs } {
+      mkSeq_(
+        element { mapKeyName.xs } { key },
+        element { mapValueName.xs } { value }
+      )
+    }
+
+  def nodeSeqToArray[F[_]: NameGenerator: Functor](seq: XQuery): F[XQuery] =
+    freshVar[F] map (x =>
+      mkArray(fn.map(func(x) { mkArrayElt(x.xqy) }, seq)))
 
   def singletonArray(item: XQuery): XQuery =
     mkArray(mkArrayElt(item))
@@ -85,7 +106,7 @@ object ejson {
           e -> emap `/` mapEntryName.xs)
         .let_(
           k -> e.xqy `/` mapKeyName.xs `/` "child::node()".xs,
-          v -> e.xqy `/` mapValueName.xs `/` "child:node()".xs)
+          v -> e.xqy `/` mapValueName.xs `/` "child::node()".xs)
         .return_(
           mkMapEntry(k.xqy, mkArray(mkSeq_(mkArrayElt(k.xqy), mkArrayElt(v.xqy)))))))
 

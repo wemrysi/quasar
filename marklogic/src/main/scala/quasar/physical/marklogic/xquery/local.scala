@@ -21,7 +21,7 @@ import quasar.NameGenerator
 
 import java.lang.SuppressWarnings
 
-import scalaz.Apply
+import scalaz.{Apply, Functor}
 import scalaz.syntax.apply._
 
 /** Functions local to Quasar, will likely need to break this object up once we
@@ -29,17 +29,39 @@ import scalaz.syntax.apply._
  */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object local {
-  import expr.{element, for_}
+  import expr.{element, for_, if_, let_}
   import syntax._
 
   val nsUri: String =
     "http://quasar-analytics.org/quasar"
 
-  def leftShiftNode(node: XQuery): XQuery =
-    node `/` "child::node()".xs `/` "child::item()".xs
+  val dataName  : String = "quasar:data"
+  val qErrorName: String = "quasar:error"
 
-  val qErrorQName: XQuery =
-    fn.QName(nsUri.xs, "quasar:ERROR".xs)
+  val dataQName  : XQuery = quasarQName(dataName)
+  val qErrorQName: XQuery = quasarQName(qErrorName)
+
+  def isDocumentNode(node: XQuery): XQuery =
+    xdmp.nodeKind(node) === "document".xs
+
+  def leftShiftNode(node: XQuery): XQuery =
+    node `/` "child::node()".xs `/` "child::node()".xs
+
+  def leftShift[F[_]: NameGenerator: Functor](item: XQuery): F[XQuery] =
+    freshVar[F] map { x =>
+      let_(x -> item) return_ {
+        if_(ejson.isArray(x.xqy))
+        .then_ { ejson.arrayLeftShift(x.xqy) }
+        .else_ {
+          if_ (ejson.isMap(x.xqy))
+          .then_ { ejson.mapLeftShift(x.xqy) }
+          .else_ { leftShiftNode(x.xqy) }
+        }
+      }
+    }
+
+  def mkData(children: XQuery): XQuery =
+    element { dataName.xs } { children }
 
   def qError(desc: XQuery, errObj: Option[XQuery] = None): XQuery =
     fn.error(qErrorQName, Some(desc), errObj)
@@ -54,7 +76,12 @@ object local {
           .return_(
             ejson.mkMapEntry(n.xqy, ejson.mkArray(mkSeq_(
               ejson.mkArrayElt(n.xqy),
-              ejson.mkArrayElt(c.xqy `/` "child::item()".xs))))))
+              ejson.mkArrayElt(c.xqy `/` "child::node()".xs))))))
       }
     }
+
+  ////
+
+  private def quasarQName(name: String): XQuery =
+    fn.QName(nsUri.xs, name.xs)
 }

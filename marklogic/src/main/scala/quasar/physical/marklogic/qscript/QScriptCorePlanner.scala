@@ -31,7 +31,10 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
 
   def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
-      liftP(mapFuncXQuery[T, F](f, src))
+      liftP(for {
+        x <- freshVar[F]
+        g <- mapFuncXQuery(f, x.xqy)
+      } yield fn.map(func(x) { g }, src))
 
     case Reduce(src, bucket, reducers, repair) =>
       XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
@@ -48,24 +51,32 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
     // NB: XQuery sequences use 1-based indexing.
     case Take(src, from, count) =>
       for {
-        x   <- liftP(freshVar[F])
-        fm  <- rebaseXQuery(from, x.xqy)
-        ct  <- rebaseXQuery(count, x.xqy)
-      } yield let_(x -> src) return_ x.xqy((fm + 1.xqy).seq to ct)
+        s   <- liftP(freshVar[F])
+        f   <- liftP(freshVar[F])
+        c   <- liftP(freshVar[F])
+        fm  <- rebaseXQuery(from, s.xqy)
+        ct  <- rebaseXQuery(count, s.xqy)
+      } yield let_(
+        s -> src,
+        f -> (fm + 1.xqy),
+        c -> ct
+      ) return_ s.xqy(f.xqy to c.xqy)
 
     case Drop(src, from, count) =>
       for {
-        x  <- liftP(freshVar[F])
-        fm <- rebaseXQuery(from, x.xqy)
-        ct <- rebaseXQuery(count, x.xqy)
+        s  <- liftP(freshVar[F])
+        f  <- liftP(freshVar[F])
+        c  <- liftP(freshVar[F])
+        fm <- rebaseXQuery(from, s.xqy)
+        ct <- rebaseXQuery(count, s.xqy)
       } yield {
-        let_(x -> src) return_ {
-          if_ (fm eq 0.xqy) then_ {
-            fn.subsequence(x.xqy, ct)
+        let_(s -> src, f -> fm, c -> ct) return_ {
+          if_ (f.xqy eq 0.xqy) then_ {
+            fn.subsequence(s.xqy, c.xqy)
           } else_ {
             mkSeq_(
-              fn.subsequence(x.xqy, 1.xqy, some(fm)),
-              fn.subsequence(x.xqy, ct))
+              fn.subsequence(s.xqy, 1.xqy, some(f.xqy)),
+              fn.subsequence(s.xqy, c.xqy))
           }
         }
       }

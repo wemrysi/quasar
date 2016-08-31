@@ -38,6 +38,7 @@ object MapFuncPlanner {
     case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
 
     // array
+    // TODO: Needs to handle Ejson arrays and strings, not seqs
     case Length(arr) => fn.count(arr).point[F]
 
     // time TODO
@@ -72,15 +73,32 @@ object MapFuncPlanner {
     case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
-    case MakeArray(x) => ejson.singletonArray(x).point[F]
-    case MakeMap(k, v) => ejson.singletonMap(k, v).point[F]
-    case ConcatArrays(x, y) => ejson.arrayConcat(x, y).point[F]
+    case MakeArray(x) =>
+      ejson.singletonArray(x).point[F]
+
+    // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
+    case MakeMap(k, v) =>
+      ejson.singletonMap(k, v).point[F]
+
+    case ConcatArrays(x, y) =>
+      ejson.arrayConcat(x, y)
 
     // TODO: Handle EJson map as well as XML nodes
-    case ProjectField(src, field) => (src `/` field).point[F]
+    case ProjectField(src, field) =>
+      for {
+        m <- freshVar[F]
+        k <- freshVar[F]
+        v <- ejson.mapLookup(m.xqy, k.xqy)
+      } yield {
+        let_(m -> src, k -> field) return_ {
+          if_ (ejson.isMap(m.xqy)) then_ v else_ (m.xqy `/` k.xqy)
+        }
+      }
 
     // TODO: Handle complex 'idx' expressions, this likely only works with literals, could use 'let' but
     //       will need some namegen to avoid shadowing.
+    //
+    // TODO: What other types should this work with?
     case ProjectIndex(arr, idx) =>
       (arr `/` s"child::${ejson.arrayEltName}[$idx + 1]".xs `/` "child::node()".xs).point[F]
 
@@ -94,7 +112,10 @@ object MapFuncPlanner {
         zmnk <- local.zipMapNodeKeys(src.xqy)
       } yield {
         let_(src -> m) return_ {
-          if_(ejson.isMap(src.xqy)) then_ zmk else_ zmnk
+          // TODO: Should this be necessary?
+          if_(fn.empty(src.xqy))
+          .then_ { src.xqy }
+          .else_ { if_(ejson.isMap(src.xqy)) then_ zmk else_ zmnk }
         }
       }
 
