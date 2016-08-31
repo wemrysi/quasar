@@ -24,6 +24,7 @@ import org.specs2.execute._
 // import org.specs2.matcher._
 // import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime}
 // import scalaz._
+import org.scalacheck.Arbitrary, Arbitrary._
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
@@ -38,15 +39,23 @@ class SimplifyStdLibSpec extends StdLibSpec {
     (simple must beRightDisjunction(LogicalPlan.Constant(expected))).toResult
   }
   
-  def nullary(prg: Fix[LogicalPlan], expected: Data) =
-    run(prg, expected)
+  val runner = new StdLibTestRunner {
+      def nullary(prg: Fix[LogicalPlan], expected: Data) =
+        run(prg, expected)
 
-  def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
-    run(prg(LogicalPlan.Constant(arg)), expected)
+      def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
+        run(prg(LogicalPlan.Constant(arg)), expected)
   
-  def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
-    run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2)), expected)
+      def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
+        run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2)), expected)
   
-  def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) = 
-    run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2), LogicalPlan.Constant(arg3)), expected)
+      def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) = 
+        run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2), LogicalPlan.Constant(arg3)), expected)
+        
+      def intDomain = arbitrary[BigInt]
+      def decDomain = arbitrary[BigDecimal]
+      def stringDomain = arbitrary[String]
+    }
+  
+  tests(runner)
 }

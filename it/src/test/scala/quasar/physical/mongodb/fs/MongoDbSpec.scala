@@ -20,15 +20,15 @@ import quasar.Predef._
 import quasar._
 import quasar.fs.{ADir, FileSystemType}
 import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig._
-import quasar.physical.mongodb._
 
 import com.mongodb.async.client.MongoClient
-import org.specs2.specification.core.Fragment
-import pathy.Path._
+import org.specs2.specification.core.{Fragment, Fragments}
+import org.specs2.specification.create.DefaultFragmentFactory._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
-class MongoDbIOSpec extends QuasarSpecification {
+
+object MongoDbSpec {
   def cfgs(fsType: FileSystemType): Task[List[(BackendName, ConnectionUri, ConnectionUri)]] =
     TestConfig.backendNames.traverse(n => TestConfig.loadConfigPair(n).map[Option[(BackendName, ConnectionUri, ConnectionUri)]] {
       case (FileSystemConfig(`fsType`, testUri),
@@ -42,46 +42,15 @@ class MongoDbIOSpec extends QuasarSpecification {
       err => Task.fail(new RuntimeException(err.toString)),
       Task.now))
 
-  def clientShould(examples: (ADir, MongoClient, MongoClient) => Fragment): Unit =
+  def clientShould(examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
     TestConfig.testDataPrefix.flatMap { prefix =>
-      cfgs(MongoDBFsType).map(_ traverse_[Id] { case (name, setupUri, testUri) =>
+      cfgs(MongoDBFsType).flatMap(_.traverse { case (name, setupUri, testUri) =>
         (connect(setupUri) |@| connect(testUri)) { (setupClient, testClient) =>
-          s"${name.name}" should examples(prefix, setupClient, testClient)
-
-          step(testClient.close)
-
-          ()
-        }.unsafePerformSync
+            Fragments(
+              examples(name, prefix, setupClient, testClient),
+              step(testClient.close),
+              step(setupClient.close))
+          }
       })
-    }.unsafePerformSync
-
-  clientShould { (prefix, setupClient, testClient) =>
-    import MongoDbIO._
-
-    val tempColl: Task[Collection] =
-      for {
-        n <- NameGenerator.salt
-        c <- Collection.fromFile(prefix </> file(n))
-              .fold(err => Task.fail(new RuntimeException(err.shows)), Task.now)
-      } yield c
-
-    "get mongo version" in {
-      serverVersion.run(testClient).unsafePerformSync.length must beGreaterThanOrEqualTo(2)
-    }
-
-    "get stats" in {
-      (for {
-        coll  <- tempColl
-        _     <- insert(
-                  coll,
-                  List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)
-        stats <- collectionStatistics(coll).run(testClient)
-        _     <- dropCollection(coll).run(setupClient)
-      } yield {
-        stats.count    must_=== 1
-        stats.dataSize must beGreaterThan(0L)
-        stats.sharded  must beFalse
-      }).unsafePerformSync
-    }
-  }
+    }.map(_.suml).unsafePerformSync
 }
