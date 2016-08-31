@@ -56,7 +56,7 @@ object ReduceIndex {
   *
   * @group MRA
   */
- // TODO: type level guarantees about indexing with `repair` into `reducers`
+// TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -170,12 +170,20 @@ object QScriptCore {
                 EnvT((Ann(_,  v2), Map(_, m2)))) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
-            val (buck, newBuckets) = concatBuckets(b1.map(_ >> m1))
-            val (full, buckAccess, valAccess) = concat(buck, mf)
-            SrcMerge(
-              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
-              lv,
-              rv).some
+            concatBuckets(b1.map(_ >> m1)) match {
+              case Some((buck, newBuckets)) => {
+                val (full, buckAccess, valAccess) = concat(buck, mf)
+                SrcMerge(
+                  EnvT((Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+              }
+              case None =>
+                SrcMerge(
+                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+            }
 
           case (EnvT((Ann(b1, v1), Reduce(_, bucket1, func1, rep1))),
                 EnvT((Ann(b2, v2), Reduce(_, bucket2, func2, rep2)))) =>

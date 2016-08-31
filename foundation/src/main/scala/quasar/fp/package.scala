@@ -621,6 +621,10 @@ package object fp
       self.ana(CoEnv.freeIso[E, F].reverseGet)
   }
 
+  // TODO[matryoshka]: Should be an HMap instance
+  def coEnvHmap[F[_], G[_], A, B](fa: CoEnv[A, F, B])(f: F ~> G) =
+    CoEnv(fa.run.map(f(_)))
+
   // TODO[matryoshka]: Should be an HTraverse instance
   def coEnvHtraverse[G[_]: Applicative, F[_], H[_], A, B](
     fa: CoEnv[A, F, B])(

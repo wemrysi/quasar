@@ -109,8 +109,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case (zs @ ZipperSides(lm, rm), zt @ ZipperTails(l :: ls, r :: rs)) =>
       mergeable.mergeSrcs(lm, rm, l, r).fold[ZipperAcc \/ ListF[Target[ExternallyManaged], (ZipperSides, ZipperTails)]](
         ZipperAcc(Nil, zs, zt).left) {
-        case SrcMerge(inn, lmf, rmf) =>
-          ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
+          case SrcMerge(inn, lmf, rmf) =>
+            ConsF(inn, (ZipperSides(lmf, rmf), ZipperTails(ls, rs))).right[ZipperAcc]
       }
     case (sides, tails) =>
       ZipperAcc(Nil, sides, tails).left
@@ -158,9 +158,13 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val (src, lMap, rMap, lBranch, rBranch) = res
 
     if (lBranch ≟ Free.point(SrcHole) && rBranch ≟ Free.point(SrcHole)) {
-      val (buck, newBucks) = concatBuckets(src.project.ask.provenance)
-      val (mf, baccess, laccess, raccess) = concat3(buck, lMap, rMap)
-      (QC.inj(Map(src, mf)), newBucks.map(_ >> baccess), laccess, raccess)
+      concatBuckets(src.project.ask.provenance) match {
+        case Some((buck, newBucks)) =>
+          val (mf, baccess, laccess, raccess) = concat3(buck, lMap, rMap)
+          (QC.inj(Map(src, mf)), newBucks.list.toList.map(_ >> baccess), laccess, raccess)
+        case None =>
+          (QC.inj(Map(src, HoleF[T])), Nil, lMap, rMap)
+      }
     } else {
       val leftRebase = rebaseBranch(lBranch, lMap)
       val rightRebase = rebaseBranch(rBranch, rMap)
@@ -190,17 +194,31 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       val rann = someAnn(rcomp, src)
       val commonProvLength = src.project.ask.provenance.length
 
-      (TJ.inj(ThetaJoin(
+      val left = concatBuckets(lann.provenance.drop(lann.provenance.length - commonProvLength))
+      val right = concatBuckets(rann.provenance.drop(rann.provenance.length - commonProvLength))
+
+      val condition = (left, right) match {
+        case (None, None) =>
+          BoolLit[T, JoinSide](true) // when both sides are empty, perform a full cross
+        case (Some(l), Some(r)) =>
+          Free.roll[MapFunc[T, ?], JoinSide](Eq(
+            l._1.map(κ(LeftSide)),
+            r._1.map(κ(RightSide))))
+        case (_, _) =>
+          BoolLit[T, JoinSide](false) // this case should never be hit
+      }
+
+      val tj = TJ.inj(ThetaJoin(
         src,
         lBranch.mapSuspension(FI.compose(envtLowerNT)),
         rBranch.mapSuspension(FI.compose(envtLowerNT)),
         // FIXME: not quite right – e.g., if there is a reduction in a branch the
         //        condition won’t line up.
-        Free.roll(Eq(
-          concatBuckets(lann.provenance.drop(lann.provenance.length - commonProvLength))._1.map(κ(LeftSide)),
-          concatBuckets(rann.provenance.drop(rann.provenance.length - commonProvLength))._1.map(κ(RightSide)))),
+        condition,
         Inner,
-        combine)),
+        combine))
+
+      (tj,
         prov.joinProvenances(
           lann.provenance.map(_ >> lacc),
           rann.provenance.map(_ >> racc)),
@@ -226,12 +244,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     func: (FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
       TargetT = {
     val (src, buckets, lval, rval) = autojoin(values(0), values(1))
-    val (bucks, newBucks) = concatBuckets(buckets)
-    val (merged, b, v) = concat(bucks, func(lval, rval).embed)
-
-    EnvT((
-      Ann[T](newBucks.map(_ >> b), v),
-      QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+    concatBuckets(buckets) match {
+      case Some((bucks, newBucks)) => {
+        val (merged, b, v) = concat(bucks, func(lval, rval).embed)
+        EnvT((
+          Ann[T](newBucks.list.toList.map(_ >> b), v),
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+      }
+      case None =>
+        EnvT((
+          EmptyAnn[T],
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, func(lval, rval).embed))))
+    }
   }
 
   // TODO unify with `merge2Map`
@@ -240,12 +264,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     func: (FreeMap[T], FreeMap[T], FreeMap[T]) => MapFunc[T, FreeMap[T]]):
       Target[T[Target]] = {
     val (src, buckets, lval, cval, rval) = autojoin3(values(0), values(1), values(2))
-    val (bucks, newBucks) = concatBuckets(buckets)
-    val (merged, b, v) = concat(bucks, func(lval, cval, rval).embed)
-
-    EnvT((
-      Ann[T](newBucks.map(_ >> b), v),
-      QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+    concatBuckets(buckets) match {
+      case Some((bucks, newBucks)) => {
+        val (merged, b, v) = concat(bucks, func(lval, cval, rval).embed)
+        EnvT((
+          Ann[T](newBucks.list.toList.map(_ >> b), v),
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
+      }
+      case None =>
+        EnvT((
+          EmptyAnn[T],
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, func(lval, cval, rval).embed))))
+    }
   }
 
   def shiftValues(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
@@ -364,21 +394,30 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     provs.tailOption.fold(values(0).project) { tail =>
-      val (newProvs, provAccess) = concatBuckets(tail)
-
-      EnvT[Ann[T], F, T[Target]]((
-        Ann[T](
-          provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-        QC.inj(Reduce[T, T[Target]](
-          values(0),
-          newProvs,
-          List(
-            ReduceFuncs.Arbitrary(newProvs),
-            ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-            Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+      concatBuckets(tail) match {
+        case Some((newProvs, provAccess)) =>
+          EnvT[Ann[T], F, T[Target]]((
+            Ann[T](
+              provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+            QC.inj(Reduce[T, T[Target]](
+              values(0),
+              newProvs,
+              List(
+                ReduceFuncs.Arbitrary(newProvs),
+                ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
+                Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+        case None =>
+          EnvT[Ann[T], F, T[Target]]((
+            EmptyAnn[T],
+            QC.inj(Reduce[T, T[Target]](
+              values(0),
+              NullLit(),
+              List(ReduceFunc.translateUnaryReduction[FreeMap[T]](func)(reduce)),
+              Free.point(ReduceIndex(0))))))
+      }
     }
   }
 
@@ -391,21 +430,30 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     // NB: If there’s no provenance, then there’s nothing to reduce. We’re
     //     already holding a single value.
     provs.tailOption.fold(EnvT((EmptyAnn[T], src))) { tail =>
-      val (newProvs, provAccess) = concatBuckets(tail)
-
-      EnvT[Ann[T], F, T[Target]]((
-        Ann[T](
-          provAccess.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
-          Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
-        QC.inj(Reduce[T, T[Target]](
-          values(0),
-          newProvs,
-          List(
-            ReduceFuncs.Arbitrary(newProvs),
-            ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
-            Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+      concatBuckets(tail) match {
+        case Some((newProvs, provAccess)) =>
+          EnvT[Ann[T], F, T[Target]]((
+            Ann[T](
+              provAccess.list.toList.map(_ >> Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](0)))),
+              Free.roll(ProjectIndex(HoleF[T], IntLit[T, Hole](1)))),
+            QC.inj(Reduce[T, T[Target]](
+              values(0),
+              newProvs,
+              List(
+                ReduceFuncs.Arbitrary(newProvs),
+                ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(ReduceIndex(0)))),
+                Free.roll(MakeArray(Free.point(ReduceIndex(1))))))))))
+        case None =>
+          EnvT[Ann[T], F, T[Target]]((
+            EmptyAnn[T],
+            QC.inj(Reduce[T, T[Target]](
+              values(0),
+              NullLit(),
+              List(ReduceFunc.translateBinaryReduction[FreeMap[T]](func)(lMap, rMap)),
+              Free.point(ReduceIndex(0))))))
+      }
     }
   }
 
@@ -508,13 +556,18 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Mapping =>
       val Ann(buckets, value) = a1.project.ask
-      val (buck, newBuckets) = concatBuckets(buckets)
-      val (mf, bucketAccess, valAccess) =
-        concat[T, Hole](buck, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))
-
-      EnvT((
-        Ann(newBuckets.map(_ >> bucketAccess), valAccess),
-        QC.inj(Map(a1, mf)))).right
+      concatBuckets(buckets) match {
+        case Some((buck, newBuckets)) =>
+          val (mf, bucketAccess, valAccess) =
+            concat[T, Hole](buck, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))
+          EnvT((
+            Ann(newBuckets.list.toList.map(_ >> bucketAccess), valAccess),
+            QC.inj(Map(a1, mf)))).right
+        case None =>
+          EnvT((
+            EmptyAnn[T],
+            QC.inj(Map(a1, Free.roll(MapFunc.translateUnaryMapping(func)(HoleF[T])))))).right
+      }
 
     case LogicalPlan.InvokeFUnapply(structural.ObjectProject, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -553,7 +606,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         QC.inj(Take(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
-          Free.roll(left).mapSuspension(FI))))).right
+          Free.roll(right).mapSuspension(FI))))).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -564,7 +617,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         QC.inj(Drop(
           EnvT((EmptyAnn[T], src)).embed,
           Free.roll(left).mapSuspension(FI),
-          Free.roll(left).mapSuspension(FI))))).right
+          Free.roll(right).mapSuspension(FI))))).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
@@ -616,12 +669,17 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Squashing =>
       val Ann(buckets, value) = a1.project.ask
-      val (buck, newBuckets) = concatBuckets(prov.squashProvenances(buckets))
-      val (mf, buckAccess, valAccess) = concat(buck, value)
-
-      EnvT((
-        Ann(newBuckets.map(_ >> buckAccess), valAccess),
-        QC.inj(Map(a1, mf)))).right
+      concatBuckets(prov.squashProvenances(buckets)) match {
+        case Some((buck, newBuckets)) =>
+          val (mf, buckAccess, valAccess) = concat(buck, value)
+          EnvT((
+            Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
+            QC.inj(Map(a1, mf)))).right
+        case None =>
+          EnvT((
+            EmptyAnn[T],
+            QC.inj(Map(a1, value)))).right
+      }
 
     case LogicalPlan.InvokeFUnapply(func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1))
         if func.effect ≟ Expansion =>
