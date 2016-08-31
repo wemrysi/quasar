@@ -180,7 +180,7 @@ object QScriptCore {
               }
               case None =>
                 SrcMerge(
-                  EnvT((Ann(Nil, HoleF[T]), Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
                   lv,
                   rv).some
             }
