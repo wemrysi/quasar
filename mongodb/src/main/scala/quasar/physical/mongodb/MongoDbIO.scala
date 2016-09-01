@@ -319,34 +319,34 @@ object MongoDbIO {
     // special anyway, at least when arrays are present.
     def decodeField(s: String): BsonField = BsonField.Name(s)
 
-    def decodeType(obj: java.lang.Object): Option[IndexType] = obj match {
-      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending.some
-      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending.some
-      case "hashed"                                => IndexType.Hashed.some
-      case _                                       => None
+    val decodeType: PartialFunction[java.lang.Object, IndexType] = {
+      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending
+      case "hashed"                                => IndexType.Hashed
     }
+
+    def decodeIndex(doc: Document): Option[Index] =
+      (for {
+        name <- Option(doc.get("name")).flatMap {
+                  case s: String => s.some
+                  case _ => None
+                }
+        keys <- Option(doc.get("key")).flatMap {
+                  case kd: Document =>
+                    kd.asScala.toList.toNel.flatMap(_.traverse {
+                      case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
+                    })
+                  case _ => None
+                }
+        unique = Option(doc.get("unique")).map {
+          case java.lang.Boolean.TRUE => true
+          case _                      => false
+        }.getOrElse(false)
+      } yield Index(name, keys, unique))
 
     collection(coll)
       .flatMap(c => collect[Document](c.listIndexes))
-      .map(_.map(doc =>
-        (for {
-          name <- Option(doc.get("name")).flatMap {
-                    case s: String => s.some
-                    case _ => None
-                  }
-          keys <- Option(doc.get("key")).flatMap {
-                    case kd: Document =>
-                      kd.asScala.toList.toNel.flatMap(_.traverse {
-                        case (k, v) => decodeType(v).strengthL(decodeField(k))
-                      })
-                    case _ => None
-                  }
-          unique = Option(doc.get("unique")).map {
-            case java.lang.Boolean.TRUE => true
-            case _                      => false
-          }.getOrElse(false)
-        } yield Index(name, keys, unique)).toList
-      ).join.toSet)
+      .map(_.flatMap(decodeIndex(_).toList).toSet)
   }
 
   def fail[A](t: Throwable): MongoDbIO[A] =
