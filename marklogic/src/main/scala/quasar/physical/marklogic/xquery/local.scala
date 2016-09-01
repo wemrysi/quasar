@@ -47,6 +47,7 @@ object local {
   def leftShiftNode(node: XQuery): XQuery =
     node `/` "child::node()".xs `/` "child::node()".xs
 
+  // TODO: Convert to a typeswitch
   def leftShift[F[_]: NameGenerator: Functor](item: XQuery): F[XQuery] =
     freshVar[F] map { x =>
       let_(x -> item) return_ {
