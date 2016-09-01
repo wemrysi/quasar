@@ -35,8 +35,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a constant boolean" in {
        // "select true"
        convert(listContents.some, LP.Constant(Data.Bool(true))) must
-       equal(
-         QC.inj(Map(RootR, BoolLit(true))).embed.some)
+         equal(chain(
+           RootR,
+           QC.inj(Map((), BoolLit(true)))).some)
     }
 
     "fail to convert a constant set" in {
@@ -51,72 +52,87 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert a simple read" in {
       convert(listContents.some, lpRead("/foo/bar")) must
-      equal(
-        SP.inj(LeftShift(
-          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("foo") </> file("bar")))).embed,
+      equal(chain(
+        ReadR(rootDir </> dir("foo") </> file("bar")),
+        SP.inj(LeftShift((),
           HoleF,
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
     }
 
     // FIXME: This can be simplified to a Union of the Reads - the LeftShift
     //        cancels out the MakeMaps.
     "convert a directory read" in {
       convert(listContents.some, lpRead("/foo")) must
-      equal(
-        SP.inj(LeftShift(
-          SP.inj(Union(RootR,
-            Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
+      equal(chain(
+        RootR,
+        SP.inj(Union((),
+          Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF))))),
+          Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+            Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
             Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
-              Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF))))),
+              Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
               Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
-                Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
-                Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
-                  Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
-                  Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))))))))))))).embed,
+                Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
+                Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))),
+
+        SP.inj(LeftShift((),
           HoleF,
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
     }
 
     "convert a squashed read" in {
       // "select * from foo"
       convert(listContents.some, identity.Squash(lpRead("/foo/bar"))) must
-      equal(
-        SP.inj(LeftShift(
-          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("foo") </> file("bar")))).embed,
+      equal(chain(
+        ReadR(rootDir </> dir("foo") </> file("bar")),
+        SP.inj(LeftShift((),
           HoleF,
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
+    }
+
+    "convert a simple take" in pending {
+      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10)))) must
+      equal(
+        chain(
+          ReadR(rootDir </> dir("foo") </> file("bar")),
+          SP.inj(LeftShift((), HoleF, Free.point(RightSide))),
+          QC.inj(Take((),
+            Free.point(SrcHole),
+            Free.roll(QC.inj(Map(
+              Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+              IntLit[Fix, Hole](10))))))).some)
     }
 
     "convert a simple read with path projects" in {
       convert(listContents.some, lpRead("/some/bar/car")) must
-      equal(
-        SP.inj(LeftShift(
-          R.inj(Const[Read, Fix[QS]](Read(rootDir </> dir("some") </> file("bar")))).embed,
+      equal(chain(
+        ReadR(rootDir </> dir("some") </> file("bar")),
+        SP.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("car")),
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
     }
 
     "convert a basic invoke" in {
       convert(None, math.Add(lpRead("/foo"), lpRead("/bar")).embed) must
-      equal(
-        TJ.inj(ThetaJoin(
-          RootR,
-          Free.roll(SP.inj(LeftShift(
-            Free.roll(QC.inj(Map(
-              Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("foo"))))),
-            Free.roll(ZipMapKeys(HoleF)),
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.point(LeftSide))),
-              Free.roll(MakeArray(Free.point(RightSide)))))))),
-          Free.roll(SP.inj(LeftShift(
-            Free.roll(QC.inj(Map(
-              Free.point(SrcHole),
-              ProjectFieldR(HoleF, StrLit("bar"))))),
-            Free.roll(ZipMapKeys(HoleF)),
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.point(LeftSide))),
-              Free.roll(MakeArray(Free.point(RightSide)))))))),
+      equal(chain(
+        RootR,
+        TJ.inj(ThetaJoin((),
+          chain[Free[?[_], Hole], QS](
+            QC.inj(Map(Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("foo")))),
+            SP.inj(LeftShift((),
+              Free.roll(ZipMapKeys(HoleF)),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(LeftSide))),
+                Free.roll(MakeArray(Free.point(RightSide)))))))),
+          chain[Free[?[_], Hole], QS](
+            QC.inj(Map(Free.point(SrcHole),
+              ProjectFieldR(HoleF, StrLit("bar")))),
+            SP.inj(LeftShift((),
+              Free.roll(ZipMapKeys(HoleF)),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(LeftSide))),
+                Free.roll(MakeArray(Free.point(RightSide)))))))),
           BoolLit(true),
           Inner,
           Free.roll(Add(
@@ -125,7 +141,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               IntLit(1))),
             Free.roll(ProjectIndex(
               Free.roll(ProjectIndex(Free.point(RightSide), IntLit(1))),
-              IntLit(1))))))).embed.some)
+              IntLit(1)))))))).some)
     }
 
     "convert project object and make object" in {
@@ -136,35 +152,35 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             "name" -> structural.ObjectProject(
               lpRead("/city"),
               LP.Constant(Data.Str("name")))))) must
-      equal(
-        SP.inj(LeftShift(
-          RootR,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("city")),
           Free.roll(MakeMap[Fix, JoinFunc[Fix]](
             StrLit[Fix, JoinSide]("name"),
             ProjectFieldR(
               Free.point[MapFunc[Fix, ?], JoinSide](RightSide),
-              StrLit[Fix, JoinSide]("name")))))).embed.some)
+              StrLit[Fix, JoinSide]("name"))))))).some)
     }
 
     "convert a basic reduction" in {
       convert(
         listContents.some,
         agg.Sum[FLP](lpRead("/person"))) must
-      equal(
-        QC.inj(Reduce(
-          SP.inj(LeftShift(
-            R.inj(Const[Read, Fix[QS]](Read(rootDir </> file("person")))).embed,
-            Free.roll(ZipMapKeys(HoleF)),
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.point(LeftSide))),
-              Free.roll(MakeArray(Free.point(RightSide))))))).embed,
+      equal(chain(
+        ReadR(rootDir </> file("person")),
+        SP.inj(LeftShift((),
+          Free.roll(ZipMapKeys(HoleF)),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.point(LeftSide))),
+            Free.roll(MakeArray(Free.point(RightSide))))))),
+        QC.inj(Reduce((),
           Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
           List(ReduceFuncs.Sum[FreeMap[Fix]](
             Free.roll(ProjectIndex(
               Free.roll(ProjectIndex(HoleF, IntLit(1))),
               IntLit(1))))),
-          Free.point(ReduceIndex(0)))).embed.some)
+          Free.point(ReduceIndex(0))))).some)
     }
 
     "convert a basic reduction wrapped in an object" in {
@@ -174,14 +190,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         makeObj(
           "0" ->
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))) must
-      equal(
-        QC.inj(Reduce(
-          SP.inj(LeftShift(
-            RootR,
-            ProjectFieldR(HoleF, StrLit("person")),
-            ProjectFieldR(
-              Free.point(RightSide),
-              StrLit("height")))).embed,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
+          ProjectFieldR(HoleF, StrLit("person")),
+          ProjectFieldR(
+            Free.point(RightSide),
+            StrLit("height")))),
+        QC.inj(Reduce((),
           Free.roll(MakeArray(
             Free.roll(MakeMap(
               StrLit("j"),
@@ -189,7 +205,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
                 Free.roll(MakeArray(NullLit())))))))),
           List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
-          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0)))))).embed.some)
+          Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
     }
 
     "convert a flatten array" in {
@@ -200,40 +216,101 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           "loc" ->
             structural.FlattenArray[FLP](
               structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))) must
-      equal(
-        SP.inj(LeftShift(
-          SP.inj(LeftShift(
-            RootR,
-            ProjectFieldR(HoleF, StrLit("zips")),
-            ProjectFieldR(
-              Free.point(RightSide),
-              StrLit("loc")))).embed,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
+          ProjectFieldR(HoleF, StrLit("zips")),
+          ProjectFieldR(
+            Free.point(RightSide),
+            StrLit("loc")))),
+        SP.inj(LeftShift((),
           HoleF,
-          Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide))))).embed.some)
+          Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide)))))).some)
     }
 
-    "convert a constant shift array" in {
+    "convert a constant shift array of size one" in {
       // this query never makes it to LP->QS transform because it's a constant value
-      // "foo := (1,2,3); select * from foo"
+      // "foo := (7); select * from foo"
+      convert(
+        None,
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))) must
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift(
+          (),
+          Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+          Free.point(RightSide)))).some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Constant(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+        //  Free.point(RightSide))).embed
+    }
+
+    "convert a constant shift array of size two" in {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8); select * from foo"
+      convert(
+        None,
+        identity.Squash[FLP](
+          structural.ShiftArray[FLP](
+            structural.ArrayConcat[FLP](
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))) must
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift(
+          (),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+          Free.point(RightSide)))).some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Constant(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+        //  Free.point(RightSide))).embed
+    }
+
+    "convert a constant shift array of size three" in {
+      // this query never makes it to LP->QS transform because it's a constant value
+      // "foo := (7,8,9); select * from foo"
       convert(
         None,
         identity.Squash[FLP](
           structural.ShiftArray[FLP](
             structural.ArrayConcat[FLP](
               structural.ArrayConcat[FLP](
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(1))),
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(2)))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(3))))))) must
-      equal(
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(8)))),
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))) must
+      equal(chain(
+        RootR,
         SP.inj(LeftShift(
-          RootR,
-          Free.roll(Nullary(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](1)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](2)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](3)).embed))).embed)),
-          Free.point(RightSide))).embed.some)
-    }.pendingUntilFixed
+          (),
+          Free.roll(ConcatArrays(
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
+          Free.point(RightSide)))).some)
+        // TODO optimize to eliminate `MakeArray`
+        //SP.inj(LeftShift(
+        //  RootR,
+        //  Free.roll(Constant(
+        //    CommonEJson.inj(ejson.Arr(List(
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
+        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
+        //  Free.point(RightSide))).embed
+    }
 
     "convert a read shift array" in {
       convert(
@@ -245,7 +322,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
                 structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
               structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))) must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(chain(RootR).some) // TODO incorrect expectation
     }.pendingUntilFixed
 
     "convert a shift/unshift array" in {
@@ -259,20 +336,20 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ShiftArrayIndices[FLP](
                   structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))),
                 LP.Constant(Data.Int(10)))))) must
-      equal(
-        QC.inj(Reduce(
-          SP.inj(LeftShift(
-            RootR,
-            Free.roll(DupArrayIndices(
-              ProjectFieldR(
-                ProjectFieldR(HoleF, StrLit("zips")),
-                StrLit("loc")))),
-            Free.roll(Multiply(Free.point(RightSide), IntLit(10))))).embed,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
+          Free.roll(DupArrayIndices(
+            ProjectFieldR(
+              ProjectFieldR(HoleF, StrLit("zips")),
+              StrLit("loc")))),
+          Free.roll(Multiply(Free.point(RightSide), IntLit(10))))),
+        QC.inj(Reduce((),
           HoleF,
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
           Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
-            Free.point(ReduceIndex(0)))))).embed.some)
+            Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed
 
     "convert a filter" in {
@@ -285,16 +362,16 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             structural.ObjectProject(lpRead("/bar"), LP.Constant(Data.Str("baz"))),
             LP.Constant(Data.Int(1)),
             LP.Constant(Data.Int(10))))) must
-      equal(
-        QC.inj(Filter(
-          SP.inj(LeftShift(
-            R.inj(Const[Read, Fix[QS]](Read(rootDir </> file("bar")))).embed,
-            HoleF,
-            Free.point(RightSide))).embed,
+      equal(chain(
+        ReadR(rootDir </> file("bar")),
+        SP.inj(LeftShift((),
+          HoleF,
+          Free.point(RightSide))),
+        QC.inj(Filter((),
           Free.roll(Between(
             ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
-            IntLit(10))))).embed.some)
+            IntLit(10)))))).some)
     }.pendingUntilFixed
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
@@ -308,7 +385,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             structural.ObjectConcat[FLP](
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
               structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))) must
-      equal(RootR.some) // TODO incorrect expectation
+      equal(chain(RootR).some) // TODO incorrect expectation
     }.pendingUntilFixed
 
     "convert basic join with explicit join condition" in {
@@ -330,8 +407,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.ObjectProject[FLP](
                   structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
                   LP.Constant(Data.Str("address")))))))
-      convert(None, lp) must equal(
-        QC.inj(Map(RootR, ProjectFieldR(HoleF, StrLit("foo")))).embed.some)
+      convert(None, lp) must
+      equal(chain(
+        RootR,
+        QC.inj(Map((), ProjectFieldR(HoleF, StrLit("foo"))))).some)
     }.pendingUntilFixed
   }
 }

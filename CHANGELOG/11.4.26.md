@@ -1,0 +1,2 @@
+- implement ThetaJoin ⇒ EquiJoin transformation
+- normalize QS before analyzing Join condition
