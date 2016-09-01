@@ -36,7 +36,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
        // "select true"
        convert(listContents.some, LP.Constant(Data.Bool(true))) must
          equal(chain(
-           RootR,
+           UnreferencedR,
            QC.inj(Map((), BoolLit(true)))).some)
     }
 
@@ -64,14 +64,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a directory read" in {
       convert(listContents.some, lpRead("/foo")) must
       equal(chain(
-        RootR,
+        UnreferencedR,
         SP.inj(Union((),
           Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF))))),
-          Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+          Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
             Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
-            Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+            Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
               Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
-              Free.roll(SP.inj(Union(Free.roll(DE.inj(Const[DeadEnd, FreeQS[Fix]](Root))),
+              Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
                 Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
                 Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))),
 
@@ -237,7 +237,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           structural.ShiftArray[FLP](
             structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))) must
       equal(chain(
-        RootR,
+        UnreferencedR,
         SP.inj(LeftShift(
           (),
           Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
@@ -262,7 +262,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))) must
       equal(chain(
-        RootR,
+        UnreferencedR,
         SP.inj(LeftShift(
           (),
           Free.roll(ConcatArrays(
@@ -292,7 +292,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 structural.MakeArrayN[Fix](LP.Constant(Data.Int(8)))),
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))) must
       equal(chain(
-        RootR,
+        UnreferencedR,
         SP.inj(LeftShift(
           (),
           Free.roll(ConcatArrays(

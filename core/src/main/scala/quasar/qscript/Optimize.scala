@@ -318,11 +318,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   def simplifyQC[F[_]: Functor, G[_]: Functor](
     FtoG: F ~> G)(
-    implicit DE: Const[DeadEnd, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F):
+    implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
     case Map(src, f) if f.length ≟ 0 =>
-      Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f)
+      Map(FtoG(QC.inj(Unreferenced[T, T[G]]())).embed, f)
     case x => x
   }
 
@@ -451,7 +450,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
+             FI: F :<: QScriptTotal[T, ?],
+             show: Delay[Show, F]):
       F[T[F]] => F[T[F]] =
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -502,18 +502,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def pathify[M[_]: Monad, F[_]: Traverse](
     g: ConvertPath.ListContents[M])(
     implicit FS: StaticPath.Aux[T, F],
-             DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](
+      FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
 
   def eliminateProjections[M[_]: Monad, F[_]: Traverse](
     fs: Option[ConvertPath.ListContents[M]])(
     implicit FS: StaticPath.Aux[T, F],
-             DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],

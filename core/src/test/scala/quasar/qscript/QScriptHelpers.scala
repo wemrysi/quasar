@@ -39,6 +39,7 @@ trait QScriptHelpers {
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
   def RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
+  def UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
   def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const[Read, Fix[QS]](Read(file)))
 
   def ProjectFieldR[A](

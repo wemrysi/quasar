@@ -46,5 +46,6 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]] extends MarkLogicPlanne
         fn.subsequence(src, "1".xqy, some(from0)),
         fn.subsequence(src, from0 + count0)
       ).point[Planning]
+    case Unreferenced()                        => ???
   }
 }

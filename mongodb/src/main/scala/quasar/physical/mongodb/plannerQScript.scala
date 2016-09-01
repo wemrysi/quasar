@@ -774,6 +774,7 @@ object MongoDbQScriptPlanner {
           (rebaseWB(joinHandler, from, src) ⊛
             (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
             WB.skip)
+        case Unreferenced() => ???
       }
     }
 
