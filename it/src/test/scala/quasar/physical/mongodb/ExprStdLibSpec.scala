@@ -152,10 +152,4 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
 
     backend.name should tests(runner)
   }
-
-  // TODO: where should this live?
-  implicit class Ops[F[_]: Catchable, A, B](fa: F[A \/ B]) {
-    def unattempt(implicit ev0: Monad[F], ev1: Show[A]): F[B] =
-      fa.flatMap(_.fold(a => Catchable[F].fail(new RuntimeException(a.shows)), _.point[F]))
-  }
 }

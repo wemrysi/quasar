@@ -21,9 +21,6 @@ import quasar.{Data, LogicalPlan, Qspec}, LogicalPlan._
 
 import matryoshka._
 import org.specs2.execute._
-// import org.specs2.matcher._
-// import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime}
-// import scalaz._
 import org.scalacheck.{Arbitrary, Gen}
 
 trait StdLibTestRunner {
@@ -151,10 +148,6 @@ abstract class StdLibSpec extends Qspec {
         }
 
         // TODO: how to express "should execute and may produce any result"
-        // "other" >> prop { (str: String) =>
-        //   (str != "true" && str != "false") ==>
-        //     unaryUndef(Boolean(_).embed, Data.Str(str))
-        // }
       }
 
       "Integer" >> {
@@ -163,8 +156,6 @@ abstract class StdLibSpec extends Qspec {
         }
 
         // TODO: how to express "should execute and may produce any result"
-        // "other" >> prop { (str: String) =>
-        // }
       }
 
       "Decimal" >> {
@@ -173,8 +164,6 @@ abstract class StdLibSpec extends Qspec {
         }
 
         // TODO: how to express "should execute and may produce any result"
-        // "other" >> prop { (str: String) =>
-        // }
       }
 
       "Null" >> {
@@ -183,10 +172,6 @@ abstract class StdLibSpec extends Qspec {
         }
 
         // TODO: how to express "should execute and may produce any result"
-        // "other" >> prop { (str: String) =>
-        //   (str != "null") ==>
-        //     unaryUndef(Null(_).embed, Data.Str(str))
-        // }
       }
 
       "ToString" >> {
