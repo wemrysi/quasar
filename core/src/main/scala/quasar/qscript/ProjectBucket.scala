@@ -102,8 +102,7 @@ object ProjectBucket {
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) =
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:

@@ -114,13 +114,12 @@ object SourcedPathable {
     new Mergeable[SourcedPathable[T, ?]] {
       type IT[F[_]] = T[F]
 
+      // TODO: Merge two LeftShifts with different repair functions
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged]) =
-        // TODO: Merge two LeftShifts with different repair functions
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:

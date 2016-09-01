@@ -89,13 +89,12 @@ object EquiJoin {
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
+      // TODO: merge two joins with different combine funcs
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) =
-        // TODO: merge two joins with different combine funcs
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:

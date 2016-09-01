@@ -167,7 +167,6 @@ object QScriptCore {
         p1: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged],
         p2: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged]) =
         (p1, p2) match {
-          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](p1, left, right).some
           case (EnvT((Ann(b1, v1), Map(_, m1))),
                 EnvT((Ann(_,  v2), Map(_, m2)))) =>
             // TODO: optimize cases where one side is a subset of the other
