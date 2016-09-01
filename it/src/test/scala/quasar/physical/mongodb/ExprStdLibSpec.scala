@@ -73,7 +73,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
         exc <- WorkflowExecutor.mongoDb.run.unattempt
-        v   <- exc.evaluate(wf, None).run.run(tmp.collection.value).eval(0).unattempt
+        v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattempt
         rez <- v.fold(
                 _.map(BsonCodec.toData(_)).point[MongoDbIO],
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
