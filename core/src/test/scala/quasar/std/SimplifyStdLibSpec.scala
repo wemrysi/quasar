@@ -21,41 +21,37 @@ import quasar.{Data, LogicalPlan}, LogicalPlan._
 
 import matryoshka._
 import org.specs2.execute._
-// import org.specs2.matcher._
-// import org.threeten.bp.{Duration, Instant, LocalDate, LocalTime}
-// import scalaz._
 import org.scalacheck.Arbitrary, Arbitrary._
 
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
 class SimplifyStdLibSpec extends StdLibSpec {
-  // def notHandled(prg: Fix[LogicalPlan]): Boolean = prg.unFix match {
-  //   case InvokeF(???, _) => true
-  //   case _ => false
-  // }
-  
   def run(lp: Fix[LogicalPlan], expected: Data): Result = {
     val simple = ensureCorrectTypes(lp).disjunction
     (simple must beRightDisjunction(LogicalPlan.Constant(expected))).toResult
   }
-  
+
   val runner = new StdLibTestRunner {
       def nullary(prg: Fix[LogicalPlan], expected: Data) =
         run(prg, expected)
 
       def unary(prg: Fix[LogicalPlan] => Fix[LogicalPlan], arg: Data, expected: Data) =
         run(prg(LogicalPlan.Constant(arg)), expected)
-  
+
       def binary(prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, expected: Data) =
         run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2)), expected)
-  
-      def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) = 
+
+      def ternary(prg: (Fix[LogicalPlan], Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan], arg1: Data, arg2: Data, arg3: Data, expected: Data) =
         run(prg(LogicalPlan.Constant(arg1), LogicalPlan.Constant(arg2), LogicalPlan.Constant(arg3)), expected)
-        
+
       def intDomain = arbitrary[BigInt]
-      def decDomain = arbitrary[BigDecimal]
+
+      // NB: BigDecimal parsing cannot handle values that are too close to the
+      // edges of its range.
+      def decDomain = arbitrary[BigDecimal].filter(i => i.scale > Int.MinValue && i.scale < Int.MaxValue)
+
       def stringDomain = arbitrary[String]
     }
-  
+
   tests(runner)
 }

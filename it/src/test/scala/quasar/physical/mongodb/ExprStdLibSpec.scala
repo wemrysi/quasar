@@ -28,7 +28,7 @@ import WorkflowExecutor.WorkflowCursor
 
 import matryoshka._, Recursive.ops._
 import org.specs2.execute._
-import pathy.Path._
+import org.specs2.main.ArgProperty
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 import shapeless.{Nat}
@@ -41,6 +41,8 @@ import shapeless.{Nat}
   * then simply fails if it finds that the generated plan required map-reduce.
   */
 class MongoDbExprStdLibSpec extends StdLibSpec {
+  args.report(showtimes = ArgProperty(true))
+
   MongoDbSpec.clientShould { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
 
@@ -62,13 +64,6 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
       case _ => ().right
     }
 
-
-    val tempColl: Task[Collection] =
-      for {
-        n <- NameGenerator.salt
-        c <- Collection.fromFile(prefix </> file(n))
-              .fold(err => Task.fail(new RuntimeException(err.shows)), Task.now)
-      } yield c
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
@@ -111,7 +106,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
     def run(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan], expected: Data): Result =
       check(args.length, prg).getOrElse(
         (for {
-          coll <- tempColl
+          coll <- MongoDbSpec.tempColl(prefix)
           argsBson <- args.zipWithIndex.traverse { case (arg, idx) =>
                       BsonCodec.fromData(arg).point[Task].unattempt.strengthL("arg" + idx) }
           _     <- insert(

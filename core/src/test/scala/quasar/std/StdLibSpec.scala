@@ -109,15 +109,36 @@ abstract class StdLibSpec extends Qspec {
 
       "Substring" >> {
         "simple" >> {
-          // NB: PostgreSQL is 1-based for `start`
+          // NB: not consistent with PostgreSQL, which is 1-based for `start`
           ternary(Substring(_, _, _).embed, Data.Str("Thomas"), Data.Int(1), Data.Int(3), Data.Str("hom"))
         }
 
-        // TODO: test offsets outside the range of 0 to str.length-1
+        "empty string and any offsets" >> prop { (start0: Int, length0: Int) =>
+          // restrict the range to something that will actually exercise the behavior
+          val start = start0 % 1000
+          val length = length0 % 1000
+          ternary(Substring(_, _, _).embed, Data.Str(""), Data.Int(start), Data.Int(length), Data.Str(""))
+        }
 
-        "any string and offsets" >> prop { (str: String, start: Int, length: Int) =>
-          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(str.substring(start, start + length)))
-        }.pendingUntilFixed("lots of errors with offset edge cases")
+        "any string with entire range" >> prop { (str: String) =>
+          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(0), Data.Int(str.length), Data.Str(str))
+        }
+
+        "any string with 0 length" >> prop { (str: String, start0: Int) =>
+          // restrict the range to something that will actually exercise the behavior
+          val start = start0 % 1000
+          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(0), Data.Str(""))
+        }
+
+        "any string and offsets" >> prop { (str: String, start0: Int, length0: Int) =>
+          // restrict the range to something that will actually exercise the behavior
+          val start = start0 % 1000
+          val length = length0 % 1000
+
+          // NB: this is the MongoDB behavior, for lack of a better idea
+          val expected = StringLib.safeSubstring(str, start, length)
+          ternary(Substring(_, _, _).embed, Data.Str(str), Data.Int(start), Data.Int(length), Data.Str(expected))
+        }
       }
 
       "Boolean" >> {
@@ -137,13 +158,9 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "Integer" >> {
-        "any Int" >> prop { (x: Int) =>
+        "any BigInt in the domain" >> prop { (x: BigInt) =>
           unary(Integer(_).embed, Data.Str(x.toString), Data.Int(x))
         }
-
-        "any BigInt" >> prop { (x: BigInt) =>
-          unary(Integer(_).embed, Data.Str(x.toString), Data.Int(x))
-        }.pendingUntilFixed("parsing accepts only 32-bit ints")  // FIXME
 
         // TODO: how to express "should execute and may produce any result"
         // "other" >> prop { (str: String) =>
@@ -151,13 +168,9 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "Decimal" >> {
-        "any Double" >> prop { (x: Double) =>
+        "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
           unary(Decimal(_).embed, Data.Str(x.toString), Data.Dec(x))
         }
-
-        "any BigDecimal" >> prop { (x: BigDecimal) =>
-          unary(Decimal(_).embed, Data.Str(x.toString), Data.Dec(x))
-        }.pendingUntilFixed("parsing accepts only doubles")  // FIXME
 
         // TODO: how to express "should execute and may produce any result"
         // "other" >> prop { (str: String) =>

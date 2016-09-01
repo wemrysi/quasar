@@ -20,22 +20,13 @@ import quasar.Predef._
 import quasar._
 import quasar.physical.mongodb._
 
-import pathy.Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 class MongoDbIOSpec extends QuasarSpecification {
   import MongoDbSpec._
-  
+
   clientShould { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
-
-    val tempColl: Task[Collection] =
-      for {
-        n <- NameGenerator.salt
-        c <- Collection.fromFile(prefix </> file(n))
-              .fold(err => Task.fail(new RuntimeException(err.shows)), Task.now)
-      } yield c
 
     backend.name should {
       "get mongo version" in {
@@ -44,7 +35,7 @@ class MongoDbIOSpec extends QuasarSpecification {
 
       "get stats" in {
         (for {
-          coll  <- tempColl
+          coll  <- tempColl(prefix)
           _     <- insert(
                     coll,
                     List(Bson.Doc(ListMap("a" -> Bson.Int32(0)))).map(_.repr)).run(setupClient)

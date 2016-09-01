@@ -20,13 +20,14 @@ import quasar.Predef._
 import quasar._
 import quasar.fs.{ADir, FileSystemType}
 import quasar.fs.mount.{ConnectionUri, MountConfig}, MountConfig._
+import quasar.physical.mongodb.Collection
 
 import com.mongodb.async.client.MongoClient
 import org.specs2.specification.core.{Fragment, Fragments}
 import org.specs2.specification.create.DefaultFragmentFactory._
+import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
 
 object MongoDbSpec {
   def cfgs(fsType: FileSystemType): Task[List[(BackendName, ConnectionUri, ConnectionUri)]] =
@@ -41,6 +42,13 @@ object MongoDbSpec {
     asyncClientDef[Task](uri).run.foldMap(NaturalTransformation.refl).flatMap(_.fold(
       err => Task.fail(new RuntimeException(err.toString)),
       Task.now))
+
+  def tempColl(prefix: ADir): Task[Collection] =
+    for {
+      n <- NameGenerator.salt
+      c <- Collection.fromFile(prefix </> file(n))
+            .fold(err => Task.fail(new RuntimeException(err.shows)), Task.now)
+    } yield c
 
   def clientShould(examples: (BackendName, ADir, MongoClient, MongoClient) => Fragment): Fragments =
     TestConfig.testDataPrefix.flatMap { prefix =>
