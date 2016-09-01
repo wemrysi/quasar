@@ -27,17 +27,21 @@ import scalaz._, Scalaz._
 @typeclass trait Mergeable[F[_]] {
   type IT[F[_]]
 
-  // `fm1` and `fm2` provide access to two unknown targets X and Y.
-  // `a1` and `a2` are the two sources to be merged.
-  //
-  // This function merges `a1` and `a2` into a common source, providing access
-  // through that common source to X and Y.
-  //
-  // In general, if `a1` and `a2` are equal, we cannot simply return
-  // `SrcMerge(a1, fm1, fm2)` because the `Hole` in `fm1` and `fm2` reference
-  // some unknown source and do not reference `a1`. In this case, our source
-  // merging has converged (at least for this iteration), but `fm1` and `fm2` still
-  // reference the old common source (which is not known to us here).
+  /**
+   * Merges `a1` and `a2` into a common source, providing access
+   * through that common source to X and Y.
+   *
+   * In general, if `a1` and `a2` are equal, we cannot simply return
+   * `SrcMerge(a1, fm1, fm2)` because the `Hole` in `fm1` and `fm2` reference
+   * some unknown source and do not reference `a1`. In this case, our source
+   * merging has converged (at least for this iteration), but `fm1` and `fm2` still
+   * reference the old common source (which is not known to us here).
+   *
+   * @param fm1 provides access to some unknown target X.
+   * @param fm2 provides access to some unknown target Y.
+   * @param a1 the left source to be merged
+   * @param a2 the right source to be merged
+   */
   def mergeSrcs(
     fm1: FreeMap[IT],
     fm2: FreeMap[IT],
