@@ -56,7 +56,7 @@ object ReduceIndex {
   *
   * @group MRA
   */
- // TODO: type level guarantees about indexing with `repair` into `reducers`
+// TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -65,7 +65,8 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
-  *     LeftShift(Map(_.sort, Reduce(_ :: _, ???))
+  *     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
+  *               RightSide)
   * but backends tend to provide sort directly, so this avoids backends having
   * to recognize the pattern. We could provide an algebra
   *     (Sort :+: QScript)#λ => QScript
@@ -77,7 +78,8 @@ object ReduceIndex {
   order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
-/** Eliminates some values from a dataset, based on the result of FilterFunc.
+/** Eliminates some values from a dataset, based on the result of `f` (which
+  * must evaluate to a boolean value for each element in the set).
   */
 @Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
@@ -111,7 +113,7 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
-          case Map(a, func)       => f(a) ∘ (Map[T, B](_, func))
+          case Map(a, func)               => f(a) ∘ (Map[T, B](_, func))
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
@@ -165,17 +167,24 @@ object QScriptCore {
         p1: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged],
         p2: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged]) =
         (p1, p2) match {
-          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](p1, left, right).some
           case (EnvT((Ann(b1, v1), Map(_, m1))),
                 EnvT((Ann(_,  v2), Map(_, m2)))) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
-            val (buck, newBuckets) = concatBuckets(b1.map(_ >> m1))
-            val (full, buckAccess, valAccess) = concat(buck, mf)
-            SrcMerge(
-              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
-              lv,
-              rv).some
+            concatBuckets(b1.map(_ >> m1)) match {
+              case Some((buck, newBuckets)) => {
+                val (full, buckAccess, valAccess) = concat(buck, mf)
+                SrcMerge(
+                  EnvT((Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+              }
+              case None =>
+                SrcMerge(
+                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+            }
 
           case (EnvT((Ann(b1, v1), Reduce(_, bucket1, func1, rep1))),
                 EnvT((Ann(b2, v2), Reduce(_, bucket2, func2, rep2)))) =>

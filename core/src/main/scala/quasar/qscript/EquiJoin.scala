@@ -27,7 +27,7 @@ import scalaz._, Scalaz._
 
 /** This is an optional component of QScript that can be used instead of
   * ThetaJoin. It’s easier to implement, but more restricted (where ThetaJoin
-  * has an arbitrary predicate to determin if a pair of records should be
+  * has an arbitrary predicate to determine if a pair of records should be
   * combined, EquiJoin has an expression on each side that is compared with
   * simple equality).
   */
@@ -62,7 +62,7 @@ object EquiJoin {
     new Delay[Show, EquiJoin[T, ?]] {
       def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
         case EquiJoin(src, lBr, rBr, lkey, rkey, f, combine) =>
-          Cord("ThetaJoin(") ++
+          Cord("EquiJoin(") ++
           showA.show(src) ++ Cord(",") ++
           lBr.show ++ Cord(",") ++
           rBr.show ++ Cord(",") ++
@@ -89,13 +89,12 @@ object EquiJoin {
     new Mergeable[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
+      // TODO: merge two joins with different combine funcs
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
         p1: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged],
-        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) =
-        // TODO: merge two joins with different combine funcs
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
