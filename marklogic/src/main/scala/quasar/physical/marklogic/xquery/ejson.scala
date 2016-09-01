@@ -22,7 +22,6 @@ import quasar.NameGenerator
 import scalaz._
 import scalaz.syntax.apply._
 
-// TODO: Optimize using XQuery seq as much as possible.
 object ejson {
   import syntax._, expr.{element, for_, func, let_}
 

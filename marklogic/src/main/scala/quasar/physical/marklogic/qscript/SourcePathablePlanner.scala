@@ -40,12 +40,11 @@ private[qscript] final class SourcedPathablePlanner[T[_[_]]: Recursive: ShowT] e
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
       } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge)
 
-    // TODO: Should duplicates be preserved?
     case Union(src, lBranch, rBranch) =>
       for {
         s <- liftP(freshVar[F])
         l <- rebaseXQuery(lBranch, s.xqy)
         r <- rebaseXQuery(rBranch, s.xqy)
-      } yield let_(s -> src) return_ mkSeq_(l, r)
+      } yield let_(s -> src) return_ (l union r)
   }
 }

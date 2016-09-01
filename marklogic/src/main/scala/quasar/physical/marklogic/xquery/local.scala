@@ -70,7 +70,6 @@ object local {
     (freshVar[F] |@| freshVar[F]) { (c, n) =>
       element { fn.nodeName(node) } {
         ejson.mkMap(
-          // TODO: What about non-node children?
           for_(c -> node `/` "child::node()".xs)
           .let_(n -> fn.nodeName(c.xqy))
           .return_(

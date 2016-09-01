@@ -67,6 +67,17 @@ sealed abstract class XQuery {
   def <<(other: XQuery): XQuery = XQuery(s"$this << $other")
   def >>(other: XQuery): XQuery = XQuery(s"$this >> $other")
 
+  // Sequence Ops
+
+  def union(other: XQuery): XQuery =
+    XQuery(s"$this union $other")
+
+  def intersect(other: XQuery): XQuery =
+    XQuery(s"$this intersect $other")
+
+  def except(other: XQuery): XQuery =
+    XQuery(s"$this except $other")
+
   // TODO: Accept a list of namespaces? Or somehow gather namespaces used in
   //       constructing the query in order to be able to output them here.
   def toQuery: String =

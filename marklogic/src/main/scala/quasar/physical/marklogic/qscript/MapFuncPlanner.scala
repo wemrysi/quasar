@@ -37,12 +37,6 @@ object MapFuncPlanner {
   def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
 
-    // array
-    // TODO: Needs to handle Ejson arrays and strings, not seqs
-    case Length(arr) => fn.count(arr).point[F]
-
-    // time TODO
-
     // math
     case Negate(x) => (-x).point[F]
     case Add(x, y) => (x + y).point[F]
@@ -83,7 +77,6 @@ object MapFuncPlanner {
     case ConcatArrays(x, y) =>
       ejson.arrayConcat(x, y)
 
-    // TODO: Handle EJson map as well as XML nodes
     case ProjectField(src, field) =>
       for {
         m <- freshVar[F]
@@ -95,12 +88,13 @@ object MapFuncPlanner {
         }
       }
 
-    // TODO: Handle complex 'idx' expressions, this likely only works with literals, could use 'let' but
-    //       will need some namegen to avoid shadowing.
-    //
     // TODO: What other types should this work with?
     case ProjectIndex(arr, idx) =>
-      (arr `/` s"child::${ejson.arrayEltName}[$idx + 1]".xs `/` "child::node()".xs).point[F]
+      freshVar[F] map { i =>
+        let_(i -> idx) return_ {
+          (arr `/` s"child::${ejson.arrayEltName}[$i + 1]".xs `/` "child::node()".xs)
+        }
+      }
 
     // other
     case Range(x, y) => (x to y).point[F]
