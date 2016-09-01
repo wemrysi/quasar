@@ -313,6 +313,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a read shift array" in pending {
+      // select (baz || quux || ducks)[*] from `/foo/bar`
       convert(
         None,
         LP.Let('x, lpRead("/foo/bar"),
