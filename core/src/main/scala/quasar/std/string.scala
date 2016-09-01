@@ -167,8 +167,8 @@ trait StringLib extends Library {
     basicUntyper)
 
   /** Substring which always gives a result, no matter what offsets are provided.
-    * Reverse-engineered from MongoDb's $substr op, for lack of a better idea of
-    * how this should work. Note: if `start` < 0, the result is `""`.
+    * Reverse-engineered from MongoDb's \$substr op, for lack of a better idea
+    * of how this should work. Note: if `start` < 0, the result is `""`.
     * If `length` < 0, then result includes the rest of the string. Otherwise
     * the behavior is as you might expect.
     */
