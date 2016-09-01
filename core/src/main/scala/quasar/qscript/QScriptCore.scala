@@ -56,7 +56,7 @@ object ReduceIndex {
   *
   * @group MRA
   */
- // TODO: type level guarantees about indexing with `repair` into `reducers`
+// TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -179,7 +179,7 @@ object QScriptCore {
               }
               case None =>
                 SrcMerge(
-                  EnvT((Ann(Nil, HoleF[T]), Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
                   lv,
                   rv).some
             }
