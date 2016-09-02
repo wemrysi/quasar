@@ -17,13 +17,17 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.NameGenerator
+import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
+import scalaz._, Scalaz._
 
 private[qscript] final class ThetaJoinPlanner[T[_[_]]] extends MarkLogicPlanner[ThetaJoin[T, ?]] {
-  val plan: AlgebraM[Planning, ThetaJoin[T, ?], XQuery] = {
-    case ThetaJoin(src, lBranch, rBranch, on, f, combine) => ???
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], ThetaJoin[T, ?], XQuery] = {
+    case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
+      s"((: ThetaJoin :)$src)".xqy.point[PlanningT[F, ?]]
   }
 }

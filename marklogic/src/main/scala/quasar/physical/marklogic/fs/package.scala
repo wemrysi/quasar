@@ -57,19 +57,21 @@ package object fs {
   ): FileSystemDef[Free[S, ?]] =
     FileSystemDef.fromPF {
       case (FsType, uri) =>
-        lift(runMarkLogicFs(uri).map { run =>
+        lift(runMarkLogicFs(uri).map { case (run, shutdown) =>
           FileSystemDef.DefinitionResult[Free[S, ?]](
             mapSNT(injectNT[Task, S] compose run) compose interpretFileSystem(
               queryfile.interpret[MarkLogicFs](10000L),
               readfile.interpret[MarkLogicFs](10000L),
               writefile.interpret[MarkLogicFs],
               managefile.interpret[MarkLogicFs]),
-            ().point[Free[S, ?]])
+            lift(shutdown).into[S])
         }).into[S].liftM[DefErrT]
     }
 
-  def runMarkLogicFs(connectionUri: ConnectionUri): Task[MarkLogicFs ~> Task] = {
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
+  def runMarkLogicFs(connectionUri: ConnectionUri): Task[(MarkLogicFs ~> Task, Task[Unit])] = {
     val uri = new URI(connectionUri.value)
+
 
     (
       KeyValueStore.impl.empty[WriteHandle, Unit]                       |@|
@@ -83,7 +85,9 @@ package object fs {
       val runCSIO = ContentSourceIO.runNT(csource)
       val runSIO  = runCSIO compose ContentSourceIO.runSessionIO
 
-      reflNT[Task] :+: runSIO :+: runCSIO :+: genUUID :+: seq :+: rhandles :+: whandles :+: qhandles
+      val runML = reflNT[Task] :+: runSIO :+: runCSIO :+: genUUID :+: seq :+: rhandles :+: whandles :+: qhandles
+
+      (runML, Task.delay(csource.getConnectionProvider.shutdown(null)))
     }
   }
 

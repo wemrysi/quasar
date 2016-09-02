@@ -14,18 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.fp
 
-import quasar.Predef._
-import quasar.physical.marklogic.xquery.XQuery
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
+import java.lang.RuntimeException
+import scalaz._, Scalaz._
 
-import matryoshka.Algebra
-
-object mapFuncXQuery {
-  def apply[T[_[_]]]: Algebra[MapFunc[T, ?], XQuery] = {
-    case v @ ToString(a1) => ???
-    case v => s" ???(MapFunc - $v)??? ".xqy
+trait CatchableInstances {
+  implicit class CatchableOfDisjunctionOps[F[_]: Catchable, A, B](self: F[A \/ B]) {
+    def unattempt(implicit ev0: Monad[F], ev1: Show[A]): F[B] =
+      self.flatMap(_.fold(a => Catchable[F].fail(new RuntimeException(a.shows)), _.point[F]))
   }
 }
+
+object catchable extends CatchableInstances

@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.Errors.convertError
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
 import quasar.fp._

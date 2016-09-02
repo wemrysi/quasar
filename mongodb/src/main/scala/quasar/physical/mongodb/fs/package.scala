@@ -169,7 +169,7 @@ package object fs {
   )(implicit
     S0: Task :<: S
   ): DefErrT[Free[S, ?], MongoClient] = {
-    import quasar.Errors.convertError
+    import quasar.convertError
     type M[A] = Free[S, A]
     type ME[A, B] = EitherT[M, A, B]
     type MEEnvErr[A] = ME[EnvironmentError,A]

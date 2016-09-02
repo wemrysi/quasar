@@ -998,7 +998,7 @@ object MongoDbQScriptPlanner {
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback(
-            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics),
+            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce[Workflow3_2F])
         plan0[T, Workflow3_2F](joinHandler)(logical)
 
