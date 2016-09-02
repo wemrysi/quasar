@@ -67,6 +67,7 @@ object ReadFile {
       * the maximum amount of data read.
       */
     def scan(file: AFile, offset: Natural, limit: Option[Positive]): Process[M, Data] = {
+      // TODO: use DataCursor.process for the appropriate cursor type
       def closeHandle(h: ReadHandle): Process[M, Nothing] =
         Process.eval_[M, Unit](unsafe.close(h).liftM[FileSystemErrT])
 

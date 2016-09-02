@@ -201,6 +201,7 @@ object QueryFile {
       * [[LogicalPlan]].
       */
     def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
+      // TODO: use DataCursor.process for the appropriate cursor type
       def moreUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h): M[Vector[Data]]) { data =>
           if (data.isEmpty)

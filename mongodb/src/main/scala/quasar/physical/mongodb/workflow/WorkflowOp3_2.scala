@@ -108,7 +108,7 @@ object WorkflowOp3_2F {
 
   implicit val refs: Refs[WorkflowOp3_2F] = Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
 
-  implicit val coalesce: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
+  implicit lazy val coalesce: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
 
   implicit val classify: Classify[WorkflowOp3_2F] =
     new Classify[WorkflowOp3_2F] {
