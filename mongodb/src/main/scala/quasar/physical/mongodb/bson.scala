@@ -327,4 +327,6 @@ object BsonField {
 
     override def toString = values.list.toList.mkString(" \\ ")
   }
+
+  implicit val equal: Equal[BsonField] = Equal.equalA
 }

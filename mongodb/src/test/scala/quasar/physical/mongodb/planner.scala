@@ -70,47 +70,76 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
 
   val basePath = rootDir[Sandboxed] </> dir("db")
 
-  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel, stats: Collection => Option[CollectionStatistics]) =
+  def queryPlanner(expr: Fix[Sql], model: MongoQueryModel,
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]]) =
     queryPlan(expr, Variables.empty, basePath, 0L, None)
       .leftMap[CompilationError](CompilationError.ManyErrors(_))
       // TODO: Would be nice to error on Constant plans here, but property
       // tests currently run into that.
       .flatMap(_.fold(
         e => scala.sys.error("query evaluated to a constant, this won’t get to the backend"),
-        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats)).leftMap(CPlannerError(_))))
+        lp => MongoDbPlanner.plan(lp, fs.QueryContext(model, stats, indexes)).leftMap(CPlannerError(_))))
 
-  def plan0(query: String, model: MongoQueryModel, stats: Collection => Option[CollectionStatistics])
+  def plan0(query: String, model: MongoQueryModel,
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]])
       : Either[CompilationError, Crystallized[WorkflowF]] = {
     fixParser.parse(Query(query)).fold(
       e => scala.sys.error("parsing error: " + e.message),
-      queryPlanner(_, model, stats).run).value.toEither
+      queryPlanner(_, model, stats, indexes).run).value.toEither
   }
 
   def plan2_6(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`2.6`, κ(None))
+    plan0(query, MongoQueryModel.`2.6`, κ(None), κ(None))
+
+  def plan3_2(query: String,
+    stats: Collection => Option[CollectionStatistics],
+    indexes: Collection => Option[Set[Index]]) =
+    plan0(query, MongoQueryModel.`3.2`, stats, indexes)
+
+  val defaultStats: Collection => Option[CollectionStatistics] =
+    κ(CollectionStatistics(10, 100, false).some)
+  val defaultIndexes: Collection => Option[Set[Index]] =
+    κ(Set(Index("_id_", NonEmptyList(BsonField.Name("_id") -> IndexType.Ascending), false)).some)
+
+  def indexes(ps: (Collection, BsonField)*): Collection => Option[Set[Index]] =  {
+    val map: Map[Collection, Set[Index]] = ps.toList.foldMap { case (c, f) => Map(c -> Set(Index(f.asText + "_", NonEmptyList(f -> IndexType.Ascending), false))) }
+    c => map.get(c).orElse(defaultIndexes(c))
+  }
 
   def plan(query: String): Either[CompilationError, Crystallized[WorkflowF]] =
-    plan0(query, MongoQueryModel.`3.2`, κ(CollectionStatistics(10, 100, false).some))
+    plan0(query, MongoQueryModel.`3.2`, defaultStats, defaultIndexes)
 
   def plan(logical: Fix[LogicalPlan]): Either[PlannerError, Crystallized[WorkflowF]] = {
     (for {
       _          <- emit(Vector(PhaseResult.Tree("Input", logical.render)), ().right)
       simplified <- emit(Vector.empty, \/-(Optimizer.simplify(logical))): EitherWriter[PlannerError, Fix[LogicalPlan]]
       _          <- emit(Vector(PhaseResult.Tree("Simplified", logical.render)), ().right)
-      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, κ(None)))
+      phys       <- MongoDbPlanner.plan(simplified, fs.QueryContext(MongoQueryModel.`3.2`, defaultStats, defaultIndexes))
     } yield phys).run.value.toEither
   }
 
   def planLog(query: String): ParsingError \/ Vector[PhaseResult] =
     for {
       expr <- fixParser.parse(Query(query))
-    } yield queryPlanner(expr, MongoQueryModel.`3.2`, κ(None)).run.written
+    } yield queryPlanner(expr, MongoQueryModel.`3.2`, defaultStats, defaultIndexes).run.written
 
   def beWorkflow(wf: Workflow) = beRight(equalToWorkflow(wf))
 
   implicit def toBsonField(name: String) = BsonField.Name(name)
   implicit def toLeftShape(shape: Reshape):      Reshape.Shape = -\/ (shape)
   implicit def toRightShape(exprOp: Expression): Reshape.Shape =  \/-(exprOp)
+
+  def isNumeric(field: BsonField): Selector =
+    Selector.Or(
+      Selector.Doc(field -> Selector.Type(BsonType.Int32)),
+      Selector.Doc(field -> Selector.Type(BsonType.Int64)),
+      Selector.Doc(field -> Selector.Type(BsonType.Dec)),
+      Selector.Doc(field -> Selector.Type(BsonType.Text)),
+      Selector.Or(
+        Selector.Doc(field -> Selector.Type(BsonType.Date)),
+        Selector.Doc(field -> Selector.Type(BsonType.Bool))))
 
   "plan from query string" should {
     "plan simple select *" in {
@@ -498,22 +527,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(Selector.And(
-           Selector.Or(
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int32)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int64)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Dec)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Text)),
-             Selector.Or(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Date)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Bool)))),
-           Selector.Doc(BsonField.Name("bar") ->
-             Selector.Gt(Bson.Int32(10)))))))
+           isNumeric(BsonField.Name("bar")),
+           Selector.Doc(
+             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
     }
 
     "plan simple reversed filter" in {
@@ -521,22 +537,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(Selector.And(
-           Selector.Or(
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int32)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int64)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Dec)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Text)),
-             Selector.Or(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Date)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Bool)))),
-           Selector.Doc(BsonField.Name("bar") ->
-             Selector.Gt(Bson.Int32(10)))))))
+           isNumeric(BsonField.Name("bar")),
+           Selector.Doc(
+             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10)))))))
     }
 
     "plan simple filter with expression in projection" in {
@@ -544,22 +547,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
        beWorkflow(chain[Workflow](
          $read(collection("db", "foo")),
          $match(Selector.And(
-           Selector.Or(
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int32)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Int64)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Dec)),
-             Selector.Doc(BsonField.Name("bar") ->
-               Selector.Type(BsonType.Text)),
-             Selector.Or(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Date)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Bool)))),
-           Selector.Doc(BsonField.Name("bar") ->
-             Selector.Gt(Bson.Int32(10))))),
+           isNumeric(BsonField.Name("bar")),
+           Selector.Doc(
+             BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10))))),
          $project(
            reshape("0" ->
              $cond(
@@ -650,25 +640,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $match(
            Selector.And(
-             Selector.Or(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Int32)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Int64)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Dec)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Text)),
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Bool)))),
+             isNumeric(BsonField.Name("bar")),
              Selector.And(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Gte(Bson.Int32(10))),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Lte(Bson.Int32(100))))))))
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Gte(Bson.Int32(10))),
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Lte(Bson.Int32(100))))))))
     }
 
     "plan filter with like" in {
@@ -831,25 +808,12 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $match(
            Selector.And(
-             Selector.Or(
-               Selector.Doc(BsonField.Name("baz") ->
-                 Selector.Type(BsonType.Int32)),
-               Selector.Doc(BsonField.Name("baz") ->
-                 Selector.Type(BsonType.Int64)),
-               Selector.Doc(BsonField.Name("baz") ->
-                 Selector.Type(BsonType.Dec)),
-               Selector.Doc(BsonField.Name("baz") ->
-                 Selector.Type(BsonType.Text)),
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("baz") ->
-                   Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("baz") ->
-                   Selector.Type(BsonType.Bool)))),
+             isNumeric(BsonField.Name("baz")),
              Selector.And(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Neq(Bson.Int32(-10))),
-               Selector.Doc(BsonField.Name("baz") ->
-                 Selector.Gt(Bson.Dec(-1.0))))))))
+               Selector.Doc(
+                 BsonField.Name("bar") -> Selector.Neq(Bson.Int32(-10))),
+               Selector.Doc(
+                 BsonField.Name("baz") -> Selector.Gt(Bson.Dec(-1.0))))))))
     }
 
     "plan complex filter" in {
@@ -858,27 +822,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $read(collection("db", "foo")),
          $match(
            Selector.And(
-             Selector.Or(
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Int32)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Int64)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Dec)),
-               Selector.Doc(BsonField.Name("bar") ->
-                 Selector.Type(BsonType.Text)),
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("bar") ->
-                   Selector.Type(BsonType.Bool)))),
+             isNumeric(BsonField.Name("bar")),
              Selector.And(
                Selector.Doc(BsonField.Name("bar") -> Selector.Gt(Bson.Int32(10))),
                Selector.Or(
-                 Selector.Doc(BsonField.Name("baz") ->
-                   Selector.Eq(Bson.Text("quux"))),
-                 Selector.Doc(BsonField.Name("foop") ->
-                   Selector.Eq(Bson.Text("zebra")))))))))
+                 Selector.Doc(
+                   BsonField.Name("baz") -> Selector.Eq(Bson.Text("quux"))),
+                 Selector.Doc(
+                   BsonField.Name("foop") -> Selector.Eq(Bson.Text("zebra")))))))))
     }
 
     "plan filter with not" in {
@@ -888,35 +839,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
          $match(
            Selector.And(
              // TODO: eliminate duplication
-             Selector.Or(
-               Selector.Doc(BsonField.Name("pop") ->
-                 Selector.Type(BsonType.Int32)),
-               Selector.Doc(BsonField.Name("pop") ->
-                 Selector.Type(BsonType.Int64)),
-               Selector.Doc(BsonField.Name("pop") ->
-                 Selector.Type(BsonType.Dec)),
-               Selector.Doc(BsonField.Name("pop") ->
-                 Selector.Type(BsonType.Text)),
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Date)),
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Bool)))),
+             isNumeric(BsonField.Name("pop")),
              Selector.And(
-               Selector.Or(
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Int32)),
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Int64)),
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Dec)),
-                 Selector.Doc(BsonField.Name("pop") ->
-                   Selector.Type(BsonType.Text)),
-                 Selector.Or(
-                   Selector.Doc(BsonField.Name("pop") ->
-                     Selector.Type(BsonType.Date)),
-                   Selector.Doc(BsonField.Name("pop") ->
-                     Selector.Type(BsonType.Bool)))),
+               isNumeric(BsonField.Name("pop")),
                Selector.Or(
                  Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
                    BsonField.Name("pop") -> Selector.NotExpr(Selector.Gt(Bson.Int32(0))))),
@@ -1204,20 +1129,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Bool)))),
+            isNumeric(BsonField.Name("pop")),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Lt(Bson.Int32(1000))))),
           $simpleMap(
@@ -1313,20 +1225,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Bool)))),
+            isNumeric(BsonField.Name("pop")),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Lte(Bson.Int32(1000))))),
           $project(
@@ -1344,21 +1243,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Bool)))),
-
+            isNumeric(BsonField.Name("pop")),
             Selector.Doc(BsonField.Name("pop") -> Selector.Gte(Bson.Int32(1000))))),
           $project(
             reshape(
@@ -2524,20 +2409,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("pop") ->
-                Selector.Type(BsonType.Text)),
-              Selector.Or(
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Date)),
-                Selector.Doc(BsonField.Name("pop") ->
-                  Selector.Type(BsonType.Bool)))),
+            isNumeric(BsonField.Name("pop")),
             Selector.Doc(
               BsonField.Name("pop") -> Selector.Gt(Bson.Int32(1000))))),
           $simpleMap(NonEmptyList(MapExpr(JsFn(Name("x"), obj(
@@ -2657,35 +2529,9 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           $match(Selector.Or(
             // TODO: Eliminate duplicates
             Selector.And(
-              Selector.Or(
-                Selector.Doc(BsonField.Name("ts") ->
-                  Selector.Type(BsonType.Int32)),
-                Selector.Doc(BsonField.Name("ts") ->
-                  Selector.Type(BsonType.Int64)),
-                Selector.Doc(BsonField.Name("ts") ->
-                  Selector.Type(BsonType.Dec)),
-                Selector.Doc(BsonField.Name("ts") ->
-                  Selector.Type(BsonType.Text)),
-                Selector.Or(
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Date)),
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Bool)))),
+              isNumeric(BsonField.Name("ts")),
               Selector.And(
-                Selector.Or(
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Int32)),
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Int64)),
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Dec)),
-                  Selector.Doc(BsonField.Name("ts") ->
-                    Selector.Type(BsonType.Text)),
-                  Selector.Or(
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Date)),
-                    Selector.Doc(BsonField.Name("ts") ->
-                      Selector.Type(BsonType.Bool)))),
+                isNumeric(BsonField.Name("ts")),
                 Selector.And(
                   Selector.And(
                     Selector.Doc(
@@ -2898,17 +2744,23 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     "plan simple join with sharded inputs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = "select zips2.city from zips join zips2 on zips._id = zips2._id"
-      plan0(query,
-        MongoQueryModel.`3.2`,
+      plan3_2(query,
         c => Map(
           collection("db", "zips") -> CollectionStatistics(10, 100, true),
-          collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c)) must_==
+          collection("db", "zips2") -> CollectionStatistics(15, 150, true)).get(c),
+        defaultIndexes) must_==
         plan2_6(query)
     }
 
     "plan simple join with sources in different DBs" in {
       // NB: cannot use $lookup, so fall back to the old approach
       val query = "select zips2.city from `/db1/zips` join `/db2/zips2` on zips._id = zips2._id"
+      plan(query) must_== plan2_6(query)
+    }
+
+    "plan simple join with no index" in {
+      // NB: cannot use $lookup, so fall back to the old approach
+      val query = "select zips2.city from zips join zips2 on zips.pop = zips2.pop"
       plan(query) must_== plan2_6(query)
     }
 
@@ -3016,8 +2868,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple inner equi-join ($lookup)" in {
-      plan(
-        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id") must
+      plan3_2(
+        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id",
+        defaultStats,
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $match(Selector.Doc(
@@ -3048,8 +2902,10 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple inner equi-join with expression ($lookup)" in {
-      plan(
-        "select foo.name, bar.address from foo join bar on lower(foo.id) = bar.foo_id") must
+      plan3_2(
+        "select foo.name, bar.address from foo join bar on lower(foo.id) = bar.foo_id",
+        defaultStats,
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $project(reshape(
@@ -3065,6 +2921,49 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
           "left" -> $field("left"),
           "right" -> $field("right"))),
         $unwind(DocField(BsonField.Name("right"))),
+        $project(reshape(
+          "name" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("left")),
+                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+              $field("left", "name"),
+              $literal(Bson.Undefined)),
+          "address" ->
+            $cond(
+              $and(
+                $lte($literal(Bson.Doc(ListMap())), $field("right")),
+                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+              $field("right", "address"),
+              $literal(Bson.Undefined))),
+          IgnoreId)))
+    }
+
+    "plan simple inner equi-join with pre-filtering ($lookup)" in {
+      plan3_2(
+        "select foo.name, bar.address from foo join bar on foo.id = bar.foo_id where bar.rating >= 4",
+        defaultStats,
+        indexes(collection("db", "foo") -> BsonField.Name("id"))) must
+      beWorkflow(chain[Workflow](
+        $read(collection("db", "bar")),
+        $match(
+          Selector.And(
+            isNumeric(BsonField.Name("rating")),
+            Selector.Doc(
+              BsonField.Name("rating") -> Selector.Gte(Bson.Int32(4))))),
+        $project(reshape(
+          "right" -> $$ROOT,
+          "__tmp2" -> $field("foo_id")),
+          ExcludeId),
+        $lookup(
+          CollectionName("foo"),
+          BsonField.Name("__tmp2"),
+          BsonField.Name("id"),
+          BsonField.Name("left")),
+        $project(reshape(
+          "right" -> $field("right"),
+          "left" -> $field("left"))),
+        $unwind(DocField(BsonField.Name("left"))),
         $project(reshape(
           "name" ->
             $cond(
@@ -3176,9 +3075,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple left equi-join ($lookup)" in {
-      plan(
+      plan3_2(
         "select foo.name, bar.address " +
-          "from foo left join bar on foo.id = bar.foo_id") must
+          "from foo left join bar on foo.id = bar.foo_id",
+        defaultStats,
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "foo")),
         $project(reshape("left" -> $$ROOT)),
@@ -3207,9 +3108,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }.pendingUntilFixed("TODO: left/right joins in $lookup")
 
     "plan simple right equi-join ($lookup)" in {
-      plan(
+      plan3_2(
         "select foo.name, bar.address " +
-          "from foo right join bar on foo.id = bar.foo_id") must
+          "from foo right join bar on foo.id = bar.foo_id",
+        defaultStats,
+        indexes(collection("db", "bar") -> BsonField.Name("foo_id"))) must
       beWorkflow(chain[Workflow](
         $read(collection("db", "bar")),
         $project(reshape("right" -> $$ROOT)),
@@ -3310,10 +3213,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan 3-way equi-join ($lookup)" in {
-      plan(
+      plan3_2(
         "select foo.name, bar.address, baz.zip " +
           "from foo join bar on foo.id = bar.foo_id " +
-          "join baz on bar.id = baz.bar_id") must
+          "join baz on bar.id = baz.bar_id",
+        defaultStats,
+        indexes(
+          collection("db", "bar") -> BsonField.Name("foo_id"),
+          collection("db", "baz") -> BsonField.Name("bar_id"))) must
         beWorkflow(chain[Workflow](
           $read(collection("db", "foo")),
           $match(Selector.Doc(
