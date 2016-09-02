@@ -14,23 +14,15 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xquery
 
-import quasar.NameGenerator
+import quasar.Predef._
+import quasar.physical.marklogic.xquery.syntax._
 
-import matryoshka._
-import scalaz._
+object json {
+  def isObject(node: XQuery): XQuery =
+    xdmp.nodeKind(node) === "object".xs
 
-trait Planner[QS[_], A] {
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QS, A]
-}
-
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
-
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan[M[_]: NameGenerator: Monad]: AlgebraM[PlanningT[M, ?], Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+  def transformFromJson(jsonNode: XQuery): XQuery =
+    XQuery(s"json:transform-from-json($jsonNode)")
 }

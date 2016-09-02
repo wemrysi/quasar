@@ -40,7 +40,7 @@ import scalaz.stream.Process
 //     to fail, thus it seems to be better to sequence them via `SessionIO` (i.e.
 //     make multiple requests) rather than to sequence them as expressions in XQuery.
 object ops {
-  import expr.{func, if_, for_, let_}
+  import expr.{func, if_, for_, let_}, axes.child
 
   def appendToFile[S[_]](
     dstFile: AFile,
@@ -125,7 +125,7 @@ object ops {
     val uri = pathUri(dir)
 
     def isMLDir(u: XQuery) =
-      fn.exists(xdmp.documentProperties(u) xp "/prop:properties/prop:directory")
+      fn.exists(xdmp.documentProperties(u) `/` child("prop:properties") `/` child("prop:directory"))
 
     val prefixPathsXqy =
       fn.filter(

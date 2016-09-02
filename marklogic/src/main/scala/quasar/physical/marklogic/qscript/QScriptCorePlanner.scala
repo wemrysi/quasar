@@ -17,6 +17,8 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef.{Map => _, _}
+import quasar.NameGenerator
+import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -24,27 +26,45 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[T[_[_]]] extends MarkLogicPlanner[QScriptCore[T, ?]] {
-  val plan: AlgebraM[Planning, QScriptCore[T, ?], XQuery] = {
-    case Map(src, f)                           => ???
-    case Reduce(src, bucket, reducers, repair) => ???
-    case Sort(src, bucket, order)              => ???
+private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+  import expr.{func, let_}
 
-    case Filter(src, f)                        =>
-      val f0 = XQuery("PREDICATE QUERY")
-      cts.andQuery(src, f0).point[Planning]
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
+    case Map(src, f) =>
+      liftP(for {
+        x <- freshVar[F]
+        g <- mapFuncXQuery(f, x.xqy)
+      } yield fn.map(func(x) { g }, src))
 
-    case Take(src, from, count)                =>
-      val from0 = XQuery("FROM")
-      val count0 = XQuery("COUNT")
-      src(from0 to (from0 + count0).seq).point[Planning]
+    case Reduce(src, bucket, reducers, repair) =>
+      XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
 
-    case Drop(src, from, count)                =>
-      val from0 = XQuery("FROM")
-      val count0 = XQuery("COUNT")
-      mkSeq_(
-        fn.subsequence(src, "1".xqy, some(from0)),
-        fn.subsequence(src, from0 + count0)
-      ).point[Planning]
+    case Sort(src, bucket, order) =>
+      XQuery(s"((: SORT :)$src)").point[PlanningT[F, ?]]
+
+    case Filter(src, f) =>
+      liftP(for {
+        x <- freshVar[F]
+        p <- mapFuncXQuery(f, x.xqy)
+      } yield fn.filter(func(x) { p }, src))
+
+    // NB: XQuery sequences use 1-based indexing.
+    case Take(src, from, count) =>
+      for {
+        s   <- liftP(freshVar[F])
+        f   <- liftP(freshVar[F])
+        c   <- liftP(freshVar[F])
+        fm  <- rebaseXQuery(from, s.xqy)
+        ct  <- rebaseXQuery(count, s.xqy)
+      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, 1.xqy, some(c.xqy))
+
+    case Drop(src, from, count) =>
+      for {
+        s  <- liftP(freshVar[F])
+        f  <- liftP(freshVar[F])
+        c  <- liftP(freshVar[F])
+        fm <- rebaseXQuery(from, s.xqy)
+        ct <- rebaseXQuery(count, s.xqy)
+      } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
   }
 }

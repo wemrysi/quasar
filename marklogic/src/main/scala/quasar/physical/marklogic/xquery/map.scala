@@ -14,23 +14,16 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xquery
 
-import quasar.NameGenerator
+import quasar.Predef._
 
-import matryoshka._
-import scalaz._
+import scalaz.Foldable
 
-trait Planner[QS[_], A] {
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QS, A]
-}
+object map {
+  def entry(key: XQuery, value: XQuery): XQuery =
+    XQuery(s"map:entry($key, $value)")
 
-object Planner {
-  def apply[QS[_], A](implicit ev: Planner[QS, A]): Planner[QS, A] = ev
-
-  implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
-    new Planner[Coproduct[F, G, ?], A] {
-      def plan[M[_]: NameGenerator: Monad]: AlgebraM[PlanningT[M, ?], Coproduct[F, G, ?], A] =
-        _.run.fold(F.plan, G.plan)
-    }
+  def new_[F[_]: Foldable](entries: F[XQuery]): XQuery =
+    XQuery(s"map:new${mkSeq(entries)}")
 }
