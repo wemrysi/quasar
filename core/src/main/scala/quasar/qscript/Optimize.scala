@@ -167,6 +167,38 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
                 }))).getOrElse(TJ.inj(x))
               case _ => TJ.inj(x)
             }
+          case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2))) if (src1.length ≟ 0) && (src1.length ≟ 0) =>
+            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
+              case (-\/(Constant(_)), _) =>
+                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
+                  case LeftSide  => mf1
+                  case RightSide => HoleF
+                }))).getOrElse(TJ.inj(x))
+              case (_, -\/(Constant(_))) =>
+                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
+                  case LeftSide  => HoleF
+                  case RightSide => mf2
+                }))).getOrElse(TJ.inj(x))
+              case (_, _) => TJ.inj(x)
+            }
+          case (Some(Map(-\/(src1), mf1)), _) if src1.length ≟ 0 =>  // left side is a Map
+            mf1.resume match {
+              case -\/(Constant(_)) =>
+                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
+                  case LeftSide  => mf1
+                  case RightSide => HoleF
+                }))).getOrElse(TJ.inj(x))
+              case _ => TJ.inj(x)
+            }
+          case (_, Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>  // right side is a Map
+            mf2.resume match {
+              case -\/(Constant(_)) =>
+                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
+                  case LeftSide  => HoleF
+                  case RightSide => mf2
+                }))).getOrElse(TJ.inj(x))
+              case _ => TJ.inj(x)
+            }
           case (_, _)=> TJ.inj(x)
         }
         case (_, _) => TJ.inj(x)
@@ -483,8 +515,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
       liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      // FIXME: currently interferes with elideConstantJoin
-      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
+      liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
       liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
