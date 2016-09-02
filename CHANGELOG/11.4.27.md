@@ -1,0 +1,1 @@
+- Fix bug in mergeSrcs where we assumed that if two sides are equal, we could optimize that case. This was based on the false assumption that the sources included full source information.

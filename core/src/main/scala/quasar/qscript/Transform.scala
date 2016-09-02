@@ -246,7 +246,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val (src, buckets, lval, rval) = autojoin(values(0), values(1))
     concatBuckets(buckets) match {
       case Some((bucks, newBucks)) => {
-        val (merged, b, v) = concat(bucks, func(lval, rval).embed)
+        val (merged, b, v) = concat(bucks, Free.roll(func(lval, rval)))
         EnvT((
           Ann[T](newBucks.list.toList.map(_ >> b), v),
           QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
@@ -254,7 +254,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       case None =>
         EnvT((
           EmptyAnn[T],
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, func(lval, rval).embed))))
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, Free.roll(func(lval, rval))))))
     }
   }
 
@@ -266,7 +266,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     val (src, buckets, lval, cval, rval) = autojoin3(values(0), values(1), values(2))
     concatBuckets(buckets) match {
       case Some((bucks, newBucks)) => {
-        val (merged, b, v) = concat(bucks, func(lval, cval, rval).embed)
+        val (merged, b, v) = concat(bucks, Free.roll(func(lval, cval, rval)))
         EnvT((
           Ann[T](newBucks.list.toList.map(_ >> b), v),
           QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, merged))))
@@ -274,7 +274,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       case None =>
         EnvT((
           EmptyAnn[T],
-          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, func(lval, cval, rval).embed))))
+          QC.inj(Map(EnvT((EmptyAnn[T], src)).embed, Free.roll(func(lval, cval, rval))))))
     }
   }
 
@@ -465,8 +465,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       // FIXME: This won’t work where we join a collection against itself
       //        We only apply _some_ optimizations at this point to maintain the
       //        TJ at the end, but that‘s still not guaranteed
-      TJ.prj(values(2).transCata[F](_.lower).project).fold(
-        (InternalError("non theta join condition found"): PlannerError).left[JoinFunc[T]])(
+      TJ.prj(values(2).transCata[F](v => (new Optimize).applyAll[F].apply(v.lower)).project).fold(
+        (InternalError(s"non theta join condition found: ${values(2).shows}"): PlannerError).left[JoinFunc[T]])(
         _.combine.right[PlannerError])
     }
 
