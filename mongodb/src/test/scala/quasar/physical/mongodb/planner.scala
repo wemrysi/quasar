@@ -239,7 +239,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                $cond(
                  $or(
                    $and(
-                     $lte($literal(Bson.Arr(Nil)), $field("state")),
+                     $lte($literal(Bson.Arr()), $field("state")),
                      $lt($field("state"), $literal(Bson.Binary(scala.Array[Byte]())))),
                    $and(
                      $lte($literal(Bson.Text("")), $field("state")),
@@ -247,7 +247,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                  $cond(
                    $or(
                      $and(
-                       $lte($literal(Bson.Arr(Nil)), $field("city")),
+                       $lte($literal(Bson.Arr()), $field("city")),
                        $lt($field("city"), $literal(Bson.Binary(scala.Array[Byte]())))),
                      $and(
                        $lte($literal(Bson.Text("")), $field("city")),
@@ -270,7 +270,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                $cond(
                  $or(
                    $and(
-                     $lte($literal(Bson.Arr(Nil)), $field("b")),
+                     $lte($literal(Bson.Arr()), $field("b")),
                      $lt($field("b"), $literal(Bson.Binary(scala.Array[Byte]())))),
                    $and(
                      $lte($literal(Bson.Text("")), $field("b")),
@@ -278,7 +278,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                  $cond(
                    $or(
                      $and(
-                       $lte($literal(Bson.Arr(Nil)), $field("a")),
+                       $lte($literal(Bson.Arr()), $field("a")),
                        $lt($field("a"), $literal(Bson.Binary(scala.Array[Byte]())))),
                      $and(
                        $lte($literal(Bson.Text("")), $field("a")),
@@ -459,7 +459,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
            reshape("0" ->
              $cond(
                $and(
-                 $lte($literal(Bson.Arr(Nil)), $field("bar")),
+                 $lte($literal(Bson.Arr()), $field("bar")),
                  $lt($field("bar"), $literal(Bson.Binary(scala.Array[Byte]())))),
                $size($field("bar")),
                $literal(Bson.Undefined))),
@@ -1029,7 +1029,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $cond(
                 $or(
                   $and(
-                    $lte($literal(Bson.Arr(Nil)), $field("city")),
+                    $lte($literal(Bson.Arr()), $field("city")),
                     $lt($field("city"), $literal(Bson.Binary(scala.Array[Byte]())))),
                   $and(
                     $lte($literal(Bson.Text("")), $field("city")),
@@ -1353,7 +1353,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 $cond(
                   $or(
                     $and(
-                      $lte($literal(Bson.Arr(Nil)), $field("city")),
+                      $lte($literal(Bson.Arr()), $field("city")),
                       $lt($field("city"), $literal(Bson.Binary(scala.Array[Byte]())))),
                     $and(
                       $lte($literal(Bson.Text("")), $field("city")),
@@ -1365,7 +1365,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                 $cond(
                   $or(
                     $and(
-                      $lte($literal(Bson.Arr(Nil)), $field("state")),
+                      $lte($literal(Bson.Arr()), $field("state")),
                       $lt($field("state"), $literal(Bson.Binary(scala.Array[Byte]())))),
                     $and(
                       $lte($literal(Bson.Text("")), $field("state")),
@@ -2710,7 +2710,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "city"),
                     $literal(Bson.Undefined))),
                 IgnoreId)),
@@ -2735,7 +2735,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $cond(
                 $and(
                   $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                  $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                  $lt($field("right"), $literal(Bson.Arr()))),
                 $field("right", "city"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
@@ -2784,7 +2784,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right"),
                     $literal(Bson.Undefined)),
                 "__tmp12" -> $$ROOT),
@@ -2853,14 +2853,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $field("left", "name"),
                     $literal(Bson.Undefined)),
                 "address" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "address"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
@@ -2926,14 +2926,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $lt($field("left"), $literal(Bson.Arr()))),
               $field("left", "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $lt($field("right"), $literal(Bson.Arr()))),
               $field("right", "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
@@ -2969,14 +2969,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $lt($field("left"), $literal(Bson.Arr()))),
               $field("left", "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $lt($field("right"), $literal(Bson.Arr()))),
               $field("right", "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
@@ -3060,14 +3060,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $field("left", "name"),
                     $literal(Bson.Undefined)),
                 "address" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "address"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
@@ -3094,14 +3094,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $lt($field("left"), $literal(Bson.Arr()))),
               $field("left", "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $lt($field("right"), $literal(Bson.Arr()))),
               $field("right", "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
@@ -3127,14 +3127,14 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                $lt($field("left"), $literal(Bson.Arr()))),
               $field("left", "name"),
               $literal(Bson.Undefined)),
           "address" ->
             $cond(
               $and(
                 $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                $lt($field("right"), $literal(Bson.Arr()))),
               $field("right", "address"),
               $literal(Bson.Undefined))),
           IgnoreId)))
@@ -3181,11 +3181,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $cond(
                       $and(
                         $lte($literal(Bson.Doc(ListMap())), $field("left", "left")),
-                        $lt($field("left", "left"), $literal(Bson.Arr(Nil)))),
+                        $lt($field("left", "left"), $literal(Bson.Arr()))),
                       $field("left", "left", "name"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
@@ -3193,11 +3193,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $cond(
                       $and(
                         $lte($literal(Bson.Doc(ListMap())), $field("left", "right")),
-                        $lt($field("left", "right"), $literal(Bson.Arr(Nil)))),
+                        $lt($field("left", "right"), $literal(Bson.Arr()))),
                       $field("left", "right", "address"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
@@ -3205,7 +3205,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "zip"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
@@ -3246,11 +3246,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $cond(
                 $and(
                   $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                  $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                  $lt($field("left"), $literal(Bson.Arr()))),
                 $cond(
                   $and(
                     $lte($literal(Bson.Doc(ListMap())), $field("left", "left")),
-                    $lt($field("left", "left"), $literal(Bson.Arr(Nil)))),
+                    $lt($field("left", "left"), $literal(Bson.Arr()))),
                   $field("left", "left", "name"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
@@ -3258,11 +3258,11 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $cond(
                 $and(
                   $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                  $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                  $lt($field("left"), $literal(Bson.Arr()))),
                 $cond(
                   $and(
                     $lte($literal(Bson.Doc(ListMap())), $field("left", "right")),
-                    $lt($field("left", "right"), $literal(Bson.Arr(Nil)))),
+                    $lt($field("left", "right"), $literal(Bson.Arr()))),
                   $field("left", "right", "address"),
                   $literal(Bson.Undefined)),
                 $literal(Bson.Undefined)),
@@ -3270,7 +3270,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
               $cond(
                 $and(
                   $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                  $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                  $lt($field("right"), $literal(Bson.Arr()))),
                 $field("right", "zip"),
                 $literal(Bson.Undefined))),
             IgnoreId)))
@@ -3308,18 +3308,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $field("left", "sha"),
                     $literal(Bson.Undefined)),
                 "c_auth" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $cond(
                       $and(
                         $lte($literal(Bson.Doc(ListMap())), $field("left", "author")),
-                        $lt($field("left", "author"), $literal(Bson.Arr(Nil)))),
+                        $lt($field("left", "author"), $literal(Bson.Arr()))),
                       $field("left", "author", "login"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined)),
@@ -3327,18 +3327,18 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "sha"),
                     $literal(Bson.Undefined)),
                 "p_auth" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $cond(
                       $and(
                         $lte($literal(Bson.Doc(ListMap())), $field("right", "author")),
-                        $lt($field("right", "author"), $literal(Bson.Arr(Nil)))),
+                        $lt($field("right", "author"), $literal(Bson.Arr()))),
                       $field("right", "author", "login"),
                       $literal(Bson.Undefined)),
                     $literal(Bson.Undefined))),
@@ -3381,28 +3381,28 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $field("left", "city"),
                     $literal(Bson.Undefined)),
                 "loc" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("left")),
-                      $lt($field("left"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("left"), $literal(Bson.Arr()))),
                     $field("left", "loc"),
                     $literal(Bson.Undefined)),
                 "city2" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "city"),
                     $literal(Bson.Undefined)),
                 "pop" ->
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right", "pop"),
                     $literal(Bson.Undefined))),
               IgnoreId)),
@@ -3429,7 +3429,7 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
                   $cond(
                     $and(
                       $lte($literal(Bson.Doc(ListMap())), $field("right")),
-                      $lt($field("right"), $literal(Bson.Arr(Nil)))),
+                      $lt($field("right"), $literal(Bson.Arr()))),
                     $field("right"),
                     $literal(Bson.Undefined)),
                 "__tmp12" -> $$ROOT),

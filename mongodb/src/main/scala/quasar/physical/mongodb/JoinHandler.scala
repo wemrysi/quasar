@@ -231,7 +231,7 @@ object JoinHandler {
         reduce(groupBy(src, key))($push(_)),
         ListMap(
           rootField             -> \/-($$ROOT),
-          otherField            -> \/-($literal(Bson.Arr(Nil))),
+          otherField            -> \/-($literal(Bson.Arr())),
           BsonField.Name("_id") -> \/-($include()))),
         ι)
 
@@ -260,7 +260,7 @@ object JoinHandler {
 
     def padEmpty(side: BsonField): Expression =
       $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
-        $literal(Bson.Arr(List(Bson.Doc(ListMap())))),
+        $literal(Bson.Arr(List(Bson.Doc()))),
         $var(DocField(side)))
 
     def buildProjection(l: Expression, r: Expression): FixOp[WF] =

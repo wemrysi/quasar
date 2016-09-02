@@ -1005,11 +1005,11 @@ object MongoDbPlanner {
             case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
               ((expr: Expression) => $and(
                 $lt($literal(Bson.Null), expr),
-                $lt(expr, $literal(Bson.Doc(ListMap())))))
+                $lt(expr, $literal(Bson.Doc()))))
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str =>
               ((expr: Expression) => $and(
                 $lt($literal(Bson.Null), expr),
-                $lt(expr, $literal(Bson.Doc(ListMap())))))
+                $lt(expr, $literal(Bson.Doc()))))
             case Type.Date ⨿ Type.Bool =>
               ((expr: Expression) =>
                 $and(
@@ -1020,7 +1020,7 @@ object MongoDbPlanner {
             case Type.Syntaxed =>
               ((expr: Expression) =>
                 $or(
-                  $lt(expr, $literal(Bson.Doc(ListMap()))),
+                  $lt(expr, $literal(Bson.Doc())),
                   $and(
                     $lte($literal(Bson.ObjectId(minOid)), expr),
                     $lt(expr, $literal(Bson.Regex("", ""))))))

@@ -285,14 +285,14 @@ package object expression {
     def isString(expr: Expression) =
       $and(
         $lte($literal(Bson.Text("")), expr),
-        $lt(expr, $literal(Bson.Doc(ListMap()))))
+        $lt(expr, $literal(Bson.Doc())))
     def isObject(expr: Expression) =
       $and(
-        $lte($literal(Bson.Doc(ListMap())), expr),
-        $lt(expr, $literal(Bson.Arr(Nil))))
+        $lte($literal(Bson.Doc()), expr),
+        $lt(expr, $literal(Bson.Arr())))
     def isArray(expr: Expression) =
       $and(
-        $lte($literal(Bson.Arr(Nil)), expr),
+        $lte($literal(Bson.Arr()), expr),
         $lt(expr, $literal(Bson.Binary(minBinary))))
     def isBinary(expr: Expression) =
       $and(
@@ -355,12 +355,12 @@ package object expression {
           app(f1, isObjectOrArray)
         case (
           $lte($literal(Bson.Doc(m1)), f1),
-          $lt(f2, $literal(Bson.Arr(Nil))),
+          $lt(f2, $literal(Bson.Arr())),
           Nil)
             if f1 == f2 && m1 == ListMap() =>
           app(f1, isObject)
         case (
-          $lte($literal(Bson.Arr(Nil)), f1),
+          $lte($literal(Bson.Arr()), f1),
           $lt(f2, $literal(Bson.Binary(b1))),
           Nil)
             if f1 == f2 && b1 ≟ minBinary =>
