@@ -18,9 +18,15 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
+import scala.math.Integral
+
 object syntax {
   final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
     def xqy: XQuery = XQuery(str)
-    def xs: XQuery = expr.string(str)
+    def xs: XQuery = XQuery.StringLit(str)
+  }
+
+  final implicit class XQueryIntegralOps[N](val num: N)(implicit N: Integral[N]) {
+    def xqy: XQuery = XQuery(N.toLong(num).toString)
   }
 }

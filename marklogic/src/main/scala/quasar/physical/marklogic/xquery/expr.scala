@@ -29,6 +29,9 @@ import scalaz.syntax.std.boolean._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object expr {
+  def element(name: XQuery)(content: XQuery): XQuery =
+    XQuery(s"element {$name} {$content}")
+
   val emptySeq: XQuery =
     XQuery("()")
 
@@ -43,9 +46,6 @@ object expr {
 
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
-
-  def string(str: String): XQuery =
-    XQuery(s""""$str"""")
 
   final case class Flwor(
     tupleStreams: IList[(String, XQuery)],

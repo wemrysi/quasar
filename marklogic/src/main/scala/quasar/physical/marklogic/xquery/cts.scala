@@ -30,7 +30,7 @@ object cts {
     XQuery(s"cts:and-query${mkSeq_(query, queryOrOptions: _*)}")
 
   def directoryQuery(uri: XQuery, urisOrDepth: XQuery*): XQuery =
-    XQuery(s"cts:directory-query($uri, ${mkSeq(urisOrDepth)})")
+    XQuery(s"cts:directory-query${mkSeq(uri +: urisOrDepth)}")
 
   def documentOrder(direction: XQuery): XQuery =
     XQuery(s"cts:document-order($direction)")
@@ -46,6 +46,9 @@ object cts {
     forestIds: IList[XQuery] = IList.empty
   ): XQuery =
     XQuery(s"cts:search($expr, $query, ${mkSeq(options)}, ${qualityWeight getOrElse "1.0".xqy}, ${mkSeq(forestIds)})")
+
+  val trueQuery: XQuery =
+    XQuery("cts:true-query()")
 
   val uriReference: XQuery =
     XQuery("cts:uri-reference()")
