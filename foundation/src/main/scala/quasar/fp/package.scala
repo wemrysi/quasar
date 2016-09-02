@@ -654,4 +654,17 @@ package object fp
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
     co => co.run.fold(κ(co), f)
 
+  def idPrism[F[_]] = PrismNT[F, F](
+    new (F ~> (Option ∘ F)#λ) {
+      def apply[A](fa: F[A]): Option[F[A]] = Some(fa)
+    },
+    NaturalTransformation.refl)
+
+  def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
+    new (CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]) {
+      def apply[B](coenv: CoEnv[A, F, B]): Option[F[B]] = coenv.run.toOption
+    },
+    new (F ~> CoEnv[A, F, ?]) {
+      def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
+    })
 }

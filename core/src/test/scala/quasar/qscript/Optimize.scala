@@ -45,9 +45,9 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     "optimize a basic read" in {
       val run =
         (quasar.fp.free.injectedNT[QS](opt.simplifyProjection).apply(_: QS[Fix[QS]])) ⋙
-          liftFG(opt.coalesceMapShift[QS, QS](opt.optionIdF[QS])) ⋙
+          liftFG(opt.coalesceMapShift[QS, QS](idPrism.get)) ⋙
           Normalizable[QS].normalize ⋙
-          liftFG(opt.simplifySP[QS, QS](opt.optionIdF[QS])) ⋙
+          liftFG(opt.simplifySP[QS, QS](idPrism.get)) ⋙
           liftFG(opt.compactLeftShift[QS, QS])
 
       val query = lpRead("/foo")

@@ -911,6 +911,10 @@ object MongoDbQScriptPlanner {
     case x => x.right
   }
 
+  private type QScript0[T[_[_]], A] = Coproduct[QScriptCore[T, ?], SourcedPathable[T, ?], A]
+  private type QScript1[T[_[_]], A] = Coproduct[Const[Read, ?], QScript0[T, ?], A]
+  type QScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScript1[T, ?], A]
+
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -971,7 +975,9 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(liftError(
         qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
-          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘ liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
+          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
+            liftFG(ShiftRead[T, QScriptTotal[T, ?]].shiftRead[QScriptTotal[T, ?], QScriptTotal[T, ?]](idPrism, NaturalTransformation.refl)) ⋘
+            liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
           ).apply(tf) ∘
             Normalizable[QScriptTotal[T, ?]].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))

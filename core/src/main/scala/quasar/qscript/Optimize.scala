@@ -243,12 +243,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         mergeSides(tj.combine)))
     }
 
-  def coalesceQC[F[_]: Functor, G[_]: Functor](
-    GtoF: G ~> λ[α => Option[F[α]]],
-    FtoG: F ~> G)(
-    implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
-      QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
-    case Map(Embed(src), mf) => GtoF(src) >>= QC.prj >>= {
+  def coalesceQC[F[_]: Functor, G[_]: Functor]
+    (GtoF: PrismNT[G, F])
+    (implicit
+      QC: QScriptCore[T, ?] :<: F,
+      FI: F :<: QScriptTotal[T, ?])
+      : QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
+    case Map(Embed(src), mf) => GtoF.get(src) >>= QC.prj >>= {
       case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
       case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
       case _ => None
@@ -256,15 +257,15 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
     case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
       from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(FtoG(QC.inj(Take(src, fromInner, count))).embed, mf).some
+        case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Take(src, fromInner, count))).embed, mf).some
         case _ => None
       }
     case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
       from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
+        case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Drop(src, fromInner, count))).embed, mf).some
         case _ => None
       }
-    case Filter(Embed(src), cond) => GtoF(src) >>= QC.prj >>= {
+    case Filter(Embed(src), cond) => GtoF.get(src) >>= QC.prj >>= {
       case Filter(srcInner, condInner) =>
         Filter(srcInner, Free.roll[MapFunc[T, ?], Hole](And(condInner, cond))).some
       case _ => None
@@ -418,21 +419,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => x
   }
 
-  def optionIdF[F[_]]: F ~> λ[α => Option[F[α]]] =
-    new (F ~> λ[α => Option[F[α]]]) {
-      def apply[A](fa: F[A]): Option[F[A]] = Some(fa)
-    }
-
-  def extractCoEnv[F[_], A]: CoEnv[A, F, ?] ~> λ[α => Option[F[α]]] =
-    new (CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]) {
-      def apply[B](coenv: CoEnv[A, F, B]): Option[F[B]] = coenv.run.toOption
-    }
-
-  def wrapCoEnv[F[_], A]: F ~> CoEnv[A, F, ?] =
-    new (F ~> CoEnv[A, F, ?]) {
-      def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
-    }
-
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
   // - Take/Drop can have a normalized order _if_ their counts are constant
@@ -456,12 +442,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
-      liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
-      liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
-      liftFF(simplifyQC[F, F](NaturalTransformation.refl[F])) ⋙
-      liftFG(simplifySP[F, F](optionIdF[F])) ⋙
-      liftFF(swapMapCount[F, F](optionIdF[F])) ⋙
+      liftFF(repeatedly(coalesceQC[F, F](idPrism))) ⋙
+      liftFG(coalesceMapShift[F, F](idPrism.get)) ⋙
+      liftFG(coalesceMapJoin[F, F](idPrism.get)) ⋙
+      liftFF(simplifyQC[F, F](idPrism.reverseGet)) ⋙
+      liftFG(simplifySP[F, F](idPrism.get)) ⋙
+      liftFF(swapMapCount[F, F](idPrism.get)) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
@@ -480,13 +466,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       Normalizable[F].normalize ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
-      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](coenvPrism))) ⋙
+      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
+      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
       // FIXME: currently interferes with elideConstantJoin
-      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
-      liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](coenvPrism.reverseGet)) ⋙
+      liftFG(simplifySP[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
+      liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙

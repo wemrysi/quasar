@@ -292,6 +292,7 @@ object MapFunc {
         case Search(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Search(_, _, _))
         case Substring(a1, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Substring(_, _, _))
         case Guard(a1, tpe, a2, a3) => (f(a1) ⊛ f(a2) ⊛ f(a3))(Guard(_, tpe, _, _))
+        case ExtractId(a1) => f(a1) ∘ (ExtractId(_))
       }
   }
 
@@ -358,6 +359,7 @@ object MapFunc {
         case (Search(a1, a2, a3), Search(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Substring(a1, a2, a3), Substring(b1, b2, b3)) => in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
         case (Guard(a1, atpe, a2, a3), Guard(b1, btpe, b2, b3)) => atpe ≟ btpe && in.equal(a1, b1) && in.equal(a2, b2) && in.equal(a3, b3)
+        case (ExtractId(a1), ExtractId(b1)) => in.equal(a1, b1)
 
         case (_, _) => false
       }
@@ -427,6 +429,7 @@ object MapFunc {
         case Search(a1, a2, a3) => Cord("Search(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Substring(a1, a2, a3) => Cord("Substring(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
         case Guard(a1, tpe, a2, a3) => Cord("Guard(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+        case ExtractId(a1) => Cord("ExtractId(") ++ sh.show(a1) ++ Cord(")")
       }
     }
 
@@ -594,6 +597,11 @@ object MapFuncs {
     */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]
+
+  /** Extracts _some_ unique id from a value. This should only ever be applied
+    * at the top-level of a collection.
+    */
+  @Lenses final case class ExtractId[T[_[_]], A](a1: A) extends Unary[T, A]
 
   object NullLit {
     def apply[T[_[_]]: Corecursive, A](): Free[MapFunc[T, ?], A] =
