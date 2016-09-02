@@ -126,84 +126,78 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.prj(qt)
       })).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
 
+  private def rebaseLeft[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    mf: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    rebase(tj.lBranch)(tj.src).fold(TJ.inj(tj))(
+      tf => QC.inj(Map(tf, tj.combine >>= {
+        case LeftSide  => HoleF
+        case RightSide => mf
+      })))
+
+  private def rebaseRight[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    mf: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    rebase(tj.rBranch)(tj.src).fold(TJ.inj(tj))(
+      tf => QC.inj(Map(tf, tj.combine >>= {
+        case LeftSide  => mf
+        case RightSide => HoleF
+      })))
+
   def elideConstantJoin[F[_], G[_]](
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       ThetaJoin[T, T[G]] => F[T[G]] = {
-    case x @ ThetaJoin(src, l, r, on, Inner, combine) if on ≟ BoolLit(true) =>
-      (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+    case tj @ ThetaJoin(src, left, right, on, Inner, _) if on ≟ BoolLit(true) =>
+      (left.resume.leftMap(_.map(_.resume)), right.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
-          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>  // both sides are a Map
+          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
             (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case (_, -\/(Constant(_))) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case (_, _) => TJ.inj(x)
+              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
+              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
+              case (_, _) => TJ.inj(tj)
             }
-          case (Some(Map(\/-(SrcHole), mf1)), _) =>  // left side is a Map
+          case (Some(Map(\/-(SrcHole), mf1)), _) =>
             mf1.resume match {
-              case -\/(Constant(_)) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
+              case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, mf1)
+              case _ => TJ.inj(tj)
             }
-          case (_, Some(Map(\/-(SrcHole), mf2))) =>  // right side is a Map
+          case (_, Some(Map(\/-(SrcHole), mf2))) =>
             mf2.resume match {
-              case -\/(Constant(_)) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
+              case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, mf2)
+              case _ => TJ.inj(tj)
             }
           case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2))) if (src1.length ≟ 0) && (src1.length ≟ 0) =>
             (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case (_, -\/(Constant(_))) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case (_, _) => TJ.inj(x)
+              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
+              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
+              case (_, _) => TJ.inj(tj)
             }
-          case (Some(Map(-\/(src1), mf1)), _) if src1.length ≟ 0 =>  // left side is a Map
+          case (Some(Map(-\/(src1), mf1)), _) if src1.length ≟ 0 =>
             mf1.resume match {
-              case -\/(Constant(_)) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
+              case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, mf1)
+              case _ => TJ.inj(tj)
             }
-          case (_, Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>  // right side is a Map
+          case (_, Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>
             mf2.resume match {
-              case -\/(Constant(_)) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
+              case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, mf2)
+              case _ => TJ.inj(tj)
             }
-          case (_, _)=> TJ.inj(x)
+          case (_, _)=> TJ.inj(tj)
         }
-        case (_, _) => TJ.inj(x)
+        case (_, _) => TJ.inj(tj)
       }
-    case x => TJ.inj(x)
+    case tj => TJ.inj(tj)
   }
 
   def simplifyProjection:
