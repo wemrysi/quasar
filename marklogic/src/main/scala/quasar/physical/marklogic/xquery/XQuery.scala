@@ -37,12 +37,14 @@ sealed abstract class XQuery {
   def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
 
   def `/`(xqy: XQuery): XQuery = xqy match {
-    case StringLit(s)   => XQuery(s"$this/$s")
+    case Step(s)        => XQuery(s"$this/$s")
+    case StringLit(s)   => XQuery(s"""$this/"$s"""")
     case Expression(ex) => XQuery(s"""$this/xdmp:value("$ex")""")
   }
 
   def `//`(xqy: XQuery): XQuery = xqy match {
-    case StringLit(s)   => XQuery(s"$this//$s")
+    case Step(s)        => XQuery(s"$this//$s")
+    case StringLit(s)   => XQuery(s"""$this//"$s"""")
     case Expression(ex) => XQuery(s"""$this//xdmp:value("$ex")""")
   }
 
@@ -95,6 +97,10 @@ object XQuery {
   final case class StringLit(str: String) extends XQuery {
     override def toString = s""""$str""""
   }
+
+  /** XPath [Step](https://www.w3.org/TR/xquery/#id-steps) expression. */
+  final case class Step(override val toString: String) extends XQuery
+
   final case class Expression(override val toString: String) extends XQuery
 
   def apply(expr: String): XQuery =

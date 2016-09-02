@@ -23,7 +23,7 @@ import scalaz._
 import scalaz.syntax.apply._
 
 object ejson {
-  import syntax._, expr.{element, for_, func, let_}
+  import syntax._, expr.{element, for_, func, let_}, axes._
 
   val nsUri: String =
     "http://quasar-analytics.org/ejson"
@@ -49,12 +49,12 @@ object ejson {
         y -> arr2
       ) return_ {
         mkArray(mkSeq_(
-          x.xqy `/` arrayEltName.xs,
-          y.xqy `/` arrayEltName.xs))
+          x.xqy `/` child(arrayEltName),
+          y.xqy `/` child(arrayEltName)))
       }))
 
   def arrayLeftShift(arr: XQuery): XQuery =
-    mkSeq_(arr) `/` arrayEltName.xs `/` "child::node()".xs
+    arr `/` child(arrayEltName) `/` child.node()
 
   def isArray(item: XQuery): XQuery =
     fn.nodeName(item) === arrayQName
@@ -63,12 +63,12 @@ object ejson {
     fn.nodeName(item) === mapQName
 
   def mapLeftShift(map: XQuery): XQuery =
-    mkSeq_(map) `/` mapEntryName.xs `/` mapValueName.xs `/` "child::node()".xs
+    map `/` child(mapEntryName) `/` child(mapValueName) `/` child.node()
 
   def mapLookup[F[_]: NameGenerator: Apply](map: XQuery, key: XQuery): F[XQuery] =
     (freshVar[F] |@| freshVar[F])((m, k) =>
       let_(m -> map, k -> key) return_ {
-        (m.xqy `/` mapEntryName.xs)(mapKeyName.xqy === k.xqy) `/` mapValueName.xs `/` "child::node()".xs
+        (m.xqy `/` child(mapEntryName))(mapKeyName.xqy === k.xqy) `/` child(mapValueName) `/` child.node()
       })
 
   def mkArray(elements: XQuery): XQuery =
@@ -102,10 +102,10 @@ object ejson {
     (freshVar[F] |@| freshVar[F] |@| freshVar[F])((e, k, v) =>
       mkMap(
         for_(
-          e -> emap `/` mapEntryName.xs)
+          e -> emap `/` child(mapEntryName))
         .let_(
-          k -> e.xqy `/` mapKeyName.xs `/` "child::node()".xs,
-          v -> e.xqy `/` mapValueName.xs `/` "child::node()".xs)
+          k -> e.xqy `/` child(mapKeyName) `/` child.node(),
+          v -> e.xqy `/` child(mapValueName) `/` child.node())
         .return_(
           mkMapEntry(k.xqy, mkArray(mkSeq_(mkArrayElt(k.xqy), mkArrayElt(v.xqy)))))))
 

@@ -30,6 +30,7 @@ import scalaz.syntax.apply._
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object local {
   import expr.{element, for_, if_, let_}
+  import axes._
   import syntax._
 
   val nsUri: String =
@@ -45,7 +46,7 @@ object local {
     xdmp.nodeKind(node) === "document".xs
 
   def leftShiftNode(node: XQuery): XQuery =
-    node `/` "child::node()".xs `/` "child::node()".xs
+    node `/` child.node() `/` child.node()
 
   // TODO: Convert to a typeswitch
   def leftShift[F[_]: NameGenerator: Functor](item: XQuery): F[XQuery] =
@@ -71,12 +72,12 @@ object local {
     (freshVar[F] |@| freshVar[F]) { (c, n) =>
       element { fn.nodeName(node) } {
         ejson.mkMap(
-          for_(c -> node `/` "child::node()".xs)
+          for_(c -> node `/` child.node())
           .let_(n -> fn.nodeName(c.xqy))
           .return_(
             ejson.mkMapEntry(n.xqy, ejson.mkArray(mkSeq_(
               ejson.mkArrayElt(n.xqy),
-              ejson.mkArrayElt(c.xqy `/` "child::node()".xs))))))
+              ejson.mkArrayElt(c.xqy `/` child.node()))))))
       }
     }
 

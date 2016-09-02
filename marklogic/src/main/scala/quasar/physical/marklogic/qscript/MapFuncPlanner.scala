@@ -32,7 +32,7 @@ import scalaz.syntax.monad._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
-  import expr.{if_, let_}
+  import expr.{if_, let_}, axes._
 
   def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
@@ -77,22 +77,39 @@ object MapFuncPlanner {
     case ConcatArrays(x, y) =>
       ejson.arrayConcat(x, y)
 
-    case ProjectField(src, field) =>
-      for {
-        m <- freshVar[F]
-        k <- freshVar[F]
-        v <- ejson.mapLookup(m.xqy, k.xqy)
-      } yield {
-        let_(m -> src, k -> field) return_ {
-          if_ (ejson.isMap(m.xqy)) then_ v else_ (m.xqy `/` k.xqy)
+    case ProjectField(src, field) => field match {
+      case XQuery.Step(_) =>
+        (src `/` field).point[F]
+
+      case XQuery.StringLit(s) =>
+        for {
+          m      <- freshVar[F]
+          lookup <- ejson.mapLookup(m.xqy, s.xs)
+        } yield {
+          let_(m -> src) return_ {
+            if_ (ejson.isMap(m.xqy))
+            .then_ { lookup }
+            .else_ { m.xqy `/` child(s) }
+          }
         }
-      }
+
+      case _ =>
+        for {
+          m <- freshVar[F]
+          k <- freshVar[F]
+          v <- ejson.mapLookup(m.xqy, k.xqy)
+        } yield {
+          let_(m -> src, k -> field) return_ {
+            if_ (ejson.isMap(m.xqy)) then_ v else_ (m.xqy `/` k.xqy)
+          }
+        }
+    }
 
     // TODO: What other types should this work with?
     case ProjectIndex(arr, idx) =>
       freshVar[F] map { i =>
         let_(i -> idx) return_ {
-          (arr `/` s"child::${ejson.arrayEltName}[$i + 1]".xs `/` "child::node()".xs)
+          arr `/` child(ejson.arrayEltName)(i.xqy + 1.xqy) `/` child.node()
         }
       }
 
