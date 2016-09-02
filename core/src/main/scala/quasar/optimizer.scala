@@ -167,7 +167,7 @@ object Optimizer {
       Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
         if n == nf =>
       typ match {
-        case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
+        case Type.Obj(m, Some(Type.Top)) if m.isEmpty =>
           \/-(Let(n, r, cont))
         case Type.Obj(_, _) =>
           \/-(Fix(x))

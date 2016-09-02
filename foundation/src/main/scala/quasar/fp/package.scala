@@ -544,11 +544,6 @@ package object fp
   def recover[F[_], A](φ: Algebra[F, A]): Algebra[CoEnv[A, F, ?], A] =
     interpret(ι, φ)
 
-  object Inj {
-    def unapply[F[_], G[_], A](g: G[A])(implicit F: F :<: G): Option[F[A]] =
-      F.prj(g)
-  }
-
   @typeclass trait EqualT[T[_[_]]] {
     def equal[F[_]](tf1: T[F], tf2: T[F])(implicit del: Delay[Equal, F]): Boolean
     def equalT[F[_]](delay: Delay[Equal, F]): Equal[T[F]] =

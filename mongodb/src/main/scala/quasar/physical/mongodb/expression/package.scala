@@ -355,12 +355,12 @@ package object expression {
           app(f1, isObjectOrArray)
         case (
           $lte($literal(Bson.Doc(m1)), f1),
-          $lt(f2, $literal(Bson.Arr())),
+          $lt(f2, $literal(Bson.Arr(List()))),
           Nil)
             if f1 == f2 && m1 == ListMap() =>
           app(f1, isObject)
         case (
-          $lte($literal(Bson.Arr()), f1),
+          $lte($literal(Bson.Arr(List())), f1),
           $lt(f2, $literal(Bson.Binary(b1))),
           Nil)
             if f1 == f2 && b1 ≟ minBinary =>

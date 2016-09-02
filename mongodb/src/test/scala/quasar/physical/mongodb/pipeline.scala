@@ -28,7 +28,7 @@ import scalaz._
 
 class PipelineSpec extends quasar.Qspec with ArbBsonField {
   import CollectionUtil._
-  import ArbitraryExprOp._
+  // import ArbitraryExprOp._
 
   implicit def arbitraryOp: Arbitrary[PipelineOp] = Arbitrary { Gen.resize(5, Gen.sized { size =>
     // Note: Gen.oneOf is overridden and this variant requires two explicit args
@@ -37,7 +37,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
     Gen.oneOf(ops(0), ops(1), ops.drop(2): _*)
   }) }
 
-  def genProject(size: Int): Gen[$ProjectF[Unit]] = for {
+  def genProject(size: Int): Gen[$ProjectF[Unit]] = ??? /*for {
     fields <- Gen.nonEmptyListOf(for {
       c  <- Gen.alphaChar
       cs <- Gen.alphaStr
@@ -50,7 +50,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
         genExpr.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
     id <- Gen.oneOf(ExcludeId, IncludeId)
-  } yield $ProjectF((), Reshape(ListMap(fields: _*)), id)
+  } yield $ProjectF((), Reshape(ListMap(fields: _*)), id)*/
 
   implicit def arbProject = Arbitrary[$ProjectF[Unit]](Gen.resize(5, Gen.sized(genProject)))
 
