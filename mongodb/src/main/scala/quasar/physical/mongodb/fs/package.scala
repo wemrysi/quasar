@@ -25,14 +25,14 @@ import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}
 import quasar.physical.mongodb.fs.bsoncursor._
+import quasar.physical.mongodb.fs.fsops._
 
 import com.mongodb.async.client.MongoClient
-import scalaz._
-import scalaz.syntax.monad._
-import scalaz.syntax.either._
-import scalaz.syntax.show._
-import scalaz.syntax.nel._
+import matryoshka.Recursive.ops._
+import pathy.Path.{depth, dirName}
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import scalaz.stream.{Writer => _, _}
 
 package object fs {
   import FileSystemDef.{DefinitionError, DefErrT}
@@ -131,6 +131,24 @@ package object fs {
         close  =  free.lift(Task.delay(client.close()).attempt.void).into[S]
       } yield FileSystemDef.DefinitionResult[M](fs, close)
   }
+
+  val listContents: ADir => EitherT[MongoDbIO, FileSystemError, Set[PathSegment]] =
+    dir => EitherT(dirName(dir) match {
+      case Some(_) =>
+        collectionsInDir(dir)
+          .map(_ foldMap (collectionPathSegment(dir) andThen (_.toSet)))
+          .run
+
+      case None if depth(dir) ≟ 0 =>
+        MongoDbIO.collections
+          .map(collectionPathSegment(dir))
+          .pipe(process1.stripNone)
+          .runLog
+          .map(_.toSet.right[FileSystemError])
+
+      case None =>
+        nonExistentParent[Set[PathSegment]](dir).run
+    })
 
   ////
 

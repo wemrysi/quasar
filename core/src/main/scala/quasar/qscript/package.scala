@@ -24,15 +24,30 @@ import scala.Predef.implicitly
 import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
-import scalaz._, Scalaz._
+import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
-/** Here we no longer care about provenance. Backends can’t do anything with
-  * it, so we simply represent joins and crosses directly. This also means that
-  * we don’t need to model certain things – project_d is just a data-level
-  * function, nest_d & swap_d only modify provenance and so are irrelevant
-  * here, and autojoin_d has been replaced with a lower-level join operation
-  * that doesn’t include the cross portion.
+/** The various representations of an arbitrary query, as seen by the filesystem
+  * connectors, along with the operations for dealing with them.
+  * 
+  * There are a few patterns that are worth noting:
+  * - `(src: A, ..., lBranch: FreeQS[T], rBranch: FreeQS[T], ...)` – used in
+  *   operations that combine multiple data sources (notably joins and unions).
+  *   This holds the divergent parts of the data sources in the branches, with
+  *   [[SrcHole]] indicating a reference back to the common `src` of the two
+  *   branches. There is not required to be a [[SrcHole]].
+  * - `Free[F, A]` – we use this structure as a restricted form of variable
+  *   binding, where `F` is some pattern functor, and `A` is some enumeration
+  *   that has a specific referent. E.g., [[FreeMap]] is a recursive structure
+  *   of [[MapFunc]] that has a single “variable”, [[SrcHole]], which (usually)
+  *   refers to the `src` parameter of that operation. [[JoinFunc]], [[FreeQS]],
+  *   and the `repair` parameter to [[Reduce]] behave similarly.
   */
+// NB: Here we no longer care about provenance. Backends can’t do anything with
+//     it, so we simply represent joins and crosses directly. This also means
+//     that we don’t need to model certain things – project_d is just a
+//     data-level function, nest_d & swap_d only modify provenance and so are
+//     irrelevant here, and autojoin_d has been replaced with a lower-level join
+//     operation that doesn’t include the cross portion.
 package object qscript {
   private type CommonPathable[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
@@ -58,11 +73,8 @@ package object qscript {
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
 
-  type FreeHole[F[_]] = Free[F, Hole]
-
-  type FreeMap[T[_[_]]] = FreeHole[MapFunc[T, ?]]
-  type FreeQS[T[_[_]]] = FreeHole[QScriptTotal[T, ?]]
-
+  type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
+  type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]
   type JoinFunc[T[_[_]]] = Free[MapFunc[T, ?], JoinSide]
 
   @Lenses final case class Ann[T[_[_]]](provenance: List[FreeMap[T]], values: FreeMap[T])
@@ -89,12 +101,16 @@ package object qscript {
     Free.roll(Eq(Free.point(LeftSide), Free.point(RightSide)))
 
   def concatBuckets[T[_[_]]: Recursive: Corecursive](buckets: List[FreeMap[T]]):
-      (FreeMap[T], List[FreeMap[T]]) =
-    (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
-      buckets.zipWithIndex.map(p =>
-        Free.roll(ProjectIndex[T, FreeMap[T]](
-          HoleF[T],
-          IntLit[T, Hole](p._2)))))
+      Option[(FreeMap[T], NEL[FreeMap[T]])] =
+    buckets match {
+      case Nil => None
+      case head :: tail =>
+        (ConcatArraysN(buckets.map(b => Free.roll(MakeArray[T, FreeMap[T]](b)))),
+          NEL(head, tail).zipWithIndex.map(p =>
+            Free.roll(ProjectIndex[T, FreeMap[T]](
+              HoleF[T],
+              IntLit[T, Hole](p._2))))).some
+    }
 
   def concat[T[_[_]]: Corecursive, A](
     l: Free[MapFunc[T, ?], A], r: Free[MapFunc[T, ?], A]):

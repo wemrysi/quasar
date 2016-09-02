@@ -440,7 +440,10 @@ package object workflow {
             case (base, up, pipe) => (base, PipelineTask(up, pipe))
           }
 
-        case WorkflowOpCoreF(op @ $MapF((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(m, r, sel, sort, limit, None, scope0, _, _), oa))), fn, scope)) if m == $MapF.mapNOP && r == $ReduceF.reduceNOP =>
+        case WorkflowOpCoreF(op @ $MapF(
+            (_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(m, r, sel, sort, limit, None, scope0, _, _), oa))),
+            fn, scope))
+            if m == $MapF.mapNOP && r == $ReduceF.reduceNOP =>
           Reshape.mergeMaps(scope0, scope).fold(
             op.newMR(base, src1, sel, sort, limit))(
             s => base -> MapReduceTask(
@@ -449,14 +452,20 @@ package object workflow {
                 applyLens MapReduce._scope set s,
               oa))
 
-        case WorkflowOpCoreF(op @ $MapF((_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, _, _, _, _, None, scope0, _, _), oa))), fn, scope)) =>
+        // A "simple" map op that doesn't do any flattening is "inlined" into
+        // the finalizer of a previous map-reduce.
+        // TODO: handle more than one MapExpr.
+        case WorkflowOpCoreF(op @ $SimpleMapF(
+            (_, (base, src1 @ MapReduceTask(src0, mr @ MapReduce(_, _, _, _, _, None, scope0, _, _), oa))),
+            NonEmptyList(MapExpr(expr), INil()),
+            scope)) =>
           Reshape.mergeMaps(scope0, scope).fold(
             op.newMR(base, src1, None, None, None))(
-            s => base -> MapReduceTask(
-              src0,
-              mr applyLens MapReduce._finalizer set Some($MapF.finalizerFn(fn))
-                applyLens MapReduce._scope set s,
-              oa))
+              s => base -> MapReduceTask(
+                src0,
+                mr applyLens MapReduce._finalizer set Some($MapF.finalizerFn(expr))
+                  applyLens MapReduce._scope set s,
+                oa))
 
         case WorkflowOpCoreF(op @ $SimpleMapF(_, _, _)) => crush(I.inj(op.raw))
 

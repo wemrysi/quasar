@@ -105,7 +105,11 @@ object MongoDbPlanner {
       def Arity1(f: JsCore => JsCore): Output = args match {
         case Sized(a1) =>
           HasJs(a1).map {
-            case (f1, p1) => ({ case list => JsFn(JsFn.defaultName, f(f1(list)(Ident(JsFn.defaultName)))) }, p1.map(There(0, _)))
+            case (f1, p1) =>
+              ({ case list => JsFn(JsFn.defaultName, f(
+                f1(list)(Ident(JsFn.defaultName))))
+              },
+                p1.map(There(0, _)))
           }
       }
 
@@ -113,7 +117,10 @@ object MongoDbPlanner {
         args match {
           case Sized(a1, a2) => (HasJs(a1) |@| HasJs(a2)) {
             case ((f1, p1), (f2, p2)) =>
-              ({ case list => JsFn(JsFn.defaultName, f(f1(list.take(p1.size))(Ident(JsFn.defaultName)), f2(list.drop(p1.size))(Ident(JsFn.defaultName)))) },
+              ({ case list => JsFn(JsFn.defaultName, f(
+                f1(list.take(p1.size))(Ident(JsFn.defaultName)),
+                f2(list.drop(p1.size))(Ident(JsFn.defaultName))))
+              },
                 p1.map(There(0, _)) ++ p2.map(There(1, _)))
           }
         }
@@ -709,11 +716,6 @@ object MongoDbPlanner {
           }
         }
 
-      def makeKeys(k: List[Ann], comp: Ann):
-          Option[List[JsFn]] =
-        k.traverse(HasJs).flatMap(k =>
-          findArgs(k, comp).map(applyPartials(k, _))).toOption
-
       /** Check for any values used in a selector which reach into the
         * "consequent" branches of Typecheck or Cond nodes, and which
         * involve expressions that are not safe to evaluate before
@@ -783,8 +785,8 @@ object MongoDbPlanner {
                     rightKeys.traverse(HasWorkflow))((l, r, lk, rk) =>
                     joinHandler.run(
                       func.asInstanceOf[TernaryFunc],
-                      JoinSource(l, lk, makeKeys(leftKeys, comp)),
-                      JoinSource(r, rk, makeKeys(rightKeys, comp))))).join
+                      JoinSource(l, lk, makeKeys(leftKeys)),
+                      JoinSource(r, rk, makeKeys(rightKeys))))).join
                 })
           }
         case GroupBy =>
@@ -934,13 +936,17 @@ object MongoDbPlanner {
       case _ => None
     }
 
-    def findArgs(partials: List[PartialJs], comp: Ann):
-        OutputM[List[List[WorkflowBuilder[F]]]] =
-      partials.traverse(_._2.traverse(_(comp.map(_._2))))
+    def makeKeys(k: List[Ann]): Option[List[JsFn]] =
+      k.traverse(a => HasJs(a).strengthR(a))
+        .flatMap(ts => findArgs(ts)(_._2).map(ll => applyPartials(ts.map(_._1), ll.map(_.length))))
+        .toOption
 
-    def applyPartials(partials: List[PartialJs], args: List[List[WorkflowBuilder[F]]]):
-        List[JsFn] =
-      (partials zip args).map(l => l._1._1(l._2.map(κ(JsFn.identity))))
+    def findArgs[A, B](partials: List[(PartialJs, Cofree[LogicalPlan, A])])(f: A => OutputM[B]):
+        OutputM[List[List[B]]] =
+      partials.traverse { case ((_, ifs), ann) => ifs.traverse(i => f(i(ann))) }
+
+    def applyPartials(partials: List[PartialJs], arities: List[Int]): List[JsFn] =
+      (partials zip arities).map(l => l._1._1(List.fill(l._2)(JsFn.identity)))
 
     // Tricky: It's easier to implement each step using StateT[\/, ...], but we
     // need the fold’s Monad to be State[..., \/], so that the morphism

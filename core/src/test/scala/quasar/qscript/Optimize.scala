@@ -16,12 +16,14 @@
 
 package quasar.qscript
 
+import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
 import quasar.qscript.MapFuncs._
 import quasar.fp._
 import quasar.fs._
 
-import matryoshka._
+import matryoshka._, FunctorT.ops._
+import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
@@ -35,13 +37,14 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
        val run = liftFG(opt.elideNopMap[QS])
 
        QueryFile.optimizeEval(query)(run).toOption must
-       equal(
-         QC.inj(Map(RootR, BoolLit(true))).embed.some)
+         equal(chain(
+           RootR,
+           QC.inj(Map((), BoolLit(true)))).some)
     }
 
     "optimize a basic read" in {
       val run =
-        (quasar.fp.free.injectedNT[QS](opt.simplifyProjections).apply(_: QS[Fix[QS]])) ⋙
+        (quasar.fp.free.injectedNT[QS](opt.simplifyProjection).apply(_: QS[Fix[QS]])) ⋙
           liftFG(opt.coalesceMapShift[QS, QS](opt.optionIdF[QS])) ⋙
           Normalizable[QS].normalize ⋙
           liftFG(opt.simplifySP[QS, QS](opt.optionIdF[QS])) ⋙
@@ -50,11 +53,74 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val query = lpRead("/foo")
 
       QueryFile.optimizeEval(query)(run).toOption must
-      equal(
-        SP.inj(LeftShift(
-          RootR,
+      equal(chain(
+        RootR,
+        SP.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
-          Free.point(RightSide))).embed.some)
+          Free.point(RightSide)))).some)
+    }
+
+    "simplify a ThetaJoin" in {
+      val exp =
+        TJ.inj(ThetaJoin(
+          DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
+          Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),
+          Free.roll(R.inj(Const(Read(rootDir </> file("bar"))))),
+          Free.roll(And(Free.roll(And(
+            // reversed equality
+            Free.roll(Eq(
+              Free.roll(ProjectField(Free.point(RightSide), StrLit("r_id"))),
+              Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_id"))))),
+            // more complicated expression, duplicated refs
+            Free.roll(Eq(
+              Free.roll(Add(
+                Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_min"))),
+                Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_max"))))),
+              Free.roll(Subtract(
+                Free.roll(ProjectField(Free.point(RightSide), StrLit("l_max"))),
+                Free.roll(ProjectField(Free.point(RightSide), StrLit("l_min"))))))))),
+            // inequality
+            Free.roll(Lt(
+              Free.roll(ProjectField(Free.point(LeftSide), StrLit("l_lat"))),
+              Free.roll(ProjectField(Free.point(RightSide), StrLit("r_lat"))))))),
+          Inner,
+          Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide))))).embed
+
+      exp.transCata(liftFG(opt.simplifyJoin[QS])) must equal(
+        QC.inj(Map(
+          QC.inj(Filter(
+            EJ.inj(EquiJoin(
+              DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
+              Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),
+              Free.roll(R.inj(Const(Read(rootDir </> file("bar"))))),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
+                Free.roll(MakeArray(
+                  Free.roll(Add(
+                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_min"))),
+                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_max"))))))))),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(ProjectField(Free.point(SrcHole), StrLit("r_id"))))),
+                Free.roll(MakeArray(
+                  Free.roll(Subtract(
+                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_max"))),
+                    Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_min"))))))))),
+              Inner,
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(LeftSide))),
+                Free.roll(MakeArray(Free.point(RightSide))))))).embed,
+            Free.roll(Lt(
+              Free.roll(ProjectField(
+                Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
+                StrLit("l_lat"))),
+              Free.roll(ProjectField(
+                Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))),
+                StrLit("r_lat"))))))).embed,
+          Free.roll(ConcatMaps(
+            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
+            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))))))).embed)
     }
   }
 }

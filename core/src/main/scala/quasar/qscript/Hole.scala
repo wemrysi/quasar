@@ -16,12 +16,19 @@
 
 package quasar.qscript
 
+import quasar.Predef._
+import quasar.fp._
+
+import monocle.Iso
 import scalaz._
 
-sealed trait Hole
+sealed abstract class Hole
+
 final case object SrcHole extends Hole
 
 object Hole {
+  def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
+
   implicit val equal: Equal[Hole] = Equal.equalRef
   implicit val show: Show[Hole] = Show.showFromToString
 }
