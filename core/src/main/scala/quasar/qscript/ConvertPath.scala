@@ -129,11 +129,11 @@ object ConvertPath extends ConvertPathInstances {
     (elems: NonEmptyList[F[T[F]]])
     (implicit
       DE: Const[DeadEnd, ?] :<: F,
-      SP: SourcedPathable[T, ?] :<: F,
+      QC: QScriptCore[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
       : F[T[F]] =
     elems.foldRight1(
-      (elem, acc) => SP.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
+      (elem, acc) => QC.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
         elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
         acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))))))
 
@@ -145,7 +145,6 @@ object ConvertPath extends ConvertPathInstances {
     implicit R: Const[Read, ?] :<: G,
              FG: F ~> G,
              DE: Const[DeadEnd, ?] :<: G,
-             SP: SourcedPathable[T, ?] :<: G,
              QC: QScriptCore[T, ?] :<: G, 
              FI: G :<: QScriptTotal[T, ?]):
       AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
@@ -188,25 +187,6 @@ object ConvertPath extends ConvertPathInstances {
           l,
           r).right[ADir])))
 
-  implicit def sourcedPathable[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
-    (implicit
-      DE: Const[DeadEnd, ?] :<: G,
-      SP: SourcedPathable[T, ?] :<: G,
-      FI: G :<: QScriptTotal[T, ?])
-      : ConvertPath.Aux[T, SourcedPathable[T, ?], G] =
-    new ConvertPath[T, SourcedPathable[T, ?]] {
-      type H[A] = G[A]
-
-      def convertPath[M[_]: Monad](f: ListContents[M]):
-          StaticPathTransformation[T, M, SourcedPathable[T, ?], G] = {
-        case Union(src, lb, rb)
-            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
-          convertBranchingOp(src, lb, rb, f)((s, l, r) =>
-            SP.inj(Union(s, l, r)))
-        case sp => EitherT(List(CoEnv(SP.inj(sp).right[ADir])).right.point[M])
-      }
-    }
-
   implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
     (implicit
       DE: Const[DeadEnd, ?] :<: G,
@@ -217,6 +197,10 @@ object ConvertPath extends ConvertPathInstances {
       type H[A] = G[A]
 
       def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, QScriptCore[T, ?], G] = {
+        case Union(src, lb, rb)
+            if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
+          convertBranchingOp(src, lb, rb, f)((s, l, r) =>
+            QC.inj(Union(s, l, r)))
         case Take(src, lb, rb)
             if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>

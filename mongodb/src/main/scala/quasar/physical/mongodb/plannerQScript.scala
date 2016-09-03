@@ -720,22 +720,6 @@ object MongoDbQScriptPlanner {
         qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
   }
 
-  implicit def sourcedPathable[T[_[_]]: Recursive: ShowT]:
-      Planner.Aux[T, SourcedPathable[T, ?]] =
-    new Planner[SourcedPathable[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) = {
-        case LeftShift(src, struct, repair) => unimplemented
-        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
-        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
-        case Union(src, lBranch, rBranch) => unimplemented
-      }
-    }
-
   implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
@@ -746,6 +730,9 @@ object MongoDbQScriptPlanner {
                  ev: Show[WorkflowBuilder[WF]],
                  WB: WorkflowBuilder.Ops[WF]) = {
         case qscript.Map(src, f) => getExprBuilder(src, f).liftM[GenT]
+        case LeftShift(src, struct, repair) => unimplemented
+        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
+        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
         case Reduce(src, bucket, reducers, repair) =>
           (getExprBuilder(src, bucket) ⊛
             reducers.traverse(_.traverse(getExpr[T])) ⊛
@@ -761,6 +748,7 @@ object MongoDbQScriptPlanner {
           val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
           keys.traverse(getExprBuilder(src, _))
             .map(WB.sortBy(src, _, dirs)).liftM[GenT]
+        case Union(src, lBranch, rBranch) => unimplemented
         case Filter(src, f) =>
           getExprBuilder(src, f).map(cond =>
             WB.filter(src, List(cond), {
