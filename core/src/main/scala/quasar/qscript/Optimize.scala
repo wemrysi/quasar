@@ -152,6 +152,44 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         case RightSide => HoleF
       })))
 
+  private def matchBoth[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    left: FreeMap[T],
+    right: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    (left.resume, right.resume) match { // if both sides are Constant, we hit the first case
+      case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, left)
+      case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, right)
+      case (_, _) => TJ.inj(tj)
+    }
+
+  private def matchLeft[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    left: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    left.resume match {
+      case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, left)
+      case _ => TJ.inj(tj)
+    }
+
+  private def matchRight[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    right: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    right.resume match {
+      case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, right)
+      case _ => TJ.inj(tj)
+    }
+
   def elideConstantJoin[F[_], G[_]](
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
@@ -163,56 +201,28 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
           // both sides `SrcHole`
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
-            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
-              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case (_, _) => TJ.inj(tj)
-            }
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
           // both sides size 0 (catches `Unreferenced` and `Root`)
           case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2))) if (src1.length ≟ 0) && (src2.length ≟ 0) =>
-            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
-              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case (_, _) => TJ.inj(tj)
-            }
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
           // left side `SrcHole`, right side size 0
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>
-            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
-              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case (_, _) => TJ.inj(tj)
-            }
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
           // right side `SrcHole`, left side size 0
           case (Some(Map(-\/(src1), mf1)), Some(Map(\/-(SrcHole), mf2))) if src1.length ≟ 0 =>
-            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, mf1)
-              case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case (_, _) => TJ.inj(tj)
-            }
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
           // left side `SrcHole`
           case (Some(Map(\/-(SrcHole), mf1)), _) =>
-            mf1.resume match {
-              case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, mf1)
-              case _ => TJ.inj(tj)
-            }
+            matchLeft[F, G](rebase)(tj, mf1)
           // right side `SrcHole`
           case (_, Some(Map(\/-(SrcHole), mf2))) =>
-            mf2.resume match {
-              case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case _ => TJ.inj(tj)
-            }
+            matchRight[F, G](rebase)(tj, mf2)
           // left side size 0
           case (Some(Map(-\/(src1), mf1)), _) if src1.length ≟ 0 =>
-            mf1.resume match {
-              case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, mf1)
-              case _ => TJ.inj(tj)
-            }
+            matchLeft[F, G](rebase)(tj, mf1)
           // right side size 0
           case (_, Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>
-            mf2.resume match {
-              case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, mf2)
-              case _ => TJ.inj(tj)
-            }
+            matchRight[F, G](rebase)(tj, mf2)
           case (_, _)=> TJ.inj(tj)
         }
         case (_, _) => TJ.inj(tj)
