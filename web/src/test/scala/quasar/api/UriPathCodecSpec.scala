@@ -19,16 +19,49 @@ package quasar.api
 import quasar.Predef._
 import quasar._
 import fs._
-
-import pathy.Path._
+import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
 
 /** This is largely copied from `pathy`. It would be nice to expose from a pathy
   * a function to validate a `PathCodec`. */
 class UriPathCodecSpec extends quasar.Qspec {
+  val codec = UriPathCodec
+
+  override def map(fs: => Fragments) = encodingFragments append super.map(fs)
+
+  private def encodings = List(
+    "%"   -> "%25",
+    "%2"  -> "%252",
+    "%25" -> "%2525",
+    "%a"  -> "%25a",
+    "%aa" -> "%25aa",
+    "%ag" -> "%25ag",
+    "%AA" -> "%25AA",
+    "%AG" -> "%25AG",
+    "."   -> "$dot$",
+    ".."  -> "$dotdot$",
+    "..." -> "...",
+    "/"   -> "%2F"
+  )
+
+  private def encodingFragments = Fragments(
+       fragmentFactory.section("encode special characters properly")
+    +: fragmentFactory.break
+    +: (encodings map checkEncoding)
+    :+ fragmentFactory.break
+    : _*
+  )
+
+  private def checkEncoding(pair: (String, String)): Fragment = {
+    val (from, to) = pair
+    val result = (
+         ((codec escape from) must_=== to)
+      && ((codec unescape to) must_=== from)
+    )
+    fragmentFactory.example(f"$from%-8s -> $to%-8s -> $from%-8s\n", result)
+  }
 
   "UriPathCodec" should {
-    val codec = UriPathCodec
     "print and parse again should produce same Path" >> {
       "absolute file" >> prop { path: AFile =>
         codec.parseAbsFile(codec.printPath(path)) must_== Some(path)
@@ -43,18 +76,5 @@ class UriPathCodecSpec extends quasar.Qspec {
         codec.parseRelDir(codec.printPath(path)) must_== Some(path)
       }
     }
-
-    "encode special characters properly" >> {
-      "/" in {
-        codec.printPath(rootDir </> dir("foo/bar") </> dir("baz")) must_== "/foo%2Fbar/baz/"
-      }
-      "." in {
-        codec.printPath(rootDir </> dir(".") </> dir("baz")) must_== "/$dot$/baz/"
-      }
-      ".." in {
-        codec.printPath(rootDir </> dir("..") </> dir("baz")) must_== "/$dotdot$/baz/"
-      }
-    }
-
   }
 }
