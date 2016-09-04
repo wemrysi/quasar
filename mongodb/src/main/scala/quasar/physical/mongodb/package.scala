@@ -34,12 +34,6 @@ package object mongodb {
 
   type WorkflowExecErrT[F[_], A] = EitherT[F, WorkflowExecutionError, A]
 
-  // NB: this String ends up being used to salt the name generator, which
-  // produces Strings which are then wrapped in Collection[Name]. As such this
-  // value always represents a Collection[Name], but it's just too tricky to
-  // propagate that type through the MT stack at the moment
-  type CollectionPrefix = String
-
   type JavaScriptPrg           = Vector[Js.Stmt]
   type JavaScriptLogT[F[_], A] = WriterT[F, JavaScriptPrg, A]
   type JavaScriptLog[A]        = Writer[JavaScriptPrg, A]

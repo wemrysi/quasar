@@ -548,7 +548,11 @@ object MapFuncs {
   @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  @Lenses final case class Cond[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Cond[T[_[_]], A](cond: A, then_ : A, else_ : A) extends Ternary[T, A] {
+    def a1 = cond
+    def a2 = then_
+    def a3 = else_
+  }
 
   // set
   @Lenses final case class Within[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
@@ -562,16 +566,32 @@ object MapFuncs {
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  @Lenses final case class Substring[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Substring[T[_[_]], A](string: A, from: A, count: A) extends Ternary[T, A] {
+    def a1 = string
+    def a2 = from
+    def a3 = count
+  }
 
   // structural
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class MakeMap[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
+    def a1 = key
+    def a2 = value
+  }
   @Lenses final case class ConcatArrays[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class ConcatMaps[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class ProjectIndex[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class ProjectField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ProjectIndex[T[_[_]], A](src: A, index: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = index
+  }
+  @Lenses final case class ProjectField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = field
+  }
+  @Lenses final case class DeleteField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = field
+  }
 
   // helpers & QScript-specific
   /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
@@ -589,7 +609,10 @@ object MapFuncs {
     * `[[0, v1], [1, v2], ...]`.
     */
   @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
+    def a1 = from
+    def a2 = to
+  }
   /** A conditional specifically for checking that `a1` satisfies `pattern`.
     */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)

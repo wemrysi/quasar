@@ -35,10 +35,11 @@ trait QScriptHelpers {
   val R = implicitly[Const[Read, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
+  val EJ = implicitly[EquiJoin[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
-  def RootR: Fix[QS] =
-    CorecursiveOps[Fix, QS](DE.inj(Const[DeadEnd, Fix[QS]](Root))).embed
+  def RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
+  def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const[Read, Fix[QS]](Read(file)))
 
   def ProjectFieldR[A](
     src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
@@ -47,6 +48,15 @@ trait QScriptHelpers {
 
   def lpRead(path: String): Fix[LP] =
     LP.Read(sandboxAbs(posixCodec.parseAbsFile(path).get))
+
+  /** A helper when writing examples that allows them to be written in order of
+    * execution.
+    */
+  // NB: Would prefer this to be `ops: T[F] => F[T[F]]*`, but it makes the call
+  //     site too annotate-y.
+  def chain[T[_[_]]: Corecursive, F[_]: Functor](op: F[T[F]], ops: F[Unit]*):
+      T[F] =
+    ops.foldLeft(op.embed)((acc, elem) => elem.as(acc).embed)
 
   // NB: This is the same type as QueryFile.ListContents
   def listContents: ConvertPath.ListContents[Id] =

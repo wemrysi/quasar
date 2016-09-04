@@ -29,6 +29,12 @@ class Predef extends LowPriorityImplicits {
   type AnyVal = scala.AnyVal
   type StringBuilder = java.lang.StringBuilder
 
+  /** The typelevel Predef additions which makes literal
+   *  types more reasonable to use.
+   */
+  type ValueOf[A]                           = scala.ValueOf[A]
+  def valueOf[A](implicit z: ValueOf[A]): A = z.value
+
   type deprecated = scala.deprecated
   type tailrec = scala.annotation.tailrec
   type SuppressWarnings = java.lang.SuppressWarnings

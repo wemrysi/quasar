@@ -17,6 +17,7 @@
 package quasar.fp
 
 import quasar.Predef._
+import quasar.RenderTree
 
 import monocle.Iso
 import scalaz._
@@ -35,4 +36,6 @@ object ExternallyManaged {
 
   implicit val equal: Equal[ExternallyManaged] = Equal.equalRef
   implicit val show: Show[ExternallyManaged] = Show.showFromToString
+  implicit val renderTree: RenderTree[ExternallyManaged] =
+    RenderTree.fromToString("ExternallyManaged")
 }

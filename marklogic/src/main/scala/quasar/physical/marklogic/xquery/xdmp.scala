@@ -48,6 +48,9 @@ object xdmp {
   def documentProperties(uris: XQuery*): XQuery =
     XQuery(s"xdmp:document-properties${mkSeq(uris)}")
 
+  def nodeKind(node: XQuery): XQuery =
+    XQuery(s"xdmp:node-kind($node)")
+
   def nodeUri(node: XQuery): XQuery =
     XQuery(s"xdmp:node-uri($node)")
 }
