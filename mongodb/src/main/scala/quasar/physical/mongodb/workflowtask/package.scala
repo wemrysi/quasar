@@ -102,7 +102,7 @@ package object workflowtask {
       case $redact((), _)                          => None
       case $geoNear((), _, _, _, _, _, _, _, _, _) => src.map(_ :+ BsonField.Name("dist"))
 
-      case $lookup((), _, _, _, as)                => src.map(_ :+ as)
+      case $lookup((), _, _, _, as)                => src.map(_ :+ as.flatten.head)
     })
   }
 }

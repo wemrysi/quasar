@@ -90,7 +90,7 @@ class MongoDbExprStdLibSpec extends StdLibSpec {
                 LogicalPlan.Read(coll.asFile),
                 LogicalPlan.Constant(Data.Str("arg" + idx))))))))
 
-      val ctx = QueryContext(queryModel, κ(None))
+      val ctx = QueryContext(queryModel, κ(None), κ(None))
 
       MongoDbPlanner.plan(lp, ctx).run.value
         .flatMap { wf =>
