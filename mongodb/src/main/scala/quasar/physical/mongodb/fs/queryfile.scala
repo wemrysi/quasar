@@ -82,7 +82,8 @@ object queryfile {
 
 final case class QueryContext(
   model: MongoQueryModel,
-  statistics: Collection => Option[CollectionStatistics])
+  statistics: Collection => Option[CollectionStatistics],
+  indexes: Collection => Option[Set[Index]])
 
 
 private final class QueryFileInterpreter[C](
@@ -210,15 +211,17 @@ private final class QueryFileInterpreter[C](
       EitherT[MongoLogWF, FileSystemError, A](
         fa.run.liftM[QRT].liftM[PhaseResultT])
 
-    def stats: EitherT[MongoDbIO, FileSystemError, Map[Collection, CollectionStatistics]] =
+    def lookup[A](f: Collection => MongoDbIO[A]): EitherT[MongoDbIO, FileSystemError, Map[Collection, A]] =
       for {
         colls <- EitherT.fromDisjunction[MongoDbIO](collections(lp).leftMap(pathErr(_)))
-        stats <- colls.toList.traverse(c => MongoDbIO.collectionStatistics(c).strengthL(c)).map(Map(_: _*)).liftM[FileSystemErrT]
-      } yield stats
+        a     <- colls.toList.traverse(c => f(c).strengthL(c)).map(Map(_: _*)).liftM[FileSystemErrT]
+      } yield a
 
-    lift((MongoDbIO.serverVersion.liftM[FileSystemErrT] |@| stats)((vers, stats) =>
+    lift((MongoDbIO.serverVersion.liftM[FileSystemErrT] |@|
+        lookup(MongoDbIO.collectionStatistics) |@|
+        lookup(MongoDbIO.indexes))((vers, stats, idxs) =>
       QueryContext(
-        MongoQueryModel(vers), stats.get(_))))
+        MongoQueryModel(vers), stats.get(_), idxs.get(_))))
   }
 
   private def convertPlanR(lp: Fix[LogicalPlan]): PlanR ~> MongoLogWFR =

@@ -32,7 +32,8 @@ import quasar.qscript._
 import quasar.std.StdLib._, string._ // TODO: remove this
 import javascript._
 
-import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
+import matryoshka.patterns.CoEnv
 import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
@@ -899,10 +900,11 @@ object MongoDbQScriptPlanner {
     def unapply[S[_]: Functor, A](obj: Free[S, A]): Option[A] = obj.resume.toOption
   }
 
-  def elideMoreGeneralGuards[T[_[_]]](subType: Type):
-      FreeMap[T] => PlannerError \/ FreeMap[T] = {
-    case free @ Roll(MapFuncs.Guard(Point(SrcHole), typ, cont, _)) =>
-      if (typ.contains(subType)) cont.right
+  def elideMoreGeneralGuards[T[_[_]]: Recursive](subType: Type):
+      CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] =>
+        PlannerError \/ CoEnv[Hole, MapFunc[T, ?], T[CoEnv[Hole, MapFunc[T, ?], ?]]] = {
+    case free @ CoEnv(\/-(MapFuncs.Guard(Embed(CoEnv(-\/(SrcHole))), typ, cont, _))) =>
+      if (typ.contains(subType)) cont.project.right
       else if (!subType.contains(typ))
         InternalError("can only contain " + subType + ", but a(n) " + typ + " is expected").left
       else free.right
@@ -914,13 +916,13 @@ object MongoDbQScriptPlanner {
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
   //       generate more correct PatternGuards in the first place, rather than
   //       trying to strip out unnecessary ones after the fact
-  def assumeReadType[T[_[_]]: Recursive, F[_]: Functor](typ: Type)(
+  def assumeReadType[T[_[_]]: Recursive: Corecursive, F[_]: Functor](typ: Type)(
     implicit QC: QScriptCore[T, ?] :<: F, R: Const[Read, ?] :<: F):
       QScriptCore[T, T[F]] => PlannerError \/ F[T[F]] = {
     case m @ qscript.Map(src, mf) =>
       R.prj(src.project).fold(
         QC.inj(m).right[PlannerError])(
-        κ(mf.transCataTM(elideMoreGeneralGuards(typ)) ∘
+        κ(freeTransCataM(mf)(elideMoreGeneralGuards(typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))))
     case qc => QC.inj(qc).right
   }
@@ -969,7 +971,7 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(liftError(
         qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
-          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) // ⋘ optimize.simplifyJoins
+          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘ liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
           ).apply(tf) ∘
             Normalizable[QScriptTotal[T, ?]].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
@@ -995,7 +997,7 @@ object MongoDbQScriptPlanner {
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback(
-            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics),
+            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce[Workflow3_2F])
         plan0[T, Workflow3_2F](joinHandler)(logical)
 
