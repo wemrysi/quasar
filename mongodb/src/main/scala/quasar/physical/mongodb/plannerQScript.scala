@@ -102,6 +102,7 @@ object MongoDbQScriptPlanner {
     import MapFuncs._
 
     val unimplemented = InternalError("unimplemented").left
+    val shouldNotBeReached = InternalError("should not be reached").left
 
     {
       case Constant(v1) =>
@@ -704,9 +705,7 @@ object MongoDbQScriptPlanner {
         joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
         implicit I: WorkflowOpCoreF :<: WF,
                  ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        // NB: This is just a dummy value. Should never be referenced.
-        κ(StateT.stateT(ValueBuilder(Bson.Null)))
+                 WB: WorkflowBuilder.Ops[WF]) = shouldNotBeReached
     }
 
   implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
@@ -774,7 +773,8 @@ object MongoDbQScriptPlanner {
           (rebaseWB(joinHandler, from, src) ⊛
             (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
             WB.skip)
-        case Unreferenced() => ???
+        case Unreferenced() =>
+          κ(StateT.stateT(ValueBuilder(Bson.Null)))
       }
     }
 
