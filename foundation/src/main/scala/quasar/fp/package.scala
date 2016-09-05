@@ -156,43 +156,6 @@ sealed trait ListMapInstances {
     }
 }
 
-trait EitherTInstances {
-  implicit def eitherTCatchable[F[_]: Catchable : Functor, E]: Catchable[EitherT[F, E, ?]] =
-    new Catchable[EitherT[F, E, ?]] {
-      def attempt[A](fa: EitherT[F, E, A]) =
-        EitherT[F, E, Throwable \/ A](
-          Catchable[F].attempt(fa.run) map {
-            case -\/(t)      => \/.right(\/.left(t))
-            case \/-(-\/(e)) => \/.left(e)
-            case \/-(\/-(a)) => \/.right(\/.right(a))
-          })
-
-      def fail[A](t: Throwable) =
-        EitherT[F, E, A](Catchable[F].fail(t))
-    }
-
-  implicit def eitherTMonadState[F[_], S, E](implicit F: MonadState[F, S]): MonadState[EitherT[F, E, ?], S] =
-    new MonadState[EitherT[F, E, ?], S] {
-      def init = F.init.liftM[EitherT[?[_], E, ?]]
-      def get = F.get.liftM[EitherT[?[_], E, ?]]
-      def put(s: S) = F.put(s).liftM[EitherT[?[_], E, ?]]
-      override def map[A, B](fa: EitherT[F, E, A])(f: A => B) = fa map f
-      def bind[A, B](fa: EitherT[F, E, A])(f: A => EitherT[F, E, B]) = fa flatMap f
-      def point[A](a: => A) = F.point(a).liftM[EitherT[?[_], E, ?]]
-    }
-
-  // Temporary workaround for a bug in scalaz 7.1, where the "right" value is
-  // sequenced twice.
-  // TODO: Remove this when we update to scalaz 7.2.
-  implicit class eitherTOps[F[_], A, B](v: EitherT[F, A, B]) {
-    def orElse_bug_free(v2: => EitherT[F, A, B])(implicit F: Monad[F]): EitherT[F, A, B] =
-      EitherT(F.bind(v.run) {
-        case    -\/ (_) => v2.run
-        case r @ \/-(_) => F.point(r)
-      })
-  }
-}
-
 trait OptionTInstances {
   implicit def optionTCatchable[F[_]: Catchable : Functor]: Catchable[OptionT[F, ?]] =
     new Catchable[OptionT[F, ?]] {
@@ -383,7 +346,7 @@ trait CoEnvInstances extends LowPriorityCoEnvImplicits {
 package object fp
     extends TreeInstances
     with ListMapInstances
-    with EitherTInstances
+    with fp.EitherTInstances
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
@@ -394,7 +357,8 @@ package object fp
     with ProcessOps
     with QFoldableOps
     with SKI
-    with StringOps {
+    with StringOps
+    with CatchableInstances {
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
 
@@ -657,6 +621,10 @@ package object fp
     final def toCoEnv[T[_[_]]: Corecursive](implicit fa: Functor[F]): T[CoEnv[E, F, ?]] =
       self.ana(CoEnv.freeIso[E, F].reverseGet)
   }
+
+  // TODO[matryoshka]: Should be an HMap instance
+  def coEnvHmap[F[_], G[_], A, B](fa: CoEnv[A, F, B])(f: F ~> G) =
+    CoEnv(fa.run.map(f(_)))
 
   // TODO[matryoshka]: Should be an HTraverse instance
   def coEnvHtraverse[G[_]: Applicative, F[_], H[_], A, B](

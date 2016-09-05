@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
   * @param param The free parameter to the expression
   */
 final case class JsFn(param: Name, expr: JsCore) {
-  def apply(x: JsCore) = expr.substitute(Ident(param), x)
+  def apply(x: JsCore): JsCore = expr.substitute(Ident(param), x)
 
   def >>>(that: JsFn): JsFn =
     if (this == JsFn.identity) that

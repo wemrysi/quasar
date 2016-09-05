@@ -35,6 +35,19 @@ sealed abstract class SourcedPathable[T[_[_]], A] {
   * `struct` is an expression that evaluates to an array or object, which is
   * then “exploded” into multiple values. `repair` is applied across the new
   * set, integrating the exploded values into the original set.
+  *
+  * E.g., in:
+  *     LeftShift(x,
+  *               ProjectField(SrcHole, "bar"),
+  *               ConcatMaps(LeftSide, MakeMap("bar", RightSide)))```
+  * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then
+  * that’s what [[LeftSide]] is. And [[RightSide]] is values like `1`, `2`, and
+  * `3`, because that’s what you get from flattening the struct.So then our
+  * right-biased [[quasar.qscript.MapFuncs.ConcatMaps]] says to concat
+  * `{ foo: 7, bar: [1, 2, 3] }` with `{ bar: 1 }`, resulting in
+  * `{ foo: 7, bar: 1 }` (then again with `{ foo: 7, bar: 2 }` and
+  * `{ foo: 7, bar: 3 }`, finishing up the handling of that one element in the
+  * original (`x`) dataset.
   */
 @Lenses final case class LeftShift[T[_[_]], A](
   src: A,
@@ -42,12 +55,8 @@ sealed abstract class SourcedPathable[T[_[_]], A] {
   repair: JoinFunc[T])
     extends SourcedPathable[T, A]
 
-/** Creates a new dataset, |a|+|b|, containing all of the entries from each of
-  * the input sets, without any indication of which set they came from
-  *
-  * This could be handled as another join type, the anti-join
-  * (T[EJson] \/ T[EJson] => T[EJson], specifically as `_.merge`), with the
-  * condition being `κ(true)`,
+/** Creates a new dataset that contains the elements from the datasets created
+  * by each branch. Duplicate values should be eliminated.
   */
 @Lenses final case class Union[T[_[_]], A](
   src: A,
@@ -105,13 +114,12 @@ object SourcedPathable {
     new Mergeable[SourcedPathable[T, ?]] {
       type IT[F[_]] = T[F]
 
+      // TODO: Merge two LeftShifts with different repair functions
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], SourcedPathable[IT, ?], Unit],
-        p2: EnvT[Ann[T], SourcedPathable[IT, ?], Unit]) =
-        // TODO: Merge two LeftShifts with different repair functions
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p1: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[T], SourcedPathable[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:

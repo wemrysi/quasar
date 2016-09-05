@@ -17,16 +17,34 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.NameGenerator
 import quasar.fp.ShowT
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class SourcedPathablePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
-  val plan: AlgebraM[Planning, SourcedPathable[T, ?], XQuery] = {
-    case LeftShift(src, struct, repair) => mapFuncXQuery(struct, src).point[Planning]
-    case Union(src, lBranch, rBranch)   => src.point[Planning]
+  import expr.{for_, let_}
+
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], SourcedPathable[T, ?], XQuery] = {
+    case LeftShift(src, struct, repair) =>
+      liftP(for {
+        s       <- freshVar[F]
+        l       <- freshVar[F]
+        r       <- freshVar[F]
+        extract <- mapFuncXQuery(struct, s.xqy)
+        lshift  <- local.leftShift(l.xqy)
+        merge   <- mergeXQuery(repair, l.xqy, r.xqy)
+      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge)
+
+    case Union(src, lBranch, rBranch) =>
+      for {
+        s <- liftP(freshVar[F])
+        l <- rebaseXQuery(lBranch, s.xqy)
+        r <- rebaseXQuery(rBranch, s.xqy)
+      } yield let_(s -> src) return_ (l union r)
   }
 }

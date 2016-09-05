@@ -37,12 +37,14 @@ sealed abstract class XQuery {
   def to(upper: XQuery): XQuery = XQuery(s"$this to $upper")
 
   def `/`(xqy: XQuery): XQuery = xqy match {
-    case StringLit(s)   => XQuery(s"$this/$s")
+    case Step(s)        => XQuery(s"$this/$s")
+    case StringLit(s)   => XQuery(s"""$this/"$s"""")
     case Expression(ex) => XQuery(s"""$this/xdmp:value("$ex")""")
   }
 
   def `//`(xqy: XQuery): XQuery = xqy match {
-    case StringLit(s)   => XQuery(s"$this//$s")
+    case Step(s)        => XQuery(s"$this//$s")
+    case StringLit(s)   => XQuery(s"""$this//"$s"""")
     case Expression(ex) => XQuery(s"""$this//xdmp:value("$ex")""")
   }
 
@@ -66,12 +68,39 @@ sealed abstract class XQuery {
   def is(other: XQuery): XQuery = XQuery(s"$this is $other")
   def <<(other: XQuery): XQuery = XQuery(s"$this << $other")
   def >>(other: XQuery): XQuery = XQuery(s"$this >> $other")
+
+  // Sequence Ops
+
+  def union(other: XQuery): XQuery =
+    XQuery(s"$this union $other")
+
+  def intersect(other: XQuery): XQuery =
+    XQuery(s"$this intersect $other")
+
+  def except(other: XQuery): XQuery =
+    XQuery(s"$this except $other")
+
+  // TODO: Accept a list of namespaces? Or somehow gather namespaces used in
+  //       constructing the query in order to be able to output them here.
+  def toQuery: String =
+    s"""
+      xquery version "1.0-ml";
+      import module namespace json = "http://marklogic.com/xdmp/json" at "/MarkLogic/json/json.xqy";
+      declare namespace ejson  = "http://quasar-analytics.org/ejson";
+      declare namespace quasar = "http://quasar-analytics.org/quasar";
+
+      $this
+    """
 }
 
 object XQuery {
   final case class StringLit(str: String) extends XQuery {
     override def toString = s""""$str""""
   }
+
+  /** XPath [Step](https://www.w3.org/TR/xquery/#id-steps) expression. */
+  final case class Step(override val toString: String) extends XQuery
+
   final case class Expression(override val toString: String) extends XQuery
 
   def apply(expr: String): XQuery =

@@ -50,20 +50,16 @@ object AsXQuery {
       }
     }
 
-  implicit val objAsXQuery: AsXQuery[Obj] =
-    new AsXQuery[Obj] {
-      val asXQuery: Algebra[Obj, XQuery] =
-        obj => map.new_(obj.value.toList.map { case (k, v) => map.entry(k.xs, v) })
-    }
-
   implicit val extensionAsXQuery: AsXQuery[Extension] =
     new AsXQuery[Extension] {
       val asXQuery: Algebra[Extension, XQuery] = {
         case Meta(value, meta) => ???
         case Map(entries)      => ???
         case Byte(b)           => xs.byte(b.toInt.xqy)
-        case Char(c)           => c.toString.xqy
-        case Int(i)            => xs.integer(i.xqy)
+        case Char(c)           => c.toString.xs
+        // TODO: There appears to be a limit on integers in MarkLogic, find out what it is
+        //       and validate `i`.
+        case Int(i)            => xs.integer(i.toString.xqy)
       }
     }
 }

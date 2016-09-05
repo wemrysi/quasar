@@ -17,17 +17,16 @@
 package quasar.physical.marklogic
 
 import quasar.SKI.κ
-import quasar.{PhaseResultW, PlannerErrT}
-import quasar.fp.{freeCata, freeCataM, interpret, interpretM, ShowT}
+import quasar.{NameGenerator, PhaseResultT, PlannerErrT}
+import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.XQuery
 
 import matryoshka.Recursive
-import scalaz.{Const, Free}
-import scalaz.{EitherT, Scalaz}, Scalaz._
+import scalaz._, Scalaz._
 
 package object qscript {
-  type Planning[A] = PlannerErrT[PhaseResultW, A]
+  type PlanningT[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
 
   type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
 
@@ -54,19 +53,28 @@ package object qscript {
       new EquiJoinPlanner[T]
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: ShowT](fm: FreeMap[T], src: XQuery): XQuery =
-    planMapFunc(fm)(κ(src))
+  def liftP[F[_]: Monad, A](fa: F[A]): PlanningT[F, A] =
+    fa.liftM[PhaseResultT].liftM[PlannerErrT]
 
-  def planMapFunc[T[_[_]]: Recursive: ShowT, A](
+  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](fm: FreeMap[T], src: XQuery): F[XQuery] =
+    planMapFunc[T, F, Hole](fm)(κ(src))
+
+  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+    planMapFunc[T, F, JoinSide](jf) {
+      case LeftSide  => l
+      case RightSide => r
+    }
+
+  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad, A](
     freeMap: Free[MapFunc[T, ?], A])(
     recover: A => XQuery
-  ): XQuery =
-    freeCata(freeMap)(interpret(recover, MapFuncPlanner[T]))
+  ): F[XQuery] =
+    freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: ShowT](fqs: FreeQS[T], src: XQuery): Planning[XQuery] = {
+  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad](fqs: FreeQS[T], src: XQuery): PlanningT[F, XQuery] = {
     import MarkLogicPlanner._
     // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
     import EitherT.eitherTMonad
-    freeCataM(fqs)(interpretM(κ(src.point[Planning]), Planner[QScriptTotal[T, ?], XQuery].plan))
+    freeCataM(fqs)(interpretM(κ(src.point[PlanningT[F, ?]]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
   }
 }

@@ -83,13 +83,12 @@ object ThetaJoin {
     new Mergeable[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
 
+      // TODO: merge two joins with different combine funcs
       def mergeSrcs(
         left: FreeMap[IT],
         right: FreeMap[IT],
-        p1: EnvT[Ann[T], ThetaJoin[IT, ?], Unit],
-        p2: EnvT[Ann[T], ThetaJoin[IT, ?], Unit]) =
-        // TODO: merge two joins with different combine funcs
-        (p1 ≟ p2).option(SrcMerge(p1, left, right))
+        p1: EnvT[Ann[T], ThetaJoin[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[T], ThetaJoin[IT, ?], ExternallyManaged]) = None
     }
 
   implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:

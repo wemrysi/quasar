@@ -17,66 +17,119 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.physical.marklogic.ejson.AsXQuery
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript.{MapFunc, MapFuncs, Nullary}, MapFuncs._
+import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import matryoshka._, Recursive.ops._
+import scalaz.Monad
 import scalaz.std.option._
+import scalaz.syntax.monad._
 import scalaz.syntax.show._
 
 object MapFuncPlanner {
-  import expr.if_
+  import expr.{if_, let_}, axes._
 
-  def apply[T[_[_]]: Recursive: ShowT]: Algebra[MapFunc[T, ?], XQuery] = {
-    case Nullary(ejson) => ejson.cata(AsXQuery[EJson].asXQuery)
-
-    // array
-    case Length(arr) => fn.count(arr)
-
-    // time TODO
+  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: Monad]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+    case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
 
     // math
-    case Negate(x) => -x
-    case Add(x, y) => x + y
-    case Multiply(x, y) => x * y
-    case Subtract(x, y) => x - y
-    case Divide(x, y) => x div y
-    case Modulo(x, y) => x mod y
-    case Power(b, e) => math.pow(b, e)
+    case Negate(x) => (-x).point[F]
+    case Add(x, y) => (x + y).point[F]
+    case Multiply(x, y) => (x * y).point[F]
+    case Subtract(x, y) => (x - y).point[F]
+    case Divide(x, y) => (x div y).point[F]
+    case Modulo(x, y) => (x mod y).point[F]
+    case Power(b, e) => math.pow(b, e).point[F]
 
     // relations
     // TODO: When to use value vs. general comparisons?
-    case Not(x) => fn.not(x)
-    case Eq(x, y) => x eq y
-    case Neq(x, y) => x ne y
-    case Lt(x, y) => x lt y
-    case Lte(x, y) => x le y
-    case Gt(x, y) => x gt y
-    case Gte(x, y) => x ge y
-    case And(x, y) => x and y
-    case Or(x, y) => x or y
-    case Cond(p, t, f) => if_ (p) then_ t else_ f
+    case Not(x) => fn.not(x).point[F]
+    case Eq(x, y) => (x eq y).point[F]
+    case Neq(x, y) => (x ne y).point[F]
+    case Lt(x, y) => (x lt y).point[F]
+    case Lte(x, y) => (x le y).point[F]
+    case Gt(x, y) => (x gt y).point[F]
+    case Gte(x, y) => (x ge y).point[F]
+    case And(x, y) => (x and y).point[F]
+    case Or(x, y) => (x or y).point[F]
+
+    case Cond(p, t, f) => if_(p).then_(t).else_(f).point[F]
 
     // string
-    case Lower(s) => fn.lowerCase(s)
-    case Upper(s) => fn.upperCase(s)
-    case ToString(x) => fn.string(x)
-    case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len))
+    case Lower(s) => fn.lowerCase(s).point[F]
+    case Upper(s) => fn.upperCase(s).point[F]
+    case ToString(x) => fn.string(x).point[F]
+    case Substring(s, loc, len) => fn.substring(s, loc + 1.xqy, some(len)).point[F]
 
     // structural
-    // TODO: Currently experimenting with sequence as Array, might not work.
-    case MakeArray(x) => x
-    case ConcatArrays(x, y) => mkSeq_(x, y)
-    case ProjectField(src, field) => src `/` field
-    case ProjectIndex(seq, idx) => seq(idx + 1.xqy)
+    case MakeArray(x) =>
+      ejson.singletonArray(x).point[F]
+
+    // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
+    case MakeMap(k, v) =>
+      ejson.singletonMap(k, v).point[F]
+
+    case ConcatArrays(x, y) =>
+      ejson.arrayConcat(x, y)
+
+    case ProjectField(src, field) => field match {
+      case XQuery.Step(_) =>
+        (src `/` field).point[F]
+
+      case XQuery.StringLit(s) =>
+        for {
+          m      <- freshVar[F]
+          lookup <- ejson.mapLookup(m.xqy, s.xs)
+        } yield {
+          let_(m -> src) return_ {
+            if_ (ejson.isMap(m.xqy))
+            .then_ { lookup }
+            .else_ { m.xqy `/` child(s) }
+          }
+        }
+
+      case _ =>
+        for {
+          m <- freshVar[F]
+          k <- freshVar[F]
+          v <- ejson.mapLookup(m.xqy, k.xqy)
+        } yield {
+          let_(m -> src, k -> field) return_ {
+            if_ (ejson.isMap(m.xqy)) then_ v else_ (m.xqy `/` k.xqy)
+          }
+        }
+    }
+
+    // TODO: What other types should this work with?
+    case ProjectIndex(arr, idx) =>
+      freshVar[F] map { i =>
+        let_(i -> idx) return_ {
+          arr `/` child(ejson.arrayEltName)(i.xqy + 1.xqy) `/` child.node()
+        }
+      }
 
     // other
-    case Range(x, y) => x to y
+    case Range(x, y) => (x to y).point[F]
 
-    case mapFunc => s"(: ${mapFunc.shows} :)()".xqy
+    case ZipMapKeys(m) =>
+      for {
+        src  <- freshVar[F]
+        zmk  <- ejson.zipMapKeys(src.xqy)
+        zmnk <- local.zipMapNodeKeys(src.xqy)
+      } yield {
+        let_(src -> m) return_ {
+          // TODO: Should this be necessary?
+          if_(fn.empty(src.xqy))
+          .then_ { src.xqy }
+          .else_ { if_(ejson.isMap(src.xqy)) then_ zmk else_ zmnk }
+        }
+      }
+
+    case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
 }

@@ -17,6 +17,8 @@
 package quasar
 
 import quasar.Predef._
+import quasar.SKI.κ
+import quasar.effect.MonotonicSeq
 
 import simulacrum.typeclass
 import scalaz._
@@ -37,28 +39,42 @@ import scalaz.syntax.functor._
     freshName map (prefix + _)
 }
 
-object NameGenerator {
-
+object NameGenerator extends NameGeneratorInstances {
   /** A short, randomized string to use as "salt" in salted name generators. */
   val salt: Task[String] =
     Task.delay(scala.util.Random.nextInt().toHexString)
+}
 
-  implicit def sequenceNameGenerator[F[_]: Monad]: NameGenerator[SeqNameGeneratorT[F, ?]] =
-    new NameGenerator[SeqNameGeneratorT[F, ?]] {
-      val ms = MonadState[StateT[F, Long, ?], Long]
-      def freshName = ms.get flatMap (n => ms.put(n + 1) as n.toString)
+sealed abstract class NameGeneratorInstances extends NameGeneratorInstances0 {
+  implicit def sequenceNameGenerator[F[_]](implicit F: MonadState[F, Long]): NameGenerator[F] =
+    new NameGenerator[F] {
+      def freshName = F.bind(F.get)(n => F.put(n + 1) as n.toString)
     }
 
-  implicit def saltedSequenceNameGenerator[F[_]: Monad]: NameGenerator[SaltedSeqNameGeneratorT[F, ?]] =
-    new NameGenerator[SaltedSeqNameGeneratorT[F, ?]] {
-      type G[A] = SeqNameGeneratorT[F, A]
-      def freshName = ReaderT[G, String, String] { salt: String =>
-        NameGenerator[G].freshName.map(s"${salt}_" + _)
-      }
+  implicit def monotonicSeqNameGenerator[S[_]](implicit S: MonotonicSeq :<: S): NameGenerator[Free[S, ?]] =
+    new NameGenerator[Free[S, ?]] {
+      def freshName = MonotonicSeq.Ops[S].next map (_.toString)
     }
+}
 
-  implicit def eitherTNameGenerator[F[_]: NameGenerator : Functor, E]: NameGenerator[EitherT[F, E, ?]] =
-    new NameGenerator[EitherT[F, E, ?]] {
+sealed abstract class NameGeneratorInstances0 {
+  implicit def eitherTNameGenerator[F[_]: NameGenerator : Functor, A]: NameGenerator[EitherT[F, A, ?]] =
+    new NameGenerator[EitherT[F, A, ?]] {
       def freshName = EitherT.right(NameGenerator[F].freshName)
+    }
+
+  implicit def readerTNameGenerator[F[_]: NameGenerator, A]: NameGenerator[ReaderT[F, A, ?]] =
+    new NameGenerator[ReaderT[F, A, ?]] {
+      def freshName = ReaderT(κ(NameGenerator[F].freshName))
+    }
+
+  implicit def stateTNameGenerator[F[_]: NameGenerator : Monad, S]: NameGenerator[StateT[F, S, ?]] =
+    new NameGenerator[StateT[F, S, ?]] {
+      def freshName = StateT(s => NameGenerator[F].freshName strengthL s)
+    }
+
+  implicit def writerTNameGenerator[F[_]: NameGenerator : Functor, W: Monoid]: NameGenerator[WriterT[F, W, ?]] =
+    new NameGenerator[WriterT[F, W, ?]] {
+      def freshName = WriterT.put(NameGenerator[F].freshName)(Monoid[W].zero)
     }
 }

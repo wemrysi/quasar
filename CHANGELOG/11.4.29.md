@@ -1,0 +1,1 @@
+- various minor build/test cleanup, including actually skipping some tests in Travis

@@ -116,7 +116,7 @@ object SessionIO {
     lift(s => Task.delay(f(s)))
 
   def evaluateQuery0(query: XQuery, options: RequestOptions): SessionIO[ResultSequence] =
-    SessionIO(s => s.submitRequest(s.newAdhocQuery(query.toString, options)))
+    SessionIO(s => s.submitRequest(s.newAdhocQuery(query.toQuery, options)))
 
   private def lift[A](f: Session => Task[A]): SessionIO[A] =
     new SessionIO(Kleisli(f))
