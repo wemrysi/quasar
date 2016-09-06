@@ -72,7 +72,7 @@ object QueryFile {
     * LogicalPlan no longer needs to be exposed.
     */
   def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
-    f: Option[ConvertPath.ListContents[M]])(
+    listContents: Option[ConvertPath.ListContents[M]])(
     lp: T[LogicalPlan]):
       EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
     val transform = new Transform[T, QS[T, ?]]
@@ -82,8 +82,8 @@ object QueryFile {
     //       repeatedly until unchanged.
     val qs =
       (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
-        optimize.eliminateProjections[M, QScriptTotal[T, ?]](f)).map(
-        _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+        optimize.eliminateProjections[M, QS[T, ?]](listContents)).map(
+          _.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
     EitherT(WriterT(qs.run.map(qq => (
       qq.fold(

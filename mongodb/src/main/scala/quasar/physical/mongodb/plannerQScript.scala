@@ -690,8 +690,11 @@ object MongoDbQScriptPlanner {
                WB: WorkflowBuilder.Ops[WF]):
         AlgebraM[StateT[OutputM, NameGen, ?], F, WorkflowBuilder[WF]]
 
-    def unimplemented[WF[_]] =
+    def unimplemented[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
       StateT(κ((InternalError("unimplemented"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
+
+    def shouldNotBeReached[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
+      StateT(κ((InternalError("should not be reached"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
   }
   object Planner {
     type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
@@ -705,8 +708,7 @@ object MongoDbQScriptPlanner {
         implicit I: WorkflowOpCoreF :<: WF,
                  ev: Show[WorkflowBuilder[WF]],
                  WB: WorkflowBuilder.Ops[WF]) =
-        // NB: This is just a dummy value. Should never be referenced.
-        κ(StateT.stateT(ValueBuilder(Bson.Null)))
+        _ => shouldNotBeReached
     }
 
   implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
@@ -762,6 +764,8 @@ object MongoDbQScriptPlanner {
           (rebaseWB(joinHandler, from, src) ⊛
             (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
             WB.skip)
+        case Unreferenced() =>
+          StateT.stateT(ValueBuilder(Bson.Null))
       }
     }
 

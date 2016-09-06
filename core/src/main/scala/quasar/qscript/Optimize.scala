@@ -126,52 +126,108 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.prj(qt)
       })).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
 
+  private def rebaseLeft[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    mf: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    rebase(tj.lBranch)(tj.src).fold(TJ.inj(tj))(
+      tf => QC.inj(Map(tf, tj.combine >>= {
+        case LeftSide  => HoleF
+        case RightSide => mf
+      })))
+
+  private def rebaseRight[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    mf: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    rebase(tj.rBranch)(tj.src).fold(TJ.inj(tj))(
+      tf => QC.inj(Map(tf, tj.combine >>= {
+        case LeftSide  => mf
+        case RightSide => HoleF
+      })))
+
+  private def matchBoth[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    left: FreeMap[T],
+    right: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    (left.resume, right.resume) match { // if both sides are Constant, we hit the first case
+      case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, left)
+      case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, right)
+      case (_, _) => TJ.inj(tj)
+    }
+
+  private def matchLeft[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    left: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    left.resume match {
+      case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, left)
+      case _ => TJ.inj(tj)
+    }
+
+  private def matchRight[F[_], G[_]](
+    rebase: FreeQS[T] => T[G] => Option[T[G]])(
+    tj: ThetaJoin[T, T[G]],
+    right: FreeMap[T])(
+    implicit TJ: ThetaJoin[T, ?] :<: F,
+             QC: QScriptCore[T, ?] :<: F):
+      F[T[G]] =
+    right.resume match {
+      case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, right)
+      case _ => TJ.inj(tj)
+    }
+
   def elideConstantJoin[F[_], G[_]](
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       ThetaJoin[T, T[G]] => F[T[G]] = {
-    case x @ ThetaJoin(src, l, r, on, Inner, combine) if on ≟ BoolLit(true) =>
-      (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+    case tj @ ThetaJoin(src, left, right, on, Inner, _) if on ≟ BoolLit(true) =>
+      (left.resume.leftMap(_.map(_.resume)), right.resume.leftMap(_.map(_.resume))) match {
         case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
-          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>  // both sides are a Map
-            (mf1.resume, mf2.resume) match { // if both sides are Constant, we hit the first case
-              case (-\/(Constant(_)), _) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case (_, -\/(Constant(_))) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case (_, _) => TJ.inj(x)
-            }
-          case (Some(Map(\/-(SrcHole), mf1)), _) =>  // left side is a Map
-            mf1.resume match {
-              case -\/(Constant(_)) =>
-                rebase(r)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
-            }
-          case (_, Some(Map(\/-(SrcHole), mf2))) =>  // right side is a Map
-            mf2.resume match {
-              case -\/(Constant(_)) =>
-                rebase(l)(src).map(tf => QC.inj(Map(tf, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))).getOrElse(TJ.inj(x))
-              case _ => TJ.inj(x)
-            }
-          case (_, _)=> TJ.inj(x)
+          // both sides `SrcHole`
+          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
+          // both sides size 0 (catches `Unreferenced` and `Root`)
+          case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2))) if (src1.length ≟ 0) && (src2.length ≟ 0) =>
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
+          // left side `SrcHole`, right side size 0
+          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
+          // right side `SrcHole`, left side size 0
+          case (Some(Map(-\/(src1), mf1)), Some(Map(\/-(SrcHole), mf2))) if src1.length ≟ 0 =>
+            matchBoth[F, G](rebase)(tj, mf1, mf2)
+          // left side `SrcHole`
+          case (Some(Map(\/-(SrcHole), mf1)), _) =>
+            matchLeft[F, G](rebase)(tj, mf1)
+          // right side `SrcHole`
+          case (_, Some(Map(\/-(SrcHole), mf2))) =>
+            matchRight[F, G](rebase)(tj, mf2)
+          // left side size 0
+          case (Some(Map(-\/(src1), mf1)), _) if src1.length ≟ 0 =>
+            matchLeft[F, G](rebase)(tj, mf1)
+          // right side size 0
+          case (_, Some(Map(-\/(src2), mf2))) if src2.length ≟ 0 =>
+            matchRight[F, G](rebase)(tj, mf2)
+          case (_, _)=> TJ.inj(tj)
         }
-        case (_, _) => TJ.inj(x)
+        case (_, _) => TJ.inj(tj)
       }
-    case x => TJ.inj(x)
+    case tj => TJ.inj(tj)
   }
 
   def simplifyProjection:
@@ -318,11 +374,10 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   def simplifyQC[F[_]: Functor, G[_]: Functor](
     GtoF: G ~> λ[α => Option[F[α]]], FtoG: F ~> G)(
-    implicit DE: Const[DeadEnd, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F):
+    implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
     case Map(src, f) if f.length ≟ 0 =>
-      Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f)
+      Map(FtoG(QC.inj(Unreferenced[T, T[G]]())).embed, f)
     case x @ LeftShift(src, struct, repair) =>
       if (!repair.element(RightSide))
         Map(src, repair ∘ κ(SrcHole))
@@ -443,7 +498,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
+             FI: F :<: QScriptTotal[T, ?],
+             show: Delay[Show, F]):
       F[T[F]] => F[T[F]] =
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -473,8 +529,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
       liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      // FIXME: currently interferes with elideConstantJoin
-      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole])) ⋙
+      liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole])) ⋙
       liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
@@ -491,18 +546,17 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def pathify[M[_]: Monad, F[_]: Traverse](
     g: ConvertPath.ListContents[M])(
     implicit FS: StaticPath.Aux[T, F],
-             DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](
+      FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
 
   def eliminateProjections[M[_]: Monad, F[_]: Traverse](
     fs: Option[ConvertPath.ListContents[M]])(
     implicit FS: StaticPath.Aux[T, F],
-             DE: Const[DeadEnd, ?] :<: F,
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
