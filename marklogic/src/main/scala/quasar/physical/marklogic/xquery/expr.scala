@@ -51,7 +51,7 @@ object expr {
     tupleStreams: IList[(String, XQuery)],
     letDefs: IList[(String, XQuery)],
     filterExpr: Option[XQuery],
-    orderSpecs: IList[(XQuery, String)],
+    orderSpecs: IList[(XQuery, SortDirection)],
     orderIsStable: Boolean
   ) {
     def let_(d: (String, XQuery), ds: (String, XQuery)*): Flwor =
@@ -60,10 +60,10 @@ object expr {
     def where_(expr: XQuery): Flwor =
       copy(filterExpr = Some(expr))
 
-    def orderBy(s: (XQuery, String), ss: (XQuery, String)*): Flwor =
+    def orderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
       copy(orderSpecs = s :: IList.fromList(ss.toList))
 
-    def stableOrderBy(s: (XQuery, String), ss: (XQuery, String)*): Flwor =
+    def stableOrderBy(s: (XQuery, SortDirection), ss: (XQuery, SortDirection)*): Flwor =
       orderBy(s, ss: _*).copy(orderIsStable = true)
 
     def return_(expr: XQuery): XQuery = {

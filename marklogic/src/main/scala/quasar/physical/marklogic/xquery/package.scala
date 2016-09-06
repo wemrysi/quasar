@@ -26,6 +26,20 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.std.option._
 
 package object xquery {
+
+  sealed abstract class SortDirection
+
+  object SortDirection {
+
+    case object Descending extends SortDirection
+    case object Ascending  extends SortDirection
+
+    def fromQScript(s: quasar.qscript.SortDir): SortDirection = s match {
+      case quasar.qscript.SortDir.Ascending  => Ascending
+      case quasar.qscript.SortDir.Descending => Descending
+    }
+  }
+
   type XPath = String
 
   def asArg(opt: Option[XQuery]): String =
