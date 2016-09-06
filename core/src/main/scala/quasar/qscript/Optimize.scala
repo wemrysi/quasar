@@ -274,11 +274,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
 
   def coalesceMapShift[F[_], G[_]: Functor](
     GtoF: G ~> λ[α => Option[F[α]]])(
-    implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
+    implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[G]] => F[T[G]] = {
-    case x @ Map(Embed(src), mf) => (GtoF(src) >>= SP.prj >>= {
+    case x @ Map(Embed(src), mf) => (GtoF(src) >>= QC.prj >>= {
       case LeftShift(srcInner, struct, repair) =>
-        SP.inj(LeftShift(srcInner, struct, mf >> repair)).some
+        QC.inj(LeftShift(srcInner, struct, mf >> repair)).some
       case _ => None
     }).getOrElse(QC.inj(x))
     case x => QC.inj(x)
@@ -317,36 +317,29 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   }
 
   def simplifyQC[F[_]: Functor, G[_]: Functor](
-    FtoG: F ~> G)(
+    GtoF: G ~> λ[α => Option[F[α]]], FtoG: F ~> G)(
     implicit DE: Const[DeadEnd, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
     case Map(src, f) if f.length ≟ 0 =>
       Map(FtoG(DE.inj(Const[DeadEnd, T[G]](Root))).embed, f)
-    case x => x
-  }
-
-  def simplifySP[F[_]: Functor, G[_]: Functor](
-    GtoF: G ~> λ[α => Option[F[α]]])(
-    implicit SP: SourcedPathable[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
-      SourcedPathable[T, T[G]] => F[T[G]] = {
     case x @ LeftShift(src, struct, repair) =>
       if (!repair.element(RightSide))
-        QC.inj(Map(src, repair ∘ κ(SrcHole)))
+        Map(src, repair ∘ κ(SrcHole))
       else if (!repair.element(LeftSide))
         (GtoF(src.project) >>= QC.prj >>= {
           case Map(innerSrc, mf) =>
-            SP.inj(LeftShift(innerSrc, struct >> mf, repair)).some
+            LeftShift(innerSrc, struct >> mf, repair).some
           case _ => None
-        }).getOrElse(SP.inj(x))
+        }).getOrElse(x)
       else
-        SP.inj(x)
-    case x => SP.inj(x)
+        x
+    case x => x
   }
 
   def compactLeftShift[F[_], G[_]: Functor](
-    implicit SP: SourcedPathable[T, ?] :<: F):
-      SourcedPathable[T, T[G]] => F[T[G]] = {
+    implicit QC: QScriptCore[T, ?] :<: F):
+      QScriptCore[T, T[G]] => F[T[G]] = {
     case x @ LeftShift(src, struct, repair) => {
       def rewrite(
         src: T[G],
@@ -373,22 +366,22 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         if (repair.para(count(zeroRef)) ≟ rightCount) {   // all `RightSide` access is through `zeroRef`
           val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
             transApoT(repair)(substitute(zeroRef, rightSideCoEnv))
-          SP.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
+          QC.inj(LeftShift(src, Free.roll[MapFunc[T, ?], Hole](dup(elem)), replacement.fromCoEnv))
         } else if (repair.para(count(oneRef)) ≟ rightCount) {   // all `RightSide` access is through `oneRef`
           val replacement: T[CoEnv[JoinSide, MapFunc[T, ?], ?]] =
             transApoT(repair)(substitute(oneRef, rightSideCoEnv))
-          SP.inj(LeftShift(src, elem, replacement.fromCoEnv))
+          QC.inj(LeftShift(src, elem, replacement.fromCoEnv))
         } else {
-          SP.inj(x)
+          QC.inj(x)
         }
       }
       struct.resume match {
         case -\/(ZipArrayIndices(elem)) => rewrite(src, repair, elem, fm => DupArrayIndices(fm))
         case -\/(ZipMapKeys(elem)) => rewrite(src, repair, elem, fm => DupMapKeys(fm))
-        case _ => SP.inj(x)
+        case _ => QC.inj(x)
       }
     }
-    case x => SP.inj(x)
+    case x => QC.inj(x)
   }
 
   def compactReduction[F[_]: Functor]:
@@ -448,7 +441,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def applyAll[F[_]: Traverse: Normalizable](
     implicit DE: Const[DeadEnd, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
-             SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
@@ -459,8 +451,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
       liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
       liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
-      liftFF(simplifyQC[F, F](NaturalTransformation.refl[F])) ⋙
-      liftFG(simplifySP[F, F](optionIdF[F])) ⋙
+      liftFF(simplifyQC[F, F](optionIdF[F], NaturalTransformation.refl[F])) ⋙
       liftFF(swapMapCount[F, F](optionIdF[F])) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
@@ -470,7 +461,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit DE: Const[DeadEnd, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
-             SP: SourcedPathable[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
@@ -484,8 +474,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       // FIXME: currently interferes with elideConstantJoin
-      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](wrapCoEnv[F, Hole])) ⋙
-      liftFG(simplifySP[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      // liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole])) ⋙
       liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙

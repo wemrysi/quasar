@@ -27,7 +27,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
-  import expr.{func, let_}
+  import expr.{func, for_, let_}
 
   def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
@@ -36,11 +36,28 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
         g <- mapFuncXQuery(f, x.xqy)
       } yield fn.map(func(x) { g }, src))
 
+    case LeftShift(src, struct, repair) =>
+      liftP(for {
+        s       <- freshVar[F]
+        l       <- freshVar[F]
+        r       <- freshVar[F]
+        extract <- mapFuncXQuery(struct, s.xqy)
+        lshift  <- local.leftShift(l.xqy)
+        merge   <- mergeXQuery(repair, l.xqy, r.xqy)
+      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge)
+
     case Reduce(src, bucket, reducers, repair) =>
       XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
 
     case Sort(src, bucket, order) =>
       XQuery(s"((: SORT :)$src)").point[PlanningT[F, ?]]
+
+    case Union(src, lBranch, rBranch) =>
+      for {
+        s <- liftP(freshVar[F])
+        l <- rebaseXQuery(lBranch, s.xqy)
+        r <- rebaseXQuery(rBranch, s.xqy)
+      } yield let_(s -> src) return_ (l union r)
 
     case Filter(src, f) =>
       liftP(for {
