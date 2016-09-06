@@ -60,10 +60,15 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          // TODO this must be implemented at some point
-          val listContents: Option[ConvertPath.ListContents[Id]] = None
-          (QueryFile.convertToQScript(listContents)(lp).traverse(executePlan(input, _, out, lp))).map(_.join.run.run)
-          }
+          // TODO this must be implemented at some point.
+          val maybeListContest: Option[ConvertPath.ListContents[Free[S, ?]]] = None
+          // ((adir: ADir) => EitherT(listContents(input, adir))).some
+
+          val qs = (QueryFile.convertToQScript(maybeListContest)(lp)) >>=
+          (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
+
+          qs.run.run
+        }
         case _ => ???
       }
     } 
@@ -73,6 +78,8 @@ object queryfile {
     new Functor[(F ∘ G)#λ] {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
+
+  // f => EitherT(WriterT(f.map(_.run)))
 
   private def executePlan[S[_]](input: Input, qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
