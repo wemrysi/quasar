@@ -111,7 +111,7 @@ trait StringLib extends Library {
   val Search = TernaryFunc(
     Mapping,
     "search",
-    "Determines if a string value matches a regular expresssion. If the third argument is true, then it is a case-insensitive match.",
+    "Determines if a string value matches a regular expression. If the third argument is true, then it is a case-insensitive match.",
     Type.Bool,
     Func.Input3(Type.Str, Type.Str, Type.Bool),
     noSimplification,
@@ -161,10 +161,21 @@ trait StringLib extends Library {
     noSimplification,
     partialTyper[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
-        Type.Const (Data.Str(str.toUpperCase))
+        Type.Const(Data.Str(str.toUpperCase))
       case Sized(Type.Str) => Type.Str
     },
     basicUntyper)
+
+  /** Substring which always gives a result, no matter what offsets are provided.
+    * Reverse-engineered from MongoDb's \$substr op, for lack of a better idea
+    * of how this should work. Note: if `start` < 0, the result is `""`.
+    * If `length` < 0, then result includes the rest of the string. Otherwise
+    * the behavior is as you might expect.
+    */
+  def safeSubstring(str: String, start: Int, length: Int): String =
+    if (start < 0 || start > str.length) ""
+    else if (length < 0) str.substring(start, str.length)
+    else str.substring(start, (start + length) min str.length)
 
   val Substring: TernaryFunc = TernaryFunc(
     Mapping,
@@ -192,10 +203,16 @@ trait StringLib extends Library {
         Type.Const(Data.Str(str)),
         Type.Const(Data.Int(from)),
         Type.Const(Data.Int(for0))) => {
-        success(Type.Const(Data.Str(str.substring(from.intValue, from.intValue + for0.intValue))))
+        success(Type.Const(Data.Str(safeSubstring(str, from.intValue, for0.intValue))))
       }
       case Sized(Type.Const(Data.Str(str)), Type.Const(Data.Int(from)), _)
           if str.length <= from =>
+        success(Type.Const(Data.Str("")))
+      case Sized(_, Type.Const(Data.Int(from)), _)
+          if from < 0 =>
+        success(Type.Const(Data.Str("")))
+      case Sized(_, _, Type.Const(Data.Int(for0)))
+          if for0.intValue ≟ 0 =>
         success(Type.Const(Data.Str("")))
       case Sized(Type.Const(Data.Str(_)), Type.Const(Data.Int(_)), Type.Int) =>
         success(Type.Str)
@@ -250,7 +267,7 @@ trait StringLib extends Library {
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
-        str.parseInt.fold(
+        \/.fromTryCatchNonFatal(BigInt(str)).fold(
           κ(failureNel(InvalidStringCoercion(str, "a string containing an integer".left))),
           i => success(Type.Const(Data.Int(i))))
 
@@ -267,8 +284,8 @@ trait StringLib extends Library {
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(Type.Const(Data.Str(str))) =>
-        str.parseDouble.fold(
-          κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
+        \/.fromTryCatchNonFatal(BigDecimal(str)).fold(
+           κ(failureNel(InvalidStringCoercion(str, "a string containing an decimal number".left))),
           i => success(Type.Const(Data.Dec(i))))
       case Sized(Type.Str) => success(Type.Int)
     },

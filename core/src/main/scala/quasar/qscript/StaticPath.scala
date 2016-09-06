@@ -30,16 +30,18 @@ import simulacrum.typeclass
 @typeclass trait StaticPath[F[_]] {
   type IT[F[_]]
 
-  def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
-    implicit TC: Corecursive[IT],
-             TR: Recursive[IT],
-             PF: Pathable[IT, ?] ~> G,
-             QC: QScriptCore[IT, ?] :<: G,
-             FG: F ~> G,
-             FI: G :<: QScriptTotal[IT, ?],
-             F: Traverse[F],
-             CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
-      AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
+  def pathifyƒ[M[_]: Monad, G[_]: Traverse]
+    (g: ListContents[M])
+    (implicit
+      TC: Corecursive[IT],
+      TR: Recursive[IT],
+      PF: Pathable[IT, ?] ~> G,
+      QC: QScriptCore[IT, ?] :<: G,
+      FG: F ~> G,
+      FI: G :<: QScriptTotal[IT, ?],
+      F: Traverse[F],
+      CP: ConvertPath.Aux[IT, Pathable[IT, ?], G])
+      : AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
 
   def toRead[M[_]: Monad, F[_]: Traverse, G[_]: Functor]
     (g: ListContents[M])
@@ -50,7 +52,6 @@ import simulacrum.typeclass
       R: Const[Read, ?] :<: G,
       FG: F ~> G,
       DE: Const[DeadEnd, ?] :<: G,
-      SP: SourcedPathable[IT, ?] :<: G,
       QC: QScriptCore[IT, ?] :<: G,
       FI: G :<: QScriptTotal[IT, ?],
       CP: ConvertPath.Aux[IT, Pathable[IT, ?], F])

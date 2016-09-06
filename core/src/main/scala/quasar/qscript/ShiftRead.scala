@@ -45,15 +45,13 @@ object ShiftRead extends ShiftReadInstances {
         coenvPrism[QScriptTotal[T, ?], Hole],
         NaturalTransformation.refl)))
 
-  implicit def sourcedPathable[T[_[_]]: Recursive: Corecursive]:
-      ShiftRead[T, SourcedPathable[T, ?]] =
-    new ShiftRead[T, SourcedPathable[T, ?]] {
+  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive]:
+      ShiftRead[T, QScriptCore[T, ?]] =
+    new ShiftRead[T, QScriptCore[T, ?]] {
       def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: SourcedPathable[T, ?] ~> F)
-        (implicit
-          R: Const[Read, ?] :<: F,
-          QC: QScriptCore[T, ?] :<: F)
-          : SourcedPathable[T, T[G]] => G[T[G]] = {
+        (GtoF: PrismNT[G, F], H: QScriptCore[T, ?] ~> F)
+        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+          : QScriptCore[T, T[G]] => G[T[G]] = {
         case x @ LeftShift(src, struct, repair) =>
           (GtoF.get(src.project) >>= R.prj).fold(
             GtoF.reverseGet(H(x)))(
@@ -65,16 +63,6 @@ object ShiftRead extends ShiftReadInstances {
               GtoF.reverseGet(H(LeftShift(GtoF.reverseGet(QC.inj(reduceSrc(src))).embed, struct, repair)))))
         case Union(src, lb, rb) =>
           GtoF.reverseGet(H(Union(reduceRead(GtoF)(src), applyToBranch(lb), applyToBranch(rb))))
-      }
-    }
-
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive]:
-      ShiftRead[T, QScriptCore[T, ?]] =
-    new ShiftRead[T, QScriptCore[T, ?]] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: QScriptCore[T, ?] ~> F)
-        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-          : QScriptCore[T, T[G]] => G[T[G]] = {
         case Drop(src, lb, rb) =>
           GtoF.reverseGet(H(Drop(
             reduceRead(GtoF)(src),

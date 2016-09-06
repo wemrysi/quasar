@@ -16,11 +16,13 @@
 
 package quasar.physical.marklogic.qscript
 
+import quasar.NameGenerator
+
 import matryoshka._
 import scalaz._
 
 trait Planner[QS[_], A] {
-  def plan: AlgebraM[Planning, QS, A]
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QS, A]
 }
 
 object Planner {
@@ -28,7 +30,7 @@ object Planner {
 
   implicit def coproduct[A, F[_], G[_]](implicit F: Planner[F, A], G: Planner[G, A]): Planner[Coproduct[F, G, ?], A] =
     new Planner[Coproduct[F, G, ?], A] {
-      def plan: AlgebraM[Planning, Coproduct[F, G, ?], A] =
+      def plan[M[_]: NameGenerator: Monad]: AlgebraM[PlanningT[M, ?], Coproduct[F, G, ?], A] =
         _.run.fold(F.plan, G.plan)
     }
 }

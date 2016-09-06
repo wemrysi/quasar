@@ -720,22 +720,6 @@ object MongoDbQScriptPlanner {
         qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
   }
 
-  implicit def sourcedPathable[T[_[_]]: Recursive: ShowT]:
-      Planner.Aux[T, SourcedPathable[T, ?]] =
-    new Planner[SourcedPathable[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) = {
-        case LeftShift(src, struct, repair) => unimplemented
-        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
-        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
-        case Union(src, lBranch, rBranch) => unimplemented
-      }
-    }
-
   implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
@@ -746,6 +730,9 @@ object MongoDbQScriptPlanner {
                  ev: Show[WorkflowBuilder[WF]],
                  WB: WorkflowBuilder.Ops[WF]) = {
         case qscript.Map(src, f) => getExprBuilder(src, f).liftM[GenT]
+        case LeftShift(src, struct, repair) => unimplemented
+        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
+        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
         case Reduce(src, bucket, reducers, repair) =>
           (getExprBuilder(src, bucket) ⊛
             reducers.traverse(_.traverse(getExpr[T])) ⊛
@@ -761,6 +748,7 @@ object MongoDbQScriptPlanner {
           val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
           keys.traverse(getExprBuilder(src, _))
             .map(WB.sortBy(src, _, dirs)).liftM[GenT]
+        case Union(src, lBranch, rBranch) => unimplemented
         case Filter(src, f) =>
           getExprBuilder(src, f).map(cond =>
             WB.filter(src, List(cond), {
@@ -911,9 +899,8 @@ object MongoDbQScriptPlanner {
     case x => x.right
   }
 
-  private type QScript0[T[_[_]], A] = Coproduct[QScriptCore[T, ?], SourcedPathable[T, ?], A]
-  private type QScript1[T[_[_]], A] = Coproduct[Const[Read, ?], QScript0[T, ?], A]
-  type QScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScript1[T, ?], A]
+  private type QScript0[T[_[_]], A] = Coproduct[Const[Read, ?], QScriptCore[T, ?], A]
+  type QScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScript0[T, ?], A]
 
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
@@ -1003,7 +990,7 @@ object MongoDbQScriptPlanner {
       case `3.2` =>
         val joinHandler =
           JoinHandler.fallback(
-            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics),
+            JoinHandler.pipeline[Workflow3_2F](queryContext.statistics, queryContext.indexes),
             JoinHandler.mapReduce[Workflow3_2F])
         plan0[T, Workflow3_2F](joinHandler)(logical)
 

@@ -16,10 +16,11 @@
 
 package quasar.fs
 
-import quasar.Predef.{Array, SuppressWarnings, Unit, Vector}
+import quasar.Predef.{Array, Nothing, SuppressWarnings, Unit, Vector}
 import quasar.Data
 
-import scalaz._
+import scalaz._, Scalaz._
+import scalaz.stream.Process
 
 /** Typeclass representing the interface to a effectful cursor of `Data`.
   *
@@ -34,6 +35,21 @@ trait DataCursor[F[_], C] {
 
   /** Closes the cursor, freeing any resources it might be using. */
   def close(cursor: C): F[Unit]
+  
+  def process(cursor: C)(implicit F: Applicative[F]): Process[F, Data] = {
+    def closeCursor(c: C): Process[F, Nothing] =
+      Process.eval_[F, Unit](close(c))
+
+    def readUntilEmpty(c: C): Process[F, Data] =
+      Process.await(nextChunk(c)) { data =>
+        if (data.isEmpty)
+          Process.halt
+        else
+          Process.emitAll(data) ++ readUntilEmpty(c)
+      }
+
+    Process.bracket(cursor.point[F])(closeCursor)(readUntilEmpty)
+  }
 }
 
 object DataCursor {

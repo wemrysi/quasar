@@ -47,6 +47,32 @@ object ReduceIndex {
     }
 }
 
+/** Flattens nested structure, converting each value into a data set, which are
+  * then unioned.
+  *
+  * `struct` is an expression that evaluates to an array or object, which is
+  * then “exploded” into multiple values. `repair` is applied across the new
+  * set, integrating the exploded values into the original set.
+  *
+  * E.g., in:
+  *     LeftShift(x,
+  *               ProjectField(SrcHole, "bar"),
+  *               ConcatMaps(LeftSide, MakeMap("bar", RightSide)))```
+  * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then
+  * that’s what [[LeftSide]] is. And [[RightSide]] is values like `1`, `2`, and
+  * `3`, because that’s what you get from flattening the struct.So then our
+  * right-biased [[quasar.qscript.MapFuncs.ConcatMaps]] says to concat
+  * `{ foo: 7, bar: [1, 2, 3] }` with `{ bar: 1 }`, resulting in
+  * `{ foo: 7, bar: 1 }` (then again with `{ foo: 7, bar: 2 }` and
+  * `{ foo: 7, bar: 3 }`, finishing up the handling of that one element in the
+  * original (`x`) dataset.
+  */
+@Lenses final case class LeftShift[T[_[_]], A](
+  src: A,
+  struct: FreeMap[T],
+  repair: JoinFunc[T])
+    extends QScriptCore[T, A]
+
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
@@ -78,6 +104,15 @@ object ReduceIndex {
   order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
+/** Creates a new dataset that contains the elements from the datasets created
+  * by each branch. Duplicate values should be eliminated.
+  */
+@Lenses final case class Union[T[_[_]], A](
+  src: A,
+  lBranch: FreeQS[T],
+  rBranch: FreeQS[T])
+    extends QScriptCore[T, A]
+
 /** Eliminates some values from a dataset, based on the result of `f` (which
   * must evaluate to a boolean value for each element in the set).
   */
@@ -96,10 +131,14 @@ object QScriptCore {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
+          case (LeftShift(a1, s1, r1), LeftShift(a2, s2, r2)) =>
+            eq.equal(a1, a2) && s1 ≟ s2 && r1 ≟ r2
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
             b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
             b1 ≟ b2 && o1 ≟ o2 && eq.equal(a1, a2)
+          case (Union(a1, l1, r1), Union(a2, l2, r2)) =>
+            eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
           case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
           case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
@@ -114,8 +153,10 @@ object QScriptCore {
         f: A => G[B]) =
         fa match {
           case Map(a, func)               => f(a) ∘ (Map[T, B](_, func))
+          case LeftShift(a, s, r)         => f(a) ∘ (LeftShift(_, s, r))
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
+          case Union(a, l, r)             => f(a) ∘ (Union(_, l, r))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
           case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
           case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
@@ -129,6 +170,10 @@ object QScriptCore {
           case Map(src, mf) => Cord("Map(") ++
             s.show(src) ++ Cord(",") ++
             mf.show ++ Cord(")")
+          case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
+            s.show(src) ++ Cord(",") ++
+            struct.show ++ Cord(",") ++
+            repair.show ++ Cord(")")
           case Reduce(a, b, red, rep) => Cord("Reduce(") ++
             s.show(a) ++ Cord(",") ++
             b.show ++ Cord(",") ++
@@ -138,6 +183,10 @@ object QScriptCore {
             s.show(a) ++ Cord(",") ++
             b.show ++ Cord(",") ++
             o.show ++ Cord(")")
+          case Union(src, l, r) => Cord("Union(") ++
+            s.show(src) ++ Cord(",") ++
+            l.show ++ Cord(",") ++
+            r.show ++ Cord(")")
           case Filter(a, func) => Cord("Filter(") ++
             s.show(a) ++ Cord(",") ++
             func.show ++ Cord(")")
@@ -220,6 +269,8 @@ object QScriptCore {
       def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
         def apply[A](qc: QScriptCore[T, A]) = qc match {
           case Map(src, f) => Map(src, normalizeMapFunc(f))
+          case LeftShift(src, s, r) =>
+            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
           case Reduce(src, bucket, reducers, repair) =>
             val normBuck = normalizeMapFunc(bucket)
             Reduce(
@@ -233,6 +284,11 @@ object QScriptCore {
               normalizeMapFunc(repair))
           case Sort(src, bucket, order) =>
             Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
+          case Union(src, l, r) =>
+            Union(
+              src,
+              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
+              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
           case Filter(src, f) => Filter(src, normalizeMapFunc(f))
           case Take(src, from, count) =>
             Take(

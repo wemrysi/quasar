@@ -357,7 +357,8 @@ package object fp
     with ProcessOps
     with QFoldableOps
     with SKI
-    with StringOps {
+    with StringOps
+    with CatchableInstances {
 
   type EnumT[F[_], A] = EnumeratorT[A, F]
 

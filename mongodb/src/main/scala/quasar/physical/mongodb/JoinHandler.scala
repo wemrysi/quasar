@@ -56,7 +56,8 @@ object JoinHandler {
     * the aggregation pipeline.
     */
   def pipeline[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (stats: Collection => Option[CollectionStatistics])
+    (stats: Collection => Option[CollectionStatistics],
+      indexes: Collection => Option[Set[Index]])
     (implicit
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
@@ -69,6 +70,14 @@ object JoinHandler {
     /** True if the collection is definitely known to be unsharded. */
     def unsharded(coll: Collection): Boolean =
       stats(coll).cata(!_.sharded, false)
+
+    /** Check for an index which can be used for lookups on a certain field. The
+      * field must appear first in the key for the index to apply.
+      */
+    def indexed(coll: Collection, field: BsonField): Boolean =
+      indexes(coll).cata(
+        _.exists(_.primary ≟ field),
+        false)
 
     def wfSourceDb: Algebra[WF, Option[DatabaseName]] = {
       case $read(Collection(db, _)) => db.some
@@ -91,20 +100,20 @@ object JoinHandler {
       case ValueBuilderF(_)                   => None
     }
 
-    // NB: filtering on the left prior to the join is not strictly necessary,
-    // but it avoids a runtime explosion in the common error case that the field
-    // referenced on one side of the condition is not found.
     def lookup(
-        lSrc: WorkflowBuilder[WF], lExpr: Expr, lName: BsonField.Name,
+        lSrc: WorkflowBuilder[WF], lKey: WorkflowBuilder[WF], lName: BsonField.Name,
         rColl: CollectionName, rField: BsonField, rName: BsonField.Name) = {
 
+      // NB: filtering on the left prior to the join is not strictly necessary,
+      // but it avoids a runtime explosion in the common error case that the
+      // field referenced on one side of the condition is not found.
       def filterExists(wb: WorkflowBuilder[WF], field: BsonField): WorkflowBuilder[WF] =
         WB.filter(wb,
           List(ExprBuilder(wb, \/-($var(DocField(field))))),
           { case List(f) => Selector.Doc(f -> Selector.Exists(true)) })
 
-      lExpr match {
-        case \/-($var(DocVar(_, Some(lField)))) =>
+      lKey match {
+        case Fix(ExprBuilderF(src, \/-($var(DocVar(_, Some(lField)))))) if src ≟ lSrc =>
           val left = WB.makeObject(lSrc, lName.asText)
           val filtered = filterExists(left, lName \ lField)
           generateWorkflow(filtered).map { case (left, _) =>
@@ -122,7 +131,7 @@ object JoinHandler {
             tmpName  <- emitSt(freshName)
             left     <- WB.objectConcat(
                           WB.makeObject(lSrc, lName.asText),
-                          WB.makeObject(ExprBuilder(lSrc, lExpr), tmpName.asText))
+                          WB.makeObject(lKey, tmpName.asText))
             t        <- generateWorkflow(left)
             (src, _) = t
           } yield CollectionBuilder(
@@ -141,50 +150,32 @@ object JoinHandler {
     }
 
     (tpe, left, right) match {
-      case (set.InnerJoin, IsLookupInput(src, expr), IsLookupFrom(coll, field))
-            if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      case (set.InnerJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
-          src, expr, LeftName,
+          src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.LeftOuterJoin, IsLookupInput(src, expr), IsLookupFrom(coll, field))
-      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   lookup(
-      //     src, expr, LeftName,
-      //     coll.collection, field, RightName).liftM[OptionT]
+      // case (set.LeftOuterJoin, JoinSource(src, List(key), _), IsLookupFrom(coll, field))
+      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+      //   ???
 
-      case (set.InnerJoin, IsLookupFrom(coll, field), IsLookupInput(src, expr))
-            if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
+      case (set.InnerJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
+            if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
         lookup(
-          src, expr, RightName,
+          src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT]
 
       // TODO: will require preserving empty arrays in $unwind (which is easier with a new feature in 3.2)
-      // case (set.RightOuterJoin, IsLookupFrom(coll, field), IsLookupInput(src, expr))
-      //       if unsharded(coll) && src.cata(sourceDb) ≟ coll.database.some =>
-      //   lookup(
-      //     src, expr, RightName,
-      //     coll.collection, field, LeftName).liftM[OptionT]
+      // case (set.RightOuterJoin, IsLookupFrom(coll, field), JoinSource(src, List(key), _))
+      //       if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
+      //   ???
 
       case _ => OptionT.none
     }
   })
 
-  object IsLookupInput {
-    /** Matches a source which is suitable to be the "left" side of a
-      * \$lookup-based join; essentially, it needs to have a single key.
-      */
-    def unapply[WF[_]](arg: JoinSource[WF])(implicit ev: Equal[WorkflowBuilder[WF]])
-      : Option[(Fix[WorkflowBuilderF[WF, ?]], Expr)] =
-      arg.keys match {
-        // TODO: generalize to handle more sources (notably ShapePreservingBuilders)
-        case List(Fix(ExprBuilderF(src, expr))) if src ≟ arg.src =>
-          (src, expr).some
-        case _ =>
-          None
-      }
-  }
   object IsLookupFrom {
     /** Matches a source which is suitable to be the "right" side of a
       * \$lookup-based join; this has to be a \$project of a single field from

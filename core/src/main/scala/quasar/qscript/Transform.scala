@@ -32,16 +32,16 @@ import shapeless.{nat, Sized}
 
 // Need to keep track of our non-type-ensured guarantees:
 // - all conditions in a ThetaJoin will refer to both sides of the join
-// - each `Free` structure in a *Join or Union will have exactly one `point`
 // - the common source in a Join or Union will be the longest common branch
-// - all Reads have a Root (or another Read?) as their source
-// - in `Pathable`, the only `MapFunc` node allowed is a `ProjectField`
+// - any unreferenced src will be `Unreferenced`, and no `Unreferenced` will
+//   ever be referenced
+// - ReduceIndices will not exceed the reducer bounds, and every reducer will be
+//   referenced at least once.
 
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
 class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: Traverse: Normalizable](
   implicit DE: Const[DeadEnd, ?] :<: F,
-           SP: SourcedPathable[T, ?] :<: F,
            QC: QScriptCore[T, ?] :<: F,
            TJ: ThetaJoin[T, ?] :<: F,
            PB: ProjectBucket[T, ?] :<: F,
@@ -290,7 +290,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       Ann(
         prov.shiftMap(Free.roll[MapFunc[T, ?], Hole](ProjectIndex(rightAccess, IntLit(0)))) :: provs.map(_ >> leftAccess),
         Free.roll(ProjectIndex(rightAccess, IntLit(1)))),
-      SP.inj(LeftShift(input, Free.roll(f(value)), sides))))
+      QC.inj(LeftShift(input, Free.roll(f(value)), sides))))
   }
 
   def shiftIds(input: T[Target], f: FreeMap[T] => MapFunc[T, FreeMap[T]]):
@@ -305,7 +305,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
       Ann(
         prov.shiftMap(rightAccess) :: provs.map(_ >> leftAccess),
         rightAccess),
-      SP.inj(LeftShift(input, Free.roll(f(value)), sides))))
+      QC.inj(LeftShift(input, Free.roll(f(value)), sides))))
   }
 
   def flatten(input: Target[T[Target]]): Target[T[Target]] = {
@@ -380,7 +380,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           Ann[T](
             NullLit[T, Hole]() :: buckets.map(_ >> leftAccess),
             rightAccess),
-          SP.inj(LeftShift(
+          QC.inj(LeftShift(
             EnvT((EmptyAnn[T], src)).embed,
             Free.roll(Range(lval, rval)),
             sides))))
@@ -695,7 +695,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {
-        (SP.inj(Union(src,
+        (QC.inj(Union(src,
           lfree.mapSuspension(FI.compose(envtLowerNT)),
           rfree.mapSuspension(FI.compose(envtLowerNT)))),
           prov.unionProvenances(

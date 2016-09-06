@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar
 
 import quasar.Predef._
-import quasar.physical.marklogic.xquery.XQuery
-import quasar.qscript._
 
-import matryoshka._
-
-private[qscript] final class SourcedPathablePlanner[T[_[_]]] extends MarkLogicPlanner[SourcedPathable[T, ?]] {
-  val plan: AlgebraM[Planning, SourcedPathable[T, ?], XQuery] = {
-    case LeftShift(src, struct, repair) => ???
-    case Union(src, lBranch, rBranch)   => ???
+/** A small smoke test for the presence of the typelevel compiler.
+ */
+class TypelevelSpec extends quasar.Qspec {
+  "typelevel compiler features" >> {
+    "should exist" >> (valueOf[5] must_=== 5)
   }
 }
