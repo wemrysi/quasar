@@ -54,7 +54,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(listContents.some, lpRead("/foo/bar")) must
       equal(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           HoleF,
           Free.point(RightSide)))).some)
     }
@@ -65,17 +65,17 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(listContents.some, lpRead("/foo")) must
       equal(chain(
         UnreferencedR,
-        SP.inj(Union((),
+        QC.inj(Union((),
           Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF))))),
-          Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+          Free.roll(QC.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
             Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF))))),
-            Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+            Free.roll(QC.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
               Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF))))),
-              Free.roll(SP.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
+              Free.roll(QC.inj(Union(Free.roll(QC.inj(Unreferenced[Fix, FreeQS[Fix]]())),
                 Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF))))),
                 Free.roll(QC.inj(Map(Free.roll(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))),
 
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           HoleF,
           Free.point(RightSide)))).some)
     }
@@ -85,7 +85,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(listContents.some, identity.Squash(lpRead("/foo/bar"))) must
       equal(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           HoleF,
           Free.point(RightSide)))).some)
     }
@@ -95,7 +95,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         chain(
           ReadR(rootDir </> dir("foo") </> file("bar")),
-          SP.inj(LeftShift((), HoleF, Free.point(RightSide))),
+          QC.inj(LeftShift((), HoleF, Free.point(RightSide))),
           QC.inj(Take((),
             Free.point(SrcHole),
             Free.roll(QC.inj(Map(
@@ -107,7 +107,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(listContents.some, lpRead("/some/bar/car")) must
       equal(chain(
         ReadR(rootDir </> dir("some") </> file("bar")),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("car")),
           Free.point(RightSide)))).some)
     }
@@ -120,7 +120,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           chain[Free[?[_], Hole], QS](
             QC.inj(Map(Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("foo")))),
-            SP.inj(LeftShift((),
+            QC.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
@@ -128,7 +128,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           chain[Free[?[_], Hole], QS](
             QC.inj(Map(Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar")))),
-            SP.inj(LeftShift((),
+            QC.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
@@ -154,7 +154,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               LP.Constant(Data.Str("name")))))) must
       equal(chain(
         RootR,
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("city")),
           Free.roll(MakeMap[Fix, JoinFunc[Fix]](
             StrLit[Fix, JoinSide]("name"),
@@ -169,7 +169,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         agg.Sum[FLP](lpRead("/person"))) must
       equal(chain(
         ReadR(rootDir </> file("person")),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           Free.roll(ZipMapKeys(HoleF)),
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.point(LeftSide))),
@@ -192,7 +192,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))) must
       equal(chain(
         RootR,
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("person")),
           ProjectFieldR(
             Free.point(RightSide),
@@ -218,12 +218,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))) must
       equal(chain(
         RootR,
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("zips")),
           ProjectFieldR(
             Free.point(RightSide),
             StrLit("loc")))),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           HoleF,
           Free.roll(MakeMap(StrLit("loc"), Free.point(RightSide)))))).some)
     }
@@ -238,12 +238,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))) must
       equal(chain(
         UnreferencedR,
-        SP.inj(LeftShift(
+        QC.inj(LeftShift(
           (),
           Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
           Free.point(RightSide)))).some)
         // TODO optimize to eliminate `MakeArray`
-        //SP.inj(LeftShift(
+        //QC.inj(LeftShift(
         //  RootR,
         //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
@@ -263,14 +263,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))) must
       equal(chain(
         UnreferencedR,
-        SP.inj(LeftShift(
+        QC.inj(LeftShift(
           (),
           Free.roll(ConcatArrays(
             Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
             Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
           Free.point(RightSide)))).some)
         // TODO optimize to eliminate `MakeArray`
-        //SP.inj(LeftShift(
+        //QC.inj(LeftShift(
         //  RootR,
         //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
@@ -293,7 +293,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
               structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))) must
       equal(chain(
         UnreferencedR,
-        SP.inj(LeftShift(
+        QC.inj(LeftShift(
           (),
           Free.roll(ConcatArrays(
             Free.roll(ConcatArrays(
@@ -302,7 +302,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
           Free.point(RightSide)))).some)
         // TODO optimize to eliminate `MakeArray`
-        //SP.inj(LeftShift(
+        //QC.inj(LeftShift(
         //  RootR,
         //  Free.roll(Constant(
         //    CommonEJson.inj(ejson.Arr(List(
@@ -339,7 +339,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
                 LP.Constant(Data.Int(10)))))) must
       equal(chain(
         RootR,
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           Free.roll(DupArrayIndices(
             ProjectFieldR(
               ProjectFieldR(HoleF, StrLit("zips")),
@@ -365,7 +365,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             LP.Constant(Data.Int(10))))) must
       equal(chain(
         ReadR(rootDir </> file("bar")),
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           HoleF,
           Free.point(RightSide))),
         QC.inj(Filter((),

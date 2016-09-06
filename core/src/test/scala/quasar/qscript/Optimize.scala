@@ -47,7 +47,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
         (quasar.fp.free.injectedNT[QS](opt.simplifyProjection).apply(_: QS[Fix[QS]])) ⋙
           liftFG(opt.coalesceMapShift[QS, QS](opt.optionIdF[QS])) ⋙
           Normalizable[QS].normalize ⋙
-          liftFG(opt.simplifySP[QS, QS](opt.optionIdF[QS])) ⋙
+          liftFF(opt.simplifyQC[QS, QS](opt.optionIdF[QS], NaturalTransformation.refl[QS])) ⋙
           liftFG(opt.compactLeftShift[QS, QS])
 
       val query = lpRead("/foo")
@@ -55,7 +55,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       QueryFile.optimizeEval(query)(run).toOption must
       equal(chain(
         RootR,
-        SP.inj(LeftShift((),
+        QC.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
           Free.point(RightSide)))).some)
     }

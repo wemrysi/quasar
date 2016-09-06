@@ -50,7 +50,7 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 //     operation that doesn’t include the cross portion.
 package object qscript {
   private type CommonPathable[T[_[_]], A] =
-    Coproduct[Const[DeadEnd, ?], SourcedPathable[T, ?], A]
+    Coproduct[Const[DeadEnd, ?], QScriptCore[T, ?], A]
 
   /** Statically known path components potentially converted to Read.
     */
@@ -58,17 +58,15 @@ package object qscript {
     Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
 
   private type QScriptTotal0[T[_[_]], A] =
-    Coproduct[QScriptCore[T, ?], Pathable[T, ?], A]
+    Coproduct[ThetaJoin[T, ?], Pathable[T, ?], A]
   private type QScriptTotal1[T[_[_]], A] =
-    Coproduct[ThetaJoin[T, ?], QScriptTotal0[T, ?], A]
-  private type QScriptTotal2[T[_[_]], A] =
-    Coproduct[EquiJoin[T, ?], QScriptTotal1[T, ?], A]
+    Coproduct[EquiJoin[T, ?], QScriptTotal0[T, ?], A]
   /** This type is used for join branch-like structures. It’s an unfortunate
     * consequence of not having mutually-recursive data structures. Once we do,
     * this can go away.
     */
   type QScriptTotal[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptTotal2[T, ?], A]
+    Coproduct[Const[Read, ?], QScriptTotal1[T, ?], A]
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]

@@ -34,7 +34,6 @@ trait QScriptHelpers {
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val R = implicitly[Const[Read, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
-  val SP = implicitly[SourcedPathable[Fix, ?] :<: QS]
   val EJ = implicitly[EquiJoin[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
 
