@@ -37,7 +37,7 @@ import scalaz.concurrent.Task
 object queryfile {
 
   final case class Input(
-    fromFile: (SparkContext, AFile) => RDD[String],
+    fromFile: (SparkContext, AFile) => Task[RDD[String]],
     store: (RDD[Data], AFile) => Task[Unit],
     fileExists: AFile => Task[Boolean],
     listContents: ADir => Task[FileSystemError \/ Set[PathSegment]]
@@ -60,10 +60,7 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          // TODO this must be implemented at some point.
           val maybeListContest: Option[ConvertPath.ListContents[Free[S, ?]]] = None
-          // ((adir: ADir) => EitherT(listContents(input, adir))).some
-
           val qs = (QueryFile.convertToQScript(maybeListContest)(lp)) >>=
           (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
 
@@ -89,13 +86,13 @@ object queryfile {
     val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptTotal[Fix, ?]]]
 
     read.asks { sc =>
-      val sparkStuff: PlannerError \/ RDD[Data] =
-        qs.cataM(total.plan(input.fromFile)).eval(sc)
+      val sparkStuff: Task[PlannerError \/ RDD[Data]] =
+        qs.cataM(total.plan(input.fromFile)).eval(sc).run
 
       injectFT.apply {
-        sparkStuff.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
+        sparkStuff >>= (mrdd => mrdd.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), out))).map(EitherT(_))
+          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), out))).map(EitherT(_)))
       }
     }.join
   }

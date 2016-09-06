@@ -34,9 +34,9 @@ import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
 
-  // TODO this should be in Task
-  def fromFile(sc: SparkContext, file: AFile): RDD[String] =
+  def fromFile(sc: SparkContext, file: AFile): Task[RDD[String]] = Task.delay {
     sc.textFile(posixCodec.unsafePrintPath(file))
+  }
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {
     implicit val codec =  DataCodec.Precise
