@@ -38,7 +38,7 @@ object queryfile {
 
   final case class Input(
     fromFile: (SparkContext, AFile) => RDD[String],
-    store: RDD[Data] => Task[AFile],
+    store: (RDD[Data], AFile) => Task[Unit],
     fileExists: AFile => Task[Boolean],
     listContents: ADir => Task[FileSystemError \/ Set[PathSegment]]
   )
@@ -88,7 +88,7 @@ object queryfile {
       injectFT.apply {
         sparkStuff.bitraverse[(Task ∘ Writer[PhaseResults, ?])#λ, FileSystemError, AFile](
           planningFailed(lp, _).point[Writer[PhaseResults, ?]].point[Task],
-          rdd => input.store(rdd).map (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), _))).map(EitherT(_))
+          rdd => input.store(rdd, out).as (Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), out))).map(EitherT(_))
       }
     }.join
   }

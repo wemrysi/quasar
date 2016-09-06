@@ -18,12 +18,13 @@ package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
 import quasar.Data
+import quasar.DataCodec
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
 import quasar.fs._
 import quasar.fs.FileSystemError._
 
-import java.io.File
+import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
 
 import org.apache.spark._
@@ -33,10 +34,20 @@ import scalaz._, Scalaz._, scalaz.concurrent.Task
 
 object queryfile {
 
+  // TODO this should be in Task
   def fromFile(sc: SparkContext, file: AFile): RDD[String] =
     sc.textFile(posixCodec.unsafePrintPath(file))
 
-  def store(rdd: RDD[Data]): Task[AFile] = ???
+  def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {
+    implicit val codec =  DataCodec.Precise
+    val ioFile = new File(posixCodec.printPath(out))
+    val pw = new PrintWriter(new FileOutputStream(ioFile, true))
+    rdd.map(data => DataCodec.render(data)).foreach {
+      case \/-(v) => pw.write(s"$v\n")
+      case -\/(der) => pw.write(s"encoding error: ${der.message}")
+    }
+    pw.close()
+  }
 
   def fileExists(f: AFile): Task[Boolean] = Task.delay {
     Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
