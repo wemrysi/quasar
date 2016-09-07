@@ -75,18 +75,6 @@ object Planner {
         }
     }
 
-  implicit def sourcedPathable[T[_[_]]: Recursive: ShowT]:
-      Planner.Aux[T, SourcedPathable[T, ?]] =
-    new Planner[SourcedPathable[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], SourcedPathable[T,?], RDD[Data]] = {
-        case LeftShift(src, struct, repair) => StateT((sc: SparkContext) => {
-          EitherT((sc, src).right[PlannerError].point[Task])
-        })
-        case Union(src, lBranch, rBranch) => ???
-      }
-    }
-
   implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
@@ -105,6 +93,11 @@ object Planner {
           ???
         case Drop(src, from, count) =>
           ???
+        case LeftShift(src, struct, repair) => StateT((sc: SparkContext) => {
+          EitherT((sc, src).right[PlannerError].point[Task])
+        })
+        case Union(src, lBranch, rBranch) => ???
+        case Unreferenced() => ???
       }
     }
   
