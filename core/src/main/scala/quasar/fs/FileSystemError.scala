@@ -47,6 +47,8 @@ object FileSystemError {
     lp: Fix[LogicalPlan],
     err: PlannerError
   ) extends FileSystemError
+  final case class QScriptPlanningFailed private (err: PlannerError)
+    extends FileSystemError
   final case class UnknownResultHandle private (h: ResultHandle)
     extends FileSystemError
   final case class UnknownReadHandle private (h: ReadHandle)
@@ -74,6 +76,10 @@ object FileSystemError {
   val planningFailed = Prism.partial[FileSystemError, (Fix[LogicalPlan], PlannerError)] {
     case PlanningFailed(lp, e) => (lp, e)
   } (PlanningFailed.tupled)
+
+  val qscriptPlanningFailed = Prism.partial[FileSystemError, PlannerError] {
+    case QScriptPlanningFailed(e) => e
+  } (QScriptPlanningFailed)
 
   val unknownResultHandle = Prism.partial[FileSystemError, ResultHandle] {
     case UnknownResultHandle(h) => h
@@ -108,6 +114,8 @@ object FileSystemError {
       case PathErr(e) =>
         e.shows
       case PlanningFailed(_, e) =>
+        e.shows
+      case QScriptPlanningFailed(e) =>
         e.shows
       case UnknownResultHandle(h) =>
         s"Attempted to get results from an unknown or closed handle: ${h.run}"

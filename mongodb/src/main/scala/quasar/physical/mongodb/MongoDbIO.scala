@@ -31,7 +31,7 @@ import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.client.model._
 import com.mongodb.async._
 import com.mongodb.async.client._
-import org.bson.{BsonBoolean, BsonDocument}
+import org.bson.{BsonBoolean, BsonDocument, Document}
 import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 import scalaz.stream._
@@ -304,6 +304,49 @@ object MongoDbIO {
         .flatMap(_.fold(
           err => fail(new MongoException("could not read collection statistics: " + err)),
           _.point[MongoDbIO]))
+  }
+
+  private def collect[A](iter: MongoIterable[A]): MongoDbIO[List[A]] = {
+    import scala.collection.JavaConverters._
+    async[java.util.ArrayList[A]](cb => iter.into[java.util.ArrayList[A]](new java.util.ArrayList[A], cb)).map(_.asScala.toList)
+  }
+
+  /** Set of indexes on a collection, including only simple index types and
+    * ignoring the rest.
+    */
+  def indexes(coll: Collection): MongoDbIO[Set[Index]] = {
+    // TODO: split on ".", but note that MongoDB seems to treat such keys
+    // special anyway, at least when arrays are present.
+    def decodeField(s: String): BsonField = BsonField.Name(s)
+
+    val decodeType: PartialFunction[java.lang.Object, IndexType] = {
+      case x: java.lang.Integer if x.intValue ≟ 1  => IndexType.Ascending
+      case x: java.lang.Integer if x.intValue ≟ -1 => IndexType.Descending
+      case "hashed"                                => IndexType.Hashed
+    }
+
+    def decodeIndex(doc: Document): Option[Index] =
+      (for {
+        name <- Option(doc.get("name")).flatMap {
+                  case s: String => s.some
+                  case _ => None
+                }
+        keys <- Option(doc.get("key")).flatMap {
+                  case kd: Document =>
+                    kd.asScala.toList.toNel.flatMap(_.traverse {
+                      case (k, v) => decodeType.lift(v).strengthL(decodeField(k))
+                    })
+                  case _ => None
+                }
+        unique = Option(doc.get("unique")).map {
+          case java.lang.Boolean.TRUE => true
+          case _                      => false
+        }.getOrElse(false)
+      } yield Index(name, keys, unique))
+
+    collection(coll)
+      .flatMap(c => collect[Document](c.listIndexes))
+      .map(_.flatMap(decodeIndex(_).toList).toSet)
   }
 
   def fail[A](t: Throwable): MongoDbIO[A] =

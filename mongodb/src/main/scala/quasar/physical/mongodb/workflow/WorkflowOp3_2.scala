@@ -31,7 +31,7 @@ final case class $LookupF[A](
   from: CollectionName,
   localField: BsonField,
   foreignField: BsonField,
-  as: BsonField.Name)
+  as: BsonField)
   extends WorkflowOp3_2F[A] { self =>
   def pipeline: PipelineF[WorkflowOp3_2F, A] =
     new PipelineF[WorkflowOp3_2F, A] {
@@ -53,12 +53,12 @@ object $lookup {
     from: CollectionName,
     localField: BsonField,
     foreignField: BsonField,
-    as: BsonField.Name)
+    as: BsonField)
     (implicit I: WorkflowOp3_2F :<: F): FixOp[F] =
       src => Fix(Coalesce[F].coalesce(I.inj($LookupF(src, from, localField, foreignField, as))))
 
   def unapply[F[_], A](op: F[A])(implicit I: WorkflowOp3_2F :<: F)
-    : Option[(A, CollectionName, BsonField, BsonField, BsonField.Name)] =
+    : Option[(A, CollectionName, BsonField, BsonField, BsonField)] =
     I.prj(op) collect {
       case $LookupF(src, from, lf, ff, as) => (src, from, lf, ff, as)
     }
@@ -108,7 +108,7 @@ object WorkflowOp3_2F {
 
   implicit val refs: Refs[WorkflowOp3_2F] = Refs.fromRewrite[WorkflowOp3_2F](rewriteRefs3_2)
 
-  implicit val coalesce: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
+  implicit lazy val coalesce: Coalesce[Workflow3_2F] = coalesceAll[Workflow3_2F]
 
   implicit val classify: Classify[WorkflowOp3_2F] =
     new Classify[WorkflowOp3_2F] {

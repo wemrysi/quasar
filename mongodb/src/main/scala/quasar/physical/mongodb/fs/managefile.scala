@@ -17,6 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
+import quasar.SKI.κ
 import quasar.NameGenerator
 import quasar.fp.TaskRef
 import quasar.fs._
@@ -54,11 +55,12 @@ object managefile {
         refineType(path).fold(deleteDir, deleteFile)
           .run.liftM[ManageInT]
 
+      // TODO: For some reason, compiler is having trouble finding Functor/Apply
+      //       instances within this block.
       case TempFile(path) =>
         val checkPath =
           EitherT.fromDisjunction[MongoManage](Collection.dbNameFromPath(path))
-            .leftMap(pathErr(_))
-            .void
+            .bimap(pathErr(_), κ(()))
 
         val mkTemp =
           freshName.liftM[FileSystemErrT] map { n =>
@@ -67,7 +69,7 @@ object managefile {
               f => fileParent(f) </> file(n))
           }
 
-        (checkPath *> mkTemp).run
+        checkPath.flatMap(κ(mkTemp)).run
     }
   }
 

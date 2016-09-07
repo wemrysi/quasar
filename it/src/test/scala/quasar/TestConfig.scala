@@ -39,16 +39,17 @@ object TestConfig {
   val TestPathPrefixEnvName = "QUASAR_TEST_PATH_PREFIX"
 
   /** External Backends. */
-  val MONGO_2_6 = BackendName("mongodb_2_6")
-  val MONGO_3_0 = BackendName("mongodb_3_0")
-  val MONGO_3_2 = BackendName("mongodb_3_2")
+  val MONGO_2_6       = BackendName("mongodb_2_6")
+  val MONGO_3_0       = BackendName("mongodb_3_0")
+  val MONGO_3_2       = BackendName("mongodb_3_2")
   val MONGO_READ_ONLY = BackendName("mongodb_read_only")
   val SKELETON = BackendName("skeleton")
   val POSTGRESQL = BackendName("postgresql")
   val SPARK_LOCAL = BackendName("spark_local")
+  val MARKLOGIC       = BackendName("marklogic")
 
   lazy val backendNames: List[BackendName] =
-    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL)
+    List(MONGO_2_6, MONGO_3_0, MONGO_3_2, MONGO_READ_ONLY, SKELETON, POSTGRESQL, SPARK_LOCAL, MARKLOGIC)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")

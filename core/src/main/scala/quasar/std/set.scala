@@ -27,13 +27,20 @@ import scalaz._, Scalaz._, Validation.success
 import shapeless.{Data => _, _}
 
 trait SetLib extends Library {
-  val Take = BinaryFunc(
+  val Take: BinaryFunc = BinaryFunc(
     Sifting,
     "(LIMIT)",
     "Takes the first N elements from a set",
     Type.Top,
     Func.Input2(Type.Top, Type.Int),
-    noSimplification,
+    new Func.Simplifier {
+      def apply[T[_[_]]: Recursive: Corecursive](orig: LogicalPlan[T[LogicalPlan]]) =
+        orig match {
+          case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Take, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
+            Take(src, ConstantF[T[LogicalPlan]](Data.Int(m.min(n))).embed).some
+          case _ => None
+        }
+    },
     partialTyper[nat._2] {
       case Sized(_, Type.Const(Data.Int(n))) if n == 0 =>
         Type.Const(Data.Set(Nil))
@@ -44,7 +51,7 @@ trait SetLib extends Library {
     },
     untyper[nat._2](t => success(Func.Input2(t, Type.Int))))
 
-  val Drop = BinaryFunc(
+  val Drop: BinaryFunc = BinaryFunc(
     Sifting,
     "(OFFSET)",
     "Drops the first N elements from a set",
@@ -55,6 +62,8 @@ trait SetLib extends Library {
         case InvokeF(_, Sized(Embed(set), Embed(ConstantF(Data.Int(n)))))
             if n == 0 =>
           set.some
+        case InvokeFUnapply(_, Sized(Embed(InvokeFUnapply(Drop, Sized(src, Embed(ConstantF(Data.Int(m)))))), Embed(ConstantF(Data.Int(n))))) =>
+          Drop(src, ConstantF[T[LogicalPlan]](Data.Int(m + n)).embed).some
         case _ => None
       }
     },

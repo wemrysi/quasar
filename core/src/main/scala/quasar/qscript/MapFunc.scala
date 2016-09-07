@@ -29,7 +29,7 @@ import scalaz._, Scalaz._
 
 sealed abstract class MapFunc[T[_[_]], A]
 
-final case class Nullary[T[_[_]], A](ejson: T[EJson]) extends MapFunc[T, A]
+sealed abstract class Nullary[T[_[_]], A] extends MapFunc[T, A]
 
 sealed abstract class Unary[T[_[_]], A] extends MapFunc[T, A] {
   def a1: A
@@ -48,8 +48,8 @@ sealed abstract class Ternary[T[_[_]], A] extends MapFunc[T, A] {
 object MapFunc {
   import MapFuncs._
 
-  /** Returns a List that maps element-by-element to a MapFunc array. If we can’t
-    * statically determine _all_ of the elements, it doesn’t match.
+  /** Returns a List that maps element-by-element to a MapFunc array. If we
+    * can’t statically determine _all_ of the elements, it doesn’t match.
     */
   object StaticArray {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
@@ -64,8 +64,8 @@ object MapFunc {
             (mf, acc) => (mf.project.run.toOption >>=
               {
                 case MakeArray(value) => (value :: acc).some
-                case Nullary(Embed(Inj(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary(v).right).embed) ++ acc).some
+                case Constant(Embed(Inj(ejson.Arr(values)))) =>
+                  (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant(v).right).embed) ++ acc).some
                 case _ => None
               }))
         case _ => None
@@ -90,18 +90,18 @@ object MapFunc {
               κ(acc.left),
               _ match {
                 case MakeArray(value) => (value :: acc).right
-                case Nullary(Embed(Inj(ejson.Arr(values)))) =>
-                  (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary(v).right).embed) ++ acc).right
+                case Constant(Embed(Inj(ejson.Arr(values)))) =>
+                  (values.map(v => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant(v).right).embed) ++ acc).right
                 case _ => acc.left
               })).merge.some
         case _ => None
       }
   }
 
-  // TODO subtyping is preventing embeding of MapFuncs
-  /** This returns the set of exressions that are concatted together. It can
-    * include statically known pieces, like MakeArray and Nullary(Arr), but also
-    * arbitrary expressions that may evaluate to an array of any size.
+  // TODO: subtyping is preventing embedding of MapFuncs
+  /** This returns the set of expressions that are concatenated together. It can
+    * include statically known pieces, like `MakeArray` and `Constant(Arr)`, but
+    * also arbitrary expressions that may evaluate to an array of any size.
     */
   object ConcatArraysN {
     private implicit def implicitPrio[F[_], G[_]]: Inject[G, Coproduct[F, G, ?]] = Inject.rightInjectInstance
@@ -114,7 +114,7 @@ object MapFunc {
         CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]((ConcatArrays(a, b): MapFunc[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(ejson.Arr[T2[EJson]](Nil)).embed)))
+        case Nil    => CoEnv(\/-(Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(ejson.Arr[T2[EJson]](Nil)).embed)))
       }
     }
 
@@ -124,7 +124,7 @@ object MapFunc {
       mf.run.fold(
         κ(None),
         {
-          case MakeArray(_) | Nullary(Embed(Inj(ejson.Arr(_)))) =>
+          case MakeArray(_) | Constant(Embed(Inj(ejson.Arr(_)))) =>
             List(mf.embed).some
           case ConcatArrays(h, t) =>
             (unapply(h.project).getOrElse(List(h)) ++
@@ -145,7 +145,7 @@ object MapFunc {
         CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]] = {
       args.toList match {
         case h :: t => t.foldLeft(h)((a, b) => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]]((ConcatMaps(a, b): MapFunc[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]]).right).embed).project
-        case Nil    => CoEnv(\/-(Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(ejson.Arr[T2[EJson]](Nil)).embed)))
+        case Nil    => CoEnv(\/-(Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(ejson.Arr[T2[EJson]](Nil)).embed)))
       }
     }
 
@@ -155,7 +155,7 @@ object MapFunc {
       mf.run.fold(
         κ(None),
         {
-          case MakeMap(_, _) | Nullary(Embed(Inj(ejson.Map(_)))) =>
+          case MakeMap(_, _) | Constant(Embed(Inj(ejson.Map(_)))) =>
             List(mf.embed).some
           case ConcatMaps(h, t) =>
             (unapply(h.project).getOrElse(List(h)) ++
@@ -174,50 +174,50 @@ object MapFunc {
     _.run.fold(
       κ(None),
       {
-        case Eq(Embed(CoEnv(\/-(Nullary(v1)))), Embed(CoEnv(\/-(Nullary(v2))))) =>
+        case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
           CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](
-            Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
+            Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
               ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
 
-        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Int(index)))))))) =>
+        case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
             as.lift(index.intValue).map(_.project)
           else None
 
-        case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Nullary(field))))) =>
+        case ProjectField(Embed(ConcatMapsN(as)), Embed(CoEnv(\/-(Constant(field))))) =>
           as.collectFirst {
             // TODO: Perhaps we could have an extractor so these could be
             //       handled by the same case
-            case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Nullary(src)))), Embed(value))))) if field ≟ src =>
+            case Embed(CoEnv(\/-(MakeMap(Embed(CoEnv(\/-(Constant(src)))), Embed(value))))) if field ≟ src =>
               value
-            case Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(m))))))) =>
+            case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
-              }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Nullary[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
+              }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
           }
 
         // elide Nil array on the left
         case ConcatArrays(
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil))))))),
+          Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
 
         // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
+          Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
 
         // elide Nil map on the left
         case ConcatMaps(
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil))))))),
+          Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
 
         // elide Nil map on the right
         case ConcatMaps(
           Embed(CoEnv(\/-(lhs))),
-          Embed(CoEnv(\/-(Nullary(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
+          Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
             CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
 
         case _ => None
@@ -232,7 +232,9 @@ object MapFunc {
         implicit G: Applicative[G]):
           G[MapFunc[T, B]] = fa match {
         // nullary
-        case Nullary(v) => G.point(Nullary[T, B](v))
+        case Constant(v) => G.point(Constant[T, B](v))
+        case Undefined() => G.point(Undefined[T, B]())
+        case Now() => G.point(Now[T, B]())
 
         // unary
         case Date(a1) => f(a1) ∘ (Date(_))
@@ -297,7 +299,9 @@ object MapFunc {
     new Delay[Equal, MapFunc[T, ?]] {
       def apply[A](in: Equal[A]): Equal[MapFunc[T, A]] = Equal.equal {
         // nullary
-        case (Nullary(v1), Nullary(v2)) => v1.equals(v2)
+        case (Constant(v1), Constant(v2)) => v1.equals(v2)
+        case (Undefined(), Undefined()) => true
+        case (Now(), Now()) => true
 
         // unary
         case (Date(a1), Date(b1)) => in.equal(a1, b1)
@@ -363,7 +367,9 @@ object MapFunc {
     new Delay[Show, MapFunc[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = Show.show {
         // nullary
-        case Nullary(v) => Cord("Nullary(") ++ v.show ++ Cord(")")
+        case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
+        case Undefined() => Cord("Undefined()")
+        case Now() => Cord("Now()")
 
         // unary
         case Date(a1) => Cord("Date(") ++ sh.show(a1) ++ Cord(")")
@@ -493,6 +499,15 @@ object MapFunc {
 
 // TODO we should statically verify that these have a `DimensionalEffect` of `Mapping`
 object MapFuncs {
+  // nullary
+  /** A value that is statically known.
+    */
+  @Lenses final case class Constant[T[_[_]], A](ejson: T[EJson]) extends Nullary[T, A]
+  /** A value that doesn’t exist. Most operations on `Undefined` should evaluate
+    * to `Undefined`. See [[IfUndefined]] for the exception.
+    */
+  @Lenses final case class Undefined[T[_[_]], A]() extends Nullary[T, A]
+
   // array
   @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
 
@@ -504,6 +519,10 @@ object MapFuncs {
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time.
+    */
+  @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
+
 
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
@@ -522,12 +541,18 @@ object MapFuncs {
   @Lenses final case class Lte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Gt[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Gte[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  /** This “catches” [[Undefined]] values and replaces them with a value.
+    */
   @Lenses final case class IfUndefined[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class And[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Or[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Coalesce[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class Between[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  @Lenses final case class Cond[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Cond[T[_[_]], A](cond: A, then_ : A, else_ : A) extends Ternary[T, A] {
+    def a1 = cond
+    def a2 = then_
+    def a3 = else_
+  }
 
   // set
   @Lenses final case class Within[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
@@ -541,16 +566,32 @@ object MapFuncs {
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Search[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
-  @Lenses final case class Substring[T[_[_]], A](a1: A, a2: A, a3: A) extends Ternary[T, A]
+  @Lenses final case class Substring[T[_[_]], A](string: A, from: A, count: A) extends Ternary[T, A] {
+    def a1 = string
+    def a2 = from
+    def a3 = count
+  }
 
   // structural
   @Lenses final case class MakeArray[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class MakeMap[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class MakeMap[T[_[_]], A](key: A, value: A) extends Binary[T, A] {
+    def a1 = key
+    def a2 = value
+  }
   @Lenses final case class ConcatArrays[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   @Lenses final case class ConcatMaps[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class ProjectIndex[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class ProjectField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-  @Lenses final case class DeleteField[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ProjectIndex[T[_[_]], A](src: A, index: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = index
+  }
+  @Lenses final case class ProjectField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = field
+  }
+  @Lenses final case class DeleteField[T[_[_]], A](src: A, field: A) extends Binary[T, A] {
+    def a1 = src
+    def a2 = field
+  }
 
   // helpers & QScript-specific
   /** Turns a map of `{ k1: v1, k2: v2, ...}` into a map of
@@ -568,17 +609,21 @@ object MapFuncs {
     * `[[0, v1], [1, v2], ...]`.
     */
   @Lenses final case class ZipArrayIndices[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Range[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
-
+  @Lenses final case class Range[T[_[_]], A](from: A, to: A) extends Binary[T, A] {
+    def a1 = from
+    def a2 = to
+  }
+  /** A conditional specifically for checking that `a1` satisfies `pattern`.
+    */
   @Lenses final case class Guard[T[_[_]], A](a1: A, pattern: Type, a2: A, a3: A)
       extends Ternary[T, A]
 
   object NullLit {
     def apply[T[_[_]]: Corecursive, A](): Free[MapFunc[T, ?], A] =
-      Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Null[T[EJson]]()).embed))
+      Free.roll(Constant[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Null[T[EJson]]()).embed))
 
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Boolean = mf.resume.fold ({
-      case Nullary(ej) => CommonEJson.prj(ej.project).fold(false) {
+      case Constant(ej) => CommonEJson.prj(ej.project).fold(false) {
         case ejson.Null() => true
         case _ => false
       }
@@ -588,10 +633,10 @@ object MapFuncs {
 
   object BoolLit {
     def apply[T[_[_]]: Corecursive, A](b: Boolean): Free[MapFunc[T, ?], A] =
-      Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Bool[T[EJson]](b)).embed))
+      Free.roll(Constant[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Bool[T[EJson]](b)).embed))
 
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Option[Boolean] = mf.resume.fold ({
-      case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+      case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
         case ejson.Bool(b) => b.some
         case _ => None
       }
@@ -601,10 +646,10 @@ object MapFuncs {
 
   object IntLit {
     def apply[T[_[_]]: Corecursive, A](i: BigInt): Free[MapFunc[T, ?], A] =
-      Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](ExtEJson.inj(ejson.Int[T[EJson]](i)).embed))
+      Free.roll(Constant[T, Free[MapFunc[T, ?], A]](ExtEJson.inj(ejson.Int[T[EJson]](i)).embed))
 
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]): Option[BigInt] = mf.resume.fold ({
-      case Nullary(ej) => ExtEJson.prj(ej.project).flatMap {
+      case Constant(ej) => ExtEJson.prj(ej.project).flatMap {
         case ejson.Int(i) => i.some
         case _ => None
       }
@@ -614,14 +659,14 @@ object MapFuncs {
 
   object StrLit {
     def apply[T[_[_]]: Corecursive, A](str: String): Free[MapFunc[T, ?], A] =
-      Free.roll(Nullary[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Str[T[EJson]](str)).embed))
+      Free.roll(Constant[T, Free[MapFunc[T, ?], A]](CommonEJson.inj(ejson.Str[T[EJson]](str)).embed))
 
     def unapply[T[_[_]]: Recursive, A, B](mf: CoEnv[A, MapFunc[T, ?], B]):
         Option[String] =
       mf.run.fold({
         _ => None
       }, {
-        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+        case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
           case ejson.Str(str) => str.some
           case _ => None
         }
@@ -631,7 +676,7 @@ object MapFuncs {
     def unapply[T[_[_]]: Recursive, A](mf: Free[MapFunc[T, ?], A]):
         Option[String] =
       mf.resume.fold({
-        case Nullary(ej) => CommonEJson.prj(ej.project).flatMap {
+        case Constant(ej) => CommonEJson.prj(ej.project).flatMap {
           case ejson.Str(str) => str.some
           case _ => None
         }

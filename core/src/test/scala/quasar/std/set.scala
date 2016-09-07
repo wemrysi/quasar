@@ -69,6 +69,6 @@ class SetSpec extends quasar.Qspec with TypeArbitrary {
            expr must beSuccessful(Const(Data.Set(l.map(κ(r)))))
         case (_, _) => expr must beSuccessful(t1)
       }
-    }
+    }.set(maxSize = 10)
   }
 }

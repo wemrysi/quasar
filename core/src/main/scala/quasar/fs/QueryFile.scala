@@ -44,10 +44,10 @@ object QueryFile {
 
   type QS[T[_[_]], A] = QScriptTotal[T, A]
 
-  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] (
+  def optimizeEval[T[_[_]]: Recursive: Corecursive: EqualT: ShowT](
     lp: T[LogicalPlan])(
-    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]):
-      PlannerError \/ T[QS[T, ?]] = {
+    eval: QS[T, T[QS[T, ?]]] => QS[T, T[QS[T, ?]]]
+  ): PlannerError \/ T[QS[T, ?]] = {
     val transform = new Transform[T, QS[T, ?]]
 
     // TODO: Instead of eliding Lets, use a `Binder` fold, or ABTs or something
@@ -58,8 +58,8 @@ object QueryFile {
         .transCata(((_: EnvT[Ann[T], QS[T, ?], T[QS[T, ?]]]).lower) ⋙ eval))
   }
 
-  /** A variant of convertToQScript that takes advantage of an existing QueryFile
-    * implementation.
+  /** A variant of convertToQScript that takes advantage of an existing
+    * QueryFile implementation.
     */
   def algConvertToQScript
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
@@ -72,20 +72,23 @@ object QueryFile {
     * LogicalPlan no longer needs to be exposed.
     */
   def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
-    f: Option[ConvertPath.ListContents[M]])(
+    listContents: Option[ConvertPath.ListContents[M]])(
     lp: T[LogicalPlan]):
       EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+    val transform = new Transform[T, QS[T, ?]]
     val optimize = new Optimize[T]
 
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
     val qs =
       (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
-        optimize.eliminateProjections(f)).map(
-        _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+        optimize.eliminateProjections[M, QS[T, ?]](listContents)).map(
+          _.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
     EitherT(WriterT(qs.run.map(qq => (
-      qq.fold(κ(Vector()), a => Vector(PhaseResult.Tree("QScript", a.render))),
+      qq.fold(
+        κ(Vector()),
+        a => Vector(PhaseResult.Tree("QScript", a.cata(transform.linearize).reverse.render))),
       qq))))
   }
 
@@ -198,6 +201,7 @@ object QueryFile {
       * [[LogicalPlan]].
       */
     def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
+      // TODO: use DataCursor.process for the appropriate cursor type
       def moreUntilEmpty(h: ResultHandle): Process[M, Data] =
         Process.await(unsafe.more(h): M[Vector[Data]]) { data =>
           if (data.isEmpty)

@@ -34,6 +34,7 @@ lazy val buildSettings = Seq(
     ("scala", Apache2_0("2014–2016", "SlamData Inc.")),
     ("java",  Apache2_0("2014–2016", "SlamData Inc."))),
   scalaVersion := "2.11.8",
+  scalaOrganization := "org.typelevel",
   outputStrategy := Some(StdoutOutput),
   initialize := {
     val version = sys.props("java.specification.version")
@@ -51,7 +52,6 @@ lazy val buildSettings = Seq(
     "bintray/non" at "http://dl.bintray.com/non/maven"),
   addCompilerPlugin("org.spire-math" %% "kind-projector"   % "0.8.0"),
   addCompilerPlugin("org.scalamacros" % "paradise"         % "2.1.0" cross CrossVersion.full),
-  addCompilerPlugin("com.milessabin"  % "si2712fix-plugin" % "1.2.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
 
@@ -60,6 +60,8 @@ lazy val buildSettings = Seq(
     "-target:jvm-1.8",
     "-Ybackend:GenBCode",
     "-Ydelambdafy:method",
+    "-Ypartial-unification",
+    "-Yliteral-types",
     "-Ywarn-unused-import"),
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
@@ -186,7 +188,7 @@ lazy val root = project.in(file("."))
 //          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, sparkcore,
+  mongodb, skeleton, postgresql, marklogic, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -245,6 +247,7 @@ lazy val main = project
     skeleton,
     postgresql,
     sparkcore,
+    marklogic,
     core % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.main)
@@ -263,6 +266,14 @@ lazy val skeleton = project
   .settings(name := "quasar-skeleton-internal")
   .dependsOn(core % BothScopes)
   .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
+lazy val marklogic = project
+  .settings(name := "quasar-marklogic-internal")
+  .dependsOn(core % BothScopes)
+  .settings(commonSettings)
+  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val postgresql = project
