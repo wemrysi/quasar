@@ -33,7 +33,7 @@ class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
       val p = write.append(f, xs.toProcess).drain ++ read.scanAll(f)
 
       MemTask.runLogEmpty(p).unsafePerformSync must_=== \/-(xs)
-    }
+    }.set(maxSize = 10)
 
     "scan should automatically close the read handle when terminated early" >> prop {
       (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
@@ -43,7 +43,7 @@ class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
         MemTask.runLog(p).run.run(emptyMem)
           .unsafePerformSync.leftMap(_.rm) must_=== ((Map.empty, \/.right(xs take n)))
       }
-    }
+    }.set(maxSize = 10)
 
     "scan should automatically close the read handle on failure" >> prop {
       (f: AFile, xs: Vector[Data]) => xs.nonEmpty ==> {
@@ -54,6 +54,6 @@ class ReadFileSpec extends quasar.Qspec with FileSystemFixture {
           .run(emptyMem)
           .unsafePerformSync must_=== ((Map.empty, \/.left(pathErr(pathNotFound(f)))))
       }
-    }
+    }.set(maxSize = 10)
   }
 }

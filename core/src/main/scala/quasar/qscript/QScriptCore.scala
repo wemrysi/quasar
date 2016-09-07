@@ -25,9 +25,7 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed abstract class QScriptCore[T[_[_]], A] {
-  def src: A
-}
+sealed abstract class QScriptCore[T[_[_]], A]
 
 /** A data-level transformation.
   */
@@ -47,6 +45,32 @@ object ReduceIndex {
     }
 }
 
+/** Flattens nested structure, converting each value into a data set, which are
+  * then unioned.
+  *
+  * `struct` is an expression that evaluates to an array or object, which is
+  * then “exploded” into multiple values. `repair` is applied across the new
+  * set, integrating the exploded values into the original set.
+  *
+  * E.g., in:
+  *     LeftShift(x,
+  *               ProjectField(SrcHole, "bar"),
+  *               ConcatMaps(LeftSide, MakeMap("bar", RightSide)))```
+  * If `x` consists of things that look like `{ foo: 7, bar: [1, 2, 3] }`, then
+  * that’s what [[LeftSide]] is. And [[RightSide]] is values like `1`, `2`, and
+  * `3`, because that’s what you get from flattening the struct.So then our
+  * right-biased [[quasar.qscript.MapFuncs.ConcatMaps]] says to concat
+  * `{ foo: 7, bar: [1, 2, 3] }` with `{ bar: 1 }`, resulting in
+  * `{ foo: 7, bar: 1 }` (then again with `{ foo: 7, bar: 2 }` and
+  * `{ foo: 7, bar: 3 }`, finishing up the handling of that one element in the
+  * original (`x`) dataset.
+  */
+@Lenses final case class LeftShift[T[_[_]], A](
+  src: A,
+  struct: FreeMap[T],
+  repair: JoinFunc[T])
+    extends QScriptCore[T, A]
+
 /** Performs a reduction over a dataset, with the dataset partitioned by the
   * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
@@ -56,7 +80,7 @@ object ReduceIndex {
   *
   * @group MRA
   */
- // TODO: type level guarantees about indexing with `repair` into `reducers`
+// TODO: type level guarantees about indexing with `repair` into `reducers`
 @Lenses final case class Reduce[T[_[_]], A](
   src: A,
   bucket: FreeMap[T],
@@ -65,7 +89,8 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Sorts values within a bucket. This could be represented with
-  *     LeftShift(Map(_.sort, Reduce(_ :: _, ???))
+  *     LeftShift(Map(Reduce(src, bucket, UnshiftArray(_)), _.sort(order)),
+  *               RightSide)
   * but backends tend to provide sort directly, so this avoids backends having
   * to recognize the pattern. We could provide an algebra
   *     (Sort :+: QScript)#λ => QScript
@@ -77,7 +102,17 @@ object ReduceIndex {
   order: List[(FreeMap[T], SortDir)])
     extends QScriptCore[T, A]
 
-/** Eliminates some values from a dataset, based on the result of FilterFunc.
+/** Creates a new dataset that contains the elements from the datasets created
+  * by each branch. Duplicate values should be eliminated.
+  */
+@Lenses final case class Union[T[_[_]], A](
+  src: A,
+  lBranch: FreeQS[T],
+  rBranch: FreeQS[T])
+    extends QScriptCore[T, A]
+
+/** Eliminates some values from a dataset, based on the result of `f` (which
+  * must evaluate to a boolean value for each element in the set).
   */
 @Lenses final case class Filter[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
@@ -88,19 +123,32 @@ object ReduceIndex {
 @Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
+/**
+ * A placeholder value that can appear in plans, but will never be referenced
+ * in the result. We consider this a wart. It should be implemented as an
+ * arbitrary value with minimal cost to generate (since it will simply be discarded).
+ */
+@Lenses final case class Unreferenced[T[_[_]], A]()
+    extends QScriptCore[T, A]
+
 object QScriptCore {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
       def apply[A](eq: Equal[A]) =
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
+          case (LeftShift(a1, s1, r1), LeftShift(a2, s2, r2)) =>
+            eq.equal(a1, a2) && s1 ≟ s2 && r1 ≟ r2
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
             b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
             b1 ≟ b2 && o1 ≟ o2 && eq.equal(a1, a2)
+          case (Union(a1, l1, r1), Union(a2, l2, r2)) =>
+            eq.equal(a1, a2) && l1 ≟ l2 && r1 ≟ r2
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
           case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
           case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
+          case (Unreferenced(), Unreferenced()) => true
           case (_, _) => false
         }
     }
@@ -111,12 +159,15 @@ object QScriptCore {
         fa: QScriptCore[T, A])(
         f: A => G[B]) =
         fa match {
-          case Map(a, func)       => f(a) ∘ (Map[T, B](_, func))
+          case Map(a, func)               => f(a) ∘ (Map[T, B](_, func))
+          case LeftShift(a, s, r)         => f(a) ∘ (LeftShift(_, s, r))
           case Reduce(a, b, func, repair) => f(a) ∘ (Reduce(_, b, func, repair))
           case Sort(a, b, o)              => f(a) ∘ (Sort(_, b, o))
+          case Union(a, l, r)             => f(a) ∘ (Union(_, l, r))
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
           case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
           case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
+          case Unreferenced()             => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
         }
     }
 
@@ -127,6 +178,10 @@ object QScriptCore {
           case Map(src, mf) => Cord("Map(") ++
             s.show(src) ++ Cord(",") ++
             mf.show ++ Cord(")")
+          case LeftShift(src, struct, repair) => Cord("LeftShift(") ++
+            s.show(src) ++ Cord(",") ++
+            struct.show ++ Cord(",") ++
+            repair.show ++ Cord(")")
           case Reduce(a, b, red, rep) => Cord("Reduce(") ++
             s.show(a) ++ Cord(",") ++
             b.show ++ Cord(",") ++
@@ -136,6 +191,10 @@ object QScriptCore {
             s.show(a) ++ Cord(",") ++
             b.show ++ Cord(",") ++
             o.show ++ Cord(")")
+          case Union(src, l, r) => Cord("Union(") ++
+            s.show(src) ++ Cord(",") ++
+            l.show ++ Cord(",") ++
+            r.show ++ Cord(")")
           case Filter(a, func) => Cord("Filter(") ++
             s.show(a) ++ Cord(",") ++
             func.show ++ Cord(")")
@@ -147,6 +206,7 @@ object QScriptCore {
             s.show(a) ++ Cord(",") ++
             f.show ++ Cord(",") ++
             c.show ++ Cord(")")
+          case Unreferenced() => Cord("Unreferenced")
         }
     }
 
@@ -162,20 +222,27 @@ object QScriptCore {
       def mergeSrcs(
         left: FreeMap[T],
         right: FreeMap[T],
-        p1: EnvT[Ann[T], QScriptCore[IT, ?], Unit],
-        p2: EnvT[Ann[T], QScriptCore[IT, ?], Unit]) =
+        p1: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged],
+        p2: EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged]) =
         (p1, p2) match {
-          case (_, _) if (p1 ≟ p2) => SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](p1, left, right).some
           case (EnvT((Ann(b1, v1), Map(_, m1))),
                 EnvT((Ann(_,  v2), Map(_, m2)))) =>
             // TODO: optimize cases where one side is a subset of the other
             val (mf, lv, rv) = concat(v1 >> m1 >> left, v2 >> m2 >> right)
-            val (buck, newBuckets) = concatBuckets(b1.map(_ >> m1))
-            val (full, buckAccess, valAccess) = concat(buck, mf)
-            SrcMerge(
-              EnvT((Ann(newBuckets.map(_ >> buckAccess), valAccess), Map((), full): QScriptCore[T, Unit])),
-              lv,
-              rv).some
+            concatBuckets(b1.map(_ >> m1)) match {
+              case Some((buck, newBuckets)) => {
+                val (full, buckAccess, valAccess) = concat(buck, mf)
+                SrcMerge(
+                  EnvT((Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+              }
+              case None =>
+                SrcMerge(
+                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                  lv,
+                  rv).some
+            }
 
           case (EnvT((Ann(b1, v1), Reduce(_, bucket1, func1, rep1))),
                 EnvT((Ann(b2, v2), Reduce(_, bucket2, func2, rep2)))) =>
@@ -186,14 +253,14 @@ object QScriptCore {
             val mapR = bucket2 >> right
 
             (mapL ≟ mapR).option(
-              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], Unit], FreeMap[IT]](
+              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
                 EnvT((Ann(b1, HoleF),
-                  Reduce((),
+                  Reduce(Extern,
                     mapL,
                     // FIXME: Concat these things!
                     func1, // for { f1 <- funcL; f2 <- funcR } yield f1 ++ f2,
                     rep1 // newRep
-                  ): QScriptCore[T, Unit])),
+                  ): QScriptCore[T, ExternallyManaged])),
                 HoleF, // lrep,
                 HoleF // rrep
               ))
@@ -211,19 +278,26 @@ object QScriptCore {
       def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
         def apply[A](qc: QScriptCore[T, A]) = qc match {
           case Map(src, f) => Map(src, normalizeMapFunc(f))
+          case LeftShift(src, s, r) =>
+            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
           case Reduce(src, bucket, reducers, repair) =>
             val normBuck = normalizeMapFunc(bucket)
             Reduce(
               src,
               // NB: all single-bucket reductions should reduce on `null`
               normBuck.resume.fold({
-                case Nullary(_) => MapFuncs.NullLit[T, Hole]()
-                case _          => normBuck
+                case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
+                case _                    => normBuck
               }, κ(normBuck)),
               reducers.map(_.map(normalizeMapFunc(_))),
               normalizeMapFunc(repair))
           case Sort(src, bucket, order) =>
             Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
+          case Union(src, l, r) =>
+            Union(
+              src,
+              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
+              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
           case Filter(src, f) => Filter(src, normalizeMapFunc(f))
           case Take(src, from, count) =>
             Take(
@@ -235,6 +309,7 @@ object QScriptCore {
               src,
               freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
               freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
+          case Unreferenced() => Unreferenced()
         }
       }
     }

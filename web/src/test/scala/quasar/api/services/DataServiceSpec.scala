@@ -270,7 +270,7 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
         response.status must_== Status.Ok
         response.contentType must_== Some(`Content-Type`(MediaType.`application/zip`))
         response.headers.get(`Content-Disposition`) must_== Some(disposition)
-      }.set(minTestsOk = 10)  // NB: this test is slow because NonEmptyDir instances are still relatively large
+      }.set(minTestsOk = 10).flakyTest("scalacheck: Gave up after only 2 passed tests. 12 tests were discarded.")  // NB: this test is slow because NonEmptyDir instances are still relatively large
       "what happens if user specifies a Path that is a directory but without the appropriate headers?" >> todo
     }
     "POST and PUT" >> {

@@ -17,70 +17,31 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.Planner.PlannerError
 import quasar.fp._
 import quasar.fs.{ADir, FileSystemError}
-import quasar.qscript.ConvertPath.{ListContents, Pathed}
+import quasar.qscript.ConvertPath.{ListContents, Pathed, postPathify}
 
-import matryoshka._, Recursive.ops._, TraverseT.ops._
+import matryoshka._, TraverseT.ops._
 import matryoshka.patterns.CoEnv
-import pathy.Path._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
 
 @typeclass trait StaticPath[F[_]] {
   type IT[F[_]]
 
-  def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
-    implicit TC: Corecursive[IT],
-             TR: Recursive[IT],
-             PF: Pathable[IT, ?] ~> G,
-             QC: QScriptCore[IT, ?] :<: G,
-             FG: F ~> G,
-             FI: G :<: QScriptTotal[IT, ?],
-             F: Traverse[F],
-             CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
-      AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
-
-  def readFile[M[_]: Monad, F[_], G[_]: Functor](
-    f: ListContents[M])(
-    implicit TC: Corecursive[IT], R: Const[Read, ?] :<: G, QC: QScriptCore[IT, ?] :<: G, F: F ~> G):
-      CoEnv[ADir, F, IT[G]] => M[List[G[IT[G]]]] =
-    _.run.fold(allDescendents[M, G](f).apply(_), fa => List(F(fa)).point[M])
-
-  def union[F[_]: Functor]
-    (elems: List[F[IT[F]]])
+  def pathifyƒ[M[_]: Monad, G[_]: Traverse]
+    (g: ListContents[M])
     (implicit
       TC: Corecursive[IT],
       TR: Recursive[IT],
-      DE: Const[DeadEnd, ?] :<: F,
-      SP: SourcedPathable[IT, ?] :<: F,
-      FI: F :<: QScriptTotal[IT, ?])
-      : FileSystemError \/ F[IT[F]] =
-    elems match {
-      case h :: t =>
-        t.foldRight(
-          h)(
-          (elem, acc) => SP.inj(Union(DE.inj(Const[DeadEnd, IT[F]](Root)).embed,
-            elem.embed.cata[Free[QScriptTotal[IT, ?], Hole]](g => Free.roll(FI.inj(g))),
-            acc.embed.cata[Free[QScriptTotal[IT, ?], Hole]](g => Free.roll(FI.inj(g)))))).right
-      case Nil => FileSystemError.readFailed("Nil", "found no files").left
-    }
-
-  /** Applied after the backend-supplied function, to convert the files into
-    * reads and combine them as necessary.
-    */
-  def postPathify[M[_]: Monad, F[_], G[_]: Functor](
-    f: ListContents[M])(
-    implicit TC: Corecursive[IT],
-             TR: Recursive[IT],
-             R: Const[Read, ?] :<: G,
-             FG: F ~> G,
-             DE: Const[DeadEnd, ?] :<: G,
-             SP: SourcedPathable[IT, ?] :<: G,
-             QC: QScriptCore[IT, ?] :<: G, 
-             FI: G :<: QScriptTotal[IT, ?]):
-      AlgebraicTransformM[IT, EitherT[M, FileSystemError, ?], Pathed[F, ?], G] =
-    p => EitherT(p.traverseM(readFile[M, F, G](f).apply) ∘ union[G])
+      PF: Pathable[IT, ?] ~> G,
+      QC: QScriptCore[IT, ?] :<: G,
+      FG: F ~> G,
+      FI: G :<: QScriptTotal[IT, ?],
+      F: Traverse[F],
+      CP: ConvertPath.Aux[IT, Pathable[IT, ?], G])
+      : AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
 
   def toRead[M[_]: Monad, F[_]: Traverse, G[_]: Functor]
     (g: ListContents[M])
@@ -91,7 +52,6 @@ import simulacrum.typeclass
       R: Const[Read, ?] :<: G,
       FG: F ~> G,
       DE: Const[DeadEnd, ?] :<: G,
-      SP: SourcedPathable[IT, ?] :<: G,
       QC: QScriptCore[IT, ?] :<: G,
       FI: G :<: QScriptTotal[IT, ?],
       CP: ConvertPath.Aux[IT, Pathable[IT, ?], F])
@@ -100,33 +60,8 @@ import simulacrum.typeclass
       Traverse[List].compose(Traverse[CoEnv[ADir, F, ?]])
 
     _.transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?]](CP.convertPath[M](g)) >>=
-      (TraverseT[IT].transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?], G](_)(postPathify[M, F, G](g)))
+      (TraverseT[IT].transCataM[EitherT[M, PlannerError, ?], Pathed[F, ?], G](_)(postPathify[IT, M, F, G](g)).leftMap(FileSystemError.qscriptPlanningFailed(_)))
     }
-
-  def wrapDir[F[_]: Functor](
-    name: String, d: F[IT[F]])(
-    implicit TC: Corecursive[IT],
-             QC: QScriptCore[IT, ?] :<: F):
-      F[IT[F]] =
-    QC.inj(Map(d.embed, Free.roll(MapFuncs.MakeMap(MapFuncs.StrLit(name), HoleF))))
-
-  def makeRead[F[_]](
-    dir: ADir, file: FileName)(
-    implicit R: Const[Read, ?] :<: F):
-      F[IT[F]] =
-    R.inj(Const[Read, IT[F]](Read(dir </> file1(file))))
-
-  def allDescendents[M[_]: Monad, F[_]: Functor](
-    listContents: ListContents[M])(
-    implicit TC: Corecursive[IT],
-             R: Const[Read, ?] :<: F,
-             QC: QScriptCore[IT, ?] :<: F):
-      ADir => M[List[F[IT[F]]]] =
-    dir => listContents(dir).run.flatMap(_.fold(
-      κ(List.empty[F[IT[F]]].point[M]),
-      _.toList.traverseM(_.fold(
-        d => allDescendents[M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir[F](f.value, makeRead(dir, f))).point[M]))))
 }
 
 object StaticPath extends LowPriorityStaticPathInstances {

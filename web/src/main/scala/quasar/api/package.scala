@@ -17,7 +17,6 @@
 package quasar
 
 import quasar.Predef._
-import quasar.Errors.convertError
 import quasar.api.ToQResponse.ops._
 import quasar.effect.Failure
 import quasar.fp._
@@ -154,24 +153,25 @@ package object api {
     }
   }
 
-  val UriPathCodec = {
+  def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8")
+  def uriDecodeUtf8(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
 
-    val $dot$ = "$dot$"
+  val UriPathCodec = {
+    val $dot$    = "$dot$"
     val $dotdot$ = "$dotdot$"
 
-    val escapeRel = (s: String) =>
-      if (s == "..") $dotdot$ else if (s == ".") $dot$ else s
+    val escapeRel: String => String = {
+      case ".." => $dotdot$
+      case "."  => $dot$
+      case s    => uriEncodeUtf8(s)
+    }
+    val unescapeRel: String => String = {
+      case `$dotdot$` => ".."
+      case `$dot$`    => "."
+      case s          => uriDecodeUtf8(s)
+    }
 
-    val unescapeRel = (s: String) =>
-      if (s == $dotdot$) ".." else if (s == $dot$) "." else s
-
-    val encode = (s: String) =>
-      UrlCodingUtils.urlEncode(s, toSkip = HPath.pathUnreserved)
-
-    val decode = (s: String) =>
-      UrlCodingUtils.urlDecode(s)
-
-    PathCodec('/', encode compose escapeRel, decode compose unescapeRel)
+    PathCodec('/', escapeRel, unescapeRel)
   }
 
   // NB: oddly, every path is prefixed with '/', except "".
@@ -208,7 +208,7 @@ package object api {
   def decodedPath(encodedPath: String): ApiError \/ APath =
     AsPath.unapply(HPath(encodedPath)) \/> ApiError.fromMsg(
       BadRequest withReason "Malformed path.",
-      s"Failed to parse '${UrlCodingUtils.urlDecode(encodedPath)}' as an absolute path.",
+      s"Failed to parse '${uriDecodeUtf8(encodedPath)}' as an absolute path.",
       "encodedPath" := encodedPath)
 
   def transcode(from: PathCodec, to: PathCodec): String => String =

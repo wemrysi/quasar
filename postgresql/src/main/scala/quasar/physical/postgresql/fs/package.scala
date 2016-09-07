@@ -57,10 +57,10 @@ package object fs {
        TaskRef(0L)
       )((kvR, kvW, i) =>
         mapSNT(injectNT[Task, S] compose (
-          transactor.trans               :+:
-          MonotonicSeq.fromTaskRef(i)    :+:
-          KeyValueStore.fromTaskRef(kvR) :+:
-          KeyValueStore.fromTaskRef(kvW))))
+          transactor.trans                    :+:
+          MonotonicSeq.fromTaskRef(i)         :+:
+          KeyValueStore.impl.fromTaskRef(kvR) :+:
+          KeyValueStore.impl.fromTaskRef(kvW))))
 
     lift(taskInterp).into
   }

@@ -1,0 +1,1 @@
+Improve the names of parameters to some `MapFuncs`
