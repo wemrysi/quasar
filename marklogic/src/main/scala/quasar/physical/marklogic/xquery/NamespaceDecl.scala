@@ -14,20 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xquery
 
-import quasar.Predef.{Map => _, _}
-import quasar.NameGenerator
-import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
+import quasar.Predef._
 
-import matryoshka._
-import scalaz._, Scalaz._
+import monocle.macros.Lenses
+import scalaz._
+import scalaz.std.tuple._
+import scalaz.syntax.show._
 
-private[qscript] final class ThetaJoinPlanner[T[_[_]]] extends MarkLogicPlanner[ThetaJoin[T, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], ThetaJoin[T, ?], XQuery] = {
-    case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
-      s"((: ThetaJoin :)$src)".xqy.point[PlanningT[F, ?]]
-  }
+@Lenses
+final case class NamespaceDecl(prefix: xml.NSPrefix, uri: xml.NSUri) {
+  def render: String = s"declare namespace ${prefix.shows} = ${uri.xs.shows}"
+}
+
+object NamespaceDecl {
+  implicit val order: Order[NamespaceDecl] =
+    Order.orderBy(ns => (ns.prefix, ns.uri))
+
+  implicit val show: Show[NamespaceDecl] =
+    Show.shows(ns => s"NamespaceDecl(${ns.render})")
 }

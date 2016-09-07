@@ -14,23 +14,30 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.physical.marklogic.xquery
 
-import quasar.Predef.{Map => _, _}
-import quasar.NameGenerator
-import quasar.physical.marklogic.xquery._
+import quasar.Predef._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
-import matryoshka._
-import scalaz._, Scalaz._
+import scalaz.{Show, Order}
+import scalaz.std.option._
+import scalaz.std.string._
+import scalaz.std.tuple._
+import scalaz.syntax.std.option._
 
-private[qscript] final class ProjectBucketPlanner[T[_[_]]] extends MarkLogicPlanner[ProjectBucket[T, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], ProjectBucket[T, ?], XQuery] = {
-    case BucketField(src, value, name) =>
-      s"((: BucketField :)$src)".xqy.point[PlanningT[F, ?]]
-
-    case BucketIndex(src, value, index) =>
-      s"((: BucketIndex :)$src)".xqy.point[PlanningT[F, ?]]
+final case class Version(version: String, encoding: Option[String]) {
+  def render: String = {
+    val enc = encoding.map(e => s" ($e)")
+    s"xquery version ${version.xs}${~enc}"
   }
+}
+
+object Version {
+  val `1.0-ml` = Version("1.0-ml", None)
+
+  implicit val order: Order[Version] =
+    Order.orderBy(v => (v.version, v.encoding))
+
+  implicit val show: Show[Version] =
+    Show.showFromToString
 }

@@ -26,7 +26,7 @@ import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
-import quasar.physical.marklogic.xquery.XQuery
+import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._
@@ -49,22 +49,34 @@ object queryfile {
   ): QueryFile ~> Free[S, ?] = {
     def plannedLP[A](
       lp: Fix[LogicalPlan])(
-      f: XQuery => ContentSourceIO[A]
+      f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
-      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import EitherT.eitherTMonad
+      type PrologsT[F[_], A] = WriterT[F, Prologs, A]
+      type M[A] = PrologsT[Free[S, ?], A]
 
-      def phase(xqy: XQuery): PhaseResults =
-        Vector(PhaseResult.Detail("XQuery", xqy.toString))
+      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+      //import EitherT.eitherTMonad
+
+      def phase(main: MainModule): PhaseResults =
+        Vector(PhaseResult.Detail("XQuery", main.render))
 
       val listContents: ConvertPath.ListContents[Free[S, ?]] =
         adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
 
+      def plan(qs: Fix[QScriptTotal[Fix, ?]]): PlanningT[Free[S, ?], MainModule] = {
+        val planRes =
+          qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[WriterT[Free[S, ?], Prologs, ?]])
+            .run.run.run
+
+        EitherT(WriterT(planRes map { case (prologs, (phases, res)) =>
+          (phases, res map (MainModule(Version.`1.0-ml`, prologs, _)))
+        }))
+      }
+
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        xqy <- qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[Free[S, ?]])
-                 .leftMap(planningFailed(lp, _))
-        a   <- WriterT.put(lift(f(xqy)).into[S])(phase(xqy)).liftM[FileSystemErrT]
+        mod <- plan(qs).leftMap(planningFailed(lp, _))
+        a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 
       planning.run.run
@@ -74,14 +86,13 @@ object queryfile {
       plannedLP(lp)(κ(out.point[ContentSourceIO]))
 
     def eval(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(xqy =>
+      plannedLP(lp)(main =>
         ContentSourceIO.resultCursor(
-          SessionIO.evaluateQuery_(xqy),
+          SessionIO.evaluateModule_(main),
           resultsChunkSize))
 
     def explain(lp: Fix[LogicalPlan]) =
-      plannedLP(lp)(xqy =>
-        ExecutionPlan(FsType, xqy.toString).point[ContentSourceIO])
+      plannedLP(lp)(main => ExecutionPlan(FsType, main.render).point[ContentSourceIO])
 
     def exists(file: AFile): Free[S, Boolean] =
       lift(ops.exists(file)).into[S]

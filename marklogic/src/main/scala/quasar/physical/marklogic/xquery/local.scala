@@ -21,26 +21,20 @@ import quasar.NameGenerator
 
 import java.lang.SuppressWarnings
 
-import scalaz.{Apply, Functor}
-import scalaz.syntax.apply._
+import eu.timepit.refined.auto._
+import scalaz.syntax.monad._
 
 /** Functions local to Quasar, will likely need to break this object up once we
  *  see classes of functions emerge.
  */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object local {
-  import expr.{element, for_, if_, let_}
-  import axes._
-  import syntax._
+  import syntax._, expr.{element, for_, if_, let_}, axes._
 
-  val nsUri: String =
-    "http://quasar-analytics.org/quasar"
+  val qsr = namespace("quasar", "http://quasar-analytics.org/quasar")
 
-  val dataName  : String = "quasar:data"
-  val qErrorName: String = "quasar:error"
-
-  val dataQName  : XQuery = quasarQName(dataName)
-  val qErrorQName: XQuery = quasarQName(qErrorName)
+  val dataN = qsr name "data"
+  val errorN = qsr name "error"
 
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
@@ -49,40 +43,42 @@ object local {
     node `/` child.node() `/` child.node()
 
   // TODO: Convert to a typeswitch
-  def leftShift[F[_]: NameGenerator: Functor](item: XQuery): F[XQuery] =
-    freshVar[F] map { x =>
+  def leftShift[F[_]: NameGenerator: PrologW](item: XQuery): F[XQuery] =
+    for {
+      x     <- freshVar[F]
+      isArr <- ejson.isArray[F](x.xqy)
+      arrLs <- ejson.arrayLeftShift[F](x.xqy)
+      isMap <- ejson.isMap[F](x.xqy)
+      mapLs <- ejson.mapLeftShift[F](x.xqy)
+    } yield {
       let_(x -> item) return_ {
-        if_(ejson.isArray(x.xqy))
-        .then_ { ejson.arrayLeftShift(x.xqy) }
+        if_(isArr)
+        .then_ { arrLs }
         .else_ {
-          if_ (ejson.isMap(x.xqy))
-          .then_ { ejson.mapLeftShift(x.xqy) }
+          if_ (isMap)
+          .then_ { mapLs }
           .else_ { leftShiftNode(x.xqy) }
         }
       }
     }
 
-  def mkData(children: XQuery): XQuery =
-    element { dataName.xs } { children }
+  def mkData[F[_]: PrologW](children: XQuery): F[XQuery] =
+    dataN.xs[F] map (data => element { data } { children })
 
-  def qError(desc: XQuery, errObj: Option[XQuery] = None): XQuery =
-    fn.error(qErrorQName, Some(desc), errObj)
+  def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
+    errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
-  def zipMapNodeKeys[F[_]: NameGenerator: Apply](node: XQuery): F[XQuery] =
-    (freshVar[F] |@| freshVar[F]) { (c, n) =>
-      element { fn.nodeName(node) } {
-        ejson.mkMap(
-          for_(c -> node `/` child.node())
-          .let_(n -> fn.nodeName(c.xqy))
-          .return_(
-            ejson.mkMapEntry(n.xqy, ejson.mkArray(mkSeq_(
-              ejson.mkArrayElt(n.xqy),
-              ejson.mkArrayElt(c.xqy `/` child.node()))))))
-      }
-    }
-
-  ////
-
-  private def quasarQName(name: String): XQuery =
-    fn.QName(nsUri.xs, name.xs)
+  def zipMapNodeKeys[F[_]: NameGenerator: PrologW](node: XQuery): F[XQuery] =
+    for {
+      c       <- freshVar[F]
+      n       <- freshVar[F]
+      kelt    <- ejson.mkArrayElt[F](n.xqy)
+      velt    <- ejson.mkArrayElt[F](c.xqy `/` child.node())
+      kvArr   <- ejson.mkArray[F](mkSeq_(kelt, velt))
+      kvEnt   <- ejson.mkMapEntry[F](n.xqy, kvArr)
+      entries =  for_(c -> node `/` child.node())
+                 .let_(n -> fn.nodeName(c.xqy))
+                 .return_(kvEnt)
+      zMap    <- ejson.mkMap[F](entries)
+    } yield zMap
 }

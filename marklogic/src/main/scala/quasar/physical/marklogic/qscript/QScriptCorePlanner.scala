@@ -29,7 +29,7 @@ import scalaz._, Scalaz._
 private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
   import expr.{func, for_, let_}
 
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
       liftP(for {
         x <- freshVar[F]
