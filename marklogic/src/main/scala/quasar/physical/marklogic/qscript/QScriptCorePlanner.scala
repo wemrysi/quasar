@@ -50,7 +50,17 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
       XQuery(s"((: REDUCE :)$src)").point[PlanningT[F, ?]]
 
     case Sort(src, bucket, order) =>
-      XQuery(s"((: SORT :)$src)").point[PlanningT[F, ?]]
+      liftP(for {
+        x           <- freshVar[F]
+        xQueryOrder <- order.traverse { case (func, sortDir) =>
+          mapFuncXQuery(func, x.xqy).strengthR(SortDirection.fromQScript(sortDir))
+        }
+        bucketOrder <- mapFuncXQuery(bucket, x.xqy).strengthR(SortDirection.Ascending)
+      } yield
+        expr
+          .for_(x -> src)
+          .orderBy(bucketOrder, xQueryOrder: _*)
+          .return_(x.xqy))
 
     case Union(src, lBranch, rBranch) =>
       for {
@@ -83,5 +93,7 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
         fm <- rebaseXQuery(from, s.xqy)
         ct <- rebaseXQuery(count, s.xqy)
       } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
+    case Unreferenced() =>
+      expr.emptySeq.point[PlanningT[F, ?]]
   }
 }

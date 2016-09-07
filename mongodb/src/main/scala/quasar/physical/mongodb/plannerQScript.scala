@@ -690,8 +690,11 @@ object MongoDbQScriptPlanner {
                WB: WorkflowBuilder.Ops[WF]):
         AlgebraM[StateT[OutputM, NameGen, ?], F, WorkflowBuilder[WF]]
 
-    def unimplemented[WF[_]] =
+    def unimplemented[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
       StateT(κ((InternalError("unimplemented"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
+
+    def shouldNotBeReached[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
+      StateT(κ((InternalError("should not be reached"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
   }
 
   object Planner {
@@ -750,6 +753,7 @@ object MongoDbQScriptPlanner {
             (rebaseWB(joinHandler, from, src) ⊛
               (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
               WB.skip)
+          case Unreferenced() => ValueBuilder(Bson.Null).point[M]
         }
       }
 
@@ -806,7 +810,7 @@ object MongoDbQScriptPlanner {
           implicit I: WorkflowOpCoreF :<: WF,
             ev: Show[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF]) =
-          κ(unimplemented)
+          κ(shouldNotBeReached)
       }
 
     implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
@@ -817,7 +821,7 @@ object MongoDbQScriptPlanner {
           implicit I: WorkflowOpCoreF :<: WF,
             ev: Show[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF]) =
-          κ(unimplemented)
+          κ(shouldNotBeReached)
       }
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
@@ -828,7 +832,7 @@ object MongoDbQScriptPlanner {
           implicit I: WorkflowOpCoreF :<: WF,
             ev: Show[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF]) =
-          κ(unimplemented)
+          κ(shouldNotBeReached)
       }
 
     implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
@@ -839,7 +843,7 @@ object MongoDbQScriptPlanner {
           implicit I: WorkflowOpCoreF :<: WF,
             ev: Show[WorkflowBuilder[WF]],
             WB: WorkflowBuilder.Ops[WF]) =
-          κ(unimplemented)
+          κ(shouldNotBeReached)
       }
   }
 

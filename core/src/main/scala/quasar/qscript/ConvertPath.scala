@@ -128,12 +128,11 @@ object ConvertPath extends ConvertPathInstances {
   def union[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (elems: NonEmptyList[F[T[F]]])
     (implicit
-      DE: Const[DeadEnd, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
       : F[T[F]] =
     elems.foldRight1(
-      (elem, acc) => QC.inj(Union(DE.inj(Const[DeadEnd, T[F]](Root)).embed,
+      (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[F]]()).embed,
         elem.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
         acc.embed.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))))))
 
@@ -144,7 +143,6 @@ object ConvertPath extends ConvertPathInstances {
     f: ListContents[M])(
     implicit R: Const[Read, ?] :<: G,
              FG: F ~> G,
-             DE: Const[DeadEnd, ?] :<: G,
              QC: QScriptCore[T, ?] :<: G, 
              FI: G :<: QScriptTotal[T, ?]):
       AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
@@ -177,19 +175,18 @@ object ConvertPath extends ConvertPathInstances {
     (src: T[Pathed[F, ?]], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[Pathed[F, ?]], FreeQS[T], FreeQS[T]) => F[T[Pathed[F, ?]]])
     (implicit
-      DE: Const[DeadEnd, ?] :<: F,
+      QC: QScriptCore[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
       : EitherT[M, FileSystemError, Pathed[F, T[Pathed[F, ?]]]] =
     (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
       List(CoEnv(
         op(
-          Corecursive[T].embed[Pathed[F, ?]](List(CoEnv(DE.inj(Const[DeadEnd, T[Pathed[F, ?]]](Root)).right[ADir]))),
+          Corecursive[T].embed[Pathed[F, ?]](List(CoEnv(QC.inj(Unreferenced[T, T[Pathed[F, ?]]]()).right[ADir]))),
           l,
           r).right[ADir])))
 
   implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
     (implicit
-      DE: Const[DeadEnd, ?] :<: G,
       QC: QScriptCore[T, ?] :<: G,
       FI: G :<: QScriptTotal[T, ?])
       : ConvertPath.Aux[T, QScriptCore[T, ?], G] =
@@ -233,7 +230,7 @@ object ConvertPath extends ConvertPathInstances {
 
   implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
     (implicit
-      DE: Const[DeadEnd, ?] :<: G,
+      QC: QScriptCore[T, ?] :<: G,
       TJ: ThetaJoin[T, ?] :<: G,
       FI: G :<: QScriptTotal[T, ?]):
       ConvertPath.Aux[T, ThetaJoin[T, ?], G] =
@@ -250,7 +247,7 @@ object ConvertPath extends ConvertPathInstances {
 
   implicit def equiJoin[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
     (implicit
-      DE: Const[DeadEnd, ?] :<: G,
+      QC: QScriptCore[T, ?] :<: G,
       EJ: EquiJoin[T, ?] :<: G,
       FI: G :<: QScriptTotal[T, ?]):
       ConvertPath.Aux[T, EquiJoin[T, ?], G] =
