@@ -20,7 +20,8 @@ import quasar.Predef._
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._
+import matryoshka.patterns.CoEnv
 import scalaz._, Scalaz._
 
 /** This optional transformation changes the semantics of [[Read]]. The default
@@ -28,128 +29,118 @@ import scalaz._, Scalaz._
   * implied [[LeftShift]] and therefore returns a set of values, which more
   * closely matches the way many data stores behave.
   */
-trait ShiftRead[T[_[_]], H[_]] {
-  def shiftRead[F[_]: Functor, G[_]: Functor]
-    (GtoF: PrismNT[G, F], H: H ~> F)
-    (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-      : H[T[G]] => G[T[G]]
+trait ShiftRead[F[_]] {
+  type G[A]
+
+  // NB: This could be either a futumorphism (as it is) or an apomorphism. Not
+  //     sure if one is clearly better.
+  def shiftRead[H[_]](GtoH: G ~> H): F ~> (H ∘ Free[H, ?])#λ
 }
 
 object ShiftRead extends ShiftReadInstances {
-  def apply[T[_[_]], H[_]](implicit ev: ShiftRead[T, H]) = ev
+  type Aux[F[_], H[_]] = ShiftRead[F] { type G[A] = H[A] }
+
+  def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[F, G]) = ev
 
   def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T]):
       FreeQS[T] =
-    freeTransCata(branch)(
-      liftCo(ShiftRead[T, QScriptTotal[T, ?]].shiftRead(
-        coenvPrism[QScriptTotal[T, ?], Hole],
-        NaturalTransformation.refl)))
+    freeTransFutu(branch)((co: CoEnv[Hole, QScriptTotal[T, ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]]) => co.run.fold(
+      κ(co.map(Free.point[CoEnv[Hole, QScriptTotal[T, ?], ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]])),
+      ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive]:
-      ShiftRead[T, QScriptCore[T, ?]] =
-    new ShiftRead[T, QScriptCore[T, ?]] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: QScriptCore[T, ?] ~> F)
-        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-          : QScriptCore[T, T[G]] => G[T[G]] = {
-        case x @ LeftShift(src, struct, repair) =>
-          (GtoF.get(src.project) >>= R.prj).fold(
-            GtoF.reverseGet(H(x)))(
-            read => (struct.resume.toOption >> (
-              repair.traverseM[Option, Hole] {
-                case LeftSide => None
-                case RightSide => HoleF.some
-              } ∘ (rep => GtoF.reverseGet(QC.inj(Map(GtoF.reverseGet(R.inj(read)).embed, rep)))))).getOrElse(
-              GtoF.reverseGet(H(LeftShift(GtoF.reverseGet(QC.inj(reduceSrc(src))).embed, struct, repair)))))
-        case Union(src, lb, rb) =>
-          GtoF.reverseGet(H(Union(reduceRead(GtoF)(src), applyToBranch(lb), applyToBranch(rb))))
-        case Drop(src, lb, rb) =>
-          GtoF.reverseGet(H(Drop(
-            reduceRead(GtoF)(src),
-            applyToBranch(lb),
-            applyToBranch(rb))))
-        case Take(src, lb, rb) =>
-          GtoF.reverseGet(H(Take(
-            reduceRead(GtoF)(src),
-            applyToBranch(lb),
-            applyToBranch(rb))))
-        case x => GtoF.reverseGet(H(x.map(reduceRead(GtoF))))
-      }
+  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]]
+    (implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+      : ShiftRead[Const[Read, ?]] =
+    new ShiftRead[Const[Read, ?]] {
+      type G[A] = F[A]
+      def shiftRead[H[_]](GtoH: G ~> H): Const[Read, ?] ~> (H ∘ Free[H, ?])#λ =
+        new (Const[Read, ?] ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](read: Const[Read, A]) =
+            GtoH(QC.inj(Reduce(
+              Free.liftF(GtoH(SR.inj(Const[ShiftedRead, A](ShiftedRead(
+                read.getConst.path,
+                IncludeId))))),
+              NullLit(),
+              List(ReduceFuncs.UnshiftMap(
+                Free.roll(ProjectIndex(HoleF, IntLit(0))),
+                Free.roll(ProjectIndex(HoleF, IntLit(1))))),
+              Free.point(ReduceIndex(0)))))
+        }
     }
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive]:
-      ShiftRead[T, ThetaJoin[T, ?]] =
-    new ShiftRead[T, ThetaJoin[T, ?]] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: ThetaJoin[T, ?] ~> F)
-        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-          : ThetaJoin[T, T[G]] => G[T[G]] =
-        tj => GtoF.reverseGet(H(ThetaJoin(
-          reduceRead(GtoF)(tj.src),
-          applyToBranch(tj.lBranch),
-          applyToBranch(tj.rBranch),
-          tj.on,
-          tj.f,
-          tj.combine)))
+  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]](implicit QC: QScriptCore[T, ?] :<: F):
+      ShiftRead.Aux[QScriptCore[T, ?], F] =
+    new ShiftRead[QScriptCore[T, ?]] {
+      type G[A] = F[A]
+      def shiftRead[H[_]](GtoH: G ~> H): QScriptCore[T, ?] ~> (H ∘ Free[H, ?])#λ =
+        new (QScriptCore[T, ?] ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](qc: QScriptCore[T, A]) = GtoH(QC.inj(qc match {
+            case Union(src, lb, rb) =>
+              Union(Free.point(src), applyToBranch(lb), applyToBranch(rb))
+            case Drop(src, lb, rb) =>
+              Drop(Free.point(src), applyToBranch(lb), applyToBranch(rb))
+            case Take(src, lb, rb) =>
+              Take(Free.point(src), applyToBranch(lb), applyToBranch(rb))
+            case _ => qc.map(Free.point)
+          }))
+        }
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive]:
-      ShiftRead[T, EquiJoin[T, ?]] =
-    new ShiftRead[T, EquiJoin[T, ?]] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: EquiJoin[T, ?] ~> F)
-        (implicit
-          R: Const[Read, ?] :<: F,
-          QC: QScriptCore[T, ?] :<: F)
-          : EquiJoin[T, T[G]] => G[T[G]] =
-        ej => GtoF.reverseGet(H(EquiJoin(
-          reduceRead(GtoF)(ej.src),
-          applyToBranch(ej.lBranch),
-          applyToBranch(ej.rBranch),
-          ej.lKey,
-          ej.rKey,
-          ej.f,
-          ej.combine)))
+  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F):
+      ShiftRead.Aux[ThetaJoin[T, ?], F] =
+    new ShiftRead[ThetaJoin[T, ?]] {
+      type G[A] = F[A]
+      def shiftRead[H[_]](GtoH: G ~> H): ThetaJoin[T, ?] ~> (H ∘ Free[H, ?])#λ =
+        new (ThetaJoin[T, ?] ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](tj: ThetaJoin[T, A]) =
+            GtoH(TJ.inj(ThetaJoin(
+              Free.point(tj.src),
+              applyToBranch(tj.lBranch),
+              applyToBranch(tj.rBranch),
+              tj.on,
+              tj.f,
+              tj.combine)))
+        }
     }
 
-  implicit def coproduct[T[_[_]]: Recursive: Corecursive, H[_], I[_]]
-    (implicit HS: ShiftRead[T, H], IS: ShiftRead[T, I]):
-      ShiftRead[T, Coproduct[H, I, ?]] =
-    new ShiftRead[T, Coproduct[H, I, ?]] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: Coproduct[H, I, ?] ~> F)
-        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-          : Coproduct[H, I, T[G]] => G[T[G]] =
-        _.run.fold(
-          HS.shiftRead[F, G](GtoF, H.compose(Inject[H, Coproduct[H, I, ?]])),
-          IS.shiftRead[F, G](GtoF, H.compose(Inject[I, Coproduct[H, I, ?]])))
+  implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit EJ: EquiJoin[T, ?] :<: F):
+      ShiftRead.Aux[EquiJoin[T, ?], F] =
+    new ShiftRead[EquiJoin[T, ?]] {
+      type G[A] = F[A]
+      def shiftRead[H[_]](GtoH: G ~> H): EquiJoin[T, ?] ~> (H ∘ Free[H, ?])#λ =
+        new (EquiJoin[T, ?] ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](ej: EquiJoin[T, A]) =
+            GtoH(EJ.inj(EquiJoin(
+              Free.point(ej.src),
+              applyToBranch(ej.lBranch),
+              applyToBranch(ej.rBranch),
+              ej.lKey,
+              ej.rKey,
+              ej.f,
+              ej.combine)))
+        }
+    }
+
+  implicit def coproduct[F[_], I[_], J[_]](implicit I: ShiftRead.Aux[I, F], J: ShiftRead.Aux[J, F]):
+      ShiftRead.Aux[Coproduct[I, J, ?], F] =
+    new ShiftRead[Coproduct[I, J, ?]] {
+      type G[A] = F[A]
+      def shiftRead[H[_]](GtoH: G ~> H): Coproduct[I, J, ?] ~> (H ∘ Free[H, ?])#λ =
+        new (Coproduct[I, J, ?] ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](co: Coproduct[I, J, A]) =
+            co.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_))
+        }
     }
 }
 
 abstract class ShiftReadInstances {
-  def reduceSrc[T[_[_]]: Corecursive, A](src: A): QScriptCore[T, A] =
-    Reduce(
-      src,
-      NullLit(),
-      List(ReduceFuncs.UnshiftMap(Free.roll(ExtractId(HoleF)), HoleF)),
-      Free.point(ReduceIndex(0)))
-
-  def reduceRead[T[_[_]]: Recursive: Corecursive, F[_], G[_]: Functor]
-    (GtoF: PrismNT[G, F])
-    (src: T[G])
-    (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-      : T[G] =
-    (GtoF.get(src.project) >>= R.prj).fold(
-      src)(
-      κ(GtoF.reverseGet(QC.inj(reduceSrc(src))).embed))
-
-  implicit def inject[T[_[_]]: Recursive: Corecursive, H[_]: Traverse]:
-      ShiftRead[T, H] =
-    new ShiftRead[T, H] {
-      def shiftRead[F[_]: Functor, G[_]: Functor]
-        (GtoF: PrismNT[G, F], H: H ~> F)
-        (implicit R: Const[Read, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-          : H[T[G]] => G[T[G]] =
-        i => GtoF.reverseGet(H(i.map(reduceRead(GtoF))))
+  implicit def inject[F[_]: Functor, I[_]](implicit F: F :<: I):
+      ShiftRead.Aux[F, I] =
+    new ShiftRead[F] {
+      type G[A] = I[A]
+      def shiftRead[H[_]](GtoH: G ~> H): F ~> (H ∘ Free[H, ?])#λ =
+        new (F ~> (H ∘ Free[H, ?])#λ) {
+          def apply[A](fa: F[A]) = GtoH(F.inj(fa.map(Free.point)))
+        }
     }
 }

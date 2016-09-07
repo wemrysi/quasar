@@ -174,17 +174,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => TJ.inj(x)
   }
 
-  def simplifyProjection:
-      ProjectBucket[T, ?] ~> QScriptCore[T, ?] =
-    new (ProjectBucket[T, ?] ~> QScriptCore[T, ?]) {
-      def apply[A](proj: ProjectBucket[T, A]) = proj match {
-        case BucketField(src, value, field) =>
-          Map(src, Free.roll(MapFuncs.ProjectField(value, field)))
-        case BucketIndex(src, value, index) =>
-          Map(src, Free.roll(MapFuncs.ProjectIndex(value, index)))
-      }
-    }
-
   /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
     * connectors to implement. It potentially adds a [[Filter]] iff there are
     * conditions in the [[ThetaJoin]] that can not be handled by an
@@ -254,6 +243,25 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
       case _ => None
     }
+    // TODO: I think this can capture cases where the LS.struct and
+    //       Reduce.repair are more complex. Or maybe that’s already simplified
+    //       by normalization?
+    case LeftShift(Embed(src), struct, shiftRepair) if struct ≟ HoleF =>
+      GtoF.get(src) >>= QC.prj >>= {
+        case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
+            if redRepair ≟ Free.point(ReduceIndex(0)) =>
+          shiftRepair.traverseM {
+            case LeftSide => None
+            case RightSide => elem.some
+          } ∘ (Map(srcInner, _))
+        case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(_, elem)), redRepair)
+            if redRepair ≟ Free.point(ReduceIndex(0)) =>
+          shiftRepair.traverseM {
+            case LeftSide => None
+            case RightSide => elem.some
+          } ∘ (Map(srcInner, _))
+        case _ => None
+      }
     // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
     case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
       from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
@@ -451,9 +459,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    // FIXME: only apply `simplifyProjection` after pathify
-    (quasar.fp.free.injectedNT[F](simplifyProjection).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
-      Normalizable[F].normalize ⋙
+    (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
       liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](coenvPrism))) ⋙
@@ -468,11 +474,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
-    * `Root` (and projections, etc.) into `Read`, so then we can handle exposing
-    * only “true” joins and converting intra-data joins to map operations.
+    * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
+    * exposing only “true” joins and converting intra-data joins to map
+    * operations.
     *
     * `f` takes QScript representing a _potential_ path to a file, converts
-    * `Root` and its children to path, with the operations post-file remaining.
+    * [[Root]] and its children to path, with the operations post-file remaining.
     */
   def pathify[M[_]: Monad, F[_]: Traverse](
     g: ConvertPath.ListContents[M])(
@@ -483,7 +490,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)) >>=
+      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
 
   def eliminateProjections[M[_]: Monad, F[_]: Traverse](
     fs: Option[ConvertPath.ListContents[M]])(
@@ -497,7 +505,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     val res = fs.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
 
     res.map(
-      _.transAna(
-        quasar.fp.free.injectedNT[QScriptTotal[T, ?]](simplifyProjection).apply(_: QScriptTotal[T, ?][T[QScriptTotal[T, ?]]])))
+      _.transAna(SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection))
   }
+
 }
