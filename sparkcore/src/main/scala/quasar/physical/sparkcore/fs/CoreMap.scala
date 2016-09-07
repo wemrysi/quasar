@@ -25,6 +25,7 @@ import quasar.Planner._
 
 import java.math.{BigDecimal => JBigDecimal}
 
+import org.threeten.bp.Instant
 import matryoshka.{Hole => _, _}
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -32,6 +33,8 @@ object CoreMap {
 
   // TODO: replace NA with something safer
   def change[T[_[_]]]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
+    case Constant(f) => ??? // contains EJson
+    case Undefined() => ??? // I don't understand the meaning
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)
       case Data.Arr(v) => Data.Int(v.size)
@@ -53,8 +56,14 @@ object CoreMap {
       case Data.Str(v) => DateLib.parseInterval(v).getOrElse(Data.NA)
       case _ => Data.NA
     }).right
-    case TimeOfDay(f) => ??? // FIXME
-    case ToTimestamp(f) => ??? // FIXME
+    case TimeOfDay(f) => (f >>> {
+      case Data.Timestamp(v) => ??? // how convert from Instant to LocalTime?
+      case _ => Data.NA
+    }).right
+    case ToTimestamp(f) => (f >>> {
+      case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
+      case _ => Data.NA
+    }).right
     case Extract(f1, f2) => ??? // FIXME
     case Negate(f) => (f >>> {
       case Data.Bool(v) => Data.Bool(!v)
