@@ -30,6 +30,7 @@ import com.marklogic.xcc._
 import eu.timepit.refined.auto._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import quasar.fp.CoproductM._
 
 package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
@@ -40,13 +41,16 @@ package object fs {
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
   type MLResultHandles[A] = KeyValueStore[ResultHandle, ResultCursor, A]
 
-  type MarkLogicFs[A]  = Coproduct[Task, MarkLogicFs0, A]
-  type MarkLogicFs0[A] = Coproduct[SessionIO, MarkLogicFs1, A]
-  type MarkLogicFs1[A] = Coproduct[ContentSourceIO, MarkLogicFs2, A]
-  type MarkLogicFs2[A] = Coproduct[GenUUID, MarkLogicFs3, A]
-  type MarkLogicFs3[A] = Coproduct[MonotonicSeq, MarkLogicFs4, A]
-  type MarkLogicFs4[A] = Coproduct[MLReadHandles, MarkLogicFs5, A]
-  type MarkLogicFs5[A] = Coproduct[MLWriteHandles, MLResultHandles, A]
+  type MarkLogicFs[A] = (
+      Task
+    #: SessionIO
+    #: ContentSourceIO
+    #: GenUUID
+    #: MonotonicSeq
+    #: MLReadHandles
+    #: MLWriteHandles
+    #: CoId[MLResultHandles]
+  )#M[A]
 
   val FsType = FileSystemType("marklogic")
 

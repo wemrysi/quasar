@@ -22,6 +22,7 @@ import quasar.Data
 import quasar.fp.TaskRef
 import quasar.fp.numeric._
 import quasar.fp.free._
+import quasar.fp.CoproductM._
 import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
@@ -33,11 +34,12 @@ import scalaz._, Scalaz._, concurrent.Task
 import org.apache.spark._
 
 class ReadFileSpec extends quasar.Qspec {
-
-  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
-  type Eff1[A] = Coproduct[Task, Eff0, A]
-  type Eff[A] = Coproduct[MonotonicSeq, Eff1, A]
-
+  type Eff[A] = (
+       MonotonicSeq
+    #: Task
+    #: KeyValueStore[ReadHandle, SparkCursor, ?]
+    #: CoId[Read[SparkContext, ?]]
+  )#M[A]
 
   "readfile" should {
     "open - read chunk - close" in skipped("Skipped until the local spark emulator can be avoided as it appears to leak resources, even after a context.stop()")

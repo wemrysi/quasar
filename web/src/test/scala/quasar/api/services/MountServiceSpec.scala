@@ -22,6 +22,7 @@ import quasar.api.matchers._
 import quasar.api.ApiErrorEntityDecoder._
 import quasar.effect.{Failure, KeyValueStore}
 import quasar.fp._
+import quasar.fp.CoproductM._
 import quasar.fp.free._
 import quasar.fs._, PathArbitrary._
 import quasar.fs.mount.{MountRequest => MR, _}
@@ -42,9 +43,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
-  type Eff0[A] = Coproduct[MountingFailure, PathMismatchFailure, A]
-  type Eff1[A] = Coproduct[Mounting, Eff0, A]
-  type Eff[A]  = Coproduct[Task, Eff1, A]
+  type Eff[A] = (Task #: Mounting #: MountingFailure #: CoId[PathMismatchFailure])#M[A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
