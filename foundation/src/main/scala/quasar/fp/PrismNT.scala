@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.fp
 
 import quasar.Predef._
-import quasar.NameGenerator
-import quasar.physical.marklogic.xquery._
-import quasar.qscript._
 
 import matryoshka._
-import scalaz._
+import scalaz._, Scalaz._
 
-private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[Read, ?], XQuery] =
-    _ => ???
+/** Just like Prism, but operates over Functors.
+  */
+final case class PrismNT[F[_], G[_]]
+  (get: F ~> (Option ∘ G)#λ, reverseGet: G ~> F) {
+
+  val getOrModify: F ~> λ[α => F[α] \/ G[α]] =
+    new (F ~> λ[α => F[α] \/ G[α]]) {
+      def apply[A](fa: F[A]) = get(fa).fold(fa.left[G[A]])(_.right)
+    }
 }

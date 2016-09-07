@@ -230,17 +230,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case tj => TJ.inj(tj)
   }
 
-  def simplifyProjection:
-      ProjectBucket[T, ?] ~> QScriptCore[T, ?] =
-    new (ProjectBucket[T, ?] ~> QScriptCore[T, ?]) {
-      def apply[A](proj: ProjectBucket[T, A]) = proj match {
-        case BucketField(src, value, field) =>
-          Map(src, Free.roll(MapFuncs.ProjectField(value, field)))
-        case BucketIndex(src, value, index) =>
-          Map(src, Free.roll(MapFuncs.ProjectIndex(value, index)))
-      }
-    }
-
   /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
     * connectors to implement. It potentially adds a [[Filter]] iff there are
     * conditions in the [[ThetaJoin]] that can not be handled by an
@@ -299,28 +288,48 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
         mergeSides(tj.combine)))
     }
 
-  def coalesceQC[F[_]: Functor, G[_]: Functor](
-    GtoF: G ~> λ[α => Option[F[α]]],
-    FtoG: F ~> G)(
-    implicit QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
-      QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
-    case Map(Embed(src), mf) => GtoF(src) >>= QC.prj >>= {
+  def coalesceQC[F[_]: Functor, G[_]: Functor]
+    (GtoF: PrismNT[G, F])
+    (implicit
+      QC: QScriptCore[T, ?] :<: F,
+      FI: F :<: QScriptTotal[T, ?])
+      : QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
+    case Map(Embed(src), mf) => GtoF.get(src) >>= QC.prj >>= {
       case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
       case Reduce(srcInner, bucket, funcs, repair) => Reduce(srcInner, bucket, funcs, mf >> repair).some
       case _ => None
     }
+    // TODO: I think this can capture cases where the LS.struct and
+    //       Reduce.repair are more complex. Or maybe that’s already simplified
+    //       by normalization?
+    case LeftShift(Embed(src), struct, shiftRepair) if struct ≟ HoleF =>
+      GtoF.get(src) >>= QC.prj >>= {
+        case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
+            if redRepair ≟ Free.point(ReduceIndex(0)) =>
+          shiftRepair.traverseM {
+            case LeftSide => None
+            case RightSide => elem.some
+          } ∘ (Map(srcInner, _))
+        case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(_, elem)), redRepair)
+            if redRepair ≟ Free.point(ReduceIndex(0)) =>
+          shiftRepair.traverseM {
+            case LeftSide => None
+            case RightSide => elem.some
+          } ∘ (Map(srcInner, _))
+        case _ => None
+      }
     // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
     case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
       from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(FtoG(QC.inj(Take(src, fromInner, count))).embed, mf).some
+        case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Take(src, fromInner, count))).embed, mf).some
         case _ => None
       }
     case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
       from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
-        case Map(fromInner, mf) => Map(FtoG(QC.inj(Drop(src, fromInner, count))).embed, mf).some
+        case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Drop(src, fromInner, count))).embed, mf).some
         case _ => None
       }
-    case Filter(Embed(src), cond) => GtoF(src) >>= QC.prj >>= {
+    case Filter(Embed(src), cond) => GtoF.get(src) >>= QC.prj >>= {
       case Filter(srcInner, condInner) =>
         Filter(srcInner, Free.roll[MapFunc[T, ?], Hole](And(condInner, cond))).some
       case _ => None
@@ -373,16 +382,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   }
 
   def simplifyQC[F[_]: Functor, G[_]: Functor](
-    GtoF: G ~> λ[α => Option[F[α]]], FtoG: F ~> G)(
+    GtoF: PrismNT[G, F])(
     implicit QC: QScriptCore[T, ?] :<: F):
       QScriptCore[T, T[G]] => QScriptCore[T, T[G]] = {
     case Map(src, f) if f.length ≟ 0 =>
-      Map(FtoG(QC.inj(Unreferenced[T, T[G]]())).embed, f)
+      Map(GtoF.reverseGet(QC.inj(Unreferenced[T, T[G]]())).embed, f)
     case x @ LeftShift(src, struct, repair) =>
       if (!repair.element(RightSide))
         Map(src, repair ∘ κ(SrcHole))
       else if (!repair.element(LeftSide))
-        (GtoF(src.project) >>= QC.prj >>= {
+        (GtoF.get(src.project) >>= QC.prj >>= {
           case Map(innerSrc, mf) =>
             LeftShift(innerSrc, struct >> mf, repair).some
           case _ => None
@@ -466,21 +475,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case x => x
   }
 
-  def optionIdF[F[_]]: F ~> λ[α => Option[F[α]]] =
-    new (F ~> λ[α => Option[F[α]]]) {
-      def apply[A](fa: F[A]): Option[F[A]] = Some(fa)
-    }
-
-  def extractCoEnv[F[_], A]: CoEnv[A, F, ?] ~> λ[α => Option[F[α]]] =
-    new (CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]) {
-      def apply[B](coenv: CoEnv[A, F, B]): Option[F[B]] = coenv.run.toOption
-    }
-
-  def wrapCoEnv[F[_], A]: F ~> CoEnv[A, F, ?] =
-    new (F ~> CoEnv[A, F, ?]) {
-      def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
-    }
-
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
   // - Take/Drop can have a normalized order _if_ their counts are constant
@@ -504,11 +498,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, F](rebaseT[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, F](optionIdF[F], NaturalTransformation.refl[F]))) ⋙
-      liftFG(coalesceMapShift[F, F](optionIdF[F])) ⋙
-      liftFG(coalesceMapJoin[F, F](optionIdF[F])) ⋙
-      liftFF(simplifyQC[F, F](optionIdF[F], NaturalTransformation.refl[F])) ⋙
-      liftFF(swapMapCount[F, F](optionIdF[F])) ⋙
+      liftFF(repeatedly(coalesceQC[F, F](idPrism))) ⋙
+      liftFG(coalesceMapShift[F, F](idPrism.get)) ⋙
+      liftFG(coalesceMapJoin[F, F](idPrism.get)) ⋙
+      liftFF(simplifyQC[F, F](idPrism)) ⋙
+      liftFF(swapMapCount[F, F](idPrism.get)) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
@@ -521,27 +515,26 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
-    // FIXME: only apply `simplifyProjection` after pathify
-    (quasar.fp.free.injectedNT[F](simplifyProjection).apply(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
-      Normalizable[F].normalize ⋙
+    (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
       liftFG(elideConstantJoin[F, CoEnv[Hole, F, ?]](rebaseTCo[F])) ⋙
-      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole]))) ⋙
-      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
-      liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole], wrapCoEnv[F, Hole])) ⋙
-      liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](extractCoEnv[F, Hole])) ⋙
+      liftFF(repeatedly(coalesceQC[F, CoEnv[Hole, F, ?]](coenvPrism))) ⋙
+      liftFG(coalesceMapShift[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
+      liftFG(coalesceMapJoin[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
+      liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](coenvPrism)) ⋙
+      liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
       Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
 
   /** A backend-or-mount-specific `f` is provided, that allows us to rewrite
-    * `Root` (and projections, etc.) into `Read`, so then we can handle exposing
-    * only “true” joins and converting intra-data joins to map operations.
+    * [[Root]] (and projections, etc.) into [[Read]], so then we can handle
+    * exposing only “true” joins and converting intra-data joins to map
+    * operations.
     *
     * `f` takes QScript representing a _potential_ path to a file, converts
-    * `Root` and its children to path, with the operations post-file remaining.
+    * [[Root]] and its children to path, with the operations post-file remaining.
     */
   def pathify[M[_]: Monad, F[_]: Traverse](
     g: ConvertPath.ListContents[M])(
@@ -551,8 +544,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](
-      FS.pathifyƒ[M, F](g)).flatMap(_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)) >>=
+      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
 
   def eliminateProjections[M[_]: Monad, F[_]: Traverse](
     fs: Option[ConvertPath.ListContents[M]])(
@@ -565,7 +558,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     val res = fs.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
 
     res.map(
-      _.transAna(
-        quasar.fp.free.injectedNT[QScriptTotal[T, ?]](simplifyProjection).apply(_: QScriptTotal[T, ?][T[QScriptTotal[T, ?]]])))
+      _.transAna(SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection))
   }
+
 }

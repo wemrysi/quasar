@@ -40,6 +40,9 @@ package object qscript {
     implicit def constRead: MarkLogicPlanner[Const[Read, ?]] =
       new ReadPlanner
 
+    implicit def constShiftedRead: MarkLogicPlanner[Const[ShiftedRead, ?]] =
+      new ShiftedReadPlanner
+
     implicit def projectBucket[T[_[_]]]: MarkLogicPlanner[ProjectBucket[T, ?]] =
       new ProjectBucketPlanner[T]
 

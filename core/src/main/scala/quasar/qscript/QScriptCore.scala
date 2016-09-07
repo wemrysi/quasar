@@ -123,11 +123,11 @@ object ReduceIndex {
 @Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
-/**
- * A placeholder value that can appear in plans, but will never be referenced
- * in the result. We consider this a wart. It should be implemented as an
- * arbitrary value with minimal cost to generate (since it will simply be discarded).
- */
+/** A placeholder value that can appear in plans, but will never be referenced
+  * in the result. We consider this a wart. It should be implemented as an
+  * arbitrary value with minimal cost to generate (since it will simply be
+  * discarded).
+  */
 @Lenses final case class Unreferenced[T[_[_]], A]()
     extends QScriptCore[T, A]
 

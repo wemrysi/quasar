@@ -219,6 +219,15 @@ object ConvertPath extends ConvertPathInstances {
         r => EitherT(List(CoEnv(R.inj(r).right[ADir])).right.point[M])
     }
 
+  implicit def shiftedRead[T[_[_]], G[_]](implicit R: Const[ShiftedRead, ?] :<: G):
+      ConvertPath.Aux[T, Const[ShiftedRead, ?], G] =
+    new ConvertPath[T, Const[ShiftedRead, ?]] {
+      type H[A] = G[A]
+
+      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, Const[ShiftedRead, ?], G] =
+        r => EitherT(List(CoEnv(R.inj(r).right[ADir])).right.point[M])
+    }
+
   implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
     (implicit
       QC: QScriptCore[T, ?] :<: G,
