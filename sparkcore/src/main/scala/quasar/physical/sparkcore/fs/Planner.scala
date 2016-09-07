@@ -80,7 +80,9 @@ object Planner {
     new Planner[SourcedPathable[T, ?]] {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], SourcedPathable[T,?], RDD[Data]] = {
-        case LeftShift(src, struct, repair) => ???
+        case LeftShift(src, struct, repair) => StateT((sc: SparkContext) => {
+          EitherT((sc, src).right[PlannerError].point[Task])
+        })
         case Union(src, lBranch, rBranch) => ???
       }
     }
@@ -110,21 +112,21 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], EquiJoin[T, ?], RDD[Data]] = ???      
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], EquiJoin[T, ?], RDD[Data]] = _ => ???      
     }
   
   // TODO: Remove this instance
   implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
     new Planner[ThetaJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = ???
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = _ => ???
     }
   
   // TODO: Remove this instance
   implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
     new Planner[ProjectBucket[T, ?]] {
       type IT[G[_]] = T[G]
-            def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ProjectBucket[T, ?], RDD[Data]] = ???
+            def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ProjectBucket[T, ?], RDD[Data]] = _ => ???
     }
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](

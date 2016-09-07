@@ -39,10 +39,9 @@ object queryfile {
   }
 
   def store(rdd: RDD[Data], out: AFile): Task[Unit] = Task.delay {
-    implicit val codec =  DataCodec.Precise
     val ioFile = new File(posixCodec.printPath(out))
     val pw = new PrintWriter(new FileOutputStream(ioFile, true))
-    rdd.map(data => DataCodec.render(data)).foreach {
+    rdd.map(data => DataCodec.render(data)(DataCodec.Precise)).collect().foreach {
       case \/-(v) => pw.write(s"$v\n")
       case -\/(der) => pw.write(s"encoding error: ${der.message}")
     }
