@@ -2,7 +2,8 @@
   "name": "wildcard with additional projections (and filtering)",
   "backends": {
       "mongodb_read_only": "pending",
-      "postgresql":        "pending"
+      "postgresql":        "pending",
+      "marklogic":         "pending"
   },
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)), city = \"BOULDER\" from zips where city like \"BOULDER%\"",

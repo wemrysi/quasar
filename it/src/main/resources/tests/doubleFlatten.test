@@ -2,7 +2,8 @@
     "name": "flatten a flattened field",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",
