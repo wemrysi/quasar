@@ -211,7 +211,7 @@ class ReadFileSpec extends quasar.Qspec with TempFSSugars {
       (TaskRef(0L) |@| TaskRef(Map.empty[ReadHandle, SparkCursor])) { (genState, kvsState) =>
         MonotonicSeq.fromTaskRef(genState) :+:
         NaturalTransformation.refl[Task] :+:
-	KeyValueStore.fromTaskRef[ReadHandle, SparkCursor](kvsState) :+:
+	KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](kvsState) :+:
         Read.constant[Task, SparkContext](sc)
       }
     }
