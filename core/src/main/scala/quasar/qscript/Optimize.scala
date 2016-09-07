@@ -504,7 +504,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(simplifyQC[F, F](idPrism)) ⋙
       liftFF(swapMapCount[F, F](idPrism.get)) ⋙
       liftFG(compactLeftShift[F, F]) ⋙
-      Normalizable[F].normalize ⋙
       liftFF(compactReduction[F]) ⋙
       liftFG(elideNopMap[F])
 
@@ -524,7 +523,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFF(simplifyQC[F, CoEnv[Hole, F, ?]](coenvPrism)) ⋙
       liftFF(swapMapCount[F, CoEnv[Hole, F, ?]](coenvPrism.get)) ⋙
       liftFG(compactLeftShift[F, CoEnv[Hole, F, ?]]) ⋙
-      Normalizable[F].normalize ⋙
       liftFF(compactReduction[CoEnv[Hole, F, ?]]) ⋙
       (fa => QC.prj(fa).fold(CoEnv(fa.right[Hole]))(elideNopMapCo[F, Hole]))  // TODO remove duplication with `elideNopMap`
 
