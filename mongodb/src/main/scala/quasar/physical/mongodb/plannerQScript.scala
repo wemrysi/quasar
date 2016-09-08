@@ -972,16 +972,16 @@ object MongoDbQScriptPlanner {
     val P = scala.Predef.implicitly[Planner.Aux[T, QScriptTotal[T, ?]]]
 
     (for {
-      qs  <- QueryFile.convertToQScript[T, MongoDbIO](listContents.some)(lp).liftM[StateT[?[_], NameGen, ?]]
+      qs  <- QueryFile.convertToQScriptRead[T, MongoDbIO, QScriptInternalRead[T, ?]](listContents)(lp).liftM[StateT[?[_], NameGen, ?]]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(liftError(
         qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
           (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
-            liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
+            SimplifyJoin[T, QScriptInternalRead[T, ?], QScriptTotal[T, ?]].simplifyJoin(idPrism.reverseGet)
           ).apply(tf) ∘
-            Normalizable[QScriptTotal[T, ?]].normalize).map(transFutu(_)(ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(idPrism.reverseGet)(_: QScriptTotal[T, T[QScriptTotal[T, ?]]])) ∘
+            Normalizable[QScriptTotal[T, ?]].normalize).map(transFutu(_)(ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(idPrism.reverseGet)(_)) ∘
             Normalizable[QScriptTotal[T, ?]].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))

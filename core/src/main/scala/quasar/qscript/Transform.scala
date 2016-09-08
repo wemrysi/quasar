@@ -57,11 +57,6 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   type TargetT = Target[T[Target]]
   type FreeEnv = Free[Target, Hole]
 
-  def DeadEndTarget(deadEnd: DeadEnd): TargetT =
-    EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](deadEnd))))
-
-  val RootTarget: TargetT = DeadEndTarget(Root)
-
   type Envs = List[Target[ExternallyManaged]]
 
   case class ZipperSides(
@@ -77,6 +72,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     sides: ZipperSides,
     tails: ZipperTails)
 
+  // TODO: Convert to NEL
   def linearize[F[_]: Functor: Foldable]:
       Algebra[F, List[F[ExternallyManaged]]] =
     fl => fl.as[ExternallyManaged](Extern) :: fl.fold
@@ -94,7 +90,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def delinearizeTargets[F[_]: Functor, A]:
       ElgotCoalgebra[Hole \/ ?, Target, List[Target[A]]] = {
     case Nil    => SrcHole.left[Target[List[Target[A]]]]
-    case h :: t => h.map(κ(t)).right
+    case h :: t => h.as(t).right
   }
 
   val consZipped: Algebra[ListF[Target[ExternallyManaged], ?], ZipperAcc] = {
@@ -509,7 +505,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
   def pathToProj(path: pathy.Path[_, _, _]): TargetT =
     pathy.Path.peel(path).fold[TargetT](
-      RootTarget) {
+      EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](Root))))) {
       case (p, n) =>
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
@@ -541,7 +537,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         EnvT((
           EmptyAnn[T],
           QC.inj(Map(
-            RootTarget.embed,
+            EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], QC.inj(Unreferenced[T, T[Target]]()))).embed,
             Free.roll[MapFunc[T, ?], Hole](mf))))))
 
     case LogicalPlan.FreeF(name) =>

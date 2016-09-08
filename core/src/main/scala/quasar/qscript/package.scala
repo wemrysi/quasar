@@ -57,18 +57,29 @@ package object qscript {
   type Pathable[T[_[_]], A] =
     Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
 
-  private type QScriptTotal0[T[_[_]], A] =
+  type QScriptInternal[T[_[_]], A] =
     Coproduct[ThetaJoin[T, ?], Pathable[T, ?], A]
-  private type QScriptTotal1[T[_[_]], A] =
-    Coproduct[EquiJoin[T, ?], QScriptTotal0[T, ?], A]
-  private type QScriptTotal2[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptTotal1[T, ?], A]
-  /** This type is used for join branch-like structures. It’s an unfortunate
-    * consequence of not having mutually-recursive data structures. Once we do,
-    * this can go away.
+  // NB: Coproducts are normally independent, but `QScriptInternal` needs to be
+  //     a component of `QScriptTotal`, because we sometimes need to “inject”
+  //     operations into a branch.
+  type QScriptInternalRead[T[_[_]], A] =
+    Coproduct[Const[Read, ?], QScriptInternal[T, ?], A]
+  private type QScriptTotal0[T[_[_]], A] =
+    Coproduct[EquiJoin[T, ?], QScriptInternalRead[T, ?], A]
+  /** This type is _only_ used for join branch-like structures. It’s an
+    * unfortunate consequence of not having mutually-recursive data structures.
+    * Once we do, this can go away. It should _not_ be used in other situations.
     */
   type QScriptTotal[T[_[_]], A] =
-    Coproduct[Const[ShiftedRead, ?], QScriptTotal2[T, ?], A]
+    Coproduct[Const[ShiftedRead, ?], QScriptTotal0[T, ?], A]
+
+  type QScriptInterim0[T[_[_]], A] =
+    Coproduct[ProjectBucket[T, ?], QScriptCore[T, ?], A]
+  type QScriptInterim[T[_[_]], A] =
+    Coproduct[ThetaJoin[T, ?], QScriptInterim0[T, ?], A]
+  type QScriptInterimRead[T[_[_]], A] =
+    Coproduct[Const[Read, ?], QScriptInterim[T, ?], A]
+
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]

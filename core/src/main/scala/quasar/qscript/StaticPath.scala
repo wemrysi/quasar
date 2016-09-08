@@ -29,30 +29,20 @@ import simulacrum.typeclass
 
 @typeclass trait StaticPath[F[_]] {
   type IT[F[_]]
+  type G[A]
 
-  def pathifyƒ[M[_]: Monad, G[_]: Traverse]
-    (g: ListContents[M])
-    (implicit
-      TC: Corecursive[IT],
-      TR: Recursive[IT],
-      PF: Pathable[IT, ?] ~> G,
-      QC: QScriptCore[IT, ?] :<: G,
-      FG: F ~> G,
-      FI: G :<: QScriptTotal[IT, ?],
-      F: Traverse[F],
-      CP: ConvertPath.Aux[IT, Pathable[IT, ?], G])
-      : AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
+  def pathifyƒ[M[_]: Monad](g: ListContents[M])
+      : AlgebraM[EitherT[M, FileSystemError, ?], F, IT[G] \/ IT[Pathable[IT, ?]]]
 
   def toRead[M[_]: Monad, F[_]: Traverse, G[_]: Functor]
     (g: ListContents[M])
     (implicit
       TC: Corecursive[IT],
       TR: Recursive[IT],
-      F: Pathable[IT, ?] ~> F,
+      F: Pathable[IT, ?] :<: F,
       R: Const[Read, ?] :<: G,
-      FG: F ~> G,
-      DE: Const[DeadEnd, ?] :<: G,
       QC: QScriptCore[IT, ?] :<: G,
+      FG: F :<: G,
       FI: G :<: QScriptTotal[IT, ?],
       CP: ConvertPath.Aux[IT, Pathable[IT, ?], F])
       : IT[Pathable[IT, ?]] => EitherT[M, FileSystemError, IT[G]] = {
@@ -65,67 +55,57 @@ import simulacrum.typeclass
 }
 
 object StaticPath extends LowPriorityStaticPathInstances {
-  type Aux[T[_[_]], F[_]] = StaticPath[F] { type IT[F[_]] = T[F] }
+  type Aux[T[_[_]], F[_], H[_]] = StaticPath[F] {
+    type IT[F[_]] = T[F]
+    type G[A] = H[A]
+  }
 
-  implicit def pathable[T[_[_]], F[_]](implicit Path: F :<: Pathable[T, ?]):
-      StaticPath.Aux[T, F] =
+  implicit def pathable[T[_[_]]: Corecursive, F[_]: Traverse, H[_]: Functor]
+    (implicit Path: F :<: Pathable[T, ?], PF: Pathable[T, ?] :<: H)
+      : StaticPath.Aux[T, F, H] =
     new StaticPath[F] {
       type IT[F[_]] = T[F]
+      type G[A] = H[A]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
-        implicit TC: Corecursive[T],
-                 TR: Recursive[T],
-                 PF: Pathable[IT, ?] ~> G,
-                 QC: QScriptCore[IT, ?] :<: G,
-                 F: F ~> G,
-                 FI: G :<: QScriptTotal[T, ?],
-                 T: Traverse[F],
-                 CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
-          // AlgebraM[FileSystemError \/ ?, F, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]]
-          F[T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]] => EitherT[M, FileSystemError, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]] =
-        fa => EitherT(fa.sequence.bimap(qt => FI(F(fa.as(qt))).embed, Path(_).embed).right.point[M])
+      def pathifyƒ[M[_]: Monad](g: ListContents[M])
+          // AlgebraM[FileSystemError \/ ?, F, T[G] \/ T[Pathable[T, ?]]]
+          : F[T[G] \/ T[Pathable[T, ?]]] => EitherT[M, FileSystemError, T[G] \/ T[Pathable[T, ?]]] =
+        fa => EitherT(fa.sequence.bimap(qt => PF.inj(Path.inj(fa.as(qt))).embed, Path(_).embed).right.point[M])
     }
 
-  implicit def coproduct[T[_[_]], H[_]: Traverse, I[_]: Traverse](
-    implicit FS: StaticPath.Aux[T, H], GS: StaticPath.Aux[T, I]):
-      StaticPath.Aux[T, Coproduct[H, I, ?]] =
+  implicit def coproduct[T[_[_]], H[_]: Traverse, I[_]: Traverse, J[_]]
+    (implicit FS: StaticPath.Aux[T, H, J], GS: StaticPath.Aux[T, I, J])
+      : StaticPath.Aux[T, Coproduct[H, I, ?], J] =
     new StaticPath[Coproduct[H, I, ?]] {
       type IT[F[_]] = T[F]
+      type G[A] = J[A]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
-        implicit TC: Corecursive[T],
-                 TR: Recursive[T],
-                 PF: Pathable[IT, ?] ~> G,
-                 QC: QScriptCore[IT, ?] :<: G,
-                 F: Coproduct[H, I, ?] ~> G,
-                 FI: G :<: QScriptTotal[T, ?],
-                 T: Traverse[Coproduct[H, I, ?]],
-                 CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
-          AlgebraM[EitherT[M, FileSystemError, ?], Coproduct[H, I, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]] =
-        _.run.fold(
-          FS.pathifyƒ(g)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[H, Coproduct[H, I, ?]]), FI, Traverse[H], CP),
-          GS.pathifyƒ(g)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[I, Coproduct[H, I, ?]]), FI, Traverse[I], CP))
+      def pathifyƒ[M[_]: Monad](g: ListContents[M])
+          : AlgebraM[EitherT[M, FileSystemError, ?], Coproduct[H, I, ?], T[G] \/ T[Pathable[T, ?]]] =
+        _.run.fold(FS.pathifyƒ(g), GS.pathifyƒ(g))
     }
 }
 
 sealed trait LowPriorityStaticPathInstances {
-  implicit def default[T[_[_]], F[_]]: StaticPath.Aux[T, F] =
+  implicit def inject
+    [T[_[_]]: Recursive: Corecursive, F[_]: Traverse, H[_]: Traverse]
+    (implicit
+      FH:                 F :<: H,
+      R:     Const[Read, ?] :<: H,
+      QC: QScriptCore[T, ?] :<: H,
+      PF:    Pathable[T, ?] :<: H,
+      FI: H :<: QScriptTotal[T, ?],
+      CP: ConvertPath.Aux[T, Pathable[T, ?], H])
+      : StaticPath.Aux[T, F, H] =
     new StaticPath[F] {
       type IT[F[_]] = T[F]
+      type G[A] = H[A]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
-        implicit TC: Corecursive[T],
-                 TR: Recursive[T],
-                 PF: Pathable[IT, ?] ~> G,
-                 QC: QScriptCore[IT, ?] :<: G,
-                 F: F ~> G,
-                 FI: G :<: QScriptTotal[T, ?],
-                 T: Traverse[F],
-                 CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
-          AlgebraM[EitherT[M, FileSystemError, ?], F, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]]=
+      def pathifyƒ[M[_]: Monad](g: ListContents[M])
+          : AlgebraM[EitherT[M, FileSystemError, ?], F, T[G] \/ T[Pathable[T, ?]]] =
         _.traverse(_.fold(
           qt => EitherT(qt.right[FileSystemError].point[M]),
-          toRead[M, G, QScriptTotal[T, ?]](g)))
-          .map(x => FI(F(x)).embed.left)
+          toRead[M, G, G](g)))
+          .map(x => FH.inj(x).embed.left)
     }
 }

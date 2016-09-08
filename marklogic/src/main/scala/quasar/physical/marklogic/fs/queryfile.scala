@@ -20,10 +20,11 @@ import quasar.Predef._
 import quasar.SKI.κ
 import quasar.{LogicalPlan, PhaseResult, PhaseResults}
 import quasar.effect.MonotonicSeq
-import quasar.fs._
-import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fp._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fs._
+import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery.XQuery
@@ -61,8 +62,8 @@ object queryfile {
         adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
 
       val planning = for {
-        qs  <- convertToQScript(some(listContents))(lp)
-        xqy <- qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[Free[S, ?]])
+        qs  <- convertToQScriptRead[Fix, Free[S, ?], QScriptInternalRead[Fix, ?]](listContents)(lp)
+        xqy <- qs.cataM(Planner[QScriptInternalRead[Fix, ?], XQuery].plan[Free[S, ?]])
                  .leftMap(planningFailed(lp, _))
         a   <- WriterT.put(lift(f(xqy)).into[S])(phase(xqy)).liftM[FileSystemErrT]
       } yield a

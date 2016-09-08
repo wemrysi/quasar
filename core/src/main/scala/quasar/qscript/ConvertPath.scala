@@ -86,7 +86,7 @@ object ConvertPath extends ConvertPathInstances {
   type StaticPathTransformation[T[_[_]], M[_], F[_], G[_]] =
     AlgebraicTransformM[T, EitherT[M, FileSystemError, ?], F, Pathed[G, ?]]
 
-  def apply[T[_[_]], F[_]](implicit ev: ConvertPath[T, F]): ConvertPath[T, F] = ev
+  def apply[T[_[_]], F[_], G[_]](implicit ev: ConvertPath.Aux[T, F, G]) = ev
 
   implicit def deadEnd[T[_[_]], G[_]]: ConvertPath.Aux[T, Const[DeadEnd, ?], G] =
     new ConvertPath[T, Const[DeadEnd, ?]] {
@@ -102,9 +102,9 @@ object ConvertPath extends ConvertPathInstances {
       F[T[F]] =
     QC.inj(Map(d.embed, Free.roll(MapFuncs.MakeMap(MapFuncs.StrLit(name), HoleF))))
 
-  def makeRead[T[_[_]], F[_]](
-    dir: ADir, file: FileName)(
-    implicit R: Const[Read, ?] :<: F):
+  def makeRead[T[_[_]], F[_]]
+    (dir: ADir, file: FileName)
+    (implicit R: Const[Read, ?] :<: F):
       F[T[F]] =
     R.inj(Const[Read, T[F]](Read(dir </> file1(file))))
 
@@ -121,9 +121,9 @@ object ConvertPath extends ConvertPathInstances {
 
   def readFile[T[_[_]]: Corecursive, M[_]: Monad, F[_], G[_]: Functor](
     f: ListContents[M])(
-    implicit R: Const[Read, ?] :<: G, QC: QScriptCore[T, ?] :<: G, F: F ~> G):
+    implicit R: Const[Read, ?] :<: G, QC: QScriptCore[T, ?] :<: G, FG: F :<: G):
       CoEnv[ADir, F, T[G]] => M[List[G[T[G]]]] =
-    _.run.fold(allDescendents[T, M, G](f).apply(_), fa => List(F(fa)).point[M])
+    _.run.fold(allDescendents[T, M, G](f).apply(_), fa => List(FG(fa)).point[M])
 
   def union[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (elems: NonEmptyList[F[T[F]]])
@@ -142,7 +142,7 @@ object ConvertPath extends ConvertPathInstances {
   def postPathify[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_], G[_]: Functor](
     f: ListContents[M])(
     implicit R: Const[Read, ?] :<: G,
-             FG: F ~> G,
+             FG: F :<: G,
              QC: QScriptCore[T, ?] :<: G, 
              FI: G :<: QScriptTotal[T, ?]):
       AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
@@ -157,9 +157,7 @@ object ConvertPath extends ConvertPathInstances {
     (implicit
       CP: ConvertPath.Aux[T, QScriptTotal[T, ?], QScriptTotal[T, ?]],
       FI: F :<: QScriptTotal[T, ?])
-      : EitherT[M, FileSystemError, FreeQS[T]] = {
-    implicit val FG = NaturalTransformation.refl[QScriptTotal[T, ?]]
-
+      : EitherT[M, FileSystemError, FreeQS[T]] =
     (freeGcataM[Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Hole, T[Pathed[QScriptTotal [T, ?], ?]]](
       branch)(
       distCata,
@@ -168,7 +166,7 @@ object ConvertPath extends ConvertPathInstances {
           transformToAlgebra[T, Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(f)))) >>=
       (TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](f)).leftMap(FileSystemError.qscriptPlanningFailed(_)))) ∘
       (_.convertTo[Free[?[_], Hole]])
-  }
+  
 
   def convertBranchingOp
     [T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Functor]

@@ -230,64 +230,6 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     case tj => TJ.inj(tj)
   }
 
-  /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
-    * connectors to implement. It potentially adds a [[Filter]] iff there are
-    * conditions in the [[ThetaJoin]] that can not be handled by an
-    * [[EquiJoin]].
-    */
-  def simplifyJoin[F[_]: Functor]
-    (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F):
-      ThetaJoin[T, T[F]] => F[T[F]] =
-    tj => {
-      // TODO: This can potentially rewrite conditions to try to get left and right
-      //       references on distinct sides.
-      def alignCondition(l: JoinFunc[T], r: JoinFunc[T]): Option[EquiJoinKey[T]] =
-        if (l.element(LeftSide) && r.element(RightSide) &&
-          !l.element(RightSide) && !r.element(LeftSide))
-          EquiJoinKey(l.as[Hole](SrcHole), r.as[Hole](SrcHole)).some
-        else if (l.element(RightSide) && r.element(LeftSide) &&
-          !l.element(LeftSide) && !r.element(RightSide))
-          EquiJoinKey(r.as[Hole](SrcHole), l.as[Hole](SrcHole)).some
-        else None
-
-      def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
-        fm.resume match {
-          case -\/(And(a, b)) =>
-            val (fir, sec) = (separateConditions(a), separateConditions(b))
-            SimplifiedJoinCondition(
-              fir.keys ++ sec.keys,
-              fir.filter.fold(
-                sec.filter)(
-                f => sec.filter.fold(f.some)(s => Free.roll(And[T, JoinFunc[T]](f, s)).some)))
-          case -\/(Eq(l, r)) =>
-            alignCondition(l, r).fold(
-              SimplifiedJoinCondition(Nil, fm.some))(
-              pair => SimplifiedJoinCondition(List(pair), None))
-          case _ => SimplifiedJoinCondition(Nil, fm.some)
-        }
-
-      def mergeSides(jf: JoinFunc[T]): FreeMap[T] =
-        jf >>= {
-          case LeftSide  => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0)))
-          case RightSide => Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))
-        }
-
-      val SimplifiedJoinCondition(keys, filter) = separateConditions(tj.on)
-      QC.inj(Map(filter.foldLeft(
-        EJ.inj(EquiJoin(
-          tj.src,
-          tj.lBranch,
-          tj.rBranch,
-          ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.left)))),
-          ConcatArraysN(keys.map(k => Free.roll(MakeArray[T, FreeMap[T]](k.right)))),
-          tj.f,
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.point(LeftSide))),
-            Free.roll(MakeArray(Free.point(RightSide))))))).embed)(
-        (ej, filt) => QC.inj(Filter(ej, mergeSides(filt))).embed),
-        mergeSides(tj.combine)))
-    }
-
   def coalesceQC[F[_]: Functor, G[_]: Functor]
     (GtoF: PrismNT[G, F])
     (implicit
@@ -488,12 +430,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // - coalesce nodes
   // - normalize mapfunc
   def applyAll[F[_]: Traverse: Normalizable](
-    implicit DE: Const[DeadEnd, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F,
+    implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
-             PB: ProjectBucket[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?],
-             show: Delay[Show, F]):
+             FI: F :<: QScriptTotal[T, ?]):
       F[T[F]] => F[T[F]] =
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -508,10 +447,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       liftFG(elideNopMap[F])
 
   def applyToFreeQS[F[_]: Traverse: Normalizable](
-    implicit DE: Const[DeadEnd, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F,
+    implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
-             PB: ProjectBucket[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
     (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
@@ -534,29 +471,16 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: Monad, F[_]: Traverse](
-    g: ConvertPath.ListContents[M])(
-    implicit FS: StaticPath.Aux[T, F],
-             F: Pathable[T, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?],
-             CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
-      T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)) >>=
-      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
-
-  def eliminateProjections[M[_]: Monad, F[_]: Traverse](
-    fs: Option[ConvertPath.ListContents[M]])(
-    implicit FS: StaticPath.Aux[T, F],
-             F: Pathable[T, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?],
-             CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
-      T[F] => EitherT[M, FileSystemError, T[QScriptTotal[T, ?]]] = qs => {
-    val res = fs.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
-
-    res.map(
-      _.transAna(SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection))
-  }
-
+  def pathify[M[_]: Monad, F[_]: Traverse, G[_]: Traverse]
+    (g: ConvertPath.ListContents[M])
+    (implicit
+      FS: StaticPath.Aux[T, F, G],
+      F:     Pathable[T, ?] :<: G,
+      R:     Const[Read, ?] :<: G,
+      QC: QScriptCore[T, ?] :<: G,
+      FI: G :<: QScriptTotal[T, ?],
+      CP: ConvertPath.Aux[T, Pathable[T, ?], G])
+      : T[F] => EitherT[M,  FileSystemError, T[G]] =
+    _.cataM(FS.pathifyƒ[M](g)) >>=
+      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, G, G](g)))
 }

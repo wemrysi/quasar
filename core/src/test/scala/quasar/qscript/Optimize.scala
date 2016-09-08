@@ -63,9 +63,9 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     "simplify a ThetaJoin" in {
       val exp =
         TJ.inj(ThetaJoin(
-          DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
-          Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),
-          Free.roll(R.inj(Const(Read(rootDir </> file("bar"))))),
+          QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
+          Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("foo")))))),
+          Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("bar")))))),
           Free.roll(And(Free.roll(And(
             // reversed equality
             Free.roll(Eq(
@@ -86,13 +86,13 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Inner,
           Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide))))).embed
 
-      exp.transCata(liftFG(opt.simplifyJoin[QS])) must equal(
-        QC.inj(Map(
-          QC.inj(Filter(
+      exp.transCata(SimplifyJoin[Fix, QS, QScriptTotal[Fix, ?]].simplifyJoin(idPrism.reverseGet)) must equal(
+        QS.inj(QC.inj(Map(
+          QS.inj(QC.inj(Filter(
             EJ.inj(EquiJoin(
-              DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
-              Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),
-              Free.roll(R.inj(Const(Read(rootDir </> file("bar"))))),
+              QS.inj(QC.inj(Unreferenced[Fix, Fix[QScriptTotal[Fix, ?]]]())).embed,
+              Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("foo")))))),
+              Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("bar")))))),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
                   Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
@@ -117,10 +117,10 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
                 StrLit("l_lat"))),
               Free.roll(ProjectField(
                 Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))),
-                StrLit("r_lat"))))))).embed,
+                StrLit("r_lat")))))))).embed,
           Free.roll(ConcatMaps(
             Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(0))),
-            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1))))))).embed)
+            Free.roll(ProjectIndex(Free.point(SrcHole), IntLit(1)))))))).embed)
     }
   }
 }

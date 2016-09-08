@@ -30,16 +30,18 @@ import scalaz._, Scalaz._
 
 trait QScriptHelpers {
   // TODO: Narrow this to QScriptPure
-  type QS[A] = QScriptTotal[Fix, A]
+  type QS[A] = QScriptInternalRead[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val R = implicitly[Const[Read, ?] :<: QS]
+  val R  = implicitly[Const[Read, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
-  val EJ = implicitly[EquiJoin[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
+  val EJ = implicitly[EquiJoin[Fix, ?] :<: QScriptTotal[Fix, ?]]
+  val SR = implicitly[Const[ShiftedRead, ?] :<: QScriptTotal[Fix, ?]]
+  val QS = implicitly[QS :<: QScriptTotal[Fix, ?]]
 
   def RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   def UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
-  def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const[Read, Fix[QS]](Read(file)))
+  def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
 
   def ProjectFieldR[A](
     src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
@@ -85,9 +87,11 @@ trait QScriptHelpers {
           FileName("person").right,
           FileName("zips").right,
           FileName("car").right)).right.point[Id])
-    
 
   def convert(lc: Option[ConvertPath.ListContents[Id]], lp: Fix[LP]):
-      Option[Fix[QScriptTotal[Fix, ?]]] =
-    QueryFile.convertToQScript[Fix, Id](lc)(lp).toOption.run.copoint
+      Option[Fix[QS]] =
+    lc.fold(
+      QueryFile.convertToQScript[Fix, QScriptInternalRead[Fix, ?]](lp))(
+      QueryFile.convertToQScriptRead[Fix, Id, QScriptInternalRead[Fix, ?]](_)(lp))
+      .toOption.run.copoint
 }
