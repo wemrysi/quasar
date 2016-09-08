@@ -98,23 +98,24 @@ object managefile {
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
     }.as(().right[PhysicalError]).handle {
-      case NonFatal(ex: EXception) => UnhandledFSError(ex).left[Unit]
+      case NonFatal(ex: Exception) => UnhandledFSError(ex).left[Unit]
     }
 
     Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
 
   private def delete[S[_]](path: APath)(implicit
-    s0: Task :<: S
-  ): Free[S, FileSystemError \/ Unit] = injectFT[Task, S].apply(
-    Task.delay {
-      \/.fromTryCatchNonFatal(FileUtils.forceDelete(toNioPath(path).toFile()))
-        .leftMap {
-        case e: FileNotFoundException => pathErr(pathNotFound(path))
-        case e => pathErr(invalidPath(path, e.getMessage()))
-      }
+    s0: Task :<: S,
+    s1: PhysErr :<: S
+  ): Free[S, FileSystemError \/ Unit] = {
+    val del: Task[PhysicalError \/ (FileSystemError \/ Unit)] = Task.delay {
+      FileUtils.forceDelete(toNioPath(path).toFile())
+    }.as(().right[FileSystemError].right[PhysicalError]).handle {
+      case e: FileNotFoundException => pathErr(pathNotFound(path)).left[Unit].right[PhysicalError]
+      case NonFatal(e : Exception) => UnhandledFSError(e).left[FileSystemError \/ Unit]
     }
-  )
+    Failure.Ops[PhysicalError, S].unattempt(lift(del).into[S])
+  }
   
   private def tempFile[S[_]](near: APath)(implicit
     s0: Task :<: S
