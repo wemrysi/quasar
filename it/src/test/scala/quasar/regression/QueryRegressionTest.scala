@@ -144,9 +144,6 @@ abstract class QueryRegressionTest[S[_]](
     run: Run
   ): Task[Result] = {
     val liftRun: CompExecM ~> Task = {
-      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import EitherT.eitherTMonad
-
       type H1[A] = PhaseResultT[Task, A]
       type H2[A] = SemanticErrsT[H1, A]
       type H3[A] = FileSystemErrT[H2, A]

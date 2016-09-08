@@ -97,9 +97,6 @@ object Repl {
   ): Free[S, Unit] = {
     import Command._
 
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-
     val RS = AtomicRef.Ops[RunState, S]
     val DF = Failure.Ops[String, S]
 

@@ -215,9 +215,6 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
 
           import xform._
 
-          // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-          import EitherT.eitherTMonad
-
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]
             type X1[A] = FileSystemErrT[X0, A]

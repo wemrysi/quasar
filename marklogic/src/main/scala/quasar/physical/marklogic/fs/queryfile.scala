@@ -18,10 +18,11 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.SKI.κ
-import quasar.{LogicalPlan, PhaseResult, PhaseResults}
+import quasar.{LogicalPlan, PhaseResult, PhaseResultT, PhaseResults}
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
+import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
 import quasar.physical.marklogic.qscript._
@@ -51,14 +52,11 @@ object queryfile {
       lp: Fix[LogicalPlan])(
       f: XQuery => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
-      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-      import EitherT.eitherTMonad
-
       def phase(xqy: XQuery): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
-      val listContents: ConvertPath.ListContents[Free[S, ?]] =
-        adir => lift(ops.ls(adir)).into[S].liftM[FileSystemErrT]
+      val listContents: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
+        adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
