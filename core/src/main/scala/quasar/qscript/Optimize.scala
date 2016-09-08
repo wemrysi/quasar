@@ -535,25 +535,25 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
   def pathify[M[_]: Monad, F[_]: Traverse](
-    g: ConvertPath.ListContents[M])(
+    ls: ConvertPath.ListContents[M])(
     implicit FS: StaticPath.Aux[T, F],
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](g)) >>=
-      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](g)))
+    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](ls)) >>=
+      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](ls)))
 
   def eliminateProjections[M[_]: Monad, F[_]: Traverse](
-    fs: Option[ConvertPath.ListContents[M]])(
+    lsOpt: Option[ConvertPath.ListContents[M]])(
     implicit FS: StaticPath.Aux[T, F],
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
       T[F] => EitherT[M, FileSystemError, T[QScriptTotal[T, ?]]] = qs => {
-    val res = fs.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
+    val res = lsOpt.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
 
     res.map(
       _.transAna(SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection))

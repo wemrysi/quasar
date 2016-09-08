@@ -120,10 +120,10 @@ object ConvertPath extends ConvertPathInstances {
         f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
 
   def readFile[T[_[_]]: Corecursive, M[_]: Monad, F[_], G[_]: Functor](
-    f: ListContents[M])(
+    ls: ListContents[M])(
     implicit R: Const[Read, ?] :<: G, QC: QScriptCore[T, ?] :<: G, F: F ~> G):
       CoEnv[ADir, F, T[G]] => M[List[G[T[G]]]] =
-    _.run.fold(allDescendents[T, M, G](f).apply(_), fa => List(F(fa)).point[M])
+    _.run.fold(allDescendents[T, M, G](ls).apply(_), fa => List(F(fa)).point[M])
 
   def union[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (elems: NonEmptyList[F[T[F]]])
@@ -140,20 +140,20 @@ object ConvertPath extends ConvertPathInstances {
     * reads and combine them as necessary.
     */
   def postPathify[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_], G[_]: Functor](
-    f: ListContents[M])(
+    ls: ListContents[M])(
     implicit R: Const[Read, ?] :<: G,
              FG: F ~> G,
              QC: QScriptCore[T, ?] :<: G, 
              FI: G :<: QScriptTotal[T, ?]):
       AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
-    p => EitherT(p.traverseM(readFile[T, M, F, G](f).apply) ∘ {
-      case Nil    => NoFilesFound(p.foldMap(_.run.fold(List(_), κ(Nil)))).left
+    p => EitherT(p.traverseM(readFile[T, M, F, G](ls).apply) ∘ {
+      case Nil => NoFilesFound(p.foldMap(_.run.fold(List(_), κ(Nil)))).left
       case h :: t => union[T, G](NonEmptyList.nel(h, t.toIList)).right
     })
 
   def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Functor]
     (src: T[Pathed[F, ?]], branch: FreeQS[T])
-    (f: ListContents[M])
+    (ls: ListContents[M])
     (implicit
       CP: ConvertPath.Aux[T, QScriptTotal[T, ?], QScriptTotal[T, ?]],
       FI: F :<: QScriptTotal[T, ?])
@@ -165,8 +165,8 @@ object ConvertPath extends ConvertPathInstances {
       distCata,
         ginterpretM(
           κ(FunctorT[T].transCata[Pathed[F, ?], Pathed[QScriptTotal[T, ?], ?]](src)(_.map(coEnvHmap(_)(FI))).point[EitherT[M, FileSystemError, ?]]),
-          transformToAlgebra[T, Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(f)))) >>=
-      (TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](f)).leftMap(FileSystemError.qscriptPlanningFailed(_)))) ∘
+          transformToAlgebra[T, Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(ls)))) >>=
+      (TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](ls)).leftMap(FileSystemError.qscriptPlanningFailed(_)))) ∘
       (_.convertTo[Free[?[_], Hole]])
   }
 
