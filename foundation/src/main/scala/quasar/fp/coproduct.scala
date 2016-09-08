@@ -18,20 +18,18 @@ package quasar.fp
 
 /** Builds nested scalaz Coproducts.
  *  Use like:
- *    import quasar.fp.CoproductM._
- *    type MarkLogicFs[A] = (
- *         Task
- *      #: SessionIO
- *      #: ContentSourceIO
- *      #: GenUUID
- *      #: MonotonicSeq
- *      #: MLReadHandles
- *      #: MLWriteHandles
- *      #: CoId[MLResultHandles]
+ *     *    type MarkLogicFs[A] = (
+ *          Task
+ *      :\: SessionIO
+ *      :\: ContentSourceIO
+ *      :\: GenUUID
+ *      :\: MonotonicSeq
+ *      :\: MLReadHandles
+ *      :\: MLWriteHandles
+ *      :/: MLResultHandles
  *    )#M[A]
  */
-object CoproductM {
-  sealed trait CoM                            { type M[A]                               }
-  sealed trait CoId[F[_]]         extends CoM { type M[A] = F[A]                        }
-  sealed trait #:[F[_], T <: CoM] extends CoM { type M[A] = scalaz.Coproduct[F, T#M, A] }
-}
+
+sealed trait CoM                             { type M[A]                               }
+sealed trait :/:[F[_], G[_]]     extends CoM { type M[A] = scalaz.Coproduct[F, G, A]   }
+sealed trait :\:[F[_], T <: CoM] extends CoM { type M[A] = scalaz.Coproduct[F, T#M, A] }

@@ -19,9 +19,7 @@ package quasar.api.services
 import quasar.Predef._
 import quasar.api._
 import quasar.effect.Failure
-import quasar.fp.liftMT
-import quasar.fp.CoproductM._
-import quasar.fp.free, free._
+import quasar.fp._, free._
 import quasar.fs._
 import quasar.fs.mount._
 
@@ -35,7 +33,7 @@ import org.specs2.matcher.TraversableMatchers._
 class RestApiSpecs extends quasar.Qspec {
   import InMemory._, Mounting.PathTypeMismatch
 
-  type Eff[A] = (Task #: PathMismatchFailure #: MountingFailure #: FileSystemFailure #: CoId[MountingFileSystem])#M[A]
+  type Eff[A] = (Task :\: PathMismatchFailure :\: MountingFailure :\: FileSystemFailure :/: MountingFileSystem)#M[A]
 
   "OPTIONS" should {
     val mount = new (Mounting ~> Task) {

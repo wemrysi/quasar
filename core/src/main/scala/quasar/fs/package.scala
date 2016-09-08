@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.effect.Failure
-import quasar.fp._, CoproductM._
+import quasar.fp._
 import quasar.fp.free._
 
 import argonaut._
@@ -26,7 +26,7 @@ import pathy.Path, Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs extends PhysicalErrorPrisms {
-  type FileSystem[A] = (QueryFile #: ReadFile #: WriteFile #: CoId[ManageFile])#M[A]
+  type FileSystem[A] = (QueryFile :\: ReadFile :\: WriteFile :/: ManageFile)#M[A]
 
   type AbsPath[T] = pathy.Path[Abs,T,Sandboxed]
   type RelPath[T] = pathy.Path[Rel,T,Sandboxed]

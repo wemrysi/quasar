@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.config._
 import quasar.console._
 import quasar.effect._
-import quasar.fp._, CoproductM._
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
@@ -89,12 +89,12 @@ object Main {
   }
 
   type ReplEff[S[_], A] = (
-       Repl.RunStateT
-    #: ConsoleIO
-    #: ReplFail
-    #: Timing
-    #: Task
-    #: CoId[S]
+        Repl.RunStateT
+    :\: ConsoleIO
+    :\: ReplFail
+    :\: Timing
+    :\: Task
+    :/: S
   )#M[A]
 
   def repl[S[_]](

@@ -16,13 +16,9 @@
 
 package quasar.physical.sparkcore.fs
 
-
 import quasar.Predef._
 import quasar.Data
-import quasar.fp.TaskRef
-import quasar.fp.numeric._
-import quasar.fp.free._
-import quasar.fp.CoproductM._
+import quasar.fp._, free._, numeric._
 import quasar.fs._
 import quasar.fs.ReadFile.ReadHandle
 import quasar.effect._
@@ -35,10 +31,10 @@ import org.apache.spark._
 
 class ReadFileSpec extends quasar.Qspec {
   type Eff[A] = (
-       MonotonicSeq
-    #: Task
-    #: KeyValueStore[ReadHandle, SparkCursor, ?]
-    #: CoId[Read[SparkContext, ?]]
+        MonotonicSeq
+    :\: Task
+    :\: KeyValueStore[ReadHandle, SparkCursor, ?]
+    :/: Read[SparkContext, ?]
   )#M[A]
 
   "readfile" should {

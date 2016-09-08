@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.effect._
-import quasar.fp._, CoproductM._
+import quasar.fp._
 import quasar.fp.free._
 import quasar.fs._
 import quasar.fs.mount._
@@ -81,7 +81,7 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = (Mounting #: QueryFile #: ReadFile #: WriteFile #: ManageFile #: CoId[CoreErrs])#M[A]
+  type CoreEff[A]   = (Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -151,12 +151,12 @@ package object main {
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
 
         type V[A] = (
-             ViewState
-          #: MonotonicSeq
-          #: Mounting
-          #: MountingFailure
-          #: PathMismatchFailure
-          #: CoId[FileSystem]
+              ViewState
+          :\: MonotonicSeq
+          :\: Mounting
+          :\: MountingFailure
+          :\: PathMismatchFailure
+          :/: FileSystem
         )#M[A]
 
         val compFs: V ~> Free[S, ?] =

@@ -18,9 +18,7 @@ package quasar.physical.postgresql
 
 import quasar.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.{free, TaskRef}, free._
-import quasar.fp.free.{injectNT, mapSNT, EnrichNT}
-import quasar.fp.CoproductM._
+import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 
@@ -38,9 +36,9 @@ package object fs {
 
   type Eff[A] = (
        ConnectionIO
-    #: MonotonicSeq
-    #: KeyValueStore[ReadHandle, impl.ReadStream[ConnectionIO], ?]
-    #: CoId[KeyValueStore[WriteHandle, writefile.TableName,     ?]]
+    :\: MonotonicSeq
+    :\: KeyValueStore[ReadHandle, impl.ReadStream[ConnectionIO], ?]
+    :/: KeyValueStore[WriteHandle, writefile.TableName,     ?]
   )#M[A]
 
   def interp[S[_]](

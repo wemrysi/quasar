@@ -18,9 +18,7 @@ package quasar.fs
 
 import quasar.Predef.{Map, Vector}
 import quasar.effect._
-import quasar.fp.TaskRef
-import quasar.fp.CoproductM._
-import quasar.fp.free, free._
+import quasar.fp._, free._
 
 import monocle.Lens
 import scalaz.{Lens => _, Failure => _, _}
@@ -88,12 +86,12 @@ package object mount {
   }
 
   type ViewFileSystem[A] = (
-       Mounting
-    #: PathMismatchFailure
-    #: MountingFailure
-    #: ViewState
-    #: MonotonicSeq
-    #: CoId[FileSystem]
+        Mounting
+    :\: PathMismatchFailure
+    :\: MountingFailure
+    :\: ViewState
+    :\: MonotonicSeq
+    :/: FileSystem
   )#M[A]
 
   object ViewFileSystem {
