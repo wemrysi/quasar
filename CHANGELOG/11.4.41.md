@@ -1,0 +1,1 @@
+Remove unnecessary `runSessionIO` in `marklogic.fs.queryfile`

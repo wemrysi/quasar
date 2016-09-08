@@ -1,0 +1,1 @@
+Improve names of some function arguments in `core`

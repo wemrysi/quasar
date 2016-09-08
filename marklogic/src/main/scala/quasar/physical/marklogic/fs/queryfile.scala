@@ -58,7 +58,7 @@ object queryfile {
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
       val listContents: ConvertPath.ListContents[Free[S, ?]] =
-        adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
+        adir => lift(ops.ls(adir)).into[S].liftM[FileSystemErrT]
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
