@@ -213,6 +213,8 @@ object Bson {
     def repr = new BsonMaxKey()
     def toJs = Js.Ident("MaxKey")
   }
+
+  implicit val equal: Equal[Bson] = Equal.equalA
 }
 
 sealed abstract class BsonType(val ordinal: Int)

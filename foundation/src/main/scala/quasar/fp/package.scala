@@ -103,6 +103,9 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
           })
     }
 
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
+
   implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
       RenderTree[Vector[A]] =
     new RenderTree[Vector[A]] {
