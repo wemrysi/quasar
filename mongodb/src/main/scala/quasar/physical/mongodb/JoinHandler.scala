@@ -24,7 +24,8 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
 import quasar.std.StdLib._
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
 import quasar.physical.mongodb.workflow._
 import WorkflowBuilder._
 
@@ -46,6 +47,9 @@ object JoinHandler {
   //        from those.
   val LeftName: BsonField.Name = BsonField.Name("left")
   val RightName: BsonField.Name = BsonField.Name("right")
+
+  private val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
 
   def fallback[WF[_], F[_]: Monad](
       first: JoinHandler[WF, OptionT[F, ?]],
@@ -258,12 +262,12 @@ object JoinHandler {
 
     val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
 
-    def padEmpty(side: BsonField): Expression =
+    def padEmpty(side: BsonField): Fix[ExprOpCoreF] =
       $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
         $literal(Bson.Arr(List(Bson.Doc()))),
         $var(DocField(side)))
 
-    def buildProjection(l: Expression, r: Expression): FixOp[WF] =
+    def buildProjection(l: Fix[ExprOpCoreF], r: Fix[ExprOpCoreF]): FixOp[WF] =
       $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
 
     // TODO exhaustive pattern match

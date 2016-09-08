@@ -20,7 +20,8 @@ import quasar.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree}, RenderTree.ops._
 import quasar.fp._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflowtask._
 
@@ -79,6 +80,10 @@ package object workflow {
   val IdLabel  = "_id"
   val IdName   = BsonField.Name(IdLabel)
   val IdVar    = DocVar.ROOT(IdName)
+
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
+  private val exprOps = ExprOpOps[ExprOpCoreF]
 
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna(normalize)
@@ -237,9 +242,9 @@ package object workflow {
         case $GroupF(src, grouped, by)  =>
           $GroupF(src,
             grouped.rewriteRefs(applyVar0),
-            by.bimap(_.rewriteRefs(applyVar0), rewriteExprRefs(_)(applyVar0)))
+            by.bimap(_.rewriteRefs(applyVar0), _.cata(exprOps.rewriteRefs[ExprOpCoreF](applyVar0))))
         case $MatchF(src, s)            => $MatchF(src, applySelector(s))
-        case $RedactF(src, e)           => $RedactF(src, rewriteExprRefs(e)(applyVar0))
+        case $RedactF(src, e)           => $RedactF(src, e.cata(exprOps.rewriteRefs[ExprOpCoreF](applyVar0)))
         case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
         case $SortF(src, l)             => $SortF(src, applyNel(l))
         case g: $GeoNearF[_]            =>

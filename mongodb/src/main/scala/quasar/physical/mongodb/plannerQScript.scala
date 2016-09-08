@@ -25,7 +25,8 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.DocField // HACK
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
@@ -41,6 +42,9 @@ object MongoDbQScriptPlanner {
   type Partial[In, Out] = (PartialFunction[List[In], Out], List[InputFinder])
 
   type OutputM[A] = PlannerError \/ A
+
+  val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
 
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
@@ -68,10 +72,10 @@ object MongoDbQScriptPlanner {
 
   def processMapFuncExpr[T[_[_]]: Recursive: ShowT, A](
     fm: Free[MapFunc[T, ?],  A])(
-    recovery: A => OutputM[Expression]):
-      OutputM[Expression] =
+    recovery: A => OutputM[Fix[ExprOpCoreF]]):
+      OutputM[Fix[ExprOpCoreF]] =
     freeCataM(fm)(
-      interpretM[OutputM, MapFunc[T, ?], A, Expression](
+      interpretM[OutputM, MapFunc[T, ?], A, Fix[ExprOpCoreF]](
         recovery,
         expression))
 
@@ -82,7 +86,7 @@ object MongoDbQScriptPlanner {
     freeCataM(fm)(interpretM[OutputM, MapFunc[T, ?], A, JsCore](recovery(_).right, javascript))
 
   // TODO: Should have a JsFn version of this for $reduce nodes.
-  val accumulator: ReduceFunc[Expression] => AccumOp[Expression] = {
+  val accumulator: ReduceFunc[Fix[ExprOpCoreF]] => AccumOp[Fix[ExprOpCoreF]] = {
     import quasar.qscript.ReduceFuncs._
 
     {
@@ -98,7 +102,7 @@ object MongoDbQScriptPlanner {
   }
 
   def expression[T[_[_]]: Recursive: ShowT]:
-      AlgebraM[OutputM, MapFunc[T, ?], Expression] = {
+      AlgebraM[OutputM, MapFunc[T, ?], Fix[ExprOpCoreF]] = {
     import MapFuncs._
 
     val unimplemented = InternalError("unimplemented").left
@@ -198,7 +202,7 @@ object MongoDbQScriptPlanner {
       case ProjectIndex(a1, a2)  => unimplemented
       case DeleteField(a1, a2)  => unimplemented
 
-      // NB: This is maybe a NOP for Expressions, as they (all?) safely
+      // NB: This is maybe a NOP for Fix[ExprOpCoreF]s, as they (all?) safely
       //     short-circuit when given the wrong type. However, our guards may be
       //     more restrictive than the operation, in which case we still want to
       //     short-circuit, so …
@@ -744,7 +748,7 @@ object MongoDbQScriptPlanner {
                 List(b),
                 Contents.Doc(red.zipWithIndex.map(ai =>
                   (BsonField.Name(ai._2.toString),
-                    accumulator(ai._1).left[Expression])).toListMap)),
+                    accumulator(ai._1).left[Fix[ExprOpCoreF]])).toListMap)),
               rep.left)).liftM[GenT]
         case Sort(src, bucket, order) =>
           val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
@@ -835,7 +839,7 @@ object MongoDbQScriptPlanner {
     }
   }
 
-  def getExpr[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[Expression] =
+  def getExpr[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[Fix[ExprOpCoreF]] =
     processMapFuncExpr(fm)(κ($$ROOT.right))
 
   def getJsFn[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[JsFn] =
@@ -844,7 +848,7 @@ object MongoDbQScriptPlanner {
   def getExprBuilder[T[_[_]]: Recursive: ShowT, WF[_]]
     (src: WorkflowBuilder[WF], fm: FreeMap[T]):
       OutputM[WorkflowBuilder[WF]] =
-    (getExpr(fm).map(_.right[JsFn]) <+> getJsFn(fm).map(_.left[Expression])) ∘
+    (getExpr(fm).map(_.right[JsFn]) <+> getJsFn(fm).map(_.left[Fix[ExprOpCoreF]])) ∘
       (ExprBuilder(src, _))
 
   def getJsMerge[T[_[_]]: Recursive: ShowT](jf: JoinFunc[T], a1: JsCore, a2: JsCore):

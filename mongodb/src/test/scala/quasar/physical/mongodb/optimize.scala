@@ -19,7 +19,8 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.TreeMatchers
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.DocField // HACK
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
@@ -29,6 +30,9 @@ import scalaz._, Scalaz._
 
 class OptimizeSpecs extends quasar.Qspec with TreeMatchers {
   import CollectionUtil._
+
+  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprCoreFp._
 
   "simplifyGroupƒ" should {
     "elide useless reduction" in {

@@ -608,6 +608,9 @@ object MongoDbPlanner {
     }
   }
 
+  import quasar.physical.mongodb.expression0._ // HACK
+  import quasar.physical.mongodb.accumulator._
+
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
     (joinHandler: JoinHandler[F, WorkflowBuilder.M])
     (implicit I: WorkflowOpCoreF :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
@@ -618,14 +621,16 @@ object MongoDbPlanner {
           OutputM[WorkflowBuilder[F]])]] =>
       State[NameGen, OutputM[Fix[WorkflowBuilderF[F, ?]]]] = {
     import WorkflowBuilder._
-    import quasar.physical.mongodb.accumulator._
-    import quasar.physical.mongodb.expression._
 
     type Input  = (OutputM[PartialSelector], OutputM[PartialJs])
     type Output = M[WorkflowBuilder[F]]
     type Ann    = Cofree[LogicalPlan, (Input, OutputM[WorkflowBuilder[F]])]
 
     import LogicalPlan._
+
+    val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+    import exprFp._
+    val check = Check[Fix, ExprOpCoreF]
 
     object HasData {
       def unapply(node: LogicalPlan[Ann]): Option[Data] = node match {
@@ -695,21 +700,21 @@ object MongoDbPlanner {
         case Sized(a1, a2, a3) => (f1(a1) |@| f2(a2) |@| f3(a3))((_, _, _))
       }
 
-      def expr1(f: Expression => Expression): Output =
+      def expr1(f: Fix[ExprOpCoreF] => Fix[ExprOpCoreF]): Output =
         lift(Arity1(HasWorkflow)).flatMap(WB.expr1(_)(f))
 
-      def groupExpr1(f: Expression => Accumulator): Output =
+      def groupExpr1(f: Fix[ExprOpCoreF] => Accumulator): Output =
         lift(Arity1(HasWorkflow).map(WB.reduce(_)(f)))
 
-      def mapExpr(p: WorkflowBuilder[F])(f: Expression => Expression): Output =
+      def mapExpr(p: WorkflowBuilder[F])(f: Fix[ExprOpCoreF] => Fix[ExprOpCoreF]): Output =
         WB.expr1(p)(f)
 
-      def expr2[A](f: (Expression, Expression) => Expression): Output =
+      def expr2[A](f: (Fix[ExprOpCoreF], Fix[ExprOpCoreF]) => Fix[ExprOpCoreF]): Output =
         lift(Arity2(HasWorkflow, HasWorkflow)).flatMap {
           case (p1, p2) => WB.expr2(p1, p2)(f)
         }
 
-      def expr3(f: (Expression, Expression, Expression) => Expression): Output =
+      def expr3(f: (Fix[ExprOpCoreF], Fix[ExprOpCoreF], Fix[ExprOpCoreF]) => Fix[ExprOpCoreF]): Output =
         lift(Arity3(HasWorkflow, HasWorkflow, HasWorkflow)).flatMap {
           case (p1, p2, p3) => WB.expr(List(p1, p2, p3)) {
             case List(e1, e2, e3) => f(e1, e2, e3)
@@ -894,8 +899,8 @@ object MongoDbPlanner {
         //       cases where we have a more restricted type. And right now we
         //       can’t use this, because it doesn’t cover every type.
         // case ToString => expr1(value =>
-        //   $cond(Check.isNull(value), $literal(Bson.Text("null")),
-        //     $cond(Check.isString(value), value,
+        //   $cond(check.isNull(value), $literal(Bson.Text("null")),
+        //     $cond(check.isString(value), value,
         //       $cond($eq(value, $literal(Bson.Bool(true))), $literal(Bson.Text("true")),
         //         $cond($eq(value, $literal(Bson.Bool(false))), $literal(Bson.Text("false")),
         //           $literal(Bson.Undefined))))))
@@ -974,17 +979,17 @@ object MongoDbPlanner {
         // NB: Even if certain checks aren’t needed by ExprOps, we have to
         //     maintain them because we may convert ExprOps to JS.
         //     Hopefully BlackShield will eliminate the need for this.
-        def exprCheck: Type => Option[Expression => Expression] =
-          generateTypeCheck[Expression, Expression]($or(_, _)) {
-            case Type.Null => ((expr: Expression) => $eq($literal(Bson.Null), expr))
+        def exprCheck: Type => Option[Fix[ExprOpCoreF] => Fix[ExprOpCoreF]] =
+          generateTypeCheck[Fix[ExprOpCoreF], Fix[ExprOpCoreF]]($or(_, _)) {
+            case Type.Null => ((expr: Fix[ExprOpCoreF]) => $eq($literal(Bson.Null), expr))
             case Type.Int
                | Type.Dec
                | Type.Int ⨿ Type.Dec
-               | Type.Int ⨿ Type.Dec ⨿ Type.Interval => Check.isNumber
-            case Type.Str => Check.isString
+               | Type.Int ⨿ Type.Dec ⨿ Type.Interval => check.isNumber
+            case Type.Str => check.isString
             case Type.Obj(map, _) =>
-              ((expr: Expression) => {
-                val basic = Check.isObject(expr)
+              ((expr: Fix[ExprOpCoreF]) => {
+                val basic = check.isObject(expr)
                 expr match {
                   case $var(dv) =>
                     map.foldLeft(
@@ -996,33 +1001,33 @@ object MongoDbPlanner {
                   case _ => basic // FIXME: Check fields
                 }
               })
-            case Type.FlexArr(_, _, _) => Check.isArray
-            case Type.Binary => Check.isBinary
-            case Type.Id => Check.isId
-            case Type.Bool => Check.isBoolean
-            case Type.Date => Check.isDate
+            case Type.FlexArr(_, _, _) => check.isArray
+            case Type.Binary => check.isBinary
+            case Type.Id => check.isId
+            case Type.Bool => check.isBoolean
+            case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
             // NB: Some explicit coproducts for adjacent types.
             case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
-              ((expr: Expression) => $and(
+              ((expr: Fix[ExprOpCoreF]) => $and(
                 $lt($literal(Bson.Null), expr),
                 $lt(expr, $literal(Bson.Doc()))))
             case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str =>
-              ((expr: Expression) => $and(
+              ((expr: Fix[ExprOpCoreF]) => $and(
                 $lt($literal(Bson.Null), expr),
                 $lt(expr, $literal(Bson.Doc()))))
             case Type.Date ⨿ Type.Bool =>
-              ((expr: Expression) =>
+              ((expr: Fix[ExprOpCoreF]) =>
                 $and(
                   $lte($literal(Bson.Bool(false)), expr),
                   // TODO: in Mongo 3.0, we can have a tighter type check.
                   // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
                   $lt(expr, $literal(Bson.Regex("", "")))))
             case Type.Syntaxed =>
-              ((expr: Expression) =>
+              ((expr: Fix[ExprOpCoreF]) =>
                 $or(
                   $lt(expr, $literal(Bson.Doc())),
                   $and(
-                    $lte($literal(Bson.ObjectId(minOid)), expr),
+                    $lte($literal(Bson.ObjectId(Check.minOid)), expr),
                     $lt(expr, $literal(Bson.Regex("", ""))))))
           }
 

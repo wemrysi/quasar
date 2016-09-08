@@ -105,17 +105,20 @@ object ExprOp3_2F {
       κ(None)
   }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit val inj: Inj[ExprOp3_2F, EX]) {
-    def $sqrt(value: T[EX]): T[EX]             = inj($sqrtF(value)).embed
-    def $abs(value: T[EX]): T[EX]              = inj($absF(value)).embed
-    def $log(value: T[EX], base: T[EX]): T[EX] = inj($logF(value, base)).embed
-    def $log10(value: T[EX]): T[EX]            = inj($log10F(value)).embed
-    def $ln(value: T[EX]): T[EX]               = inj($lnF(value)).embed
-    def $pow(value: T[EX], exp: T[EX]): T[EX]  = inj($powF(value, exp)).embed
-    def $exp(value: T[EX]): T[EX]              = inj($expF(value)).embed
-    def $trunc(value: T[EX]): T[EX]            = inj($truncF(value)).embed
-    def $ceil(value: T[EX]): T[EX]             = inj($ceilF(value)).embed
-    def $floor(value: T[EX]): T[EX]            = inj($floorF(value)).embed
+  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOp3_2F, EX]) {
+    @inline private implicit def convert(expr: ExprOp3_2F[T[EX]]): T[EX] =
+      inj(expr).embed
+
+    def $sqrt(value: T[EX]): T[EX]             = $sqrtF(value)
+    def $abs(value: T[EX]): T[EX]              = $absF(value)
+    def $log(value: T[EX], base: T[EX]): T[EX] = $logF(value, base)
+    def $log10(value: T[EX]): T[EX]            = $log10F(value)
+    def $ln(value: T[EX]): T[EX]               = $lnF(value)
+    def $pow(value: T[EX], exp: T[EX]): T[EX]  = $powF(value, exp)
+    def $exp(value: T[EX]): T[EX]              = $expF(value)
+    def $trunc(value: T[EX]): T[EX]            = $truncF(value)
+    def $ceil(value: T[EX]): T[EX]             = $ceilF(value)
+    def $floor(value: T[EX]): T[EX]            = $floorF(value)
   }
 }
 

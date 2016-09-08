@@ -39,8 +39,6 @@ package object expression0 {
   /** The type for expressions supporting the most advanced capabilities. */
   type ExprOp[A] = Expr3_2[A]
 
-  type Expression = Fix[ExprOp]
-
   // The following few cases are places where the ExprOp created from
   // the LogicalPlan needs special handling to behave the same when
   // converted to JS.

@@ -75,7 +75,7 @@ object ExprOp3_0F {
       κ(None)
   }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit val inj: Inj[ExprOp3_0F, EX]) {
+  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOp3_0F, EX]) {
     def $dateToString(format: FormatString, date: T[EX]): T[EX] =
       inj($dateToStringF(format, date)).embed
   }

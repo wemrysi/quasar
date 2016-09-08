@@ -36,6 +36,7 @@ trait ExprOpOps[EX[_]] {
 
   def rewriteRefs0[F[_]: Functor](applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[EX, F]): AlgebraM[Option, EX, Fix[F]]
 
+  // TODO: capture F in the typeclass?
   final def rewriteRefs[F[_]: Functor](applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[EX, F]): Algebra[EX, Fix[F]] = {
     val r0 = rewriteRefs0[F](applyVar)
     x => r0(x).getOrElse(Fix(inj(x)))

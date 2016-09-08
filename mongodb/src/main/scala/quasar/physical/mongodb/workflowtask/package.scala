@@ -18,7 +18,8 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
 import quasar.physical.mongodb.workflow._
 
 import matryoshka._
@@ -29,11 +30,14 @@ package object workflowtask {
 
   type Pipeline = List[PipelineOp]
 
+  private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprCoreFp._
+
   val simplifyProject: WorkflowOpCoreF[Unit] => Option[PipelineF[WorkflowOpCoreF, Unit]] =
     {
       case $ProjectF(src, Reshape(cont), id) =>
         $ProjectF(src,
-          Reshape(cont.map {
+          Reshape[ExprOpCoreF](cont.map {
             case (k, \/-($var(DocField(v)))) if k == v => k -> $include().right
             case x                                     => x
           }),
@@ -75,7 +79,7 @@ package object workflowtask {
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape(names.map(_ -> $include().right).toListMap),
+                  Reshape[ExprOpCoreF](names.map(_ -> $include().right).toListMap),
                   ExcludeId).pipeline)))
 
         case None =>
@@ -84,7 +88,7 @@ package object workflowtask {
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape(ListMap(ExprName -> $var(base).right)),
+                  Reshape[ExprOpCoreF](ListMap(ExprName -> $var(base).right)),
                   ExcludeId).pipeline)))
       }
     case _ => (base, task)

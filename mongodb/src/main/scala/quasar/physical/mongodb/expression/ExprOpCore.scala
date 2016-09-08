@@ -21,8 +21,8 @@ import quasar._, Planner._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.expression.DocVar // HACK
-import quasar.physical.mongodb.Bson
+import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
+import quasar.physical.mongodb.{Bson, BsonField}
 import quasar.physical.mongodb.javascript._
 
 import matryoshka._
@@ -381,83 +381,99 @@ object ExprOpCoreF {
       def apply[A](r: RenderTree[A]) =
         new RenderTree[ExprOpCoreF[A]] {
           def render(expr: ExprOpCoreF[A]) = expr match {
-            case _ => Terminal(List("ExprOpCoreF"), Some(expr.toString)) // HACK
+            case _ => Terminal(List("ExprOpCore"), Some(expr.toString))
           }
         }
     }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit val inj: Inj[ExprOpCoreF, EX]) {
-    def $include()                                   = inj($includeF[T[EX]]()).embed
-    def $var(docVar: DocVar): T[EX]                  = inj($varF[T[EX]](docVar)).embed
+  /** "Fixed" constructors, with the corecursive type and the coproduct type
+    * captured when an instance is created. */
+  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOpCoreF, EX]) {
+    @inline private implicit def convert(expr: ExprOpCoreF[T[EX]]): T[EX] =
+      inj(expr).embed
+
+    def $include(): T[EX]                            = $includeF[T[EX]]()
+    def $var(docVar: DocVar): T[EX]                  = $varF[T[EX]](docVar)
 
     def $and(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = inj($andF(first, second, others: _*)).embed
+                                                     = $andF(first, second, others: _*)
     def $or(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = inj($orF(first, second, others: _*)).embed
-    def $not(value: T[EX]): T[EX]                    = inj($notF(value)).embed
+                                                     = $orF(first, second, others: _*)
+    def $not(value: T[EX]): T[EX]                    = $notF(value)
 
-    def $setEquals(left: T[EX], right: T[EX]): T[EX] = inj($setEqualsF(left, right)).embed
+    def $setEquals(left: T[EX], right: T[EX]): T[EX] = $setEqualsF(left, right)
     def $setIntersection(left: T[EX], right: T[EX]): T[EX]
-                                                     = inj($setIntersectionF(left, right)).embed
+                                                     = $setIntersectionF(left, right)
     def $setDifference(left: T[EX], right: T[EX]): T[EX]
-                                                     = inj($setDifferenceF(left, right)).embed
-    def $setUnion(left: T[EX], right: T[EX]): T[EX]  = inj($setUnionF(left, right)).embed
+                                                     = $setDifferenceF(left, right)
+    def $setUnion(left: T[EX], right: T[EX]): T[EX]  = $setUnionF(left, right)
     def $setIsSubset(left: T[EX], right: T[EX]): T[EX]
-                                                     = inj($setIsSubsetF(left, right)).embed
+                                                     = $setIsSubsetF(left, right)
 
-    def $anyElementTrue(value: T[EX]): T[EX]         = inj($anyElementTrueF(value)).embed
-    def $allElementsTrue(value: T[EX]): T[EX]        = inj($allElementsTrueF(value)).embed
+    def $anyElementTrue(value: T[EX]): T[EX]         = $anyElementTrueF(value)
+    def $allElementsTrue(value: T[EX]): T[EX]        = $allElementsTrueF(value)
 
-    def $cmp(left: T[EX], right: T[EX]): T[EX]       = inj($cmpF(left, right)).embed
-    def $eq(left: T[EX], right: T[EX]): T[EX]        = inj($eqF(left, right)).embed
-    def $gt(left: T[EX], right: T[EX]): T[EX]        = inj($gtF(left, right)).embed
-    def $gte(left: T[EX], right: T[EX]): T[EX]       = inj($gteF(left, right)).embed
-    def $lt(left: T[EX], right: T[EX]): T[EX]        = inj($ltF(left, right)).embed
-    def $lte(left: T[EX], right: T[EX]): T[EX]       = inj($lteF(left, right)).embed
-    def $neq(left: T[EX], right: T[EX]): T[EX]       = inj($neqF(left, right)).embed
+    def $cmp(left: T[EX], right: T[EX]): T[EX]       = $cmpF(left, right)
+    def $eq(left: T[EX], right: T[EX]): T[EX]        = $eqF(left, right)
+    def $gt(left: T[EX], right: T[EX]): T[EX]        = $gtF(left, right)
+    def $gte(left: T[EX], right: T[EX]): T[EX]       = $gteF(left, right)
+    def $lt(left: T[EX], right: T[EX]): T[EX]        = $ltF(left, right)
+    def $lte(left: T[EX], right: T[EX]): T[EX]       = $lteF(left, right)
+    def $neq(left: T[EX], right: T[EX]): T[EX]       = $neqF(left, right)
 
-    def $add(left: T[EX], right: T[EX]): T[EX]       = inj($addF(left, right)).embed
-    def $divide(left: T[EX], right: T[EX]): T[EX]    = inj($divideF(left, right)).embed
-    def $mod(left: T[EX], right: T[EX]): T[EX]       = inj($modF(left, right)).embed
-    def $multiply(left: T[EX], right: T[EX]): T[EX]  = inj($multiplyF(left, right)).embed
-    def $subtract(left: T[EX], right: T[EX]): T[EX]  = inj($subtractF(left, right)).embed
+    def $add(left: T[EX], right: T[EX]): T[EX]       = $addF(left, right)
+    def $divide(left: T[EX], right: T[EX]): T[EX]    = $divideF(left, right)
+    def $mod(left: T[EX], right: T[EX]): T[EX]       = $modF(left, right)
+    def $multiply(left: T[EX], right: T[EX]): T[EX]  = $multiplyF(left, right)
+    def $subtract(left: T[EX], right: T[EX]): T[EX]  = $subtractF(left, right)
 
     def $concat(first: T[EX], second: T[EX], others: T[EX]*): T[EX]
-                                                     = inj($concatF(first, second, others: _*)).embed
+                                                     = $concatF(first, second, others: _*)
     def $strcasecmp(left: T[EX], right: T[EX]): T[EX]
-                                                     = inj($strcasecmpF(left, right)).embed
+                                                     = $strcasecmpF(left, right)
     def $substr(value: T[EX], start: T[EX], count: T[EX]): T[EX]
-                                                     = inj($substrF(value, start, count)).embed
-    def $toLower(value: T[EX]): T[EX]                = inj($toLowerF(value)).embed
-    def $toUpper(value: T[EX]): T[EX]                = inj($toUpperF(value)).embed
+                                                     = $substrF(value, start, count)
+    def $toLower(value: T[EX]): T[EX]                = $toLowerF(value)
+    def $toUpper(value: T[EX]): T[EX]                = $toUpperF(value)
 
-    def $meta()                                      = inj($metaF[T[EX]]()).embed
+    def $meta(): T[EX]                               = $metaF[T[EX]]()
 
-    def $size(array: T[EX]): T[EX]                   = inj($sizeF(array)).embed
+    def $size(array: T[EX]): T[EX]                   = $sizeF(array)
 
     def $arrayMap(input: T[EX], as: DocVar.Name, in: T[EX]): T[EX]
-                                                     = inj($arrayMapF(input, as, in)).embed
+                                                     = $arrayMapF(input, as, in)
     def $let(vars: ListMap[DocVar.Name, T[EX]], in: T[EX]): T[EX]
-                                                     = inj($letF(vars, in)).embed
-    def $literal(value: Bson): T[EX]                 = inj($literalF[T[EX]](value)).embed
+                                                     = $letF(vars, in)
+    def $literal(value: Bson): T[EX]                 = $literalF[T[EX]](value)
 
-    def $dayOfYear(date: T[EX]): T[EX]               = inj($dayOfYearF(date)).embed
-    def $dayOfMonth(date: T[EX]): T[EX]              = inj($dayOfMonthF(date)).embed
-    def $dayOfWeek(date: T[EX]): T[EX]               = inj($dayOfWeekF(date)).embed
-    def $year(date: T[EX]): T[EX]                    = inj($yearF(date)).embed
-    def $month(date: T[EX]): T[EX]                   = inj($monthF(date)).embed
-    def $week(date: T[EX]): T[EX]                    = inj($weekF(date)).embed
-    def $hour(date: T[EX]): T[EX]                    = inj($hourF(date)).embed
-    def $minute(date: T[EX]): T[EX]                  = inj($minuteF(date)).embed
-    def $second(date: T[EX]): T[EX]                  = inj($secondF(date)).embed
-    def $millisecond(date: T[EX]): T[EX]             = inj($millisecondF(date)).embed
+    def $dayOfYear(date: T[EX]): T[EX]               = $dayOfYearF(date)
+    def $dayOfMonth(date: T[EX]): T[EX]              = $dayOfMonthF(date)
+    def $dayOfWeek(date: T[EX]): T[EX]               = $dayOfWeekF(date)
+    def $year(date: T[EX]): T[EX]                    = $yearF(date)
+    def $month(date: T[EX]): T[EX]                   = $monthF(date)
+    def $week(date: T[EX]): T[EX]                    = $weekF(date)
+    def $hour(date: T[EX]): T[EX]                    = $hourF(date)
+    def $minute(date: T[EX]): T[EX]                  = $minuteF(date)
+    def $second(date: T[EX]): T[EX]                  = $secondF(date)
+    def $millisecond(date: T[EX]): T[EX]             = $millisecondF(date)
 
     def $cond(predicate: T[EX], ifTrue: T[EX], ifFalse: T[EX]): T[EX]
-                                                     = inj($condF(predicate, ifTrue, ifFalse)).embed
+                                                     = $condF(predicate, ifTrue, ifFalse)
     def $ifNull(expr: T[EX], replacement: T[EX]): T[EX]
-                                                     = inj($ifNullF(expr, replacement)).embed
+                                                     = $ifNullF(expr, replacement)
+
+    val $$ROOT: T[EX]    = $var(DocVar.ROOT())
+    val $$CURRENT: T[EX] = $var(DocVar.CURRENT())
+
+    // FIXME: used only by tests and should live in src/test somewhere
+    def $field(field: String, others: String*): T[EX] =
+      $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))
   }
 }
+
+
+// "Unfixed" constructors/extractors, which inject/project ops into an arbitrary
+// expression type, but handle any type for the recursive arguments.
 
 object $includeF {
   def apply[EX[_], A]()(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
@@ -842,6 +858,10 @@ object $ifNullF {
     }
 }
 
+// "Fixed" constructors/extractors inject/project to/from an arbitrary
+// expression type, and also in/out of an arbitrary (Co)Recursive type.
+// NB: for now, only the handful of extractors we actually use are defined here,
+// and the constructors are defined in the companion's `fixpoint` class.
 object $include {
   def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Boolean =
     $includeF.unapply(Recursive[T].project(expr))

@@ -19,16 +19,21 @@ package quasar.physical.mongodb
 import quasar._
 import quasar.Predef._
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
+import matryoshka.Fix
 import org.scalacheck._
 import scalaz._
 
 class PipelineSpec extends quasar.Qspec with ArbBsonField {
   import CollectionUtil._
-  // import ArbitraryExprOp._
+  import ArbitraryExprOp._
+
+  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprCoreFp._
 
   implicit def arbitraryOp: Arbitrary[PipelineOp] = Arbitrary { Gen.resize(5, Gen.sized { size =>
     // Note: Gen.oneOf is overridden and this variant requires two explicit args
@@ -37,7 +42,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
     Gen.oneOf(ops(0), ops(1), ops.drop(2): _*)
   }) }
 
-  def genProject(size: Int): Gen[$ProjectF[Unit]] = ??? /*for {
+  def genProject(size: Int): Gen[$ProjectF[Unit]] = for {
     fields <- Gen.nonEmptyListOf(for {
       c  <- Gen.alphaChar
       cs <- Gen.alphaStr
@@ -50,7 +55,7 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
         genExpr.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
     id <- Gen.oneOf(ExcludeId, IncludeId)
-  } yield $ProjectF((), Reshape(ListMap(fields: _*)), id)*/
+  } yield $ProjectF((), Reshape[ExprOpCoreF](ListMap(fields: _*)), id)
 
   implicit def arbProject = Arbitrary[$ProjectF[Unit]](Gen.resize(5, Gen.sized(genProject)))
 

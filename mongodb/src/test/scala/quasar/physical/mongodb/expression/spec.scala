@@ -21,15 +21,19 @@ import quasar.fp._
 import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
 import quasar.physical.mongodb.{Bson, BsonField}
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import org.scalacheck._, Arbitrary.arbitrary
 import scalaz._
 import scalacheck.ScalazArbitrary._
 
 object ArbitraryExprOp {
 
-  val fpCore = ExprOpCoreF.fixpoint[Fix, ExprOp]
-  val fp3_0 = ExprOp3_0F.fixpoint[Fix, ExprOp]
+  val fpCore: ExprOpCoreF.fixpoint[Fix, Expr2_6] = ExprOpCoreF.fixpoint[Fix, Expr2_6]
+  import fpCore._
+  val fp3_0: ExprOp3_0F.fixpoint[Fix, Expr3_0] = ExprOp3_0F.fixpoint[Fix, Expr3_0]
+  import fp3_0._
+  val fp3_2: ExprOp3_2F.fixpoint[Fix, Expr3_2] = ExprOp3_2F.fixpoint[Fix, Expr3_2]
+  import fp3_2._
 
   implicit val formatSpecifierArbitrary: Arbitrary[FormatSpecifier] = Arbitrary {
     import FormatSpecifier._
@@ -43,27 +47,40 @@ object ArbitraryExprOp {
     arbitrary[List[String \/ FormatSpecifier]].map(FormatString(_))
   }
 
-  lazy val genExpr: Gen[Expression] =
+  lazy val genExpr: Gen[Fix[Expr2_6]] =
     Gen.oneOf(
-      arbitrary[Int].map(x => fpCore.$literal(Bson.Int32(x))),
+      arbitrary[Int].map(x => $literal(Bson.Int32(x))),
+      Gen.alphaChar.map(c => $var(DocField(BsonField.Name(c.toString)))))
+
+  lazy val genExpr3_0: Gen[Fix[Expr3_0]] = {
+    def inj(expr: Fix[Expr2_6]): Fix[Expr3_0] = expr.transCata(Inj[Expr2_6, Expr3_0].run)
+    Gen.oneOf(
+      genExpr.map(inj),
       arbitrary[FormatString].map(fmt =>
-        fp3_0.$dateToString(fmt, fpCore.$var(DocField(BsonField.Name("date")))))/*,
-      Gen.alphaChar.map(c => $varF(DocField(BsonField.Name(c.toString))).embed),
-      genExpr.flatMap(x => Gen.oneOf(
-        $sqrtF(x).embed,
-        $absF(x).embed,
-        $log10F(x).embed,
-        $lnF(x).embed,
-        $truncF(x).embed,
-        $ceilF(x).embed,
-        $floorF(x).embed)),
+        $dateToString(fmt, inj($var(DocField(BsonField.Name("date")))))))
+  }
+
+  lazy val genExpr3_2: Gen[Fix[Expr3_2]] = {
+    def inj(expr: Fix[Expr2_6]): Fix[Expr3_2] = expr.transCata(Inj[Expr2_6, Expr3_2].run)
+    def inj3_0(expr: Fix[Expr3_0]): Fix[Expr3_2] = expr.transCata(Inj[Expr3_0, Expr3_2].run)
+    Gen.oneOf(
+      genExpr3_0.map(inj3_0),
+      genExpr.map(inj).flatMap(x => Gen.oneOf(
+        $sqrt(x),
+        $abs(x),
+        $log10(x),
+        $ln(x),
+        $trunc(x),
+        $ceil(x),
+        $floor(x))),
       for {
-        x <- genExpr
-        y <- genExpr
+        x <- genExpr.map(inj)
+        y <- genExpr.map(inj)
         expr <- Gen.oneOf(
-          $logF(x, y).embed,
-          $powF(x, y).embed)
-      } yield expr*/)
+          $log(x, y),
+          $pow(x, y))
+      } yield expr)
+  }
 }
 
 class ExpressionSpec extends quasar.Qspec {

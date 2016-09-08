@@ -21,7 +21,8 @@ import quasar._, Planner._
 import quasar.fp._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
+import quasar.physical.mongodb.expression.DocField // HACK
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.SortDir
 
@@ -35,6 +36,9 @@ class WorkflowBuilderSpec extends quasar.Qspec {
 
   val builder = WorkflowBuilder.Ops[WorkflowF]
   import builder._
+
+  private val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprCoreFp._
 
   val readZips = read(collection("db", "zips"))
   def pureInt(n: Int) = pure(Bson.Int32(n))
@@ -651,7 +655,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $ReadF(db; zips)
           |│  │  ╰─ Schema(None)
-          |│  ╰─ ExprOp(Fix($varF(DocField(BsonField.Name("pop")))))
+          |│  ╰─ ExprOpCore($varF(DocField(BsonField.Name("pop"))))
           |├─ By
           |│  ╰─ ValueBuilder(Int32(1))
           |╰─ Content

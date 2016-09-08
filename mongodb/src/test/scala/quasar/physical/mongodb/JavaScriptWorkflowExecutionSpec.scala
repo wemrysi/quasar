@@ -19,17 +19,21 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression0._ // HACK
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
 import scala.collection.immutable.ListMap
 
+import matryoshka._
 import scalaz._
 import scalaz.syntax.either._
 
 class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
   import CollectionUtil._
+
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =
     WorkflowExecutor.toJS(Crystallize[WorkflowF].crystallize(wf))
