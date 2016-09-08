@@ -97,7 +97,9 @@ object managefile {
     val move: Task[PhysicalError \/ Unit] = Task.delay {
       val deleted = FileUtils.deleteDirectory(toNioPath(dst).toFile())
       FileUtils.moveDirectory(toNioPath(src).toFile(), toNioPath(dst).toFile())
-    }.as(().right[PhysicalError])
+    }.as(().right[PhysicalError]).handle {
+      case NonFatal(ex: EXception) => UnhandledFSError(ex).left[Unit]
+    }
 
     Failure.Ops[PhysicalError, S].unattempt(lift(move).into[S])
   }
