@@ -32,7 +32,8 @@ trait QScriptHelpers {
   // TODO: Narrow this to QScriptPure
   type QS[A] = QScriptTotal[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val R = implicitly[Const[Read, ?] :<: QS]
+  val R  = implicitly[Const[Read, ?] :<: QS]
+  val SR = implicitly[Const[ShiftedRead, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val EJ = implicitly[EquiJoin[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]

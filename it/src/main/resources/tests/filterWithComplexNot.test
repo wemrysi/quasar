@@ -3,7 +3,7 @@
 
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql": "pending"
+        "postgresql": "pending", "marklogic": "pending"
     },
 
     "query": "select _id as zip from largeZips
