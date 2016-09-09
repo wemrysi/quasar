@@ -50,16 +50,21 @@ object local {
 
   // TODO: Convert to a typeswitch
   def leftShift[F[_]: PrologW]: F[FunctionDecl.FunctionDecl1] =
-    (qsr.name("left-shift").qn[F] |@| ejson.arrayLeftShift[F] |@| ejson.mapLeftShift[F] |@| nodeLeftShift[F]) {
-      (fname, arrayLs, mapLs, nodeLs) =>
-
+    (
+      qsr.name("left-shift").qn[F] |@|
+      ejson.isArray[F]             |@|
+      ejson.isMap[F]               |@|
+      ejson.arrayLeftShift[F]      |@|
+      ejson.mapLeftShift[F]        |@|
+      nodeLeftShift[F]
+    ) { (fname, isMap, isArray, arrayLs, mapLs, nodeLs) =>
       declare(fname)(
         $("node") as SequenceType("node()")
       ).as(SequenceType("item()*")) { node: XQuery =>
         for {
-          isArr       <- ejson.isArray[F](node)
+          isArr       <- isArray(node)
           shiftedArr  <- arrayLs(node)
-          isMap       <- ejson.isMap[F](node)
+          isMap       <- isMap(node)
           shiftedMap  <- mapLs(node)
           shiftedNode <- nodeLs(node)
         } yield {
@@ -84,13 +89,13 @@ object local {
     for {
       c       <- freshVar[F]
       n       <- freshVar[F]
-      kelt    <- ejson.mkArrayElt[F](n.xqy)
-      velt    <- ejson.mkArrayElt[F](c.xqy `/` child.node())
-      kvArr   <- ejson.mkArray[F](mkSeq_(kelt, velt))
-      kvEnt   <- ejson.mkMapEntry[F](n.xqy, kvArr)
+      kelt    <- ejson.mkArrayElt[F] apply n.xqy
+      velt    <- ejson.mkArrayElt[F] apply (c.xqy `/` child.node())
+      kvArr   <- ejson.mkArray[F] apply mkSeq_(kelt, velt)
+      kvEnt   <- ejson.mkMapEntry[F] apply (n.xqy, kvArr)
       entries =  for_(c -> node `/` child.node())
                  .let_(n -> fn.nodeName(c.xqy))
                  .return_(kvEnt)
-      zMap    <- ejson.mkMap[F](entries)
+      zMap    <- ejson.mkMap[F] apply entries
     } yield zMap
 }

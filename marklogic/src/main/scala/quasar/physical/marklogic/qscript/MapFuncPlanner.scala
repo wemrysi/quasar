@@ -73,14 +73,14 @@ object MapFuncPlanner {
 
     // structural
     case MakeArray(x) =>
-      ejson.singletonArray[F](x)
+      ejson.singletonArray[F] apply x
 
     // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
     case MakeMap(k, v) =>
-      ejson.singletonMap[F](k, v)
+      ejson.singletonMap[F] apply (k, v)
 
     case ConcatArrays(x, y) =>
-      ejson.arrayConcat[F](x, y)
+      ejson.arrayConcat[F] apply (x, y)
 
     case ProjectField(src, field) => field match {
       case XQuery.Step(_) =>
@@ -92,8 +92,8 @@ object MapFuncPlanner {
 
           for {
             m      <- freshVar[F]
-            lookup <- ejson.mapLookup(m.xqy, qn.xs)
-            isMap  <- ejson.isMap(m.xqy)
+            lookup <- ejson.mapLookup[F] apply (m.xqy, qn.xs)
+            isMap  <- ejson.isMap[F] apply (m.xqy)
           } yield {
             let_(m -> src) return_ {
               if_ (isMap)
@@ -110,8 +110,8 @@ object MapFuncPlanner {
         for {
           m     <- freshVar[F]
           k     <- freshVar[F]
-          v     <- ejson.mapLookup(m.xqy, k.xqy)
-          isMap <- ejson.isMap(m.xqy)
+          v     <- ejson.mapLookup[F] apply (m.xqy, k.xqy)
+          isMap <- ejson.isMap[F] apply (m.xqy)
         } yield {
           let_(m -> src, k -> field) return_ {
             if_ (isMap) then_ v else_ (m.xqy `/` k.xqy)
@@ -133,9 +133,9 @@ object MapFuncPlanner {
     case ZipMapKeys(m) =>
       for {
         src   <- freshVar[F]
-        zmk   <- ejson.zipMapKeys(src.xqy)
+        zmk   <- ejson.zipMapKeys apply src.xqy
         zmnk  <- local.zipMapNodeKeys(src.xqy)
-        isMap <- ejson.isMap(src.xqy)
+        isMap <- ejson.isMap[F] apply (src.xqy)
       } yield {
         let_(src -> m) return_ {
           // TODO: Should this be necessary?
