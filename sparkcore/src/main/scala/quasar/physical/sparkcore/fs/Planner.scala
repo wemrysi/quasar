@@ -82,13 +82,29 @@ object Planner {
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
-            EitherT(freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change)).map(df => (sc, src.map(df))).point[Task]))
+            EitherT {
+              val maybeFunc =
+                freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+              maybeFunc.map(df => (sc, src.map(df))).point[Task]
+            }
+          )
         case Reduce(src, bucket, reducers, repair) =>
-          ???
+          ??? // select [sum(pop), max(pop)] from cities group by state
         case Sort(src, bucket, order) =>
           ???
         case Filter(src, f) =>
-          ???
+          StateT((sc: SparkContext) =>
+            EitherT {
+              val maybeFunc =
+                freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+              maybeFunc.map(df => (sc, src.filter{
+                df >>> {
+                  case Data.Bool(b) => b
+                  case _ => false
+                }
+              })).point[Task]
+            }
+          )
         case Take(src, from, count) =>
           ???
         case Drop(src, from, count) =>
@@ -97,7 +113,10 @@ object Planner {
           EitherT((sc, src).right[PlannerError].point[Task])
         })
         case Union(src, lBranch, rBranch) => ???
-        case Unreferenced() => ???
+        case Unreferenced() =>
+          StateT((sc: SparkContext) => {
+            EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Task])
+          })
       }
     }
   
