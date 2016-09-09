@@ -30,12 +30,12 @@ private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[S
   import expr.{for_, if_}, axes.child
 
   // TODO: Implement `idStatus`
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], Const[ShiftedRead, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
 
-      liftP(for {
+      for {
         d     <- freshVar[F]
         c     <- freshVar[F]
         xform <- json.transformFromJson[F](c.xqy)
@@ -43,6 +43,6 @@ private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[S
         for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
         .let_(c -> d.xqy `/` child.node())
         .return_ { if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy }
-      })
+      }
   }
 }

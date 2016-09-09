@@ -26,7 +26,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class DeadEndPlanner extends MarkLogicPlanner[Const[DeadEnd, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], Const[DeadEnd, ?], XQuery] = {
-    case Const(Root) => mkSeq_("/".xqy).point[PlanningT[F, ?]]
+  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, Const[DeadEnd, ?], XQuery] = {
+    case Const(Root) => mkSeq_("/".xqy).point[F]
   }
 }

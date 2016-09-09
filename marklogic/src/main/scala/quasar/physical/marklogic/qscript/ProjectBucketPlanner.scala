@@ -26,11 +26,11 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class ProjectBucketPlanner[T[_[_]]] extends MarkLogicPlanner[ProjectBucket[T, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], ProjectBucket[T, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, ProjectBucket[T, ?], XQuery] = {
     case BucketField(src, value, name) =>
-      s"((: BucketField :)$src)".xqy.point[PlanningT[F, ?]]
+      s"((: BucketField :)$src)".xqy.point[F]
 
     case BucketIndex(src, value, index) =>
-      s"((: BucketIndex :)$src)".xqy.point[PlanningT[F, ?]]
+      s"((: BucketIndex :)$src)".xqy.point[F]
   }
 }

@@ -53,7 +53,10 @@ object queryfile {
       f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type M[A] = PrologsT[Free[S, ?], A]
+      type M[A] = PrologsT[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+
+      // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+      import WriterT.writerTMonad
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", main.render))
@@ -61,19 +64,14 @@ object queryfile {
       val listContents: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      def plan(qs: Fix[QScriptTotal[Fix, ?]]): PlanningT[Free[S, ?], MainModule] = {
-        val planRes =
-          qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[WriterT[Free[S, ?], Prologs, ?]])
-            .run.run.run
-
-        EitherT(WriterT(planRes map { case (prologs, (phases, res)) =>
-          (phases, res map (MainModule(Version.`1.0-ml`, prologs, _)))
-        }))
-      }
+      def plan(qs: Fix[QScriptTotal[Fix, ?]]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
+        qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[M]).run map {
+          case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
+        }
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        mod <- plan(qs).leftMap(planningFailed(lp, _))
+        mod <- plan(qs)
         a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 

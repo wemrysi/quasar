@@ -17,7 +17,7 @@
 package quasar.physical.marklogic
 
 import quasar.SKI.κ
-import quasar.{NameGenerator, PhaseResultT, PlannerErrT}
+import quasar.NameGenerator
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
@@ -26,8 +26,6 @@ import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
-  type PlanningT[F[_], A] = PlannerErrT[PhaseResultT[F, ?], A]
-
   type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
 
   object MarkLogicPlanner {
@@ -53,9 +51,6 @@ package object qscript {
       new EquiJoinPlanner[T]
   }
 
-  def liftP[F[_]: Monad, A](fa: F[A]): PlanningT[F, A] =
-    fa.liftM[PhaseResultT].liftM[PlannerErrT]
-
   def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](fm: FreeMap[T], src: XQuery): F[XQuery] =
     planMapFunc[T, F, Hole](fm)(κ(src))
 
@@ -71,8 +66,8 @@ package object qscript {
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](fqs: FreeQS[T], src: XQuery): PlanningT[F, XQuery] = {
+  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](fqs: FreeQS[T], src: XQuery): F[XQuery] = {
     import MarkLogicPlanner._
-    freeCataM(fqs)(interpretM(κ(src.point[PlanningT[F, ?]]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
+    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
   }
 }

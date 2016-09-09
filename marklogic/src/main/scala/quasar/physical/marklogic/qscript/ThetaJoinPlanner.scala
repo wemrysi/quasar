@@ -26,8 +26,8 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class ThetaJoinPlanner[T[_[_]]] extends MarkLogicPlanner[ThetaJoin[T, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[PlanningT[F, ?], ThetaJoin[T, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
-      s"((: ThetaJoin :)$src)".xqy.point[PlanningT[F, ?]]
+      s"((: ThetaJoin :)$src)".xqy.point[F]
   }
 }
