@@ -42,9 +42,7 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
   import posixCodec.printPath
   import PathError._, Mounting.PathTypeMismatch
 
-  type Eff0[A] = Coproduct[MountingFailure, PathMismatchFailure, A]
-  type Eff1[A] = Coproduct[Mounting, Eff0, A]
-  type Eff[A]  = Coproduct[Task, Eff1, A]
+  type Eff[A] = (Task :\: Mounting :\: MountingFailure :/: PathMismatchFailure)#M[A]
 
   type Mounted = Set[MR]
   type TestSvc = Request => Free[Eff, (Response, Mounted)]
