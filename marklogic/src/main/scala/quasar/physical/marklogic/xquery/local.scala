@@ -29,7 +29,7 @@ import scalaz.syntax.monad._
  */
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object local {
-  import syntax._, expr.{element, for_, if_, let_}, axes._
+  import syntax._, expr.{element, for_, if_}, axes._
 
   val qsr = namespace("quasar", "http://quasar-analytics.org/quasar")
 
@@ -39,28 +39,40 @@ object local {
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
 
-  def leftShiftNode(node: XQuery): XQuery =
-    node `/` child.node() `/` child.node()
-
-  // TODO: Convert to a typeswitch
-  def leftShift[F[_]: NameGenerator: PrologW](item: XQuery): F[XQuery] =
-    for {
-      x     <- freshVar[F]
-      isArr <- ejson.isArray[F](x.xqy)
-      arrLs <- ejson.arrayLeftShift[F](x.xqy)
-      isMap <- ejson.isMap[F](x.xqy)
-      mapLs <- ejson.mapLeftShift[F](x.xqy)
-    } yield {
-      let_(x -> item) return_ {
-        if_(isArr)
-        .then_ { arrLs }
-        .else_ {
-          if_ (isMap)
-          .then_ { mapLs }
-          .else_ { leftShiftNode(x.xqy) }
-        }
+  def nodeLeftShift[F[_]: PrologW]: F[FunctionDecl.FunctionDecl1] =
+    qsr.name("node-left-shift").qn[F] map { fname =>
+      declare(fname)(
+        $("node") as SequenceType("node()*")
+      ).as(SequenceType("item()*")) { n =>
+        n `/` child.node() `/` child.node()
       }
     }
+
+  // TODO: Convert to a typeswitch
+  def leftShift[F[_]: PrologW]: F[FunctionDecl.FunctionDecl1] =
+    (qsr.name("left-shift").qn[F] |@| ejson.arrayLeftShift[F] |@| ejson.mapLeftShift[F] |@| nodeLeftShift[F]) {
+      (fname, arrayLs, mapLs, nodeLs) =>
+
+      declare(fname)(
+        $("node") as SequenceType("node()")
+      ).as(SequenceType("item()*")) { node: XQuery =>
+        for {
+          isArr       <- ejson.isArray[F](node)
+          shiftedArr  <- arrayLs(node)
+          isMap       <- ejson.isMap[F](node)
+          shiftedMap  <- mapLs(node)
+          shiftedNode <- nodeLs(node)
+        } yield {
+          if_(isArr)
+          .then_ { shiftedArr }
+          .else_ {
+            if_ (isMap)
+            .then_ { shiftedMap }
+            .else_ { shiftedNode }
+          }
+        }
+      }
+    }.join
 
   def mkData[F[_]: PrologW](children: XQuery): F[XQuery] =
     dataN.xs[F] map (data => element { data } { children })

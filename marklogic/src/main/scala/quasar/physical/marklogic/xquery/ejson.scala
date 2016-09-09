@@ -40,8 +40,14 @@ object ejson {
         .map(arrs => let_(x -> arr1, y -> arr2) return_ arrs)
     }.join
 
-  def arrayLeftShift[F[_]: PrologW](arr: XQuery): F[XQuery] =
-    arrayN.qn[F] map (aname => arr `/` child(aname) `/` child.node())
+  def arrayLeftShift[F[_]: PrologW]: F[FunctionDecl.FunctionDecl1] =
+    (ejs.name("array-left-shift").qn[F] |@| arrayN.qn[F] |@| arrayEltN.qn[F]) { (fname, aname, aelt) =>
+      declare(fname)(
+        $("arr") as SequenceType(s"element($aname)")
+      ).as(SequenceType("item()*")) { arr =>
+        arr `/` child(aelt) `/` child.node()
+      }
+    }
 
   def isArray[F[_]: PrologW](item: XQuery): F[XQuery] =
     arrayN.xqy[F] map (fn.nodeName(item) === _)
@@ -49,9 +55,16 @@ object ejson {
   def isMap[F[_]: PrologW](item: XQuery): F[XQuery] =
     mapN.xqy[F] map (fn.nodeName(item) === _)
 
-  def mapLeftShift[F[_]: PrologW](map: XQuery): F[XQuery] =
-    (mapEntryN.qn[F] |@| mapValueN.qn[F])((mentry, mval) =>
-      map `/` child(mentry) `/` child(mval) `/` child.node())
+  def mapLeftShift[F[_]: PrologW]: F[FunctionDecl.FunctionDecl1] =
+    (ejs.name("map-left-shift").qn[F] |@| mapN.qn[F] |@| mapEntryN.qn[F] |@| mapValueN.qn[F]) {
+      (fname, mname, mentry, mval) =>
+
+      declare(fname)(
+        $("map") as SequenceType(s"element($mname)")
+      ).as(SequenceType("item()*")) { m =>
+        m `/` child(mentry) `/` child(mval) `/` child.node()
+      }
+    }
 
   def mapLookup[F[_]: NameGenerator: PrologW](map: XQuery, key: XQuery): F[XQuery] =
     (freshVar[F] |@| freshVar[F] |@| mapEntryN.qn |@| mapKeyN.xqy |@| mapValueN.qn) {

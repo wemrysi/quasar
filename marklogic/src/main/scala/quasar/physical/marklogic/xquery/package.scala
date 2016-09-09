@@ -63,20 +63,20 @@ package object xquery {
       Show.shows(_.xqy.toString)
   }
 
-  final case class SequenceType(value: String) extends scala.AnyVal
+  final case class SequenceType(override val toString: String) extends scala.AnyVal
 
   object SequenceType {
     val Top: SequenceType = SequenceType("item()*")
 
     implicit val order: Order[SequenceType] =
-      Order.orderBy(_.value)
+      Order.orderBy(_.toString)
 
     implicit val show: Show[SequenceType] =
-      Show.shows(_.value)
+      Show.showFromToString
   }
 
   final case class FunctionParam(name: ParamName, tpe: SequenceType) {
-    def render: String = s"${name.xqy} as ${tpe.value}"
+    def render: String = s"${name.xqy} as $tpe"
   }
 
   object FunctionParam {

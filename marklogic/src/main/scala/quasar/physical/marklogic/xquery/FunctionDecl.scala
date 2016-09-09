@@ -18,9 +18,10 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
-import scalaz._
+import scalaz._, Id.Id
 import scalaz.std.tuple._
 import scalaz.syntax.foldable._
+import scalaz.syntax.functor._
 
 sealed abstract class FunctionDecl {
   def name: xml.QName
@@ -31,7 +32,7 @@ sealed abstract class FunctionDecl {
   // TODO: Naming?
   def render: String = {
     val paramsList = parameters.map(_.render).toList
-    s"declare function ${name}${paramsList.mkString("(", ", ", ")")} as $returnType { $body }"
+    s"declare function ${name}${paramsList.mkString("(", ", ", ")")} as $returnType {\n  $body\n}"
   }
 }
 
@@ -86,8 +87,12 @@ object FunctionDecl {
 
   final case class FunctionDecl1Dsl(fn: xml.QName, p1: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl1Dsl = copy(rt = rType)
+
+    def apply[F[_]: Functor](body: XQuery => F[XQuery]): F[FunctionDecl1] =
+      body(p1.name.xqy) map (FunctionDecl1(fn, p1, rt, _))
+
     def apply(body: XQuery => XQuery): FunctionDecl1 =
-      FunctionDecl1(fn, p1, rt, body(p1.name.xqy))
+      apply[Id](body)
   }
 
   final case class FunctionDecl2Dsl(fn: xml.QName, p1: FunctionParam, p2: FunctionParam, rt: SequenceType) {

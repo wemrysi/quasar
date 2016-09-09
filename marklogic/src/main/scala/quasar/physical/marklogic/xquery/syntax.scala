@@ -42,7 +42,7 @@ object syntax {
   }
 
   def $(paramName: String Refined IsNCName): ParamName =
-    ParamName(NSPrefix.local(NCName(paramName)))
+    ParamName(QName.local(NCName(paramName)))
 
   final implicit class XQueryStringOps(val str: String) extends scala.AnyVal {
     def xqy: XQuery = XQuery(str)
@@ -73,6 +73,11 @@ object syntax {
   final implicit class FunctionDecl1Ops(val func: FunctionDecl1) extends scala.AnyVal {
     def apply[F[_]](p1: XQuery)(implicit F: PrologW[F]): F[XQuery] =
       F.writer(ISet singleton Prolog.funcDecl(func), func.name(p1))
+  }
+
+  final implicit class FunctionDecl1FOps[F[_]](val funcF: F[FunctionDecl1]) extends scala.AnyVal {
+    def apply(p1: XQuery)(implicit F: PrologW[F]): F[XQuery] =
+      F.bind(funcF)(_(p1))
   }
 
   final implicit class FunctionDecl2Ops(val func: FunctionDecl2) extends scala.AnyVal {

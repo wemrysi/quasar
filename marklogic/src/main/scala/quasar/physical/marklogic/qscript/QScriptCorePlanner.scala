@@ -42,7 +42,7 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
         l       <- freshVar[F]
         r       <- freshVar[F]
         extract <- mapFuncXQuery(struct, s.xqy)
-        lshift  <- local.leftShift(l.xqy)
+        lshift  <- local.leftShift[F] apply (l.xqy)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
       } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge
 
