@@ -97,13 +97,21 @@ object FunctionDecl {
 
   final case class FunctionDecl2Dsl(fn: xml.QName, p1: FunctionParam, p2: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl2Dsl = copy(rt = rType)
+
+    def apply[F[_]: Functor](body: (XQuery, XQuery) => F[XQuery]): F[FunctionDecl2] =
+      body(p1.name.xqy, p2.name.xqy) map (FunctionDecl2(fn, p1, p2, rt, _))
+
     def apply(body: (XQuery, XQuery) => XQuery): FunctionDecl2 =
-      FunctionDecl2(fn, p1, p2, rt, body(p1.name.xqy, p2.name.xqy))
+      apply[Id](body)
   }
 
   final case class FunctionDecl3Dsl(fn: xml.QName, p1: FunctionParam, p2: FunctionParam, p3: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl3Dsl = copy(rt = rType)
+
+    def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl3] =
+      body(p1.name.xqy, p2.name.xqy, p3.name.xqy) map (FunctionDecl3(fn, p1, p2, p3, rt, _))
+
     def apply(body: (XQuery, XQuery, XQuery) => XQuery): FunctionDecl3 =
-      FunctionDecl3(fn, p1, p2, p3, rt, body(p1.name.xqy, p2.name.xqy, p3.name.xqy))
+      apply[Id](body)
   }
 }
