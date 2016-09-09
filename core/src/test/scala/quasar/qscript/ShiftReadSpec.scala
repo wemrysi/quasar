@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.fp._
+import quasar.qscript.MapFuncs._
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
@@ -35,8 +36,11 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
 
       val newQScript = transFutu(qScript)(ShiftRead[Fix, QScriptTotal[Fix, ?], QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)((_: QScriptTotal[Fix, Fix[QScriptTotal[Fix, ?]]])))
 
+      // TODO: Optimize away the `IncludeId`.
       newQScript.transCata(optimize.applyAll) must_=
-        Fix(SR.inj(Const(ShiftedRead(sampleFile, ExcludeId))))
-    }.pendingUntilFixed("Seems as though, in this particular case at least, the transformation is not having any effect")
+        Fix(QC.inj(Map(
+          Fix(SR.inj(Const(ShiftedRead(sampleFile, IncludeId)))),
+          Free.roll(ProjectIndex(HoleF, IntLit(1))))))
+    }
   }
 }
