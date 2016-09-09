@@ -119,7 +119,7 @@ object QueryFile {
 
   def convertToQScriptRead
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad, QS[_]: Traverse: Normalizable]
-    (listContents: ConvertPath.ListContents[M])
+    (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
       DE:    Const[DeadEnd, ?] :<: QS, // TODO: Get rid of this, but kill pathable first.

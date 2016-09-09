@@ -58,7 +58,7 @@ object queryfile {
       def phase(xqy: XQuery): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
-      val listContents: ConvertPath.ListContents[Free[S, ?]] =
+      val listContents: DiscoverPath.ListContents[Free[S, ?]] =
         adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
 
       val planning = for {

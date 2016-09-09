@@ -471,16 +471,13 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: Monad, F[_]: Traverse, G[_]: Traverse]
-    (g: ConvertPath.ListContents[M])
+  def pathify[M[_]: Monad, IN[_]: Traverse, OUT[_]: Traverse]
+    (g: DiscoverPath.ListContents[M])
     (implicit
-      FS: StaticPath.Aux[T, F, G],
-      F:     Pathable[T, ?] :<: G,
-      R:     Const[Read, ?] :<: G,
-      QC: QScriptCore[T, ?] :<: G,
-      FI: G :<: QScriptTotal[T, ?],
-      CP: ConvertPath.Aux[T, Pathable[T, ?], G])
-      : T[F] => EitherT[M,  FileSystemError, T[G]] =
-    _.cataM(FS.pathifyƒ[M](g)) >>=
-      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, G, G](g)))
+      FS: DiscoverPath.Aux[T, IN, OUT],
+      R:     Const[Read, ?] :<: OUT,
+      QC: QScriptCore[T, ?] :<: OUT,
+      FI: OUT :<: QScriptTotal[T, ?])
+      : T[IN] => EitherT[M,  FileSystemError, T[OUT]] =
+    _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)
 }

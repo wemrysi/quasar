@@ -49,16 +49,14 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
-  private type CommonPathable[T[_[_]], A] =
+  private type QScriptInternal0[T[_[_]], A] =
     Coproduct[Const[DeadEnd, ?], QScriptCore[T, ?], A]
 
-  /** Statically known path components potentially converted to Read.
-    */
-  type Pathable[T[_[_]], A] =
-    Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
+  private type QScriptInternal1[T[_[_]], A] =
+    Coproduct[ProjectBucket[T, ?], QScriptInternal0[T, ?], A]
 
   type QScriptInternal[T[_[_]], A] =
-    Coproduct[ThetaJoin[T, ?], Pathable[T, ?], A]
+    Coproduct[ThetaJoin[T, ?], QScriptInternal1[T, ?], A]
   // NB: Coproducts are normally independent, but `QScriptInternal` needs to be
   //     a component of `QScriptTotal`, because we sometimes need to “inject”
   //     operations into a branch.

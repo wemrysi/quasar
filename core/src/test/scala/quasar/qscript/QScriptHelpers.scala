@@ -61,7 +61,7 @@ trait QScriptHelpers {
     ops.foldLeft(op.embed)((acc, elem) => elem.as(acc).embed)
 
   // NB: This is the same type as QueryFile.ListContents
-  def listContents: ConvertPath.ListContents[Id] =
+  def listContents: DiscoverPath.ListContents[Id] =
     d => EitherT((
       if (d ≟ rootDir)
         Set(
@@ -88,7 +88,7 @@ trait QScriptHelpers {
           FileName("zips").right,
           FileName("car").right)).right.point[Id])
 
-  def convert(lc: Option[ConvertPath.ListContents[Id]], lp: Fix[LP]):
+  def convert(lc: Option[DiscoverPath.ListContents[Id]], lp: Fix[LP]):
       Option[Fix[QS]] =
     lc.fold(
       QueryFile.convertToQScript[Fix, QScriptInternalRead[Fix, ?]](lp))(
