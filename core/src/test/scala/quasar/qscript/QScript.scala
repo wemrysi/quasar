@@ -340,13 +340,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
+          ProjectFieldR(HoleF, StrLit("zips")),
+          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))),
+        QC.inj(LeftShift((),
           Free.roll(DupArrayIndices(
-            ProjectFieldR(
-              ProjectFieldR(HoleF, StrLit("zips")),
-              StrLit("loc")))),
+            ProjectFieldR(HoleF, StrLit("loc")))),
           Free.roll(Multiply(Free.point(RightSide), IntLit(10))))),
         QC.inj(Reduce((),
-          HoleF,
+          HoleF, // FIXME provenance needs to be here
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
           Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
