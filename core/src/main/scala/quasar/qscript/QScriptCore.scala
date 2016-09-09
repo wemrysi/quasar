@@ -25,9 +25,7 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed abstract class QScriptCore[T[_[_]], A] {
-  def src: A
-}
+sealed abstract class QScriptCore[T[_[_]], A]
 
 /** A data-level transformation.
   */
@@ -125,6 +123,14 @@ object ReduceIndex {
 @Lenses final case class Drop[T[_[_]], A](src: A, from: FreeQS[T], count: FreeQS[T])
     extends QScriptCore[T, A]
 
+/** A placeholder value that can appear in plans, but will never be referenced
+  * in the result. We consider this a wart. It should be implemented as an
+  * arbitrary value with minimal cost to generate (since it will simply be
+  * discarded).
+  */
+@Lenses final case class Unreferenced[T[_[_]], A]()
+    extends QScriptCore[T, A]
+
 object QScriptCore {
   implicit def equal[T[_[_]]: EqualT]: Delay[Equal, QScriptCore[T, ?]] =
     new Delay[Equal, QScriptCore[T, ?]] {
@@ -142,6 +148,7 @@ object QScriptCore {
           case (Filter(a1, f1), Filter(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
           case (Take(a1, f1, c1), Take(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
           case (Drop(a1, f1, c1), Drop(a2, f2, c2)) => eq.equal(a1, a2) && f1 ≟ f2 && c1 ≟ c2
+          case (Unreferenced(), Unreferenced()) => true
           case (_, _) => false
         }
     }
@@ -160,6 +167,7 @@ object QScriptCore {
           case Filter(a, func)            => f(a) ∘ (Filter(_, func))
           case Take(a, from, c)           => f(a) ∘ (Take(_, from, c))
           case Drop(a, from, c)           => f(a) ∘ (Drop(_, from, c))
+          case Unreferenced()             => (Unreferenced[T, B](): QScriptCore[T, B]).point[G]
         }
     }
 
@@ -198,6 +206,7 @@ object QScriptCore {
             s.show(a) ++ Cord(",") ++
             f.show ++ Cord(",") ++
             c.show ++ Cord(")")
+          case Unreferenced() => Cord("Unreferenced")
         }
     }
 
@@ -300,6 +309,7 @@ object QScriptCore {
               src,
               freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
               freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
+          case Unreferenced() => Unreferenced()
         }
       }
     }

@@ -93,5 +93,7 @@ private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] exten
         fm <- rebaseXQuery(from, s.xqy)
         ct <- rebaseXQuery(count, s.xqy)
       } yield let_(s -> src, f -> fm, c -> ct) return_ fn.subsequence(f.xqy, c.xqy + 1.xqy)
+    case Unreferenced() =>
+      expr.emptySeq.point[PlanningT[F, ?]]
   }
 }

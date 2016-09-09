@@ -30,9 +30,6 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
-
   "QueryFile" should {
     "descendantFiles" >> {
       "returns all descendants of the given directory" >> prop {
