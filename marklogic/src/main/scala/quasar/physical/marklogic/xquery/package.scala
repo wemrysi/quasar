@@ -18,6 +18,8 @@ package quasar.physical.marklogic
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.physical.marklogic.validation._
+import quasar.physical.marklogic.xquery.xml._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri
@@ -48,7 +50,7 @@ package object xquery {
     }
   }
 
-  final case class ParamName(value: xml.QName) {
+  final case class ParamName(value: QName) {
     def as(tpe: SequenceType): FunctionParam = FunctionParam(this, tpe)
     def xqy: XQuery = XQuery(s"$$${value}")
   }
@@ -88,11 +90,11 @@ package object xquery {
   def asArg(opt: Option[XQuery]): String =
     opt.map(", " + _.toString).orZero
 
-  def declare(fname: xml.QName): FunctionDecl.FunctionDeclDsl =
+  def declare(fname: QName): FunctionDecl.FunctionDeclDsl =
     FunctionDecl.FunctionDeclDsl(fname)
 
-  def declareLocal(fname: xml.NCName): FunctionDecl.FunctionDeclDsl =
-    declare(xml.NSPrefix.local(fname))
+  def declareLocal(fname: NCName): FunctionDecl.FunctionDeclDsl =
+    declare(NSPrefix.local(fname))
 
   def freshVar[F[_]: NameGenerator: Functor]: F[String] =
     NameGenerator[F].prefixedName("$v")
@@ -103,11 +105,11 @@ package object xquery {
   def mkSeq_(x: XQuery, xs: XQuery*): XQuery =
     mkSeq(x +: xs)
 
-  def module(prefix: String Refined xml.IsNCName, uri: String Refined Uri, locs: (String Refined Uri)*): ModuleImport =
-    ModuleImport(Some(xml.NSPrefix(xml.NCName(prefix))), xml.NSUri(uri), locs.map(xml.NSUri(_)).toIList)
+  def module(prefix: String Refined IsNCName, uri: String Refined Uri, locs: (String Refined Uri)*): ModuleImport =
+    ModuleImport(Some(NSPrefix(NCName(prefix))), NSUri(uri), locs.map(NSUri(_)).toIList)
 
-  def namespace(prefix: String Refined xml.IsNCName, uri: String Refined Uri): NamespaceDecl =
-    NamespaceDecl(xml.NSPrefix(xml.NCName(prefix)), xml.NSUri(uri))
+  def namespace(prefix: String Refined IsNCName, uri: String Refined Uri): NamespaceDecl =
+    NamespaceDecl(NSPrefix(NCName(prefix)), NSUri(uri))
 
   def xmlElement(name: String, content: String): String =
     s"<$name>$content</$name>"

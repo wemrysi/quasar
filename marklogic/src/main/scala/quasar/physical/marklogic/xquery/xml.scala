@@ -17,14 +17,12 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xquery.syntax._
 
-import eu.timepit.refined.{W, refineMV}
+import eu.timepit.refined.refineMV
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.boolean._
-import eu.timepit.refined.collection._
-import eu.timepit.refined.string._
-
+import eu.timepit.refined.string.Uri
 import scalaz.{Order, Show}
 import scalaz.std.option._
 import scalaz.std.string._
@@ -32,9 +30,6 @@ import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 object xml {
-  type IsName   = True // TODO: Validate using xerces XMLChar util
-  type IsNCName = Not[Contains[W.`':'`.T]] And IsName
-
   final case class Name(value: String Refined IsName) {
     override def toString = this.shows
   }
@@ -82,7 +77,7 @@ object xml {
 
   object NSPrefix {
     val local: NSPrefix =
-      NSPrefix(NCName(refineMV("local")))
+      NSPrefix(NCName(refineMV[IsNCName]("local")))
 
     implicit val order: Order[NSPrefix] =
       Order.orderBy(_.value)

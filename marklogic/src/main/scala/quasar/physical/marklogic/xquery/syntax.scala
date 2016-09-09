@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xquery.xml._
 
 import scala.math.Integral
