@@ -30,7 +30,7 @@ private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[S
   import expr.{for_, if_}, axes.child
 
   // TODO: Implement `idStatus`
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)

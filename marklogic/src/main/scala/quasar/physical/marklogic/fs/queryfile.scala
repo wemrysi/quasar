@@ -18,7 +18,7 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.SKI.κ
-import quasar.{LogicalPlan, PhaseResult, PhaseResultT, PhaseResults}
+import quasar.{LogicalPlan, PhaseResult, PhaseResultT, PhaseResults, PlannerErrT}
 import quasar.effect.MonotonicSeq
 import quasar.fs._
 import quasar.fs.impl.queryFileFromDataCursor
@@ -53,7 +53,7 @@ object queryfile {
       f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type M[A] = PrologsT[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+      type M[A] = PrologsT[PlannerErrT[PhaseResultT[Free[S, ?], ?], ?], A]
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
@@ -64,14 +64,14 @@ object queryfile {
       val listContents: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      def plan(qs: Fix[QScriptTotal[Fix, ?]]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
+      def plan(qs: Fix[QScriptTotal[Fix, ?]]): PlannerErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
         qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[M]).run map {
           case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
         }
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        mod <- plan(qs)
+        mod <- plan(qs).leftMap(FileSystemError.planningFailed(lp, _))
         a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 

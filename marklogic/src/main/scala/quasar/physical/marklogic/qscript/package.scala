@@ -18,6 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.SKI.κ
 import quasar.NameGenerator
+import quasar.Planner.PlannerError
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
@@ -26,6 +27,8 @@ import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
+  // TODO: Maybe a ML-specific error type here?
+  type MonadPlanErr[F[_]] = MonadError_[F, PlannerError]
   type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
 
   object MarkLogicPlanner {
@@ -51,22 +54,24 @@ package object qscript {
       new EquiJoinPlanner[T]
   }
 
-  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](fm: FreeMap[T], src: XQuery): F[XQuery] =
+  def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
     planMapFunc[T, F, Hole](fm)(κ(src))
 
-  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
+  def mergeXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](jf: JoinFunc[T], l: XQuery, r: XQuery): F[XQuery] =
     planMapFunc[T, F, JoinSide](jf) {
       case LeftSide  => l
       case RightSide => r
     }
 
-  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW, A](
+  def planMapFunc[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr, A](
     freeMap: Free[MapFunc[T, ?], A])(
     recover: A => XQuery
   ): F[XQuery] =
     freeCataM(freeMap)(interpretM(a => recover(a).point[F], MapFuncPlanner[T, F]))
 
-  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW](fqs: FreeQS[T], src: XQuery): F[XQuery] = {
+  def rebaseXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](
+    fqs: FreeQS[T], src: XQuery
+  ): F[XQuery] = {
     import MarkLogicPlanner._
     freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
   }

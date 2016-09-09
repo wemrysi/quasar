@@ -26,7 +26,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, Const[Read, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[Read, ?], XQuery] = {
     case Const(Read(absFile)) =>
       s"((: Read :)())".xqy.point[F]
   }

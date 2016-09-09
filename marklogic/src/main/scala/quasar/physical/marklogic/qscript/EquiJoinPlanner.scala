@@ -26,7 +26,7 @@ import matryoshka._
 import scalaz._, Scalaz._
 
 private[qscript] final class EquiJoinPlanner[T[_[_]]] extends MarkLogicPlanner[EquiJoin[T, ?]] {
-  def plan[F[_]: NameGenerator: PrologW]: AlgebraM[F, EquiJoin[T, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, EquiJoin[T, ?], XQuery] = {
     case EquiJoin(src, lBranch, rBranch, leftKey, rightKey, joinType, combineFunc) =>
       s"((: EquiJoin :)$src)".xqy.point[F]
   }

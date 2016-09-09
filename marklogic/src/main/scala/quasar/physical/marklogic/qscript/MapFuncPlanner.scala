@@ -18,22 +18,27 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.Planner.{PlannerError, InternalError}
 import quasar.ejson.EJson
 import quasar.fp.ShowT
+import quasar.physical.marklogic.MonadError_
 import quasar.physical.marklogic.ejson.AsXQuery
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.xquery.xml.{IsNCName, NCName, QName}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
+import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
+import scalaz.syntax.std.either._
 
 object MapFuncPlanner {
   import expr.{if_, let_}, axes._
 
-  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
+  def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
     case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
 
     // math
@@ -80,21 +85,25 @@ object MapFuncPlanner {
       case XQuery.Step(_) =>
         (src `/` field).point[F]
 
-      // TODO: Validate `s` is a QName
-      case XQuery.StringLit(s) => ???
-        /*
-        for {
-          m      <- freshVar[F]
-          lookup <- ejson.mapLookup(m.xqy, s.xs)
-          isMap  <- ejson.isMap(m.xqy)
-        } yield {
-          let_(m -> src) return_ {
-            if_ (isMap)
-            .then_ { lookup }
-            .else_ { m.xqy `/` child(s) }
+      case XQuery.StringLit(s) =>
+        refineV[IsNCName](s).disjunction map { ncname =>
+          val qn = QName.local(NCName(ncname))
+
+          for {
+            m      <- freshVar[F]
+            lookup <- ejson.mapLookup(m.xqy, qn.xs)
+            isMap  <- ejson.isMap(m.xqy)
+          } yield {
+            let_(m -> src) return_ {
+              if_ (isMap)
+              .then_ { lookup }
+              .else_ { m.xqy `/` child(qn) }
+            }
           }
+        } getOrElse {
+          MonadError_[F, PlannerError].raiseError(InternalError(
+            s"'$s' is not a valid XML QName."))
         }
-        */
 
       case _ =>
         for {
