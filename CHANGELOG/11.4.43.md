@@ -1,0 +1,1 @@
+Mark all regressions tests as pending for MarkLogic

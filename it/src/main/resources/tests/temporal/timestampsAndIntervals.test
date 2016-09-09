@@ -1,7 +1,7 @@
 {
   "name": "timestamp and interval syntax",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "../days.data",
 

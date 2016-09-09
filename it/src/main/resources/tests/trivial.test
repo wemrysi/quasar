@@ -1,7 +1,7 @@
 {
   "name": "simple read",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "smallZips.data",
 

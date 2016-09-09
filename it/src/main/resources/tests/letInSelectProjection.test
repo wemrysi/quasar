@@ -1,7 +1,7 @@
 {
     "name": "handle let as project of select",
 
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
 
     "data": "zips.data",
 
