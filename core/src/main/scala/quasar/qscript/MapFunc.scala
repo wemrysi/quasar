@@ -134,8 +134,8 @@ object MapFunc {
 
   }
 
-  type CoMF[T2[_[_]], A, B] = CoEnv[A, MapFunc[T2, ?], B]
-  type CoMFR[T[_[_]], T2[_[_]], A] = CoMF[T2, A, T[CoMF[T2, A, ?]]]
+  type CoMF[T[_[_]], A, B] = CoEnv[A, MapFunc[T, ?], B]
+  type CoMFR[T[_[_]], A] = CoMF[T, A, T[CoMF[T, A, ?]]]
 
   // TODO subtyping is preventing embeding of MapFuncs
   object ConcatMapsN {
@@ -164,20 +164,34 @@ object MapFunc {
         })
   }
 
+  // we start from the leaves, and make the inner parts into Constant as we go
+  // so the immediate child is always a constant, else we know the endpoint was not a constant
+  // use freeTransCata!
+  def foldConstant[T[_[_]]: Recursive: Corecursive, A]:
+      CoMFR[T, A] => Option[CoMFR[T, A]] =
+    _.run.fold(
+      κ(None),
+      {
+        case MakeArray(Embed(CoEnv(\/-(Constant(v))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Arr(List(v))).embed).right).some
+
+        case _ => None
+      })
+
   // TODO: This could be split up as it is in LP, with each function containing
   //       its own normalization.
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
-  def normalize[T[_[_]]: Recursive: Corecursive, T2[_[_]]: Recursive: Corecursive: EqualT, A]:
-      CoMFR[T, T2, A] => Option[CoMFR[T, T2, A]] = {
-    implicit def implicitPrio[F[_], G[_]]: Inject[F, Coproduct[F, G, ?]] = Inject.leftInjectInstance
-
+  def normalize[T[_[_]]: Recursive: Corecursive: EqualT, A]:
+      CoMFR[T, A] => Option[CoMFR[T, A]] = {
     _.run.fold(
       κ(None),
       {
         case Eq(Embed(CoEnv(\/-(Constant(v1)))), Embed(CoEnv(\/-(Constant(v2))))) =>
-          CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](
-            Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](CommonEJson.inj(
-              ejson.Bool[T2[EJson]](v1 ≟ v2)).embed).right).some
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](CommonEJson.inj(
+              ejson.Bool[T[EJson]](v1 ≟ v2)).embed).right).some
 
         case ProjectIndex(Embed(StaticArrayPrefix(as)), Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Int(index)))))))) =>
           if (index.isValidInt)
@@ -193,32 +207,32 @@ object MapFunc {
             case Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(m))))))) =>
               m.find {
                 case (k, v) => k ≟ field
-              }.map(p => CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](Constant[T2, T[CoEnv[A, MapFunc[T2, ?], ?]]](p._2).right)).get
+              }.map(p => CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](p._2).right)).get
           }
 
         // elide Nil array on the left
         case ConcatArrays(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
 
         // elide Nil array on the right
         case ConcatArrays(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(Nil)))))))) =>
-            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
 
         // elide Nil map on the left
         case ConcatMaps(
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil))))))),
           Embed(CoEnv(\/-(rhs)))) =>
-            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](rhs.right[A]).some
+            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](rhs.right[A]).some
 
         // elide Nil map on the right
         case ConcatMaps(
           Embed(CoEnv(\/-(lhs))),
           Embed(CoEnv(\/-(Constant(Embed(ejson.Extension(ejson.Map(Nil)))))))) =>
-            CoEnv[A, MapFunc[T2, ?], T[CoEnv[A, MapFunc[T2, ?], ?]]](lhs.right[A]).some
+            CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](lhs.right[A]).some
 
         case _ => None
       })
