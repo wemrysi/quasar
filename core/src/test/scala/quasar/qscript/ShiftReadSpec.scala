@@ -36,7 +36,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
 
       val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)(_))
 
-      // TODO: Better expectation once we optimize away `IncludeId`.
+      // TODO: Optimize away the `IncludeId`.
       newQScript.transCata(optimize.applyAll) must_=
       Fix(QS.inj(QC.inj(Map(
         Fix(SR.inj(Const[ShiftedRead, Fix[QScriptTotal[Fix, ?]]](ShiftedRead(sampleFile, IncludeId)))),

@@ -18,8 +18,7 @@ package quasar.fs
 
 import quasar.Predef.{Map, Vector}
 import quasar.effect._
-import quasar.fp.TaskRef
-import quasar.fp.free, free._
+import quasar.fp._, free._
 
 import monocle.Lens
 import scalaz.{Lens => _, Failure => _, _}
@@ -86,11 +85,14 @@ package object mount {
       KeyValueStore.impl.toState[State[S,?]](l)
   }
 
-  type ViewFileSystem0[A] = Coproduct[MonotonicSeq, FileSystem, A]
-  type ViewFileSystem1[A] = Coproduct[ViewState, ViewFileSystem0, A]
-  type ViewFileSystem2[A] = Coproduct[MountingFailure, ViewFileSystem1, A]
-  type ViewFileSystem3[A] = Coproduct[PathMismatchFailure, ViewFileSystem2, A]
-  type ViewFileSystem[A]  = Coproduct[Mounting, ViewFileSystem3, A]
+  type ViewFileSystem[A] = (
+        Mounting
+    :\: PathMismatchFailure
+    :\: MountingFailure
+    :\: ViewState
+    :\: MonotonicSeq
+    :/: FileSystem
+  )#M[A]
 
   object ViewFileSystem {
     def interpret[F[_]](

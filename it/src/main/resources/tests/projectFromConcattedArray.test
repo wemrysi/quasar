@@ -2,7 +2,8 @@
     "name": "project from concatted array",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "pending"
     },
     "data": "largeZips.data",
     "query": "select (loc || [1, 2])[1] from largeZips",

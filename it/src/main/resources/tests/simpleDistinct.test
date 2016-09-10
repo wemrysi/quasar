@@ -1,7 +1,7 @@
 {
   "name": "simple distinct",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "olympics.data",
 

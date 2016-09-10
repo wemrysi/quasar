@@ -2,7 +2,8 @@
     "name": "convert values to/from strings",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "pending"
     },
     "data": "zips.data",
     "query": "select integer(_id), decimal(_id), to_string(pop), to_string(loc[0]), to_string(length(city) < 9) from zips",

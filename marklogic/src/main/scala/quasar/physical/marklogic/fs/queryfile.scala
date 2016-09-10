@@ -59,7 +59,7 @@ object queryfile {
         Vector(PhaseResult.Detail("XQuery", xqy.toString))
 
       val listContents: DiscoverPath.ListContents[Free[S, ?]] =
-        adir => lift(ContentSourceIO.runSessionIO(ops.ls(adir))).into[S].liftM[FileSystemErrT]
+        adir => lift(ops.ls(adir)).into[S].liftM[FileSystemErrT]
 
       val planning = for {
         qs  <- convertToQScriptRead[Fix, Free[S, ?], QScriptInternalRead[Fix, ?]](listContents)(lp)

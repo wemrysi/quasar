@@ -1,7 +1,7 @@
 {
   "name": "constant and a grouped value",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "zips.data",
 
