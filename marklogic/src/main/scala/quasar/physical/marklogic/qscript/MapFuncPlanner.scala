@@ -134,8 +134,8 @@ object MapFuncPlanner {
       for {
         src   <- freshVar[F]
         zmk   <- ejson.zipMapKeys apply src.xqy
-        zmnk  <- local.zipMapNodeKeys(src.xqy)
-        isMap <- ejson.isMap[F] apply (src.xqy)
+        zmnk  <- qscript.zipMapNodeKeys apply src.xqy
+        isMap <- ejson.isMap apply (src.xqy)
       } yield {
         let_(src -> m) return_ {
           // TODO: Should this be necessary?
