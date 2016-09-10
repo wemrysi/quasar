@@ -18,7 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
-import quasar.fp._
+import quasar.fp._, eitherT._
 
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._

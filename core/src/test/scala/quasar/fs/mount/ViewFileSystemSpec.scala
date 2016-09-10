@@ -20,7 +20,7 @@ import quasar.Predef._
 
 import quasar._, LogicalPlan._
 import quasar.effect.{Failure, KeyValueStore, MonotonicSeq}
-import quasar.fp._
+import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.fs.InMemory.InMemState
 import quasar.sql.{InnerJoin => _, _}

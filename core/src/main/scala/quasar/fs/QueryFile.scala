@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar._, Planner._, RenderTree.ops._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.eitherT._
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._

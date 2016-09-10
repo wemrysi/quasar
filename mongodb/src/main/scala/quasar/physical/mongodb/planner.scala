@@ -40,6 +40,9 @@ object MongoDbPlanner {
   import Planner._
   import WorkflowBuilder._
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   import agg._
   import array._
   import date._

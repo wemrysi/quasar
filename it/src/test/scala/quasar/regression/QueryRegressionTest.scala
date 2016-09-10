@@ -18,7 +18,7 @@ package quasar.regression
 
 import quasar.Predef._
 import quasar._
-import quasar.fp._, free._
+import quasar.fp._, eitherT._, free._
 import quasar.fs._
 import quasar.main.FilesystemQueries
 import quasar.fs.mount.{Mounts, hierarchical}

@@ -18,7 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
-import quasar.fp._
+import quasar.fp._, eitherT._
 import quasar.scalacheck._
 
 import pathy.Path._

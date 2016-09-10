@@ -18,7 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, PhaseResultT}
-import quasar.fp._
+import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
