@@ -38,9 +38,11 @@ trait ShiftRead[F[_]] {
 }
 
 object ShiftRead extends ShiftReadInstances {
-  type Aux[F[_], H[_]] = ShiftRead[F] { type G[A] = H[A] }
+  // NB: The `T` parameter is unused, but without it, the `read` instance
+  //     doesn’t get resolved.
+  type Aux[T[_[_]], F[_], H[_]] = ShiftRead[F] { type G[A] = H[A] }
 
-  def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[F, G]) = ev
+  def apply[T[_[_]], F[_], G[_]](implicit ev: ShiftRead.Aux[T, F, G]) = ev
 
   def applyToBranch[T[_[_]]: Recursive: Corecursive](branch: FreeQS[T]):
       FreeQS[T] =
@@ -50,7 +52,7 @@ object ShiftRead extends ShiftReadInstances {
 
   implicit def read[T[_[_]]: Recursive: Corecursive, F[_]]
     (implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-      : ShiftRead[Const[Read, ?]] =
+      : ShiftRead.Aux[T, Const[Read, ?], F] =
     new ShiftRead[Const[Read, ?]] {
       type G[A] = F[A]
       def shiftRead[H[_]](GtoH: G ~> H): Const[Read, ?] ~> (H ∘ Free[H, ?])#λ =
@@ -69,7 +71,7 @@ object ShiftRead extends ShiftReadInstances {
     }
 
   implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]](implicit QC: QScriptCore[T, ?] :<: F):
-      ShiftRead.Aux[QScriptCore[T, ?], F] =
+      ShiftRead.Aux[T, QScriptCore[T, ?], F] =
     new ShiftRead[QScriptCore[T, ?]] {
       type G[A] = F[A]
       def shiftRead[H[_]](GtoH: G ~> H): QScriptCore[T, ?] ~> (H ∘ Free[H, ?])#λ =
@@ -87,7 +89,7 @@ object ShiftRead extends ShiftReadInstances {
     }
 
   implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit TJ: ThetaJoin[T, ?] :<: F):
-      ShiftRead.Aux[ThetaJoin[T, ?], F] =
+      ShiftRead.Aux[T, ThetaJoin[T, ?], F] =
     new ShiftRead[ThetaJoin[T, ?]] {
       type G[A] = F[A]
       def shiftRead[H[_]](GtoH: G ~> H): ThetaJoin[T, ?] ~> (H ∘ Free[H, ?])#λ =
@@ -104,7 +106,7 @@ object ShiftRead extends ShiftReadInstances {
     }
 
   implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]](implicit EJ: EquiJoin[T, ?] :<: F):
-      ShiftRead.Aux[EquiJoin[T, ?], F] =
+      ShiftRead.Aux[T, EquiJoin[T, ?], F] =
     new ShiftRead[EquiJoin[T, ?]] {
       type G[A] = F[A]
       def shiftRead[H[_]](GtoH: G ~> H): EquiJoin[T, ?] ~> (H ∘ Free[H, ?])#λ =
@@ -121,8 +123,9 @@ object ShiftRead extends ShiftReadInstances {
         }
     }
 
-  implicit def coproduct[F[_], I[_], J[_]](implicit I: ShiftRead.Aux[I, F], J: ShiftRead.Aux[J, F]):
-      ShiftRead.Aux[Coproduct[I, J, ?], F] =
+  implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
+    (implicit I: ShiftRead.Aux[T, I, F], J: ShiftRead.Aux[T, J, F]):
+      ShiftRead.Aux[T, Coproduct[I, J, ?], F] =
     new ShiftRead[Coproduct[I, J, ?]] {
       type G[A] = F[A]
       def shiftRead[H[_]](GtoH: G ~> H): Coproduct[I, J, ?] ~> (H ∘ Free[H, ?])#λ =
@@ -134,8 +137,8 @@ object ShiftRead extends ShiftReadInstances {
 }
 
 abstract class ShiftReadInstances {
-  implicit def inject[F[_]: Functor, I[_]](implicit F: F :<: I):
-      ShiftRead.Aux[F, I] =
+  implicit def inject[T[_[_]], F[_]: Functor, I[_]](implicit F: F :<: I):
+      ShiftRead.Aux[T, F, I] =
     new ShiftRead[F] {
       type G[A] = I[A]
       def shiftRead[H[_]](GtoH: G ~> H): F ~> (H ∘ Free[H, ?])#λ =
