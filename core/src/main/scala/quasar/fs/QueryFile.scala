@@ -51,7 +51,7 @@ object QueryFile {
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
       PB:  ProjectBucket[T, ?] :<: QS,
-      FI:   QS :<: QScriptTotal[T, ?],
+      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
       mergeable: Mergeable.Aux[T, QS],
       eq:            Delay[Equal, QS],
       show:           Delay[Show, QS])
@@ -74,7 +74,7 @@ object QueryFile {
       SP: SimplifyProjection.Aux[IQS, QS],
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
-      FI: QS :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val optimize = new Optimize[T]
 
@@ -86,6 +86,10 @@ object QueryFile {
       .transCata(optimize.applyAll)
   }
 
+  /** The shape of QScript that’s used during conversion from LP. */
+  private type QScriptInternal[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
+
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
@@ -96,7 +100,7 @@ object QueryFile {
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
-      FI: QS :<: QScriptTotal[T, ?],
+      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
       show:         Delay[Show, QS],
       RT:     Delay[RenderTree, QS])
       : EitherT[Writer[PhaseResults, ?], FileSystemError, T[QS]] = {
@@ -122,23 +126,25 @@ object QueryFile {
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
-      DE:    Const[DeadEnd, ?] :<: QS, // TODO: Get rid of this, but kill pathable first.
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
-      FI:   QS :<: QScriptTotal[T, ?],
+      FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
       show:           Delay[Show, QS],
       RT:       Delay[RenderTree, QS])
       : EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS]] = {
     val transform = new Transform[T, QScriptInternal[T, ?]]
     val optimize = new Optimize[T]
 
+    type InterimQS[A] =
+      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
     val qs =
       (EitherT(optimizeEval[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
-        optimize.pathify[M, QScriptInternal[T, ?], QScriptInternalRead[T, ?]](listContents)) ∘
-        normalizeQScript[T, QScriptInternalRead[T, ?], QS]
+        optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)) ∘
+        normalizeQScript[T, InterimQS, QS]
 
     EitherT(WriterT(qs.run.map(qq => (
       qq.fold(

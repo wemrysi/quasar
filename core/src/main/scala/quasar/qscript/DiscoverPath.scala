@@ -51,12 +51,12 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
     (implicit
       R:     Const[Read, ?] :<: OUT,
       QC: QScriptCore[T, ?] :<: OUT,
-      FI: OUT :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : EitherT[M, FileSystemError, FreeQS[T]] =
     freeCataM[EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Hole, List[ADir] \&/ T[QScriptTotal[T, ?]]](
       branch)(
       interpretM(
-        κ((src ∘ (_.transCata(FI.inj[T[QScriptTotal[T, ?]]]))).point[EitherT[M, FileSystemError, ?]]),
+        κ((src ∘ (_.transCata(FI.inject[T[QScriptTotal[T, ?]]]))).point[EitherT[M, FileSystemError, ?]]),
         DiscoverPath[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].discoverPath(f))) >>=
       (unionAll[T, M, QScriptTotal[T, ?]](f).apply(_) ∘ (_.convertTo[Free[?[_], Hole]]))
 
@@ -68,7 +68,7 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
     (implicit
       R:     Const[Read, ?] :<: OUT,
       QC: QScriptCore[T, ?] :<: OUT,
-      FI: OUT :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : EitherT[M, FileSystemError, List[ADir] \&/ T[OUT]] =
     (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
       \&/-(op(QC.inj(Unreferenced[T, T[OUT]]()).embed, l, r).embed))
@@ -95,7 +95,7 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
       R:       Const[Read, ?] :<: F,
       QC:   QScriptCore[T, ?] :<: F,
       PB: ProjectBucket[T, ?] :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ProjectBucket[T, ?], F] =
     new DiscoverPath[ProjectBucket[T, ?]] {
       type IT[F[_]] = T[F]
@@ -133,7 +133,7 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
     (implicit
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, QScriptCore[T, ?], F] =
     new DiscoverPath[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]
@@ -161,7 +161,7 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
       TJ: ThetaJoin[T, ?] :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ThetaJoin[T, ?], F] =
     new DiscoverPath[ThetaJoin[T, ?]] {
       type IT[F[_]] = T[F]
@@ -179,7 +179,7 @@ abstract class DiscoverPathInstances extends DiscoverPathInstances0 {
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
       EJ: EquiJoin[T, ?] :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, EquiJoin[T, ?], F] =
     new DiscoverPath[EquiJoin[T, ?]] {
       type IT[F[_]] = T[F]
@@ -213,12 +213,14 @@ abstract class DiscoverPathInstances0 {
 
   def union[T[_[_]]: Recursive: Corecursive, OUT[_]: Functor]
     (elems: NonEmptyList[T[OUT]])
-    (implicit QC: QScriptCore[T, ?] :<: OUT, FI: OUT :<: QScriptTotal[T, ?])
+    (implicit
+      QC: QScriptCore[T, ?] :<: OUT,
+      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : T[OUT] =
     elems.foldRight1(
       (elem, acc) => QC.inj(Union(QC.inj(Unreferenced[T, T[OUT]]()).embed,
-        elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))),
-        acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inj(g))))).embed)
+        elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
+        acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
 
   def makeRead[T[_[_]], F[_]]
     (dir: ADir, file: FileName)
@@ -257,7 +259,7 @@ abstract class DiscoverPathInstances0 {
     (implicit
       R:     Const[Read, ?] :<: OUT,
       QC: QScriptCore[T, ?] :<: OUT,
-      FI: OUT :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : List[ADir] \&/ T[OUT] => EitherT[M, FileSystemError, T[OUT]] =
     _.fold(
       ds => EitherT(unionDirs[T, M, OUT](g).apply(ds) ∘ (_.fold[FileSystemError \/ T[OUT]](
@@ -271,7 +273,7 @@ abstract class DiscoverPathInstances0 {
       R:     Const[Read, ?] :<: F,
       QC: QScriptCore[T, ?] :<: F,
       IN:                IN :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, IN, F] =
     new DiscoverPath[IN] {
       type IT[F[_]] = T[F]

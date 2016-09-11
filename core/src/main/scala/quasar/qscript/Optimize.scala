@@ -66,7 +66,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]](
-    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
+    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       ThetaJoin[T, ?] ~> F =
     new (ThetaJoin[T, ?] ~> F) {
       def apply[A](tj: ThetaJoin[T, A]) = tj match {
@@ -75,7 +75,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
           QC.inj(Map(src, combine.map(_ => SrcHole: Hole)))
         case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
           (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
-            case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
+            case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
               case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
                 QC.inj(Map(src, combine >>= {
                   case LeftSide  => mf1
@@ -83,7 +83,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
                 }))
               case (_, _) => TJ.inj(x)
             }
-            case (-\/(m1), \/-(SrcHole)) => (FI.prj(m1) >>= QC.prj) match {
+            case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj) match {
               case Some(Map(\/-(SrcHole), mf1)) =>
                 QC.inj(Map(src, combine >>= {
                   case LeftSide  => mf1
@@ -91,7 +91,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
                 }))
               case _ => TJ.inj(x)
             }
-            case (\/-(SrcHole), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
+            case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj) match {
               case Some(Map(\/-(SrcHole), mf2)) =>
                 QC.inj(Map(src, combine >>= {
                   case LeftSide  => HoleF
@@ -108,22 +108,22 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def rebaseT[F[_]: Traverse](
     target: FreeQS[T])(
     src: T[F])(
-    implicit FI: F :<: QScriptTotal[T, ?]):
+    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       Option[T[F]] =
     freeCata[QScriptTotal[T, ?], T[QScriptTotal[T, ?]], T[QScriptTotal[T, ?]]](
-      target.map(_ => src.transAna(FI)))(recover(_.embed)).transAnaM(FI.prj)
+      target.map(_ => src.transAna(FI.inject)))(recover(_.embed)).transAnaM(FI.project)
 
   def rebaseTCo[F[_]: Traverse](
     target: FreeQS[T])(
     srcCo: T[CoEnv[Hole, F, ?]])(
-    implicit FI: F :<: QScriptTotal[T, ?]):
+    implicit FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
-    //       target.transAnaM(_.htraverse(FI.prj)) ∘ (srcCo >> _)
+    //       target.transAnaM(_.htraverse(FI.project)) ∘ (srcCo >> _)
     freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
       target)(
       coEnvHtraverse(_)(new (QScriptTotal[T, ?] ~> (Option ∘ F)#λ) {
-        def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.prj(qt)
+        def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.project(qt)
       })).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
 
   private def rebaseLeft[F[_], G[_]](
@@ -194,11 +194,11 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     rebase: FreeQS[T] => T[G] => Option[T[G]])(
     implicit TJ: ThetaJoin[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
+             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       ThetaJoin[T, T[G]] => F[T[G]] = {
     case tj @ ThetaJoin(src, left, right, on, Inner, _) if on ≟ BoolLit(true) =>
       (left.resume.leftMap(_.map(_.resume)), right.resume.leftMap(_.map(_.resume))) match {
-        case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
+        case (-\/(m1), -\/(m2)) => (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
           // both sides `SrcHole`
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
             matchBoth[F, G](rebase)(tj, mf1, mf2)
@@ -234,7 +234,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (GtoF: PrismNT[G, F])
     (implicit
       QC: QScriptCore[T, ?] :<: F,
-      FI: F :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : QScriptCore[T, T[G]] => Option[QScriptCore[T, T[G]]] = {
     case Map(Embed(src), mf) => GtoF.get(src) >>= QC.prj >>= {
       case Map(srcInner, mfInner) => Map(srcInner, mf >> mfInner).some
@@ -262,12 +262,12 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       }
     // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
     case Take(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
+      from.resume.swap.toOption >>= FI.project >>= QC.prj >>= {
         case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Take(src, fromInner, count))).embed, mf).some
         case _ => None
       }
     case Drop(src, from, count) => // Pull more work to _after_ limiting the dataset
-      from.resume.swap.toOption >>= FI.prj >>= QC.prj >>= {
+      from.resume.swap.toOption >>= FI.project >>= QC.prj >>= {
         case Map(fromInner, mf) => Map(GtoF.reverseGet(QC.inj(Drop(src, fromInner, count))).embed, mf).some
         case _ => None
       }
@@ -432,7 +432,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def applyAll[F[_]: Traverse: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
+             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[F]] => F[T[F]] =
     (Normalizable[F].normalize(_: F[T[F]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -449,7 +449,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   def applyToFreeQS[F[_]: Traverse: Normalizable](
     implicit QC: QScriptCore[T, ?] :<: F,
              TJ: ThetaJoin[T, ?] :<: F,
-             FI: F :<: QScriptTotal[T, ?]):
+             FI: Injectable.Aux[F, QScriptTotal[T, ?]]):
       F[T[CoEnv[Hole, F, ?]]] => CoEnv[Hole, F, T[CoEnv[Hole, F, ?]]] =
     (Normalizable[F].normalize(_: F[T[CoEnv[Hole, F, ?]]])) ⋙
       quasar.fp.free.injectedNT[F](elideNopJoin[F]) ⋙
@@ -477,7 +477,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       FS: DiscoverPath.Aux[T, IN, OUT],
       R:     Const[Read, ?] :<: OUT,
       QC: QScriptCore[T, ?] :<: OUT,
-      FI: OUT :<: QScriptTotal[T, ?])
+      FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : T[IN] => EitherT[M,  FileSystemError, T[OUT]] =
     _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)
 }

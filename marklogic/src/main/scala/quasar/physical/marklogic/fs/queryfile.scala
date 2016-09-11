@@ -62,8 +62,8 @@ object queryfile {
         adir => lift(ops.ls(adir)).into[S].liftM[FileSystemErrT]
 
       val planning = for {
-        qs  <- convertToQScriptRead[Fix, Free[S, ?], QScriptInternalRead[Fix, ?]](listContents)(lp)
-        xqy <- qs.cataM(Planner[QScriptInternalRead[Fix, ?], XQuery].plan[Free[S, ?]])
+        qs  <- convertToQScriptRead[Fix, Free[S, ?], QScriptRead[Fix, ?]](listContents)(lp)
+        xqy <- qs.cataM(Planner[QScriptRead[Fix, ?], XQuery].plan[Free[S, ?]])
                  .leftMap(planningFailed(lp, _))
         a   <- WriterT.put(lift(f(xqy)).into[S])(phase(xqy)).liftM[FileSystemErrT]
       } yield a

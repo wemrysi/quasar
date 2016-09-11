@@ -46,7 +46,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
            TJ: ThetaJoin[T, ?] :<: F,
            PB: ProjectBucket[T, ?] :<: F,
            // TODO: Remove this one once we have multi-sorted AST
-           FI: F :<: QScriptTotal[T, ?],
+           FI: Injectable.Aux[F, QScriptTotal[T, ?]],
            mergeable:  Mergeable.Aux[T, F],
            eq:         Delay[Equal, F],
            show:       Delay[Show, F]) {
@@ -206,8 +206,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
       val tj = TJ.inj(ThetaJoin(
         src,
-        lBranch.mapSuspension(FI.compose(envtLowerNT)),
-        rBranch.mapSuspension(FI.compose(envtLowerNT)),
+        lBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
+        rBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
         // FIXME: not quite right – e.g., if there is a reduction in a branch the
         //        condition won’t line up.
         condition,
@@ -488,8 +488,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         TJ.inj(ThetaJoin(
           commonSrc,
-          rebaseBranch(leftSide, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(rightSide, rMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(leftSide, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(rightSide, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
           cond,
           tpe,
           combine))))
@@ -601,8 +601,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         QC.inj(Take(
           EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI),
-          Free.roll(right).mapSuspension(FI))))).right
+          Free.roll(left).mapSuspension(FI.inject),
+          Free.roll(right).mapSuspension(FI.inject))))).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -612,8 +612,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         QC.inj(Drop(
           EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI),
-          Free.roll(right).mapSuspension(FI))))).right
+          Free.roll(left).mapSuspension(FI.inject),
+          Free.roll(right).mapSuspension(FI.inject))))).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
@@ -692,8 +692,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {
         (QC.inj(Union(src,
-          lfree.mapSuspension(FI.compose(envtLowerNT)),
-          rfree.mapSuspension(FI.compose(envtLowerNT)))),
+          lfree.mapSuspension(FI.inject.compose(envtLowerNT)),
+          rfree.mapSuspension(FI.inject.compose(envtLowerNT)))),
           prov.unionProvenances(
             someAnn(lfree.resume, src).provenance,
             someAnn(rfree.resume, src).provenance),
@@ -709,8 +709,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         src.project.ask,
         TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
           EquiJF,
           Inner,
           Free.point(LeftSide))))).right
@@ -721,8 +721,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         left.resume.fold(_.ask, κ(src.project.ask)),
         TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
           Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
           LeftOuter,
           Free.point(LeftSide))))).right

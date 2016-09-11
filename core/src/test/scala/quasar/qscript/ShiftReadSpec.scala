@@ -34,12 +34,12 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
           ReadR(sampleFile),
           QC.inj(LeftShift((), HoleF, Free.point(RightSide))))
 
-      val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)(_))
+      val newQScript = transFutu(qScript)(ShiftRead[Fix, QS, QST].shiftRead(idPrism.reverseGet)(_))
 
       // TODO: Optimize away the `IncludeId`.
       newQScript.transCata(optimize.applyAll) must_=
-      Fix(QS.inj(QC.inj(Map(
-        Fix(SR.inj(Const[ShiftedRead, Fix[QScriptTotal[Fix, ?]]](ShiftedRead(sampleFile, IncludeId)))),
+      Fix(QS.inject(QC.inj(Map(
+        Fix(SR.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
         Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
     }
   }

@@ -66,14 +66,14 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         UnreferencedR,
         QC.inj(Union((),
-          Free.roll(QS.inj(QC.inj(Map(Free.roll(QS.inj(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar")))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
-          Free.roll(QS.inj(QC.inj(Union(Free.roll(QS.inj(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-            Free.roll(QS.inj(QC.inj(Map(Free.roll(QS.inj(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car")))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
-            Free.roll(QS.inj(QC.inj(Union(Free.roll(QS.inj(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-              Free.roll(QS.inj(QC.inj(Map(Free.roll(QS.inj(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city")))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
-              Free.roll(QS.inj(QC.inj(Union(Free.roll(QS.inj(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-                Free.roll(QS.inj(QC.inj(Map(Free.roll(QS.inj(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person")))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
-                Free.roll(QS.inj(QC.inj(Map(Free.roll(QS.inj(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips")))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
+          Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar")))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
+          Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+            Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car")))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
+            Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+              Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city")))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
+              Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person")))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips")))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
 
         QC.inj(LeftShift((),
           HoleF,
@@ -98,8 +98,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           QC.inj(LeftShift((), HoleF, Free.point(RightSide))),
           QC.inj(Take((),
             Free.point(SrcHole),
-            Free.roll(QS.inj(QC.inj(Map(
-              Free.roll(QS.inj(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+            Free.roll(QST[QS].inject(QC.inj(Map(
+              Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
               IntLit[Fix, Hole](10)))))))).some)
     }
 
@@ -118,17 +118,17 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         RootR,
         TJ.inj(ThetaJoin((),
           chain[Free[?[_], Hole], QScriptTotal[Fix, ?]](
-            QS.inj(QC.inj(Map(Free.point(SrcHole),
+            QST[QS].inject(QC.inj(Map(Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("foo"))))),
-            QS.inj(QC.inj(LeftShift((),
+            QST[QS].inject(QC.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),
                 Free.roll(MakeArray(Free.point(RightSide))))))))),
           chain[Free[?[_], Hole], QScriptTotal[Fix, ?]](
-            QS.inj(QC.inj(Map(Free.point(SrcHole),
+            QST[QS].inject(QC.inj(Map(Free.point(SrcHole),
               ProjectFieldR(HoleF, StrLit("bar"))))),
-            QS.inj(QC.inj(LeftShift((),
+            QST[QS].inject(QC.inj(LeftShift((),
               Free.roll(ZipMapKeys(HoleF)),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(Free.point(LeftSide))),

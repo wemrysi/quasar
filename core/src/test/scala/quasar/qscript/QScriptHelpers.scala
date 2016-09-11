@@ -29,18 +29,27 @@ import pathy.Path._
 import scalaz._, Scalaz._
 
 trait QScriptHelpers {
-  // TODO: Narrow this to QScriptPure
-  type QS[A] = QScriptInternalRead[Fix, A]
+  type QS[A] =
+    (QScriptCore[Fix, ?] :\:
+      ThetaJoin[Fix, ?] :\:
+      Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+
+  type QST[A] =
+    (QScriptCore[Fix, ?] :\:
+      ThetaJoin[Fix, ?] :\: EquiJoin[Fix, ?] :\:
+      Const[ShiftedRead, ?] :\: Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
   val R  = implicitly[Const[Read, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ = implicitly[EquiJoin[Fix, ?] :<: QScriptTotal[Fix, ?]]
-  val SR = implicitly[Const[ShiftedRead, ?] :<: QScriptTotal[Fix, ?]]
-  val QS = implicitly[QS :<: QScriptTotal[Fix, ?]]
+  val EJ = implicitly[EquiJoin[Fix, ?] :<: QST]
+  val SR = implicitly[Const[ShiftedRead, ?] :<: QST]
+  val QS = implicitly[Injectable.Aux[QS, QST]]
+  def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
 
-  def RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
-  def UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
+  val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
+  val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
   def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
 
   def ProjectFieldR[A](
@@ -91,7 +100,7 @@ trait QScriptHelpers {
   def convert(lc: Option[DiscoverPath.ListContents[Id]], lp: Fix[LP]):
       Option[Fix[QS]] =
     lc.fold(
-      QueryFile.convertToQScript[Fix, QScriptInternalRead[Fix, ?]](lp))(
-      QueryFile.convertToQScriptRead[Fix, Id, QScriptInternalRead[Fix, ?]](_)(lp))
+      QueryFile.convertToQScript[Fix, QS](lp))(
+      QueryFile.convertToQScriptRead[Fix, Id, QS](_)(lp))
       .toOption.run.copoint
 }

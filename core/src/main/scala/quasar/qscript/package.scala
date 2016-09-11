@@ -49,35 +49,22 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
-  private type QScriptInternal0[T[_[_]], A] =
-    Coproduct[Const[DeadEnd, ?], QScriptCore[T, ?], A]
-
-  private type QScriptInternal1[T[_[_]], A] =
-    Coproduct[ProjectBucket[T, ?], QScriptInternal0[T, ?], A]
-
-  type QScriptInternal[T[_[_]], A] =
-    Coproduct[ThetaJoin[T, ?], QScriptInternal1[T, ?], A]
-  // NB: Coproducts are normally independent, but `QScriptInternal` needs to be
-  //     a component of `QScriptTotal`, because we sometimes need to “inject”
-  //     operations into a branch.
-  type QScriptInternalRead[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptInternal[T, ?], A]
-  private type QScriptTotal0[T[_[_]], A] =
-    Coproduct[EquiJoin[T, ?], QScriptInternalRead[T, ?], A]
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.
     * Once we do, this can go away. It should _not_ be used in other situations.
     */
   type QScriptTotal[T[_[_]], A] =
-    Coproduct[Const[ShiftedRead, ?], QScriptTotal0[T, ?], A]
+    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
+      ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
+      Const[ShiftedRead, ?] :\: Const [Read, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  type QScriptInterim0[T[_[_]], A] =
-    Coproduct[ProjectBucket[T, ?], QScriptCore[T, ?], A]
-  type QScriptInterim[T[_[_]], A] =
-    Coproduct[ThetaJoin[T, ?], QScriptInterim0[T, ?], A]
-  type QScriptInterimRead[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptInterim[T, ?], A]
+  /** QScript that has not gone through Read conversion. */
+  type QScript[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
+  /** QScript that has gone through Read conversion. */
+  type QScriptRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]

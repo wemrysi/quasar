@@ -22,6 +22,8 @@ import quasar.qscript.MapFuncs._
 import quasar.fp._
 import quasar.fs._
 
+import scala.Predef.implicitly
+
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
@@ -29,33 +31,42 @@ import scalaz._, Scalaz._
 class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
   val opt = new quasar.qscript.Optimize[Fix]
 
+  type QSI[A] =
+    (QScriptCore[Fix, ?] :\: ProjectBucket[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[DeadEnd, ?])#M[A]
+  val DEI =     implicitly[Const[DeadEnd, ?] :<: QSI]
+  val PBI = implicitly[ProjectBucket[Fix, ?] :<: QSI]
+  val QCI =   implicitly[QScriptCore[Fix, ?] :<: QSI]
+  val TJI =     implicitly[ThetaJoin[Fix, ?] :<: QSI]
+  val RootI: QSI[Fix[QSI]] = DEI.inj(Const[DeadEnd, Fix[QSI]](Root))
+  val UnreferencedI: QSI[Fix[QSI]] = QCI.inj(Unreferenced[Fix, Fix[QSI]]())
+
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
   "optimizer" should {
     "elide a no-op map in a constant boolean" in {
        val query = LP.Constant(Data.Bool(true))
-       val run = liftFG(opt.elideNopMap[QS])
+       val run = liftFG(opt.elideNopMap[QSI])
 
-       QueryFile.optimizeEval(query)(run).toOption must
+       QueryFile.optimizeEval[Fix, QSI](query)(run).toOption must
          equal(chain(
-           RootR,
-           QC.inj(Map((), BoolLit(true)))).some)
+           UnreferencedI,
+           QCI.inj(Map((), BoolLit(true)))).some)
     }
 
     "optimize a basic read" in {
       val run =
-        (SimplifyProjection[QS, QS].simplifyProjection(_: QS[Fix[QS]])) ⋙
-          liftFG(opt.coalesceMapShift[QS, QS](idPrism.get)) ⋙
-          Normalizable[QS].normalize ⋙
-          liftFF(opt.simplifyQC[QS, QS](idPrism)) ⋙
-          liftFG(opt.compactLeftShift[QS, QS])
+        (SimplifyProjection[QSI, QSI].simplifyProjection(_: QSI[Fix[QSI]])) ⋙
+          liftFG(opt.coalesceMapShift[QSI, QSI](idPrism.get)) ⋙
+          Normalizable[QSI].normalize ⋙
+          liftFF(opt.simplifyQC[QSI, QSI](idPrism)) ⋙
+          liftFG(opt.compactLeftShift[QSI, QSI])
 
       val query = lpRead("/foo")
 
       QueryFile.optimizeEval(query)(run).toOption must
       equal(chain(
-        RootR,
-        QC.inj(LeftShift((),
+        RootI,
+        QCI.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
           Free.point(RightSide)))).some)
     }
@@ -64,8 +75,8 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val exp =
         TJ.inj(ThetaJoin(
           QC.inj(Unreferenced[Fix, Fix[QS]]()).embed,
-          Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("foo")))))),
-          Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("bar")))))),
+          Free.roll(QST[QS].inject(R.inj(Const(Read(rootDir </> file("foo")))))),
+          Free.roll(QST[QS].inject(R.inj(Const(Read(rootDir </> file("bar")))))),
           Free.roll(And(Free.roll(And(
             // reversed equality
             Free.roll(Eq(
@@ -86,13 +97,13 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Inner,
           Free.roll(ConcatMaps(Free.point(LeftSide), Free.point(RightSide))))).embed
 
-      exp.transCata(SimplifyJoin[Fix, QS, QScriptTotal[Fix, ?]].simplifyJoin(idPrism.reverseGet)) must equal(
-        QS.inj(QC.inj(Map(
-          QS.inj(QC.inj(Filter(
+      exp.transCata(SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet)) must equal(
+        QS.inject(QC.inj(Map(
+          QS.inject(QC.inj(Filter(
             EJ.inj(EquiJoin(
-              QS.inj(QC.inj(Unreferenced[Fix, Fix[QScriptTotal[Fix, ?]]]())).embed,
-              Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("foo")))))),
-              Free.roll(QS.inj(R.inj(Const(Read(rootDir </> file("bar")))))),
+              QS.inject(QC.inj(Unreferenced[Fix, Fix[QST]]())).embed,
+              Free.roll(QST[QS].inject(R.inj(Const(Read(rootDir </> file("foo")))))),
+              Free.roll(QST[QS].inject(R.inj(Const(Read(rootDir </> file("bar")))))),
               Free.roll(ConcatArrays(
                 Free.roll(MakeArray(
                   Free.roll(ProjectField(Free.point(SrcHole), StrLit("l_id"))))),
