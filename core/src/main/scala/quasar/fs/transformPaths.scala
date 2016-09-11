@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import quasar.Predef._
 import quasar.LogicalPlan, LogicalPlan.ReadF
 import quasar.fp.free.{flatMapSNT, liftFT, transformIn}
 
@@ -37,8 +38,8 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def readFile[S[_]](
-    inPath: AbsPath ~> AbsPath,
-    outPath: AbsPath ~> AbsPath
+    inPath: EndoM[AbsPath],
+    outPath: EndoM[AbsPath]
   )(implicit
     S: ReadFile :<: S
   ): S ~> Free[S, ?] = {
@@ -46,21 +47,19 @@ object transformPaths {
 
     val R = ReadFile.Unsafe[S]
 
-    val g = new (ReadFile ~> Free[S, ?]) {
-      def apply[A](rf: ReadFile[A]) = rf match {
-        case Open(src, off, lim) =>
-          R.open(inPath(src), off, lim)
-            .bimap(transformErrorPath(outPath), readHFile.modify(outPath(_)))
-            .run
+    val g = λ[ReadFile ~> Free[S, ?]] {
+      case Open(src, off, lim) =>
+        R.open(inPath(src), off, lim)
+          .bimap(transformErrorPath(outPath), readHFile.modify(outPath(_)))
+          .run
 
-        case Read(h) =>
-          R.read(readHFile.modify(inPath(_))(h))
-            .leftMap(transformErrorPath(outPath))
-            .run
+      case Read(h) =>
+        R.read(readHFile.modify(inPath(_))(h))
+          .leftMap(transformErrorPath(outPath))
+          .run
 
-        case Close(h) =>
-          R.close(readHFile.modify(inPath(_))(h))
-      }
+      case Close(h) =>
+        R.close(readHFile.modify(inPath(_))(h))
     }
 
     transformIn(g, liftFT[S])
@@ -73,8 +72,8 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def writeFile[S[_]](
-    inPath: AbsPath ~> AbsPath,
-    outPath: AbsPath ~> AbsPath
+    inPath: EndoM[AbsPath],
+    outPath: EndoM[AbsPath]
   )(implicit
     S: WriteFile :<: S
   ): S ~> Free[S, ?] = {
@@ -82,22 +81,19 @@ object transformPaths {
 
     val W = WriteFile.Unsafe[S]
 
-    val g = new (WriteFile ~> Free[S, ?]) {
-      def apply[A](wf: WriteFile[A]) = wf match {
-        case Open(dst) =>
-          W.open(inPath(dst))
-            .bimap(transformErrorPath(outPath), writeHFile.modify(outPath(_)))
-            .run
+    val g = λ[WriteFile ~> Free[S, ?]] {
+      case Open(dst) =>
+        W.open(inPath(dst))
+          .bimap(transformErrorPath(outPath), writeHFile.modify(outPath(_)))
+          .run
 
-        case Write(h, d) =>
-          W.write(writeHFile.modify(inPath(_))(h), d)
-            .map(_ map transformErrorPath(outPath))
+      case Write(h, d) =>
+        W.write(writeHFile.modify(inPath(_))(h), d)
+          .map(_ map transformErrorPath(outPath))
 
-        case Close(h) =>
-          W.close(writeHFile.modify(inPath(_))(h))
-      }
+      case Close(h) =>
+        W.close(writeHFile.modify(inPath(_))(h))
     }
-
     transformIn(g, liftFT[S])
   }
 
@@ -108,35 +104,32 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def manageFile[S[_]](
-    inPath: AbsPath ~> AbsPath,
-    outPath: AbsPath ~> AbsPath
+    inPath: EndoM[AbsPath],
+    outPath: EndoM[AbsPath]
   )(implicit
     S: ManageFile :<: S
   ): S ~> Free[S, ?] = {
     import ManageFile._, MoveScenario._
 
     val M = ManageFile.Ops[S]
+    val g = λ[ManageFile ~> Free[S, ?]] {
+      case Move(scn, sem) =>
+        M.move(
+          scn.fold(
+            (src, dst) => dirToDir(inPath(src), inPath(dst)),
+            (src, dst) => fileToFile(inPath(src), inPath(dst))),
+          sem
+        ).leftMap(transformErrorPath(outPath)).run
 
-    val g = new (ManageFile ~> Free[S, ?]) {
-      def apply[A](mf: ManageFile[A]) = mf match {
-        case Move(scn, sem) =>
-          M.move(
-            scn.fold(
-              (src, dst) => dirToDir(inPath(src), inPath(dst)),
-              (src, dst) => fileToFile(inPath(src), inPath(dst))),
-            sem
-          ).leftMap(transformErrorPath(outPath)).run
+      case Delete(p) =>
+        M.delete(inPath(p))
+          .leftMap(transformErrorPath(outPath))
+          .run
 
-        case Delete(p) =>
-          M.delete(inPath(p))
-            .leftMap(transformErrorPath(outPath))
-            .run
-
-        case TempFile(p) =>
-          M.tempFile(inPath(p))
-            .bimap(transformErrorPath(outPath), outPath(_))
-            .run
-      }
+      case TempFile(p) =>
+        M.tempFile(inPath(p))
+          .bimap(transformErrorPath(outPath), outPath(_))
+          .run
     }
 
     transformIn(g, liftFT[S])
@@ -150,55 +143,50 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def queryFile[S[_]](
-    inPath: AbsPath ~> AbsPath,
-    outPath: AbsPath ~> AbsPath,
-    outPathR: RelPath ~> RelPath
+    inPath: EndoM[AbsPath],
+    outPath: EndoM[AbsPath],
+    outPathR: EndoM[RelPath]
   )(implicit
     S: QueryFile :<: S
   ): S ~> Free[S, ?] = {
     import QueryFile._
 
-    val Q = QueryFile.Ops[S]
-    val U = QueryFile.Unsafe[S]
+    val Q             = QueryFile.Ops[S]
+    val U             = QueryFile.Unsafe[S]
+    val translateFile = natToFunction[AbsPath, AbsPath, File](inPath)
 
-    val g = new (QueryFile ~> Free[S, ?]) {
+    val g = λ[QueryFile ~> Free[S, ?]] {
+      case ExecutePlan(lp, out) =>
+        Q.execute(lp.transAna(transformLPPaths(translateFile)), inPath(out))
+          .bimap(transformErrorPath(outPath), outPath(_))
+          .run.run
 
-      val translateFile = natToFunction[AbsPath, AbsPath, File](inPath)
+      case EvaluatePlan(lp) =>
+        U.eval(lp.transAna(transformLPPaths(translateFile)))
+          .leftMap(transformErrorPath(outPath))
+          .run.run
 
-      def apply[A](qf: QueryFile[A]) = qf match {
-        case ExecutePlan(lp, out) =>
-          Q.execute(lp.transAna(transformLPPaths(translateFile)), inPath(out))
-            .bimap(transformErrorPath(outPath), outPath(_))
-            .run.run
+      case More(h) =>
+        U.more(h)
+          .leftMap(transformErrorPath(outPath))
+          .run
 
-        case EvaluatePlan(lp) =>
-          U.eval(lp.transAna(transformLPPaths(translateFile)))
-            .leftMap(transformErrorPath(outPath))
-            .run.run
+      case Close(h) =>
+        U.close(h)
 
-        case More(h) =>
-          U.more(h)
-            .leftMap(transformErrorPath(outPath))
-            .run
+      case Explain(lp) =>
+        Q.explain(lp.transAna(transformLPPaths(translateFile)))
+          .leftMap(transformErrorPath(outPath))
+          .run.run
 
-        case Close(h) =>
-          U.close(h)
+      case ListContents(d) =>
+        Q.ls(inPath(d))
+          .leftMap(transformErrorPath(outPath))
+          .run
 
-        case Explain(lp) =>
-          Q.explain(lp.transAna(transformLPPaths(translateFile)))
-            .leftMap(transformErrorPath(outPath))
-            .run.run
-
-        case ListContents(d) =>
-          Q.ls(inPath(d))
-            .leftMap(transformErrorPath(outPath))
-            .run
-
-        case FileExists(f) =>
-          Q.fileExists(inPath(f))
-      }
+      case FileExists(f) =>
+        Q.fileExists(inPath(f))
     }
-
     transformIn(g, liftFT[S])
   }
 
@@ -210,8 +198,8 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def fileSystem[S[_]](
-    inPath: AbsPath ~> AbsPath,
-    outPath: AbsPath ~> AbsPath,
+    inPath: EndoM[AbsPath],
+    outPath: EndoM[AbsPath],
     outPathR: RelPath ~> RelPath
   )(implicit
     S0: ReadFile :<: S,
@@ -246,19 +234,16 @@ object transformPaths {
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
-    f: AbsPath ~> AbsPath
+    f: EndoM[AbsPath]
   ): FileSystemError => FileSystemError =
     fsPathError.modify(f(_)) compose
     fsUnkRdError.modify(f(_)) compose
     fsUnkWrError.modify(f(_)) compose
     fsPlannerError.modify(_.transAna(transformLPPaths(natToFunction[AbsPath,AbsPath,File](f))))
 
-  private def transformLPPaths(f: AFile => AFile): LogicalPlan ~> LogicalPlan =
-    new (LogicalPlan ~> LogicalPlan) {
-      def apply[A](lp: LogicalPlan[A]) = lp match {
-        // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
-        case ReadF(p) => ReadF(f(mkAbsolute(rootDir, p)))
-        case _        => lp
-      }
-    }
+  private def transformLPPaths(f: AFile => AFile) = λ[LogicalPlan ~> LogicalPlan] {
+    // Documentation on `QueryFile` guarantees absolute paths, so calling `mkAbsolute`
+    case ReadF(p) => ReadF(f(mkAbsolute(rootDir, p)))
+    case lp       => lp
+  }
 }

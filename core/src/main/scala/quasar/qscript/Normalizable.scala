@@ -33,23 +33,16 @@ import simulacrum.typeclass
 }
 
 trait NormalizableInstances {
-  implicit def const[A]: Normalizable[Const[A, ?]] =
-    new Normalizable[Const[A, ?]] {
-      def normalize = new (Const[A, ?] ~> Const[A, ?]) {
-        def apply[B](const: Const[A, B]) = const
-      }
-    }
-
-  implicit def coproduct[F[_], G[_]](
-    implicit F: Normalizable[F], G: Normalizable[G]):
-      Normalizable[Coproduct[F, G, ?]] =
-    new Normalizable[Coproduct[F, G, ?]] {
-      def normalize = new (Coproduct[F, G, ?] ~> Coproduct[F, G, ?]) {
-        def apply[A](sp: Coproduct[F, G, A]) =
-          Coproduct(sp.run.bimap(F.normalize(_), G.normalize(_)))
-      }
-    }
+  implicit def const[A] = new Normalizable[Const[A, ?]] {
+    def normalize = λ[EndoM[Const[A, ?]]](x => x)
+  }
+  implicit def coproduct[F[_] : Normalizable, G[_] : Normalizable] = new Normalizable[Coproduct[F, G, ?]] {
+    def normalize = λ[EndoM[Coproduct[F, G, ?]]](sp => Coproduct(sp.run.bimap(Normalizable[F] normalize _, Normalizable[G] normalize _)))
+  }
 }
 
-object Normalizable extends NormalizableInstances
-
+object Normalizable extends NormalizableInstances {
+  /** It would be nice to be able to write a method like this, but it crashes scalac.
+  def make[F[X]](nt: F ~> F): Normalizable[F] = new Normalizable[F] { def normalize = nt }
+   */
+}
