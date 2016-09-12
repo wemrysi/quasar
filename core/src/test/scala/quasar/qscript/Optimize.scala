@@ -94,6 +94,33 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
     }
 
+    "fold nested boolean values" in {
+      val falseBool: Fix[ejson.EJson] =
+        CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](false)).embed
+
+      val trueBool: Fix[ejson.EJson] =
+        CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](true)).embed
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(
+            // !false && (false || !true)
+            Free.roll(And(
+              Free.roll(Not(Free.roll(Constant(falseBool)))),
+              Free.roll(Or(
+                Free.roll(Constant(falseBool)),
+                Free.roll(Not(Free.roll(Constant(trueBool))))))))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(
+            CommonEJson.inj(ejson.Arr(List(CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](false)).embed)))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
     "simplify a ThetaJoin" in {
       val exp: Fix[QS] =
         TJ.inj(ThetaJoin(

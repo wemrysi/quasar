@@ -172,10 +172,42 @@ object MapFunc {
     _.run.fold(
       κ(None),
       {
-        case MakeArray(Embed(CoEnv(\/-(Constant(v))))) =>
+        // relations
+        case And(
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Bool(v1))))))),
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Bool(v2)))))))) =>
           CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
             Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
-              CommonEJson.inj(ejson.Arr(List(v))).embed).right).some
+              CommonEJson.inj(ejson.Bool[T[EJson]](v1 && v2)).embed).right).some
+
+        case Or(
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Bool(v1))))))),
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Bool(v2)))))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Bool[T[EJson]](v1 || v2)).embed).right).some
+
+        case Not(Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Bool(v1)))))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Bool[T[EJson]](!v1)).embed).right).some
+
+        // string
+        case Lower(Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Str(v1)))))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Str[T[EJson]](v1.toLowerCase)).embed).right).some
+
+        case Upper(Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Str(v1)))))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Str[T[EJson]](v1.toUpperCase)).embed).right).some
+
+        // structural
+        case MakeArray(Embed(CoEnv(\/-(Constant(v1))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant[T, T[CoEnv[A, MapFunc[T, ?], ?]]](
+              CommonEJson.inj(ejson.Arr(List(v1))).embed).right).some
 
         case _ => None
       })
