@@ -60,8 +60,42 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Free.point(RightSide)))).some)
     }
 
+    "fold a constant array value" in {
+      val value: Fix[ejson.EJson] =
+        ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(Free.roll(Constant(value))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(CommonEJson.inj(ejson.Arr(List(value)))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
+    "fold a constant doubly-nested array value" in {
+      val value: Fix[ejson.EJson] =
+        ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(Free.roll(MakeArray(Free.roll(Constant(value))))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(CommonEJson.inj(ejson.Arr(List(CommonEJson.inj(ejson.Arr(List(value))).embed)))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
     "simplify a ThetaJoin" in {
-      val exp =
+      val exp: Fix[QS] =
         TJ.inj(ThetaJoin(
           DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
           Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),
