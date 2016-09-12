@@ -18,7 +18,6 @@ package quasar.physical.marklogic
 
 import quasar.SKI.κ
 import quasar.NameGenerator
-import quasar.Planner.PlannerError
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
@@ -27,9 +26,9 @@ import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
-  // TODO: Maybe a ML-specific error type here?
-  type MonadPlanErr[F[_]] = MonadError_[F, PlannerError]
-  type MarkLogicPlanner[QS[_]] = Planner[QS, XQuery]
+  type MonadPlanErr[F[_]]         = MonadError_[F, MarkLogicPlannerError]
+  type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
+  type MarkLogicPlanner[QS[_]]    = Planner[QS, XQuery]
 
   object MarkLogicPlanner {
     implicit def qScriptCore[T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[QScriptCore[T, ?]] =

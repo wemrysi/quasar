@@ -18,7 +18,6 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.Planner.{PlannerError, InternalError}
 import quasar.ejson.EJson
 import quasar.fp.ShowT
 import quasar.physical.marklogic.MonadError_
@@ -102,8 +101,8 @@ object MapFuncPlanner {
             }
           }
         } getOrElse {
-          MonadError_[F, PlannerError].raiseError(InternalError(
-            s"'$s' is not a valid XML QName."))
+          MonadError_[F, MarkLogicPlannerError].raiseError(
+            MarkLogicPlannerError.invalidQName(s))
         }
 
       case _ =>
