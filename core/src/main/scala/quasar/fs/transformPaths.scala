@@ -38,8 +38,8 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def readFile[S[_]](
-    inPath: EndoM[AbsPath],
-    outPath: EndoM[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
     S: ReadFile :<: S
   ): S ~> Free[S, ?] = {
@@ -72,8 +72,8 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def writeFile[S[_]](
-    inPath: EndoM[AbsPath],
-    outPath: EndoM[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
     S: WriteFile :<: S
   ): S ~> Free[S, ?] = {
@@ -104,8 +104,8 @@ object transformPaths {
     * @param outPath transforms output paths (including those in errors)
     */
   def manageFile[S[_]](
-    inPath: EndoM[AbsPath],
-    outPath: EndoM[AbsPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath]
   )(implicit
     S: ManageFile :<: S
   ): S ~> Free[S, ?] = {
@@ -143,9 +143,9 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def queryFile[S[_]](
-    inPath: EndoM[AbsPath],
-    outPath: EndoM[AbsPath],
-    outPathR: EndoM[RelPath]
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
+    outPathR: EndoK[RelPath]
   )(implicit
     S: QueryFile :<: S
   ): S ~> Free[S, ?] = {
@@ -198,8 +198,8 @@ object transformPaths {
     * @param outPathR transforms relative output paths
     */
   def fileSystem[S[_]](
-    inPath: EndoM[AbsPath],
-    outPath: EndoM[AbsPath],
+    inPath: EndoK[AbsPath],
+    outPath: EndoK[AbsPath],
     outPathR: RelPath ~> RelPath
   )(implicit
     S0: ReadFile :<: S,
@@ -234,7 +234,7 @@ object transformPaths {
     FileSystemError.planningFailed composeLens _1
 
   private def transformErrorPath(
-    f: EndoM[AbsPath]
+    f: EndoK[AbsPath]
   ): FileSystemError => FileSystemError =
     fsPathError.modify(f(_)) compose
     fsUnkRdError.modify(f(_)) compose

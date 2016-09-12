@@ -74,12 +74,12 @@ package object fs extends PhysicalErrorPrisms {
   /** Rebases absolute paths onto the provided absolute directory, so
     * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.
     */
-  def rebaseA(onto: ADir) = λ[EndoM[AbsPath]](apath =>
+  def rebaseA(onto: ADir) = λ[EndoK[AbsPath]](apath =>
     apath.relativeTo(rootDir[Sandboxed]).fold(apath)(onto </> _)
   )
 
   /** Removes the given prefix from an absolute path, if present. */
-  def stripPrefixA(prefix: ADir) = λ[EndoM[AbsPath]](apath =>
+  def stripPrefixA(prefix: ADir) = λ[EndoK[AbsPath]](apath =>
     apath.relativeTo(prefix).fold(apath)(rootDir </> _)
   )
 

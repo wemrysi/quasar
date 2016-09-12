@@ -34,10 +34,10 @@ import simulacrum.typeclass
 
 trait NormalizableInstances {
   implicit def const[A] = new Normalizable[Const[A, ?]] {
-    def normalize = λ[EndoM[Const[A, ?]]](x => x)
+    def normalize = λ[EndoK[Const[A, ?]]](x => x)
   }
   implicit def coproduct[F[_] : Normalizable, G[_] : Normalizable] = new Normalizable[Coproduct[F, G, ?]] {
-    def normalize = λ[EndoM[Coproduct[F, G, ?]]](sp => Coproduct(sp.run.bimap(Normalizable[F] normalize _, Normalizable[G] normalize _)))
+    def normalize = λ[EndoK[Coproduct[F, G, ?]]](sp => Coproduct(sp.run.bimap(Normalizable[F] normalize _, Normalizable[G] normalize _)))
   }
 }
 
