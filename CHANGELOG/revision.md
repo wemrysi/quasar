@@ -1,3 +1,3 @@
 - [1418] Add support for XQuery module imports and namespace/function declarations
   - Converted existing namespaces and imports to use new constructs
-  - Converted left shift functions into declarations as a smoke test
+  - Converted locally defined functions into declarations
