@@ -164,9 +164,8 @@ object MapFunc {
         })
   }
 
-  // we start from the leaves, and make the inner parts into Constant as we go
-  // so the immediate child is always a constant, else we know the endpoint was not a constant
-  // use freeTransCata!
+  // Transform effectively constant `MapFunc` into a `Constant` value.
+  // This is a mini-evaluator for constant qscript values.
   def foldConstant[T[_[_]]: Recursive: Corecursive, A]:
       CoMFR[T, A] => Option[CoMFR[T, A]] =
     _.run.fold(
