@@ -32,7 +32,9 @@ sealed abstract class QScriptCore[T[_[_]], A]
 @Lenses final case class Map[T[_[_]], A](src: A, f: FreeMap[T])
     extends QScriptCore[T, A]
 
-@Lenses final case class ReduceIndex(idx: Int)
+@Lenses final case class ReduceIndex(idx: Int) {
+  def incr(j: Int): ReduceIndex = ReduceIndex(idx + j)
+}
 
 object ReduceIndex {
   implicit def equal: Equal[ReduceIndex] =
@@ -232,38 +234,37 @@ object QScriptCore {
             concatBuckets(b1.map(_ >> m1)) match {
               case Some((buck, newBuckets)) => {
                 val (full, buckAccess, valAccess) = concat(buck, mf)
-                SrcMerge(
-                  EnvT((Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess), Map(Extern, full): QScriptCore[T, ExternallyManaged])),
+                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
+                  EnvT((
+                    Ann(newBuckets.list.toList.map(_ >> buckAccess), valAccess),
+                    Map(Extern, full))),
                   lv,
                   rv).some
               }
               case None =>
-                SrcMerge(
-                  EnvT((EmptyAnn[T], Map(Extern, mf): QScriptCore[T, ExternallyManaged])),
+                SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
+                  EnvT((EmptyAnn[T], Map(Extern, mf))),
                   lv,
                   rv).some
             }
 
-          case (EnvT((Ann(b1, v1), Reduce(_, bucket1, func1, rep1))),
-                EnvT((Ann(b2, v2), Reduce(_, bucket2, func2, rep2)))) =>
-            val funcL = func1.map(_.map(_ >> left))
-            val funcR = func1.map(_.map(_ >> right))
-            // val (newRep, lrep, rrep) = concat(rep1, rep2.map(_ + func1.length))
+          case (EnvT((Ann(b1, _), Reduce(_, bucket1, func1, rep1))),
+                EnvT((Ann(_,  _), Reduce(_, bucket2, func2, rep2)))) =>
             val mapL = bucket1 >> left
             val mapR = bucket2 >> right
 
-            (mapL ≟ mapR).option(
+            (mapL ≟ mapR).option {
+              val funcL = func1.map(_.map(_ >> left))
+              val funcR = func1.map(_.map(_ >> right))
+              val (newRep, lrep, rrep) = concat(rep1, rep2.map(_.incr(func1.length)))
+
               SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
-                EnvT((Ann(b1, HoleF),
-                  Reduce(Extern,
-                    mapL,
-                    // FIXME: Concat these things!
-                    func1, // for { f1 <- funcL; f2 <- funcR } yield f1 ++ f2,
-                    rep1 // newRep
-                  ): QScriptCore[T, ExternallyManaged])),
-                HoleF, // lrep,
-                HoleF // rrep
-              ))
+                EnvT((
+                  Ann(b1, HoleF),
+                  Reduce(Extern, mapL, funcL ++ funcR, newRep))),
+                lrep,
+                rrep)
+            }
 
           case (_, _) => None
         }
