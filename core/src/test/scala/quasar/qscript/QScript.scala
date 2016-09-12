@@ -340,20 +340,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
+          ProjectFieldR(HoleF, StrLit("zips")),
+          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))),
+        QC.inj(LeftShift((),
           Free.roll(DupArrayIndices(
-            ProjectFieldR(
-              ProjectFieldR(HoleF, StrLit("zips")),
-              StrLit("loc")))),
+            ProjectFieldR(HoleF, StrLit("loc")))),
           Free.roll(Multiply(Free.point(RightSide), IntLit(10))))),
         QC.inj(Reduce((),
-          HoleF,
+          HoleF, // FIXME provenance needs to be here
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
           Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed
 
-    "convert a filter" in skipped { // takes 1 min 17 sec to run
+    "convert a filter" in { // takes 1 min 17 sec to run
       // "select * from foo where bar between 1 and 10"
       convert(
         listContents.some,
@@ -373,7 +374,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
             IntLit(10)))))).some)
-    }
+    }.pendingUntilFixed
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in {
