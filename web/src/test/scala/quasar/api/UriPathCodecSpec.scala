@@ -41,7 +41,9 @@ class UriPathCodecSpec extends quasar.Qspec {
     "."   -> "$dot$",
     ".."  -> "$dotdot$",
     "..." -> "...",
-    "/"   -> "%2F"
+    "/"   -> "%2F",
+    " "   -> "%20",
+    "+ "  -> "%2B%20"
   )
 
   private def encodingFragments = Fragments(
