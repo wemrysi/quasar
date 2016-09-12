@@ -1,0 +1,2 @@
+- upgrade kind-projector
+- exploit the new polymorphic lambda syntax
