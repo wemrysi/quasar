@@ -153,7 +153,10 @@ package object api {
     }
   }
 
-  def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8")
+  /** This encoder translates spaces into pluses, but we want the
+   *  more rigorous encoding %20.
+   */
+  def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
   def uriDecodeUtf8(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
 
   val UriPathCodec = {
