@@ -102,16 +102,15 @@ object EquiJoin {
     new Normalizable[EquiJoin[T, ?]] {
       val opt = new Optimize[T]
 
-      def normalize = new (EquiJoin[T, ?] ~> EquiJoin[T, ?]) {
-        def apply[A](ej: EquiJoin[T, A]) =
-          EquiJoin(
-            ej.src,
-            freeTransCata(ej.lBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-            freeTransCata(ej.rBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-            normalizeMapFunc(ej.lKey),
-            normalizeMapFunc(ej.rKey),
-            ej.f,
-            normalizeMapFunc(ej.combine))
-      }
+      def normalize = λ[EquiJoin[T, ?] ~> EquiJoin[T, ?]](ej =>
+        EquiJoin(
+          ej.src,
+          freeTransCata(ej.lBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
+          freeTransCata(ej.rBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
+          normalizeMapFunc(ej.lKey),
+          normalizeMapFunc(ej.rKey),
+          ej.f,
+          normalizeMapFunc(ej.combine))
+      )
     }
 }

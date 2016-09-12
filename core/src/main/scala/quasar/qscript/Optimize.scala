@@ -66,43 +66,39 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
   def elideNopJoin[F[_]](
-    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]):
-      ThetaJoin[T, ?] ~> F =
-    new (ThetaJoin[T, ?] ~> F) {
-      def apply[A](tj: ThetaJoin[T, A]) = tj match {
-        case ThetaJoin(src, l, r, on, Inner, combine)
-            if l ≟ Free.point(SrcHole) && r ≟ Free.point(SrcHole) && on ≟ EquiJF =>
-          QC.inj(Map(src, combine.map(_ => SrcHole: Hole)))
-        case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
-          (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
-            case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
-              case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
-                QC.inj(Map(src, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => mf2
-                }))
-              case (_, _) => TJ.inj(x)
-            }
-            case (-\/(m1), \/-(SrcHole)) => (FI.prj(m1) >>= QC.prj) match {
-              case Some(Map(\/-(SrcHole), mf1)) =>
-                QC.inj(Map(src, combine >>= {
-                  case LeftSide  => mf1
-                  case RightSide => HoleF
-                }))
-              case _ => TJ.inj(x)
-            }
-            case (\/-(SrcHole), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
-              case Some(Map(\/-(SrcHole), mf2)) =>
-                QC.inj(Map(src, combine >>= {
-                  case LeftSide  => HoleF
-                  case RightSide => mf2
-                }))
-              case _ => TJ.inj(x)
-            }
+    implicit TJ: ThetaJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F, FI: F :<: QScriptTotal[T, ?]) = λ[ThetaJoin[T, ?] ~> F] {
+      case ThetaJoin(src, l, r, on, Inner, combine)
+          if l ≟ Free.point(SrcHole) && r ≟ Free.point(SrcHole) && on ≟ EquiJF =>
+        QC.inj(Map(src, combine.map(_ => SrcHole: Hole)))
+      case x @ ThetaJoin(src, l, r, on, _, combine) if on ≟ BoolLit(true) =>
+        (l.resume.leftMap(_.map(_.resume)), r.resume.leftMap(_.map(_.resume))) match {
+          case (-\/(m1), -\/(m2)) => (FI.prj(m1) >>= QC.prj, FI.prj(m2) >>= QC.prj) match {
+            case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
+              QC.inj(Map(src, combine >>= {
+                case LeftSide  => mf1
+                case RightSide => mf2
+              }))
             case (_, _) => TJ.inj(x)
           }
-        case x => TJ.inj(x)
-      }
+          case (-\/(m1), \/-(SrcHole)) => (FI.prj(m1) >>= QC.prj) match {
+            case Some(Map(\/-(SrcHole), mf1)) =>
+              QC.inj(Map(src, combine >>= {
+                case LeftSide  => mf1
+                case RightSide => HoleF
+              }))
+            case _ => TJ.inj(x)
+          }
+          case (\/-(SrcHole), -\/(m2)) => (FI.prj(m2) >>= QC.prj) match {
+            case Some(Map(\/-(SrcHole), mf2)) =>
+              QC.inj(Map(src, combine >>= {
+                case LeftSide  => HoleF
+                case RightSide => mf2
+              }))
+            case _ => TJ.inj(x)
+          }
+          case (_, _) => TJ.inj(x)
+        }
+      case x => TJ.inj(x)
     }
 
   def rebaseT[F[_]: Traverse](
@@ -120,11 +116,9 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       Option[T[CoEnv[Hole, F, ?]]] =
     // TODO: with the right instances & types everywhere, this should look like
     //       target.transAnaM(_.htraverse(FI.prj)) ∘ (srcCo >> _)
-    freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](
-      target)(
-      coEnvHtraverse(_)(new (QScriptTotal[T, ?] ~> (Option ∘ F)#λ) {
-        def apply[A](qt: QScriptTotal[T, A]): Option[F[A]] = FI.prj(qt)
-      })).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
+    freeTransCataM[T, Option, QScriptTotal[T, ?], F, Hole, Hole](target)(
+      coEnvHtraverse(_)(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI prj _))
+    ).map(targ => (srcCo.fromCoEnv >> targ).toCoEnv[T])
 
   private def rebaseLeft[F[_], G[_]](
     rebase: FreeQS[T] => T[G] => Option[T[G]])(

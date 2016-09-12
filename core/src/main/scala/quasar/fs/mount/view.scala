@@ -76,34 +76,32 @@ object view {
       } yield h
     }
 
-    new (ReadFile ~> Free[S, ?]) {
-      def apply[A](rf: ReadFile[A]): Free[S, A] = rf match {
-        case Open(file, off, lim) =>
-          mount.exists(file).ifM(
-            openView(file, off, lim).run,
-            openFile(file, off, lim).run)
+    λ[ReadFile ~> Free[S, ?]] {
+      case Open(file, off, lim) =>
+        mount.exists(file).ifM(
+          openView(file, off, lim).run,
+          openFile(file, off, lim).run)
 
-        case Read(handle) =>
-          viewState.get(handle).toRight(unknownReadHandle(handle)).flatMap {
-            case ResultSet.Data(values) =>
-              viewState.put(handle, ResultSet.Data(Vector.empty))
-                .as(values)
-                .liftM[FileSystemErrT]
+      case Read(handle) =>
+        viewState.get(handle).toRight(unknownReadHandle(handle)).flatMap {
+          case ResultSet.Data(values) =>
+            viewState.put(handle, ResultSet.Data(Vector.empty))
+              .as(values)
+              .liftM[FileSystemErrT]
 
-            case ResultSet.Read(handle) =>
-              readUnsafe.read(handle)
+          case ResultSet.Read(handle) =>
+            readUnsafe.read(handle)
 
-            case ResultSet.Results(handle) =>
-              queryUnsafe.more(handle)
-          }.run
+          case ResultSet.Results(handle) =>
+            queryUnsafe.more(handle)
+        }.run
 
-        case Close(handle) =>
-          (viewState.get(handle) <* viewState.delete(handle).liftM[OptionT]).flatMapF {
-            case ResultSet.Data(_)         => ().point[Free[S, ?]]
-            case ResultSet.Read(handle)    => readUnsafe.close(handle)
-            case ResultSet.Results(handle) => queryUnsafe.close(handle)
-          }.getOrElse(())
-      }
+      case Close(handle) =>
+        (viewState.get(handle) <* viewState.delete(handle).liftM[OptionT]).flatMapF {
+          case ResultSet.Data(_)         => ().point[Free[S, ?]]
+          case ResultSet.Read(handle)    => readUnsafe.close(handle)
+          case ResultSet.Results(handle) => queryUnsafe.close(handle)
+        }.getOrElse(())
     }
   }
 
@@ -118,20 +116,18 @@ object view {
     val writeUnsafe = WriteFile.Unsafe[S]
     val mount = Mounting.Ops[S]
 
-    new (WriteFile ~> Free[S, ?]) {
-      def apply[A](wf: WriteFile[A]): Free[S, A] = wf match {
-        case Open(p) =>
-          mount.exists(p).ifM(
-            pathErr(invalidPath(p, "Cannot write to a view."))
-              .left[WriteHandle].point[Free[S, ?]],
-            writeUnsafe.open(p).run)
+    λ[WriteFile ~> Free[S, ?]] {
+      case Open(p) =>
+        mount.exists(p).ifM(
+          pathErr(invalidPath(p, "Cannot write to a view."))
+            .left[WriteHandle].point[Free[S, ?]],
+          writeUnsafe.open(p).run)
 
-        case Write(h, chunk) =>
-          writeUnsafe.write(h, chunk)
+      case Write(h, chunk) =>
+        writeUnsafe.write(h, chunk)
 
-        case Close(h) =>
-          writeUnsafe.close(h)
-      }
+      case Close(h) =>
+        writeUnsafe.close(h)
     }
   }
 
@@ -226,27 +222,25 @@ object view {
         }).run
       })
 
-    new (ManageFile ~> Free[S, ?]) {
-      def apply[A](mf: ManageFile[A]) = mf match {
-        case Move(scenario, semantics) =>
-          scenario.fold(
-            (src, dst) => dirToDirMove(src, dst, semantics),
-            (src, dst) => fileToFileMove(src, dst, semantics).run)
+    λ[ManageFile ~> Free[S, ?]] {
+      case Move(scenario, semantics) =>
+        scenario.fold(
+          (src, dst) => dirToDirMove(src, dst, semantics),
+          (src, dst) => fileToFileMove(src, dst, semantics).run)
 
-        case Delete(path) =>
-          refineType(path).fold(
-            d => mount.viewsHavingPrefix(d)
-                   .flatMap(_.traverse_(deleteView))
-                   .liftM[FileSystemErrT] *> manage.delete(d),
+      case Delete(path) =>
+        refineType(path).fold(
+          d => mount.viewsHavingPrefix(d)
+                 .flatMap(_.traverse_(deleteView))
+                 .liftM[FileSystemErrT] *> manage.delete(d),
 
-            f => mount.exists(f).liftM[FileSystemErrT].ifM(
-                   deleteView(f).liftM[FileSystemErrT],
-                   manage.delete(f))
-          ).run
+          f => mount.exists(f).liftM[FileSystemErrT].ifM(
+                 deleteView(f).liftM[FileSystemErrT],
+                 manage.delete(f))
+        ).run
 
-        case TempFile(nearTo) =>
-          manage.tempFile(nearTo).run
-      }
+      case TempFile(nearTo) =>
+        manage.tempFile(nearTo).run
     }
   }
 
@@ -274,38 +268,36 @@ object view {
         f.relativeTo(dir).flatMap(firstSegmentName).toSet
       })
 
-    new (QueryFile ~> Free[S, ?]) {
-      def apply[A](qf: QueryFile[A]) = qf match {
-        case ExecutePlan(lp, out) =>
-          resolve(lp, query.execute(_, out))
+    λ[QueryFile ~> Free[S, ?]] {
+      case ExecutePlan(lp, out) =>
+        resolve(lp, query.execute(_, out))
 
-        case EvaluatePlan(lp) =>
-          resolve(lp, queryUnsafe.eval)
+      case EvaluatePlan(lp) =>
+        resolve(lp, queryUnsafe.eval)
 
-        case More(handle) =>
-          queryUnsafe.more(handle).run
+      case More(handle) =>
+        queryUnsafe.more(handle).run
 
-        case Close(handle) =>
-          queryUnsafe.close(handle)
+      case Close(handle) =>
+        queryUnsafe.close(handle)
 
-        case Explain(lp) =>
-          resolve(lp, query.explain)
+      case Explain(lp) =>
+        resolve(lp, query.explain)
 
-        case ListContents(dir) =>
-          (listViews(dir) |@| query.ls(dir).run)((vls, qls) => qls match {
-            case \/-(ps) =>
-              (ps ++ vls).right
-            case -\/(err @ PathErr(PathNotFound(_))) =>
-              if (vls.nonEmpty) vls.right else err.left
-            case -\/(v) =>
-              v.left
-          })
+      case ListContents(dir) =>
+        (listViews(dir) |@| query.ls(dir).run)((vls, qls) => qls match {
+          case \/-(ps) =>
+            (ps ++ vls).right
+          case -\/(err @ PathErr(PathNotFound(_))) =>
+            if (vls.nonEmpty) vls.right else err.left
+          case -\/(v) =>
+            v.left
+        })
 
-        case FileExists(file) =>
-          mount.exists(file).ifM(
-            true.point[Free[S, ?]],
-            query.fileExists(file))
-      }
+      case FileExists(file) =>
+        mount.exists(file).ifM(
+          true.point[Free[S, ?]],
+          query.fileExists(file))
     }
   }
 

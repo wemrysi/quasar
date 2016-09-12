@@ -75,18 +75,14 @@ package object fs extends PhysicalErrorPrisms {
   /** Rebases absolute paths onto the provided absolute directory, so
     * `rebaseA(/baz)(/foo/bar)` becomes `/baz/foo/bar`.
     */
-  def rebaseA(onto: ADir): AbsPath ~> AbsPath =
-    new (AbsPath ~> AbsPath) {
-      def apply[T](apath: AbsPath[T]) =
-        apath.relativeTo(rootDir[Sandboxed]).fold(apath)(onto </> _)
-    }
+  def rebaseA(onto: ADir) = λ[EndoK[AbsPath]](apath =>
+    apath.relativeTo(rootDir[Sandboxed]).fold(apath)(onto </> _)
+  )
 
   /** Removes the given prefix from an absolute path, if present. */
-  def stripPrefixA(prefix: ADir): AbsPath ~> AbsPath =
-    new (AbsPath ~> AbsPath) {
-      def apply[T](apath: AbsPath[T]) =
-        apath.relativeTo(prefix).fold(apath)(rootDir </> _)
-    }
+  def stripPrefixA(prefix: ADir) = λ[EndoK[AbsPath]](apath =>
+    apath.relativeTo(prefix).fold(apath)(rootDir </> _)
+  )
 
   /** Returns the first named segment of the given relative path. */
   def firstSegmentName(f: RPath): Option[PathSegment] =
