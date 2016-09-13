@@ -30,7 +30,7 @@ import simulacrum.typeclass
   def normalizeMapFunc[T[_[_]]: Recursive: Corecursive: EqualT, A](fm: Free[MapFunc[T, ?], A]):
       Free[MapFunc[T, ?], A] =
     freeTransCata[T, MapFunc[T, ?], MapFunc[T, ?], A, A](fm)(
-      repeatedly(MapFunc.normalize[T, A]) compose repeatedly(MapFunc.foldConstant[T, A]))
+      repeatedly(MapFunc.normalize[T, A]) compose orOriginal(MapFunc.foldConstant[T, A]))
 }
 
 trait NormalizableInstances {
