@@ -16,16 +16,26 @@
 
 package quasar.physical.marklogic.xquery
 
+import quasar.Predef.String
+
 import javax.xml.parsers.SAXParserFactory
+import org.xml.sax.SAXException
 import scala.xml.Elem
 import scala.xml.factory.XMLLoader
 
-/** Provides methods for securely parsing XML documents, avoiding known DoS attackes.
+import scalaz.\/
+
+/** Provides methods for securely parsing XML documents, avoiding known DoS attacks.
   *
   * @see https://github.com/scala/scala-xml/issues/17
   * @see https://github.com/akka/akka/pull/17660/files#diff-3f57ed15f4aa764e53d971ec647b544fR47
   */
 object SecureXML {
+  def loadString(s: String): SAXException \/ Elem =
+    \/.fromTryCatchThrowable[Elem, SAXException](loader.loadString(s))
+
+  ////
+
   private val loader: XMLLoader[Elem] = new XMLLoader[Elem] {
     override def parser = {
       val factory = SAXParserFactory.newInstance()

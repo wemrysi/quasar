@@ -36,12 +36,12 @@ object xdmitem {
     case item: XdmAttribute             => ???
     // TODO: Inefficient for large data as it must be buffered into memory
     case item: XdmBinary                => Data.Binary(ImmutableArray.fromArray(item.asBinaryData))
-    case item: XdmComment               => ???
+    case item: XdmComment               => Data.NA
     case item: XdmDocument              => ???
     case item: XdmElement               => ???
-    case item: XdmProcessingInstruction => ???
-    case item: XdmText                  => ???
-    case item: XSAnyURI                 => ???
+    case item: XdmProcessingInstruction => Data.NA
+    case item: XdmText                  => Data.Str(item.asString)
+    case item: XSAnyURI                 => Data.Str(item.asString)
     case item: XSBase64Binary           => Data.Binary(ImmutableArray.fromArray(item.asBinaryData))
     case item: XSBoolean                => Data.Bool(item.asPrimitiveBoolean)
     case item: XSDate                   => ???
@@ -57,7 +57,7 @@ object xdmitem {
     case item: XSGYearMonth             => ???
     case item: XSHexBinary              => Data.Binary(ImmutableArray.fromArray(item.asBinaryData))
     case item: XSInteger                => Data.Int(item.asBigInteger)
-    case item: XSQName                  => ???
+    case item: XSQName                  => Data.Str(item.asString)
     case item: XSString                 => Data.Str(item.asString)
     case item: XSTime                   => ???
     case item: XSUntypedAtomic          => ???
