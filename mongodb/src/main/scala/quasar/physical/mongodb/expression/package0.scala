@@ -21,9 +21,11 @@ import quasar.Type, Type.⨿
 import quasar.fp.Prj
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.Planner.{PlannerError, UnsupportedJS}
+import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.physical.mongodb.javascript._
 
 import matryoshka._
+import monocle.Prism
 import scalaz._, Scalaz._
 
 // HACK
@@ -38,6 +40,10 @@ package object expression0 {
 
   /** The type for expressions supporting the most advanced capabilities. */
   type ExprOp[A] = Expr3_2[A]
+
+  val DocField = Prism.partial[DocVar, BsonField] {
+    case DocVar.ROOT(Some(tail)) => tail
+  } (DocVar.ROOT(_))
 
   // The following few cases are places where the ExprOp created from
   // the LogicalPlan needs special handling to behave the same when

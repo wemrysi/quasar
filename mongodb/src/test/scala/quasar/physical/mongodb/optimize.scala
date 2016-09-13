@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.TreeMatchers
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.DocField // HACK
 import quasar.physical.mongodb.optimize.pipeline._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._

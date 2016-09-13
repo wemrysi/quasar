@@ -26,7 +26,6 @@ import quasar.namegen._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.DocField // HACK
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._

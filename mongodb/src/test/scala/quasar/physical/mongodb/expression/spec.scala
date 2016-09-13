@@ -18,7 +18,7 @@ package quasar.physical.mongodb.expression0 // HACK
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
+import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._

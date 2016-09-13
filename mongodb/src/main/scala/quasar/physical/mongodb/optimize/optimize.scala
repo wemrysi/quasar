@@ -21,7 +21,7 @@ import quasar.jscore._
 import quasar.fp._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
+import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.physical.mongodb.workflow._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._

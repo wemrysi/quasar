@@ -22,7 +22,7 @@ import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
+import quasar.physical.mongodb.expression.DocVar // HACK
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._

@@ -20,7 +20,7 @@ import quasar._
 import quasar.Predef._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.{DocField, DocVar} // HACK
+import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
