@@ -38,6 +38,7 @@ object qscript {
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
 
+  // quasar:node-left-shift($node as node()*) as item()*
   def nodeLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("node-left-shift").qn[F] map { fname =>
       declare(fname)(
@@ -47,9 +48,8 @@ object qscript {
       }
     }
 
-  /** quasar:left-shift($node as node()) as item()*
-    * TODO: Convert to a typeswitch
-    */
+  // quasar:left-shift($node as node()) as item()*
+  // TODO: Convert to a typeswitch
   def leftShift[F[_]: PrologW]: F[FunctionDecl1] =
     (
       qs.name("left-shift").qn[F] |@|
@@ -86,7 +86,7 @@ object qscript {
   def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
     errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
-  /** quasar:zip-map-node-keys($node as node()) as element(ejson:map) */
+  // quasar:zip-map-node-keys($node as node()) as element(ejson:map)
   def zipMapNodeKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
     (qs.name("zip-map-node-keys").qn[F] |@| ejson.mapN.qn) { (fname, mname) =>
       declare(fname)(

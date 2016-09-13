@@ -35,7 +35,7 @@ object ejson {
   val mapKeyN   = ejs name "map-key"
   val mapValueN = ejs name "map-value"
 
-  /** ejson:array-concat($arr1 as element(ejson:array), $arr2 as element(ejson:array)) as element(ejson:array) */
+  // ejson:array-concat($arr1 as element(ejson:array), $arr2 as element(ejson:array)) as element(ejson:array)
   def arrayConcat[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-concat").qn[F] |@| arrayN.qn |@| arrayEltN.qn) { (fname, aname, aelt) =>
       declare(fname)(
@@ -46,7 +46,7 @@ object ejson {
       }
     }.join
 
-  /** ejson:array-left-shift($arr as element(ejson:array)) as item()* */
+  // ejson:array-left-shift($arr as element(ejson:array)) as item()*
   def arrayLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("array-left-shift").qn[F] |@| arrayN.qn |@| arrayEltN.qn) { (fname, aname, aelt) =>
       declare(fname)(
@@ -56,27 +56,27 @@ object ejson {
       }
     }
 
-  /** ejson:is-array($node as node()) as xs:boolean() */
+  // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("is-array").qn[F] |@| arrayN.xqy) { (fname, aname) =>
       declare(fname)(
         $("node") as SequenceType("node()")
-      ).as(SequenceType("xs:boolean()")) { node =>
+      ).as(SequenceType("xs:boolean")) { node =>
         fn.nodeName(node) === aname
       }
     }
 
-  /** ejson:is-map($node as node()) as xs:boolean() */
+  // ejson:is-map($node as node()) as xs:boolean
   def isMap[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("is-map").qn[F] |@| mapN.xqy) { (fname, mname) =>
       declare(fname)(
         $("node") as SequenceType("node()")
-      ).as(SequenceType("xs:boolean()")) { node =>
+      ).as(SequenceType("xs:boolean")) { node =>
         fn.nodeName(node) === mname
       }
     }
 
-  /** ejson:map-left-shift($map as element(ejson:map)) as item()* */
+  // ejson:map-left-shift($map as element(ejson:map)) as item()*
   def mapLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("map-left-shift").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapValueN.qn) {
       (fname, mname, mentry, mval) =>
@@ -88,7 +88,7 @@ object ejson {
       }
     }
 
-  /** ejson:map-lookup($map as element(ejson:map), $key as item()*) as item()* */
+  // ejson:map-lookup($map as element(ejson:map), $key as item()*) as item()*
   def mapLookup[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
     (ejs.name("map-lookup").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapKeyN.xqy |@| mapValueN.qn) {
       (fname, mname, mentry, mkey, mval) =>
@@ -101,7 +101,7 @@ object ejson {
       }
     }
 
-  /** ejson:make-array($elements as element(ejson:array-element)*) as element(ejson:array) */
+  // ejson:make-array($elements as element(ejson:array-element)*) as element(ejson:array)
   def mkArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("make-array").qn[F] |@| arrayN.qn |@| arrayN.xs |@| arrayEltN.qn) { (fname, aname, arrxs, aelt) =>
       declare(fname)(
@@ -111,7 +111,7 @@ object ejson {
       }
     }
 
-  /** ejson:make-array-element($value as item()*) as element(ejson:array-element) */
+  // ejson:make-array-element($value as item()*) as element(ejson:array-element)
   def mkArrayElt[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("make-array-element").qn[F] |@| arrayEltN.qn |@| arrayEltN.xs) { (fname, aelt, aeltxs) =>
       declare(fname)(
@@ -121,7 +121,7 @@ object ejson {
       }
     }
 
-  /** ejson:make-map($entries as element(ejson:map-entry)*) as element(ejson:map) */
+  // ejson:make-map($entries as element(ejson:map-entry)*) as element(ejson:map)
   def mkMap[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("make-map").qn[F] |@| mapN.qn |@| mapN.xs |@| mapEntryN.qn) { (fname, mname, mapxs, ment) =>
       declare(fname)(
@@ -131,7 +131,7 @@ object ejson {
       }
     }
 
-  /** ejson:make-map-entry($key as item()*, $value as item()*) as element(ejson:map-entry) */
+  // ejson:make-map-entry($key as item()*, $value as item()*) as element(ejson:map-entry)
   def mkMapEntry[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("make-map-entry").qn[F] |@| mapEntryN.qn |@| mapEntryN.xs |@| mapKeyN.xs |@| mapValueN.xs) {
       (fname, mentry, mentryxs, mkeyxs, mvalxs) =>
@@ -149,7 +149,7 @@ object ejson {
       }
     }
 
-  /** ejson:seq-to-array($items as item()*) as element(ejson:array) */
+  // ejson:seq-to-array($items as item()*) as element(ejson:array)
   def seqToArray[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
     (ejs.name("seq-to-array").qn[F] |@| arrayN.qn) { (fname, aname) =>
       declare(fname)(
@@ -164,7 +164,7 @@ object ejson {
       }
     }.join
 
-  /** ejson:singleton-array($item as item()*) as element(ejson:array) */
+  // ejson:singleton-array($item as item()*) as element(ejson:array)
   def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
     (ejs.name("singleton-array").qn[F] |@| arrayN.qn) { (fname, aname) =>
       declare(fname)(
@@ -174,7 +174,7 @@ object ejson {
       }
     }.join
 
-  /** ejson:singleton-map($key as item()*, $value as item()*) as element(ejson:map) */
+  // ejson:singleton-map($key as item()*, $value as item()*) as element(ejson:map)
   def singletonMap[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("singleton-map").qn[F] |@| mapN.qn) { (fname, mname) =>
       declare(fname)(
@@ -185,7 +185,7 @@ object ejson {
       }
     }.join
 
-  /** ejson:zip-map-keys($map as element(ejson:map)) as element(ejson:map) */
+  // ejson:zip-map-keys($map as element(ejson:map)) as element(ejson:map)
   def zipMapKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
     (ejs.name("zip-map-keys").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapKeyN.qn |@| mapValueN.qn) {
       (fname, mname, mentry, mkey, mval) =>
