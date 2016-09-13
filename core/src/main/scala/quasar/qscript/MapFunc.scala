@@ -202,6 +202,18 @@ object MapFunc {
           CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
             Constant(CommonEJson.inj(ejson.Arr[T[EJson]](List(v1))).embed).right).some
 
+        case MakeMap(
+            Embed(CoEnv(\/-(Constant(key @ Embed(ejson.Common(ejson.Str(_))))))),
+            Embed(CoEnv(\/-(Constant(value))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant(ExtEJson.inj(ejson.Map[T[EJson]](List(key -> value))).embed).right).some
+
+        case ConcatArrays(
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(v1))))))),
+            Embed(CoEnv(\/-(Constant(Embed(ejson.Common(ejson.Arr(v2)))))))) =>
+          CoEnv[A, MapFunc[T, ?], T[CoEnv[A, MapFunc[T, ?], ?]]](
+            Constant(CommonEJson.inj(ejson.Arr[T[EJson]](v1 ++ v2)).embed).right).some
+
         case _ => None
       })
 
