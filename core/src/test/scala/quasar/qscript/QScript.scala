@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
 import quasar.ejson
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib
@@ -236,8 +237,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
-            CommonEJson.inj(ejson.Arr[Fix[ejson.EJson]](List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
+            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7))))))),
           Free.point(RightSide)))).some)
     }
 
@@ -256,9 +257,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
+            EJson.fromCommon[Fix].apply(ejson.Arr(List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8))))))),
           Free.point(RightSide)))).some)
     }
 
@@ -279,10 +280,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         QC.inj(LeftShift(
           (),
           Free.roll(Constant(
-            CommonEJson.inj(ejson.Arr(List(
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
-              ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
+            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](9))))))),
           Free.point(RightSide)))).some)
     }
 

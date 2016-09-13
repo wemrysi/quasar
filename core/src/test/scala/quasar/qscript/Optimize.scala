@@ -21,6 +21,7 @@ import quasar.{LogicalPlan => LP, _}
 import quasar.qscript.MapFuncs._
 import quasar.fp._
 import quasar.fs._
+import quasar.ejson.EJson
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
@@ -61,8 +62,8 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     }
 
     "fold a constant array value" in {
-      val value: Fix[ejson.EJson] =
-        ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed
+      val value: Fix[EJson] =
+        EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
@@ -72,14 +73,14 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR,
-          Free.roll(Constant(CommonEJson.inj(ejson.Arr(List(value)))))))
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
 
       exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
     }
 
     "fold a constant doubly-nested array value" in {
-      val value: Fix[ejson.EJson] =
-        ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed
+      val value: Fix[EJson] =
+        ejson.EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
@@ -89,17 +90,17 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
       val expected: QS[Fix[QS]] =
         QC.inj(Map(
           RootR,
-          Free.roll(Constant(CommonEJson.inj(ejson.Arr(List(CommonEJson.inj(ejson.Arr(List(value))).embed)))))))
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
 
       exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
     }
 
     "fold nested boolean values" in {
-      val falseBool: Fix[ejson.EJson] =
-        CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](false)).embed
+      val falseBool: Fix[EJson] =
+        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](false))
 
-      val trueBool: Fix[ejson.EJson] =
-        CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](true)).embed
+      val trueBool: Fix[EJson] =
+        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](true))
 
       val exp: QS[Fix[QS]] =
         QC.inj(Map(
@@ -116,7 +117,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
         QC.inj(Map(
           RootR,
           Free.roll(Constant(
-            CommonEJson.inj(ejson.Arr(List(CommonEJson.inj(ejson.Bool[Fix[ejson.EJson]](false)).embed)))))))
+            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
 
       exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
     }
