@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression0 // HACK
+package quasar.physical.mongodb.expression
 
 import quasar.Predef._
 import quasar._, Planner._
 import quasar.fp.Inj
 import quasar.physical.mongodb.Bson
-import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.jscore, jscore.JsFn
 
 import matryoshka._
 import scalaz._
 
 trait ExprOpOps[EX[_]] {
+  // TODO: capture F in the typeclass?
   def simplify[F[_]](implicit I: Inj[EX, F]): AlgebraM[Option, EX, Fix[F]]
 
   def bson: Algebra[EX, Bson]

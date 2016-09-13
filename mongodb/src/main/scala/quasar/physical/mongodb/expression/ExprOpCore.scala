@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression0 // HACK
+package quasar.physical.mongodb.expression
 
 import quasar.Predef._
 import quasar._, Planner._
 import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.expression.DocVar // HACK
 import quasar.physical.mongodb.{Bson, BsonField}
 import quasar.physical.mongodb.javascript._
 

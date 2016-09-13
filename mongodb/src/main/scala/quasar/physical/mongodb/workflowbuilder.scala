@@ -24,8 +24,7 @@ import quasar._, Planner._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.DocVar // HACK
+import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.std.StdLib._
 import quasar.qscript._

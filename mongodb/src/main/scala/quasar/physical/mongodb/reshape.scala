@@ -21,8 +21,7 @@ import quasar.fp._
 import quasar._, Planner._
 import quasar.jscore, jscore.{JsFn}
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression0._ // HACK
-import quasar.physical.mongodb.expression.DocVar // HACK
+import quasar.physical.mongodb.expression._
 
 import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
@@ -56,7 +55,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
       ev2: Traverse[EX],
       ev3: Equal[Fix[EX]]): PlannerError \/ JsFn =
     value.map { case (key, expr) =>
-      key.asText -> expr.fold[PlannerError \/ JsFn](_.toJs, _.para(expression0.toJs[Fix, EX]))
+      key.asText -> expr.fold[PlannerError \/ JsFn](_.toJs, _.para(expression.toJs[Fix, EX]))
     }.sequence.map { l => JsFn(JsFn.defaultName,
       jscore.Obj(l.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(JsFn.defaultName)) }))
     }

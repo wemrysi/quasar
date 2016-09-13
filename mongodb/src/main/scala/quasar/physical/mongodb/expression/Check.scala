@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.mongodb.expression0 // HACK
+package quasar.physical.mongodb.expression
 
 import quasar.Predef._
 import quasar.Type

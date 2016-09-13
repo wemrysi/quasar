@@ -24,8 +24,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, MapReduce, Reshape, Selector, sortDirToBson},
   MapReduce.Scope
 import quasar.physical.mongodb.accumulator._
-import quasar.physical.mongodb.expression0._  // HACK
-import quasar.physical.mongodb.expression.DocVar  // HACK
+import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflowtask._
 import quasar.qscript.SortDir
 

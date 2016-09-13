@@ -608,7 +608,7 @@ object MongoDbPlanner {
     }
   }
 
-  import quasar.physical.mongodb.expression0._ // HACK
+  import quasar.physical.mongodb.expression._
   import quasar.physical.mongodb.accumulator._
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
