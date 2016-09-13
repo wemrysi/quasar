@@ -19,8 +19,6 @@ package quasar
 import quasar.Predef._
 import quasar.fp._
 
-import scala.Predef.implicitly
-
 import matryoshka._
 import matryoshka.patterns._
 import monocle.macros.Lenses
@@ -69,9 +67,6 @@ package object qscript {
     */
   type QScriptTotal[T[_[_]], A] =
     Coproduct[Const[ShiftedRead, ?], QScriptTotal2[T, ?], A]
-
-  val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
-  val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]

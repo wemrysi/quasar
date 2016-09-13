@@ -106,8 +106,8 @@ object StaticPath extends LowPriorityStaticPathInstances {
           AlgebraM[M, Coproduct[H, I, ?], IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]] =
 
         _.run.fold(
-          FS.pathifyƒ(ls)(MonadError[M, FileSystemError], Traverse[G], TC, TR, PF, QC, F.compose(Inject[H, Coproduct[H, I, ?]]), FI, Traverse[H], CP),
-          GS.pathifyƒ(ls)(MonadError[M, FileSystemError], Traverse[G], TC, TR, PF, QC, F.compose(Inject[I, Coproduct[H, I, ?]]), FI, Traverse[I], CP))
+          FS.pathifyƒ(ls)(MonadFsErr[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[H, Coproduct[H, I, ?]]), FI, Traverse[H], CP),
+          GS.pathifyƒ(ls)(MonadFsErr[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[I, Coproduct[H, I, ?]]), FI, Traverse[I], CP))
     }
 }
 
