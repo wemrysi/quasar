@@ -727,7 +727,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
           src,
           rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
           rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
-          Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
+          Free.roll(Constant(EJson.fromCommon[T].apply(ejson.Bool[T[EJson]](false)))),
           LeftOuter,
           Free.point(LeftSide))))).right
 
