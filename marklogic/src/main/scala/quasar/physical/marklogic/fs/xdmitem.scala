@@ -18,6 +18,9 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.physical.marklogic.xquery.SecureXML
+
+import scala.xml.Elem
 
 import com.marklogic.xcc.types._
 import scalaz._
@@ -33,12 +36,16 @@ object xdmitem {
     case item: JSArray                  => ???
     case item: JSObject                 => ???
     case item: JsonItem                 => data.JsonParser.parseFromString(item.asString).getOrElse(Data.NA)
-    case item: XdmAttribute             => ???
+
+    case item: XdmAttribute             =>
+      val attr = item.asW3cAttr
+      Data.Obj(ListMap(attr.getName -> Data.Str(attr.getValue)))
+
     // TODO: Inefficient for large data as it must be buffered into memory
     case item: XdmBinary                => Data.Binary(ImmutableArray.fromArray(item.asBinaryData))
     case item: XdmComment               => Data.NA
-    case item: XdmDocument              => ???
-    case item: XdmElement               => ???
+    case item: XdmDocument              => SecureXML.loadString(item.asString) map (elementToData) getOrElse Data.NA
+    case item: XdmElement               => SecureXML.loadString(item.asString) map (elementToData) getOrElse Data.NA
     case item: XdmProcessingInstruction => Data.NA
     case item: XdmText                  => Data.Str(item.asString)
     case item: XSAnyURI                 => Data.Str(item.asString)
@@ -63,4 +70,31 @@ object xdmitem {
     case item: XSUntypedAtomic          => ???
     case _                              => Data.NA // This case should not be hit although we can't prove it.
   }
+
+  /** Example
+    *
+    * <foo type="baz" id="1">
+    *   <bar>
+    *     <baz>37</baz>
+    *     <bat>one</bat>
+    *     <bat>two</bat>
+    *   </bar>
+    *   <quux>lorem ipsum</quux>
+    * </foo>
+    *
+    * {
+    *   "foo": {
+    *     "_attributes": {
+    *       "type": "baz",
+    *       "id": "1"
+    *     },
+    *     "bar": {
+    *       "baz": "37",
+    *       "bat": ["one", "two"]
+    *     },
+    *     "quux": "lorem ipsum"
+    *   }
+    * }
+    */
+  def elementToData(elem: Elem): Data = ???
 }
