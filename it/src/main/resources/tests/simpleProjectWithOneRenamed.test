@@ -6,7 +6,8 @@
     "mongodb_3_0":       "pending",
     "mongodb_read_only": "pending",
     "mongodb_3_2":       "pending",
-    "postgresql":        "pending"
+    "postgresql":        "pending",
+    "marklogic":         "pending"
   },
 
   "data": "zips.data",

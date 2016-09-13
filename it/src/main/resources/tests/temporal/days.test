@@ -1,7 +1,7 @@
 {
   "name": "dow and isodow",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "../days.data",
 

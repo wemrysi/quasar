@@ -31,7 +31,7 @@ import simulacrum.typeclass
   type IT[F[_]]
 
   def pathifyƒ[M[_]: Monad, G[_]: Traverse]
-    (g: ListContents[M])
+    (ls: ListContents[M])
     (implicit
       TC: Corecursive[IT],
       TR: Recursive[IT],
@@ -44,7 +44,7 @@ import simulacrum.typeclass
       : AlgebraM[EitherT[M, FileSystemError, ?], F, IT[QScriptTotal[IT, ?]] \/ IT[Pathable[IT, ?]]]
 
   def toRead[M[_]: Monad, F[_]: Traverse, G[_]: Functor]
-    (g: ListContents[M])
+    (ls: ListContents[M])
     (implicit
       TC: Corecursive[IT],
       TR: Recursive[IT],
@@ -59,8 +59,8 @@ import simulacrum.typeclass
     implicit val pathedTraverse: Traverse[Pathed[F, ?]] =
       Traverse[List].compose(Traverse[CoEnv[ADir, F, ?]])
 
-    _.transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?]](CP.convertPath[M](g)) >>=
-      (TraverseT[IT].transCataM[EitherT[M, PlannerError, ?], Pathed[F, ?], G](_)(postPathify[IT, M, F, G](g)).leftMap(FileSystemError.qscriptPlanningFailed(_)))
+    _.transCataM[EitherT[M, FileSystemError, ?], Pathed[F, ?]](CP.convertPath[M](ls)) >>=
+      (TraverseT[IT].transCataM[EitherT[M, PlannerError, ?], Pathed[F, ?], G](_)(postPathify[IT, M, F, G](ls)).leftMap(FileSystemError.qscriptPlanningFailed(_)))
     }
 }
 
@@ -72,7 +72,7 @@ object StaticPath extends LowPriorityStaticPathInstances {
     new StaticPath[F] {
       type IT[F[_]] = T[F]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
+      def pathifyƒ[M[_]: Monad, G[_]: Traverse](ls: ListContents[M])(
         implicit TC: Corecursive[T],
                  TR: Recursive[T],
                  PF: Pathable[IT, ?] ~> G,
@@ -92,7 +92,7 @@ object StaticPath extends LowPriorityStaticPathInstances {
     new StaticPath[Coproduct[H, I, ?]] {
       type IT[F[_]] = T[F]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
+      def pathifyƒ[M[_]: Monad, G[_]: Traverse](ls: ListContents[M])(
         implicit TC: Corecursive[T],
                  TR: Recursive[T],
                  PF: Pathable[IT, ?] ~> G,
@@ -103,8 +103,8 @@ object StaticPath extends LowPriorityStaticPathInstances {
                  CP: ConvertPath.Aux[IT, Pathable[IT, ?], G]):
           AlgebraM[EitherT[M, FileSystemError, ?], Coproduct[H, I, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]] =
         _.run.fold(
-          FS.pathifyƒ(g)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[H, Coproduct[H, I, ?]]), FI, Traverse[H], CP),
-          GS.pathifyƒ(g)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[I, Coproduct[H, I, ?]]), FI, Traverse[I], CP))
+          FS.pathifyƒ(ls)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[H, Coproduct[H, I, ?]]), FI, Traverse[H], CP),
+          GS.pathifyƒ(ls)(Monad[M], Traverse[G], TC, TR, PF, QC, F.compose(Inject[I, Coproduct[H, I, ?]]), FI, Traverse[I], CP))
     }
 }
 
@@ -113,7 +113,7 @@ sealed trait LowPriorityStaticPathInstances {
     new StaticPath[F] {
       type IT[F[_]] = T[F]
 
-      def pathifyƒ[M[_]: Monad, G[_]: Traverse](g: ListContents[M])(
+      def pathifyƒ[M[_]: Monad, G[_]: Traverse](ls: ListContents[M])(
         implicit TC: Corecursive[T],
                  TR: Recursive[T],
                  PF: Pathable[IT, ?] ~> G,
@@ -125,7 +125,7 @@ sealed trait LowPriorityStaticPathInstances {
           AlgebraM[EitherT[M, FileSystemError, ?], F, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]]=
         _.traverse(_.fold(
           qt => EitherT(qt.right[FileSystemError].point[M]),
-          toRead[M, G, QScriptTotal[T, ?]](g)))
+          toRead[M, G, QScriptTotal[T, ?]](ls)))
           .map(x => FI(F(x)).embed.left)
     }
 }

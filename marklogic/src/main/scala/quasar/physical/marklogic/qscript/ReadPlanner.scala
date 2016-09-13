@@ -19,24 +19,12 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
-import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._
 
 private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
-  import expr.{for_, if_}, axes.child
-
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[Read, ?], XQuery] = {
-    case Const(Read(absFile)) =>
-      val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
-      val dirRepr = posixCodec.printPath(asDir)
-
-      liftP((freshVar[F] |@| freshVar[F])((d, c) =>
-        for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
-        .let_(c -> d.xqy `/` child.node())
-        .return_ { if_ (json.isObject(c.xqy)) then_ json.transformFromJson(c.xqy) else_ c.xqy }))
-  }
+  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[Read, ?], XQuery] =
+    _ => ???
 }

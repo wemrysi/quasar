@@ -24,7 +24,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.SortDir
 
 import matryoshka.Fix
 import org.scalacheck._

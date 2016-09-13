@@ -61,12 +61,14 @@ package object qscript {
     Coproduct[ThetaJoin[T, ?], Pathable[T, ?], A]
   private type QScriptTotal1[T[_[_]], A] =
     Coproduct[EquiJoin[T, ?], QScriptTotal0[T, ?], A]
+  private type QScriptTotal2[T[_[_]], A] =
+    Coproduct[Const[Read, ?], QScriptTotal1[T, ?], A]
   /** This type is used for join branch-like structures. It’s an unfortunate
     * consequence of not having mutually-recursive data structures. Once we do,
     * this can go away.
     */
   type QScriptTotal[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptTotal1[T, ?], A]
+    Coproduct[Const[ShiftedRead, ?], QScriptTotal2[T, ?], A]
 
   val ExtEJson = implicitly[ejson.Extension :<: ejson.EJson]
   val CommonEJson = implicitly[ejson.Common :<: ejson.EJson]

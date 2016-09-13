@@ -1,6 +1,6 @@
 {
     "name": "delete",
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
     "data": "zips.data",
     "query": "delete from zips where pop < 100000",
     "predicate": "equalsExactly",

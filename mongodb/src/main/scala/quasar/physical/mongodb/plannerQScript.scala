@@ -699,143 +699,154 @@ object MongoDbQScriptPlanner {
     def shouldNotBeReached[WF[_]]: StateT[OutputM, NameGen, WorkflowBuilder[WF]] =
       StateT(κ((InternalError("should not be reached"): PlannerError).left[(NameGen, WorkflowBuilder[WF])]))
   }
+
   object Planner {
     type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
-  // NB: Shouldn’t need this once we convert to paths.
-  implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
-    new Planner[Const[DeadEnd, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        _ => shouldNotBeReached
-    }
-
-  implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
-    new Planner[Const[Read, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
-  }
-
-  implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
-      Planner.Aux[T, QScriptCore[T, ?]] =
-    new Planner[QScriptCore[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) = {
-        case qscript.Map(src, f) => getExprBuilder(src, f).liftM[GenT]
-        case LeftShift(src, struct, repair) => unimplemented
-        // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
-        //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
-        case Reduce(src, bucket, reducers, repair) =>
-          (getExprBuilder(src, bucket) ⊛
-            reducers.traverse(_.traverse(getExpr[T])) ⊛
-            getJsRed(repair))((b, red, rep) =>
-            ExprBuilder(
-              GroupBuilder(src,
-                List(b),
-                Contents.Doc(red.zipWithIndex.map(ai =>
-                  (BsonField.Name(ai._2.toString),
-                    accumulator(ai._1).left[Fix[ExprOpCoreF]])).toListMap)),
-              rep.left)).liftM[GenT]
-        case Sort(src, bucket, order) =>
-          val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
-          keys.traverse(getExprBuilder(src, _))
-            .map(WB.sortBy(src, _, dirs)).liftM[GenT]
-        case Union(src, lBranch, rBranch) => unimplemented
-        case Filter(src, f) =>
-          getExprBuilder(src, f).map(cond =>
-            WB.filter(src, List(cond), {
-              case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
-            })).liftM[GenT]
-        case Take(src, from, count) =>
-          (rebaseWB(joinHandler, from, src) ⊛
-            (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-            WB.limit)
-        case Drop(src, from, count) =>
-          (rebaseWB(joinHandler, from, src) ⊛
-            (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
-            WB.skip)
-        case Unreferenced() =>
-          StateT.stateT(ValueBuilder(Bson.Null))
+    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
+      new Planner[Const[ShiftedRead, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          qs => Collection.fromFile(qs.getConst.path).bimap(PlanPathError(_): PlannerError, WB.read).liftM[GenT]
       }
-    }
 
-  implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
-      Planner.Aux[T, EquiJoin[T, ?]] =
-    new Planner[EquiJoin[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        qs =>
-          // FIXME: we should take advantage of the already merged srcs
-          (rebaseWB(joinHandler, qs.lBranch, qs.src) ⊛
-            rebaseWB(joinHandler, qs.rBranch, qs.src) ⊛
-            getExprBuilder(qs.src, qs.lKey).liftM[GenT] ⊛
-            getExprBuilder(qs.src, qs.rKey).liftM[GenT])(
-            (lb, rb, lk, rk) =>
-            joinHandler.run(
-              qs.f match {
-                case Inner => set.InnerJoin
-                case FullOuter => set.FullOuterJoin
-                case LeftOuter => set.LeftOuterJoin
-                case RightOuter => set.RightOuterJoin
-              },
-              JoinSource(lb, List(lk), getJsFn(qs.lKey).toOption.map(List(_))),
-              JoinSource(rb, List(rk), getJsFn(qs.rKey).toOption.map(List(_))))).join
+    implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
+        Planner.Aux[T, QScriptCore[T, ?]] =
+      new Planner[QScriptCore[T, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) = {
+          case qscript.Map(src, f) => getExprBuilder(src, f).liftM[GenT]
+          case LeftShift(src, struct, repair) => unimplemented
+          // (getExprBuilder(src, struct) ⊛ getJsMerge(repair))(
+          //   (expr, jm) => WB.jsExpr(List(src, WB.flattenMap(expr)), jm))
+          case Reduce(src, bucket, reducers, repair) =>
+            (getExprBuilder(src, bucket) ⊛
+              reducers.traverse(_.traverse(getExpr[T])) ⊛
+              getJsRed(repair))((b, red, rep) =>
+              ExprBuilder(
+                GroupBuilder(src,
+                  List(b),
+                  Contents.Doc(red.zipWithIndex.map(ai =>
+                    (BsonField.Name(ai._2.toString),
+                      accumulator(ai._1).left[Fix[ExprOpCoreF]])).toListMap)),
+                rep.left)).liftM[GenT]
+          case Sort(src, bucket, order) =>
+            val (keys, dirs) = ((bucket, SortDir.Ascending) :: order).unzip
+            keys.traverse(getExprBuilder(src, _))
+              .map(WB.sortBy(src, _, dirs)).liftM[GenT]
+          case Filter(src, f) =>
+            getExprBuilder(src, f).map(cond =>
+              WB.filter(src, List(cond), {
+                case f :: Nil => Selector.Doc(f -> Selector.Eq(Bson.Bool(true)))
+              })).liftM[GenT]
+          case Union(src, lBranch, rBranch) => unimplemented
+          case Take(src, from, count) =>
+            (rebaseWB(joinHandler, from, src) ⊛
+              (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
+              WB.limit)
+          case Drop(src, from, count) =>
+            (rebaseWB(joinHandler, from, src) ⊛
+              (rebaseWB(joinHandler, count, src) >>= (HasInt(_).liftM[GenT])))(
+              WB.skip)
+          case Unreferenced() => ValueBuilder(Bson.Null).point[M]
+        }
+      }
 
-    }
+    implicit def equiJoin[T[_[_]]: Recursive: ShowT]:
+        Planner.Aux[T, EquiJoin[T, ?]] =
+      new Planner[EquiJoin[T, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          qs =>
+        // FIXME: we should take advantage of the already merged srcs
+        (rebaseWB(joinHandler, qs.lBranch, qs.src) ⊛
+          rebaseWB(joinHandler, qs.rBranch, qs.src) ⊛
+          getExprBuilder(qs.src, qs.lKey).liftM[GenT] ⊛
+          getExprBuilder(qs.src, qs.rKey).liftM[GenT])(
+          (lb, rb, lk, rk) =>
+          joinHandler.run(
+            qs.f match {
+              case Inner => set.InnerJoin
+              case FullOuter => set.FullOuterJoin
+              case LeftOuter => set.LeftOuterJoin
+              case RightOuter => set.RightOuterJoin
+            },
+            JoinSource(lb, List(lk), getJsFn(qs.lKey).toOption.map(List(_))),
+            JoinSource(rb, List(rk), getJsFn(qs.rKey).toOption.map(List(_))))).join
+      }
 
-  // TODO: Remove this instance
-  implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
-    new Planner[ThetaJoin[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        κ(unimplemented)
-    }
+    implicit def coproduct[T[_[_]], F[_], G[_]](
+      implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
+        Planner.Aux[T, Coproduct[F, G, ?]] =
+      new Planner [Coproduct[F, G, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          _.run.fold(F.plan(joinHandler), G.plan(joinHandler))
+      }
 
-  // TODO: Remove this instance
-  implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
-    new Planner[ProjectBucket[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        κ(unimplemented)
-    }
 
-  implicit def coproduct[T[_[_]], F[_], G[_]](
-    implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
-      Planner.Aux[T, Coproduct[F, G, ?]] =
-    new Planner [Coproduct[F, G, ?]] {
-      type IT[G[_]] = T[G]
-      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-        implicit I: WorkflowOpCoreF :<: WF,
-                 ev: Show[WorkflowBuilder[WF]],
-                 WB: WorkflowBuilder.Ops[WF]) =
-        _.run.fold(F.plan(joinHandler), G.plan(joinHandler))
-    }
+    // TODO: All instances below here only need to exist because of `FreeQS`, but
+    //       can’t actually be called.
+
+    implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
+      new Planner[Const[DeadEnd, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          κ(shouldNotBeReached)
+      }
+
+    implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
+      new Planner[Const[Read, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          κ(shouldNotBeReached)
+      }
+
+    implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
+      new Planner[ThetaJoin[T, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          κ(shouldNotBeReached)
+      }
+
+    implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
+      new Planner[ProjectBucket[T, ?]] {
+        type IT[G[_]] = T[G]
+        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+          implicit I: WorkflowOpCoreF :<: WF,
+            ev: Show[WorkflowBuilder[WF]],
+            WB: WorkflowBuilder.Ops[WF]) =
+          κ(shouldNotBeReached)
+      }
   }
 
   def getExpr[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[Fix[ExprOpCoreF]] =
@@ -906,6 +917,9 @@ object MongoDbQScriptPlanner {
     case x => x.right
   }
 
+  private type QScript0[T[_[_]], A] = Coproduct[Const[Read, ?], QScriptCore[T, ?], A]
+  type QScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScript0[T, ?], A]
+
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -966,8 +980,10 @@ object MongoDbQScriptPlanner {
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(liftError(
         qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
-          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘ liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
+          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
+            liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
           ).apply(tf) ∘
+            Normalizable[QScriptTotal[T, ?]].normalize).map(transFutu(_)(ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(idPrism.reverseGet)(_: QScriptTotal[T, T[QScriptTotal[T, ?]]])) ∘
             Normalizable[QScriptTotal[T, ?]].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
