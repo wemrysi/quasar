@@ -26,20 +26,23 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner
-    extends MarkLogicPlanner[Const[ShiftedRead, ?]] {
+private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[ShiftedRead, ?]] {
   import expr.{for_, if_}, axes.child
 
   // TODO: Implement `idStatus`
-  def plan[F[_]: NameGenerator: Monad]:
-      AlgebraM[PlanningT[F, ?], Const[ShiftedRead, ?], XQuery] = {
+  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
 
-      liftP((freshVar[F] |@| freshVar[F])((d, c) =>
+      for {
+        d     <- freshVar[F]
+        c     <- freshVar[F]
+        xform <- json.transformFromJson[F](c.xqy)
+      } yield {
         for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
         .let_(c -> d.xqy `/` child.node())
-        .return_ { if_ (json.isObject(c.xqy)) then_ json.transformFromJson(c.xqy) else_ c.xqy }))
+        .return_ { if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy }
+      }
   }
 }

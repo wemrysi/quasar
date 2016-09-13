@@ -18,7 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs.FileSystemError
+import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
 import quasar.qscript.MapFuncs._
 
@@ -528,29 +528,26 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: Monad, F[_]: Traverse](
+  def pathify[M[_]: MonadFsErr, F[_]: Traverse](
     ls: ConvertPath.ListContents[M])(
     implicit FS: StaticPath.Aux[T, F],
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
-      T[F] => EitherT[M,  FileSystemError, T[QScriptTotal[T, ?]]] =
-    _.cataM[EitherT[M, FileSystemError, ?], T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](ls)) >>=
-      (_.fold(qt => EitherT(qt.right.point[M]), FS.toRead[M, F, QScriptTotal[T, ?]](ls)))
+      T[F] => M[T[QScriptTotal[T, ?]]] =
+    _.cataM[M, T[QScriptTotal[T, ?]] \/ T[Pathable[T, ?]]](FS.pathifyƒ[M, F](ls))
+      .flatMap(_.fold(_.point[M], FS.toRead[M, F, QScriptTotal[T, ?]](ls)))
 
-  def eliminateProjections[M[_]: Monad, F[_]: Traverse](
+  def eliminateProjections[M[_]: MonadFsErr, F[_]: Traverse](
     lsOpt: Option[ConvertPath.ListContents[M]])(
     implicit FS: StaticPath.Aux[T, F],
              F: Pathable[T, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F,
              FI: F :<: QScriptTotal[T, ?],
              CP: ConvertPath.Aux[T, Pathable[T, ?], F]):
-      T[F] => EitherT[M, FileSystemError, T[QScriptTotal[T, ?]]] = qs => {
-    val res = lsOpt.fold(EitherT(qs.transAna(FI.inj).right[FileSystemError].point[M]))(pathify[M, F](_).apply(qs))
-
-    res.map(
-      _.transAna(SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection))
+      T[F] => M[T[QScriptTotal[T, ?]]] = {
+    val simplifyProj = SimplifyProjection[QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyProjection
+    qs => lsOpt.fold(qs.transAna(FI.inj).point[M])(pathify[M, F](_).apply(qs)) map (_.transAna(simplifyProj))
   }
-
 }

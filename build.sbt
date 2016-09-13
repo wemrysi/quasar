@@ -267,9 +267,15 @@ lazy val skeleton = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogicValidation = project.in(file("marklogic-validation"))
+  .settings(name := "quasar-marklogic-validation-internal")
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.marklogicValidation)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(core % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)

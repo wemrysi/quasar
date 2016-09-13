@@ -61,6 +61,12 @@ package object fs extends PhysicalErrorPrisms {
   type FileSystemFailure[A] = Failure[FileSystemError, A]
   type FileSystemErrT[F[_], A] = EitherT[F, FileSystemError, A]
 
+  type MonadFsErr[F[_]] = MonadError[F, FileSystemError]
+
+  object MonadFsErr {
+    def apply[F[_]](implicit F: MonadFsErr[F]): MonadFsErr[F] = F
+  }
+
   type PhysErr[A] = Failure[PhysicalError, A]
 
   def interpretFileSystem[M[_]](

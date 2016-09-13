@@ -33,12 +33,12 @@ trait ConvertPath[T[_[_]], F[_]] {
 
   type H[A]
 
-  def convertPath[M[_]: Monad](f: ListContents[M]):
+  def convertPath[M[_]: MonadFsErr](f: ListContents[M]):
       ConvertPath.StaticPathTransformation[T, M, F, H]
 
   def fileType[M[_]: Monad](listContents: ListContents[M]):
       (ADir, String) => OptionT[M, ADir \/ AFile] =
-    (dir, name) => listContents(dir).toOption >>=
+    (dir, name) => listContents(dir).liftM[OptionT] >>=
       (cont => OptionT((cont.find(_.fold(_.value ≟ name, _.value ≟ name)) ∘
         (_.bimap(dir </> dir1(_), dir </> file1(_)))).point[M]))
 }
@@ -46,7 +46,7 @@ trait ConvertPath[T[_[_]], F[_]] {
 object ConvertPath extends ConvertPathInstances {
   type Aux[T[_[_]], F[_], G[_]] = ConvertPath[T, F] { type H[A] = G[A] }
 
-  type ListContents[M[_]] = ADir => EitherT[M, FileSystemError, Set[PathSegment]]
+  type ListContents[M[_]] = ADir => M[Set[PathSegment]]
 
   /** A function that converts a portion of QScript to statically-known paths.
     *
@@ -84,7 +84,7 @@ object ConvertPath extends ConvertPathInstances {
     * them in data.
     */
   type StaticPathTransformation[T[_[_]], M[_], F[_], G[_]] =
-    AlgebraicTransformM[T, EitherT[M, FileSystemError, ?], F, Pathed[G, ?]]
+    AlgebraicTransformM[T, M, F, Pathed[G, ?]]
 
   def apply[T[_[_]], F[_]](implicit ev: ConvertPath[T, F]): ConvertPath[T, F] = ev
 
@@ -92,8 +92,8 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, Const[DeadEnd, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, Const[DeadEnd, ?], G] =
-        κ(EitherT(List(CoEnv(rootDir[Sandboxed].left[G[T[Pathed[G, ?]]]])).right[FileSystemError].point[M]))
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, Const[DeadEnd, ?], G] =
+        κ(List(CoEnv(rootDir[Sandboxed].left[G[T[Pathed[G, ?]]]])).point[M])
     }
 
   def wrapDir[T[_[_]]: Corecursive, F[_]: Functor](
@@ -113,11 +113,11 @@ object ConvertPath extends ConvertPathInstances {
     implicit R: Const[Read, ?] :<: F,
              QC: QScriptCore[T, ?] :<: F):
       ADir => M[List[F[T[F]]]] =
-    dir => listContents(dir).run.flatMap(_.fold(
-      κ(List.empty[F[T[F]]].point[M]),
-      ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
+    dir => listContents(dir) flatMap { ps =>
+      ISet.fromList(ps.toList).toList.traverseM(_.fold(
         d => allDescendents[T, M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
+        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))
+    }
 
   def readFile[T[_[_]]: Corecursive, M[_]: Monad, F[_], G[_]: Functor](
     ls: ListContents[M])(
@@ -143,7 +143,7 @@ object ConvertPath extends ConvertPathInstances {
     ls: ListContents[M])(
     implicit R: Const[Read, ?] :<: G,
              FG: F ~> G,
-             QC: QScriptCore[T, ?] :<: G, 
+             QC: QScriptCore[T, ?] :<: G,
              FI: G :<: QScriptTotal[T, ?]):
       AlgebraicTransformM[T, EitherT[M, PlannerError, ?], Pathed[F, ?], G] =
     p => EitherT(p.traverseM(readFile[T, M, F, G](ls).apply) ∘ {
@@ -151,33 +151,42 @@ object ConvertPath extends ConvertPathInstances {
       case h :: t => union[T, G](NonEmptyList.nel(h, t.toIList)).right
     })
 
-  def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Functor]
+  def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, F[_]: Functor]
     (src: T[Pathed[F, ?]], branch: FreeQS[T])
     (ls: ListContents[M])
     (implicit
       CP: ConvertPath.Aux[T, QScriptTotal[T, ?], QScriptTotal[T, ?]],
       FI: F :<: QScriptTotal[T, ?])
-      : EitherT[M, FileSystemError, FreeQS[T]] = {
+      : M[FreeQS[T]] = {
     implicit val FG = NaturalTransformation.refl[QScriptTotal[T, ?]]
 
-    (freeGcataM[Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Hole, T[Pathed[QScriptTotal [T, ?], ?]]](
-      branch)(
-      distCata,
-        ginterpretM(
-          κ(FunctorT[T].transCata[Pathed[F, ?], Pathed[QScriptTotal[T, ?], ?]](src)(_.map(coEnvHmap(_)(FI))).point[EitherT[M, FileSystemError, ?]]),
-          transformToAlgebra[T, Id, EitherT[M, FileSystemError, ?], QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(ls)))) >>=
-      (TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](_)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](ls)).leftMap(FileSystemError.qscriptPlanningFailed(_)))) ∘
-      (_.convertTo[Free[?[_], Hole]])
+    val plugHole =
+      FunctorT[T].transCata[Pathed[F, ?], Pathed[QScriptTotal[T, ?], ?]](src)(_.map(coEnvHmap(_)(FI))).point[M]
+
+    val convertPathAlg =
+      transformToAlgebra[T, Id, M, QScriptTotal[T, ?], Pathed[QScriptTotal[T, ?], ?]](CP.convertPath(ls))
+
+    val pathedBranch =
+      freeGcataM[Id, M, QScriptTotal[T, ?], Hole, T[Pathed[QScriptTotal [T, ?], ?]]](
+        branch)(distCata, ginterpretM(κ(plugHole), convertPathAlg))
+
+    def postProcess(pathed: T[Pathed[QScriptTotal[T, ?], ?]]): M[T[QScriptTotal[T, ?]]] =
+      TraverseT[T].transCataM[EitherT[M, PlannerError, ?], Pathed[QScriptTotal[T, ?], ?], QScriptTotal[T, ?]](
+        pathed)(postPathify[T, M, QScriptTotal[T, ?], QScriptTotal[T, ?]](ls))
+        .run.flatMap(_.fold(
+          FileSystemError.qscriptPlanningFailed(_).raiseError[M, T[QScriptTotal[T, ?]]],
+          _.point[M]))
+
+    (pathedBranch >>= postProcess) ∘ (_.convertTo[Free[?[_], Hole]])
   }
 
-  def convertBranchingOp
-    [T[_[_]]: Recursive: Corecursive, M[_]: Monad, F[_]: Functor]
+  def convertBranchingOp[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, F[_]: Functor]
     (src: T[Pathed[F, ?]], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[Pathed[F, ?]], FreeQS[T], FreeQS[T]) => F[T[Pathed[F, ?]]])
     (implicit
       QC: QScriptCore[T, ?] :<: F,
       FI: F :<: QScriptTotal[T, ?])
-      : EitherT[M, FileSystemError, Pathed[F, T[Pathed[F, ?]]]] =
+      : M[Pathed[F, T[Pathed[F, ?]]]] =
     (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
       List(CoEnv(
         op(
@@ -193,7 +202,7 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, QScriptCore[T, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, QScriptCore[T, ?], G] = {
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, QScriptCore[T, ?], G] = {
         case Union(src, lb, rb)
             if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
@@ -206,7 +215,7 @@ object ConvertPath extends ConvertPathInstances {
             if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
             QC.inj(Drop(s, l, r)))
-        case qc => EitherT(List(CoEnv(QC.inj(qc).right[ADir])).right.point[M])
+        case qc => List(CoEnv(QC.inj(qc).right[ADir])).point[M]
       }
     }
 
@@ -215,8 +224,8 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, Const[Read, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, Const[Read, ?], G] =
-        r => EitherT(List(CoEnv(R.inj(r).right[ADir])).right.point[M])
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, Const[Read, ?], G] =
+        r => List(CoEnv(R.inj(r).right[ADir])).point[M]
     }
 
   implicit def shiftedRead[T[_[_]], G[_]](implicit R: Const[ShiftedRead, ?] :<: G):
@@ -224,8 +233,8 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, Const[ShiftedRead, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, Const[ShiftedRead, ?], G] =
-        r => EitherT(List(CoEnv(R.inj(r).right[ADir])).right.point[M])
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, Const[ShiftedRead, ?], G] =
+        r => List(CoEnv(R.inj(r).right[ADir])).point[M]
     }
 
   implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, G[_]: Functor]
@@ -237,7 +246,7 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, ThetaJoin[T, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, ThetaJoin[T, ?], G] = {
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, ThetaJoin[T, ?], G] = {
         case ThetaJoin(src, lb, rb, on, jType, combine)
             if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
@@ -254,7 +263,7 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, EquiJoin[T, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, EquiJoin[T, ?], G] = {
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, EquiJoin[T, ?], G] = {
         case EquiJoin(src, lb, rb, lk, rk, jType, combine)
             if Recursive[T].project[Pathed[G, ?]](src.copoint).exists(_.run.isLeft) =>
           convertBranchingOp(src, lb, rb, f)((s, l, r) =>
@@ -268,15 +277,15 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, ProjectBucket[T, ?]] {
       type H[A] = G[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]):
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]):
           StaticPathTransformation[T, M, ProjectBucket[T, ?], G] = {
         case x @ BucketField(src, _, StrLit(str)) =>
-          EitherT.right(Recursive[T].project[Pathed[G, ?]](src.copoint).traverseM(e => e.run.fold(
+          Recursive[T].project[Pathed[G, ?]](src.copoint).traverseM(_.run.fold(
             dir => fileType(f).apply(dir, str).fold(
               df => List(CoEnv(df.map(file => R.inj(Const[Read, T[Pathed[G, ?]]](Read(file)))))),
               Nil),
-            κ(List(CoEnv(PB.inj(x).right[ADir])).point[M]))))
-        case x => EitherT.right(List(CoEnv(PB.inj(x).right[ADir])).point[M])
+            κ(List(CoEnv(PB.inj(x).right[ADir])).point[M])))
+        case x => List(CoEnv(PB.inj(x).right[ADir])).point[M]
       }
     }
 
@@ -286,7 +295,7 @@ object ConvertPath extends ConvertPathInstances {
     new ConvertPath[T, Coproduct[F, G, ?]] {
       type H[A] = I[A]
 
-      def convertPath[M[_]: Monad](f: ListContents[M]): StaticPathTransformation[T, M, Coproduct[F, G, ?], I] =
+      def convertPath[M[_]: MonadFsErr](f: ListContents[M]): StaticPathTransformation[T, M, Coproduct[F, G, ?], I] =
         _.run.fold(F.convertPath(f), G.convertPath(f))
     }
 }

@@ -19,12 +19,15 @@ package quasar.physical.marklogic.qscript
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
+import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._
+import scalaz._, Scalaz._
 
 private[qscript] final class ReadPlanner extends MarkLogicPlanner[Const[Read, ?]] {
-  def plan[F[_]: NameGenerator: Monad]: AlgebraM[PlanningT[F, ?], Const[Read, ?], XQuery] =
-    _ => ???
+  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[Read, ?], XQuery] = {
+    case Const(Read(absFile)) =>
+      s"((: Read :)())".xqy.point[F]
+  }
 }

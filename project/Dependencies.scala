@@ -72,6 +72,9 @@ object Dependencies {
       .exclude("org.spark-project.spark", "unused")
       .exclude("io.netty", "netty-all")
   )
+  def marklogicValidation = Seq(
+    "eu.timepit" %% "refined" %  refinedVersion
+  )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,

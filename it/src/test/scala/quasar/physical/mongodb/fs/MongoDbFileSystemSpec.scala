@@ -47,6 +47,10 @@ import DataArbitrary._
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filterNot (fs => isMongoReadOnly(fs.name))))
         with quasar.ExclusiveQuasarSpecification {
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   val query  = QueryFile.Ops[FileSystemIO]
   val write  = WriteFile.Ops[FileSystemIO]
   val manage = ManageFile.Ops[FileSystemIO]
@@ -214,9 +218,6 @@ class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (
           val xform = QueryFile.Transforms[query.F]
 
           import xform._
-
-          // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-          import EitherT.eitherTMonad
 
           val runExec: CompExecM ~> FileSystemErrT[PhaseResultT[Task, ?], ?] = {
             type X0[A] = PhaseResultT[Task, A]

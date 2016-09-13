@@ -40,6 +40,9 @@ object MongoDbPlanner {
   import Planner._
   import WorkflowBuilder._
 
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
+
   import agg._
   import array._
   import date._
@@ -1108,9 +1111,6 @@ object MongoDbPlanner {
     (logical: Fix[LogicalPlan])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-    import StateT.stateTMonadState
 
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
