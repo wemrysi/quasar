@@ -18,6 +18,9 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.physical.marklogic.xquery.xml.QName
+
+import scala.xml._
 
 import jawn._
 
@@ -35,5 +38,30 @@ object data {
         def jint(n: String) = Data.Int(BigInt(n))
         def jstring(s: String) = Data.Str(s)
       }
+  }
+
+  // TODO: Error type for when data keys aren't valid QNames
+  // TODO: Reuse names from xquery.ejson
+  // TODO: Should only need ejson:array and quasar:data for top-level objects, inner objects can use property names as element names
+  // TODO: Do we need to declare the top-level quasar/ejson namespaces?
+  def toXML(elementName: QName): Data => NodeSeq = {
+    case Data.Binary(bytes) => ???
+    case Data.Bool(b)       => ???
+    case Data.Date(d)       => ???
+    case Data.Dec(d)        => ???
+    case Data.Id(s)         => ???
+    case Data.Int(i)        => ???
+    case Data.Interval(ivl) => ???
+    case Data.Null          => ???
+    case Data.Str(s)        => ???
+    case Data.Time(t)       => ???
+    case Data.Timestamp(ts) => ???
+
+    case Data.Arr(xs)       => ???
+    case Data.Obj(xs)       => ???
+
+    // TODO: These can only appear in LogicalPlan, no?
+    case Data.Set(_)        => NodeSeq.Empty
+    case Data.NA            => NodeSeq.Empty
   }
 }
