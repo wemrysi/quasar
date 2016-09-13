@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.fp._
 import quasar.NameGenerator
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
@@ -29,20 +30,28 @@ import scalaz._, Scalaz._
 private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[ShiftedRead, ?]] {
   import expr.{for_, if_}, axes.child
 
-  // TODO: Implement `idStatus`
   def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
 
+      def addIdIfRequired(docVar: XQuery): F[XQuery => XQuery] = for {
+        mkArr <- ejson.mkArray[F].getApply
+        mkElt <- ejson.mkArrayElt[F].getApply
+      } yield idStatus match {
+        case IncludeId => xqy => mkArr(mkSeq_(mkElt(fn.documentUri(docVar)), mkElt(xqy)))
+        case ExcludeId => ι
+      }
+
       for {
         d     <- freshVar[F]
         c     <- freshVar[F]
         xform <- json.transformFromJson[F](c.xqy)
+        addId <- addIdIfRequired(d.xqy)
       } yield {
         for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
         .let_(c -> d.xqy `/` child.node())
-        .return_ { if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy }
+        .return_ { if_ (json.isObject(c.xqy)) then_ addId(xform) else_ addId(c.xqy) }
       }
   }
 }
