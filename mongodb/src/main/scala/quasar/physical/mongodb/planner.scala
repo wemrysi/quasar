@@ -1007,28 +1007,10 @@ object MongoDbPlanner {
             case Type.Bool => check.isBoolean
             case Type.Date => check.isDateOrTimestamp // FIXME: use isDate here when >= 3.0
             // NB: Some explicit coproducts for adjacent types.
-            case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
-              ((expr: Fix[ExprOpCoreF]) => $and(
-                $lt($literal(Bson.Null), expr),
-                $lt(expr, $literal(Bson.Doc()))))
-            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str =>
-              ((expr: Fix[ExprOpCoreF]) => $and(
-                $lt($literal(Bson.Null), expr),
-                $lt(expr, $literal(Bson.Doc()))))
-            case Type.Date ⨿ Type.Bool =>
-              ((expr: Fix[ExprOpCoreF]) =>
-                $and(
-                  $lte($literal(Bson.Bool(false)), expr),
-                  // TODO: in Mongo 3.0, we can have a tighter type check.
-                  // $lt(expr, $literal(Bson.Timestamp(Instant.ofEpochMilli(0), 0)))))
-                  $lt(expr, $literal(Bson.Regex("", "")))))
-            case Type.Syntaxed =>
-              ((expr: Fix[ExprOpCoreF]) =>
-                $or(
-                  $lt(expr, $literal(Bson.Doc())),
-                  $and(
-                    $lte($literal(Bson.ObjectId(Check.minOid)), expr),
-                    $lt(expr, $literal(Bson.Regex("", ""))))))
+            case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
+            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString
+            case Type.Date ⨿ Type.Bool => check.isDateTimestampOrBoolean
+            case Type.Syntaxed => check.isSyntaxed
           }
 
         val v =

@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.Type
+import quasar.Type, Type.⨿
 import quasar.fp.Prj
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.Planner.{PlannerError, UnsupportedJS}
@@ -52,55 +52,63 @@ package object expression0 {
       // matches the pattern the planner generates for converting epoch time
       // values to timestamps. Adding numbers to dates works in ExprOp, but not
       // in Javacript.
-      case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli == 0 =>
-        Recursive[T].para(r)(toJs[T, EX]).map(r => JsFn(JsFn.defaultName, jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
+      case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli ≟ 0 =>
+        Recursive[T].para(r)(toJs[T, EX]).map(r => JsFn(JsFn.defaultName,
+          jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
 
-      case Check(expr, Type.Numeric)   => app(expr, isAnyNumber)
-      case Check(expr, Type.Str)       => app(expr, isString)
-      case Check(expr, Type.AnyObject) => app(expr, isObject)
-      case Check(expr, Type.AnyArray)  => app(expr, isArray)
-      case Check(expr, Type.Binary)    => app(expr, isBinary)
-      case Check(expr, Type.Id)        => app(expr, isObjectId)
-      case Check(expr, Type.Bool)      => app(expr, isBoolean)
-      case Check(expr, typ) if typ ≟ (Type.Date ⨿ Type.Timestamp) =>
-        app(expr, x =>
-          jscore.BinOp(jscore.Or,
-            isDate(x),
-            isTimestamp(x)))
-      case Check(expr, Type.Date)      => app(expr, isDate)
-      case Check(expr, Type.Timestamp) => app(expr, isTimestamp)
-      // TODO: more types
-      // app(expr, isObjectOrArray)
-      // app(expr, x =>
-      //   jscore.binop(jscore.Or,
-      //     isBinary(x),
-      //     isObjectId(x),
-      //     isBoolean(x),
-      //     isDate(x),
-      //     isTimestamp(x)))
-      // app(expr, x =>
-      //   jscore.BinOp(jscore.Or,
-      //     isDate(x),
-      //     isTimestamp(x)))
-      // app(expr, x =>
-      //   jscore.binop(jscore.Or,
-      //     isDate(x),
-      //     isTimestamp(x),
-      //     isBoolean(x)))
-      // app(expr, x =>
-      //   jscore.binop(jscore.Or,
-      //     isAnyNumber(x),
-      //     isString(x)))
-      // app(expr, x =>
-      //   jscore.binop(jscore.Or,
-      //     isNull(x),
-      //     isAnyNumber(x),
-      //     isString(x),
-      //     isObjectId(x),
-      //     isBoolean(x),
-      //     isDate(x),
-      //     isTimestamp(x)))
-      case Check(expr, typ)            => UnsupportedJS("type check not converted: " + typ).left
+      case Check(expr, typ) => typ match {
+        case Type.Numeric   => app(expr, isAnyNumber)
+        case Type.Str       => app(expr, isString)
+        case Type.AnyObject => app(expr, isObject)
+        case Type.AnyArray  => app(expr, isArray)
+        case Type.Binary    => app(expr, isBinary)
+        case Type.Id        => app(expr, isObjectId)
+        case Type.Bool      => app(expr, isBoolean)
+        case Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.BinOp(jscore.Or,
+              isDate(x),
+              isTimestamp(x)))
+        case Type.Date      => app(expr, isDate)
+        case Type.Timestamp => app(expr, isTimestamp)
+        case Type.AnyObject ⨿ Type.AnyArray =>
+          app(expr, isObjectOrArray)
+        case Type.Binary ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.binop(jscore.Or,
+              isBinary(x),
+              isObjectId(x),
+              isBoolean(x),
+              isDate(x),
+              isTimestamp(x)))
+        case Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.BinOp(jscore.Or,
+              isDate(x),
+              isTimestamp(x)))
+        case Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.binop(jscore.Or,
+              isDate(x),
+              isTimestamp(x),
+              isBoolean(x)))
+        case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
+          app(expr, x =>
+            jscore.binop(jscore.Or,
+              isAnyNumber(x),
+              isString(x)))
+        case Type.Null ⨿ Type.Numeric ⨿ Type.Str ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.binop(jscore.Or,
+              isNull(x),
+              isAnyNumber(x),
+              isString(x),
+              isObjectId(x),
+              isBoolean(x),
+              isDate(x),
+              isTimestamp(x)))
+        case _ => UnsupportedJS("type check not converted: " + typ).left
+      }
     }
   }
 

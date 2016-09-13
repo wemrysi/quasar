@@ -871,6 +871,24 @@ object $var {
     $varF.unapply(Recursive[T].project(expr))
 }
 
+object $and {
+  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX], Seq[T[EX]])] =
+    $andF.unapplySeq(Recursive[T].project(expr))
+}
+object $or {
+  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX], Seq[T[EX]])] =
+    $orF.unapplySeq(Recursive[T].project(expr))
+}
+
+object $lt {
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
+    $ltF.unapply(Recursive[T].project(expr))
+}
+object $lte {
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
+    $lteF.unapply(Recursive[T].project(expr))
+}
+
 object $add {
   def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
     $addF.unapply(Recursive[T].project(expr))
