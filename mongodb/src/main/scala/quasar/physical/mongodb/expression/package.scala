@@ -47,7 +47,10 @@ package object expression {
   // the LogicalPlan needs special handling to behave the same when
   // converted to JS.
   // TODO: See SD-736 for the way forward.
-  def translate[T[_[_]]: Corecursive: Recursive, EX[_]: ExprOpOps: Traverse](implicit prj: Prj[ExprOpCoreF, EX], ev: Equal[T[EX]])
+  def translate[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
+      prj: Prj[ExprOpCoreF, EX],
+      ev0: Equal[T[EX]],
+      ev1: ExprOpOps.Uni[EX])
       : PartialFunction[T[EX], PlannerError \/ JsFn] = {
     def app(x: T[EX], tc: JsCore => JsCore): PlannerError \/ JsFn =
       Recursive[T].para(x)(toJs[T, EX]).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
@@ -122,7 +125,7 @@ package object expression {
   def toJs[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
       ev0: Prj[ExprOpCoreF, EX],
       ev1: Equal[T[EX]],
-      ops: ExprOpOps[EX])
+      ops: ExprOpOps.Uni[EX])
       : GAlgebra[(T[EX], ?), EX, PlannerError \/ JsFn] =
     { t =>
       def expr = Traverse[EX].map(t)(_._1).embed

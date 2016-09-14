@@ -179,14 +179,14 @@ object $project {
 
 final case class $RedactF[A](src: A, value: Fix[ExprOpCoreF])
   extends WorkflowOpCoreF[A] { self =>
-  def pipeline: PipelineF[WorkflowOpCoreF, A] =
+  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
       def src = self.src
       def reparent[B](newSrc: B) = self.copy(src = newSrc).pipeline
 
       def op = "$redact"
-      def rhs = value.cata(ExprOpOps[ExprOpCoreF].bson)
+      def rhs = value.cata(exprOps.bson)
     }
 }
 object $RedactF {
@@ -283,7 +283,7 @@ object $unwind {
 final case class $GroupF[A](src: A, grouped: Grouped, by: Reshape.Shape[ExprOpCoreF])
     extends WorkflowOpCoreF[A] { self =>
 
-  def pipeline: PipelineF[WorkflowOpCoreF, A] =
+  def pipeline(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): PipelineF[WorkflowOpCoreF, A] =
     new PipelineF[WorkflowOpCoreF, A] {
       def wf = self
       def src = self.src
@@ -292,7 +292,7 @@ final case class $GroupF[A](src: A, grouped: Grouped, by: Reshape.Shape[ExprOpCo
       def op = "$group"
       def rhs = {
         val Bson.Doc(m) = grouped.bson
-        Bson.Doc(m + (IdLabel -> by.fold(_.bson, _.cata(ExprOpOps[ExprOpCoreF].bson))))
+        Bson.Doc(m + (IdLabel -> by.fold(_.bson, _.cata(exprOps.bson))))
       }
     }
 

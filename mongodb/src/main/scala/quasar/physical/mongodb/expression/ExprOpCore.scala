@@ -210,16 +210,19 @@ object ExprOpCoreF {
       }
   }
 
-  implicit val ops: ExprOpOps[ExprOpCoreF] = new ExprOpOps[ExprOpCoreF] {
+  implicit def ops[F[_]: Functor](implicit inj: Inj[ExprOpCoreF, F]): ExprOpOps.Aux[ExprOpCoreF, F] = new ExprOpOps[ExprOpCoreF] {
+    type OUT[A] = F[A]
 
-    def simplify[F[_]](implicit inj: Inj[ExprOpCoreF, F]): AlgebraM[Option, ExprOpCoreF, Fix[F]] = {
+    val fp = fixpoint[Fix, F]
+
+    def simplify: AlgebraM[Option, ExprOpCoreF, Fix[F]] = {
       case $condF(Fix($literalF(Bson.Bool(true))),  c, _) => c.some
       case $condF(Fix($literalF(Bson.Bool(false))), _, a) => a.some
-      case $condF(Fix($literalF(_)),                _, _) => Fix[F](inj($literalF(Bson.Null))).some
+      case $condF(Fix($literalF(_)),                _, _) => fp.$literal(Bson.Null).some
       case $ifNullF(Fix($literalF(Bson.Null)), r)         => r.some
-      case $ifNullF(Fix($literalF(e)),         _)         => Fix[F](inj($literalF(e))).some
-      case $notF(Fix($literalF(Bson.Bool(b))))            => Fix[F](inj($literalF(Bson.Bool(!b)))).some
-      case $notF(Fix($literalF(_)))                       => Fix[F](inj($literalF(Bson.Null))).some
+      case $ifNullF(Fix($literalF(e)),         _)         => fp.$literal(e).some
+      case $notF(Fix($literalF(Bson.Bool(b))))            => fp.$literal(Bson.Bool(!b)).some
+      case $notF(Fix($literalF(_)))                       => fp.$literal(Bson.Null).some
       case _ => None
     }
 
@@ -369,8 +372,8 @@ object ExprOpCoreF {
       }
     }
 
-    def rewriteRefs0[F[_]: Functor](applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[ExprOpCoreF, F]) = {
-      case $varF(f) => applyVar.lift(f).map(ExprOpCoreF.fixpoint[Fix, F].$var)
+    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
+      case $varF(f) => applyVar.lift(f).map(fp.$var)
       case _        => None
     }
   }

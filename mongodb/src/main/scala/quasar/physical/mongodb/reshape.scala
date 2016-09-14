@@ -50,7 +50,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
   import Reshape.Shape
 
   def toJs(implicit
-      ev0: ExprOpOps[EX],
+      ev0: ExprOpOps.Uni[EX],
       ev1: Prj[ExprOpCoreF, EX],
       ev2: Traverse[EX],
       ev3: Equal[Fix[EX]]): PlannerError \/ JsFn =
@@ -60,7 +60,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
       jscore.Obj(l.map { case (k, v) => jscore.Name(k) -> v(jscore.Ident(JsFn.defaultName)) }))
     }
 
-  def bson(implicit ops: ExprOpOps[EX], ev: Functor[EX]): Bson.Doc = Bson.Doc(value.map {
+  def bson(implicit ops: ExprOpOps.Uni[EX], ev: Functor[EX]): Bson.Doc = Bson.Doc(value.map {
     case (field, either) => field.asText -> either.fold(_.bson, _.cata(ops.bson))
   })
 
@@ -74,7 +74,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
         κ(None)))
 
   def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit
-      ops: ExprOpOps[EX],
+      ops: ExprOpOps.Uni[EX],
       ev0: Inj[ExprOpCoreF, EX],
       ev1: Prj[ExprOpCoreF, EX],
       ev2: Functor[EX]): Reshape[EX] =
@@ -83,7 +83,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
       x => (x match {
         case $include() => ExprOpCoreF.fixpoint[Fix, EX].$var(DocField(k))
         case _          => x
-      }).cata(ops.rewriteRefs[EX](applyVar)))))
+      }).cata(ops.rewriteRefs(applyVar)))))
 
   def \ (f: BsonField): Option[Shape[EX]] = projectSeq(f.flatten)
 
@@ -157,7 +157,7 @@ object Reshape {
 
   private val ProjectNodeType = List("Project")
 
-  private[mongodb] def renderReshape[EX[_]: Functor](shape: Reshape[EX])(implicit ops: ExprOpOps[EX]): List[RenderedTree] = {
+  private[mongodb] def renderReshape[EX[_]: Functor](shape: Reshape[EX])(implicit ops: ExprOpOps.Uni[EX]): List[RenderedTree] = {
     def renderField(field: BsonField, value: Shape[EX]) = {
       val (label, typ) = field.bson.toJs.pprint(0) -> "Name"
       value match {

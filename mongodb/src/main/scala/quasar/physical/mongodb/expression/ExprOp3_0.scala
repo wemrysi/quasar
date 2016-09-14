@@ -54,9 +54,10 @@ object ExprOp3_0F {
       }
   }
 
-  implicit val ops: ExprOpOps[ExprOp3_0F] = new ExprOpOps[ExprOp3_0F] {
+  implicit def ops[F[_]: Functor](implicit inj: Inj[ExprOp3_0F, F]): ExprOpOps.Aux[ExprOp3_0F, F] = new ExprOpOps[ExprOp3_0F] {
+    type OUT[A] = F[A]
 
-    def simplify[F[_]](implicit inj: Inj[ExprOp3_0F, F]): AlgebraM[Option, ExprOp3_0F, Fix[F]] =
+    def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
       κ(None)
 
     def bson: Algebra[ExprOp3_0F, Bson] = {
@@ -70,7 +71,7 @@ object ExprOp3_0F {
       // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
       expr => UnsupportedJS(expr.toString).left
 
-    def rewriteRefs0[F[_]: Functor](applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[ExprOp3_0F, F]) =
+    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) =
       κ(None)
   }
 

@@ -79,10 +79,10 @@ object ExprOp3_2F {
       }
   }
 
-  implicit val ops: ExprOpOps[ExprOp3_2F] = new ExprOpOps[ExprOp3_2F] {
+  implicit def ops[F[_]: Functor](implicit inj: Inj[ExprOp3_2F, F]): ExprOpOps.Aux[ExprOp3_2F, F] = new ExprOpOps[ExprOp3_2F] {
+    type OUT[A] = F[A]
 
-    def simplify[F[_]](implicit inj: Inj[ExprOp3_2F, F]): AlgebraM[Option, ExprOp3_2F, Fix[F]] =
-      κ(None)
+    val simplify: AlgebraM[Option, ExprOp3_2F, Fix[F]] = κ(None)
 
     def bson: Algebra[ExprOp3_2F, Bson] = {
       case $sqrtF(value)      => Bson.Doc("$sqrt" -> value)
@@ -100,8 +100,7 @@ object ExprOp3_2F {
       // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
       expr => UnsupportedJS(expr.toString).left
 
-    def rewriteRefs0[F[_]: Functor](applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[ExprOp3_2F, F]) =
-      κ(None)
+    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
   }
 
   final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOp3_2F, EX]) {

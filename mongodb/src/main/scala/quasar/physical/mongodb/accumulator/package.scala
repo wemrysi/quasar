@@ -27,8 +27,9 @@ package object accumulator {
 
   type Accumulator = AccumOp[Fix[ExprOpCoreF]]
 
-  def rewriteGroupRefs(t: Accumulator)(applyVar: PartialFunction[DocVar, DocVar]): Accumulator =
-    t.map(_.cata(ExprOpOps[ExprOpCoreF].rewriteRefs[ExprOpCoreF](applyVar)))
+  def rewriteGroupRefs(t: Accumulator)(applyVar: PartialFunction[DocVar, DocVar])
+      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): Accumulator =
+    t.map(_.cata(exprOps.rewriteRefs(applyVar)))
 
   val groupBsonƒ: AccumOp[Bson] => Bson = {
     case $addToSet(value) => Bson.Doc("$addToSet" -> value)
@@ -41,5 +42,6 @@ package object accumulator {
     case $sum(value)      => Bson.Doc("$sum" -> value)
   }
 
-  def groupBson(g: Accumulator) = groupBsonƒ(g.map(_.cata(ExprOpOps[ExprOpCoreF].bson)))
+  def groupBson(g: Accumulator)(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+    groupBsonƒ(g.map(_.cata(exprOps.bson)))
 }

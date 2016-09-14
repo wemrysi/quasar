@@ -65,7 +65,8 @@ object JoinHandler {
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowOp3_2F :<: WF,
-      ev2: Show[WorkflowBuilder[WF]])
+      ev2: Show[WorkflowBuilder[WF]],
+      ev3: ExprOpOps.Uni[ExprOpCoreF])
     : JoinHandler[WF, OptionT[WorkflowBuilder.M, ?]] = JoinHandler({ (tpe, left, right) =>
 
     val WB = WorkflowBuilder.Ops[WF]
@@ -200,7 +201,7 @@ object JoinHandler {
 
   /** Plan an arbitrary join using only "core" operators, which always means a map-reduce. */
   def mapReduce[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]])
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOpCoreF])
     : JoinHandler[WF, WorkflowBuilder.M] = JoinHandler({ (tpe, left0, right0) =>
 
     val ops = Ops[WF]
@@ -339,7 +340,7 @@ object JoinHandler {
   //      `Workflow.crush`, when we actually have a task (whether aggregation or
   //       mapReduce) in hand, we would know for sure.
   private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor](wb: WorkflowBuilder[WF])
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]])
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOpCoreF])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
     def checkTask(wt: workflowtask.WorkflowTask): Boolean = wt match {
