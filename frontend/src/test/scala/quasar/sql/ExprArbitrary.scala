@@ -17,16 +17,15 @@
 package quasar.sql
 
 import quasar.Predef._
-import quasar.fs._
-import quasar.fs.PathArbitrary._
-import quasar.std.StdLib._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.sql.fixpoint._
+import quasar.std.StdLib._
 
 import matryoshka.Fix
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Duration, Instant}
-import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
+import scalaz.scalacheck.ScalaCheckBinding._
 
 trait ExprArbitrary {
   implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))

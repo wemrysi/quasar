@@ -16,6 +16,7 @@
 
 package quasar.fs
 
+import quasar.contrib.pathy._
 import quasar.fp.free.flatMapSNT
 
 import scalaz._, NaturalTransformation.refl

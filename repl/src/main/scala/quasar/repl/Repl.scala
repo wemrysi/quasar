@@ -19,6 +19,7 @@ package quasar.repl
 import quasar.Predef._
 
 import quasar.{Data, DataCodec, PhaseResult, Variables}
+import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
 import quasar.effect._
 import quasar.fp._

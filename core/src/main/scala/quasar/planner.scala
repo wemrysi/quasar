@@ -17,8 +17,9 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.ADir
 import quasar.fp._
-import quasar.fs.{ADir, PathError}
+import quasar.fs.PathError
 
 import matryoshka._
 import monocle.Prism

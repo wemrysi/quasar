@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
