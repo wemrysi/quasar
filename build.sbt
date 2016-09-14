@@ -66,6 +66,7 @@ lazy val buildSettings = Seq(
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
+  scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,
     Wart.AsInstanceOf,
