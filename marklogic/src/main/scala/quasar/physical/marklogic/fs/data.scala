@@ -18,8 +18,19 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.SKI.κ
+import quasar.ejson.EJson
+import quasar.fp.{interpret, interpretM}
+import quasar.physical.marklogic.MonadErrMsg
+import quasar.physical.marklogic.xml._
+
+import scala.xml._
 
 import jawn._
+import matryoshka._
+import matryoshka.patterns._
+import scalaz.{Bitraverse, Traverse, Id}
+import scalaz.syntax.monadError._
 
 object data {
   object JsonParser extends SupportParser[Data] {
@@ -36,4 +47,20 @@ object data {
         def jstring(s: String) = Data.Str(s)
       }
   }
+
+  def encodeXml[F[_]: MonadErrMsg](data: Data): F[Node] =
+    data.hyloM[F, CoEnv[Data, EJson, ?], Node](
+      interpretM(
+        d => s"No representation for '$d' in XML.".raiseError[F, Node],
+        EncodeXml[F, EJson].encodeXml),
+      Data.toEJson[EJson] andThen (_.point[F]))
+
+  def decodeXml(node: Node): Data =
+    node.hylo[CoEnv[Node, EJson, ?], Data](
+      interpret(κ(Data.NA), Data.fromEJson),
+      DecodeXml[Id.Id, EJson].decodeXml andThen (CoEnv(_)))
+
+  // TODO{matryoshka}: Remove once we've upgraded to 0.11.2+
+  private implicit def coenvTraverse[E]: Traverse[CoEnv[E, EJson, ?]] =
+    Bitraverse[CoEnv[?, EJson, ?]].rightTraverse
 }
