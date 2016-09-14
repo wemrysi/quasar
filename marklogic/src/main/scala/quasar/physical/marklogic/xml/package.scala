@@ -25,7 +25,7 @@ import scalaz.{Node => _, _}, Scalaz._
 
 package object xml {
 
-  private val attributesKeyName = "_attributes"
+  final case class KeywordConfig(attributesKeyName: String, textKeyName: String)
 
   import Data._
 
@@ -54,32 +54,38 @@ package object xml {
     *   }
     * }
     */
-  def toData(elem: Elem): Data = {
-    Obj(ListMap(elem.label -> toDataImpl(elem.child.toList, elem.attributes.some)))
+  def toData(elem: Elem, config: KeywordConfig): Data = {
+
+    def impl(nodes: List[Node], m: Option[MetaData]): Data = nodes match {
+      case List(Text(str)) =>
+        m.flatMap(attrToData).cata(
+          m => Obj(ListMap(
+            config.attributesKeyName  -> m,
+            config.textKeyName        -> Str(str)
+          )),
+          Str(str)
+        )
+      case xs =>
+        val elementChildren = xs.collect { case a: Elem => a}.groupBy(fullName)
+        val childrenData = elementChildren.mapValues {
+          case List(single) => impl(single.child.toList, single.attributes.some)
+          case xs           => Arr(xs.map(x => impl(x.child.toList, x.attributes.some)))
+        }.toList
+        val attributeData = m.flatMap(attrToData).strengthL(config.attributesKeyName).toList
+        Obj(ListMap((attributeData ++ childrenData): _*))
+    }
+
+    def attrToData(meta: MetaData): Option[Data] = meta match {
+      case scala.xml.Null => None
+      case m    =>
+        Obj(ListMap(meta.iterator.map(m => m.key -> impl(m.value.toList, none)).toList: _*)).some
+    }
+
+    Obj(ListMap(fullName(elem) -> impl(elem.child.toList, elem.attributes.some)))
   }
 
-  private def toDataImpl(nodes: List[Node], m: Option[MetaData]): Data = nodes match {
-    case List(Text(str)) =>
-      m.flatMap(attrToData).cata(
-        m => Obj(ListMap(
-          attributesKeyName -> m,
-          "_text"           -> Str(str)
-        )),
-        Str(str)
-      )
-    case xs =>
-      val elementChildren = xs.collect { case a: Elem => a}.groupBy(_.label)
-      val childrenData = elementChildren.mapValues {
-        case List(single) => toDataImpl(single.child.toList, single.attributes.some)
-        case xs           => Arr(xs.map(x => toDataImpl(x.child.toList, x.attributes.some)))
-      }.toList
-      val attributeData = m.flatMap(attrToData).strengthL(attributesKeyName).toList
-      Obj(ListMap((attributeData ++ childrenData): _*))
-  }
+  def toData(elem: Elem): Data = toData(elem, KeywordConfig(attributesKeyName = "_attributes", textKeyName = "_text"))
 
-  private def attrToData(meta: MetaData): Option[Data] = meta match {
-    case scala.xml.Null => None
-    case m    =>
-      Obj(ListMap(meta.iterator.map(m => m.key -> toDataImpl(m.value.toList, none)).toList: _*)).some
-  }
+  private def fullName(elem: Elem): String =
+    Option(elem.prefix).map(_ + ":").getOrElse("") + elem.label
 }

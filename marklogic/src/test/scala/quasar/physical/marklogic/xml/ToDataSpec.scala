@@ -71,6 +71,40 @@ class ToDataSpec extends quasar.Qspec {
       }
     }
 
+    "element with name prefix" in {
+      val sample = <quasar:foo>hello</quasar:foo>
+      val expected =
+        Obj(ListMap(
+          "quasar:foo" -> Str("hello")
+        ))
+      toData(sample) must_= expected
+    }
+
+    "empty element" in {
+      val sample = <foo></foo>
+      val expected =
+        Obj(ListMap(
+          "foo" -> Str("")
+        ))
+      toData(sample) must_= expected
+    }.pendingUntilFixed
+
+    "multiple empty elements" in {
+      val sample =
+        <foo>
+          <bar></bar>
+          <bar></bar>
+          <bar></bar>
+        </foo>
+      val expected =
+        Obj(ListMap(
+          "foo" -> Obj(ListMap(
+            "bar" -> Arr(List(Str(""), Str(""), Str("")))
+          ))
+        ))
+      toData(sample) must_= expected
+    }.pendingUntilFixed
+
     "example" in {
       val sample =
         <foo type="baz" id="1">
