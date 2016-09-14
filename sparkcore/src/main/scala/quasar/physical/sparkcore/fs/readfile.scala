@@ -17,19 +17,15 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.Data
-import quasar.DataCodec
-import quasar.fp.ι
-import quasar.fs._
-import quasar.fs.PathError._
-import quasar.fs.FileSystemError._
+import quasar.{Data, DataCodec}
+import quasar.contrib.pathy._
 import quasar.effect._
+import quasar.fp.ι
+import quasar.fs._, FileSystemError._, PathError._
 
-import org.apache.spark.rdd._
 import org.apache.spark.SparkContext
-import scalaz._
-import Scalaz._
-
+import org.apache.spark.rdd._
+import scalaz._, Scalaz._
 
 final case class SparkCursor(rdd: Option[RDD[Data]])
 

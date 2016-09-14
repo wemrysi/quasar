@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.fs
+package quasar.contrib.pathy
 
 import quasar.Predef._
 
 import org.scalacheck.{Arbitrary, Gen, Shrink}
-import pathy.scalacheck.PathyArbitrary._
 import pathy.Path._
+import pathy.scalacheck.PathyArbitrary._
 
 trait PathArbitrary {
 
@@ -44,8 +44,8 @@ trait PathArbitrary {
   }
 
   private def split(file: AFile, index: Int): (ADir, RFile) = {
-    // .get should always succed because it is impossible not to sandbox an absolute path
-    // to the root directory
+    // NB: `.get` should always succeed because it is impossible not to sandbox
+    //     an absolute path to the root directory
     if (index <= 0) (rootDir[Sandboxed], sandbox(rootDir[Sandboxed], file).get)
     else {
       val (dir, filename) = peel(file)

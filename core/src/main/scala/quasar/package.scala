@@ -15,26 +15,22 @@
  */
 
 import quasar.Predef.{List, String, Vector}
+import quasar.contrib.pathy.ADir
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.numeric._
-import quasar.fs.ADir
 import quasar.sql._
 import quasar.std.StdLib.set._
 
 import scala.Option
 
 import matryoshka._, Recursive.ops._
-import scalaz._
-import scalaz.Leibniz._
+import scalaz._, Leibniz._
 import scalaz.std.vector._
-import scalaz.std.list._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
 import scalaz.syntax.either._
-import scalaz.syntax.writer._
+import scalaz.syntax.monad._
 import scalaz.syntax.nel._
-import shapeless._
+import scalaz.syntax.writer._
 
 package object quasar {
   type SemanticErrors = NonEmptyList[SemanticError]
@@ -111,32 +107,5 @@ package object quasar {
     lim.fold(
       skipped)(
       l => Take(skipped, LogicalPlan.ConstantF[T[LogicalPlan]](Data.Int(l.get)).embed).embed)
-  }
-
-  // TODO generalize this and contribute to shapeless-contrib
-  implicit class FuncUtils[A, N <: shapeless.Nat](val self: Func.Input[A, N]) extends scala.AnyVal {
-    def reverse: Func.Input[A, N] =
-      Sized.wrap[List[A], N](self.unsized.reverse)
-
-    def foldMap[B](f: A => B)(implicit F: Monoid[B]): B =
-      self.unsized.foldMap(f)
-
-    def foldRight[B](z: => B)(f: (A, => B) => B): B =
-      Foldable[List].foldRight(self.unsized, z)(f)
-
-    def traverse[G[_], B](f: A => G[B])(implicit G: Applicative[G]): G[Func.Input[B, N]] =
-      G.map(self.unsized.traverse(f))(bs => Sized.wrap[List[B], N](bs))
-
-    // Input[Option[B], N] -> Option[Input[B, N]]
-    def sequence[G[_], B](implicit ev: A === G[B], G: Applicative[G]): G[Func.Input[B, N]] =
-      G.map(self.unsized.sequence(ev, G))(bs => Sized.wrap[List[B], N](bs))
-
-    def zip[B](input: Func.Input[B, N]): Func.Input[(A, B), N] =
-      Sized.wrap[List[(A, B)], N](self.unsized.zip(input))
-
-    def unzip3[X, Y, Z](implicit ev: A === (X, (Y, Z))): (Func.Input[X, N], Func.Input[Y, N], Func.Input[Z, N]) =
-      Unzip[List].unzip3[X, Y, Z](ev.subst(self.unsized)) match {
-        case (x, y, z) => (Sized.wrap[List[X], N](x), Sized.wrap[List[Y], N](y), Sized.wrap[List[Z], N](z))
-      }
   }
 }

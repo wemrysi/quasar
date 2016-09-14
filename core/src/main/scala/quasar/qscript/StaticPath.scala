@@ -18,8 +18,9 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.PlannerError
+import quasar.contrib.pathy.ADir
 import quasar.fp._
-import quasar.fs.{ADir, FileSystemError, MonadFsErr}
+import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.qscript.ConvertPath.{ListContents, Pathed, postPathify}
 
 import matryoshka._, TraverseT.ops._

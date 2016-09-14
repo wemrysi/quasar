@@ -17,13 +17,13 @@
 package quasar.api.services
 
 import quasar.Predef._
-import quasar.api._
+import quasar.api._, ApiErrorEntityDecoder._
 import quasar.api.matchers._
-import quasar.api.ApiErrorEntityDecoder._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.effect.{Failure, KeyValueStore}
 import quasar.fp._
 import quasar.fp.free._
-import quasar.fs._, PathArbitrary._
+import quasar.fs._
 import quasar.fs.mount.{MountRequest => MR, _}
 
 import argonaut._, Argonaut._

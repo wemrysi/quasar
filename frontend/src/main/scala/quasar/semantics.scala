@@ -18,7 +18,7 @@ package quasar
 
 import quasar.Predef._
 import quasar.RenderTree.ops._
-import quasar.fs.prettyPrint
+import quasar.contrib.pathy.prettyPrint
 import quasar.sql._
 
 import scala.AnyRef
