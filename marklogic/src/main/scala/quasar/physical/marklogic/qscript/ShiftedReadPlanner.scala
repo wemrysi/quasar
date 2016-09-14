@@ -26,11 +26,13 @@ import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner extends MarkLogicPlanner[Const[ShiftedRead, ?]] {
+private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
+  extends MarkLogicPlanner[F, Const[ShiftedRead, ?]] {
+
   import expr.{for_, if_}, axes.child
 
   // TODO: Implement `idStatus`
-  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
+  val plan: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
