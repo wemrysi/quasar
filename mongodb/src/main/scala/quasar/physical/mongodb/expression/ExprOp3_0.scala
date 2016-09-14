@@ -54,7 +54,7 @@ object ExprOp3_0F {
       }
   }
 
-  implicit def ops[F[_]: Functor](implicit inj: Inj[ExprOp3_0F, F]): ExprOpOps.Aux[ExprOp3_0F, F] = new ExprOpOps[ExprOp3_0F] {
+  implicit def ops[F[_]: Functor](implicit I: ExprOp3_0F :<: F): ExprOpOps.Aux[ExprOp3_0F, F] = new ExprOpOps[ExprOp3_0F] {
     type OUT[A] = F[A]
 
     def simplify: AlgebraM[Option, ExprOp3_0F, Fix[F]] =
@@ -75,9 +75,9 @@ object ExprOp3_0F {
       κ(None)
   }
 
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOp3_0F, EX]) {
+  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOp3_0F :<: EX) {
     def $dateToString(format: FormatString, date: T[EX]): T[EX] =
-      inj($dateToStringF(format, date)).embed
+      I.inj($dateToStringF(format, date)).embed
   }
 }
 
@@ -106,15 +106,15 @@ object FormatString {
 }
 
 object $dateToStringF {
-  def apply[EX[_], A](format: FormatString, date: A)(implicit inj: Inj[ExprOp3_0F, EX]): EX[A] =
-    inj(ExprOp3_0F.$dateToStringF(format, date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOp3_0F, EX]): Option[(FormatString, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](format: FormatString, date: A)(implicit I: ExprOp3_0F :<: EX): EX[A] =
+    I.inj(ExprOp3_0F.$dateToStringF(format, date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOp3_0F :<: EX): Option[(FormatString, A)] =
+    I.prj(expr) collect {
       case ExprOp3_0F.$dateToStringF(format, date) => (format, date)
     }
 }
 
 object $dateToString {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOp3_0F, EX]): Option[(FormatString, T[EX])] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOp3_0F :<: EX): Option[(FormatString, T[EX])] =
     $dateToStringF.unapply(Recursive[T].project(expr))
 }

@@ -51,7 +51,7 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
 
   def toJs(implicit
       ev0: ExprOpOps.Uni[EX],
-      ev1: Prj[ExprOpCoreF, EX],
+      ev1: ExprOpCoreF :<: EX,
       ev2: Traverse[EX],
       ev3: Equal[Fix[EX]]): PlannerError \/ JsFn =
     value.map { case (key, expr) =>
@@ -75,9 +75,8 @@ final case class Reshape[EX[_]](value: ListMap[BsonField.Name, Reshape.Shape[EX]
 
   def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit
       ops: ExprOpOps.Uni[EX],
-      ev0: Inj[ExprOpCoreF, EX],
-      ev1: Prj[ExprOpCoreF, EX],
-      ev2: Functor[EX]): Reshape[EX] =
+      ev0: ExprOpCoreF :<: EX,
+      ev1: Functor[EX]): Reshape[EX] =
     Reshape(value.transform((k, v) => v.bimap(
       _.rewriteRefs(applyVar),
       x => (x match {

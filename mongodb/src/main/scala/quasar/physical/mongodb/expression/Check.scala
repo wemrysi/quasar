@@ -30,8 +30,7 @@ import scalaz._, Scalaz._
   */
 final case class Check[T[_[_]], EX[_]: Functor](implicit
     T: Corecursive[T],
-    inj: Inj[ExprOpCoreF, EX],
-    prj: Prj[ExprOpCoreF, EX]) {
+    I: ExprOpCoreF :<: EX) {
   import Check._
 
   private val exprCoreFp = ExprOpCoreF.fixpoint[T, EX]
@@ -89,7 +88,7 @@ object Check {
     * constructors above.
     */
   // TODO: remove this when we no longer perform after-the-fact translation
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: Prj[ExprOpCoreF, EX], ev2: Equal[T[EX]])
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
       : Option[(T[EX], Type)] = {
     val nilMap = ListMap.empty[String, Bson]
     expr match {
@@ -120,7 +119,7 @@ object Check {
   }
 
   object IsBetween {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: Prj[ExprOpCoreF, EX], ev2: Equal[T[EX]])
+    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
       : Option[(Bson, T[EX], Bson)] =
       expr match {
         case $and(
@@ -133,7 +132,7 @@ object Check {
   }
 
   object IsBetweenExcl {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: Prj[ExprOpCoreF, EX], ev2: Equal[T[EX]])
+    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
       : Option[(Bson, T[EX], Bson)] =
       expr match {
         case $and(
@@ -146,7 +145,7 @@ object Check {
   }
 
   object IsBetweenIncl {
-    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: Prj[ExprOpCoreF, EX], ev2: Equal[T[EX]])
+    def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit ev1: ExprOpCoreF :<: EX, ev2: Equal[T[EX]])
       : Option[(Bson, T[EX], Bson)] =
       expr match {
         case $and(

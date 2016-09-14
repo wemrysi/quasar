@@ -95,8 +95,8 @@ object ExprOpCoreF {
   final case class $ifNullF[A](expr: A, replacement: A) extends ExprOpCoreF[A]
 
   // TODO: if this is needed, comment explaining why
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[ExprOpCoreF[A]] =
-    prj(expr)
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[ExprOpCoreF[A]] =
+    I.prj(expr)
 
   implicit def equal:
       Delay[Equal, ExprOpCoreF] =
@@ -210,7 +210,7 @@ object ExprOpCoreF {
       }
   }
 
-  implicit def ops[F[_]: Functor](implicit inj: Inj[ExprOpCoreF, F]): ExprOpOps.Aux[ExprOpCoreF, F] = new ExprOpOps[ExprOpCoreF] {
+  implicit def ops[F[_]: Functor](implicit I: ExprOpCoreF :<: F): ExprOpOps.Aux[ExprOpCoreF, F] = new ExprOpOps[ExprOpCoreF] {
     type OUT[A] = F[A]
 
     val fp = fixpoint[Fix, F]
@@ -390,9 +390,9 @@ object ExprOpCoreF {
 
   /** "Fixed" constructors, with the corecursive type and the coproduct type
     * captured when an instance is created. */
-  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit inj: Inj[ExprOpCoreF, EX]) {
+  final case class fixpoint[T[_[_]]: Corecursive, EX[_]: Functor](implicit I: ExprOpCoreF :<: EX) {
     @inline private implicit def convert(expr: ExprOpCoreF[T[EX]]): T[EX] =
-      inj(expr).embed
+      I.inj(expr).embed
 
     def $include(): T[EX]                            = $includeF[T[EX]]()
     def $var(docVar: DocVar): T[EX]                  = $varF[T[EX]](docVar)
@@ -478,384 +478,384 @@ object ExprOpCoreF {
 // expression type, but handle any type for the recursive arguments.
 
 object $includeF {
-  def apply[EX[_], A]()(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$includeF[A]())
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Boolean =
-    prj(expr) match {
+  def apply[EX[_], A]()(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$includeF[A]())
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Boolean =
+    I.prj(expr) match {
       case Some(ExprOpCoreF.$includeF()) => true
       case _                             => false
     }
 }
 object $varF {
-  def apply[EX[_], A](docVar: DocVar)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$varF[A](docVar))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[DocVar] =
-    prj(expr) collect {
+  def apply[EX[_], A](docVar: DocVar)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$varF[A](docVar))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[DocVar] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$varF(docVar) => docVar
     }
 }
 
 object $andF {
-  def apply[EX[_], A](first: A, second: A, others: A*)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$andF[A](first, second, others: _*))
-  def unapplySeq[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A, Seq[A])] =
-    prj(expr) collect {
+  def apply[EX[_], A](first: A, second: A, others: A*)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$andF[A](first, second, others: _*))
+  def unapplySeq[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, Seq[A])] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$andF(first, second, others @ _*) => (first, second, others.toList)
     }
 }
 object $orF {
-  def apply[EX[_], A](first: A, second: A, others: A*)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$orF[A](first, second, others: _*))
-  def unapplySeq[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A, Seq[A])] =
-    prj(expr) collect {
+  def apply[EX[_], A](first: A, second: A, others: A*)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$orF[A](first, second, others: _*))
+  def unapplySeq[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, Seq[A])] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$orF(first, second, others @ _*) => (first, second, others.toList)
     }
 }
 
 object $notF {
-  def apply[EX[_], A](value: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$notF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$notF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$notF(value) => value
     }
 }
 
 object $setEqualsF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$setEqualsF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$setEqualsF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$setEqualsF(left, right) => (left, right)
     }
 }
 object $setIntersectionF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$setIntersectionF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$setIntersectionF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$setIntersectionF(left, right) => (left, right)
     }
 }
 object $setDifferenceF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$setDifferenceF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$setDifferenceF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$setDifferenceF(left, right) => (left, right)
     }
 }
 object $setUnionF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$setUnionF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$setUnionF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$setUnionF(left, right) => (left, right)
     }
 }
 object $setIsSubsetF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$setIsSubsetF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$setIsSubsetF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$setIsSubsetF(left, right) => (left, right)
     }
 }
 
 object $anyElementTrueF {
-  def apply[EX[_], A](value: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$anyElementTrueF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$anyElementTrueF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$anyElementTrueF(value) => value
     }
 }
 object $allElementsTrueF {
-  def apply[EX[_], A](value: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$allElementsTrueF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$allElementsTrueF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$anyElementTrueF(value) => value
     }
 }
 
 object $cmpF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$cmpF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$cmpF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$cmpF(left, right) => (left, right)
     }
 }
 object $eqF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$eqF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$eqF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$eqF(left, right) => (left, right)
     }
 }
 object $gtF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$gtF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$gtF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$gtF(left, right) => (left, right)
     }
 }
 object $gteF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$gteF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$gteF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$gteF(left, right) => (left, right)
     }
 }
 object $ltF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$ltF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$ltF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$ltF(left, right) => (left, right)
     }
 }
 object $lteF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$lteF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$lteF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$lteF(left, right) => (left, right)
     }
 }
 object $neqF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$neqF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$neqF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$neqF(left, right) => (left, right)
     }
 }
 
 object $addF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$addF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$addF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$addF(left, right) => (left, right)
     }
 }
 object $divideF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$divideF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$divideF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$divideF(left, right) => (left, right)
     }
 }
 object $modF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$modF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$modF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$modF(left, right) => (left, right)
     }
 }
 object $multiplyF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$multiplyF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$multiplyF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$multiplyF(left, right) => (left, right)
     }
 }
 object $subtractF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$subtractF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$subtractF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$subtractF(left, right) => (left, right)
     }
 }
 
 object $concatF {
-  def apply[EX[_], A](first: A, second: A, others: A*)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$concatF[A](first, second, others: _*))
-  def unapplySeq[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A, Seq[A])] =
-    prj(expr) collect {
+  def apply[EX[_], A](first: A, second: A, others: A*)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$concatF[A](first, second, others: _*))
+  def unapplySeq[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, Seq[A])] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$concatF(first, second, others @ _*) => (first, second, others.toList)
     }
 }
 object $strcasecmpF {
-  def apply[EX[_], A](left: A, right: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$strcasecmpF[A](left, right))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](left: A, right: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$strcasecmpF[A](left, right))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$strcasecmpF(left, right) => (left, right)
     }
 }
 object $substrF {
-  def apply[EX[_], A](value: A, start: A, count: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$substrF[A](value, start, count))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A, start: A, count: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$substrF[A](value, start, count))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$substrF(value, start, count) => (value, start, count)
     }
 }
 object $toLowerF {
-  def apply[EX[_], A](value: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$toLowerF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$toLowerF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$toLowerF(value) => value
     }
 }
 object $toUpperF {
-  def apply[EX[_], A](value: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$toUpperF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$toUpperF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$toUpperF(value) => value
     }
 }
 
 object $metaF {
-  def apply[EX[_], A]()(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$metaF[A]())
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Boolean =
-    prj(expr) match {
+  def apply[EX[_], A]()(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$metaF[A]())
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Boolean =
+    I.prj(expr) match {
       case Some(ExprOpCoreF.$metaF()) => true
       case _                    => false
     }
 }
 
 object $sizeF {
-  def apply[EX[_], A](array: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$sizeF[A](array))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](array: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$sizeF[A](array))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$sizeF(array) => array
     }
 }
 
 object $arrayMapF {
-  def apply[EX[_], A](input: A, as: DocVar.Name, in: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$arrayMapF[A](input, as, in))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, DocVar.Name, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](input: A, as: DocVar.Name, in: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$arrayMapF[A](input, as, in))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, DocVar.Name, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$arrayMapF(input, as, in) => (input, as, in)
     }
 }
 object $letF {
-  def apply[EX[_], A](vars: ListMap[DocVar.Name, A], in: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$letF[A](vars, in))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(ListMap[DocVar.Name, A], A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](vars: ListMap[DocVar.Name, A], in: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$letF[A](vars, in))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(ListMap[DocVar.Name, A], A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$letF(vars, in) => (vars, in)
     }
 }
 object $literalF {
-  def apply[EX[_], A](value: Bson)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$literalF[A](value))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[Bson] =
-    prj(expr) collect {
+  def apply[EX[_], A](value: Bson)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$literalF[A](value))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[Bson] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$literalF(value) => value
     }
 }
 
 object $dayOfYearF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$dayOfYearF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$dayOfYearF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$dayOfYearF(date) => date
     }
 }
 object $dayOfMonthF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$dayOfMonthF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$dayOfMonthF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$dayOfMonthF(date) => date
     }
 }
 object $dayOfWeekF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$dayOfWeekF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$dayOfWeekF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$dayOfWeekF(date) => date
     }
 }
 object $yearF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$yearF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$yearF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$yearF(date) => date
     }
 }
 object $monthF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$monthF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$monthF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$monthF(date) => date
     }
 }
 object $weekF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$weekF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$weekF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$weekF(date) => date
     }
 }
 object $hourF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$hourF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$hourF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$hourF(date) => date
     }
 }
 object $minuteF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$minuteF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$minuteF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$minuteF(date) => date
     }
 }
 object $secondF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$secondF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$secondF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$secondF(date) => date
     }
 }
 object $millisecondF {
-  def apply[EX[_], A](date: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$millisecondF[A](date))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[A] =
-    prj(expr) collect {
+  def apply[EX[_], A](date: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$millisecondF[A](date))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[A] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$millisecondF(date) => date
     }
 }
 
 object $condF {
-  def apply[EX[_], A](predicate: A, ifTrue: A, ifFalse: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$condF[A](predicate, ifTrue, ifFalse))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](predicate: A, ifTrue: A, ifFalse: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$condF[A](predicate, ifTrue, ifFalse))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$condF(pred, t, f) => (pred, t, f)
     }
 }
 object $ifNullF {
-  def apply[EX[_], A](expr: A, replacement: A)(implicit inj: Inj[ExprOpCoreF, EX]): EX[A] =
-    inj(ExprOpCoreF.$ifNullF[A](expr, replacement))
-  def unapply[EX[_], A](expr: EX[A])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(A, A)] =
-    prj(expr) collect {
+  def apply[EX[_], A](expr: A, replacement: A)(implicit I: ExprOpCoreF :<: EX): EX[A] =
+    I.inj(ExprOpCoreF.$ifNullF[A](expr, replacement))
+  def unapply[EX[_], A](expr: EX[A])(implicit I: ExprOpCoreF :<: EX): Option[(A, A)] =
+    I.prj(expr) collect {
       case ExprOpCoreF.$ifNullF(expr, replacement) => (expr, replacement)
     }
 }
@@ -865,38 +865,38 @@ object $ifNullF {
 // NB: for now, only the handful of extractors we actually use are defined here,
 // and the constructors are defined in the companion's `fixpoint` class.
 object $include {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Boolean =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Boolean =
     $includeF.unapply(Recursive[T].project(expr))
 }
 object $var {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[DocVar] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[DocVar] =
     $varF.unapply(Recursive[T].project(expr))
 }
 
 object $and {
-  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX], Seq[T[EX]])] =
+  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX], Seq[T[EX]])] =
     $andF.unapplySeq(Recursive[T].project(expr))
 }
 object $or {
-  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX], Seq[T[EX]])] =
+  def unapplySeq[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX], Seq[T[EX]])] =
     $orF.unapplySeq(Recursive[T].project(expr))
 }
 
 object $lt {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
     $ltF.unapply(Recursive[T].project(expr))
 }
 object $lte {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
     $lteF.unapply(Recursive[T].project(expr))
 }
 
 object $add {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[(T[EX], T[EX])] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[(T[EX], T[EX])] =
     $addF.unapply(Recursive[T].project(expr))
 }
 
 object $literal {
-  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit prj: Prj[ExprOpCoreF, EX]): Option[Bson] =
+  def unapply[T[_[_]]: Recursive, EX[_]: Functor](expr: T[EX])(implicit I: ExprOpCoreF :<: EX): Option[Bson] =
     $literalF.unapply(Recursive[T].project(expr))
 }

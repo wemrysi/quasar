@@ -18,7 +18,6 @@ package quasar.physical.mongodb.expression
 
 import quasar.Predef._
 import quasar._, Planner._
-import quasar.fp.Inj
 import quasar.physical.mongodb.Bson
 import quasar.jscore, jscore.JsFn
 
@@ -39,9 +38,9 @@ trait ExprOpOps[IN[_]] {
 
   def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]]
 
-  final def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit inj: Inj[IN, OUT]): Algebra[IN, Fix[OUT]] = {
+  final def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit I: IN :<: OUT): Algebra[IN, Fix[OUT]] = {
     val r0 = rewriteRefs0(applyVar)
-    x => r0(x).getOrElse(Fix(inj(x)))
+    x => r0(x).getOrElse(Fix(I.inj(x)))
   }
 }
 object ExprOpOps {

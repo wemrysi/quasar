@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.Type, Type.⨿
-import quasar.fp.Prj
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.Planner.{PlannerError, UnsupportedJS}
 import quasar.physical.mongodb.javascript._
@@ -48,7 +47,7 @@ package object expression {
   // converted to JS.
   // TODO: See SD-736 for the way forward.
   def translate[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
-      prj: Prj[ExprOpCoreF, EX],
+      I: ExprOpCoreF :<: EX,
       ev0: Equal[T[EX]],
       ev1: ExprOpOps.Uni[EX])
       : PartialFunction[T[EX], PlannerError \/ JsFn] = {
@@ -123,7 +122,7 @@ package object expression {
   /** "Idiomatic" translation to JS, accounting for patterns needing special
     * handling. */
   def toJs[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
-      ev0: Prj[ExprOpCoreF, EX],
+      ev0: ExprOpCoreF :<: EX,
       ev1: Equal[T[EX]],
       ops: ExprOpOps.Uni[EX])
       : GAlgebra[(T[EX], ?), EX, PlannerError \/ JsFn] =

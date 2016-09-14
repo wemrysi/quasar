@@ -613,7 +613,7 @@ object MongoDbPlanner {
 
   def workflowƒ[F[_]: Functor: Coalesce: Crush: Crystallize]
     (joinHandler: JoinHandler[F, WorkflowBuilder.M])
-    (implicit I: WorkflowOpCoreF :<: F, ev: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
+    (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[WorkflowBuilder[F]], WB: WorkflowBuilder.Ops[F])  // FIXME: don't need first two?
     : LogicalPlan[
         Cofree[LogicalPlan, (
           (OutputM[PartialSelector],

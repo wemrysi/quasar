@@ -52,7 +52,7 @@ object ArbitraryExprOp {
       Gen.alphaChar.map(c => $var(DocField(BsonField.Name(c.toString)))))
 
   lazy val genExpr3_0: Gen[Fix[Expr3_0]] = {
-    def inj(expr: Fix[Expr2_6]): Fix[Expr3_0] = expr.transCata(Inj[Expr2_6, Expr3_0].run)
+    def inj(expr: Fix[Expr2_6]): Fix[Expr3_0] = expr.transCata(Inject[Expr2_6, Expr3_0])
     Gen.oneOf(
       genExpr.map(inj),
       arbitrary[FormatString].map(fmt =>
@@ -60,8 +60,8 @@ object ArbitraryExprOp {
   }
 
   lazy val genExpr3_2: Gen[Fix[Expr3_2]] = {
-    def inj(expr: Fix[Expr2_6]): Fix[Expr3_2] = expr.transCata(Inj[Expr2_6, Expr3_2].run)
-    def inj3_0(expr: Fix[Expr3_0]): Fix[Expr3_2] = expr.transCata(Inj[Expr3_0, Expr3_2].run)
+    def inj(expr: Fix[Expr2_6]): Fix[Expr3_2] = expr.transCata(Inject[Expr2_6, Expr3_2])
+    def inj3_0(expr: Fix[Expr3_0]): Fix[Expr3_2] = expr.transCata(Inject[Expr3_0, Expr3_2])
     Gen.oneOf(
       genExpr3_0.map(inj3_0),
       genExpr.map(inj).flatMap(x => Gen.oneOf(
