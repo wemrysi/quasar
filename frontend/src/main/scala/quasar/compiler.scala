@@ -17,13 +17,13 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy._
+import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.fs._
 import quasar.sql._
 import quasar.std.StdLib._
-import quasar.{SemanticAnalysis => SA}
-import quasar.SemanticAnalysis._, quasar.SemanticError._
+import quasar.{SemanticAnalysis => SA}, SA._, SemanticError._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path._

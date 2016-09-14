@@ -186,9 +186,11 @@ lazy val root = project.in(file("."))
 //
    ejson, effect, js,
 //          |
+         frontend,
+//          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, marklogic, sparkcore,
+  marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -229,9 +231,24 @@ lazy val js = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val frontend = project
+  .settings(name := "quasar-frontend-internal")
+  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
+  .dependsOn(
+    ejson % BothScopes,
+    effect % BothScopes,
+    js % BothScopes,
+    frontend % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(

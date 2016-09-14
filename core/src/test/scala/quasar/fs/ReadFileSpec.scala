@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
+import quasar.contrib.pathy._
 import quasar.fp._
 
 import pathy.scalacheck.PathyArbitrary._

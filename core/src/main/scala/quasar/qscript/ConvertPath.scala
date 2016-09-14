@@ -18,8 +18,9 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.Planner.{NoFilesFound, PlannerError}
+import quasar.contrib.pathy._
 import quasar.fp._
-import quasar.fs._
+import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.qscript.MapFuncs._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._

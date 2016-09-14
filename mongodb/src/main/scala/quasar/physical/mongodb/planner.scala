@@ -17,9 +17,10 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar._
+import quasar._, Type._
+import quasar.contrib.pathy.mkAbsolute
+import quasar.contrib.shapeless._
 import quasar.fp._
-import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
@@ -27,7 +28,6 @@ import quasar.physical.mongodb.javascript._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._
-import quasar.Type._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant

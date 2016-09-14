@@ -17,16 +17,15 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
+import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, Planner => QPlanner}
 import quasar.SKI.κ
-import quasar.{PhaseResult, PhaseResultT, PhaseResults}
-import quasar.{Data, LogicalPlan}
-import quasar.{Planner => QPlanner}
+import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
-import quasar.fs._
-import quasar.fs.impl.queryFileFromDataCursor
 import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
+import quasar.fs._
+import quasar.fs.impl.queryFileFromDataCursor
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
