@@ -17,10 +17,8 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.{LogicalPlan, PhaseResults}
-import quasar.fp.numeric._
-import quasar.fp.free._
-import quasar.Data
+import quasar.{Data, LogicalPlan, PhaseResults}
+import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.fp.free._
 import quasar.fp.numeric._

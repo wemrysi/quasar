@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.contrib.pathy._
 import quasar.fp._, eitherT._
 import quasar.fp.numeric._
 
