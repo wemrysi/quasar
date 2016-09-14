@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendName, Data, TestConfig}
+import quasar.contrib.pathy._
 import quasar.fp.{TaskRef, reflNT}
 import quasar.fp.eitherT._
 import quasar.fp.free._

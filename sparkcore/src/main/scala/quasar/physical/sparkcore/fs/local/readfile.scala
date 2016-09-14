@@ -17,9 +17,9 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
-import quasar.fs._
-import quasar.fp.free._
+import quasar.contrib.pathy._
 import quasar.effect.Read
+import quasar.fp.free._
 import quasar.physical.sparkcore.fs.Input
 
 import java.io.File

@@ -18,8 +18,9 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.{Data, DataCodec}
-import quasar.fs._
+import quasar.contrib.pathy._
 import quasar.fp.free.lift
+import quasar.fs._
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._

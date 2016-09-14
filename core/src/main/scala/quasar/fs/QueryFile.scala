@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar._, Planner._, RenderTree.ops._
+import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
 import quasar.fp.eitherT._

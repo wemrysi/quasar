@@ -17,9 +17,10 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.{FPath, refineTypeAbs}
+import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.fs.{FPath, refineTypeAbs}
 import quasar.namegen._
 
 import scala.Some
