@@ -22,10 +22,11 @@ import quasar.DataArbitrary._
 import quasar.api._,
   ApiErrorEntityDecoder._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric._
-import quasar.fs._, PathArbitrary._
+import quasar.fs._
 
 import argonaut.Json
 import argonaut.Argonaut._
