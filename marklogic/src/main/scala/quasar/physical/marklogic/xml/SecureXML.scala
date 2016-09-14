@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.xml
 
 import quasar.Predef.String
 
