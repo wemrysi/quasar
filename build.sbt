@@ -271,7 +271,9 @@ lazy val marklogicValidation = project.in(file("marklogic-validation"))
   .settings(name := "quasar-marklogic-validation-internal")
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.marklogicValidation)
-  .enablePlugins(AutomateHeaderPlugin)
+  // TODO: Disabled until a new release of sbt-headers with exclusion is available
+  //       as we don't want our headers applied to XMLChar.java
+  //.enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
