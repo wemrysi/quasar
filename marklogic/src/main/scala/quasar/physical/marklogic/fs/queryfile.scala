@@ -68,7 +68,7 @@ object queryfile {
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
       def plan(qs: Fix[QScriptTotal[Fix, ?]]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
-        qs.cataM(Planner[QScriptTotal[Fix, ?], XQuery].plan[M]).run map {
+        qs.cataM(MarkLogicPlanner[M, QScriptTotal[Fix, ?]].plan).run map {
           case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
         }
 
