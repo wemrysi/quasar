@@ -19,16 +19,21 @@ package quasar.physical.marklogic.xml
 import quasar.Predef.String
 import quasar.physical.marklogic.validation._
 
+import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
-import scalaz.{Order, Show}
+import scalaz.{Order, Show, \/}
 import scalaz.std.string._
 import scalaz.syntax.show._
+import scalaz.syntax.std.either._
 
 final case class NCName(value: String Refined IsNCName) {
   override def toString = this.shows
 }
 
 object NCName {
+  def apply(s: String): String \/ NCName =
+    refineV[IsNCName](s).disjunction map (NCName(_))
+
   implicit val order: Order[NCName] =
     Order.orderBy(_.value.get)
 

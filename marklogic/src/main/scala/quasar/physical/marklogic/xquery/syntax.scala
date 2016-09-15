@@ -31,12 +31,12 @@ import scalaz.syntax.show._
 object syntax {
   import FunctionDecl._
 
-  final case class NameBuilder(ns: NamespaceDecl, local: NCName) {
+  final case class NameBuilder(decl: NamespaceDecl, local: NCName) {
     def qn[F[_]](implicit F: PrologW[F]): F[QName] =
-      F.writer(ISet singleton Prolog.nsDecl(ns), ns.prefix(local))
+      F.writer(ISet singleton Prolog.nsDecl(decl), decl.ns(local))
 
     def xqy[F[_]: PrologW]: F[XQuery] =
-      xs map (fn.QName(ns.uri.xs, _))
+      xs map (fn.QName(decl.ns.uri.xs, _))
 
     def xs[F[_]: PrologW]: F[XQuery] =
       qn map (_.xs)
@@ -72,7 +72,8 @@ object syntax {
   }
 
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
-    def name(local: String Refined IsNCName): NameBuilder = NameBuilder(ns, NCName(local))
+    def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
+    def name(local: NCName): NameBuilder = NameBuilder(ns, local)
   }
 
   final implicit class ModuleImportOps(val mod: ModuleImport) extends scala.AnyVal {

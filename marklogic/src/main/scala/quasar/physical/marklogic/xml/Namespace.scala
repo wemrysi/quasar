@@ -14,25 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.xml
 
 import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
 
 import monocle.macros.Lenses
-import scalaz._
-import scalaz.syntax.show._
+import scalaz.{Order, Show}
+import scalaz.std.tuple._
 
 @Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
+final case class Namespace(prefix: NSPrefix, uri: NSUri) {
+  def apply(local: NCName): QName = QName.prefixed(prefix, local)
 }
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
+object Namespace {
+  implicit val order: Order[Namespace] =
+    Order.orderBy(ns => (ns.prefix, ns.uri))
 
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
+  implicit val show: Show[Namespace] =
+    Show.shows(ns => s"Namespace(${ns.prefix}=${ns.uri})")
 }

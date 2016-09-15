@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.physical.marklogic.xml.namespaces._
 
 import java.lang.SuppressWarnings
 
@@ -30,10 +31,9 @@ object qscript {
   import syntax._, expr.{element, for_, if_}, axes._
   import FunctionDecl.FunctionDecl1
 
-  val qs = namespace("qscript", "http://quasar-analytics.org/qscript")
-
-  val dataN = qs name "data"
-  val errorN = qs name "error"
+  val qs     = NamespaceDecl(qscriptNs)
+  val dataN  = qs name qscriptData.local
+  val errorN = qs name qscriptError.local
 
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs

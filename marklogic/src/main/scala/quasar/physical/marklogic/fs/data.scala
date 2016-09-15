@@ -23,14 +23,15 @@ import quasar.ejson.EJson
 import quasar.fp.{interpret, interpretM}
 import quasar.physical.marklogic.MonadErrMsg
 import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.xml.namespaces._
 
 import scala.xml._
 
+import eu.timepit.refined.auto._
 import jawn._
 import matryoshka._
 import matryoshka.patterns._
-import scalaz.{Bitraverse, Traverse, Id}
-import scalaz.syntax.monadError._
+import scalaz.{Node => _, _}, Scalaz._
 
 object data {
   object JsonParser extends SupportParser[Data] {
@@ -48,11 +49,90 @@ object data {
       }
   }
 
+  def toXml[F[_]: MonadErrMsg](data: Data): F[Elem] = {
+    def typeAttr(tpe: String): Attribute =
+      Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe, Null)
+
+    def elem(name: QName, attrs: MetaData, children: Node*): Elem =
+      Elem(name.prefix.map(_.shows).orNull, name.local.shows, attrs, TopScope, true, children: _*)
+
+    def typed(name: QName, tpe: String, children: Node*): F[Elem] =
+      elem(name, typeAttr(tpe), children: _*).point[F]
+
+    def rootElem(name: QName, attrs: MetaData, children: Node*): Elem =
+      Elem(name.prefix.map(_.shows).orNull, name.local.shows, attrs, ejsBinding, true, children: _*)
+
+    def literal(tpe: String, children: Node*): F[Elem] =
+      rootElem(ejsonLiteral, typeAttr(tpe), children: _*).point[F]
+
+    def toXml0(elementName: QName): Data => F[Elem] = {
+      case Data.Binary(bytes) => ???
+      case Data.Bool(b)       => typed(elementName, "boolean", Text(b.fold("true", "false")))
+      case Data.Date(d)       => ???
+      case Data.Dec(d)        => typed(elementName, "decimal", Text(d.toString))
+      case Data.Id(id)        => typed(elementName, "id", Text(id))
+      case Data.Int(i)        => typed(elementName, "integer", Text(i.toString))
+      case Data.Interval(ivl) => ???
+      case Data.Null          => typed(elementName, "null")
+      case Data.Str(s)        => typed(elementName, "string", Text(s))
+      case Data.Time(t)       => ???
+      case Data.Timestamp(ts) => ???
+
+      case Data.Arr(elements) =>
+        elements.traverse(toXml0(ejsonArrayElt)) map { kids =>
+          elem(elementName, Null, elem(ejsonArray, Null, kids: _*))
+        }
+
+      case Data.Obj(entries)  =>
+        entries.toList.traverse { case (k, v) =>
+          for {
+            qn <- NCName(k).fold(κ(invalidQName[F, QName](k)), QName.local(_).point[F])
+            el <- toXml0(qn)(v)
+          } yield el
+        } map { kids =>
+          elem(elementName, Null, kids: _*)
+        }
+
+      case Data.NA            => ???
+      case Data.Set(xs)       => ???
+    }
+
+    data match {
+      case Data.Binary(bytes) => ???
+      case Data.Bool(b)       => literal("boolean", Text(b.fold("true", "false")))
+      case Data.Date(d)       => ???
+      case Data.Dec(d)        => literal("decimal", Text(d.toString))
+      case Data.Id(id)        => literal("id", Text(id))
+      case Data.Int(i)        => literal("integer", Text(i.toString))
+      case Data.Interval(ivl) => ???
+      case Data.Null          => literal("null")
+      case Data.Str(s)        => literal("string", Text(s))
+      case Data.Time(t)       => ???
+      case Data.Timestamp(ts) => ???
+
+      case Data.Arr(elements) =>
+        elements.traverse(toXml0(ejsonArrayElt)) map { kids =>
+          rootElem(ejsonArray, Null, kids: _*)
+        }
+
+      case Data.Obj(entries)  =>
+        entries.toList.traverse { case (k, v) =>
+          for {
+            qn <- NCName(k).fold(κ(invalidQName[F, QName](k)), QName.local(_).point[F])
+            el <- toXml0(qn)(v)
+          } yield el
+        } map { kids =>
+          rootElem(ejsonMap, Null, kids: _*)
+        }
+
+      case Data.NA            => ???
+      case Data.Set(xs)       => ???
+    }
+  }
+
   def encodeXml[F[_]: MonadErrMsg](data: Data): F[Node] =
     data.hyloM[F, CoEnv[Data, EJson, ?], Node](
-      interpretM(
-        d => s"No representation for '$d' in XML.".raiseError[F, Node],
-        EncodeXml[F, EJson].encodeXml),
+      interpretM(noReprErr[F, Node], EncodeXml[F, EJson].encodeXml),
       Data.toEJson[EJson] andThen (_.point[F]))
 
   def decodeXml(node: Node): Data =
@@ -60,7 +140,16 @@ object data {
       interpret(κ(Data.NA), Data.fromEJson),
       DecodeXml[Id.Id, EJson].decodeXml andThen (CoEnv(_)))
 
+  private val ejsBinding: NamespaceBinding =
+    NamespaceBinding(qscriptNs.prefix.shows, qscriptNs.uri.shows, TopScope)
+
   // TODO{matryoshka}: Remove once we've upgraded to 0.11.2+
   private implicit def coenvTraverse[E]: Traverse[CoEnv[E, EJson, ?]] =
     Bitraverse[CoEnv[?, EJson, ?]].rightTraverse
+
+  private def noReprErr[F[_]: MonadErrMsg, A](data: Data): F[A] =
+    s"No representation for '$data' in XML.".raiseError[F, A]
+
+  private def invalidQName[F[_]: MonadErrMsg, A](s: String): F[A] =
+    s"'$s' is not a valid XML QName.".raiseError[F, A]
 }
