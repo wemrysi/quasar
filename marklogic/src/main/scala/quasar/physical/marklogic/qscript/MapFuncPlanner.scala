@@ -23,9 +23,9 @@ import quasar.fp.ShowT
 import quasar.physical.marklogic.MonadError_
 import quasar.physical.marklogic.ejson.AsXQuery
 import quasar.physical.marklogic.validation._
+import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.physical.marklogic.xquery.xml.{NCName, QName}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import eu.timepit.refined.refineV

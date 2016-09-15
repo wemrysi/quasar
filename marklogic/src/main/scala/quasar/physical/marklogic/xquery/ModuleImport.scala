@@ -17,6 +17,8 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.xquery.syntax._
 
 import monocle.macros.Lenses
 import scalaz._
@@ -28,7 +30,7 @@ import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 @Lenses
-final case class ModuleImport(prefix: Option[xml.NSPrefix], uri: xml.NSUri, locs: IList[xml.NSUri]) {
+final case class ModuleImport(prefix: Option[NSPrefix], uri: NSUri, locs: IList[NSUri]) {
   def render: String = {
     val pfxStr = prefix.map(p => s" namespace ${p.shows} =")
     val locStr = locs.toNel.map(ls => s" at ${ls.map(_.xs.shows).intercalate(", ")}")
@@ -37,7 +39,7 @@ final case class ModuleImport(prefix: Option[xml.NSPrefix], uri: xml.NSUri, locs
 }
 
 object ModuleImport {
-  def prefixed(pfx: xml.NSPrefix, uri: xml.NSUri): ModuleImport =
+  def prefixed(pfx: NSPrefix, uri: NSUri): ModuleImport =
     ModuleImport(some(pfx), uri, IList.empty)
 
   implicit val order: Order[ModuleImport] =

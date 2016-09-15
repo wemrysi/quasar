@@ -19,7 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.NameGenerator
 import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xquery.xml._
+import quasar.physical.marklogic.xml._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.Uri

@@ -14,26 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.xml
 
-import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.physical.marklogic.validation.IsNCName
 
-import monocle.macros.Lenses
-import scalaz._
-import scalaz.std.tuple._
+import eu.timepit.refined.refineMV
+import scalaz.{Order, Show}
 import scalaz.syntax.show._
 
-@Lenses
-final case class NamespaceDecl(prefix: NSPrefix, uri: NSUri) {
-  def render: String = s"declare namespace ${prefix.shows} = ${uri.xs.shows}"
+/** A namespace prefix like `xs` or `fn`. */
+final case class NSPrefix(value: NCName) extends scala.AnyVal {
+  def apply(local: NCName): QName = QName.prefixed(this, local)
+  override def toString = this.shows
 }
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(ns => (ns.prefix, ns.uri))
+object NSPrefix {
+  val local: NSPrefix =
+    NSPrefix(NCName(refineMV[IsNCName]("local")))
 
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(ns => s"NamespaceDecl(${ns.render})")
+  implicit val order: Order[NSPrefix] =
+    Order.orderBy(_.value)
+
+  implicit val show: Show[NSPrefix] =
+    Show.shows(_.value.shows)
 }

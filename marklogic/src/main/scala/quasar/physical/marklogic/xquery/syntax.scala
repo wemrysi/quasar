@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xquery.xml._
+import quasar.physical.marklogic.xml._
 
 import scala.math.Integral
 
@@ -26,6 +26,7 @@ import eu.timepit.refined.api.Refined
 import scalaz.{Functor, ISet}
 import scalaz.std.iterable._
 import scalaz.syntax.functor._
+import scalaz.syntax.show._
 
 object syntax {
   import FunctionDecl._
@@ -55,10 +56,19 @@ object syntax {
 
   final implicit class QNameOps(val qn: QName) extends scala.AnyVal {
     def apply(args: XQuery*): XQuery = XQuery(s"${qn}${mkSeq(args)}")
+    def xs: XQuery = qn.shows.xs
   }
 
   final implicit class QNameFOps[F[_]: Functor](val qnf: F[QName]) {
     def apply(args: XQuery*): F[XQuery] = qnf map (_(args: _*))
+  }
+
+  final implicit class NCNameOps(val ncname: NCName) extends scala.AnyVal {
+    def xs: XQuery = ncname.value.get.xs
+  }
+
+  final implicit class NSUriOps(val uri: NSUri) extends scala.AnyVal {
+    def xs: XQuery = uri.value.get.xs
   }
 
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
