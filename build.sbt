@@ -50,8 +50,8 @@ lazy val buildSettings = Seq(
     "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
     "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
     "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math" %% "kind-projector"   % "0.8.0"),
-  addCompilerPlugin("org.scalamacros" % "paradise"         % "2.1.0" cross CrossVersion.full),
+  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.0"),
+  addCompilerPlugin("org.scalamacros" %  "paradise"       % "2.1.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
 
@@ -66,6 +66,7 @@ lazy val buildSettings = Seq(
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
+  scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,
     Wart.AsInstanceOf,
@@ -186,9 +187,11 @@ lazy val root = project.in(file("."))
 //
    ejson, effect, js,
 //          |
+         frontend,
+//          |
           core,
 //      / / | \ \
-  mongodb, skeleton, postgresql, marklogic, sparkcore,
+  marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
           main,
 //        /  \
@@ -229,9 +232,24 @@ lazy val js = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val frontend = project
+  .settings(name := "quasar-frontend-internal")
+  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
+  .dependsOn(
+    ejson % BothScopes,
+    effect % BothScopes,
+    js % BothScopes,
+    frontend % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -268,9 +286,17 @@ lazy val skeleton = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogicValidation = project.in(file("marklogic-validation"))
+  .settings(name := "quasar-marklogic-validation-internal")
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.marklogicValidation)
+  // TODO: Disabled until a new release of sbt-headers with exclusion is available
+  //       as we don't want our headers applied to XMLChar.java
+  //.enablePlugins(AutomateHeaderPlugin)
+
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(core % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)

@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.namegen._
 

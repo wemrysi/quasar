@@ -17,15 +17,15 @@
 package quasar
 
 import quasar.Predef._
-import quasar.fs.sandboxCurrent
+import quasar.contrib.pathy.sandboxCurrent
 import quasar.fp._
 import quasar.sql.Query
 import quasar.std._
 
 import matryoshka._
-import scalaz._, Scalaz._
-import pathy.Path._
 import org.specs2.matcher.MustThrownMatchers._
+import pathy.Path._
+import scalaz._, Scalaz._
 
 trait CompilerHelpers extends TermLogicalPlanMatchers {
   import StdLib._

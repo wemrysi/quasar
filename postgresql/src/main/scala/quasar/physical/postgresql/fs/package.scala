@@ -18,8 +18,7 @@ package quasar.physical.postgresql
 
 import quasar.Predef._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
-import quasar.fp.{free, TaskRef}, free._
-import quasar.fp.free.{injectNT, mapSNT, EnrichNT}
+import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
 
@@ -35,12 +34,12 @@ import scalaz.concurrent.Task
 package object fs {
   val FsType = FileSystemType("postgresql")
 
-  type Eff1[A] = Coproduct[
-                    KeyValueStore[ReadHandle,  impl.ReadStream[ConnectionIO], ?],
-                    KeyValueStore[WriteHandle, writefile.TableName,           ?],
-                    A]
-  type Eff0[A] = Coproduct[MonotonicSeq, Eff1, A]
-  type Eff[A]  = Coproduct[ConnectionIO, Eff0, A]
+  type Eff[A] = (
+       ConnectionIO
+    :\: MonotonicSeq
+    :\: KeyValueStore[ReadHandle, impl.ReadStream[ConnectionIO], ?]
+    :/: KeyValueStore[WriteHandle, writefile.TableName,     ?]
+  )#M[A]
 
   def interp[S[_]](
       uri: ConnectionUri

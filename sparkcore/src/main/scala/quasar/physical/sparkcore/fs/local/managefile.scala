@@ -25,6 +25,7 @@ import quasar.fp.free._
 import quasar.fs.ManageFile._
 import quasar.fs.ManageFile.MoveScenario._
 import quasar.fs.impl.ensureMoveSemantics
+import quasar.contrib.pathy._
 
 import java.nio.file._
 import java.lang.Exception

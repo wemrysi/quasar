@@ -1,7 +1,7 @@
 {
   "name": "filter on date part",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "../days.data",
 

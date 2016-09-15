@@ -17,8 +17,9 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP}
-import quasar.fp._
+import quasar.{LogicalPlan => LP, PhaseResultT}
+import quasar.contrib.pathy._
+import quasar.fp._, eitherT._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
@@ -32,7 +33,8 @@ trait QScriptHelpers {
   // TODO: Narrow this to QScriptPure
   type QS[A] = QScriptTotal[Fix, A]
   val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val R = implicitly[Const[Read, ?] :<: QS]
+  val R  = implicitly[Const[Read, ?] :<: QS]
+  val SR = implicitly[Const[ShiftedRead, ?] :<: QS]
   val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
   val EJ = implicitly[EquiJoin[Fix, ?] :<: QS]
   val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
@@ -58,9 +60,8 @@ trait QScriptHelpers {
       T[F] =
     ops.foldLeft(op.embed)((acc, elem) => elem.as(acc).embed)
 
-  // NB: This is the same type as QueryFile.ListContents
-  def listContents: ConvertPath.ListContents[Id] =
-    d => EitherT((
+  val listContents: ConvertPath.ListContents[Id] =
+    d =>
       if (d ≟ rootDir)
         Set(
           DirName("foo").left,
@@ -84,10 +85,11 @@ trait QScriptHelpers {
           FileName("city").right,
           FileName("person").right,
           FileName("zips").right,
-          FileName("car").right)).right.point[Id])
-    
+          FileName("car").right)
 
   def convert(lc: Option[ConvertPath.ListContents[Id]], lp: Fix[LP]):
-      Option[Fix[QScriptTotal[Fix, ?]]] =
-    QueryFile.convertToQScript[Fix, Id](lc)(lp).toOption.run.copoint
+      Option[Fix[QScriptTotal[Fix, ?]]] = {
+    val lc1 = lc map (_.andThen(_.liftM[PhaseResultT].liftM[FileSystemErrT]))
+    QueryFile.convertToQScript(lc1)(lp).toOption.run.copoint
+  }
 }

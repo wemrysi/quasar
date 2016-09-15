@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp._
 import quasar.fp.free._
@@ -81,11 +82,7 @@ package object main {
 
   /** Effect comprising the core Quasar apis. */
   type CoreEffIO[A] = Coproduct[Task, CoreEff, A]
-  type CoreEff[A]   = Coproduct[Mounting, CoreEff0, A]
-  type CoreEff0[A]  = Coproduct[QueryFile, CoreEff1, A]
-  type CoreEff1[A]  = Coproduct[ReadFile, CoreEff2, A]
-  type CoreEff2[A]  = Coproduct[WriteFile, CoreEff3, A]
-  type CoreEff3[A]  = Coproduct[ManageFile, CoreErrs, A]
+  type CoreEff[A]   = (Mounting :\: QueryFile :\: ReadFile :\: WriteFile :\: ManageFile :/: CoreErrs)#M[A]
 
   object CoreEff {
     def runFs[S[_]](
@@ -154,6 +151,15 @@ package object main {
             hfsRef,
             HierarchicalFsEff.interpreter[S](seqRef, mntedRHRef))
 
+        type V[A] = (
+              ViewState
+          :\: MonotonicSeq
+          :\: Mounting
+          :\: MountingFailure
+          :\: PathMismatchFailure
+          :/: FileSystem
+        )#M[A]
+
         val compFs: V ~> Free[S, ?] =
           injectFT[Task, S].compose(KeyValueStore.impl.fromTaskRef(viewHRef)) :+:
           injectFT[Task, S].compose(MonotonicSeq.fromTaskRef(seqRef))         :+:
@@ -164,12 +170,6 @@ package object main {
 
         flatMapSNT(compFs) compose view.fileSystem[V]
       }
-
-    private type V[A]  = Coproduct[ViewState, V0, A]
-    private type V0[A] = Coproduct[MonotonicSeq, V1, A]
-    private type V1[A] = Coproduct[Mounting, V2, A]
-    private type V2[A] = Coproduct[MountingFailure, V3, A]
-    private type V3[A] = Coproduct[PathMismatchFailure, FileSystem, A]
   }
 
   /** The effects required by hierarchical FileSystem operations. */

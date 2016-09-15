@@ -18,8 +18,10 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar._, Planner._, RenderTree.ops._
+import quasar.contrib.pathy._
 import quasar.effect.LiftedOps
 import quasar.fp._
+import quasar.fp.eitherT._
 import quasar.qscript._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
@@ -65,31 +67,43 @@ object QueryFile {
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, S[_]]
     (lp: T[LogicalPlan])
     (implicit QF: QueryFile.Ops[S]):
-      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] =
-    convertToQScript[T, Free[S, ?]]((QF.ls(_: ADir)).some)(lp)
+      EitherT[WriterT[Free[S, ?], PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+
+    val lc = (d: ADir) => EitherT(QF.ls(d).run.liftM[WriterT[?[_], PhaseResults, ?]])
+
+    convertToQScript(some(lc))(lp)
+  }
 
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
-  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]: Monad](
+  def convertToQScript[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, M[_]](
     listContents: Option[ConvertPath.ListContents[M]])(
-    lp: T[LogicalPlan]):
-      EitherT[WriterT[M, PhaseResults, ?], FileSystemError, T[QS[T, ?]]] = {
+    lp: T[LogicalPlan])(
+    implicit
+    merr: MonadError[M, FileSystemError],
+    mtell: MonadTell[M, PhaseResults]
+  ): M[T[QS[T, ?]]] = {
     val transform = new Transform[T, QS[T, ?]]
     val optimize = new Optimize[T]
 
+    val rawQS =
+      optimizeEval(lp)(optimize.applyAll).fold(
+        perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
+        merr.point(_))
+
+    val withoutProj =
+      merr.bind(rawQS)(optimize.eliminateProjections[M, QS[T, ?]](listContents))
+
     // TODO: Rather than explicitly applying multiple times, we should apply
     //       repeatedly until unchanged.
-    val qs =
-      (EitherT(optimizeEval(lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
-        optimize.eliminateProjections[M, QS[T, ?]](listContents)).map(
-          _.transCata(optimize.applyAll).transCata(optimize.applyAll))
+    val optimized =
+      merr.map(withoutProj)(_.transCata(optimize.applyAll).transCata(optimize.applyAll))
 
-    EitherT(WriterT(qs.run.map(qq => (
-      qq.fold(
-        κ(Vector()),
-        a => Vector(PhaseResult.Tree("QScript", a.cata(transform.linearize).reverse.render))),
-      qq))))
+    mtell.bind(optimized) { qs =>
+      val renderedTree = qs.cata(transform.linearize).reverse.render
+      mtell.writer(Vector(PhaseResult.Tree("QScript", renderedTree)), qs)
+    }
   }
 
   /** The result of the query is stored in an output file
@@ -150,9 +164,6 @@ object QueryFile {
   /** This operation should return whether a file exists in the filesystem.*/
   final case class FileExists(file: AFile)
     extends QueryFile[Boolean]
-
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
 
   final class Ops[S[_]](implicit S: QueryFile :<: S)
     extends LiftedOps[QueryFile, S] {

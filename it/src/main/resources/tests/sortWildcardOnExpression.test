@@ -2,7 +2,8 @@
     "name": "sort wildcard on expression",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "pending"
     },
     "data": "largeZips.data",
     "query": "select * from largeZips order by pop/10 desc",

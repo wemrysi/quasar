@@ -1,7 +1,7 @@
 {
   "name": "convert epoch milliseconds value to timestamp",
 
-  "backends": { "postgresql": "pending" },
+  "backends": { "postgresql": "pending", "marklogic": "pending" },
 
   "data": "../days.data",
 

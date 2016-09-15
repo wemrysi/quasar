@@ -19,8 +19,8 @@ package quasar.physical.sparkcore
 import quasar.Predef._
 import quasar.EnvironmentError
 import quasar.fs.mount.FileSystemDef._
-import quasar.fs._
 import quasar.fs.mount.ConnectionUri
+import quasar.contrib.pathy._
 
 import pathy.Path._
 import org.apache.spark._

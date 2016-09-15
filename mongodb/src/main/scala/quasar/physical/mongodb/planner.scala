@@ -17,9 +17,10 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar._
+import quasar._, Type._
+import quasar.contrib.pathy.mkAbsolute
+import quasar.contrib.shapeless._
 import quasar.fp._
-import quasar.fs.mkAbsolute
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
@@ -27,7 +28,6 @@ import quasar.physical.mongodb.javascript._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 import quasar.std.StdLib._
-import quasar.Type._
 
 import matryoshka._, Recursive.ops._, TraverseT.ops._
 import org.threeten.bp.Instant
@@ -39,6 +39,9 @@ object MongoDbPlanner {
   import LogicalPlan._
   import Planner._
   import WorkflowBuilder._
+
+  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
+  import EitherT.eitherTMonad
 
   import agg._
   import array._
@@ -1108,9 +1111,6 @@ object MongoDbPlanner {
     (logical: Fix[LogicalPlan])
     (implicit ev0: WorkflowOpCoreF :<: F, ev1: Show[Fix[WorkflowBuilderF[F, ?]]], ev2: RenderTree[Fix[F]])
       : EitherT[Writer[PhaseResults, ?], PlannerError, Crystallized[F]] = {
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-    import StateT.stateTMonadState
 
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.

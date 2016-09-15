@@ -19,6 +19,7 @@ package quasar.fs
 import quasar.Predef.{Vector, None, Set}
 import quasar.Planner.UnsupportedPlan
 import quasar.{LogicalPlan, PhaseResults}
+import quasar.contrib.pathy._
 
 import matryoshka.Fix
 import pathy.Path._
@@ -34,47 +35,23 @@ import scalaz.syntax.std.option._
 object Empty {
   import FileSystemError._, PathError._
 
-  def readFile[F[_]: Applicative]: ReadFile ~> F =
-    new (ReadFile ~> F) {
-      def apply[A](rf: ReadFile[A]) = rf match {
-        case ReadFile.Open(f, _, _) =>
-          fsPathNotFound(f)
+  def readFile[F[_]: Applicative] = λ[ReadFile ~> F] {
+    case ReadFile.Open(f, _, _) => fsPathNotFound(f)
+    case ReadFile.Read(h)       => unknownReadHandle(h).left.point[F]
+    case ReadFile.Close(_)      => ().point[F]
+  }
 
-        case ReadFile.Read(h) =>
-          unknownReadHandle(h).left.point[F]
+  def writeFile[F[_]: Applicative] = λ[WriteFile ~> F] {
+    case WriteFile.Open(f)        => WriteFile.WriteHandle(f, 0).right.point[F]
+    case WriteFile.Write(_, data) => data.map(writeFailed(_, "empty filesystem")).point[F]
+    case WriteFile.Close(_)       => ().point[F]
+  }
 
-        case ReadFile.Close(_) =>
-          ().point[F]
-      }
-    }
-
-  def writeFile[F[_]: Applicative]: WriteFile ~> F =
-    new (WriteFile ~> F) {
-      def apply[A](wf: WriteFile[A]) = wf match {
-        case WriteFile.Open(f) =>
-          WriteFile.WriteHandle(f, 0).right.point[F]
-
-        case WriteFile.Write(_, data) =>
-          data.map(writeFailed(_, "empty filesystem")).point[F]
-
-        case WriteFile.Close(_) =>
-          ().point[F]
-      }
-    }
-
-  def manageFile[F[_]: Applicative]: ManageFile ~> F =
-    new (ManageFile ~> F) {
-      def apply[A](mf: ManageFile[A]) = mf match {
-        case ManageFile.Move(scn, _) =>
-          fsPathNotFound(scn.src)
-
-        case ManageFile.Delete(p) =>
-          fsPathNotFound(p)
-
-        case ManageFile.TempFile(p) =>
-          (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
-      }
-    }
+  def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
+    case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
+    case ManageFile.Delete(p)    => fsPathNotFound(p)
+    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+  }
 
   def queryFile[F[_]: Applicative]: QueryFile ~> F =
     new (QueryFile ~> F) {

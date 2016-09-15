@@ -21,6 +21,7 @@ import quasar.{LogicalPlan => LP, _}
 import quasar.qscript.MapFuncs._
 import quasar.fp._
 import quasar.fs._
+import quasar.ejson.EJson
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
@@ -44,10 +45,10 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
 
     "optimize a basic read" in {
       val run =
-        (quasar.fp.free.injectedNT[QS](opt.simplifyProjection).apply(_: QS[Fix[QS]])) ⋙
-          liftFG(opt.coalesceMapShift[QS, QS](opt.optionIdF[QS])) ⋙
+        (SimplifyProjection[QS, QS].simplifyProjection(_: QS[Fix[QS]])) ⋙
+          liftFG(opt.coalesceMapShift[QS, QS](idPrism.get)) ⋙
           Normalizable[QS].normalize ⋙
-          liftFF(opt.simplifyQC[QS, QS](opt.optionIdF[QS], NaturalTransformation.refl[QS])) ⋙
+          liftFF(opt.simplifyQC[QS, QS](idPrism)) ⋙
           liftFG(opt.compactLeftShift[QS, QS])
 
       val query = lpRead("/foo")
@@ -60,8 +61,69 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
           Free.point(RightSide)))).some)
     }
 
+    "fold a constant array value" in {
+      val value: Fix[EJson] =
+        EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(Free.roll(Constant(value))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(value)))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
+    "fold a constant doubly-nested array value" in {
+      val value: Fix[EJson] =
+        ejson.EJson.fromExt[Fix].apply(ejson.Int[Fix[EJson]](7))
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(Free.roll(MakeArray(Free.roll(Constant(value))))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Arr(List(value))))))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
+    "fold nested boolean values" in {
+      val falseBool: Fix[EJson] =
+        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](false))
+
+      val trueBool: Fix[EJson] =
+        EJson.fromCommon[Fix].apply(ejson.Bool[Fix[EJson]](true))
+
+      val exp: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(MakeArray(
+            // !false && (false || !true)
+            Free.roll(And(
+              Free.roll(Not(Free.roll(Constant(falseBool)))),
+              Free.roll(Or(
+                Free.roll(Constant(falseBool)),
+                Free.roll(Not(Free.roll(Constant(trueBool))))))))))))
+
+      val expected: QS[Fix[QS]] =
+        QC.inj(Map(
+          RootR,
+          Free.roll(Constant(
+            ejson.CommonEJson.inj(ejson.Arr(List(EJson.fromCommon[Fix].apply(ejson.Bool[Fix[ejson.EJson]](false)))))))))
+
+      exp.embed.transCata(Normalizable[QS].normalize(_: QS[Fix[QS]])) must equal(expected.embed)
+    }
+
     "simplify a ThetaJoin" in {
-      val exp =
+      val exp: Fix[QS] =
         TJ.inj(ThetaJoin(
           DE.inj(Const[DeadEnd, Fix[QS]](Root)).embed,
           Free.roll(R.inj(Const(Read(rootDir </> file("foo"))))),

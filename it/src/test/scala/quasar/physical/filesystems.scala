@@ -19,6 +19,7 @@ package quasar.physical
 import quasar.Predef._
 import quasar.{EnvironmentError, EnvErr}
 import quasar.config.{CfgErr, ConfigError}
+import quasar.contrib.pathy._
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
@@ -29,10 +30,7 @@ import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object filesystems {
-
-  type Eff0[A] = Coproduct[PhysErr, Task, A]
-  type Eff1[A] = Coproduct[EnvErr, Eff0, A]
-  type Eff[A]  = Coproduct[CfgErr, Eff1, A]
+  type Eff[A]  = (CfgErr :\: EnvErr :\: PhysErr :/: Task)#M[A]
   type EffM[A] = Free[Eff, A]
 
   def testFileSystem(

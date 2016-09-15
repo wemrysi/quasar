@@ -17,8 +17,8 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar._
-import fs._
+import quasar.contrib.pathy._
+
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
 
@@ -41,7 +41,9 @@ class UriPathCodecSpec extends quasar.Qspec {
     "."   -> "$dot$",
     ".."  -> "$dotdot$",
     "..." -> "...",
-    "/"   -> "%2F"
+    "/"   -> "%2F",
+    " "   -> "%20",
+    "+ "  -> "%2B%20"
   )
 
   private def encodingFragments = Fragments(

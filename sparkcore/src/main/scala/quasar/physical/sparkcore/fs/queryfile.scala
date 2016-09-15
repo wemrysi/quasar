@@ -23,6 +23,7 @@ import quasar.fs._
 import quasar.fs.PathError._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
+import quasar.contrib.pathy._
 
 import java.io.File
 import java.nio.file._

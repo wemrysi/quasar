@@ -18,8 +18,9 @@ package quasar.fs.mount
 
 import quasar.Predef._
 import quasar.{LogicalPlan, PhaseResults}
+import quasar.contrib.pathy._
 import quasar.effect._
-import quasar.fp._, free._
+import quasar.fp._, free._, eitherT._
 import quasar.fs._
 
 import matryoshka.{free => _, _}, Recursive.ops._
@@ -50,23 +51,21 @@ object hierarchical {
       flatMapSNT(injectFT[F, S] compose f) compose mounted.readFile[ReadFile](d)
     }
 
-    new (ReadFile ~> M) {
-      def apply[A](rf: ReadFile[A]) = rf match {
-        case Open(loc, off, lim) =>
-          lookupMounted(mountedRfs, loc) map { case (_, g) =>
-            g(Open(loc, off, lim))
-          } getOrElse pathErr(pathNotFound(loc)).left.point[M]
+    λ[ReadFile ~> M] {
+      case Open(loc, off, lim) =>
+        lookupMounted(mountedRfs, loc) map { case (_, g) =>
+          g(Open(loc, off, lim))
+        } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
-        case Read(h) =>
-          lookupMounted(mountedRfs, h.file) map { case (_, g) =>
-            g(Read(h))
-          } getOrElse unknownReadHandle(h).left.point[M]
+      case Read(h) =>
+        lookupMounted(mountedRfs, h.file) map { case (_, g) =>
+          g(Read(h))
+        } getOrElse unknownReadHandle(h).left.point[M]
 
-        case Close(h) =>
-          lookupMounted(mountedRfs, h.file) map { case (_, g) =>
-            g(Close(h))
-          } getOrElse ().point[M]
-      }
+      case Close(h) =>
+        lookupMounted(mountedRfs, h.file) map { case (_, g) =>
+          g(Close(h))
+        } getOrElse ().point[M]
     }
   }
 
@@ -89,23 +88,21 @@ object hierarchical {
       flatMapSNT(injectFT[F, S] compose f) compose mounted.writeFile[WriteFile](d)
     }
 
-    new (WriteFile ~> M) {
-      def apply[A](wf: WriteFile[A]) = wf match {
-        case Open(loc) =>
-          lookupMounted(mountedWfs, loc) map { case (_, g) =>
-            g(Open(loc))
-          } getOrElse pathErr(pathNotFound(loc)).left.point[M]
+    λ[WriteFile ~> M] {
+      case Open(loc) =>
+        lookupMounted(mountedWfs, loc) map { case (_, g) =>
+          g(Open(loc))
+        } getOrElse pathErr(pathNotFound(loc)).left.point[M]
 
-        case Write(h, chunk) =>
-          lookupMounted(mountedWfs, h.file) map { case (_, g) =>
-            g(Write(h, chunk))
-          } getOrElse Vector(unknownWriteHandle(h)).point[M]
+      case Write(h, chunk) =>
+        lookupMounted(mountedWfs, h.file) map { case (_, g) =>
+          g(Write(h, chunk))
+        } getOrElse Vector(unknownWriteHandle(h)).point[M]
 
-        case Close(h) =>
-          lookupMounted(mountedWfs, h.file) map { case (_, g) =>
-            g(Close(h))
-          } getOrElse ().point[M]
-      }
+      case Close(h) =>
+        lookupMounted(mountedWfs, h.file) map { case (_, g) =>
+          g(Close(h))
+        } getOrElse ().point[M]
     }
   }
 
@@ -131,50 +128,48 @@ object hierarchical {
     def noMountError(path: APath) =
       pathErr(invalidPath(path, "does not refer to a mounted filesystem"))
 
-    new (ManageFile ~> M) {
-      def apply[A](mf: ManageFile[A]) = mf match {
-        case Move(scn, sem) =>
-          val src = lookup(scn.src).toRightDisjunction(
-            pathErr(pathNotFound(scn.src)))
+    def deleteDir(d: ADir) =
+      lookup(d) cata (
+        { case (_, g) => g(Delete(d)) },
+        mountedMfs.toMap.filterKeys(_.relativeTo(d).isDefined)
+          .toList
+          .traverse { case (mnt, g) => g(Delete(mnt)) }
+          .map(_.sequence_))
 
-          val dst = lookup(scn.dst).toRightDisjunction(
-            noMountError(scn.dst))
+    def deleteFile(f: AFile) =
+      EitherT.fromDisjunction[M](
+        lookup(f) toRightDisjunction pathErr(pathNotFound(f))
+      ).flatMapF { case (_, g) =>
+        g(Delete(f))
+      }.run
 
-          EitherT.fromDisjunction[M](src tuple dst).flatMap {
-            case ((srcMnt, g), (dstMnt, _)) if srcMnt == dstMnt =>
-              EitherT(g(Move(scn, sem)))
+    λ[ManageFile ~> M] {
+      case Move(scn, sem) =>
+        val src = lookup(scn.src).toRightDisjunction(
+          pathErr(pathNotFound(scn.src)))
 
-            case _ =>
-              pathErr(invalidPath(
-                scn.dst,
-                s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
-              )).raiseError[MES, Unit]
-          }.run
+        val dst = lookup(scn.dst).toRightDisjunction(
+          noMountError(scn.dst))
 
-        case Delete(path) =>
-          refineType(path).fold(deleteDir, deleteFile)
+        EitherT.fromDisjunction[M](src tuple dst).flatMap {
+          case ((srcMnt, g), (dstMnt, _)) if srcMnt == dstMnt =>
+            EitherT(g(Move(scn, sem)))
 
-        case TempFile(near) =>
-          EitherT.fromDisjunction[M](
-            lookup(near) toRightDisjunction noMountError(near)
-          ).flatMapF { case (_, g) =>
-            g(TempFile(near))
-          }.run
-      }
+          case _ =>
+            pathErr(invalidPath(
+              scn.dst,
+              s"must refer to the same filesystem as '${posixCodec.printPath(scn.src)}'"
+            )).raiseError[MES, Unit]
+        }.run
 
-      def deleteDir(d: ADir) =
-        lookup(d) cata (
-          { case (_, g) => g(Delete(d)) },
-          mountedMfs.toMap.filterKeys(_.relativeTo(d).isDefined)
-            .toList
-            .traverse { case (mnt, g) => g(Delete(mnt)) }
-            .map(_.sequence_))
+      case Delete(path) =>
+        refineType(path).fold(deleteDir, deleteFile)
 
-      def deleteFile(f: AFile) =
+      case TempFile(near) =>
         EitherT.fromDisjunction[M](
-          lookup(f) toRightDisjunction pathErr(pathNotFound(f))
+          lookup(near) toRightDisjunction noMountError(near)
         ).flatMapF { case (_, g) =>
-          g(Delete(f))
+          g(TempFile(near))
         }.run
     }
   }
@@ -203,62 +198,60 @@ object hierarchical {
       flatMapSNT(injectFT[F, S] compose f) compose mounted.queryFile[QueryFile](d)
     }
 
-    new (QueryFile ~> M) {
-      def apply[A](qf: QueryFile[A]) = qf match {
-        case ExecutePlan(lp, out) =>
-          resultForPlan(lp, some(out), ExecutePlan(lp, out))
-            .map(_._2).run.run
+    def resultForPlan[A](
+      lp: Fix[LogicalPlan],
+      out: Option[AFile],
+      qf: QueryFile[(PhaseResults, FileSystemError \/ A)]
+    ): ExecM[(ADir, A)] =
+      mountForPlan(mountedQfs, lp, out) match {
+        case -\/(err) =>
+          EitherT.leftU[(ADir, A)](err.point[G])
 
-        case EvaluatePlan(lp) =>
-          (for {
-            r    <- resultForPlan(lp, none, EvaluatePlan(lp))
-            newH <- toExec(seq.next.map(ResultHandle(_)))
-            _    <- toExec(handles.put(newH, r))
-          } yield newH).run.run
-
-        case More(h) =>
-          getMounted[S](h, mountedQfs)
-            .toRight(unknownResultHandle(h))
-            .flatMapF { case (qh, g) => g(More(qh)) }
-            .run
-
-        case Close(h) =>
-          getMounted[S](h, mountedQfs)
-            .flatMapF(handles.delete(h).as(_))
-            .flatMapF { case (qh, g) => g(Close(qh)) }
-            .getOrElse(())
-
-        case Explain(lp) =>
-          resultForPlan(lp, none, Explain(lp))
-            .map(_._2).run.run
-
-        case ListContents(d) =>
-          lookupMounted(mountedQfs, d)
-            .map { case (_, g) => g(ListContents(d)) }
-            .orElse(
-              lsMounts(mountedQfs.toMap.keySet, d)
-                .map(_.right[FileSystemError].point[M]))
-            .getOrElse(pathErr(pathNotFound(d)).left.point[M])
-
-        case FileExists(f) =>
-          lookupMounted(mountedQfs, f)
-            .map { case (_, g) => g(FileExists(f)) }
-            .getOrElse(false.point[M])
+        case \/-((mnt, g)) =>
+          EitherT(WriterT(g(qf)): G[FileSystemError \/ A])
+            .strengthL(mnt)
       }
 
-      def resultForPlan[A](
-        lp: Fix[LogicalPlan],
-        out: Option[AFile],
-        qf: QueryFile[(PhaseResults, FileSystemError \/ A)]
-      ): ExecM[(ADir, A)] =
-        mountForPlan(mountedQfs, lp, out) match {
-          case -\/(err) =>
-            EitherT.leftU[(ADir, A)](err.point[G])
+    λ[QueryFile ~> M] {
+      case ExecutePlan(lp, out) =>
+        resultForPlan(lp, some(out), ExecutePlan(lp, out))
+          .map(_._2).run.run
 
-          case \/-((mnt, g)) =>
-            EitherT(WriterT(g(qf)): G[FileSystemError \/ A])
-              .strengthL(mnt)
-        }
+      case EvaluatePlan(lp) =>
+        (for {
+          r    <- resultForPlan(lp, none, EvaluatePlan(lp))
+          newH <- toExec(seq.next.map(ResultHandle(_)))
+          _    <- toExec(handles.put(newH, r))
+        } yield newH).run.run
+
+      case More(h) =>
+        getMounted[S](h, mountedQfs)
+          .toRight(unknownResultHandle(h))
+          .flatMapF { case (qh, g) => g(More(qh)) }
+          .run
+
+      case Close(h) =>
+        getMounted[S](h, mountedQfs)
+          .flatMapF(handles.delete(h).as(_))
+          .flatMapF { case (qh, g) => g(Close(qh)) }
+          .getOrElse(())
+
+      case Explain(lp) =>
+        resultForPlan(lp, none, Explain(lp))
+          .map(_._2).run.run
+
+      case ListContents(d) =>
+        lookupMounted(mountedQfs, d)
+          .map { case (_, g) => g(ListContents(d)) }
+          .orElse(
+            lsMounts(mountedQfs.toMap.keySet, d)
+              .map(_.right[FileSystemError].point[M]))
+          .getOrElse(pathErr(pathNotFound(d)).left.point[M])
+
+      case FileExists(f) =>
+        lookupMounted(mountedQfs, f)
+          .map { case (_, g) => g(FileExists(f)) }
+          .getOrElse(false.point[M])
     }
   }
 

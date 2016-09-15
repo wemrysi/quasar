@@ -18,7 +18,8 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataArbitrary, LogicalPlan, PhaseResults}
-import quasar.fp._
+import quasar.contrib.pathy._
+import quasar.fp._, eitherT._
 import quasar.scalacheck._
 
 import pathy.Path._
@@ -29,9 +30,6 @@ import scalaz.scalacheck.ScalazArbitrary._
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
   import InMemory._, FileSystemError._, PathError._, DataArbitrary._
   import query._, transforms.ExecM
-
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
 
   "QueryFile" should {
     "descendantFiles" >> {

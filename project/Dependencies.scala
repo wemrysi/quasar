@@ -34,6 +34,7 @@ object Dependencies {
     "org.typelevel"              %% "shapeless-scalaz"          %    slcVersion,
     "com.slamdata"               %% "matryoshka-core"           %     "0.11.1",
     "com.slamdata"               %% "pathy-core"                %   pathyVersion,
+    "com.slamdata"               %% "pathy-argonaut"            %   pathyVersion    %     Test,
     "eu.timepit"                 %% "refined"                   %  refinedVersion,
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion % Test force(),
@@ -71,6 +72,9 @@ object Dependencies {
       .exclude("com.esotericsoftware.minlog", "minlog")
       .exclude("org.spark-project.spark", "unused")
       .exclude("io.netty", "netty-all")
+  )
+  def marklogicValidation = Seq(
+    "eu.timepit" %% "refined" %  refinedVersion
   )
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"        % jacksonVersion,

@@ -18,14 +18,15 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, DataArbitrary}
-import quasar.fp._
+import quasar.contrib.pathy._
+import quasar.fp._, eitherT._
 
 import org.specs2.specification.core._
 import pathy.scalacheck.PathyArbitrary._
 import scalaz._
 import scalaz.std.vector._
-import scalaz.syntax.monad._
 import scalaz.stream._
+import scalaz.syntax.monad._
 
 /** FIXME: couldn't make this one work with Qspec. */
 class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with FileSystemFixture {
