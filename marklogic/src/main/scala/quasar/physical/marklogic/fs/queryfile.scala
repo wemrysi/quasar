@@ -21,6 +21,7 @@ import quasar.{Data, LogicalPlan, PhaseResult, PhaseResults, PhaseResultT, Plann
 import quasar.SKI.κ
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
+import quasar.fp._
 import quasar.fp.eitherT._
 import quasar.fp.free.lift
 import quasar.fp.numeric.Positive
@@ -31,7 +32,7 @@ import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -58,6 +59,7 @@ object queryfile {
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
+      val optimize = new Optimize[Fix]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", main.render))
@@ -72,12 +74,13 @@ object queryfile {
 
       val planning = for {
         qs  <- convertToQScript(some(listContents))(lp)
-        mod <- plan(qs) leftMap (mlerr => mlerr match {
-                 case InvalidQName(s) =>
-                   FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
-                     // TODO: Change to include the QScript context when supported
-                     LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
-               })
+        shifted = transFutu(qs)(ShiftRead[Fix, QScriptTotal[Fix, ?], QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)((_: QScriptTotal[Fix, Fix[QScriptTotal[Fix, ?]]]))).transCata(optimize.applyAll)
+        mod <- plan(shifted).leftMap(mlerr => mlerr match {
+          case InvalidQName(s) =>
+            FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
+              // TODO: Change to include the QScript context when supported
+              LogicalPlan.ConstantF(Data.Str(s)), Some(mlerr.shows)))
+        })
         a   <- WriterT.put(lift(f(mod)).into[S])(phase(mod)).liftM[FileSystemErrT]
       } yield a
 
