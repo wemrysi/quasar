@@ -31,15 +31,17 @@ import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap {
 
-  // TODO: replace NA with something safer
+  // TODO: replace Data.NA with something safer
   def change[T[_[_]]]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
-    case Constant(f) => ??? // contains EJson
-    case Undefined() => ??? // I don't understand the meaning
+    case Constant(f) => ??? // DONTKNOW contains EJson
+    case Undefined() => ??? // DONTKNOW I don't understand the meaning
+
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)
       case Data.Arr(v) => Data.Int(v.size)
-      case _ => Data.NA // this should never happen (see TODO above)
+      case _ => Data.NA 
     }).right
+
     case Date(f) => (f >>> {
       case Data.Str(v) => DateLib.parseDate(v).getOrElse(Data.NA)
       case _ => Data.NA
@@ -57,19 +59,22 @@ object CoreMap {
       case _ => Data.NA
     }).right
     case TimeOfDay(f) => (f >>> {
-      case Data.Timestamp(v) => ??? // how convert from Instant to LocalTime?
+      case Data.Timestamp(v) => ??? // DONTKNOW how convert from Instant to LocalTime?
       case _ => Data.NA
     }).right
     case ToTimestamp(f) => (f >>> {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => Data.NA
     }).right
-    case Extract(f1, f2) => ??? // FIXME
+    case Extract(f1, f2) => ??? // DONTKNOW
+    case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
+
     case Negate(f) => (f >>> {
-      case Data.Bool(v) => Data.Bool(!v)
+      case Data.Int(v) => Data.Int(-v)
+      case Data.Dec(v) => Data.Dec(-v)
+      // case Data.Interval(v) => 
       case _ => Data.NA
     }).right
-    // TODO not all possible pairs were matched, should they?
     case Add(f1, f2) => ((x: Data) => add(f1(x), f2(x))).right
     case Multiply(f1, f2) => ((x: Data) => multiply(f1(x), f2(x))).right
     case Subtract(f1, f2) => ((x: Data) => subtract(f1(x), f2(x))).right
