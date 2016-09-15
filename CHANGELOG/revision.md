@@ -1,1 +1,1 @@
-- extract a `sql` subproject
+- extract a `connector` subproject

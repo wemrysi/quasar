@@ -31,7 +31,6 @@ object Optimizer {
   import quasar.std.StdLib._
   import set._
   import structural._
-  import Planner._
 
   private def countUsageƒ(target: Symbol): Algebra[LogicalPlan, Int] = {
     case FreeF(symbol) if symbol == target => 1
@@ -156,30 +155,6 @@ object Optimizer {
         if n == nf =>
       Let(n, b, cont)
     case x => Fix(x)
-  }
-
-  /** To be used by backends that require collections to contain Obj, this
-    * looks at type checks on `Read` then either eliminates them if they are
-    * trivial, leaves them if they check field contents, or errors if they are
-    * incompatible.
-    */
-  def assumeReadObjƒ:
-      AlgebraM[PlannerError \/ ?, LogicalPlan, Fix[LogicalPlan]] = {
-    case x @ LetF(n, r @ Fix(ReadF(_)),
-      Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
-        if n == nf =>
-      typ match {
-        case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
-          \/-(Let(n, r, cont))
-        case Type.Obj(_, _) =>
-          \/-(Fix(x))
-        case _ =>
-          -\/(UnsupportedPlan(x,
-            Some("collections can only contain objects, but a(n) " +
-              typ +
-              " is expected")))
-      }
-    case x => \/-(Fix(x))
   }
 
   sealed trait Component[A] {
