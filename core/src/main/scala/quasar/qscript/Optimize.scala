@@ -157,6 +157,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (left.resume, right.resume) match { // if both sides are Constant, we hit the first case
       case (-\/(Constant(_)), _) => rebaseRight[F, G](rebase)(tj, left)
       case (_, -\/(Constant(_))) => rebaseLeft[F, G](rebase)(tj, right)
+      case (-\/(Undefined()), _) => rebaseRight[F, G](rebase)(tj, left)
+      case (_, -\/(Undefined())) => rebaseLeft[F, G](rebase)(tj, right)
       case (_, _) => TJ.inj(tj)
     }
 
@@ -169,6 +171,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       F[T[G]] =
     left.resume match {
       case -\/(Constant(_)) => rebaseRight[F, G](rebase)(tj, left)
+      case -\/(Undefined()) => rebaseRight[F, G](rebase)(tj, left)
       case _ => TJ.inj(tj)
     }
 
@@ -181,6 +184,7 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
       F[T[G]] =
     right.resume match {
       case -\/(Constant(_)) => rebaseLeft[F, G](rebase)(tj, right)
+      case -\/(Undefined()) => rebaseLeft[F, G](rebase)(tj, right)
       case _ => TJ.inj(tj)
     }
 

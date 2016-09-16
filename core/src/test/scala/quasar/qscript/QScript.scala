@@ -91,6 +91,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           Free.point(RightSide)))).some)
     }
 
+    "convert a basic select with type checking" in {
+      val lp = fullCompileExp("select foo from bar")
+      val qs = convert(listContents.some, lp)
+      qs must equal(chain(RootR).some) // TODO incorrect expectation
+    }.pendingUntilFixed
+
     "convert a simple take" in pending {
       convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10)))) must
       equal(
