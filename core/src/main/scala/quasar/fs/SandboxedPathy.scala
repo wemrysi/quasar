@@ -17,13 +17,14 @@
 package quasar.fs
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 
 import pathy.Path._
 import scalaz._, Scalaz._
 
 /**
-  * Use with care. Functions make the assumption that Sandboxed Pathy paths do not contain ParentIn or Current.
-  * This can not currently be guaranteed.
+  * Use with care. Functions make the assumption that Sandboxed Pathy paths do
+  * not contain ParentIn or Current. This can not currently be guaranteed.
   */
 object SandboxedPathy {
 

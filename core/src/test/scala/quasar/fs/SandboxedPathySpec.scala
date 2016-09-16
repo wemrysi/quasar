@@ -17,7 +17,7 @@
 package quasar.fs
 
 import quasar.Predef._
-import quasar.fs.PathArbitrary._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fs.SandboxedPathy._
 
 import pathy.Path._

@@ -18,31 +18,28 @@ package quasar.physical.mongodb.fs
 
 import quasar.Predef._
 
-import quasar._
-import quasar.fs._
+import quasar._, DataArbitrary._, TestConfig.isMongoReadOnly
+import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fs._, FileSystemError._, FileSystemTest._
 import quasar.main.FilesystemQueries
+import quasar.physical.mongodb.Collection
+import quasar.physical.mongodb.fs.MongoDbFileSystemSpec.mongoFsUT
 import quasar.regression._
 import quasar.sql, sql.Sql
 
-import quasar.physical.mongodb.Collection
-import org.specs2.specification.core._
 import com.mongodb.MongoException
 import matryoshka.Fix
 import monocle.Prism
-import monocle.std.{disjunction => D}
 import monocle.function.Field1
+import monocle.std.{disjunction => D}
 import monocle.std.tuple2._
 import org.specs2.execute.SkipException
+import org.specs2.specification.core._
 import pathy.Path._
 import scalaz.{Optional => _, _}, Scalaz._
-import scalaz.stream._
 import scalaz.concurrent.Task
-import quasar.TestConfig.isMongoReadOnly
-import MongoDbFileSystemSpec.mongoFsUT
-import FileSystemTest._
-import FileSystemError._
-import DataArbitrary._
+import scalaz.stream._
 
 /** Unit tests for the MongoDB filesystem implementation. */
 class MongoDbFileSystemSpec extends FileSystemTest[FileSystemIO](mongoFsUT map (_ filterNot (fs => isMongoReadOnly(fs.name))))

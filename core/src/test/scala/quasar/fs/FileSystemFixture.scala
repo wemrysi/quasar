@@ -19,8 +19,8 @@ package quasar.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.DataArbitrary._
+import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
-import quasar.fs.PathArbitrary._
 import quasar.fp.free.{Interpreter, SpecializedInterpreter}
 import quasar.fs.SandboxedPathy._
 
