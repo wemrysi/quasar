@@ -1,6 +1,10 @@
 {
     "name": "group by array",
-    "backends": { "postgresql": "pending", "marklogic": "pending" },
+    "backends": {
+        "postgresql": "pending",
+        "marklogic":  "pending",
+        "couchbase":  "pending"
+    },
     "data": "slamengine_commits.data",
     "query": "select distinct count(*) from slamengine_commits group by parents",
     "predicate": "containsExactly",
