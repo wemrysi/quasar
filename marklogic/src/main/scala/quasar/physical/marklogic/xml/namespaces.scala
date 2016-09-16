@@ -23,13 +23,18 @@ object namespaces {
   val qscriptData   = qscriptNs(NCName("data"))
   val qscriptError  = qscriptNs(NCName("error"))
 
+  // NB: We've choosen to only support EJSON maps with string keys for the
+  //     time-being as that maps reasonably to XML elements.
   val ejsonNs       = Namespace(NSPrefix(NCName("ejson")), NSUri("http://quasar-analytics.org/ejson"))
-  val ejsonArray    = ejsonNs(NCName("array"))
+  val ejsonEjson    = ejsonNs(NCName("ejson"))
   val ejsonArrayElt = ejsonNs(NCName("array-element"))
+  val ejsonType     = ejsonNs(NCName("type"))
+
+  // TODO: Drop all of these once we've updated the xquery impl.
+  val ejsonArray    = ejsonNs(NCName("array"))
   val ejsonMap      = ejsonNs(NCName("map"))
   val ejsonMapEntry = ejsonNs(NCName("map-entry"))
   val ejsonMapKey   = ejsonNs(NCName("map-key"))
   val ejsonMapValue = ejsonNs(NCName("map-value"))
   val ejsonLiteral  = ejsonNs(NCName("literal"))
-  val ejsonType     = ejsonNs(NCName("type"))
 }

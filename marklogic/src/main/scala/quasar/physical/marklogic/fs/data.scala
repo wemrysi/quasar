@@ -34,6 +34,8 @@ import matryoshka.patterns._
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
+  type EJsonType = String
+
   object JsonParser extends SupportParser[Data] {
     implicit val facade: Facade[Data] =
       new SimpleFacade[Data] {
@@ -50,84 +52,57 @@ object data {
   }
 
   def toXml[F[_]: MonadErrMsg](data: Data): F[Elem] = {
-    def typeAttr(tpe: String): Attribute =
+    def typeAttr(tpe: EJsonType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe, Null)
 
-    def elem(name: QName, attrs: MetaData, children: Node*): Elem =
-      Elem(name.prefix.map(_.shows).orNull, name.local.shows, attrs, TopScope, true, children: _*)
+    def ejsElem(name: QName, tpe: EJsonType, ns: NamespaceBinding, children: Seq[Node]): Elem =
+      Elem(name.prefix.map(_.shows).orNull, name.local.shows, typeAttr(tpe), ns, true, children: _*)
 
-    def typed(name: QName, tpe: String, children: Node*): F[Elem] =
-      elem(name, typeAttr(tpe), children: _*).point[F]
+    def innerElem(name: QName, tpe: EJsonType, children: Seq[Node]): Elem =
+      ejsElem(name, tpe, TopScope, children)
 
-    def rootElem(name: QName, attrs: MetaData, children: Node*): Elem =
-      Elem(name.prefix.map(_.shows).orNull, name.local.shows, attrs, ejsBinding, true, children: _*)
+    def rootElem(name: QName, tpe: EJsonType, children: Seq[Node]): Elem =
+      ejsElem(name, tpe, ejsBinding, children)
 
-    def literal(tpe: String, children: Node*): F[Elem] =
-      rootElem(ejsonLiteral, typeAttr(tpe), children: _*).point[F]
-
-    def toXml0(elementName: QName): Data => F[Elem] = {
+    def toXml0(
+      elem: (QName, EJsonType, Seq[Node]) => Elem,
+      loop: QName => Data => F[Elem]
+    ): QName => Data => F[Elem] = elementName => {
       case Data.Binary(bytes) => ???
-      case Data.Bool(b)       => typed(elementName, "boolean", Text(b.fold("true", "false")))
+      case Data.Bool(b)       => elem(elementName, "boolean", Text(b.fold("true", "false"))).point[F]
       case Data.Date(d)       => ???
-      case Data.Dec(d)        => typed(elementName, "decimal", Text(d.toString))
-      case Data.Id(id)        => typed(elementName, "id", Text(id))
-      case Data.Int(i)        => typed(elementName, "integer", Text(i.toString))
+      case Data.Dec(d)        => elem(elementName, "decimal", Text(d.toString)).point[F]
+      case Data.Id(id)        => elem(elementName, "id"     , Text(id)).point[F]
+      case Data.Int(i)        => elem(elementName, "integer", Text(i.toString)).point[F]
       case Data.Interval(ivl) => ???
-      case Data.Null          => typed(elementName, "null")
-      case Data.Str(s)        => typed(elementName, "string", Text(s))
+      case Data.Null          => elem(elementName, "null"   , Nil).point[F]
+      case Data.Str(s)        => elem(elementName, "string" , Text(s)).point[F]
       case Data.Time(t)       => ???
       case Data.Timestamp(ts) => ???
 
       case Data.Arr(elements) =>
-        elements.traverse(toXml0(ejsonArrayElt)) map { kids =>
-          elem(elementName, Null, elem(ejsonArray, Null, kids: _*))
-        }
+        elements.traverse(loop(ejsonArrayElt)) map (elem(elementName, "array", _))
 
       case Data.Obj(entries)  =>
         entries.toList.traverse { case (k, v) =>
           for {
-            qn <- NCName(k).fold(κ(invalidQName[F, QName](k)), QName.local(_).point[F])
-            el <- toXml0(qn)(v)
+            qn <- NCName(k).fold(
+                    κ(invalidQName[F, QName](k)),
+                    QName.local(_).point[F])
+            el <- loop(qn)(v)
           } yield el
         } map { kids =>
-          elem(elementName, Null, kids: _*)
+          elem(elementName, "object", kids)
         }
 
       case Data.NA            => ???
       case Data.Set(xs)       => ???
     }
 
-    data match {
-      case Data.Binary(bytes) => ???
-      case Data.Bool(b)       => literal("boolean", Text(b.fold("true", "false")))
-      case Data.Date(d)       => ???
-      case Data.Dec(d)        => literal("decimal", Text(d.toString))
-      case Data.Id(id)        => literal("id", Text(id))
-      case Data.Int(i)        => literal("integer", Text(i.toString))
-      case Data.Interval(ivl) => ???
-      case Data.Null          => literal("null")
-      case Data.Str(s)        => literal("string", Text(s))
-      case Data.Time(t)       => ???
-      case Data.Timestamp(ts) => ???
+    def inner: QName => Data => F[Elem] =
+      name => toXml0(innerElem, inner)(name)
 
-      case Data.Arr(elements) =>
-        elements.traverse(toXml0(ejsonArrayElt)) map { kids =>
-          rootElem(ejsonArray, Null, kids: _*)
-        }
-
-      case Data.Obj(entries)  =>
-        entries.toList.traverse { case (k, v) =>
-          for {
-            qn <- NCName(k).fold(κ(invalidQName[F, QName](k)), QName.local(_).point[F])
-            el <- toXml0(qn)(v)
-          } yield el
-        } map { kids =>
-          rootElem(ejsonMap, Null, kids: _*)
-        }
-
-      case Data.NA            => ???
-      case Data.Set(xs)       => ???
-    }
+    toXml0(rootElem, inner)(ejsonEjson)(data)
   }
 
   def encodeXml[F[_]: MonadErrMsg](data: Data): F[Node] =
@@ -141,15 +116,15 @@ object data {
       DecodeXml[Id.Id, EJson].decodeXml andThen (CoEnv(_)))
 
   private val ejsBinding: NamespaceBinding =
-    NamespaceBinding(qscriptNs.prefix.shows, qscriptNs.uri.shows, TopScope)
-
-  // TODO{matryoshka}: Remove once we've upgraded to 0.11.2+
-  private implicit def coenvTraverse[E]: Traverse[CoEnv[E, EJson, ?]] =
-    Bitraverse[CoEnv[?, EJson, ?]].rightTraverse
+    NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
 
   private def noReprErr[F[_]: MonadErrMsg, A](data: Data): F[A] =
     s"No representation for '$data' in XML.".raiseError[F, A]
 
   private def invalidQName[F[_]: MonadErrMsg, A](s: String): F[A] =
     s"'$s' is not a valid XML QName.".raiseError[F, A]
+
+  // TODO{matryoshka}: Remove once we've upgraded to 0.11.2+
+  private implicit def coenvTraverse[E]: Traverse[CoEnv[E, EJson, ?]] =
+    Bitraverse[CoEnv[?, EJson, ?]].rightTraverse
 }
