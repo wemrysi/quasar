@@ -14,26 +14,19 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
-import quasar.std._
+import quasar.Data
+import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 
 import matryoshka.Fix
 
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
-  import StdLib._
-  import agg._
-  import array._
-  import date._
-  import identity._
-  import math._
-  import relations._
-  import StdLib.set._
-  import string._
-  import structural._
-
-  import LogicalPlan._
+  // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We
+  //     need to do a better job of handling this.
+  import quasar.LogicalPlan._
+  import quasar.std.StdLib._, relations._, StdLib.set._, string._, structural._
 
   "compiler" should {
     "compile simple constant example 1" in {
