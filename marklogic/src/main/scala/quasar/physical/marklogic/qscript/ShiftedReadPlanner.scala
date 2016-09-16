@@ -24,27 +24,20 @@ import quasar.qscript._
 
 import matryoshka._
 import pathy.Path._
-import scalaz._, Scalaz._
+import scalaz._
 
 private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
   extends MarkLogicPlanner[F, Const[ShiftedRead, ?]] {
 
-  import expr.{for_, if_}, axes.child
-
-  // TODO: Implement `idStatus`
   val plan: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
     case Const(ShiftedRead(absFile, idStatus)) =>
       val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
       val dirRepr = posixCodec.printPath(asDir)
 
-      for {
-        d     <- freshVar[F]
-        c     <- freshVar[F]
-        xform <- json.transformFromJson[F](c.xqy)
-      } yield {
-        for_(d -> cts.search(fn.doc(), cts.directoryQuery(dirRepr.xs, "1".xs)))
-        .let_(c -> d.xqy `/` child.node())
-        .return_ { if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy }
+      val includeId = idStatus match {
+        case IncludeId => "true".xqy
+        case ExcludeId => "false".xqy
       }
+      qscript.shiftedRead apply (dirRepr.xs, includeId)
   }
 }

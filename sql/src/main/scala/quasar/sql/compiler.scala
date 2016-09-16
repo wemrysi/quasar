@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
+import quasar.{BinaryFunc, Data, Func, GenericFunc, LogicalPlan, Reduction, SemanticError, Sifting, TernaryFunc, UnaryFunc, VarName},
+  SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.sql._
-import quasar.std.StdLib._
-import quasar.{SemanticAnalysis => SA}, SA._, SemanticError._
+import quasar.std.StdLib, StdLib._
+import quasar.sql.{SemanticAnalysis => SA}, SA._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path._
@@ -179,7 +180,7 @@ trait Compiler[F[_]] {
     StateT[M, CompilerState, Unit](s => (f(s), ()).point[M])
 
   // TODO: parameterize this
-  val library = std.StdLib
+  val library = StdLib
 
   type CoAnn[F[_]] = Cofree[F, SA.Annotations]
   type CoExpr = CoAnn[Sql]
@@ -338,10 +339,10 @@ trait Compiler[F[_]] {
               compile0(clause).map(c =>
                 LogicalPlan.Invoke(
                   tpe match {
-                    case LeftJoin  => LeftOuterJoin
-                    case sql.InnerJoin => InnerJoin
-                    case RightJoin => RightOuterJoin
-                    case FullJoin  => FullOuterJoin
+                    case LeftJoin             => LeftOuterJoin
+                    case quasar.sql.InnerJoin => InnerJoin
+                    case RightJoin            => RightOuterJoin
+                    case FullJoin             => FullOuterJoin
                   },
                   Func.Input3(leftFree, rightFree, c))))
           } yield LogicalPlan.Let(leftName, left0,
@@ -526,23 +527,6 @@ trait Compiler[F[_]] {
   def compile(tree: Cofree[Sql, SA.Annotations])(
       implicit F: Monad[F]): F[SemanticError \/ Fix[LogicalPlan]] = {
     compile0(tree).eval(CompilerState(Nil, Context(Nil, Nil), 0)).run.map(_.map(Compiler.reduceGroupKeys))
-  }
-}
-
-sealed trait JoinDir {
-  def projectFrom(t: Fix[LogicalPlan]): Fix[LogicalPlan]
-}
-object JoinDir {
-  import structural._
-
-  final case object Left extends JoinDir {
-    def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("left"))))
-  }
-
-  final case object Right extends JoinDir {
-    def projectFrom(t: Fix[LogicalPlan]) =
-      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("right"))))
   }
 }
 
