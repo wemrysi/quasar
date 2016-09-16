@@ -18,6 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.physical.marklogic.xml.namespaces._
 
 import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
@@ -26,14 +27,14 @@ object ejson {
   import syntax._, expr.{element, for_, func}, axes._
   import FunctionDecl.{FunctionDecl1, FunctionDecl2}
 
-  val ejs = namespace("ejson", "http://quasar-analytics.org/ejson")
+  val ejs = NamespaceDecl(ejsonNs)
 
-  val arrayN    = ejs name "array"
-  val arrayEltN = ejs name "array-element"
-  val mapN      = ejs name "map"
-  val mapEntryN = ejs name "map-entry"
-  val mapKeyN   = ejs name "map-key"
-  val mapValueN = ejs name "map-value"
+  val arrayN    = ejs name ejsonArray.local
+  val arrayEltN = ejs name ejsonArrayElt.local
+  val mapN      = ejs name ejsonMap.local
+  val mapEntryN = ejs name ejsonMapEntry.local
+  val mapKeyN   = ejs name ejsonMapKey.local
+  val mapValueN = ejs name ejsonMapValue.local
 
   // ejson:array-concat($arr1 as element(ejson:array), $arr2 as element(ejson:array)) as element(ejson:array)
   def arrayConcat[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =

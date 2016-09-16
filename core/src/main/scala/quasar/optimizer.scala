@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.contrib.shapeless._
 import quasar.fp.binder._
 import quasar.namegen._
+import quasar.sql.JoinDir
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.ownOps._
 import scalaz._, Scalaz._

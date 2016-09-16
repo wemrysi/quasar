@@ -51,7 +51,7 @@ object Dependencies {
     "org.http4s"                 %% "http4s-core"    % http4sVersion,
     "com.slamdata"               %% "pathy-argonaut" %  pathyVersion
   )
-  def main = Seq(
+  def interface = Seq(
     "com.github.scopt" %% "scopt" % "3.5.0",
     "org.jboss.aesh"    % "aesh"  % "0.66.8"
   )

@@ -27,6 +27,7 @@ import scalaz.std.list._
 import scalaz.syntax.std.boolean._
 import simulacrum.typeclass
 
+// TODO: Rename to EncodeXQuery
 @typeclass
 trait AsXQuery[F[_]] {
   def asXQuery: Algebra[F, XQuery]

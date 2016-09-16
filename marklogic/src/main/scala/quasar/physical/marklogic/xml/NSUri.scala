@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical.marklogic.xml
 
-import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.Predef.String
 
-import monocle.macros.Lenses
-import scalaz._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.string.Uri
+import scalaz.{Order, Show}
+import scalaz.std.string._
 import scalaz.syntax.show._
 
-@Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
+/** A URI used to denote a namespace. */
+final case class NSUri(value: String Refined Uri) {
+  override def toString = this.shows
 }
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
+object NSUri {
+  implicit val order: Order[NSUri] =
+    Order.orderBy(_.value.get)
 
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
+  implicit val show: Show[NSUri] =
+    Show.shows(_.value.get)
 }

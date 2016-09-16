@@ -14,25 +14,8 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.sql
 
-import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.Predef.String
 
-import monocle.macros.Lenses
-import scalaz._
-import scalaz.syntax.show._
-
-@Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
-}
-
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
-
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
-}
+final case class Query(value: String)

@@ -23,8 +23,8 @@ import quasar.fp.free.lift
 import quasar.fs._
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
+import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.xml._
 import quasar.physical.marklogic.xquery.syntax._
 
 import scala.math.{ceil, log}

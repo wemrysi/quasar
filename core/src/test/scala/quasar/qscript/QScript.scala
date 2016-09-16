@@ -17,13 +17,12 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
-import quasar.ejson
-import quasar.ejson.EJson
+import quasar.{Data, LogicalPlan => LP}
+import quasar.ejson, ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
-import quasar.std.StdLib
-import quasar.std.StdLib._
+import quasar.sql.CompilerHelpers
+import quasar.std.StdLib, StdLib._
 
 import matryoshka._
 import pathy.Path._

@@ -14,99 +14,21 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
+import quasar.{NonTerminal, RenderTree, RenderedTree, SemanticError, Terminal, VarName},
+  RenderTree.ops._,
+  SemanticError._
 import quasar.contrib.pathy.prettyPrint
-import quasar.sql._
 
 import scala.AnyRef
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
-import monocle._
-import pathy.Path, Path._
 import scalaz._, Scalaz._, Validation.{success, failure}
-import shapeless.{Prism => _, _}
 import shapeless.contrib.scalaz._
 
-sealed trait SemanticError {
-  def message: String
-}
-
-object SemanticError {
-  implicit val SemanticErrorShow: Show[SemanticError] = Show.shows(_.message)
-
-  final case class GenericError(message: String) extends SemanticError
-
-  final case class DomainError(data: Data, hint: Option[String]) extends SemanticError {
-    def message = "The data '" + data + "' did not fall within its expected domain" + hint.map(": " + _)
-  }
-
-  final case class FunctionNotFound(name: String) extends SemanticError {
-    def message = "The function '" + name + "' could not be found in the standard library"
-  }
-  final case class TypeError(expected: Type, actual: Type, hint: Option[String]) extends SemanticError {
-    def message = "Expected type " + expected + " but found " + actual + hint.map(": " + _).getOrElse("")
-  }
-  final case class VariableParseError(vari: VarName, value: VarValue, cause: quasar.sql.ParsingError) extends SemanticError {
-    def message = "The variable " + vari + " should contain a SQL expression but was `" + value.value + "` (" + cause.message + ")"
-  }
-  final case class UnboundVariable(vari: VarName) extends SemanticError {
-    def message = "There is no binding for the variable " + vari
-  }
-  final case class DuplicateRelationName(defined: String) extends SemanticError {
-    def message = "Found relation with duplicate name '" + defined + "'"
-  }
-  final case class NoTableDefined(node: Fix[Sql]) extends SemanticError {
-    def message = "No table was defined in the scope of \'" + pprint(node) + "\'"
-  }
-  final case class MissingField(name: String) extends SemanticError {
-    def message = "No field named '" + name + "' exists"
-  }
-  final case class DuplicateAlias(name: String) extends SemanticError {
-    def message = s"Alias `$name` appears twice in projections"
-  }
-  final case class MissingIndex(index: Int) extends SemanticError {
-    def message = "No element exists at array index '" + index
-  }
-  final case class WrongArgumentCount(func: String, expected: Int, actual: Int) extends SemanticError {
-    def message = "Wrong number of arguments for function '" + func + "': expected " + expected + " but found " + actual
-  }
-  final case class InvalidStringCoercion(str: String, expected: String \/ List[String]) extends SemanticError {
-    def message =
-      "Expected " +
-        expected.fold("“" + _ + "”", "one of " + _.mkString("“", "”", ", ")) +
-        " but found “" + str + "”"
-  }
-  final case class AmbiguousReference(node: Fix[Sql], relations: List[SqlRelation[Unit]])
-      extends SemanticError {
-    def message = "The expression '" + pprint(node) + "' is ambiguous and might refer to any of the tables " + relations.mkString(", ")
-  }
-  final case object CompiledTableMissing extends SemanticError {
-    def message = "Expected the root table to be compiled but found nothing"
-  }
-  final case class CompiledSubtableMissing(name: String) extends SemanticError {
-    def message = "Expected to find a compiled subtable with name \"" + name + "\""
-  }
-  final case class DateFormatError[N <: Nat](func: GenericFunc[N], str: String, hint: Option[String]) extends SemanticError {
-    def message = "Date/time string could not be parsed as " + func.name + ": " + str + hint.map(" (" + _ + ")").getOrElse("")
-  }
-  final case class InvalidPathError(path: Path[_, File, _], hint: Option[String]) extends SemanticError {
-    def message = "Invalid path: " + posixCodec.unsafePrintPath(path) + hint.map(" (" + _ + ")").getOrElse("")
-  }
-
-  // TODO: Add other prisms when necessary (unless we enable the "No Any" wart first)
-  val genericError: Prism[SemanticError, String] =
-    Prism[SemanticError, String] {
-      case GenericError(msg) => Some(msg)
-      case _ => None
-    } (GenericError(_))
-}
-
 object SemanticAnalysis {
-  import SemanticError._
-
   type Failure = NonEmptyList[SemanticError]
 
   private def fail[A](e: SemanticError) = Validation.failure[Failure, A](NonEmptyList(e))
@@ -129,7 +51,7 @@ object SemanticAnalysis {
     */
   def projectSortKeysƒ[T[_[_]]: Recursive: Corecursive]:
       Sql[T[Sql]] => Option[Sql[T[Sql]]] = {
-    case Select(d, projections, r, f, g, Some(sql.OrderBy(keys))) => {
+    case Select(d, projections, r, f, g, Some(OrderBy(keys))) => {
       def matches(key: T[Sql]): PartialFunction[Proj[T[Sql]], T[Sql]] =
         key.project match {
           case Ident(keyName) => {
@@ -156,7 +78,7 @@ object SemanticAnalysis {
           } (
             kExpr => (projs, (orderType, kExpr) :: keys, index))
       }
-      select(d, projections ⊹ projs2, r, f, g, sql.OrderBy(keys2).some).some
+      select(d, projections ⊹ projs2, r, f, g, OrderBy(keys2).some).some
     }
     case _ => None
   }

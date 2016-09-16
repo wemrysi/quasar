@@ -14,25 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.sql
 
-import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.{Data, LogicalPlan}
+import quasar.std.StdLib._
 
-import monocle.macros.Lenses
-import scalaz._
-import scalaz.syntax.show._
+import matryoshka.Fix
 
-@Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
+sealed trait JoinDir {
+  def projectFrom(t: Fix[LogicalPlan]): Fix[LogicalPlan]
 }
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
+object JoinDir {
+  import structural._
 
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
+  final case object Left extends JoinDir {
+    def projectFrom(t: Fix[LogicalPlan]) =
+      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("left"))))
+  }
+
+  final case object Right extends JoinDir {
+    def projectFrom(t: Fix[LogicalPlan]) =
+      Fix(ObjectProject(t, LogicalPlan.Constant(Data.Str("right"))))
+  }
 }

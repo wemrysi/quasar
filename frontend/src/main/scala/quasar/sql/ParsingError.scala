@@ -14,25 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.sql
 
 import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.fp._
+import quasar.fs._
 
-import monocle.macros.Lenses
-import scalaz._
-import scalaz.syntax.show._
+import matryoshka._
+import scalaz._, Scalaz._
 
-@Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
+sealed trait ParsingError { def message: String}
+final case class GenericParsingError(message: String) extends ParsingError
+final case class ParsingPathError(error: PathError) extends ParsingError {
+  def message = error.shows
 }
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
-
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
+object ParsingError {
+  implicit val parsingErrorShow: Show[ParsingError] = Show.showFromToString
 }
