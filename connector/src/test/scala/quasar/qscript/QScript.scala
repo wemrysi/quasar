@@ -17,13 +17,12 @@
 package quasar.qscript
 
 import quasar.Predef._
-import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
-import quasar.ejson
-import quasar.ejson.EJson
+import quasar.{Data, LogicalPlan => LP}
+import quasar.ejson, ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
-import quasar.std.StdLib
-import quasar.std.StdLib._
+import quasar.sql.CompilerHelpers
+import quasar.std.StdLib, StdLib._
 
 import matryoshka._
 import pathy.Path._
@@ -83,7 +82,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert a squashed read" in {
       // "select * from foo"
-      convert(listContents.some, identity.Squash(lpRead("/foo/bar"))) must
+      convert(listContents.some, identity.Squash(lpRead("/foo/bar")).embed) must
       equal(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
         QC.inj(LeftShift((),
@@ -98,7 +97,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }.pendingUntilFixed
 
     "convert a simple take" in pending {
-      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10)))) must
+      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
       equal(
         chain(
           ReadR(rootDir </> dir("foo") </> file("bar")),
@@ -173,7 +172,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a basic reduction" in {
       convert(
         listContents.some,
-        agg.Sum[FLP](lpRead("/person"))) must
+        agg.Sum(lpRead("/person")).embed) must
       equal(chain(
         ReadR(rootDir </> file("person")),
         QC.inj(LeftShift((),
@@ -196,7 +195,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         None,
         makeObj(
           "0" ->
-            agg.Sum[FLP](structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height")))))) must
+            agg.Sum(structural.ObjectProject(lpRead("/person"), LP.Constant(Data.Str("height"))).embed))) must
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -216,8 +215,8 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         None,
         makeObj(
           "loc" ->
-            structural.FlattenArray[FLP](
-              structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))))) must
+            structural.FlattenArray(
+              structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc"))).embed))) must
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -235,9 +234,9 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // "foo := (7); select * from foo"
       convert(
         None,
-        identity.Squash[FLP](
-          structural.ShiftArray[FLP](
-            structural.MakeArrayN[Fix](LP.Constant(Data.Int(7)))))) must
+        identity.Squash(
+          structural.ShiftArray(
+            structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))).embed).embed).embed) must
       equal(chain(
         UnreferencedR,
         QC.inj(LeftShift(
@@ -253,11 +252,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // "foo := (7,8); select * from foo"
       convert(
         None,
-        identity.Squash[FLP](
-          structural.ShiftArray[FLP](
-            structural.ArrayConcat[FLP](
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))))))) must
+        identity.Squash(
+          structural.ShiftArray(
+            structural.ArrayConcat(
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))).embed,
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed).embed).embed) must
       equal(chain(
         UnreferencedR,
         QC.inj(LeftShift(
@@ -274,13 +273,13 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // "foo := (7,8,9); select * from foo"
       convert(
         None,
-        identity.Squash[FLP](
-          structural.ShiftArray[FLP](
-            structural.ArrayConcat[FLP](
-              structural.ArrayConcat[FLP](
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))),
-                structural.MakeArrayN[Fix](LP.Constant(Data.Int(8)))),
-              structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))))))) must
+        identity.Squash(
+          structural.ShiftArray(
+            structural.ArrayConcat(
+              structural.ArrayConcat(
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(7))).embed,
+                structural.MakeArrayN[Fix](LP.Constant(Data.Int(8))).embed).embed,
+              structural.MakeArrayN[Fix](LP.Constant(Data.Int(9))).embed).embed).embed).embed) must
       equal(chain(
         UnreferencedR,
         QC.inj(LeftShift(
@@ -298,12 +297,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(
         None,
         LP.Let('x, lpRead("/foo/bar"),
-          structural.ShiftArray[FLP](
-            structural.ArrayConcat[FLP](
-              structural.ArrayConcat[FLP](
-                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("baz"))),
-                structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("quux")))),
-              structural.ObjectProject[FLP](LP.Free('x), LP.Constant(Data.Str("ducks"))))))) must
+          structural.ShiftArray(
+            structural.ArrayConcat(
+              structural.ArrayConcat(
+                structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("baz"))).embed,
+                structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("quux"))).embed).embed,
+              structural.ObjectProject(LP.Free('x), LP.Constant(Data.Str("ducks"))).embed).embed).embed)) must
       equal(chain(RootR).some) // TODO incorrect expectation
     }.pendingUntilFixed
 
@@ -313,11 +312,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         None,
         makeObj(
           "0" ->
-            structural.UnshiftArray[FLP](
-              math.Multiply[FLP](
-                structural.ShiftArrayIndices[FLP](
-                  structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc")))),
-                LP.Constant(Data.Int(10)))))) must
+            structural.UnshiftArray(
+              math.Multiply(
+                structural.ShiftArrayIndices(
+                  structural.ObjectProject(lpRead("/zips"), LP.Constant(Data.Str("loc"))).embed).embed,
+                LP.Constant(Data.Int(10))).embed))) must
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
@@ -339,12 +338,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       // "select * from foo where bar between 1 and 10"
       convert(
         listContents.some,
-        StdLib.set.Filter[FLP](
+        StdLib.set.Filter(
           lpRead("/bar"),
-          relations.Between[FLP](
-            structural.ObjectProject(lpRead("/bar"), LP.Constant(Data.Str("baz"))),
+          relations.Between(
+            structural.ObjectProject(lpRead("/bar"), LP.Constant(Data.Str("baz"))).embed,
             LP.Constant(Data.Int(1)),
-            LP.Constant(Data.Int(10))))) must
+            LP.Constant(Data.Int(10))).embed).embed) must
       equal(chain(
         ReadR(rootDir </> file("bar")),
         QC.inj(LeftShift((),
@@ -363,11 +362,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       convert(
         None,
         LP.Let('__tmp0,
-          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))),
-          identity.Squash[FLP](
-            structural.ObjectConcat[FLP](
-              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))),
-              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))))))) must
+          StdLib.set.InnerJoin(lpRead("/person"), lpRead("/car"), LP.Constant(Data.Bool(true))).embed,
+          identity.Squash(
+            structural.ObjectConcat(
+              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("left"))).embed,
+              structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("right"))).embed).embed).embed)) must
       equal(chain(RootR).some) // TODO incorrect expectation
     }.pendingUntilFixed
 
@@ -377,18 +376,18 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val lp = LP.Let('__tmp0, lpRead("/foo"),
         LP.Let('__tmp1, lpRead("/bar"),
           LP.Let('__tmp2,
-            StdLib.set.InnerJoin[FLP](LP.Free('__tmp0), LP.Free('__tmp1),
-              relations.Eq[FLP](
-                structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("id"))),
-                structural.ObjectProject(LP.Free('__tmp1), LP.Constant(Data.Str("foo_id"))))),
+            StdLib.set.InnerJoin(LP.Free('__tmp0), LP.Free('__tmp1),
+              relations.Eq(
+                structural.ObjectProject(LP.Free('__tmp0), LP.Constant(Data.Str("id"))).embed,
+                structural.ObjectProject(LP.Free('__tmp1), LP.Constant(Data.Str("foo_id"))).embed).embed).embed,
             makeObj(
               "name" ->
-                structural.ObjectProject[FLP](
-                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("left"))),
+                structural.ObjectProject(
+                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("left"))).embed,
                   LP.Constant(Data.Str("name"))),
               "address" ->
-                structural.ObjectProject[FLP](
-                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))),
+                structural.ObjectProject(
+                  structural.ObjectProject(LP.Free('__tmp2), LP.Constant(Data.Str("right"))).embed,
                   LP.Constant(Data.Str("address")))))))
       convert(None, lp) must
       equal(chain(

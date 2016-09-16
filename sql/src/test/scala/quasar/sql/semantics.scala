@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
+import quasar.TreeMatchers
+import quasar.sql.SemanticAnalysis._
 import quasar.sql.fixpoint._
 
 import matryoshka._, FunctorT.ops._
@@ -25,9 +27,6 @@ import pathy.Path._
 class SemanticsSpec extends quasar.Qspec with TreeMatchers {
 
   "TransformSelect" should {
-    import quasar.SemanticAnalysis._
-    import quasar.sql._
-
     val compiler = Compiler.trampoline
 
     def transform[T[_[_]]: Recursive: Corecursive](q: T[Sql]): T[Sql] =

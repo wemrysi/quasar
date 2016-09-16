@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.sql
 
 import quasar.Predef._
+import quasar.sql.SemanticAnalysis._, Provenance._
+
 import pathy.Path._
 
 class ProvenanceSpec extends quasar.Qspec {
-  import SemanticAnalysis._
-  import Provenance._
-  import sql._
-
   val Rel1 = Relation(TableRelationAST(file("foo"), None))
   val Rel2 = Relation(TableRelationAST(file("bar"), None))
 

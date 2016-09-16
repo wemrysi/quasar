@@ -18,17 +18,18 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
-import quasar.qscript.MapFuncs._
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fs._
-import quasar.ejson.EJson
+import quasar.sql.CompilerHelpers
+import quasar.qscript.MapFuncs._
 
 import matryoshka._, FunctorT.ops._
 import pathy.Path._
 import scalaz._, Scalaz._
 
 class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers {
-  val opt = new quasar.qscript.Optimize[Fix]
+  val opt = new Optimize[Fix]
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
