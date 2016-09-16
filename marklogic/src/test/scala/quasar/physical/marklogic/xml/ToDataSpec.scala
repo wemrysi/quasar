@@ -87,7 +87,7 @@ class ToDataSpec extends quasar.Qspec {
           "foo" -> Str("")
         ))
       toData(sample) must_= expected
-    }.pendingUntilFixed
+    }
 
     "multiple empty elements" in {
       val sample =
@@ -103,7 +103,7 @@ class ToDataSpec extends quasar.Qspec {
           ))
         ))
       toData(sample) must_= expected
-    }.pendingUntilFixed
+    }
 
     "example" in {
       val sample =

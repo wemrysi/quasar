@@ -57,6 +57,7 @@ package object xml {
   def toData(elem: Elem, config: KeywordConfig): Data = {
 
     def impl(nodes: List[Node], m: Option[MetaData]): Data = nodes match {
+      case List() => Str("")
       case List(Text(str)) =>
         m.flatMap(attrToData).cata(
           m => Obj(ListMap(
