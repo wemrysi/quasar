@@ -19,8 +19,6 @@ package quasar.physical.marklogic.fs
 import quasar.Predef._
 import quasar.Data
 import quasar.SKI.κ
-import quasar.ejson.EJson
-import quasar.fp.{interpret, interpretM}
 import quasar.physical.marklogic.MonadErrMsg
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
@@ -29,8 +27,6 @@ import scala.xml._
 
 import eu.timepit.refined.auto._
 import jawn._
-import matryoshka._
-import matryoshka.patterns._
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
@@ -105,26 +101,9 @@ object data {
     toXml0(rootElem, inner)(ejsonEjson)(data)
   }
 
-  def encodeXml[F[_]: MonadErrMsg](data: Data): F[Node] =
-    data.hyloM[F, CoEnv[Data, EJson, ?], Node](
-      interpretM(noReprErr[F, Node], EncodeXml[F, EJson].encodeXml),
-      Data.toEJson[EJson] andThen (_.point[F]))
-
-  def decodeXml(node: Node): Data =
-    node.hylo[CoEnv[Node, EJson, ?], Data](
-      interpret(κ(Data.NA), Data.fromEJson),
-      DecodeXml[Id.Id, EJson].decodeXml andThen (CoEnv(_)))
-
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
 
-  private def noReprErr[F[_]: MonadErrMsg, A](data: Data): F[A] =
-    s"No representation for '$data' in XML.".raiseError[F, A]
-
   private def invalidQName[F[_]: MonadErrMsg, A](s: String): F[A] =
     s"'$s' is not a valid XML QName.".raiseError[F, A]
-
-  // TODO{matryoshka}: Remove once we've upgraded to 0.11.2+
-  private implicit def coenvTraverse[E]: Traverse[CoEnv[E, EJson, ?]] =
-    Bitraverse[CoEnv[?, EJson, ?]].rightTraverse
 }
