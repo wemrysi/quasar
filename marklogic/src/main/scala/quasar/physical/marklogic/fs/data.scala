@@ -24,9 +24,11 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 
 import scala.xml._
+import java.util.Base64
 
 import eu.timepit.refined.auto._
 import jawn._
+import monocle.Prism
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
@@ -81,7 +83,7 @@ object data {
       }
 
       elementName => {
-        case Data.Binary(bytes) => ???
+        case Data.Binary(bytes) => elem(elementName, "binary" , Text(base64(bytes))          ).point[F]
         case Data.Bool(b)       => elem(elementName, "boolean", Text(b.fold("true", "false"))).point[F]
         case Data.Date(d)       => ???
         case Data.Dec(d)        => elem(elementName, "decimal", Text(d.toString)             ).point[F]
@@ -108,6 +110,13 @@ object data {
 
     toXml0(rootStr, rootElem, inner)(ejsonEjson)(data)
   }
+
+  ////
+
+  // NB: Able to cast as `xs:base64Binary` in XQuery
+  private val base64 = Prism[String, ImmutableArray[Byte]](
+    s => \/.fromTryCatchNonFatal(Base64.getDecoder.decode(s)).map(ImmutableArray.fromArray).toOption)(
+    (Base64.getEncoder.encodeToString(_)) compose (_.toArray))
 
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
