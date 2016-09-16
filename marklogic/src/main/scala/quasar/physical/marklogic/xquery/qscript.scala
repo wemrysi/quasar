@@ -29,7 +29,7 @@ import scalaz.syntax.monad._
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object qscript {
   import syntax._, expr.{element, for_, if_}, axes._
-  import FunctionDecl.FunctionDecl1
+  import FunctionDecl.{FunctionDecl1, FunctionDecl2}
 
   val qs     = NamespaceDecl(qscriptNs)
   val dataN  = qs name qscriptData.local
@@ -38,7 +38,7 @@ object qscript {
   def isDocumentNode(node: XQuery): XQuery =
     xdmp.nodeKind(node) === "document".xs
 
-  // quasar:node-left-shift($node as node()*) as item()*
+  // qscript:node-left-shift($node as node()*) as item()*
   def nodeLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
     qs.name("node-left-shift").qn[F] map { fname =>
       declare(fname)(
@@ -48,7 +48,7 @@ object qscript {
       }
     }
 
-  // quasar:left-shift($node as node()) as item()*
+  // qscript:left-shift($node as node()) as item()*
   // TODO: Convert to a typeswitch
   def leftShift[F[_]: PrologW]: F[FunctionDecl1] =
     (
@@ -86,7 +86,7 @@ object qscript {
   def qError[F[_]: PrologW](desc: XQuery, errObj: Option[XQuery] = None): F[XQuery] =
     errorN.xqy[F] map (err => fn.error(err, Some(desc), errObj))
 
-  // quasar:zip-map-node-keys($node as node()) as element(ejson:map)
+  // qscript:zip-map-node-keys($node as node()) as element(ejson:map)
   def zipMapNodeKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
     (qs.name("zip-map-node-keys").qn[F] |@| ejson.mapN.qn) { (fname, mname) =>
       declare(fname)(
@@ -105,6 +105,27 @@ object qscript {
                      .return_(kvEnt)
           zMap    <- ejson.mkMap[F] apply entries
         } yield zMap
+      }
+    }.join
+
+  // qscript:shifted-read($uri as xs:string, $include-id as xs:boolean) as element()*
+  def shiftedRead[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
+    qs.name("shifted-read").qn[F].map { fname =>
+      declare(fname)(
+        $("uri") as SequenceType("xs:string"),
+        $("include-id") as SequenceType("xs:boolean")
+      ).as(SequenceType(s"element()")) { (uri: XQuery, includeId: XQuery) =>
+        for {
+          d     <- freshVar[F]
+          c     <- freshVar[F]
+          b     <- freshVar[F]
+          xform <- json.transformFromJson[F](c.xqy)
+          mkArr <- ejson.seqToArray[F].getApply
+        } yield
+          for_(d -> cts.search(fn.doc(), cts.directoryQuery(uri, "1".xs)))
+            .let_(c -> d.xqy `/` child.node())
+            .let_(b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
+            .return_ { if_ (includeId) then_ mkArr(mkSeq_(fn.documentUri(d.xqy), b.xqy)) else_ b.xqy }
       }
     }.join
 }
