@@ -1,7 +1,7 @@
 {
     "name": "combine case (3-arg expr) with group by",
 
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
 
     "data": "zips.data",
 

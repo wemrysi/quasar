@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy._
 import quasar.fs._
 import quasar.fs.mount.MountConfig
 

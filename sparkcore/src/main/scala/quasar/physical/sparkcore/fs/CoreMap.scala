@@ -22,19 +22,20 @@ import quasar.std.DateLib
 import quasar.Data
 import quasar.qscript._
 import quasar.Planner._
+import quasar.SKI.κ
 
 import java.math.{BigDecimal => JBigDecimal}
 
 import org.threeten.bp.Instant
-import matryoshka.{Hole => _, _}
+import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap {
 
   // TODO: replace Data.NA with something safer
-  def change[T[_[_]]]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
-    case Constant(f) => ??? // DONTKNOW contains EJson
-    case Undefined() => ??? // DONTKNOW I don't understand the meaning
+  def change[T[_[_]] : Recursive]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
+    case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
+    case Undefined() => κ[Data, Data](Data.NA).right // TODO compback to this one, needs reviewv
 
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)

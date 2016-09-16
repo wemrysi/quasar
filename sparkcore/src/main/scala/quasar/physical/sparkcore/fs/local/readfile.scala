@@ -17,10 +17,11 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
-import quasar.fs._
-import quasar.fp.free._
+import quasar.contrib.pathy._
 import quasar.effect.Read
-import quasar.physical.sparkcore.fs.readfile.{Input, Offset, Limit}
+import quasar.fp.free._
+import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
+import quasar.physical.sparkcore.fs.readfile.Input
 
 import java.io.File
 

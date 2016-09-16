@@ -18,7 +18,9 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{BackendName, Data, TestConfig}
-import quasar.fp.{eitherTCatchable, TaskRef, reflNT}
+import quasar.contrib.pathy._
+import quasar.fp.{TaskRef, reflNT}
+import quasar.fp.eitherT._
 import quasar.fp.free._
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.effect._

@@ -17,7 +17,8 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
-import quasar.{PhaseResults,PhaseResult, LogicalPlan, Data}
+import quasar.{PhaseResults, PhaseResultT, PhaseResult, LogicalPlan, Data}
+import quasar.fp.eitherT._
 import quasar.qscript._
 import quasar.fs.QueryFile
 import quasar.fs.QueryFile._
@@ -26,6 +27,8 @@ import quasar.Planner._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.effect.Read
+import quasar.contrib.pathy._
+
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -40,7 +43,7 @@ object queryfile {
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
     store: (RDD[Data], AFile) => Task[Unit],
     fileExists: AFile => Task[Boolean],
-    listContents: ADir => Task[FileSystemError \/ Set[PathSegment]]
+    listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]]
   )
 
   type SparkContextRead[A] = Read[SparkContext, A]
@@ -60,8 +63,8 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          val maybeListContest: Option[ConvertPath.ListContents[Free[S, ?]]] = None
-          val qs = (QueryFile.convertToQScript(maybeListContest)(lp)) >>=
+          val lc: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] = (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT]) 
+          val qs = (QueryFile.convertToQScript(lc.some)(lp)) >>=
           (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
 
           qs.run.run
@@ -103,5 +106,5 @@ object queryfile {
 
   private def listContents[S[_]](input: Input, d: ADir)(implicit
     s0: Task :<: S): Free[S, FileSystemError \/ Set[PathSegment]] =
-    injectFT[Task, S].apply(input.listContents(d))
+    injectFT[Task, S].apply(input.listContents(d).run)
 }

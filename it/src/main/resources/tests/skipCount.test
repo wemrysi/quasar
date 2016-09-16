@@ -1,7 +1,7 @@
 {
     "name": "skip and count",
 
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
 
     "data": "zips.data",
 

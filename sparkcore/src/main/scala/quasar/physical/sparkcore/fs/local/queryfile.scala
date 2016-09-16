@@ -19,10 +19,11 @@ package quasar.physical.sparkcore.fs.local
 import quasar.Predef._
 import quasar.Data
 import quasar.DataCodec
+import quasar.fs.FileSystemError
 import quasar.fs.PathError._
 import quasar.physical.sparkcore.fs.queryfile.Input
-import quasar.fs._
 import quasar.fs.FileSystemError._
+import quasar.contrib.pathy._
 
 import java.io.{File, PrintWriter, FileOutputStream}
 import java.nio.file._
@@ -52,7 +53,7 @@ object queryfile {
     Files.exists(Paths.get(posixCodec.unsafePrintPath(f)))
   }
 
-  def listContents(d: ADir): Task[FileSystemError \/ Set[PathSegment]]  = Task.delay {
+  def listContents(d: ADir): EitherT[Task, FileSystemError, Set[PathSegment]] = EitherT(Task.delay {
     val directory = new File(posixCodec.unsafePrintPath(d))
     if(directory.exists()) {
       \/.fromTryCatchNonFatal{
@@ -66,7 +67,7 @@ object queryfile {
           pathErr(invalidPath(d, e.getMessage()))
       }
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
-  }
+  })
 
   def input: Input = Input(fromFile _, store _, fileExists _, listContents _)
 }

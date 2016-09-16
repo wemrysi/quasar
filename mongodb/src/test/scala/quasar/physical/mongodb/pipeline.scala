@@ -21,7 +21,7 @@ import quasar.Predef._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.SortDir
 
 import org.scalacheck._
 import scalaz._

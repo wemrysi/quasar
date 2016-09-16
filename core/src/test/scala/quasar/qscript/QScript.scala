@@ -19,6 +19,7 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, Data, CompilerHelpers}
 import quasar.ejson
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript.MapFuncs._
 import quasar.std.StdLib
@@ -175,7 +176,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.roll(MakeArray(Free.point(LeftSide))),
             Free.roll(MakeArray(Free.point(RightSide))))))),
         QC.inj(Reduce((),
-          Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
+          NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap[Fix]](
             Free.roll(ProjectIndex(
               Free.roll(ProjectIndex(HoleF, IntLit(1))),
@@ -198,12 +199,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             Free.point(RightSide),
             StrLit("height")))),
         QC.inj(Reduce((),
-          Free.roll(MakeArray(
-            Free.roll(MakeMap(
-              StrLit("j"),
-              Free.roll(ConcatArrays(
-                Free.roll(MakeArray(Free.roll(MakeMap(StrLit("f"), StrLit("person"))))),
-                Free.roll(MakeArray(NullLit())))))))),
+          NullLit(), // reduce on a constant bucket, which is normalized to Null
           List(ReduceFuncs.Sum[FreeMap[Fix]](HoleF)),
           Free.roll(MakeMap(StrLit("0"), Free.point(ReduceIndex(0))))))).some)
     }
@@ -240,15 +236,10 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         UnreferencedR,
         QC.inj(LeftShift(
           (),
-          Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
+          Free.roll(Constant(
+            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7))))))),
           Free.point(RightSide)))).some)
-        // TODO optimize to eliminate `MakeArray`
-        //QC.inj(LeftShift(
-        //  RootR,
-        //  Free.roll(Constant(
-        //    CommonEJson.inj(ejson.Arr(List(
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed))).embed)),
-        //  Free.point(RightSide))).embed
     }
 
     "convert a constant shift array of size two" in {
@@ -265,18 +256,11 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         UnreferencedR,
         QC.inj(LeftShift(
           (),
-          Free.roll(ConcatArrays(
-            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
-            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
+          Free.roll(Constant(
+            EJson.fromCommon[Fix].apply(ejson.Arr(List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8))))))),
           Free.point(RightSide)))).some)
-        // TODO optimize to eliminate `MakeArray`
-        //QC.inj(LeftShift(
-        //  RootR,
-        //  Free.roll(Constant(
-        //    CommonEJson.inj(ejson.Arr(List(
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed))).embed)),
-        //  Free.point(RightSide))).embed
     }
 
     "convert a constant shift array of size three" in {
@@ -295,21 +279,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         UnreferencedR,
         QC.inj(LeftShift(
           (),
-          Free.roll(ConcatArrays(
-            Free.roll(ConcatArrays(
-              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed)))),
-              Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed)))))),
-            Free.roll(MakeArray(Free.roll(Constant(ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed)))))),
+          Free.roll(Constant(
+            EJson.fromCommon[Fix].apply(ejson.Arr[Fix[ejson.EJson]](List(
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](7)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](8)),
+              EJson.fromExt[Fix].apply(ejson.Int[Fix[ejson.EJson]](9))))))),
           Free.point(RightSide)))).some)
-        // TODO optimize to eliminate `MakeArray`
-        //QC.inj(LeftShift(
-        //  RootR,
-        //  Free.roll(Constant(
-        //    CommonEJson.inj(ejson.Arr(List(
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](7)).embed,
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](8)).embed,
-        //      ExtEJson.inj(ejson.Int[Fix[ejson.EJson]](9)).embed))).embed)),
-        //  Free.point(RightSide))).embed
     }
 
     "convert a read shift array" in {
@@ -340,20 +315,21 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(chain(
         RootR,
         QC.inj(LeftShift((),
+          ProjectFieldR(HoleF, StrLit("zips")),
+          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))),
+        QC.inj(LeftShift((),
           Free.roll(DupArrayIndices(
-            ProjectFieldR(
-              ProjectFieldR(HoleF, StrLit("zips")),
-              StrLit("loc")))),
+            ProjectFieldR(HoleF, StrLit("loc")))),
           Free.roll(Multiply(Free.point(RightSide), IntLit(10))))),
         QC.inj(Reduce((),
-          HoleF,
+          HoleF, // FIXME provenance needs to be here
           List(ReduceFuncs.UnshiftArray(HoleF[Fix])),
           Free.roll(MakeMap[Fix, Free[MapFunc[Fix, ?], ReduceIndex]](
             StrLit[Fix, ReduceIndex]("0"),
             Free.point(ReduceIndex(0))))))).some)
     }.pendingUntilFixed
 
-    "convert a filter" in skipped { // takes 1 min 17 sec to run
+    "convert a filter" in { // takes 1 min 17 sec to run
       // "select * from foo where bar between 1 and 10"
       convert(
         listContents.some,
@@ -373,7 +349,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             ProjectFieldR(HoleF, StrLit("baz")),
             IntLit(1),
             IntLit(10)))))).some)
-    }
+    }.pendingUntilFixed
 
     // an example of how logical plan expects magical "left" and "right" fields to exist
     "convert magical query" in {

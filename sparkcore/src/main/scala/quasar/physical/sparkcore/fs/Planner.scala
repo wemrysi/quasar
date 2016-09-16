@@ -24,8 +24,7 @@ import quasar._
 import quasar.Planner._
 import quasar.fp._
 import quasar.qscript._
-
-import quasar.fs._
+import quasar.contrib.pathy.AFile
 
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -73,6 +72,12 @@ object Planner {
             })
           })
         }
+    }
+
+  implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
+    new Planner[Const[ShiftedRead, ?]] {
+      type IT[G[_]] = T[G]
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]) = ???
     }
 
   implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:

@@ -17,10 +17,10 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.{ADir, APath}
 import quasar.effect._
-import quasar.fp.{reflNT, TaskRef}
-import quasar.fp.free, free._
-import quasar.fs.{ADir, APath, Empty, PhysicalError, ReadFile}
+import quasar.fp._ , free._
+import quasar.fs.{Empty, PhysicalError, ReadFile}
 import quasar.fs.mount._, FileSystemDef.DefinitionResult
 import quasar.main._
 import quasar.regression._
@@ -36,10 +36,7 @@ class ViewReadQueryRegressionSpec
   extends QueryRegressionTest[FileSystemIO](QueryRegressionTest.externalFS.map(_.take(1))) {
 
   val suiteName = "View Reads"
-
-  type ViewFS0[A] = Coproduct[MonotonicSeq, FileSystemIO, A]
-  type ViewFS1[A] = Coproduct[ViewState, ViewFS0, A]
-  type ViewFS[A]  = Coproduct[Mounting, ViewFS1, A]
+  type ViewFS[A] = (Mounting :\: ViewState :\: MonotonicSeq :/: FileSystemIO)#M[A]
 
   def mounts(path: APath, expr: Fix[Sql], vars: Variables): Task[Mounting ~> Task] =
     (

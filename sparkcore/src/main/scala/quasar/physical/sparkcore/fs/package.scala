@@ -19,8 +19,8 @@ package quasar.physical.sparkcore
 import quasar.Predef._
 import quasar.EnvironmentError
 import quasar.fs.mount.FileSystemDef._
-import quasar.fs._
 import quasar.fs.mount.ConnectionUri
+import quasar.contrib.pathy._
 
 import pathy.Path._
 import org.apache.spark._
@@ -42,6 +42,8 @@ package object fs {
         SparkFSConf(new SparkConf().setMaster(master), sandboxAbs(prefix))
       }.fold(error(s"Could not extrat a path from $rootPath"))(_.right[DefinitionError])
 
+    // TODO use spark://host:port/var/hadoop
+    // note: that some master configs can be in different shape than spark://host:port
     uri.value.split('|').toList match {
       case master :: prefixPath :: Nil => forge(master, prefixPath)
       case _ =>

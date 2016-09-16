@@ -18,6 +18,7 @@ package quasar.fs
 
 import quasar.Predef._
 import quasar.{Data, PhaseResult, LogicalPlan, PhaseResults}
+import quasar.contrib.pathy._
 import quasar.fp._
 import numeric._
 import quasar.Optimizer

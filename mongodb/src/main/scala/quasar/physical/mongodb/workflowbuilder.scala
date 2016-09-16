@@ -27,7 +27,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 import quasar.std.StdLib._
-import quasar.qscript._
+import quasar.qscript.SortDir
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
