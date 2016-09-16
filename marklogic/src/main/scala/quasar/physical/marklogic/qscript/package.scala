@@ -26,31 +26,33 @@ import matryoshka.Recursive
 import scalaz._, Scalaz._
 
 package object qscript {
-  type MonadPlanErr[F[_]]         = MonadError_[F, MarkLogicPlannerError]
-  type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
-  type MarkLogicPlanner[QS[_]]    = Planner[QS, XQuery]
+  type MonadPlanErr[F[_]]            = MonadError_[F, MarkLogicPlannerError]
+  type MarkLogicPlanErrT[F[_], A]    = EitherT[F, MarkLogicPlannerError, A]
+  type MarkLogicPlanner[F[_], QS[_]] = Planner[F, QS, XQuery]
 
   object MarkLogicPlanner {
-    implicit def qScriptCore[T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[QScriptCore[T, ?]] =
-      new QScriptCorePlanner[T]
+    def apply[F[_], QS[_]](implicit MLP: MarkLogicPlanner[F, QS]): MarkLogicPlanner[F, QS] = MLP
 
-    implicit def constDeadEnd: MarkLogicPlanner[Const[DeadEnd, ?]] =
-      new DeadEndPlanner
+    implicit def qScriptCore[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
+      new QScriptCorePlanner[F, T]
 
-    implicit def constRead: MarkLogicPlanner[Const[Read, ?]] =
-      new ReadPlanner
+    implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
+      new DeadEndPlanner[F]
 
-    implicit def constShiftedRead: MarkLogicPlanner[Const[ShiftedRead, ?]] =
-      new ShiftedReadPlanner
+    implicit def constRead[F[_]: Applicative]: MarkLogicPlanner[F, Const[Read, ?]] =
+      new ReadPlanner[F]
 
-    implicit def projectBucket[T[_[_]]]: MarkLogicPlanner[ProjectBucket[T, ?]] =
-      new ProjectBucketPlanner[T]
+    implicit def constShiftedRead[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead, ?]] =
+      new ShiftedReadPlanner[F]
 
-    implicit def thetajoin[T[_[_]]]: MarkLogicPlanner[ThetaJoin[T, ?]] =
-      new ThetaJoinPlanner[T]
+    implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
+      new ProjectBucketPlanner[F, T]
 
-    implicit def equiJoin[T[_[_]]]: MarkLogicPlanner[EquiJoin[T, ?]] =
-      new EquiJoinPlanner[T]
+    implicit def thetajoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
+      new ThetaJoinPlanner[F, T]
+
+    implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
+      new EquiJoinPlanner[F, T]
   }
 
   def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =
@@ -72,6 +74,6 @@ package object qscript {
     fqs: FreeQS[T], src: XQuery
   ): F[XQuery] = {
     import MarkLogicPlanner._
-    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[QScriptTotal[T, ?], XQuery].plan[F]))
+    freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
   }
 }

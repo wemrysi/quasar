@@ -26,10 +26,12 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-private[qscript] final class QScriptCorePlanner[T[_[_]]: Recursive: ShowT] extends MarkLogicPlanner[QScriptCore[T, ?]] {
+private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
+  extends MarkLogicPlanner[F, QScriptCore[T, ?]] {
+
   import expr.{func, for_, let_}
 
-  def plan[F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, QScriptCore[T, ?], XQuery] = {
+  val plan: AlgebraM[F, QScriptCore[T, ?], XQuery] = {
     case Map(src, f) =>
       for {
         x <- freshVar[F]
