@@ -296,6 +296,19 @@ trait QFoldableOps {
   }
 }
 
+trait DebugOps {
+  final implicit class ToDebugOps[A](val self: A) {
+    /** Applies some operation to a value and returns the original value. Useful
+      * for things like adding debugging printlns in the middle of an
+      * expression.
+      */
+    final def <|(f: A => Unit): A = {
+      f(self)
+      self
+    }
+  }
+}
+
 trait SKI {
   // NB: Unicode has double-struck and bold versions of the letters, which might
   //     be more appropriate, but the code points are larger than 2 bytes, so
@@ -356,6 +369,7 @@ package object fp
     with JsonOps
     with ProcessOps
     with QFoldableOps
+    with DebugOps
     with SKI
     with StringOps
     with CatchableInstances {

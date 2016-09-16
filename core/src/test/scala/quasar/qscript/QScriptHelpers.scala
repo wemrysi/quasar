@@ -34,16 +34,13 @@ trait QScriptHelpers {
       ThetaJoin[Fix, ?] :\:
       Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
 
-  type QST[A] =
-    (QScriptCore[Fix, ?] :\:
-      ThetaJoin[Fix, ?] :\: EquiJoin[Fix, ?] :\:
-      Const[ShiftedRead, ?] :\: Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+  type QST[A] = QScriptTotal[Fix, A]
 
-  val DE = implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  = implicitly[Const[Read, ?] :<: QS]
-  val QC = implicitly[QScriptCore[Fix, ?] :<: QS]
-  val TJ = implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ = implicitly[EquiJoin[Fix, ?] :<: QST]
+  val DE =     implicitly[Const[DeadEnd, ?] :<: QS]
+  val R  =        implicitly[Const[Read, ?] :<: QS]
+  val QC =   implicitly[QScriptCore[Fix, ?] :<: QS]
+  val TJ =     implicitly[ThetaJoin[Fix, ?] :<: QS]
+  val EJ =      implicitly[EquiJoin[Fix, ?] :<: QST]
   val SR = implicitly[Const[ShiftedRead, ?] :<: QST]
   val QS = implicitly[Injectable.Aux[QS, QST]]
   def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
@@ -51,6 +48,14 @@ trait QScriptHelpers {
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
   def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
+
+  val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
+  val RT  =        implicitly[Const[Read, ?] :<: QST]
+  val QCT =   implicitly[QScriptCore[Fix, ?] :<: QST]
+  val TJT =     implicitly[ThetaJoin[Fix, ?] :<: QST]
+  val EJT =      implicitly[EquiJoin[Fix, ?] :<: QST]
+  val PBT = implicitly[ProjectBucket[Fix, ?] :<: QST]
+  val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
 
   def ProjectFieldR[A](
     src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):

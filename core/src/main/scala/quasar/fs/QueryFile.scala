@@ -47,6 +47,7 @@ object QueryFile {
     (lp: T[LogicalPlan])
     (eval: QS[T[QS]] => QS[T[QS]])
     (implicit
+      CQ: Coalesce.Aux[T, QS, QS],
       DE:    Const[DeadEnd, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
@@ -71,17 +72,19 @@ object QueryFile {
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
     (implicit
+      CI:  Coalesce.Aux[T, IQS, IQS],
       SP: SimplifyProjection.Aux[IQS, QS],
+      CQ:  Coalesce.Aux[T, QS, QS],
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]])
       : T[IQS] => T[QS] = {
     val optimize = new Optimize[T]
 
+    // TODO: This would be `transHylo` if there were such a thing.
     _.transAna(SP.simplifyProjection)
-      .transCata(optimize.applyAll)
-      .transCata(optimize.applyAll)
-      .transCata(optimize.applyAll)
+      // TODO: Rather than explicitly applying multiple times, we should apply
+      //       repeatedly until unchanged.
       .transCata(optimize.applyAll)
       .transCata(optimize.applyAll)
   }
@@ -97,6 +100,7 @@ object QueryFile {
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (implicit
+      CQ:  Coalesce.Aux[T, QS, QS],
       DE:  Const[DeadEnd, ?] :<: QS,
       QC:  QScriptCore[T, ?] :<: QS,
       TJ:    ThetaJoin[T, ?] :<: QS,
@@ -107,8 +111,6 @@ object QueryFile {
     val transform = new Transform[T, QScriptInternal[T, ?]]
     val optimize = new Optimize[T]
 
-    // TODO: Rather than explicitly applying multiple times, we should apply
-    //       repeatedly until unchanged.
     val qs =
       optimizeEval[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
         normalizeQScript[T, QScriptInternal[T, ?], QS]
@@ -126,6 +128,7 @@ object QueryFile {
     (listContents: DiscoverPath.ListContents[M])
     (lp: T[LogicalPlan])
     (implicit
+      CQ:  Coalesce.Aux[T, QS, QS],
       R:        Const[Read, ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
@@ -139,8 +142,6 @@ object QueryFile {
     type InterimQS[A] =
       (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
 
-    // TODO: Rather than explicitly applying multiple times, we should apply
-    //       repeatedly until unchanged.
     val qs =
       (EitherT(optimizeEval[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[M]) >>=
         optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)) ∘

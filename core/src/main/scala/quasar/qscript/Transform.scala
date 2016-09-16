@@ -40,16 +40,20 @@ import shapeless.{nat, Sized}
 
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
-class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: Traverse: Normalizable](
-  implicit DE: Const[DeadEnd, ?] :<: F,
-           QC: QScriptCore[T, ?] :<: F,
-           TJ: ThetaJoin[T, ?] :<: F,
-           PB: ProjectBucket[T, ?] :<: F,
-           // TODO: Remove this one once we have multi-sorted AST
-           FI: Injectable.Aux[F, QScriptTotal[T, ?]],
-           mergeable:  Mergeable.Aux[T, F],
-           eq:         Delay[Equal, F],
-           show:       Delay[Show, F]) {
+class Transform
+  [T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT,
+    F[_]: Traverse: Normalizable]
+  (implicit
+    C:  Coalesce.Aux[T, F, F],
+    DE: Const[DeadEnd, ?] :<: F,
+    QC: QScriptCore[T, ?] :<: F,
+    TJ: ThetaJoin[T, ?] :<: F,
+    PB: ProjectBucket[T, ?] :<: F,
+    // TODO: Remove this one once we have multi-sorted AST
+    FI: Injectable.Aux[F, QScriptTotal[T, ?]],
+    mergeable:  Mergeable.Aux[T, F],
+    eq:         Delay[Equal, F],
+    show:       Delay[Show, F]) {
 
   val prov = new Provenance[T]
 

@@ -33,7 +33,13 @@ trait SimplifyJoin[F[_]] {
   def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[IT[H]] => H[IT[H]]
 }
 
-object SimplifyJoin extends SimplifyJoinInstances {
+private final case class EquiJoinKey[T[_[_]]]
+  (left: FreeMap[T], right: FreeMap[T])
+
+private final case class SimplifiedJoinCondition[T[_[_]]]
+  (keys: List[EquiJoinKey[T]], filter: Option[JoinFunc[T]])
+
+object SimplifyJoin {
   type Aux[T[_[_]], F[_], H[_]] = SimplifyJoin[F] {
     type IT[F[_]] = T[F]
     type G[A] = H[A]
@@ -45,7 +51,7 @@ object SimplifyJoin extends SimplifyJoinInstances {
       : FreeQS[T] =
     freeTransCata(branch)(liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
 
-  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]]
+  implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
@@ -107,7 +113,7 @@ object SimplifyJoin extends SimplifyJoinInstances {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]]
+  implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]]
     (implicit QC: QScriptCore[T, ?] :<: F)
       : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
@@ -125,7 +131,7 @@ object SimplifyJoin extends SimplifyJoinInstances {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: Recursive: Corecursive: EqualT: ShowT, F[_]]
+  implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]]
     (implicit EJ: EquiJoin[T, ?] :<: F)
       : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {
@@ -152,10 +158,8 @@ object SimplifyJoin extends SimplifyJoinInstances {
           : Coproduct[I, J, T[H]] => H[T[H]] =
         _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
     }
-}
 
-abstract class SimplifyJoinInstances {
-  implicit def inject[T[_[_]], F[_], I[_]](implicit F: F :<: I)
+  def default[T[_[_]], F[_], I[_]](implicit F: F :<: I)
       : SimplifyJoin.Aux[T, F, I] =
     new SimplifyJoin[F] {
       type IT[F[_]] = T[F]
@@ -164,4 +168,22 @@ abstract class SimplifyJoinInstances {
       def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[T[H]] => H[T[H]] =
         fa => GtoH(F.inj(fa))
     }
+
+  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+      : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
+    default
+
+  implicit def read[T[_[_]], F[_]](implicit R: Const[Read, ?] :<: F)
+      : SimplifyJoin.Aux[T, Const[Read, ?], F] =
+    default
+
+  implicit def shiftedRead[T[_[_]], F[_]]
+    (implicit SR: Const[ShiftedRead, ?] :<: F)
+      : SimplifyJoin.Aux[T, Const[ShiftedRead, ?], F] =
+    default
+
+  implicit def projectBucket[T[_[_]], F[_]]
+    (implicit PB: ProjectBucket[T, ?] :<: F)
+      : SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
+    default
 }

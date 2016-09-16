@@ -45,7 +45,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
   "optimizer" should {
     "elide a no-op map in a constant boolean" in {
        val query = LP.Constant(Data.Bool(true))
-       val run = liftFG(opt.elideNopMap[QSI])
+       val run = liftFG(opt.elideNopQC[QSI, QSI](idPrism.reverseGet))
 
        QueryFile.optimizeEval[Fix, QSI](query)(run).toOption must
          equal(chain(
@@ -56,10 +56,10 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
     "optimize a basic read" in {
       val run =
         (SimplifyProjection[QSI, QSI].simplifyProjection(_: QSI[Fix[QSI]])) ⋙
-          liftFG(opt.coalesceMapShift[QSI, QSI](idPrism.get)) ⋙
+          liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
           Normalizable[QSI].normalize ⋙
-          liftFF(opt.simplifyQC[QSI, QSI](idPrism)) ⋙
-          liftFG(opt.compactLeftShift[QSI, QSI])
+          liftFF(repeatedly(Coalesce[Fix, QSI, QSI].coalesce(idPrism))) ⋙
+          liftFF(repeatedly(opt.compactQC(_: QScriptCore[Fix, Fix[QSI]])))
 
       val query = lpRead("/foo")
 
@@ -69,6 +69,101 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
         QCI.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
           Free.point(RightSide)))).some)
+    }
+
+    "coalesce a Map into a subsequent LeftShift" in {
+      val exp =
+        LeftShift(
+          Map(
+            Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+            BoolLit[Fix, Hole](true)).embed,
+          HoleF,
+          Free.point[MapFunc[Fix, ?], JoinSide](RightSide))
+
+      Coalesce[Fix, QScriptCore[Fix, ?], QScriptCore[Fix, ?]].coalesce(idPrism).apply(exp) must
+      equal(
+        LeftShift(
+          Unreferenced[Fix, Fix[QScriptCore[Fix, ?]]]().embed,
+          BoolLit[Fix, Hole](true),
+          Free.point[MapFunc[Fix, ?], JoinSide](RightSide)).some)
+    }
+
+    "elide a join with a constant on one side" in {
+      val exp =
+        TJ.inj(ThetaJoin(
+          RootR.embed,
+          Free.roll(QST[QS].inject(QC.inj(LeftShift(
+            Free.roll(QST[QS].inject(QC.inj(Map(
+              Free.roll(QST[QS].inject(DE.inj(Const[DeadEnd, Free[QScriptTotal[Fix, ?], Hole]](Root)))),
+              ProjectFieldR(HoleF, StrLit("city")))))),
+            Free.roll(ZipMapKeys(HoleF)),
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.point(LeftSide))),
+              Free.roll(MakeArray(Free.point(RightSide))))))))),
+          Free.roll(QST[QS].inject(QC.inj(Map(
+            Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, Free[QScriptTotal[Fix, ?], Hole]]()))),
+            StrLit("name"))))),
+          BoolLit[Fix, JoinSide](true),
+          Inner,
+          ProjectFieldR(
+            Free.roll(ProjectIndex(
+              Free.roll(ProjectIndex(Free.point(LeftSide), IntLit(1))),
+              IntLit(1))),
+            Free.point(RightSide)))).embed
+
+      // TODO: only require a single pass
+      exp.transCata(opt.applyAll[QS]).transCata(opt.applyAll[QS]) must equal(
+        chain(
+          RootR,
+          QC.inj(LeftShift((),
+            ProjectFieldR(HoleF, StrLit("city")),
+            ProjectFieldR(Free.point(RightSide), StrLit("name"))))))
+    }
+
+    "elide a join in the branch of a join" in {
+      val exp =
+        TJT.inj(ThetaJoin(
+          DET.inj(Const[DeadEnd, Fix[QScriptTotal[Fix, ?]]](Root)).embed,
+          Free.roll(QCT.inj(Map(
+            Free.roll(QCT.inj(Unreferenced())),
+            StrLit("name")))),
+          Free.roll(TJT.inj(ThetaJoin(
+            Free.roll(DET.inj(Const(Root))),
+            Free.roll(QCT.inj(LeftShift(
+              Free.point(SrcHole),
+              Free.roll(ZipMapKeys(HoleF)),
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(Free.point(LeftSide))),
+                Free.roll(MakeArray(Free.point(RightSide)))))))),
+            Free.roll(QCT.inj(Map(
+              Free.roll(QCT.inj(Unreferenced())),
+              StrLit("name")))),
+            BoolLit(true),
+            Inner,
+            Free.roll(ConcatArrays(
+              Free.roll(MakeArray(Free.point(LeftSide))),
+              Free.roll(MakeArray(Free.point(RightSide)))))))),
+          BoolLit(true),
+          Inner,
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(Free.point(LeftSide))),
+            Free.roll(MakeArray(Free.point(RightSide))))))).embed
+
+      // TODO: only require a single pass
+      exp.transCata(opt.applyAll[QST]).transCata(opt.applyAll[QST]) must
+      equal(
+        QCT.inj(LeftShift(
+          DET.inj(Const[DeadEnd, Fix[QST]](Root)).embed,
+          Free.roll(ZipMapKeys(HoleF)),
+          Free.roll(ConcatArrays(
+            Free.roll(MakeArray(StrLit("name"))),
+            Free.roll(MakeArray(
+              Free.roll(ConcatArrays(
+                Free.roll(MakeArray(
+                  Free.roll(ConcatArrays(
+                    Free.roll(MakeArray(Free.point(LeftSide))),
+                    Free.roll(MakeArray(Free.point(RightSide))))))),
+                Free.roll(MakeArray(StrLit("name"))))))))))).embed)
     }
 
     "simplify a ThetaJoin" in {
