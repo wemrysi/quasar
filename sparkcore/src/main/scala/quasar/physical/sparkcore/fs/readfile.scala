@@ -29,7 +29,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
 
-final case class SparkCursor(rdd: Option[RDD[Data]])
+final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
 object readfile {
 
@@ -76,7 +76,7 @@ object readfile {
       rdd <- input.rddFrom(f, offset, limit)
       cur = SparkCursor(rdd.map{ raw =>
         DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }.some)
+      }.zipWithIndex.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h
@@ -91,15 +91,25 @@ object readfile {
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
+    // TODO arbitrary value, more or less a good starting point
+    // but we should consider some measuring
+    val step = 5000
+
     kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
-        case SparkCursor(None) =>
+        case SparkCursor(None, _) =>
           Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-        case SparkCursor(Some(rdd)) =>
+        case SparkCursor(Some(rdd), p) =>
 
-          val collect = rdd.collect.toVector.pure[EitherT[Free[S, ?], FileSystemError, ?]]
-          val clear = kvs.put(h, SparkCursor(None)).liftM[FileSystemErrT]
+        val collect = rdd
+          .filter(d => d._2 >= p && d._2 < (p + step))
+          .map(_._1).collect.toVector.pure[EitherT[Free[S, ?], FileSystemError, ?]]
 
-          collect <* clear
+        for {
+          collected <- collect
+          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(some(rdd), p + step)
+          _ <- kvs.put(h, cur).liftM[FileSystemErrT]
+        } yield collected
+        
     }.run
   }
 
