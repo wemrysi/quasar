@@ -19,6 +19,7 @@ package quasar.physical.marklogic
 import quasar.Predef._
 import quasar.Data
 
+import scala.collection.immutable.Seq
 import scala.xml._
 
 import scalaz.{Node => _, _}, Scalaz._
@@ -55,10 +56,9 @@ package object xml {
     * }
     */
   def toData(elem: Elem, config: KeywordConfig): Data = {
-
-    def impl(nodes: List[Node], m: Option[MetaData]): Data = nodes match {
-      case List() => Str("")
-      case List(Text(str)) =>
+    def impl(nodes: Seq[Node], m: Option[MetaData]): Data = nodes match {
+      case Seq() => Str("")
+      case Seq(Text(str)) =>
         m.flatMap(attrToData).cata(
           m => Obj(ListMap(
             config.attributesKeyName  -> m,
@@ -67,26 +67,28 @@ package object xml {
           Str(str)
         )
       case xs =>
-        val elementChildren = xs.collect { case a: Elem => a}.groupBy(fullName)
-        val childrenData = elementChildren.mapValues {
-          case List(single) => impl(single.child.toList, single.attributes.some)
-          case xs           => Arr(xs.map(x => impl(x.child.toList, x.attributes.some)))
-        }.toList
-        val attributeData = m.flatMap(attrToData).strengthL(config.attributesKeyName).toList
-        Obj(ListMap((attributeData ++ childrenData): _*))
+        val childrenByName = elements(xs) groupBy qualifiedName
+        val childrenData = childrenByName.mapValues {
+          case Seq(single) => impl(single.child, single.attributes.some)
+          case xs          => Arr(xs.map(x => impl(x.child, x.attributes.some)).toList)
+        }
+        val attributeData = m.flatMap(attrToData).strengthL(config.attributesKeyName)
+        Obj(ListMap((attributeData.toList ++ childrenData): _*))
     }
 
     def attrToData(meta: MetaData): Option[Data] = meta match {
       case scala.xml.Null => None
-      case m    =>
-        Obj(ListMap(meta.iterator.map(m => m.key -> impl(m.value.toList, none)).toList: _*)).some
+      case m              => Obj(ListMap(meta.map(m => m.key -> impl(m.value, none)).toSeq: _*)).some
     }
 
-    Obj(ListMap(fullName(elem) -> impl(elem.child.toList, elem.attributes.some)))
+    Obj(ListMap(qualifiedName(elem) -> impl(elem.child, elem.attributes.some)))
   }
 
   def toData(elem: Elem): Data = toData(elem, KeywordConfig(attributesKeyName = "_attributes", textKeyName = "_text"))
 
-  private def fullName(elem: Elem): String =
-    Option(elem.prefix).map(_ + ":").getOrElse("") + elem.label
+  def elements(nodes: Seq[Node]): Seq[Elem] =
+    nodes.collect { case e: Elem => e }
+
+  def qualifiedName(elem: Elem): String =
+    Option(elem.prefix).fold("")(_ + ":") + elem.label
 }

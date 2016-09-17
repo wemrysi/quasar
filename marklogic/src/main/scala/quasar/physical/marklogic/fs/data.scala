@@ -18,12 +18,11 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
-import quasar.SKI.κ
-import quasar.physical.marklogic.MonadErrMsg
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 
 import scala.xml._
+import scala.collection.immutable.Seq
 import java.util.Base64
 
 import eu.timepit.refined.auto._
@@ -35,8 +34,6 @@ import org.threeten.bp.temporal.TemporalAccessor
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
-  type EJsonType = String
-
   object JsonParser extends SupportParser[Data] {
     implicit val facade: Facade[Data] =
       new SimpleFacade[Data] {
@@ -52,7 +49,7 @@ object data {
       }
   }
 
-  def toXml[F[_]: MonadErrMsg](data: Data): F[Elem] = {
+  def toXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: EJsonType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe, Null)
 
@@ -74,47 +71,132 @@ object data {
     def toXml0(
       str: (QName, String) => Elem,
       elem: (QName, EJsonType, Seq[Node]) => Elem,
-      loop: QName => Data => F[Elem]
-    ): QName => Data => F[Elem] = {
-      val mapEntryToXml: ((String, Data)) => F[Elem] = {
+      loop: QName => Data => Validation[ErrorMessages, Elem]
+    ): QName => Data => Validation[ErrorMessages, Elem] = {
+      val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
         case (k, v) => for {
-          qn <- NCName(k).fold(
-                  κ(invalidQName[F, QName](k)),
-                  QName.local(_).point[F])
-          el <- loop(qn)(v)
+          nc <- NCName(k) leftAs s"'$k' is not a valid XML QName.".wrapNel
+          el <- loop(QName.local(nc))(v).disjunction
         } yield el
       }
 
       elementName => {
-        case Data.Binary(bytes) => elem(elementName, "binary"   , Text(base64(bytes))          ).point[F]
-        case Data.Bool(b)       => elem(elementName, "boolean"  , Text(b.fold("true", "false"))).point[F]
-        case Data.Date(d)       => elem(elementName, "date"     , Text(localDate(d))           ).point[F]
-        case Data.Dec(d)        => elem(elementName, "decimal"  , Text(d.toString)             ).point[F]
-        case Data.Id(id)        => elem(elementName, "id"       , Text(id)                     ).point[F]
-        case Data.Int(i)        => elem(elementName, "integer"  , Text(i.toString)             ).point[F]
-        case Data.Interval(d)   => elem(elementName, "interval" , Text(duration(d))            ).point[F]
-        case Data.Null          => elem(elementName, "null"     , Nil                          ).point[F]
-        case Data.Str(s)        => str(elementName              , s                            ).point[F]
-        case Data.Time(t)       => elem(elementName, "time"     , Text(localTime(t))           ).point[F]
-        case Data.Timestamp(ts) => elem(elementName, "timestamp", Text(instant(ts))            ).point[F]
+        case Data.Binary(bytes) => elem(elementName, "binary"   , Text(base64(bytes))          ).success
+        case Data.Bool(b)       => elem(elementName, "boolean"  , Text(b.fold("true", "false"))).success
+        case Data.Date(d)       => elem(elementName, "date"     , Text(localDate(d))           ).success
+        case Data.Dec(d)        => elem(elementName, "decimal"  , Text(d.toString)             ).success
+        case Data.Id(id)        => elem(elementName, "id"       , Text(id)                     ).success
+        case Data.Int(i)        => elem(elementName, "integer"  , Text(i.toString)             ).success
+        case Data.Interval(d)   => elem(elementName, "interval" , Text(duration(d))            ).success
+        case Data.Null          => elem(elementName, "null"     , Nil                          ).success
+        case Data.Str(s)        => str(elementName              , s                            ).success
+        case Data.Time(t)       => elem(elementName, "time"     , Text(localTime(t))           ).success
+        case Data.Timestamp(ts) => elem(elementName, "timestamp", Text(instant(ts))            ).success
 
         case Data.Arr(elements) =>
           elements traverse loop(ejsonArrayElt) map (elem(elementName, "array", _))
 
         case Data.Obj(entries)  =>
-          entries.toList traverse mapEntryToXml map (elem(elementName, "object", _))
+          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, "object", _))
 
-        case other              => noReprErr[F, Elem](other)
+        case other              => s"No representation for '$other' in XML.".failureNel[Elem]
       }
     }
 
-    def inner: QName => Data => F[Elem] =
+    def inner: QName => Data => Validation[ErrorMessages, Elem] =
       name => toXml0(innerStr, innerElem, inner)(name)
 
     toXml0(rootStr, rootElem, inner)(ejsonEjson)(data)
+      .fold(_.raiseError[F, Elem], _.point[F])
+  }
+
+  def fromXml[F[_]: MonadErrMsgs](elem: Elem): F[Data] = {
+    def leaf: ((EJsonType, String)) => Validation[ErrorMessages, Data] = {
+      case ("binary", b64) =>
+        base64.getOption(b64)
+          .map(bytes => Data._binary(bytes))
+          .toSuccessNel(s"Expected Base64-encoded binary data, found: $b64")
+
+      case ("boolean", "true")  => Data._bool(true).success
+      case ("boolean", "false") => Data._bool(false).success
+
+      case ("date", d) =>
+        localDate.getOption(d)
+          .map(Data._date(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
+
+      case ("decimal", d) =>
+        Validation.fromTryCatchNonFatal(BigDecimal(d))
+          .map(Data._dec(_))
+          .leftAs(s"Expected a decimal number, found: $d".wrapNel)
+
+      case ("id", id) => Data._id(id).success
+
+      case ("integer", n) =>
+        Validation.fromTryCatchNonFatal(BigInt(n))
+          .map(Data._int(_))
+          .leftAs(s"Expected an integral number, found: $n".wrapNel)
+
+      case ("interval", ivl) =>
+        duration.getOption(ivl)
+          .map(Data._interval(_))
+          .toSuccessNel(s"Expected a duration in seconds, found: $ivl")
+
+      case ("string", s) => Data._str(s).success
+
+      case ("time", t) =>
+        localTime.getOption(t)
+          .map(Data._time(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
+
+      case ("timestamp", ts) =>
+        instant.getOption(ts)
+          .map(Data._timestamp(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted date-time, found: $ts")
+
+      case (tpe, _) => s"Unrecognized type: $tpe".failureNel
+    }
+
+    def fromXml0: Node => Validation[ErrorMessages, Data] = {
+      case DataElem("object", children) =>
+        elements(children).toList
+          .traverse(el => fromXml0(el) strengthL qualifiedName(el))
+          .map(entries => Data._obj(ListMap(entries: _*)))
+
+      case DataElem("array" , children) =>
+        elements(children).toList
+          .traverse(fromXml0)
+          .map(Data._arr(_))
+
+      case DataElem("null"  , Seq()   ) => (Data.Null: Data).success
+      case DataElem(tpe     , Text(s) ) => leaf((tpe, s))
+
+      case other                        => s"Unrecognized Data XML encoding: ${other}.".failureNel
+    }
+
+    fromXml0(elem).fold(_.raiseError[F, Data], _.point[F])
   }
 
   ////
+
+  private type EJsonType = String
+
+  private object EJsonType {
+    val tpfx = ejsonType.prefix.shows
+    val tloc = ejsonType.local.shows
+
+    def unapply(metadata: MetaData): Option[String] = metadata match {
+      case PrefixedAttribute(`tpfx`, `tloc`, Text(tpe), _) => Some(tpe)
+      case _                                               => Some("string")
+    }
+  }
+
+  private object DataElem {
+    def unapply(elem: Elem): Option[(EJsonType, Seq[Node])] = elem match {
+      case Elem(_, _, EJsonType(tpe), _, _, children) => Some((tpe, children))
+      case _                                          => None
+    }
+  }
 
   // xs:base64Binary
   private val base64 = Prism[String, ImmutableArray[Byte]](
@@ -145,10 +227,4 @@ object data {
 
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
-
-  private def noReprErr[F[_]: MonadErrMsg, A](data: Data): F[A] =
-    s"No representation for '$data' in XML.".raiseError[F, A]
-
-  private def invalidQName[F[_]: MonadErrMsg, A](s: String): F[A] =
-    s"'$s' is not a valid XML QName.".raiseError[F, A]
 }
