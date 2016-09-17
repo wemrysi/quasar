@@ -18,7 +18,6 @@ package quasar.sql
 
 import quasar.Predef._
 import quasar.fp._
-import quasar.fs._
 import quasar.std._
 
 import scala.util.parsing.combinator._
@@ -28,18 +27,6 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
-
-sealed trait ParsingError { def message: String}
-final case class GenericParsingError(message: String) extends ParsingError
-final case class ParsingPathError(error: PathError) extends ParsingError {
-  def message = error.shows
-}
-
-object ParsingError {
-  implicit val parsingErrorShow: Show[ParsingError] = Show.showFromToString
-}
-
-final case class Query(value: String)
 
 sealed trait DerefType[T[_[_]]]
 final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]

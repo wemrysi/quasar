@@ -185,15 +185,17 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-   ejson, effect, js,
+   ejson, effect, js, // NB: need to get dependencies to look like:
 //          |
-         frontend,
-//          |
-          core,
+         frontend,    //   frontend, connector,
+//          |               /    \  /     \
+           sql,       //  sql,  core,    marklogic, mongodb, ...
+//          |                \    |     /
+        connector,    //      interface,
 //      / / | \ \
-  marklogic, mongodb, postgresql, skeleton, sparkcore,
+  core, marklogic, mongodb, postgresql, skeleton, sparkcore,
 //      \ \ | / /
-          main,
+        interface,
 //        /  \
       repl,   web,
 //        \  /
@@ -232,6 +234,24 @@ lazy val js = project
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val core = project
+  .settings(name := "quasar-core-internal")
+  .dependsOn(
+    frontend % BothScopes,
+    connector % BothScopes)
+  .settings(commonSettings)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true)
+  .enablePlugins(AutomateHeaderPlugin)
+
+// frontends
+
+// TODO: This area is still tangled. It contains things that should be in `sql`,
+//       things that should be in `core`, and probably other things that should
+//       be elsewhere.
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
@@ -243,13 +263,23 @@ lazy val frontend = project
     ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val core = project
-  .settings(name := "quasar-core-internal")
+lazy val sql = project
+  .settings(name := "quasar-sql-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
+
+// connectors
+
+lazy val connector = project
+  .settings(name := "quasar-connector-internal")
   .dependsOn(
     ejson % BothScopes,
     effect % BothScopes,
     js % BothScopes,
-    frontend % BothScopes)
+    frontend % BothScopes,
+    sql % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -258,32 +288,13 @@ lazy val core = project
     ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val main = project
-  .settings(name := "quasar-main-internal")
-  .dependsOn(
-    mongodb,
-    skeleton,
-    postgresql,
-    sparkcore,
-    marklogic,
-    core % BothScopes)
-  .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.main)
-  .enablePlugins(AutomateHeaderPlugin)
 
-// filesystems (backends)
-
-lazy val mongodb = project
-  .settings(name := "quasar-mongodb-internal")
-  .dependsOn(core % BothScopes)
+lazy val marklogic = project
+  .settings(name := "quasar-marklogic-internal")
+  .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.mongodb)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val skeleton = project
-  .settings(name := "quasar-skeleton-internal")
-  .dependsOn(core % BothScopes)
-  .settings(commonSettings)
+  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
+  .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogicValidation = project.in(file("marklogic-validation"))
@@ -294,38 +305,51 @@ lazy val marklogicValidation = project.in(file("marklogic-validation"))
   //       as we don't want our headers applied to XMLChar.java
   //.enablePlugins(AutomateHeaderPlugin)
 
-lazy val marklogic = project
-  .settings(name := "quasar-marklogic-internal")
-  .dependsOn(core % BothScopes, marklogicValidation)
+lazy val mongodb = project
+  .settings(name := "quasar-mongodb-internal")
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
-  .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
-  .settings(libraryDependencies ++= Dependencies.marklogic)
+  .settings(libraryDependencies ++= Dependencies.mongodb)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val skeleton = project
+  .settings(name := "quasar-skeleton-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.sparkcore)
   .enablePlugins(AutomateHeaderPlugin)
 
-
-// frontends
-
-// TODO: Get SQL here
-
 // interfaces
+
+lazy val interface = project
+  .settings(name := "quasar-interface-internal")
+  .dependsOn(
+    core % BothScopes,
+    marklogic,
+    mongodb,
+    postgresql,
+    sparkcore,
+    skeleton)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.interface)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(main, foundation % BothScopes)
+  .dependsOn(interface, foundation % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
@@ -337,7 +361,7 @@ lazy val repl = project
 
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(main, core % BothScopes)
+  .dependsOn(interface, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
