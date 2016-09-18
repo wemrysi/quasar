@@ -48,7 +48,7 @@ package object qscript {
     implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
       new ProjectBucketPlanner[F, T]
 
-    implicit def thetajoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
+    implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
       new ThetaJoinPlanner[F, T]
 
     implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
