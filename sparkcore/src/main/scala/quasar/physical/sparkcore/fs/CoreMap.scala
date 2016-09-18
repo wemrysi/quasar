@@ -73,31 +73,50 @@ object CoreMap {
     case Negate(f) => (f >>> {
       case Data.Int(v) => Data.Int(-v)
       case Data.Dec(v) => Data.Dec(-v)
-      // case Data.Interval(v) => 
+      case Data.Interval(v) => Data.Interval(v.negated())
       case _ => Data.NA
     }).right
+    // TODO not all permutations covered (should they be covered?)
     case Add(f1, f2) => ((x: Data) => add(f1(x), f2(x))).right
     case Multiply(f1, f2) => ((x: Data) => multiply(f1(x), f2(x))).right
     case Subtract(f1, f2) => ((x: Data) => subtract(f1(x), f2(x))).right
     case Divide(f1, f2) => ((x: Data) => divide(f1(x), f2(x))).right
-    case Modulo(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a % b)
+    case Modulo(f1, f2) => ((x: Data) => modulo(f1(x), f2(x))).right
+    case Power(f1, f2) => ((x: Data) => power(f1(x), f2(x))).right
+
+    case Not(f) => (f >>> {
+      case Data.Bool(b) => Data.Bool(!b)
       case _ => Data.NA
     }).right
+    case Eq(f1, f2) => ((x: Data) => eq(f1(x), f2(x))).right
+    case Neq(f1, f2) => ((x: Data) => eq(f1(x), f2(x)) match {
+      case Data.Bool(b) => Data.Bool(!b)
+      case _ => Data.NA
+    }).right
+
     case ToString(f) => (f >>> toStringFunc).right
     case _ => InternalError("not implemented").left
   }
 
-
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(new JBigDecimal(b.bigInteger)))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) + b)
+    case (Data.Int(a), Data.Interval(b)) => ???
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
+    case (Data.Dec(a), Data.Interval(b)) => ???
+    case (Data.Interval(a), Data.Int(b)) => ???
+    case (Data.Interval(a), Data.Dec(b)) => ???
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
-    case (Data.Date(a), Data.Interval(b)) => Data.Date(a.plus(b))
-    case (Data.Time(a), Data.Interval(b)) => Data.Time(a.plus(b))
+    case (Data.Timestamp(a), Data.Int(b)) => ???
+    case (Data.Timestamp(a), Data.Dec(b)) => ???
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
+    case (Data.Date(a), Data.Int(b)) => ???
+    case (Data.Date(a), Data.Dec(b)) => ???
+    case (Data.Date(a), Data.Interval(b)) => Data.Date(a.plus(b))
+    case (Data.Time(a), Data.Int(b)) => ???
+    case (Data.Time(a), Data.Dec(b)) => ???
+    case (Data.Time(a), Data.Interval(b)) => Data.Time(a.plus(b))
     case _ => Data.NA
   }
 
@@ -132,6 +151,61 @@ object CoreMap {
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => Data.NA
+  }
+
+  //MathRel Numeric
+  private def modulo(d1: Data, d2: Data) = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
+    case (Data.Int(a), Data.Dec(b)) => ???
+    case (Data.Dec(a), Data.Int(b)) => ???
+    case (Data.Dec(a), Data.Dec(b)) => ???
+    case (Data.Interval(a), Data.Int(b)) => ???
+    case (Data.Interval(a), Data.Dec(b)) => ???
+    case _ => Data.NA
+  }
+
+  private def power(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Int(a ^ b)
+    case (Data.Int(a), Data.Dec(b)) => ???
+    case (Data.Dec(a), Data.Int(b)) => ???
+    case (Data.Dec(a), Data.Dec(b)) => ???
+    case _ => Data.NA
+  }
+
+  private def eq(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Null, Data.Null) => Data.Bool(true) // is it really?
+    case (Data.Str(a), Data.Str(b)) => Data.Bool(a == b)
+    case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a == b)
+    case (Data.Int(a), Data.Int(b)) => Data.Bool(a == b)
+    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a == b)
+    case (Data.Obj(a), Data.Obj(b)) => ??? // TODO
+    case (Data.Arr(a), Data.Arr(b)) => if(a.size != b.size) Data.Bool(false) else {
+      a.zip(b)
+        .map {
+        case (d1, d2) => eq(d1, d2)
+      }.fold(Data.Bool(true)){
+        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
+        case _ => Data.NA
+      }
+    }
+    case (Data.Set(a), Data.Set(b)) => if(a.size != b.size) Data.Bool(false) else {
+      a.zip(b)
+        .map {
+        case (d1, d2) => eq(d1, d2)
+      }.fold(Data.Bool(true)){
+        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
+        case _ => Data.NA
+      }
+    }
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a == b)
+    case (Data.Date(a), Data.Date(b)) => Data.Bool(a == b)
+    case (Data.Time(a), Data.Time(b)) => Data.Bool(a == b)
+    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a == b)
+    case (Data.Binary(a), Data.Binary(b)) => Data.Bool(a == b)
+    case (Data.Id(a), Data.Id(b)) => Data.Bool(a == b)
+    case (Data.NA, Data.NA) => Data.Bool(true) // is it really?
+    case _ => Data.Bool(false)
+
   }
 
   private def toStringFunc: Data => Data = {
