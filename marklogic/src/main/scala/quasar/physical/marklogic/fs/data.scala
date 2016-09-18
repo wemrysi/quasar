@@ -24,9 +24,14 @@ import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 
 import scala.xml._
+import java.util.Base64
 
 import eu.timepit.refined.auto._
 import jawn._
+import monocle.Prism
+import org.threeten.bp._
+import org.threeten.bp.format._
+import org.threeten.bp.temporal.TemporalAccessor
 import scalaz.{Node => _, _}, Scalaz._
 
 object data {
@@ -81,17 +86,17 @@ object data {
       }
 
       elementName => {
-        case Data.Binary(bytes) => ???
-        case Data.Bool(b)       => elem(elementName, "boolean", Text(b.fold("true", "false"))).point[F]
-        case Data.Date(d)       => ???
-        case Data.Dec(d)        => elem(elementName, "decimal", Text(d.toString)             ).point[F]
-        case Data.Id(id)        => elem(elementName, "id"     , Text(id)                     ).point[F]
-        case Data.Int(i)        => elem(elementName, "integer", Text(i.toString)             ).point[F]
-        case Data.Interval(ivl) => ???
-        case Data.Null          => elem(elementName, "null"   , Nil                          ).point[F]
-        case Data.Str(s)        => str(elementName            , s                            ).point[F]
-        case Data.Time(t)       => ???
-        case Data.Timestamp(ts) => ???
+        case Data.Binary(bytes) => elem(elementName, "binary"   , Text(base64(bytes))          ).point[F]
+        case Data.Bool(b)       => elem(elementName, "boolean"  , Text(b.fold("true", "false"))).point[F]
+        case Data.Date(d)       => elem(elementName, "date"     , Text(localDate(d))           ).point[F]
+        case Data.Dec(d)        => elem(elementName, "decimal"  , Text(d.toString)             ).point[F]
+        case Data.Id(id)        => elem(elementName, "id"       , Text(id)                     ).point[F]
+        case Data.Int(i)        => elem(elementName, "integer"  , Text(i.toString)             ).point[F]
+        case Data.Interval(d)   => elem(elementName, "interval" , Text(duration(d))            ).point[F]
+        case Data.Null          => elem(elementName, "null"     , Nil                          ).point[F]
+        case Data.Str(s)        => str(elementName              , s                            ).point[F]
+        case Data.Time(t)       => elem(elementName, "time"     , Text(localTime(t))           ).point[F]
+        case Data.Timestamp(ts) => elem(elementName, "timestamp", Text(instant(ts))            ).point[F]
 
         case Data.Arr(elements) =>
           elements traverse loop(ejsonArrayElt) map (elem(elementName, "array", _))
@@ -108,6 +113,35 @@ object data {
 
     toXml0(rootStr, rootElem, inner)(ejsonEjson)(data)
   }
+
+  ////
+
+  // xs:base64Binary
+  private val base64 = Prism[String, ImmutableArray[Byte]](
+    s => \/.fromTryCatchNonFatal(Base64.getDecoder.decode(s)).map(ImmutableArray.fromArray).toOption)(
+    (Base64.getEncoder.encodeToString(_)) compose (_.toArray))
+
+  // xs:date
+  private val localDate: Prism[String, LocalDate] = temporal(LocalDate.from, DateTimeFormatter.ISO_LOCAL_DATE)
+  // xs:time
+  private val localTime: Prism[String, LocalTime] = temporal(LocalTime.from, DateTimeFormatter.ISO_LOCAL_TIME)
+  // xs:dateTime
+  private val instant: Prism[String, Instant] = temporal(Instant.from, DateTimeFormatter.ISO_INSTANT)
+
+  private def temporal[T <: TemporalAccessor](f: TemporalAccessor => T, fmt: DateTimeFormatter): Prism[String, T] =
+    Prism[String, T](s => \/.fromTryCatchNonFatal(f(fmt.parse(s))).toOption)(fmt.format)
+
+  private val DurationEncoding = "(-?\\d+)(?:\\.(\\d+))?".r
+
+  private val duration = Prism[String, Duration] {
+    case DurationEncoding(secs, nanos) =>
+      \/.fromTryCatchNonFatal(Duration.ofSeconds(secs.toLong, nanos.toLong)).toOption
+
+    case DurationEncoding(secs) =>
+      \/.fromTryCatchNonFatal(Duration.ofSeconds(secs.toLong)).toOption
+
+    case _ => None
+  } (d => s"${d.getSeconds}.${d.getNano}")
 
   private val ejsBinding: NamespaceBinding =
     NamespaceBinding(ejsonNs.prefix.shows, ejsonNs.uri.shows, TopScope)
