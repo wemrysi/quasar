@@ -33,13 +33,15 @@ private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: Mona
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {
-        l   <- freshVar[F]
-        r   <- freshVar[F]
-        lhs <- rebaseXQuery(lBranch, src)
-        rhs <- rebaseXQuery(rBranch, src)
-        body <- planMapFunc(combine){ case LeftSide => l.xqy case RightSide => r.xqy}
+        l      <- freshVar[F]
+        r      <- freshVar[F]
+        lhs    <- rebaseXQuery(lBranch, src)
+        rhs    <- rebaseXQuery(rBranch, src)
+        filter <- planMapFunc(on){ case LeftSide => l.xqy case RightSide => r.xqy }
+        body   <- planMapFunc(combine){ case LeftSide => l.xqy case RightSide => r.xqy }
       } yield {
         for_(l -> lhs, r -> rhs).
+        where_(filter).
         return_(body)
       }
   }
