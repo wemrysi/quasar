@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
-import quasar.fp._
+import quasar.fp._, eitherT._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
@@ -28,7 +28,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._, string._ // TODO: remove this
 import javascript._
 
@@ -946,9 +946,6 @@ object MongoDbQScriptPlanner {
       EitherT[WriterT[MongoDbIO, PhaseResults, ?], FileSystemError, Crystallized[WF]] = {
     val optimize = new Optimize[T]
 
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-
     // NB: Locally add state on top of the result monad so everything
     //     can be done in a single for comprehension.
     type PlanT[X[_], A] = EitherT[X, FileSystemError, A]
@@ -974,8 +971,10 @@ object MongoDbQScriptPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
 
+    val lc = listContents andThen (ss => EitherT(ss.run.liftM[PhaseResultT]))
+
     (for {
-      qs  <- QueryFile.convertToQScriptRead[T, MongoDbIO, QScriptRead[T, ?]](listContents)(lp).liftM[StateT[?[_], NameGen, ?]]
+      qs  <- QueryFile.convertToQScriptRead[T, F, QScriptRead[T, ?]](lc)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme

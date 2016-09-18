@@ -20,7 +20,8 @@ import quasar.Predef._
 import quasar.fp.TaskRef
 import quasar.fp._, free._
 
-import scalaz._, concurrent.Task
+import scalaz._, scalaz.syntax.applicative._
+import scalaz.concurrent.Task
 
 /** Provides the ability to obtain a value of type `R` from the environment.
   *
@@ -35,15 +36,12 @@ object Read {
     extends LiftedOps[Read[R, ?], S] { self =>
 
     /** Request a value from the environment. */
-    def ask: F[R] =
-    lift(Ask(r => r))
+    def ask: F[R] = lift(Ask(r => r))
 
     /** Request and modify a value from the environment. */
-    def asks[A](f: R => A): F[A] =
-    ask map f
+    def asks[A](f: R => A): F[A] = ask map f
 
-    def asksM[A](f: R => F[A]): F[A] =
-    ask flatMap f
+    def asksM[A](f: R => F[A]): F[A] = ask flatMap f
 
     /** Evaluate a computation in a modified environment. */
     def local(f: R => R): F ~> F = {
@@ -62,8 +60,7 @@ object Read {
     }
 
     /** Evaluate a computation using the given environment. */
-    def scope(r: R): F ~> F =
-    local(_ => r)
+    def scope(r: R): F ~> F = local(_ => r)
 
     implicit val monadReader: MonadReader[F, R] =
       new MonadReader[F, R] {
@@ -79,39 +76,9 @@ object Read {
       new Ops[R, S]
   }
 
-  def contramapR[Q, R](f: Q => R): Read[R, ?] ~> Read[Q, ?] =
-    new (Read[R, ?] ~> Read[Q, ?]) {
-      def apply[A](ra: Read[R, A]) = ra match {
-        case Ask(g) => Ask(g compose f)
-      }
-    }
-
-  def constant[F[_], R](r: R)(implicit F: Applicative[F]): Read[R, ?] ~> F =
-    new (Read[R, ?] ~> F) {
-      private val fr = F.point(r)
-      def apply[A](ra: Read[R, A]) = ra match {
-        case Ask(f) => F.map(fr)(f)
-      }
-    }
-
-  def fromTaskRef[R](tr: TaskRef[R]): Read[R, ?] ~> Task =
-    new (Read[R, ?] ~> Task) {
-      def apply[A](ra: Read[R, A]) = ra match {
-        case Ask(f) => tr.read.map(f)
-      }
-    }
-
-  def toReader[F[_], R](implicit F: MonadReader[F, R]): Read[R, ?] ~> F =
-    new (Read[R, ?] ~> F) {
-      def apply[A](ra: Read[R, A]) = ra match {
-        case Ask(f) => F.asks(f)
-      }
-    }
-
-  def toState[F[_], R](implicit F: MonadState[F, R]): Read[R, ?] ~> F =
-    new (Read[R, ?] ~> F) {
-      def apply[A](ra: Read[R, A]) = ra match {
-        case Ask(f) => F.gets(f)
-      }
-    }
+  def contramapR[Q, R](f: Q => R)                      = λ[Read[R, ?] ~> Read[Q, ?]] { case Ask(g) => Ask(g compose f) }
+  def constant[F[_]: Applicative, R](r: R)             = λ[Read[R, ?] ~> F]          { case Ask(f) => r.point[F] map f }
+  def fromTaskRef[R](tr: TaskRef[R])                   = λ[Read[R, ?] ~> Task]       { case Ask(f) => tr.read map f    }
+  def toReader[F[_], R](implicit F: MonadReader[F, R]) = λ[Read[R, ?] ~> F]          { case Ask(f) => F asks f         }
+  def toState[F[_], R](implicit F: MonadState[F, R])   = λ[Read[R, ?] ~> F]          { case Ask(f) => F gets f         }
 }
