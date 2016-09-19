@@ -341,6 +341,7 @@ lazy val interface = project
     marklogic,
     mongodb,
     postgresql,
+    sparkcore,
     skeleton)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.interface)
