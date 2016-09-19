@@ -85,7 +85,6 @@ object Dependencies {
     "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   def web = Seq(
-    "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,

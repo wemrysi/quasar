@@ -1106,6 +1106,30 @@ object MongoDbPlanner {
     }
   }
 
+  /** To be used by backends that require collections to contain Obj, this
+    * looks at type checks on `Read` then either eliminates them if they are
+    * trivial, leaves them if they check field contents, or errors if they are
+    * incompatible.
+    */
+  def assumeReadObjƒ:
+      AlgebraM[PlannerError \/ ?, LogicalPlan, Fix[LogicalPlan]] = {
+    case x @ LetF(n, r @ Fix(ReadF(_)),
+      Fix(TypecheckF(Fix(FreeF(nf)), typ, cont, _)))
+        if n == nf =>
+      typ match {
+        case Type.Obj(m, Some(Type.Top)) if m == ListMap() =>
+          \/-(Let(n, r, cont))
+        case Type.Obj(_, _) =>
+          \/-(Fix(x))
+        case _ =>
+          -\/(UnsupportedPlan(x,
+            Some("collections can only contain objects, but a(n) " +
+              typ +
+              " is expected")))
+      }
+    case x => \/-(Fix(x))
+  }
+
   def plan0[F[_]: Functor: Coalesce: Crush: Crystallize]
     (joinHandler: JoinHandler[F, WorkflowBuilder.M])
     (logical: Fix[LogicalPlan])
@@ -1135,7 +1159,7 @@ object MongoDbPlanner {
     val wfƒ = workflowƒ[F](joinHandler) ⋙ (_ ∘ (_ ∘ (_ ∘ normalize[F])))
 
     (for {
-      cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](Optimizer.assumeReadObjƒ)))
+      cleaned <- log("Logical Plan (reduced typechecks)")(liftError(logical.cataM[PlannerError \/ ?, Fix[LogicalPlan]](assumeReadObjƒ)))
       align <- log("Logical Plan (aligned joins)")       (liftError(cleaned.apo(elideJoinCheckƒ).cataM(alignJoinsƒ ⋘ repeatedly(Optimizer.simplifyƒ[Fix]))))
       prep <- log("Logical Plan (projections preferred)")(Optimizer.preferProjections(align).point[M])
       wb   <- log("Workflow Builder")                    (swizzle(swapM(lpParaZygoHistoS(prep)(annotateƒ, wfƒ))))
