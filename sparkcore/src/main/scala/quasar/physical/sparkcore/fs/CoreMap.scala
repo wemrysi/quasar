@@ -93,7 +93,21 @@ object CoreMap {
       case Data.Bool(b) => Data.Bool(!b)
       case _ => Data.NA
     }).right
-
+    case Lt(f1, f2) => ((x: Data) => lt(f1(x), f2(x))).right
+    case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
+    case Gt(f1, f2) => ((x: Data) => gt(f1(x), f2(x))).right
+    case Gte(f1, f2) => ((x: Data) => gte(f1(x), f2(x))).right
+    case IfUndefined(f1, f2) => ??? // TODO
+    case And(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a && b)
+      case _ => Data.NA
+    }).right
+    case Or(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
+      case _ => Data.NA
+    }).right
+    case Coalesce(f1, f2)_ => ??? // TODO
+    case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
     case ToString(f) => (f >>> toStringFunc).right
     case _ => InternalError("not implemented").left
   }
@@ -205,9 +219,81 @@ object CoreMap {
     case (Data.Id(a), Data.Id(b)) => Data.Bool(a == b)
     case (Data.NA, Data.NA) => Data.Bool(true) // is it really?
     case _ => Data.Bool(false)
-
   }
 
+  //  Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
+  private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
+    case (Data.Int(a), Data.Dec(b)) => ??? // TODO
+    case (Data.Int(a), Data.Interval(b)) => ???
+    case (Data.Int(a), Data.Str(b)) => ???
+    case (Data.Int(a), Data.Timestamp(b)) => ???
+    case (Data.Int(a), Data.Date(b)) => ???
+    case (Data.Int(a), Data.Time(b)) => ???
+    case (Data.Int(a), Data.Bool(b)) => ???
+    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
+    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
+      case (false, true) => Data.Bool(true)
+      case _ => Data.Bool(false)
+    }
+    case _ => Data.NA
+  }
+
+  private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Bool(a <= b)
+    // TODO same as lt
+    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a <= b)
+    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
+      case (true, false) => Data.Bool(false)
+      case _ => Data.Bool(true)
+    }
+    case _ => Data.NA
+  }
+
+  private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Bool(a > b)
+    // TODO same as lt
+    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a > b)
+    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
+      case (true, false) => Data.Bool(true)
+      case _ => Data.Bool(false)
+    }
+    case _ => Data.NA
+  }
+
+  private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
+    case (Data.Int(a), Data.Int(b)) => Data.Bool(a >= b)
+    // TODO same as lt
+    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a >= b)
+    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
+      case (false, true) => Data.Bool(false)
+      case _ => Data.Bool(true)
+    }
+    case _ => Data.NA
+  }
+
+  private def between(d1: Data, d2: Data, d3: Data): Data = ???
+  
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
     case d: Data.Str => d
