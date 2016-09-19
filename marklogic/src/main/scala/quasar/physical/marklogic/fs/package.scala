@@ -36,6 +36,14 @@ package object fs {
   import xcc.{ContentSourceIO, ResultCursor, SessionIO}
   import uuid.GenUUID
 
+  type ErrorMessages = NonEmptyList[String]
+
+  type MonadErrMsgs[F[_]] = MonadError[F, ErrorMessages]
+
+  object MonadErrMsgs {
+    def apply[F[_]](implicit F: MonadErrMsgs[F]): MonadErrMsgs[F] = F
+  }
+
   type MLReadHandles[A] = KeyValueStore[ReadHandle, ReadStream[ContentSourceIO], A]
   type MLWriteHandles[A] = KeyValueStore[WriteHandle, Unit, A]
   type MLResultHandles[A] = KeyValueStore[ResultHandle, ResultCursor, A]
