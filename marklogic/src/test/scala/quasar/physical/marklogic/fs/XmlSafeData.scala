@@ -37,16 +37,11 @@ object XmlSafeData {
 
   implicit val arbitrary: Arbitrary[XmlSafeData] =
     Arbitrary(genData(
-      // object keys
-      Gen.nonEmptyListOf(Gen.alphaChar) map (_.mkString   ),
-      // strings
-      Gen.listOf(Gen.alphaNumChar)      map (_.mkString   ),
-      // ints
-      arb[Int]                          map (BigInt(_)    ),
-      // decs
-      arb[Double]                       map (BigDecimal(_)),
-      // ids
-      Gen.listOf(Gen.alphaNumChar)      map (_.mkString   )
+      objKeySrc = Gen.nonEmptyListOf(Gen.alphaChar) map (_.mkString   ),
+      strSrc    = Gen.listOf(Gen.alphaNumChar)      map (_.mkString   ),
+      intSrc    = arb[Int]                          map (BigInt(_)    ),
+      decSrc    = arb[Double]                       map (BigDecimal(_)),
+      idSrc     = Gen.listOf(Gen.alphaNumChar)      map (_.mkString   )
     ) map (XmlSafeData(_)))
 
   implicit val shrink: Shrink[XmlSafeData] =
