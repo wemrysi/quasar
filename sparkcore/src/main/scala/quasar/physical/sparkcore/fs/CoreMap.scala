@@ -26,7 +26,7 @@ import quasar.SKI.κ
 
 import java.math.{BigDecimal => JBigDecimal}
 
-import org.threeten.bp.Instant
+import org.threeten.bp.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}, Recursive.ops._
 import scalaz.{Divide => _, _}, Scalaz._
 
@@ -60,7 +60,7 @@ object CoreMap {
       case _ => Data.NA
     }).right
     case TimeOfDay(f) => (f >>> {
-      case Data.Timestamp(v) => ??? // DONTKNOW how convert from Instant to LocalTime?
+      case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
       case _ => Data.NA
     }).right
     case ToTimestamp(f) => (f >>> {
@@ -106,7 +106,7 @@ object CoreMap {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => Data.NA
     }).right
-    case Coalesce(f1, f2)_ => ??? // TODO
+    case Coalesce(f1, f2) => ??? // TODO
     case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
     case ToString(f) => (f >>> toStringFunc).right
     case _ => InternalError("not implemented").left
