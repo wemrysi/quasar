@@ -37,15 +37,14 @@ object data {
   object JsonParser extends SupportParser[Data] {
     implicit val facade: Facade[Data] =
       new SimpleFacade[Data] {
-        def jarray(arr: List[Data]) = Data.Arr(arr)
-        // TODO: Should `ListMap` really be in the interface, or just used as impl?
+        def jarray(arr: List[Data])         = Data.Arr(arr)
         def jobject(obj: Map[String, Data]) = Data.Obj(ListMap(obj.toList: _*))
-        def jnull() = Data.Null
-        def jfalse() = Data.False
-        def jtrue() = Data.True
-        def jnum(n: String) = Data.Dec(BigDecimal(n))
-        def jint(n: String) = Data.Int(BigInt(n))
-        def jstring(s: String) = Data.Str(s)
+        def jnull()                         = Data.Null
+        def jfalse()                        = Data.False
+        def jtrue()                         = Data.True
+        def jnum(n: String)                 = Data.Dec(BigDecimal(n))
+        def jint(n: String)                 = Data.Int(BigInt(n))
+        def jstring(s: String)              = Data.Str(s)
       }
   }
 
@@ -88,6 +87,7 @@ object data {
         case Data.Id(id)        => elem(elementName, "id"       , Text(id)                     ).success
         case Data.Int(i)        => elem(elementName, "integer"  , Text(i.toString)             ).success
         case Data.Interval(d)   => elem(elementName, "interval" , Text(duration(d))            ).success
+        case Data.NA            => elem(elementName, "na"       , Nil                          ).success
         case Data.Null          => elem(elementName, "null"     , Nil                          ).success
         case Data.Str(s)        => str(elementName              , s                            ).success
         case Data.Time(t)       => elem(elementName, "time"     , Text(localTime(t))           ).success
@@ -111,67 +111,68 @@ object data {
   }
 
   def fromXml[F[_]: MonadErrMsgs](elem: Elem): F[Data] = {
-    def leaf: ((EJsonType, String)) => Validation[ErrorMessages, Data] = {
-      case ("binary", b64) =>
+    def fromXml0: Node => Validation[ErrorMessages, Data] = {
+      case DataNode("array", children) =>
+        elements(children).toList traverse fromXml0 map (Data._arr(_))
+
+      case DataNode("binary", Txt(b64)) =>
         base64.getOption(b64)
           .map(bytes => Data._binary(bytes))
           .toSuccessNel(s"Expected Base64-encoded binary data, found: $b64")
 
-      case ("boolean", "true")  => Data._bool(true).success
-      case ("boolean", "false") => Data._bool(false).success
+      case DataNode("binary", Seq()   ) =>
+        Data._binary(ImmutableArray.fromArray(Array())).success
 
-      case ("date", d) =>
+      case DataNode("boolean", Txt("true"))  => Data._bool(true).success
+      case DataNode("boolean", Txt("false")) => Data._bool(false).success
+
+      case DataNode("date", Txt(d)) =>
         localDate.getOption(d)
           .map(Data._date(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
 
-      case ("decimal", d) =>
+      case DataNode("decimal", Txt(d)) =>
         Validation.fromTryCatchNonFatal(BigDecimal(d))
           .map(Data._dec(_))
           .leftAs(s"Expected a decimal number, found: $d".wrapNel)
 
-      case ("id", id) => Data._id(id).success
+      case DataNode("id", Txt(id)) => Data._id(id).success
+      case DataNode("id", Seq()  ) => Data._id("").success
 
-      case ("integer", n) =>
+      case DataNode("integer", Txt(n)) =>
         Validation.fromTryCatchNonFatal(BigInt(n))
           .map(Data._int(_))
           .leftAs(s"Expected an integral number, found: $n".wrapNel)
 
-      case ("interval", ivl) =>
+      case DataNode("interval", Txt(ivl)) =>
         duration.getOption(ivl)
           .map(Data._interval(_))
           .toSuccessNel(s"Expected a duration in seconds, found: $ivl")
 
-      case ("string", s) => Data._str(s).success
+      case DataNode("na", Seq()) => (Data.NA: Data).success
 
-      case ("time", t) =>
-        localTime.getOption(t)
-          .map(Data._time(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
+      case DataNode("null", Seq()) => (Data.Null: Data).success
 
-      case ("timestamp", ts) =>
-        instant.getOption(ts)
-          .map(Data._timestamp(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted date-time, found: $ts")
-
-      case (tpe, _) => s"Unrecognized type: $tpe".failureNel
-    }
-
-    def fromXml0: Node => Validation[ErrorMessages, Data] = {
-      case DataElem("object", children) =>
+      case DataNode("object", children) =>
         elements(children).toList
           .traverse(el => fromXml0(el) strengthL qualifiedName(el))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
-      case DataElem("array" , children) =>
-        elements(children).toList
-          .traverse(fromXml0)
-          .map(Data._arr(_))
+      case DataNode("string", Txt(s)) => Data._str(s).success
+      case DataNode("string", Seq() ) => Data._str("").success
 
-      case DataElem("null"  , Seq()   ) => (Data.Null: Data).success
-      case DataElem(tpe     , Text(s) ) => leaf((tpe, s))
+      case DataNode("time", Txt(t)) =>
+        localTime.getOption(t)
+          .map(Data._time(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
 
-      case other                        => s"Unrecognized Data XML encoding: ${other}.".failureNel
+      case DataNode("timestamp", Txt(ts)) =>
+        instant.getOption(ts)
+          .map(Data._timestamp(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted date-time, found: $ts")
+
+      case DataNode(tpe, _) => s"Unrecognized type: $tpe".failureNel
+      case other            => s"Unrecognized Data XML: $other.".failureNel
     }
 
     fromXml0(elem).fold(_.raiseError[F, Data], _.point[F])
@@ -181,21 +182,19 @@ object data {
 
   private type EJsonType = String
 
-  private object EJsonType {
-    val tpfx = ejsonType.prefix.shows
-    val tloc = ejsonType.local.shows
+  private object DataNode {
+    def unapply(node: Node): Option[(EJsonType, Seq[Node])] = {
+      val tpe = node.attributes collectFirst {
+        case PrefixedAttribute(p, n, Seq(Text(t)), _) if s"$p:$n" === ejsonType.shows => t
+      } getOrElse "string"
 
-    def unapply(metadata: MetaData): Option[String] = metadata match {
-      case PrefixedAttribute(`tpfx`, `tloc`, Text(tpe), _) => Some(tpe)
-      case _                                               => Some("string")
+      Some((tpe, node.child))
     }
   }
 
-  private object DataElem {
-    def unapply(elem: Elem): Option[(EJsonType, Seq[Node])] = elem match {
-      case Elem(_, _, EJsonType(tpe), _, _, children) => Some((tpe, children))
-      case _                                          => None
-    }
+  private object Txt {
+    def unapply(nodes: Seq[Node]): Option[String] =
+      nodes.headOption collect { case Text(s) => s }
   }
 
   // xs:base64Binary
@@ -208,7 +207,7 @@ object data {
   // xs:time
   private val localTime: Prism[String, LocalTime] = temporal(LocalTime.from, DateTimeFormatter.ISO_LOCAL_TIME)
   // xs:dateTime
-  private val instant: Prism[String, Instant] = temporal(Instant.from, DateTimeFormatter.ISO_INSTANT)
+  private val instant: Prism[String, Instant]     = temporal(Instant.from  , DateTimeFormatter.ISO_INSTANT)
 
   private def temporal[T <: TemporalAccessor](f: TemporalAccessor => T, fmt: DateTimeFormatter): Prism[String, T] =
     Prism[String, T](s => \/.fromTryCatchNonFatal(f(fmt.parse(s))).toOption)(fmt.format)

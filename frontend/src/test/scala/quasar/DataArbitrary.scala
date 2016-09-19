@@ -31,11 +31,11 @@ trait DataArbitrary {
         Gen.listOf(for { c <- Gen.alphaChar; d <- simpleData } yield c.toString -> d).map(t => Data.Obj(ListMap(t: _*))),
         Gen.listOf(simpleData).map(Data.Arr(_)),
         // Tricky cases:
-        Gen.const(Data.Obj(ListMap("$date" -> Data.Str("Jan 1")))),
+        Gen.const(Data.Obj(ListMap("date" -> Data.Str("Jan 1")))),
         SafeInt.map(x =>
           Data.Obj(ListMap(
-            "$obj" -> Data.Obj(ListMap(
-              "$obj" -> Data.Int(x))))))))
+            "obj" -> Data.Obj(ListMap(
+              "obj" -> Data.Int(x))))))))
   }
 
   implicit def dataShrink(implicit l: Shrink[List[Data]], m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
