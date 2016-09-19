@@ -17,10 +17,11 @@
 package quasar.physical.marklogic.fs
 
 import quasar.Predef._
-import quasar.{Data, DataCodec}
+import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp.free.lift
 import quasar.fs._
+import quasar.physical.marklogic.fs.data.toXml
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml._
@@ -60,7 +61,7 @@ object ops {
 
     val createOptions = {
       val copts = new ContentCreateOptions()
-      copts.setFormatJson()
+      copts.setFormatXml()
       copts
     }
 
@@ -71,10 +72,11 @@ object ops {
       if (width === 0) "" else s"%0${width}x"
     }
 
-    val jsonData: Vector[FileSystemError \/ String] =
+    val xmlData: Vector[FileSystemError \/ String] =
       data map { d =>
-        DataCodec.render(d)(DataCodec.Precise)
-          .leftMap(e => FileSystemError.writeFailed(d, e.message))
+        toXml[ErrorMessages \/ ?](d).bimap(
+          ms => FileSystemError.writeFailed(d, ms.intercalate(", ")),
+          _.toString)
       }
 
     def mkContent(cid: String, seqNum: Int, str: String): Content = {
@@ -85,8 +87,8 @@ object ops {
 
     for {
       cid  <- chunkId
-      (errs, contents) = jsonData.separate
-      cs   =  contents.zipWithIndex map { case (json, i) => mkContent(cid, i, json) }
+      (errs, contents) = xmlData.separate
+      cs   =  contents.zipWithIndex map { case (xml, i) => mkContent(cid, i, xml) }
       exs  <- lift(SessionIO.insertContentCollectErrors(cs)).into[S]
     } yield if (exs.isEmpty) errs else (FileSystemError.partialWrite(errs.length) +: errs)
   }
@@ -228,7 +230,7 @@ object ops {
       IList(cts.indexOrder(cts.uriReference, "ascending".xs)))
 
     ContentSourceIO.resultStream(SessionIO.evaluateQuery_(xqy))
-      .map(xdmitem.toData)
+      .map(xdm => xdmitem.toData[ErrorMessages \/ ?](xdm) | Data.NA)
   }
 
   ////
