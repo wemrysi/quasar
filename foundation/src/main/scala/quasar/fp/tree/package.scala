@@ -21,33 +21,31 @@ import quasar.Predef._
 import matryoshka._
 import scalaz._
 
+/** "Generic" types for building partially-constructed trees in some
+  * "functorized" type. */
+// TODO: submit to matryoshka?
 package object tree {
-  /** A tree structure with one kind of hole. See `eval1`. */
+  /** A tree structure with one kind of hole. See [[UnaryOps.eval]]. */
   type Unary[F[_]] = Free[F, UnaryArg]
   object Unary {
     def arg[F[_]]: Unary[F] = Free.pure(UnaryArg._1)
   }
-
-  /** A tree structure with two kinds of holes. See `eval2`. */
-  type Binary[F[_]] = Free[F, BinaryArg]
-  object Binary {
-    def arg1[F[_]]: Binary[F] = Free.pure(BinaryArg._1)
-    def arg2[F[_]]: Binary[F] = Free.pure(BinaryArg._2)
-  }
-
-  /** A tree structure with three kinds of holes. See `eval3`. */
-  type Ternary[F[_]] = Free[F, TernaryArg]
-  object Ternary {
-    def arg1[F[_]]: Ternary[F] = Free.pure(TernaryArg._1)
-    def arg2[F[_]]: Ternary[F] = Free.pure(TernaryArg._2)
-    def arg3[F[_]]: Ternary[F] = Free.pure(TernaryArg._3)
-  }
-
   trait UnaryArg {
     def fold[A](arg1: A): A = arg1
   }
   object UnaryArg {
     case object _1 extends UnaryArg
+  }
+  implicit class UnaryOps[F[_]](self: Unary[F]) {
+    def eval[T[_[_]]: Corecursive](arg: T[F])(implicit F: Functor[F]): T[F] =
+      freeCata[F, UnaryArg, T[F]](self)(interpret(_.fold(arg), _.embed))
+  }
+
+  /** A tree structure with two kinds of holes. See [[BinaryOps.eval]]. */
+  type Binary[F[_]] = Free[F, BinaryArg]
+  object Binary {
+    def arg1[F[_]]: Binary[F] = Free.pure(BinaryArg._1)
+    def arg2[F[_]]: Binary[F] = Free.pure(BinaryArg._2)
   }
   trait BinaryArg {
     def fold[A](arg1: A, arg2: A): A = this match {
@@ -58,6 +56,18 @@ package object tree {
   object BinaryArg {
     case object _1 extends BinaryArg
     case object _2 extends BinaryArg
+  }
+  implicit class BinaryOps[F[_]](self: Binary[F]) {
+    def eval[T[_[_]]: Corecursive](arg1: T[F], arg2: T[F])(implicit F: Functor[F]): T[F] =
+      freeCata[F, BinaryArg, T[F]](self)(interpret(_.fold(arg1, arg2), _.embed))
+  }
+
+  /** A tree structure with three kinds of holes. See [[TernaryOps.eval]]. */
+  type Ternary[F[_]] = Free[F, TernaryArg]
+  object Ternary {
+    def arg1[F[_]]: Ternary[F] = Free.pure(TernaryArg._1)
+    def arg2[F[_]]: Ternary[F] = Free.pure(TernaryArg._2)
+    def arg3[F[_]]: Ternary[F] = Free.pure(TernaryArg._3)
   }
   trait TernaryArg {
     def fold[A](arg1: A, arg2: A, arg3: A): A = this match {
@@ -71,16 +81,8 @@ package object tree {
     case object _2 extends TernaryArg
     case object _3 extends TernaryArg
   }
-
-  def eval1[T[_[_]]: Corecursive, F[_]: Traverse](t: Unary[F]): T[F] => T[F] =
-    arg => freeCata[F, UnaryArg, T[F]](t)(interpret(_.fold(arg), _.embed))
-
-  def eval2[T[_[_]]: Corecursive, F[_]: Traverse](t: Binary[F]): (T[F], T[F]) => T[F] =
-    (arg1, arg2) => freeCata[F, BinaryArg, T[F]](t)(interpret(_.fold(arg1, arg2), _.embed))
-
-  def eval3[T[_[_]]: Corecursive, F[_]: Traverse](t: Ternary[F]): (T[F], T[F], T[F]) => T[F] =
-    (arg1, arg2, arg3) => freeCata[F, TernaryArg, T[F]](t)(interpret(_.fold(arg1, arg2, arg3), _.embed))
-
-  // TODO
-  // implicit def unaryRenderTree(implicit Delay[RenderTree, ???]): RenderTree[Unary[F]]
+  implicit class TernaryOps[F[_]](self: Ternary[F]) {
+    def eval[T[_[_]]: Corecursive](arg1: T[F], arg2: T[F], arg3: T[F])(implicit F: Functor[F]): T[F] =
+      freeCata[F, TernaryArg, T[F]](self)(interpret(_.fold(arg1, arg2, arg3), _.embed))
+  }
 }
