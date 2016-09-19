@@ -16,8 +16,6 @@
 
 package quasar.physical.marklogic.fs
 
-import quasar.Data
-import quasar.DataArbitrary._
 import quasar.physical.marklogic.fs.data.{toXml, fromXml}
 import quasar.physical.marklogic.xml.SecureXML
 
@@ -27,19 +25,19 @@ final class DataXmlEncodingSpec extends quasar.Qspec {
   type Result[A] = ErrorMessages \/ A
 
   "Data <-> XML encoding" should {
-    "roundtrip" >> prop { data: Data =>
-      toXml[Result](data).flatMap(fromXml[Result]) must_= data.right
+    "roundtrip" >> prop { xd: XmlSafeData =>
+      toXml[Result](xd.data).flatMap(fromXml[Result]) must_= xd.data.right
     }
 
-    "roundtrip through serialization" >> prop { data: Data =>
+    "roundtrip through serialization" >> prop { xd: XmlSafeData =>
       val rt = for {
-        xml <- toXml[Result](data)
+        xml <- toXml[Result](xd.data)
         el  <- SecureXML.loadString(xml.toString)
                  .leftMap(e => e.toString.wrapNel)
         d   <- fromXml[Result](el)
       } yield d
 
-      rt must_= data.right
+      rt must_= xd.data.right
     }
   }
 }
