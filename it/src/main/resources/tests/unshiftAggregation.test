@@ -1,0 +1,15 @@
+{
+    "name": "unshift aggregation",
+    "backends": {
+        "marklogic":  "pending",
+        "postgresql": "pending"
+    },
+    "data": "largeZips.data",
+    "query": "select state, city, [pop ...] as pop from largeZips group by state, city",
+    "predicate": "containsAtLeast",
+    "expected": [
+        { "state": "AK", "city": "ANCHORAGE",   "pop": [32383, 29857] },
+        { "state": "AK", "city": "KETCHIKAN",   "pop": [13886, 422] },
+        { "state": "AK", "city": "POINT BAKER", "pop": [426] }
+    ]
+}
