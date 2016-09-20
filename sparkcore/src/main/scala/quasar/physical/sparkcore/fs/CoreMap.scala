@@ -76,7 +76,6 @@ object CoreMap {
       case Data.Interval(v) => Data.Interval(v.negated())
       case _ => Data.NA
     }).right
-    // TODO not all permutations covered (should they be covered?)
     case Add(f1, f2) => ((x: Data) => add(f1(x), f2(x))).right
     case Multiply(f1, f2) => ((x: Data) => multiply(f1(x), f2(x))).right
     case Subtract(f1, f2) => ((x: Data) => subtract(f1(x), f2(x))).right
@@ -97,7 +96,10 @@ object CoreMap {
     case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
     case Gt(f1, f2) => ((x: Data) => gt(f1(x), f2(x))).right
     case Gte(f1, f2) => ((x: Data) => gte(f1(x), f2(x))).right
-    case IfUndefined(f1, f2) => ??? // TODO
+    case IfUndefined(f1, f2) => ((x: Data) => f1(x) match {
+      case Data.NA => f2(x)
+      case d => d
+    }).right
     case And(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a && b)
       case _ => Data.NA
@@ -106,7 +108,10 @@ object CoreMap {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => Data.NA
     }).right
-    case Coalesce(f1, f2) => ??? // TODO
+    case Coalesce(f1, f2) => ((x: Data) => f1(x) match {
+      case Data.Null => f2(x)
+      case d => d
+    }).right
     case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
     case Cond(fCond, fThen, fElse) => ((x: Data) => fCond(x) match {
       case Data.Bool(true) => fThen(x)
@@ -114,7 +119,7 @@ object CoreMap {
       case _ => Data.NA
     }).right
       
-    case Within(f1, f2) => ???
+    case Within(f1, f2) => ??? // TODO only Data.Arr
 
     case Lower(f) => (f >>> {
       case Data.Str(a) => Data.Str(a.toLowerCase())
@@ -162,21 +167,11 @@ object CoreMap {
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) + b)
-    case (Data.Int(a), Data.Interval(b)) => ???
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(new JBigDecimal(b.bigInteger)))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
-    case (Data.Dec(a), Data.Interval(b)) => ???
-    case (Data.Interval(a), Data.Int(b)) => ???
-    case (Data.Interval(a), Data.Dec(b)) => ???
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
-    case (Data.Timestamp(a), Data.Int(b)) => ???
-    case (Data.Timestamp(a), Data.Dec(b)) => ???
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
-    case (Data.Date(a), Data.Int(b)) => ???
-    case (Data.Date(a), Data.Dec(b)) => ???
     case (Data.Date(a), Data.Interval(b)) => Data.Date(a.plus(b))
-    case (Data.Time(a), Data.Int(b)) => ???
-    case (Data.Time(a), Data.Dec(b)) => ???
     case (Data.Time(a), Data.Interval(b)) => Data.Time(a.plus(b))
     case _ => Data.NA
   }
@@ -204,7 +199,6 @@ object CoreMap {
   }
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
-    // TODO missibin Temporal
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a / b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(new JBigDecimal(b.bigInteger)))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a / b)
@@ -214,7 +208,6 @@ object CoreMap {
     case _ => Data.NA
   }
 
-  //MathRel Numeric
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
     case (Data.Int(a), Data.Dec(b)) => ???
