@@ -5,11 +5,11 @@
         "postgresql": "pending"
     },
     "data": "zips.data",
-    "query": "select state, city, [pop ...] as pop from zips group by state, city",
+    "query": "select state as state0, city as city0, [pop ...] as pop0 from zips group by state, city",
     "predicate": "containsAtLeast",
     "expected": [
-        { "state": "AK", "city": "ANCHORAGE",   "pop": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116] },
-        { "state": "AK", "city": "KETCHIKAN",   "pop": [13886, 422] },
-        { "state": "AK", "city": "POINT BAKER", "pop": [426] }
+        { "state0": "AK", "city0": "ANCHORAGE",   "pop0": [14436, 15891, 12534, 32383, 20128, 29857, 17094, 18356, 15192, 8116] },
+        { "state0": "AK", "city0": "KETCHIKAN",   "pop0": [13886, 422] },
+        { "state0": "AK", "city0": "POINT BAKER", "pop0": [426] }
     ]
 }
