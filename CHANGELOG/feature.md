@@ -1,1 +1,1 @@
-- implement proper read for sparkcore where quasar will not read all content with single read, but do it in batches
+- Implement streaming reads for Spark
