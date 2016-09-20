@@ -18,11 +18,11 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.qscript.MapFuncs._
-import quasar.std.DateLib
+import quasar.std.{DateLib, StringLib}
 import quasar.Data
 import quasar.qscript._
 import quasar.Planner._
-import quasar.SKI.κ
+import quasar.SKI._
 
 import java.math.{BigDecimal => JBigDecimal}
 
@@ -129,8 +129,33 @@ object CoreMap {
       case Data.Str("false") => Data.Bool(false)
       case _ => Data.NA
     }).right
-
+    case Integer(f) => (f >>> {
+      case Data.Str(a) => \/.fromTryCatchNonFatal(Data.Int(BigInt(a))).fold(κ(Data.NA), ι)
+      case _ => Data.NA
+    }).right
+    case Decimal(f) => (f >>> {
+      case Data.Str(a) => \/.fromTryCatchNonFatal(Data.Dec(BigDecimal(a))).fold(κ(Data.NA), ι)
+      case _ => Data.NA
+    }).right
+    case Null(f) => (f >>> {
+      case Data.Str("null") => Data.Null
+      case _ => Data.NA
+    }).right
     case ToString(f) => (f >>> toStringFunc).right
+    case Search(fStr, fPattern, fInsen) =>
+      ((x: Data) => search(fStr(x), fPattern(x), fInsen(x))).right
+    case Substring(fStr, fFrom, fCount) =>
+      ((x: Data) => substring(fStr(x), fFrom(x), fCount(x))).right
+    case MakeArray(f) => (f >>> ((x: Data) => Data.Arr(List(x)))).right
+    case MakeMap(fK, fV) => ???
+    case ConcatArrays(f1, f2) => ???
+    case ConcatMaps(f1, f2) => ???
+    case ProjectIndex(f1, f2) => ???
+    case ProjectField(fSrc, fField) => ???
+    case DeleteField(fSrc, fField) => ???
+    case DupMapKeys(f) => ???
+    case DupArrayIndices(f) => ???
+    case ZipMapKeys(f) => ???
     case _ => InternalError("not implemented").left
   }
 
@@ -339,8 +364,21 @@ object CoreMap {
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
-    // TODO fails on d: Data.NA
-    case d => d
+    case _ => Data.NA
   }
+
+  private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
+    (dStr, dPattern, dInsen) match {
+      case (Data.Str(str), Data.Str(pattern), Data.Bool(insen)) =>
+        Data.Bool(StringLib.matchAnywhere(str, pattern, insen))
+      case _ => Data.NA
+    }
+
+  private def substring(dStr: Data, dFrom: Data, dCount: Data): Data =
+    (dStr, dFrom, dCount) match {
+      case (Data.Str(str), Data.Int(from), Data.Int(count)) =>
+        \/.fromTryCatchNonFatal(Data.Str(str.substring(from.toInt, count.toInt))).fold(κ(Data.NA), ι)
+      case _ => Data.NA
+    }
 
 }
