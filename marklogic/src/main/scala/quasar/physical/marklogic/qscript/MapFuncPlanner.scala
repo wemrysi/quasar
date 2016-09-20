@@ -74,9 +74,15 @@ object MapFuncPlanner {
     case MakeArray(x) =>
       ejson.singletonArray[F] apply x
 
-    // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
-    case MakeMap(k, v) =>
-      ejson.singletonMap[F] apply (k, v)
+    case MakeMap(k, v) => k match {
+      case XQuery.StringLit(s) =>
+        refineV[IsNCName](s).disjunction map { ncname =>
+          val qn = QName.local(NCName(ncname))
+          ejson.singletonObject[F] apply (qn.xs, v)
+        } getOrElse invalidQName(s)
+
+      case _ => ejson.singletonObject[F] apply (k, v)
+    }
 
     case ConcatArrays(x, y) =>
       ejson.arrayConcat[F] apply (x, y)
@@ -87,38 +93,22 @@ object MapFuncPlanner {
 
       case XQuery.StringLit(s) =>
         refineV[IsNCName](s).disjunction map { ncname =>
-          val qn = QName.local(NCName(ncname))
-
-          for {
-            m      <- freshVar[F]
-            lookup <- ejson.mapLookup[F] apply (m.xqy, qn.xs)
-            isMap  <- ejson.isMap[F] apply (m.xqy)
-          } yield {
+          freshVar[F] map { m =>
             let_(m -> src) return_ {
-              if_ (isMap)
-              .then_ { lookup }
-              .else_ { m.xqy `/` child(qn) }
+              m.xqy `/` child(QName.local(NCName(ncname)))
             }
           }
-        } getOrElse {
-          MonadError_[F, MarkLogicPlannerError].raiseError(
-            MarkLogicPlannerError.invalidQName(s))
-        }
+        } getOrElse invalidQName(s)
 
       case _ =>
-        for {
-          m     <- freshVar[F]
-          k     <- freshVar[F]
-          v     <- ejson.mapLookup[F] apply (m.xqy, k.xqy)
-          isMap <- ejson.isMap[F] apply (m.xqy)
-        } yield {
+        (freshVar[F] |@| freshVar[F]) { (m, k) =>
           let_(m -> src, k -> field) return_ {
-            if_ (isMap) then_ v else_ (m.xqy `/` k.xqy)
+            m.xqy `/` k.xqy
           }
         }
     }
 
-    // TODO: What other types should this work with?
+    // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
       (freshVar[F] |@| ejson.arrayEltN.qn) { (i, arrElt) =>
         let_(i -> idx) return_ {
@@ -127,23 +117,16 @@ object MapFuncPlanner {
       }
 
     // other
-    case Range(x, y) => (x to y).point[F]
+    case Range(x, y)   => (x to y).point[F]
 
-    case ZipMapKeys(m) =>
-      for {
-        src   <- freshVar[F]
-        zmk   <- ejson.zipMapKeys apply src.xqy
-        zmnk  <- qscript.zipMapNodeKeys apply src.xqy
-        isMap <- ejson.isMap apply (src.xqy)
-      } yield {
-        let_(src -> m) return_ {
-          // TODO: Should this be necessary?
-          if_(fn.empty(src.xqy))
-          .then_ { src.xqy }
-          .else_ { if_(isMap) then_ zmk else_ zmnk }
-        }
-      }
+    case ZipMapKeys(m) => qscript.zipMapNodeKeys[F] apply m
 
     case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
+
+  ////
+
+  private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
+    MonadError_[F, MarkLogicPlannerError].raiseError(
+      MarkLogicPlannerError.invalidQName(s))
 }
