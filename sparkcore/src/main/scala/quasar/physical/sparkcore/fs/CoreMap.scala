@@ -108,6 +108,28 @@ object CoreMap {
     }).right
     case Coalesce(f1, f2) => ??? // TODO
     case Between(f1, f2, f3) => ((x: Data) => between(f1(x), f2(x), f3(x))).right
+    case Cond(fCond, fThen, fElse) => ((x: Data) => fCond(x) match {
+      case Data.Bool(true) => fThen(x)
+      case Data.Bool(false) => fElse(x)
+      case _ => Data.NA
+    }).right
+      
+    case Within(f1, f2) => ???
+
+    case Lower(f) => (f >>> {
+      case Data.Str(a) => Data.Str(a.toLowerCase())
+      case _ => Data.NA
+    }).right
+    case Upper(f) => (f >>> {
+      case Data.Str(a) => Data.Str(a.toUpperCase())
+      case _ => Data.NA
+    }).right
+    case Bool(f) => (f >>> {
+      case Data.Str("true") => Data.Bool(true)
+      case Data.Str("false") => Data.Bool(false)
+      case _ => Data.NA
+    }).right
+
     case ToString(f) => (f >>> toStringFunc).right
     case _ => InternalError("not implemented").left
   }
@@ -224,13 +246,6 @@ object CoreMap {
   //  Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
-    case (Data.Int(a), Data.Dec(b)) => ??? // TODO
-    case (Data.Int(a), Data.Interval(b)) => ???
-    case (Data.Int(a), Data.Str(b)) => ???
-    case (Data.Int(a), Data.Timestamp(b)) => ???
-    case (Data.Int(a), Data.Date(b)) => ???
-    case (Data.Int(a), Data.Time(b)) => ???
-    case (Data.Int(a), Data.Bool(b)) => ???
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
@@ -246,7 +261,6 @@ object CoreMap {
 
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a <= b)
-    // TODO same as lt
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a <= b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
@@ -262,7 +276,6 @@ object CoreMap {
 
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a > b)
-    // TODO same as lt
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a > b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
@@ -278,7 +291,6 @@ object CoreMap {
 
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a >= b)
-    // TODO same as lt
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a >= b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
@@ -292,7 +304,24 @@ object CoreMap {
     case _ => Data.NA
   }
 
-  private def between(d1: Data, d2: Data, d3: Data): Data = ???
+  private def between(d1: Data, d2: Data, d3: Data): Data = (d1, d2, d3) match {
+    case (Data.Int(a), Data.Int(b), Data.Int(c)) =>
+      Data.Bool(a < b && b < c)
+    case (Data.Dec(a), Data.Dec(b), Data.Dec(c)) =>
+      Data.Bool(a < b && b < c)
+    case (Data.Interval(a), Data.Interval(b), Data.Interval(c)) =>
+      Data.Bool(a.compareTo(b) < 0 && b.compareTo(c) < 0)
+    case (Data.Str(a), Data.Str(b), Data.Str(c)) =>
+      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+    case (Data.Timestamp(a), Data.Timestamp(b), Data.Timestamp(c)) =>
+      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+    case (Data.Date(a), Data.Date(b), Data.Date(c)) =>
+      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+    case (Data.Time(a), Data.Time(b), Data.Time(c)) =>
+      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+    case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => Data.Bool(false) // TODO case?
+    case _ => Data.NA
+  }
   
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
