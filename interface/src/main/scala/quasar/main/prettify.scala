@@ -25,7 +25,7 @@ import scala.Predef.{ArrowAssoc, augmentString, intWrapper}
 import scalaz._
 
 object Prettify {
-  sealed trait Segment
+  sealed trait Segment extends Product with Serializable
   final case class FieldSeg(name: String) extends Segment
   final case class IndexSeg(index: Int) extends Segment
 

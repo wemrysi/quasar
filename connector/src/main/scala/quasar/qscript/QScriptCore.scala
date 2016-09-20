@@ -25,7 +25,7 @@ import matryoshka.patterns._
 import monocle.macros.Lenses
 import scalaz._, Scalaz._
 
-sealed abstract class QScriptCore[T[_[_]], A]
+sealed abstract class QScriptCore[T[_[_]], A] extends Product with Serializable
 
 /** A data-level transformation.
   */

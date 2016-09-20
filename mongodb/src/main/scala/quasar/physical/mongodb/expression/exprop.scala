@@ -19,7 +19,7 @@ package quasar.physical.mongodb.expression
 import quasar.Predef._
 import quasar.physical.mongodb.Bson
 
-sealed trait ExprOp[A]
+sealed trait ExprOp[A] extends Product with Serializable
 object ExprOp {
   final case class $includeF[A]() extends ExprOp[A]
   final case class $varF[A](docVar: DocVar) extends ExprOp[A]
