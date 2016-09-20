@@ -117,10 +117,6 @@ object writefile {
     S1: Task :<: S,
     context: Read.Ops[Context, S]
   ): Free[S, Unit] =
-    (for {
-      st  <- writeHandles.get(h)
-      _   <- lift(Task.delay(st.bucket.close)).into.liftM[OptionT]
-      _   <- writeHandles.delete(h).liftM[OptionT]
-    } yield ()).run.void
+    writeHandles.delete(h)
 
 }

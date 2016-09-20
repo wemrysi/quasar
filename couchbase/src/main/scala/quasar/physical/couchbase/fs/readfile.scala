@@ -93,8 +93,6 @@ object readfile {
   )(implicit
     S0: Task :<: S
   ): Free[S, Unit] =
-    lift(Task.delay(
-      cursor.bucket.close
-    ).void).into
+    ().point[Free[S, ?]]
 
 }
