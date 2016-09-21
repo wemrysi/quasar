@@ -74,6 +74,7 @@ object Planner {
         }
     }
 
+  // TODO difference between this & read
   implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
     new Planner[Const[ShiftedRead, ?]] {
       type IT[G[_]] = T[G]
