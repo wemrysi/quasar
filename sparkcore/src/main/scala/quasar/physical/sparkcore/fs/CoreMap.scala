@@ -32,6 +32,8 @@ import scalaz.{Divide => _, _}, Scalaz._
 
 object CoreMap {
 
+  private val undefined = Data.NA
+
   // TODO: replace Data.NA with something safer
   def change[T[_[_]] : Recursive]: AlgebraM[PlannerError \/ ?, MapFunc[T, ?], Data => Data] = {
     case Constant(f) => κ[Data, Data](f.cata(Data.fromEJson)).right
@@ -40,41 +42,41 @@ object CoreMap {
     case Length(f) => (f >>> {
       case Data.Str(v) => Data.Int(v.length)
       case Data.Arr(v) => Data.Int(v.size)
-      case _ => Data.NA 
+      case _ => undefined 
     }).right
 
     case Date(f) => (f >>> {
       case Data.Str(v) => DateLib.parseDate(v).getOrElse(Data.NA)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Time(f) => (f >>> {
       case Data.Str(v) => DateLib.parseTime(v).getOrElse(Data.NA)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Timestamp(f) => (f >>> {
       case Data.Str(v) => DateLib.parseTimestamp(v).getOrElse(Data.NA)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Interval(f) => (f >>> {
       case Data.Str(v) => DateLib.parseInterval(v).getOrElse(Data.NA)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case TimeOfDay(f) => (f >>> {
       case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case ToTimestamp(f) => (f >>> {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
-      case _ => Data.NA
+      case _ => undefined
     }).right
-    case Extract(f1, f2) => ??? // DONTKNOW
+    case Extract(f1, f2) => ??? // TODO - waits for Moss changes
     case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
       case Data.Int(v) => Data.Int(-v)
       case Data.Dec(v) => Data.Dec(-v)
       case Data.Interval(v) => Data.Interval(v.negated())
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Add(f1, f2) => ((x: Data) => add(f1(x), f2(x))).right
     case Multiply(f1, f2) => ((x: Data) => multiply(f1(x), f2(x))).right
@@ -85,12 +87,12 @@ object CoreMap {
 
     case Not(f) => (f >>> {
       case Data.Bool(b) => Data.Bool(!b)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Eq(f1, f2) => ((x: Data) => eq(f1(x), f2(x))).right
     case Neq(f1, f2) => ((x: Data) => eq(f1(x), f2(x)) match {
       case Data.Bool(b) => Data.Bool(!b)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Lt(f1, f2) => ((x: Data) => lt(f1(x), f2(x))).right
     case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
@@ -102,11 +104,11 @@ object CoreMap {
     }).right
     case And(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a && b)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Or(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Coalesce(f1, f2) => ((x: Data) => f1(x) match {
       case Data.Null => f2(x)
@@ -116,35 +118,38 @@ object CoreMap {
     case Cond(fCond, fThen, fElse) => ((x: Data) => fCond(x) match {
       case Data.Bool(true) => fThen(x)
       case Data.Bool(false) => fElse(x)
-      case _ => Data.NA
+      case _ => undefined
     }).right
       
-    case Within(f1, f2) => ??? // TODO only Data.Arr
+    case Within(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (d, Data.Arr(list)) => Data.Bool(list.contains(d))
+      case _ => undefined
+    }).right
 
     case Lower(f) => (f >>> {
       case Data.Str(a) => Data.Str(a.toLowerCase())
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Upper(f) => (f >>> {
       case Data.Str(a) => Data.Str(a.toUpperCase())
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Bool(f) => (f >>> {
       case Data.Str("true") => Data.Bool(true)
       case Data.Str("false") => Data.Bool(false)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Integer(f) => (f >>> {
       case Data.Str(a) => \/.fromTryCatchNonFatal(Data.Int(BigInt(a))).fold(κ(Data.NA), ι)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Decimal(f) => (f >>> {
       case Data.Str(a) => \/.fromTryCatchNonFatal(Data.Dec(BigDecimal(a))).fold(κ(Data.NA), ι)
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case Null(f) => (f >>> {
       case Data.Str("null") => Data.Null
-      case _ => Data.NA
+      case _ => undefined
     }).right
     case ToString(f) => (f >>> toStringFunc).right
     case Search(fStr, fPattern, fInsen) =>
@@ -173,7 +178,7 @@ object CoreMap {
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
     case (Data.Date(a), Data.Interval(b)) => Data.Date(a.plus(b))
     case (Data.Time(a), Data.Interval(b)) => Data.Time(a.plus(b))
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def subtract(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -185,7 +190,7 @@ object CoreMap {
     case (Data.Date(a), Data.Interval(b)) => Data.Date(a.minus(b))
     case (Data.Time(a), Data.Interval(b)) => Data.Time(a.minus(b))
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.minus(b))
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def multiply(d1: Data, d2: Data): Data = (d1, d2)  match {
@@ -195,7 +200,7 @@ object CoreMap {
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) * b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -205,7 +210,7 @@ object CoreMap {
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) / b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
@@ -215,7 +220,7 @@ object CoreMap {
     case (Data.Dec(a), Data.Dec(b)) => ???
     case (Data.Interval(a), Data.Int(b)) => ???
     case (Data.Interval(a), Data.Dec(b)) => ???
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def power(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -223,7 +228,7 @@ object CoreMap {
     case (Data.Int(a), Data.Dec(b)) => ???
     case (Data.Dec(a), Data.Int(b)) => ???
     case (Data.Dec(a), Data.Dec(b)) => ???
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def eq(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -239,7 +244,7 @@ object CoreMap {
         case (d1, d2) => eq(d1, d2)
       }.fold(Data.Bool(true)){
         case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => Data.NA
+        case _ => undefined
       }
     }
     case (Data.Set(a), Data.Set(b)) => if(a.size != b.size) Data.Bool(false) else {
@@ -248,7 +253,7 @@ object CoreMap {
         case (d1, d2) => eq(d1, d2)
       }.fold(Data.Bool(true)){
         case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => Data.NA
+        case _ => undefined
       }
     }
     case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a == b)
@@ -274,7 +279,7 @@ object CoreMap {
       case (false, true) => Data.Bool(true)
       case _ => Data.Bool(false)
     }
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def lte(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -289,7 +294,7 @@ object CoreMap {
       case (true, false) => Data.Bool(false)
       case _ => Data.Bool(true)
     }
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def gt(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -304,7 +309,7 @@ object CoreMap {
       case (true, false) => Data.Bool(true)
       case _ => Data.Bool(false)
     }
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def gte(d1: Data, d2: Data): Data = (d1, d2) match {
@@ -319,7 +324,7 @@ object CoreMap {
       case (false, true) => Data.Bool(false)
       case _ => Data.Bool(true)
     }
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def between(d1: Data, d2: Data, d3: Data): Data = (d1, d2, d3) match {
@@ -338,7 +343,7 @@ object CoreMap {
     case (Data.Time(a), Data.Time(b), Data.Time(c)) =>
       Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
     case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => Data.Bool(false) // TODO case?
-    case _ => Data.NA
+    case _ => undefined
   }
   
   private def toStringFunc: Data => Data = {
@@ -357,21 +362,21 @@ object CoreMap {
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
-    case _ => Data.NA
+    case _ => undefined
   }
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {
       case (Data.Str(str), Data.Str(pattern), Data.Bool(insen)) =>
         Data.Bool(StringLib.matchAnywhere(str, pattern, insen))
-      case _ => Data.NA
+      case _ => undefined
     }
 
   private def substring(dStr: Data, dFrom: Data, dCount: Data): Data =
     (dStr, dFrom, dCount) match {
       case (Data.Str(str), Data.Int(from), Data.Int(count)) =>
         \/.fromTryCatchNonFatal(Data.Str(str.substring(from.toInt, count.toInt))).fold(κ(Data.NA), ι)
-      case _ => Data.NA
+      case _ => undefined
     }
 
 }
