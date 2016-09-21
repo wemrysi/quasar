@@ -117,14 +117,7 @@ object Planner {
         case LeftShift(src, struct, repair) => StateT((sc: SparkContext) => {
           EitherT((sc, src).right[PlannerError].point[Task])
         })
-        case Union(src, lBranch, rBranch) =>
-          val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-          val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
-
-          for {
-            left <- freeCataM(lBranch)(interpretM(κ(srcState), algebraM))
-            right <- freeCataM(rBranch)(interpretM(κ(srcState), algebraM))
-          } yield left ++ right
+        case Union(src, lBranch, rBranch) => ???
         case Unreferenced() =>
           StateT((sc: SparkContext) => {
             EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Task])
