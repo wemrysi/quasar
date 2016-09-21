@@ -34,7 +34,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
   "replan" should {
     "convert a constant boolean" in {
        // "select true"
-       convert(listContents.some, LP.Constant(Data.Bool(true))) must
+       convert(lc.some, LP.Constant(Data.Bool(true))) must
          equal(chain(
            UnreferencedR,
            QC.inj(Map((), BoolLit(true)))).some)
@@ -43,7 +43,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "fail to convert a constant set" in {
       // "select {\"a\": 1, \"b\": 2, \"c\": 3, \"d\": 4, \"e\": 5}{*} limit 3 offset 1"
       convert(
-        listContents.some,
+        lc.some,
         LP.Constant(Data.Set(List(
           Data.Obj(ListMap("0" -> Data.Int(2))),
           Data.Obj(ListMap("0" -> Data.Int(3))))))) must
@@ -51,7 +51,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a simple read" in {
-      convert(listContents.some, lpRead("/foo/bar")) must
+      convert(lc.some, lpRead("/foo/bar")) must
       equal(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
         QC.inj(LeftShift((),
@@ -62,27 +62,15 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     // FIXME: This can be simplified to a Union of the Reads - the LeftShift
     //        cancels out the MakeMaps.
     "convert a directory read" in {
-      convert(listContents.some, lpRead("/foo")) must
+      convert(lc.some, lpRead("/foo")) must
       equal(chain(
-        UnreferencedR,
-        QC.inj(Union((),
-          Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar")))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
-          Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-            Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car")))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
-            Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-              Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city")))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
-              Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
-                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person")))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
-                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(QST[QS].inject(R.inj(Const[Read, FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips")))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
-
-        QC.inj(LeftShift((),
-          HoleF,
-          Free.point(RightSide)))).some)
+        ReadR(rootDir </> dir("foo")),
+        QC.inj(LeftShift((), HoleF, Free.point(RightSide)))).some)
     }
 
     "convert a squashed read" in {
       // "select * from foo"
-      convert(listContents.some, identity.Squash(lpRead("/foo/bar")).embed) must
+      convert(lc.some, identity.Squash(lpRead("/foo/bar")).embed) must
       equal(chain(
         ReadR(rootDir </> dir("foo") </> file("bar")),
         QC.inj(LeftShift((),
@@ -92,12 +80,12 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert a basic select with type checking" in {
       val lp = fullCompileExp("select foo from bar")
-      val qs = convert(listContents.some, lp)
+      val qs = convert(lc.some, lp)
       qs must equal(chain(RootR).some) // TODO incorrect expectation
     }.pendingUntilFixed
 
     "convert a simple take" in pending {
-      convert(listContents.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
+      convert(lc.some, StdLib.set.Take(lpRead("/foo/bar"), LP.Constant(Data.Int(10))).embed) must
       equal(
         chain(
           ReadR(rootDir </> dir("foo") </> file("bar")),
@@ -110,7 +98,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     }
 
     "convert a simple read with path projects" in {
-      convert(listContents.some, lpRead("/some/bar/car")) must
+      convert(lc.some, lpRead("/some/bar/car")) must
       equal(chain(
         ReadR(rootDir </> dir("some") </> file("bar")),
         QC.inj(LeftShift((),
@@ -171,7 +159,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
 
     "convert a basic reduction" in {
       convert(
-        listContents.some,
+        lc.some,
         agg.Sum(lpRead("/person")).embed) must
       equal(chain(
         ReadR(rootDir </> file("person")),
@@ -337,7 +325,7 @@ class QScriptSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
     "convert a filter" in { // takes 1 min 17 sec to run
       // "select * from foo where bar between 1 and 10"
       convert(
-        listContents.some,
+        lc.some,
         StdLib.set.Filter(
           lpRead("/bar"),
           relations.Between(

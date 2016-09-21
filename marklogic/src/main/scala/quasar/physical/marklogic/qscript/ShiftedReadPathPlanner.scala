@@ -17,17 +17,25 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
+import quasar.NameGenerator
+import quasar.contrib.pathy.APath
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 
 import matryoshka._
-import scalaz._, Scalaz._
+import pathy.Path._
+import scalaz._
 
-private[qscript] final class DeadEndPlanner[F[_]: Applicative]
-  extends MarkLogicPlanner[F, Const[DeadEnd, ?]] {
+private[qscript] final class ShiftedReadPathPlanner[F[_]: NameGenerator: PrologW]
+  extends MarkLogicPlanner[F, Const[ShiftedRead[APath], ?]] {
 
-  val plan: AlgebraM[F, Const[DeadEnd, ?], XQuery] = {
-    case Const(Root) => mkSeq_("/".xqy).point[F]
+  val plan: AlgebraM[F, Const[ShiftedRead[APath], ?], XQuery] = {
+    case Const(ShiftedRead(absPath, idStatus)) =>
+      val includeId = idStatus match {
+        case IncludeId => "true".xqy
+        case ExcludeId => "false".xqy
+      }
+      qscript.shiftedRead apply (posixCodec.printPath(absPath).xs, includeId)
   }
 }

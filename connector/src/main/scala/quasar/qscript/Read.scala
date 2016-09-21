@@ -16,8 +16,9 @@
 
 package quasar.qscript
 
-import quasar.fp._
 import quasar.RenderTree
+import quasar.contrib.pathy.APath
+import quasar.fp._
 
 import matryoshka._
 import monocle.macros.Lenses
@@ -26,12 +27,13 @@ import scalaz._, Scalaz._
 
 // TODO: Abstract Read over the backend’s preferred path representation.
 /** A backend-resolved `Root`, which is now a path. */
-@Lenses final case class Read(path: AbsFile[Sandboxed])
+@Lenses final case class Read[A](path: A)
 
 object Read {
-  implicit def equal: Equal[Read] = Equal.equalBy(_.path)
-  implicit def show: Show[Read] =
+  implicit def equal[A: Equal]: Equal[Read[A]] = Equal.equalBy(_.path)
+  implicit def show[A <: APath]: Show[Read[A]] =
     Show.show(r => Cord("Read(") ++ posixCodec.printPath(r.path) ++ Cord(")"))
 
-  implicit def renderTree: RenderTree[Read] = RenderTree.fromShow("Read")
+  implicit def renderTree[A <: APath]: RenderTree[Read[A]] =
+    RenderTree.fromShow("Read")
 }

@@ -18,6 +18,7 @@ package quasar.qscript
 
 import quasar.Predef._
 import quasar.{LogicalPlan => LP, _}
+import quasar.contrib.pathy.AFile
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fs._
@@ -26,7 +27,7 @@ import quasar.qscript.MapFuncs._
 
 import scala.Predef.implicitly
 
-import matryoshka._, FunctorT.ops._
+import matryoshka._, FunctorT.ops._, TraverseT.nonInheritedOps._
 import pathy.Path._
 import scalaz._, Scalaz._
 
@@ -71,6 +72,23 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
         QCI.inj(LeftShift((),
           ProjectFieldR(HoleF, StrLit("foo")),
           Free.point(RightSide)))).some)
+    }
+
+    "expand a directory read" in {
+      convert(lc.some, lpRead("/foo")).flatMap(
+        _.transCataM(ExpandDirs[Fix, QS, QST].expandDirs(idPrism.reverseGet, lc)).toOption.run.copoint) must
+      equal(chain(
+        QCT.inj(Unreferenced[Fix, Fix[QST]]()),
+        QCT.inj(Union((),
+          Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RT.inj(Const[Read[AFile], FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("bar"))))), Free.roll(MakeMap(StrLit("bar"), HoleF)))))),
+          Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+            Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RT.inj(Const[Read[AFile], FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("car"))))), Free.roll(MakeMap(StrLit("car"), HoleF)))))),
+            Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+              Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RT.inj(Const[Read[AFile], FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("city"))))), Free.roll(MakeMap(StrLit("city"), HoleF)))))),
+              Free.roll(QST[QS].inject(QC.inj(Union(Free.roll(QST[QS].inject(QC.inj(Unreferenced[Fix, FreeQS[Fix]]()))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RT.inj(Const[Read[AFile], FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("person"))))), Free.roll(MakeMap(StrLit("person"), HoleF)))))),
+                Free.roll(QST[QS].inject(QC.inj(Map(Free.roll(RT.inj(Const[Read[AFile], FreeQS[Fix]](Read(rootDir </> dir("foo") </> file("zips"))))), Free.roll(MakeMap(StrLit("zips"), HoleF)))))))))))))))))))),
+        QCT.inj(LeftShift((), HoleF, Free.point(RightSide)))).some)
     }
 
     "coalesce a Map into a subsequent LeftShift" in {

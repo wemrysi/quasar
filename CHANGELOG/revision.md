@@ -1,2 +1,1 @@
-- make it possible to use an arbitrary QScript coproduct at various points, most importantly for connectors to know exactly what components can exist in the structure
-- many improvements to QScript normalization
+- extract `ExpandDirs` transformation from `DiscoverPath`

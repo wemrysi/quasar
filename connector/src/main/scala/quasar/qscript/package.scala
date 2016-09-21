@@ -17,6 +17,7 @@
 package quasar
 
 import quasar.Predef._
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.fp._
 
 import matryoshka._
@@ -54,7 +55,9 @@ package object qscript {
   type QScriptTotal[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
       ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
-      Const[ShiftedRead, ?] :\: Const [Read, ?] :/: Const[DeadEnd, ?])#M[A]
+      Const[ShiftedRead[APath], ?] :\: Const[ShiftedRead[AFile], ?] :\:
+      Const[Read[APath], ?] :\: Const[Read[AFile], ?] :/:
+      Const[DeadEnd, ?])#M[A]
 
   /** QScript that has not gone through Read conversion. */
   type QScript[T[_[_]], A] =
@@ -62,7 +65,7 @@ package object qscript {
 
   /** QScript that has gone through Read conversion. */
   type QScriptRead[T[_[_]], A] =
-    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]

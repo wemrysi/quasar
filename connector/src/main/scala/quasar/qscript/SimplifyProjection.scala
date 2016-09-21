@@ -124,11 +124,11 @@ object SimplifyProjection {
       : SimplifyProjection.Aux[Const[DeadEnd, ?], F] =
     default[Const[DeadEnd, ?], F]
 
-  implicit def read[F[_]](implicit R: Const[Read, ?] :<: F)
-      : SimplifyProjection.Aux[Const[Read, ?], F] =
-    default[Const[Read, ?], F]
+  implicit def read[F[_], A](implicit R: Const[Read[A], ?] :<: F)
+      : SimplifyProjection.Aux[Const[Read[A], ?], F] =
+    default[Const[Read[A], ?], F]
 
-  implicit def shiftedRead[F[_]](implicit SR: Const[ShiftedRead, ?] :<: F)
-      : SimplifyProjection.Aux[Const[ShiftedRead, ?], F] =
-    default[Const[ShiftedRead, ?], F]
+  implicit def shiftedRead[F[_], A](implicit SR: Const[ShiftedRead[A], ?] :<: F)
+      : SimplifyProjection.Aux[Const[ShiftedRead[A], ?], F] =
+    default[Const[ShiftedRead[A], ?], F]
 }

@@ -18,6 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner._, Type.{Const => _, Coproduct => _, _}
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.fp._, eitherT._
 import quasar.fs.{FileSystemError, QueryFile}
 import quasar.javascript._
@@ -702,8 +703,8 @@ object MongoDbQScriptPlanner {
 
     def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
-      new Planner[Const[ShiftedRead, ?]] {
+    implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
+      new Planner[Const[ShiftedRead[AFile], ?]] {
         type IT[G[_]] = T[G]
         def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
           joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
@@ -804,49 +805,31 @@ object MongoDbQScriptPlanner {
     // TODO: All instances below here only need to exist because of `FreeQS`, but
     //       can’t actually be called.
 
-    implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
-      new Planner[Const[DeadEnd, ?]] {
-        type IT[G[_]] = T[G]
-        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-          implicit I: WorkflowOpCoreF :<: WF,
-            ev: Show[WorkflowBuilder[WF]],
-            WB: WorkflowBuilder.Ops[WF]) =
-          κ(shouldNotBeReached)
+    def unreachable[T[_[_]], F[_]]: Planner.Aux[T, F] = new Planner[F] {
+      type IT[G[_]] = T[G]
+      def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
+        joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
+        implicit I: WorkflowOpCoreF :<: WF,
+          ev: Show[WorkflowBuilder[WF]],
+          WB: WorkflowBuilder.Ops[WF]) =
+        κ(shouldNotBeReached)
       }
 
-    implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
-      new Planner[Const[Read, ?]] {
-        type IT[G[_]] = T[G]
-        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-          implicit I: WorkflowOpCoreF :<: WF,
-            ev: Show[WorkflowBuilder[WF]],
-            WB: WorkflowBuilder.Ops[WF]) =
-          κ(shouldNotBeReached)
-      }
+    implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
+      unreachable
+
+    implicit def read[T[_[_]], A]: Planner.Aux[T, Const[Read[A], ?]] =
+      unreachable
+
+    implicit def shiftedReadPath[T[_[_]]]
+        : Planner.Aux[T, Const[ShiftedRead[APath], ?]] =
+      unreachable
 
     implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
-      new Planner[ThetaJoin[T, ?]] {
-        type IT[G[_]] = T[G]
-        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-          implicit I: WorkflowOpCoreF :<: WF,
-            ev: Show[WorkflowBuilder[WF]],
-            WB: WorkflowBuilder.Ops[WF]) =
-          κ(shouldNotBeReached)
-      }
+      unreachable
 
     implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
-      new Planner[ProjectBucket[T, ?]] {
-        type IT[G[_]] = T[G]
-        def plan[WF[_]: Functor: Coalesce: Crush: Crystallize](
-          joinHandler: JoinHandler[WF, WorkflowBuilder.M])(
-          implicit I: WorkflowOpCoreF :<: WF,
-            ev: Show[WorkflowBuilder[WF]],
-            WB: WorkflowBuilder.Ops[WF]) =
-          κ(shouldNotBeReached)
-      }
+      unreachable
   }
 
   def getExpr[T[_[_]]: Recursive: ShowT](fm: FreeMap[T]): OutputM[Expression] =
@@ -923,10 +906,10 @@ object MongoDbQScriptPlanner {
   //       generate more correct PatternGuards in the first place, rather than
   //       trying to strip out unnecessary ones after the fact
   def assumeReadType[T[_[_]]: Recursive: Corecursive, F[_]: Functor](typ: Type)(
-    implicit QC: QScriptCore[T, ?] :<: F, R: Const[Read, ?] :<: F):
+    implicit QC: QScriptCore[T, ?] :<: F, SR: Const[ShiftedRead[AFile], ?] :<: F):
       QScriptCore[T, T[F]] => PlannerError \/ F[T[F]] = {
     case m @ qscript.Map(src, mf) =>
-      R.prj(src.project).fold(
+      SR.prj(src.project).fold(
         QC.inj(m).right[PlannerError])(
         κ(freeTransCataM(mf)(elideMoreGeneralGuards(typ)) ∘
           (mf => QC.inj(qscript.Map(src, mf)))))
@@ -953,11 +936,11 @@ object MongoDbQScriptPlanner {
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
-    type MongoQScriptInterim[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[Read, ?])#M[A]
-
     type MongoQScript[A] =
-      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
+
+    type MongoQScript1[A] = (Const[ShiftedRead[APath], ?] :/:  MongoQScript)#M[A]
+    type MongoQScript0[A] = (Const[Read[APath], ?] :/: MongoQScript1)#M[A]
 
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
@@ -978,13 +961,14 @@ object MongoDbQScriptPlanner {
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
-      opt <- log("QScript (Mongo-specific)")(liftError(
-        qs.transCataM[PlannerError \/ ?, MongoQScriptInterim](tf =>
-          (liftFGM(assumeReadType[T, MongoQScriptInterim](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
-            SimplifyJoin[T, QScriptRead[T, ?], MongoQScriptInterim].simplifyJoin(idPrism.reverseGet)
-          ).apply(tf) ∘
-            Normalizable[MongoQScriptInterim].normalize).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
-            Normalizable[MongoQScript].normalize)))
+      opt <- log("QScript (Mongo-specific)")(
+        transFutu(
+          qs.transCata[MongoQScript0](
+            SimplifyJoin[T, QScriptRead[T, ?], MongoQScript0].simplifyJoin(idPrism.reverseGet)))(
+          ShiftRead[T, MongoQScript0, MongoQScript1].shiftRead(idPrism.reverseGet)(_))
+          .transCataM(ExpandDirs[T, MongoQScript1, MongoQScript].expandDirs(idPrism.reverseGet, lc)).liftM[StateT[?[_], NameGen, ?]] >>=
+          (tf => liftError(tf.transCataM[PlannerError \/ ?, MongoQScript](liftFGM(assumeReadType[T, MongoQScript](Type.Obj(ListMap(), Some(Type.Top)))).apply(_) ∘
+            Normalizable[MongoQScript].normalize))))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](Planner[T, MongoQScript].plan(joinHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])

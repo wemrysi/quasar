@@ -132,7 +132,7 @@ object QueryFile {
       merr: MonadError[M, FileSystemError],
       mtell: MonadTell[M, PhaseResults],
       CQ:  Coalesce.Aux[T, QS, QS],
-      R:        Const[Read, ?] :<: QS,
+      R: Const[Read[APath], ?] :<: QS,
       QC:    QScriptCore[T, ?] :<: QS,
       TJ:      ThetaJoin[T, ?] :<: QS,
       FI: Injectable.Aux[QS, QScriptTotal[T, ?]],
@@ -143,7 +143,7 @@ object QueryFile {
     val optimize = new Optimize[T]
 
     type InterimQS[A] =
-      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
+      (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read[APath], ?])#M[A]
 
     val qs =
       merr.map(

@@ -680,6 +680,11 @@ package object fp
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
     co => co.run.fold(κ(co), f)
 
+  def liftCoM[T[_[_]], M[_]: Applicative, F[_], A]
+    (f: F[T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]])
+      : CoEnv[A, F, T[CoEnv[A, F, ?]]] => M[CoEnv[A, F, T[CoEnv[A, F, ?]]]] =
+    co => co.run.fold(κ(co.point[M]), f)
+
   def idPrism[F[_]] = PrismNT[F, F](
     new (F ~> (Option ∘ F)#λ) {
       def apply[A](fa: F[A]): Option[F[A]] = Some(fa)

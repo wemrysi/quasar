@@ -161,11 +161,11 @@ object Coalesce {
   implicit def deadEnd[T[_[_]], G[_]]: Coalesce.Aux[T, Const[DeadEnd, ?], G] =
     default
 
-  implicit def read[T[_[_]], G[_]]: Coalesce.Aux[T, Const[Read, ?], G] =
+  implicit def read[T[_[_]], G[_], A]: Coalesce.Aux[T, Const[Read[A], ?], G] =
     default
 
-  implicit def shiftedRead[T[_[_]], G[_]]
-      : Coalesce.Aux[T, Const[ShiftedRead, ?], G] =
+  implicit def shiftedRead[T[_[_]], G[_], A]
+      : Coalesce.Aux[T, Const[ShiftedRead[A], ?], G] =
     default
 
   implicit def thetaJoin[T[_[_]], G[_]]: Coalesce.Aux[T, ThetaJoin[T, ?], G] =

@@ -19,12 +19,13 @@ package quasar.qscript
 import quasar.Predef._
 import quasar.Planner.NoFilesFound
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fs._
 import quasar.qscript.MapFuncs._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
-import pathy.Path.{dir1, file1, FileName, rootDir}
+import pathy.Path.{dir1, file1, rootDir}
 import scalaz._, Scalaz._, \&/._
 
 trait DiscoverPath[IN[_]] {
@@ -48,10 +49,6 @@ object DiscoverPath extends DiscoverPathInstances {
 abstract class DiscoverPathInstances {
   type ListContents[M[_]] = ADir => M[Set[PathSegment]]
 
-  // TODO: Move to scalaz, or at least quasar.fp
-  def -\&/[A, B](a: A): These[A, B] = This(a)
-  def \&/-[A, B](b: B): These[A, B] = That(b)
-
   def union[T[_[_]]: Recursive: Corecursive, OUT[_]: Functor]
     (elems: NonEmptyList[T[OUT]])
     (implicit
@@ -63,11 +60,9 @@ abstract class DiscoverPathInstances {
         elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
         acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
 
-  def makeRead[T[_[_]], F[_]]
-    (dir: ADir, file: FileName)
-    (implicit R: Const[Read, ?] :<: F):
+  def makeRead[T[_[_]], F[_]](path: ADir)(implicit R: Const[Read[APath], ?] :<: F):
       F[T[F]] =
-    R.inj(Const[Read, T[F]](Read(dir </> file1(file))))
+    R.inj(Const[Read[APath], T[F]](Read(path)))
 
   def wrapDir[T[_[_]]: Corecursive, F[_]: Functor]
     (name: String, d: F[T[F]])
@@ -75,46 +70,34 @@ abstract class DiscoverPathInstances {
       : F[T[F]] =
     QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
 
-  def allDescendents[T[_[_]]: Corecursive, M[_]: MonadFsErr, F[_]: Functor](
-    listContents: ListContents[M])(
-    implicit R: Const[Read, ?] :<: F,
-             QC: QScriptCore[T, ?] :<: F):
-      ADir => M[List[F[T[F]]]] =
-    dir => (listContents(dir) >>=
-      (ps => ISet.fromList(ps.toList).toList.traverseM(_.fold(
-        d => allDescendents[T, M, F](listContents).apply(dir </> dir1(d)) ∘ (_ ∘ (wrapDir(d.value, _))),
-        f => List(wrapDir[T, F](f.value, makeRead(dir, f))).point[M]))))
-      .handleError(κ(List.empty[F[T[F]]].point[M]))
-
-  def unionDirs[T[_[_]]: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
-    (g: ListContents[M])
-    (implicit R: Const[Read, ?] :<: OUT, QC: QScriptCore[T, ?] :<: OUT)
-      : List[ADir] => M[Option[NonEmptyList[T[OUT]]]] =
-    dirs => dirs.traverseM(allDescendents[T, M, OUT](g)) ∘ (_ ∘ (_.embed) match {
+  def unionDirs[T[_[_]]: Corecursive, OUT[_]: Functor]
+    (implicit R: Const[Read[APath], ?] :<: OUT, QC: QScriptCore[T, ?] :<: OUT)
+      : List[ADir] => Option[NonEmptyList[T[OUT]]] =
+    _ ∘ (makeRead[T, OUT](_).embed) match {
       case Nil    => None
       case h :: t => NonEmptyList.nel(h, t.toIList).some
-    })
+    }
 
   def unionAll[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
     (g: ListContents[M])
     (implicit
-      R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore[T, ?] :<: OUT,
+      R: Const[Read[APath], ?] :<: OUT,
+      QC:    QScriptCore[T, ?] :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : List[ADir] \&/ T[OUT] => M[T[OUT]] =
     _.fold(
-      ds => unionDirs[T, M, OUT](g).apply(ds) >>= (_.fold[M[T[OUT]]](
+      ds => unionDirs[T, OUT].apply(ds).fold[M[T[OUT]]](
         MonadError[M, FileSystemError].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
-        union(_).point[M])),
+        union(_).point[M]),
       _.point[M],
-      (ds, qs) => unionDirs[T, M, OUT](g).apply(ds) ∘ (_.fold(qs)(d => union(qs <:: d))))
+      (ds, qs) => unionDirs[T, OUT].apply(ds).fold(qs)(d => union(qs <:: d)).point[M])
 
   def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], branch: FreeQS[T])
     (f: ListContents[M])
     (implicit
-      R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore[T, ?] :<: OUT,
+      R: Const[Read[APath], ?] :<: OUT,
+      QC:    QScriptCore[T, ?] :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : M[FreeQS[T]] =
     freeCataM[M, QScriptTotal[T, ?], Hole, List[ADir] \&/ T[QScriptTotal[T, ?]]](
@@ -130,8 +113,8 @@ abstract class DiscoverPathInstances {
     (src: List[ADir] \&/ T[OUT], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[OUT], FreeQS[T], FreeQS[T]) => OUT[T[OUT]])
     (implicit
-      R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore[T, ?] :<: OUT,
+      R: Const[Read[APath], ?] :<: OUT,
+      QC:    QScriptCore[T, ?] :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : M[List[ADir] \&/ T[OUT]] =
     (convertBranch(src, lb)(f) ⊛ convertBranch(src, rb)(f))((l, r) =>
@@ -156,9 +139,9 @@ abstract class DiscoverPathInstances {
 
   implicit def projectBucket[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (implicit
-      R:       Const[Read, ?] :<: F,
-      QC:   QScriptCore[T, ?] :<: F,
-      PB: ProjectBucket[T, ?] :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
+      PB:  ProjectBucket[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ProjectBucket[T, ?], F] =
     new DiscoverPath[ProjectBucket[T, ?]] {
@@ -167,7 +150,7 @@ abstract class DiscoverPathInstances {
 
       def handleDirs[M[_]: MonadFsErr](g: ListContents[M], dirs: List[ADir], field: String) =
         dirs.traverseM(fileType(g).apply(_, field).fold(
-          df => List(df ∘ (file => R.inj(Const[Read, T[OUT]](Read(file))).embed)),
+          df => List(df ∘ (file => R.inj(Const[Read[APath], T[OUT]](Read(file))).embed)),
           Nil)) ∘ {
           case Nil => -\&/(Nil)
           case h :: t => t.foldRight(h.fold(d => -\&/(List(d)), \&/-(_)))((elem, acc) =>
@@ -204,8 +187,8 @@ abstract class DiscoverPathInstances {
 
   implicit def qscriptCore[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (implicit
-      R:     Const[Read, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, QScriptCore[T, ?], F] =
     new DiscoverPath[QScriptCore[T, ?]] {
@@ -231,9 +214,9 @@ abstract class DiscoverPathInstances {
 
   implicit def thetaJoin[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (implicit
-      R:     Const[Read, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
-      TJ: ThetaJoin[T, ?] :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
+      TJ:      ThetaJoin[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, ThetaJoin[T, ?], F] =
     new DiscoverPath[ThetaJoin[T, ?]] {
@@ -249,9 +232,9 @@ abstract class DiscoverPathInstances {
 
   implicit def equiJoin[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
     (implicit
-      R:     Const[Read, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
-      EJ: EquiJoin[T, ?] :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
+      EJ:       EquiJoin[T, ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, EquiJoin[T, ?], F] =
     new DiscoverPath[EquiJoin[T, ?]] {
@@ -278,9 +261,9 @@ abstract class DiscoverPathInstances {
 
   def default[T[_[_]]: Recursive: Corecursive, IN[_]: Traverse, F[_]: Functor]
     (implicit
-      R:     Const[Read, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
-      IN:                IN :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
+      IN:                   IN :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
       : DiscoverPath.Aux[T, IN, F] =
     new DiscoverPath[IN] {
@@ -291,20 +274,21 @@ abstract class DiscoverPathInstances {
         _.traverse(unionAll(g)) ∘ (in => \&/-(IN.inj(in).embed))
     }
 
-  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A]
     (implicit
-      R:     Const[Read, ?] :<: F,
-      QC: QScriptCore[T, ?] :<: F,
+      R: Const[Read[APath], ?] :<: F,
+      QC:    QScriptCore[T, ?] :<: F,
+      RA:    Const[Read[A], ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
-      : DiscoverPath.Aux[T, Const[Read, ?], F] =
+      : DiscoverPath.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]]: Recursive: Corecursive, F[_]: Functor]
+  implicit def shiftedRead[T[_[_]]: Recursive: Corecursive, F[_]: Functor, A]
     (implicit
-      R:         Const[Read, ?] :<: F,
-      QC:     QScriptCore[T, ?] :<: F,
-      IN: Const[ShiftedRead, ?] :<: F,
+      R:     Const[Read[APath], ?] :<: F,
+      QC:        QScriptCore[T, ?] :<: F,
+      IN: Const[ShiftedRead[A], ?] :<: F,
       FI: Injectable.Aux[F, QScriptTotal[T, ?]])
-      : DiscoverPath.Aux[T, Const[ShiftedRead, ?], F] =
+      : DiscoverPath.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 }

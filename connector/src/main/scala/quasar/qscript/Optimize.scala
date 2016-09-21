@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.Predef._
+import quasar.contrib.pathy.APath
 import quasar.fp._
 import quasar.fs.MonadFsErr
 import quasar.qscript.MapFunc._
@@ -321,8 +322,8 @@ class Optimize[T[_[_]]: Recursive: Corecursive: EqualT: ShowT] {
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],
-      R:     Const[Read, ?] :<: OUT,
-      QC: QScriptCore[T, ?] :<: OUT,
+      R:  Const[Read[APath], ?] :<: OUT,
+      QC:     QScriptCore[T, ?] :<: OUT,
       FI: Injectable.Aux[OUT, QScriptTotal[T, ?]])
       : T[IN] => M[T[OUT]] =
     _.cataM(FS.discoverPath[M](g)) >>= DiscoverPath.unionAll[T, M, OUT](g)

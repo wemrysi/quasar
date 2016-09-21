@@ -67,7 +67,7 @@ object queryfile {
       val listContents: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
 
       def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
         qs.cataM(MarkLogicPlanner[M, MLQScript].plan).run map {

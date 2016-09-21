@@ -21,7 +21,7 @@ import quasar.fp._
 
 import argonaut._
 import _root_.pathy.Path, Path._
-import scalaz._, Scalaz._
+import _root_.scalaz._, Scalaz._
 
 package object pathy {
   type AbsPath[T] = Path[Abs,T,Sandboxed]

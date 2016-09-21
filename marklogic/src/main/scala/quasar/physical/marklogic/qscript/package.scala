@@ -18,6 +18,7 @@ package quasar.physical.marklogic
 
 import quasar.SKI.κ
 import quasar.NameGenerator
+import quasar.contrib.pathy.{AFile, APath}
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
 import quasar.physical.marklogic.xquery.{PrologW, XQuery}
@@ -36,23 +37,26 @@ package object qscript {
     implicit def qScriptCore[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, QScriptCore[T, ?]] =
       new QScriptCorePlanner[F, T]
 
-    implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
-      new DeadEndPlanner[F]
-
-    implicit def constRead[F[_]: Applicative]: MarkLogicPlanner[F, Const[Read, ?]] =
-      new ReadPlanner[F]
-
-    implicit def constShiftedRead[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead, ?]] =
-      new ShiftedReadPlanner[F]
-
-    implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
-      new ProjectBucketPlanner[F, T]
-
     implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
       new ThetaJoinPlanner[F, T]
 
+    implicit def constShiftedReadPath[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[APath], ?]] =
+      new ShiftedReadPathPlanner[F]
+
+    implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
+      new UnreachablePlanner[F, Const[DeadEnd, ?]]
+
+    implicit def constRead[F[_]: Applicative, A]: MarkLogicPlanner[F, Const[Read[A], ?]] =
+      new UnreachablePlanner[F, Const[Read[A], ?]]
+
+    implicit def constShiftedReadFile[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[AFile], ?]] =
+      new UnreachablePlanner[F, Const[ShiftedRead[AFile], ?]]
+
+    implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
+      new UnreachablePlanner[F, ProjectBucket[T, ?]]
+
     implicit def equiJoin[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, EquiJoin[T, ?]] =
-      new EquiJoinPlanner[F, T]
+      new UnreachablePlanner[F, EquiJoin[T, ?]]
   }
 
   def mapFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](fm: FreeMap[T], src: XQuery): F[XQuery] =

@@ -54,12 +54,12 @@ object ShiftRead {
       κ(co.map(Free.point[CoEnv[Hole, QScriptTotal[T, ?], ?], T[CoEnv[Hole, QScriptTotal[T, ?], ?]]])),
       ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(coenvPrism[QScriptTotal[T, ?], Hole].reverseGet)(_)))
 
-  implicit def read[T[_[_]]: Recursive: Corecursive, F[_]]
-    (implicit SR: Const[ShiftedRead, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
-      : ShiftRead.Aux[T, Const[Read, ?], F] =
-    new ShiftRead[Const[Read, ?]] {
+  implicit def read[T[_[_]]: Recursive: Corecursive, F[_], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+      : ShiftRead.Aux[T, Const[Read[A], ?], F] =
+    new ShiftRead[Const[Read[A], ?]] {
       type G[A] = F[A]
-      def shiftRead[H[_]](GtoH: G ~> H) = λ[Const[Read, ?] ~> FixFreeH[H, ?]](read =>
+      def shiftRead[H[_]](GtoH: G ~> H) = λ[Const[Read[A], ?] ~> FixFreeH[H, ?]](read =>
         GtoH(QC.inj(Reduce(
           Free.liftF(GtoH(SR.inj(Const(ShiftedRead(
             read.getConst.path,
@@ -121,11 +121,13 @@ object ShiftRead {
     }
 
   implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
-    (implicit I: ShiftRead.Aux[T, I, F], J: ShiftRead.Aux[T, J, F]): ShiftRead.Aux[T, Coproduct[I, J, ?], F] =
+    (implicit I: ShiftRead.Aux[T, I, F], J: ShiftRead.Aux[T, J, F])
+      : ShiftRead.Aux[T, Coproduct[I, J, ?], F] =
       new ShiftRead[Coproduct[I, J, ?]] {
         type G[A] = F[A]
         def shiftRead[H[_]](GtoH: G ~> H) =
-          λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](_.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
+          λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](
+            _.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
       }
 
   def default[T[_[_]], F[_]: Functor, I[_]](implicit F: F :<: I):
@@ -139,9 +141,9 @@ object ShiftRead {
       : ShiftRead.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_]]
-    (implicit SR: Const[ShiftedRead, ?] :<: F)
-      : ShiftRead.Aux[T, Const[ShiftedRead, ?], F] =
+  implicit def shiftedRead[T[_[_]], F[_], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
+      : ShiftRead.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
   implicit def projectBucket[T[_[_]], F[_]]

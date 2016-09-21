@@ -33,30 +33,30 @@ trait QScriptHelpers {
   type QS[A] =
     (QScriptCore[Fix, ?] :\:
       ThetaJoin[Fix, ?] :\:
-      Const[Read, ?] :/: Const[DeadEnd, ?])#M[A]
+      Const[Read[APath], ?] :/: Const[DeadEnd, ?])#M[A]
 
   type QST[A] = QScriptTotal[Fix, A]
 
-  val DE =     implicitly[Const[DeadEnd, ?] :<: QS]
-  val R  =        implicitly[Const[Read, ?] :<: QS]
-  val QC =   implicitly[QScriptCore[Fix, ?] :<: QS]
-  val TJ =     implicitly[ThetaJoin[Fix, ?] :<: QS]
-  val EJ =      implicitly[EquiJoin[Fix, ?] :<: QST]
-  val SR = implicitly[Const[ShiftedRead, ?] :<: QST]
+  val DE =            implicitly[Const[DeadEnd, ?] :<: QS]
+  val R  =        implicitly[Const[Read[APath], ?] :<: QS]
+  val QC =          implicitly[QScriptCore[Fix, ?] :<: QS]
+  val TJ =            implicitly[ThetaJoin[Fix, ?] :<: QS]
+  val EJ =             implicitly[EquiJoin[Fix, ?] :<: QST]
+  val SR = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
   val QS = implicitly[Injectable.Aux[QS, QST]]
   def QST[F[_]](implicit ev: Injectable.Aux[F, QScriptTotal[Fix, ?]]) = ev
 
   val RootR: QS[Fix[QS]] = DE.inj(Const[DeadEnd, Fix[QS]](Root))
   val UnreferencedR: QS[Fix[QS]] = QC.inj(Unreferenced[Fix, Fix[QS]]())
-  def ReadR(file: AFile): QS[Fix[QS]] = R.inj(Const(Read(file)))
+  def ReadR(path: APath): QS[Fix[QS]] = R.inj(Const(Read(path)))
 
-  val DET =     implicitly[Const[DeadEnd, ?] :<: QST]
-  val RT  =        implicitly[Const[Read, ?] :<: QST]
-  val QCT =   implicitly[QScriptCore[Fix, ?] :<: QST]
-  val TJT =     implicitly[ThetaJoin[Fix, ?] :<: QST]
-  val EJT =      implicitly[EquiJoin[Fix, ?] :<: QST]
-  val PBT = implicitly[ProjectBucket[Fix, ?] :<: QST]
-  val SRT = implicitly[Const[ShiftedRead, ?] :<: QST]
+  val DET =            implicitly[Const[DeadEnd, ?] :<: QST]
+  val RT  =        implicitly[Const[Read[AFile], ?] :<: QST]
+  val QCT =          implicitly[QScriptCore[Fix, ?] :<: QST]
+  val TJT =            implicitly[ThetaJoin[Fix, ?] :<: QST]
+  val EJT =             implicitly[EquiJoin[Fix, ?] :<: QST]
+  val PBT =        implicitly[ProjectBucket[Fix, ?] :<: QST]
+  val SRT = implicitly[Const[ShiftedRead[APath], ?] :<: QST]
 
   def ProjectFieldR[A](
     src: Free[MapFunc[Fix, ?], A], field: Free[MapFunc[Fix, ?], A]):
@@ -102,14 +102,16 @@ trait QScriptHelpers {
           FileName("zips").right,
           FileName("car").right)
 
+  def lc = listContents >>> (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]])
+
   implicit val monadTell: MonadTell[FileSystemErrT[PhaseResultT[Id, ?], ?], PhaseResults] =
     EitherT.monadListen[WriterT[Id, Vector[PhaseResult], ?], PhaseResults, FileSystemError](
       WriterT.writerTMonadListen[Id, Vector[PhaseResult]])
 
-  def convert(lc: Option[DiscoverPath.ListContents[Id]], lp: Fix[LP]):
+  def convert(lc: Option[DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Id, ?], ?]]], lp: Fix[LP]):
       Option[Fix[QS]] =
     lc.fold(
       QueryFile.convertToQScript[Fix, QS](lp))(
-      f => QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](f >>> (_.point[FileSystemErrT[PhaseResultT[Id, ?], ?]]))(lp))
+      QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Id, ?], ?], QS](_)(lp))
       .toOption.run.copoint
 }

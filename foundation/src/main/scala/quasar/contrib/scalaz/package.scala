@@ -14,19 +14,11 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.qscript
+package quasar.contrib
 
-import quasar.Predef._
-import quasar.physical.marklogic.xquery._
-import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
+import _root_.scalaz._, \&/._
 
-import matryoshka._
-import scalaz._, Scalaz._
-
-private[qscript] final class ReadPlanner[F[_]: Applicative] extends MarkLogicPlanner[F, Const[Read, ?]] {
-  val plan: AlgebraM[F, Const[Read, ?], XQuery] = {
-    case Const(Read(absFile)) =>
-      s"((: Read :)())".xqy.point[F]
-  }
+package object scalaz {
+  def -\&/[A, B](a: A): These[A, B] = This(a)
+  def \&/-[A, B](b: B): These[A, B] = That(b)
 }

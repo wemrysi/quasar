@@ -17,27 +17,14 @@
 package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
-import quasar.NameGenerator
+import quasar.SKI.κ
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.qscript._
 
 import matryoshka._
-import pathy.Path._
-import scalaz._
+import scalaz._, Scalaz._
 
-private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
-  extends MarkLogicPlanner[F, Const[ShiftedRead, ?]] {
-
-  val plan: AlgebraM[F, Const[ShiftedRead, ?], XQuery] = {
-    case Const(ShiftedRead(absFile, idStatus)) =>
-      val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
-      val dirRepr = posixCodec.printPath(asDir)
-
-      val includeId = idStatus match {
-        case IncludeId => "true".xqy
-        case ExcludeId => "false".xqy
-      }
-      qscript.shiftedRead apply (dirRepr.xs, includeId)
-  }
+private[qscript] final class UnreachablePlanner[M[_]: Applicative, F[_]]
+    extends MarkLogicPlanner[M, F] {
+  val plan: AlgebraM[M, F, XQuery] = κ(s"((: Unreachable :)())".xqy.point[M])
 }

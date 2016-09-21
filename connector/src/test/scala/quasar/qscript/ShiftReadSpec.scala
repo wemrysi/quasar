@@ -17,6 +17,7 @@
 package quasar.qscript
 
 import quasar.fp._
+import quasar.contrib.pathy.APath
 import quasar.qscript.MapFuncs._
 
 import matryoshka._, FunctorT.ops._
@@ -39,7 +40,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers {
       // TODO: Optimize away the `IncludeId`.
       newQScript.transCata(optimize.applyAll) must_=
       Fix(QS.inject(QC.inj(Map(
-        Fix(SR.inj(Const[ShiftedRead, Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
+        Fix(SR.inj(Const[ShiftedRead[APath], Fix[QST]](ShiftedRead(sampleFile, IncludeId)))),
         Free.roll(ProjectIndex(HoleF, IntLit(1)))))))
     }
   }
