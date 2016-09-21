@@ -48,7 +48,7 @@ object data {
       }
   }
 
-  def toXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
+  def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
     def typeAttr(tpe: EJsonType): Attribute =
       Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe, Null)
 
@@ -67,7 +67,7 @@ object data {
     def rootStr(name: QName, str: String): Elem =
       ejsElem(name, None, ejsBinding, Text(str))
 
-    def toXml0(
+    def encodeXml0(
       str: (QName, String) => Elem,
       elem: (QName, EJsonType, Seq[Node]) => Elem,
       loop: QName => Data => Validation[ErrorMessages, Elem]
@@ -104,16 +104,16 @@ object data {
     }
 
     def inner: QName => Data => Validation[ErrorMessages, Elem] =
-      name => toXml0(innerStr, innerElem, inner)(name)
+      name => encodeXml0(innerStr, innerElem, inner)(name)
 
-    toXml0(rootStr, rootElem, inner)(ejsonEjson)(data)
+    encodeXml0(rootStr, rootElem, inner)(ejsonEjson)(data)
       .fold(_.raiseError[F, Elem], _.point[F])
   }
 
-  def fromXml[F[_]: MonadErrMsgs](elem: Elem): F[Data] = {
-    def fromXml0: Node => Validation[ErrorMessages, Data] = {
+  def decodeXml[F[_]: MonadErrMsgs](elem: Elem): F[Data] = {
+    def decodeXml0: Node => Validation[ErrorMessages, Data] = {
       case DataNode("array", children) =>
-        elements(children).toList traverse fromXml0 map (Data._arr(_))
+        elements(children).toList traverse decodeXml0 map (Data._arr(_))
 
       case DataNode("binary", Txt(b64)) =>
         base64.getOption(b64)
@@ -155,7 +155,7 @@ object data {
 
       case DataNode("object", children) =>
         elements(children).toList
-          .traverse(el => fromXml0(el) strengthL qualifiedName(el))
+          .traverse(el => decodeXml0(el) strengthL qualifiedName(el))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode("string", Txt(s)) => Data._str(s).success
@@ -175,7 +175,7 @@ object data {
       case other            => s"Unrecognized Data XML: $other.".failureNel
     }
 
-    fromXml0(elem).fold(_.raiseError[F, Data], _.point[F])
+    decodeXml0(elem).fold(_.raiseError[F, Data], _.point[F])
   }
 
   ////

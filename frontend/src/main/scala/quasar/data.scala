@@ -98,6 +98,9 @@ object Data {
   val _obj =
     Prism.partial[Data, ListMap[String, Data]] { case Data.Obj(m) => m } (Data.Obj(_))
 
+  def singletonObj(k: String, v: Data): Data =
+    Obj(ListMap(k -> v))
+
   final case class Arr(value: List[Data]) extends Data {
     def dataType = Type.Arr(value ∘ (Type.Const(_)))
     def toJs = value.traverse(_.toJs).map(jscore.Arr(_))
