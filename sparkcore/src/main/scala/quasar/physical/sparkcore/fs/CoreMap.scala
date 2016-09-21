@@ -163,6 +163,7 @@ object CoreMap {
     }).right
     case ConcatArrays(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
+      case _ => undefined
     }).right
     case ConcatMaps(f1, f2) => InternalError("not implemented").left
       // TODO
