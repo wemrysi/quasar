@@ -186,7 +186,7 @@ package object expression {
 
   // TODO: This should at least use Show.
   implicit val ExprOpRenderTree: RenderTree[Expression] =
-    RenderTree.fromToString[Expression]("ExprOp")
+    RenderTree.fromShow[Expression]("ExprOp")
 
   /** "Literal" translation to JS. */
   def toJsSimpleƒ(expr: ExprOp[JsFn]): PlannerError \/ JsFn = {
@@ -216,16 +216,16 @@ package object expression {
         case o @ Bson.ObjectId(_) => \/-(toJsObjectId(o))
         case d @ Bson.Date(_)     => \/-(toJsDate(d))
         // TODO: implement the rest of these (see SD-451)
-        case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.toString))
-        case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.toString))
+        case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.shows))
+        case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.shows))
         case Bson.Undefined       => \/-(jscore.ident("undefined"))
 
-        case _ => -\/(NonRepresentableInJS(bson.toString))
+        case _ => -\/(NonRepresentableInJS(bson.shows))
       }
     }
 
     expr match {
-      case $includeF()             => -\/(NonRepresentableInJS(expr.toString))
+      case $includeF()             => -\/(NonRepresentableInJS(expr.shows))
       case $varF(dv)               => \/-(dv.toJs)
       case $addF(l, r)             => binop(jscore.Add, l, r)
       case $andF(f, s, o @ _*)     =>
@@ -241,7 +241,7 @@ package object expression {
       case $literalF(bson)         => const(bson).map(l => JsFn.const(l))
       case $ltF(l, r)              => binop(jscore.Lt, l, r)
       case $lteF(l, r)             => binop(jscore.Lte, l, r)
-      case $metaF()                => -\/(NonRepresentableInJS(expr.toString))
+      case $metaF()                => -\/(NonRepresentableInJS(expr.shows))
       case $multiplyF(l, r)        => binop(jscore.Mult, l, r)
       case $neqF(l, r)             => binop(jscore.Neq, l, r)
       case $notF(a)                => unop(jscore.Not, a)
@@ -267,7 +267,7 @@ package object expression {
       case $millisecondF(a)        => invoke(a, "getUTCMilliseconds")
 
       // TODO: implement the rest of these and remove the catch-all (see SD-451)
-      case _                       => -\/(UnsupportedJS(expr.toString))
+      case _                       => -\/(UnsupportedJS(expr.shows))
     }
   }
 

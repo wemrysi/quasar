@@ -650,13 +650,14 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           |├─ ExprBuilder
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $ReadF(db; zips)
-          |│  │  ╰─ Schema(None)
-          |│  ╰─ ExprOp(Fix($varF(DocField(BsonField.Name("pop")))))
+          |│  │  ╰─ Schema
+          |│  ╰─ ExprOp($var(DocField(BsonField.Name("pop"))))
           |├─ By
           |│  ╰─ ValueBuilder(Int32(1))
           |╰─ Content
           |   ╰─ -\/
-          |      ╰─ AccumOp($sum(Fix($varF(DocVar.ROOT()))))""".stripMargin)
+          |      ╰─ $sum(())
+          |         ╰─ ExprOp($var(DocVar.ROOT()))""".stripMargin)
     }
 
   }

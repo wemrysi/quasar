@@ -322,7 +322,7 @@ private final class QueryFileInterpreter[C](
     case InsertFailed(bson, reason) =>
       executionFailed(lp,
         s"Unable to insert data into MongoDB: $reason",
-        jSingle("data", bson.toString.asJson),
+        jSingle("data", bson.shows.asJson),
         none)
 
     case NoDatabase =>

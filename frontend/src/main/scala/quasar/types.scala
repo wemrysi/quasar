@@ -204,8 +204,10 @@ trait TypeInstances {
     def append(f1: Type, f2: => Type) = Type.lub(f1, f2)
   }
 
+  implicit val show: Show[Type] = Show.showFromToString
+
   implicit val TypeRenderTree: RenderTree[Type] =
-    RenderTree.fromToString[Type]("Type")
+    RenderTree.fromShow[Type]("Type")
 
   implicit val typeEncodeJson: EncodeJson[Type] =
     EncodeJson {

@@ -38,8 +38,10 @@ object SemanticAnalysis {
   object Synthetic {
     final case object SortKey extends Synthetic
 
-    implicit val SyntheticRenderTree: RenderTree[Synthetic] =
-      RenderTree.fromToString[Synthetic]("Synthetic")
+    implicit val show: Show[Synthetic] = Show.showFromToString
+
+    implicit val renderTree: RenderTree[Synthetic] =
+      RenderTree.fromShow[Synthetic]("Synthetic")
   }
 
   private val syntheticPrefix = "__sd__"

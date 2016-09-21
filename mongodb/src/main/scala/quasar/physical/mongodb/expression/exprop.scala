@@ -17,7 +17,11 @@
 package quasar.physical.mongodb.expression
 
 import quasar.Predef._
+import quasar.fp._
 import quasar.physical.mongodb.Bson
+
+import matryoshka._
+import scalaz._, Scalaz._
 
 sealed trait ExprOp[A] extends Product with Serializable
 object ExprOp {
@@ -82,6 +86,103 @@ object ExprOp {
   final case class $condF[A](predicate: A, ifTrue: A, ifFalse: A)
       extends ExprOp[A]
   final case class $ifNullF[A](expr: A, replacement: A) extends ExprOp[A]
+
+  implicit val show: Delay[Show, ExprOp] =
+    new Delay[Show, ExprOp] {
+      def apply[A](s: Show[A]) = Show.show {
+        case $includeF() => Cord("$include")
+        case $varF(docVar) => Cord("$var(") ++ docVar.show ++ Cord(")")
+
+        case $andF(first, second, others @ _*) =>
+          Cord("$and(") ++ (second :: others.toList).foldLeft(s.show(first))(_ ++ Cord(", ") ++ s.show(_)) ++ Cord(")")
+        case $orF(first, second, others @ _*) =>
+          Cord("$or(") ++ (second :: others.toList).foldLeft(s.show(first))(_ ++ Cord(", ") ++ s.show(_)) ++ Cord(")")
+        case $notF(value) => Cord("$not(") ++ s.show(value) ++ Cord(")")
+
+        case $setEqualsF(left, right) =>
+          Cord("$setEquals(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $setIntersectionF(left, right) =>
+          Cord("$setIntersection(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $setDifferenceF(left, right) =>
+          Cord("$setDifference(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $setUnionF(left, right) =>
+          Cord("$setUnion(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $setIsSubsetF(left, right) =>
+          Cord("$setIsSubset(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+
+        case $anyElementTrueF(value) =>
+          Cord("$anyElementTrue(") ++ s.show(value) ++ Cord(")")
+        case $allElementsTrueF(value) =>
+          Cord("$allElementsTrue(") ++ s.show(value) ++ Cord(")")
+
+        case $cmpF(left, right) =>
+          Cord("$cmp(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $eqF(left, right)  =>
+          Cord("$eq(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $gtF(left, right)  =>
+          Cord("$gt(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $gteF(left, right) =>
+          Cord("$gte(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $ltF(left, right)  =>
+          Cord("$lt(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $lteF(left, right) =>
+          Cord("$lte(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $neqF(left, right) =>
+          Cord("$neq(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+
+        case $addF(left, right) =>
+          Cord("$add(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $divideF(left, right) =>
+          Cord("$divide(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $modF(left, right) =>
+          Cord("$mod(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $multiplyF(left, right) =>
+          Cord("$multiply(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $subtractF(left, right) =>
+          Cord("$subtract(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+
+        case $concatF(first, second, others @ _*) =>
+          Cord("$concat(") ++ (second :: others.toList).foldLeft(s.show(first))(_ ++ Cord(", ") ++ s.show(_)) ++ Cord(")")
+
+        case $strcasecmpF(left, right) =>
+          Cord("$strcasecmp(") ++ s.show(left) ++ Cord(", ") ++ s.show(right) ++ Cord(")")
+        case $substrF(value, start, count) =>
+          Cord("$substr(") ++ s.show(value) ++ Cord(", ") ++ s.show(start) ++ Cord(", ") ++ s.show(count) ++ Cord(")")
+        case $toLowerF(value) => Cord("$toLower(") ++ s.show(value) ++ Cord(")")
+        case $toUpperF(value) => Cord("$toUpper(") ++ s.show(value) ++ Cord(")")
+
+        case $metaF() => Cord("$meta")
+
+        case $sizeF(array) => Cord("$size(") ++ s.show(array) ++ Cord(")")
+
+        case $arrayMapF(input, as, in) =>
+          Cord("$arrayMap(") ++ s.show(input) ++ Cord(", ") ++ as.show ++ Cord(", ") ++ s.show(in) ++ Cord(")")
+
+        case $letF(vars, in) =>
+          // FIXME: Don’t use `toString` here.
+          Cord("$let(") ++ vars.toString ++ Cord(", ") ++ s.show(in) ++ Cord(")")
+
+        case $literalF(value: Bson) =>
+          Cord("$literal(") ++ value.show ++ Cord(")")
+
+        case $dayOfYearF(date) => Cord("$dayOfYear(") ++ s.show(date) ++ Cord(")")
+        case $dayOfMonthF(date) => Cord("$dayOfMonth(") ++ s.show(date) ++ Cord(")")
+        case $dayOfWeekF(date) => Cord("$dayOfWeek(") ++ s.show(date) ++ Cord(")")
+        case $yearF(date) => Cord("$year(") ++ s.show(date) ++ Cord(")")
+        case $monthF(date) => Cord("$month(") ++ s.show(date) ++ Cord(")")
+        case $weekF(date) => Cord("$week(") ++ s.show(date) ++ Cord(")")
+        case $hourF(date) => Cord("$hour(") ++ s.show(date) ++ Cord(")")
+        case $minuteF(date) => Cord("$minute(") ++ s.show(date) ++ Cord(")")
+        case $secondF(date) => Cord("$second(") ++ s.show(date) ++ Cord(")")
+        case $millisecondF(date) => Cord("$millisecond(") ++ s.show(date) ++ Cord(")")
+
+        case $condF(predicate, ifTrue, ifFalse) =>
+          Cord("$cond(") ++ s.show(predicate) ++ Cord(", ") ++ s.show(ifTrue) ++ Cord(", ") ++ s.show(ifFalse) ++ Cord(")")
+
+        case $ifNullF(expr, replacement) =>
+          Cord("$ifNull(") ++ s.show(expr) ++ Cord(", ") ++ s.show(replacement) ++ Cord(")")
+      }
+    }
 }
 
 object $includeF {

@@ -1,1 +1,1 @@
-- enable the Product and Serializable warts
+- enable the ToString wart

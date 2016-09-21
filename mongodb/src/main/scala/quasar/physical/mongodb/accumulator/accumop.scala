@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.RenderTree
 import quasar.fp._
 
+import matryoshka._
 import scalaz._
 
 sealed trait AccumOp[A]
@@ -33,7 +34,7 @@ object AccumOp {
   final case class $avg[A](value: A)      extends AccumOp[A]
   final case class $sum[A](value: A)      extends AccumOp[A]
 
-  implicit val AccumOpInstance: Traverse1[AccumOp] with Comonad[AccumOp]  =
+  implicit val instance: Traverse1[AccumOp] with Comonad[AccumOp]  =
     new Traverse1[AccumOp] with Comonad[AccumOp] {
       def cobind[A, B](fa: AccumOp[A])(f: (AccumOp[A]) ⇒ B) = map(fa)(κ(f(fa)))
 
@@ -65,8 +66,21 @@ object AccumOp {
         }
     }
 
-  implicit val AccumOpRenderTree: RenderTree[Accumulator] =
-    RenderTree.fromToString[Accumulator]("AccumOp")
+  implicit val show: Delay[Show, AccumOp] = new Delay[Show, AccumOp] {
+    def apply[A](s: Show[A]) = Show.show {
+      case $addToSet(v) => Cord("$addToSet(") ++ s.show(v) ++ Cord(")")
+      case $avg(v) => Cord("$avg(") ++ s.show(v) ++ Cord(")")
+      case $first(v) => Cord("$first(") ++ s.show(v) ++ Cord(")")
+      case $last(v) => Cord("$last(") ++ s.show(v) ++ Cord(")")
+      case $max(v) => Cord("$max(") ++ s.show(v) ++ Cord(")")
+      case $min(v) => Cord("$min(") ++ s.show(v) ++ Cord(")")
+      case $push(v) => Cord("$push(") ++ s.show(v) ++ Cord(")")
+      case $sum(v) => Cord("$sum(") ++ s.show(v) ++ Cord(")")
+    }
+  }
+
+  implicit val renderTree: Delay[RenderTree, AccumOp] =
+    RenderTree.delayFromShow
 }
 
 object $addToSet {

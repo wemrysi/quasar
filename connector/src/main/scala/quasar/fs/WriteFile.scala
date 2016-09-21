@@ -35,12 +35,10 @@ object WriteFile {
     val tupleIso: Iso[WriteHandle, (AFile, Long)] =
       Iso((h: WriteHandle) => (h.file, h.id))((WriteHandle(_, _)).tupled)
 
-    implicit val writeHandleShow: Show[WriteHandle] =
-      Show.showFromToString
+    implicit val show: Show[WriteHandle] = Show.showFromToString
 
     // TODO: Switch to order once Order[Path[B,T,S]] exists
-    implicit val writeHandleEqual: Equal[WriteHandle] =
-      Equal.equalBy(tupleIso.get)
+    implicit val equal: Equal[WriteHandle] = Equal.equalBy(tupleIso.get)
   }
 
   final case class Open(file: AFile)
@@ -288,9 +286,9 @@ object WriteFile {
       def render(wf: WriteFile[A]) = wf match {
         case Open(file)           => NonTerminal(List("Open"), None, List(file.render))
         case Write(handle, chunk) =>
-          NonTerminal(List("Read"), handle.toString.some,
-            chunk.map(d => Terminal(List("Data"), d.toString.some)).toList)
-        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+          NonTerminal(List("Read"), handle.shows.some,
+            chunk.map(d => Terminal(List("Data"), d.shows.some)).toList)
+        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
       }
     }
 }
