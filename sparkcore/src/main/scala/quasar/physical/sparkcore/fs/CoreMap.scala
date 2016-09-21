@@ -173,6 +173,7 @@ object CoreMap {
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(list), Data.Int(index)) =>
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
+      case _ => undefined
     }).right
     case ProjectField(fSrc, fField) => InternalError("not implemented").left
     case DeleteField(fSrc, fField) => InternalError("not implemented").left
