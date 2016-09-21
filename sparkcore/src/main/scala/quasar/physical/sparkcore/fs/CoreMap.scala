@@ -69,7 +69,7 @@ object CoreMap {
       case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
       case _ => undefined
     }).right
-    case Extract(f1, f2) => ??? // TODO - waits for Moss changes
+    case Extract(f1, f2) => InternalError("not implemented").left // TODO - waits for Moss changes
     case Now() => ((x: Data) => Data.Timestamp(Instant.now())).right
 
     case Negate(f) => (f >>> {
@@ -157,15 +157,27 @@ object CoreMap {
     case Substring(fStr, fFrom, fCount) =>
       ((x: Data) => substring(fStr(x), fFrom(x), fCount(x))).right
     case MakeArray(f) => (f >>> ((x: Data) => Data.Arr(List(x)))).right
-    case MakeMap(fK, fV) => ???
-    case ConcatArrays(f1, f2) => ???
-    case ConcatMaps(f1, f2) => ???
-    case ProjectIndex(f1, f2) => ???
-    case ProjectField(fSrc, fField) => ???
-    case DeleteField(fSrc, fField) => ???
-    case DupMapKeys(f) => ???
-    case DupArrayIndices(f) => ???
-    case ZipMapKeys(f) => ???
+    case MakeMap(fK, fV) => ((x: Data) => (fK(x), fV(x)) match {
+      case (Data.Str(k), v) => Data.Obj(ListMap(k -> v))
+      case _ => undefined
+    }).right
+    case ConcatArrays(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
+    }).right
+    case ConcatMaps(f1, f2) => InternalError("not implemented").left
+      // TODO
+    // case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      // case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 |+| m2)
+    // }).right
+    case ProjectIndex(f1, f2) => InternalError("not implemented").left
+    case ProjectField(fSrc, fField) => InternalError("not implemented").left
+    case DeleteField(fSrc, fField) => InternalError("not implemented").left
+    case DupMapKeys(f) => InternalError("not implemented").left
+    case DupArrayIndices(f) => InternalError("not implemented").left
+    case ZipMapKeys(f) => InternalError("not implemented").left
+    case ZipArrayIndices(f) => InternalError("not implemented").left
+    case Range(fFrom, fTo) => InternalError("not implemented").left
+    case Guard(f1, fPattern, f2,ff3) => InternalError("not implemented").left
     case _ => InternalError("not implemented").left
   }
 
