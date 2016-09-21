@@ -105,6 +105,7 @@ package object sql {
       case sel @ Select(_, _, _, _, _, _) => {
         // perform all the appropriate recursions
         // TODO remove asInstanceOf by providing a `SelectF` at compile time
+        @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
         val sel2 = Functor[Sql].map(sel)(_.makeTables(bindings)).asInstanceOf[Select[T[Sql]]]
 
         def mkRel[A](rel: SqlRelation[A]): SqlRelation[A] = rel match {

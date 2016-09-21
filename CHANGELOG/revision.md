@@ -1,1 +1,1 @@
-- enable the ToString wart
+- enable the IsInstanceOf wart (and AsInstanceOf partially)

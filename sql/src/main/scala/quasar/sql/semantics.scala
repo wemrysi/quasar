@@ -187,6 +187,7 @@ object SemanticAnalysis {
 
     // TODO: Implement Order for all sorts of types so we can get Equal (well,
     //       Order, even) defined properly for Provenance.
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def equals(that: scala.Any): Boolean = (this, that) match {
       case (x, y) if (x.eq(y.asInstanceOf[AnyRef])) => true
       case (Relation(v1), Relation(v2))             => v1 == v2
