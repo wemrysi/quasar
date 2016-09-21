@@ -21,7 +21,7 @@ import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp.free.lift
 import quasar.fs._
-import quasar.physical.marklogic.fs.data.toXml
+import quasar.physical.marklogic.fs.data.encodeXml
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xml._
@@ -74,7 +74,7 @@ object ops {
 
     val xmlData: Vector[FileSystemError \/ String] =
       data map { d =>
-        toXml[ErrorMessages \/ ?](d).bimap(
+        encodeXml[ErrorMessages \/ ?](d).bimap(
           ms => FileSystemError.writeFailed(d, ms.intercalate(", ")),
           _.toString)
       }

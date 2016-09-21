@@ -33,24 +33,24 @@ object xdmitem {
   def toData[F[_]: MonadErrMsgs](xdm: XdmItem): F[Data] = xdm match {
     case item: CtsBox                   =>
       Data.singletonObj("cts:box", Data.Obj(ListMap(
-        "east"  -> Data.Str(item.getEast),
-        "north" -> Data.Str(item.getNorth),
-        "south" -> Data.Str(item.getSouth),
-        "west"  -> Data.Str(item.getWest)
+        "east"  -> Data._str(item.getEast),
+        "north" -> Data._str(item.getNorth),
+        "south" -> Data._str(item.getSouth),
+        "west"  -> Data._str(item.getWest)
       ))).point[F]
 
     case item: CtsCircle                =>
       toData[F](item.getCenter) map { center =>
         Data.singletonObj("cts:circle", Data.Obj(ListMap(
            "center" -> center,
-           "radius" -> Data.Str(item.getRadius)
+           "radius" -> Data._str(item.getRadius)
          )))
       }
 
     case item: CtsPoint                 =>
       Data.singletonObj("cts:point", Data.Obj(ListMap(
-        "latitude"  -> Data.Str(item.getLatitude),
-        "longitude" -> Data.Str(item.getLongitude)
+        "latitude"  -> Data._str(item.getLatitude),
+        "longitude" -> Data._str(item.getLongitude)
       ))).point[F]
 
     case item: CtsPolygon               =>
@@ -65,35 +65,35 @@ object xdmitem {
 
     case item: XdmAttribute             =>
       val attr = item.asW3cAttr
-      Data.singletonObj(attr.getName, Data.Str(attr.getValue)).point[F]
+      Data.singletonObj(attr.getName, Data._str(attr.getValue)).point[F]
 
     // TODO: Inefficient for large data as it must be buffered into memory
     case item: XdmBinary                => bytesToData[F](item.asBinaryData)
-    case item: XdmComment               => Data.singletonObj("xdm:comment"  , Data.Str(item.asString)).point[F]
+    case item: XdmComment               => Data.singletonObj("xdm:comment"  , Data._str(item.asString)).point[F]
     case item: XdmDocument              => xmlToData[F](item.asString)
     case item: XdmElement               => xmlToData[F](item.asString)
-    case item: XdmProcessingInstruction => Data.singletonObj("xdm:processingInstruction", Data.Str(item.asString)).point[F]
+    case item: XdmProcessingInstruction => Data.singletonObj("xdm:processingInstruction", Data._str(item.asString)).point[F]
     case item: XdmText                  => Data._str(item.asString).point[F]
     case item: XSAnyURI                 => Data._str(item.asString).point[F]
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
-    case item: XSDate                   => Data.singletonObj("xs:date"      , Data.Str(item.asString)).point[F]
+    case item: XSDate                   => Data.singletonObj("xs:date"      , Data._str(item.asString)).point[F]
     case item: XSDateTime               => Data._timestamp(Instant.ofEpochMilli(item.asDate.getTime)).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
-    case item: XSDuration               => Data.singletonObj("xs:duration"  , Data.Str(item.asString)).point[F]
+    case item: XSDuration               => Data.singletonObj("xs:duration"  , Data._str(item.asString)).point[F]
     case item: XSFloat                  => Data._dec(item.asBigDecimal).point[F]
-    case item: XSGDay                   => Data.singletonObj("xs:gDay"      , Data.Str(item.asString)).point[F]
-    case item: XSGMonth                 => Data.singletonObj("xs:gMonth"    , Data.Str(item.asString)).point[F]
-    case item: XSGMonthDay              => Data.singletonObj("xs:gMonthDay" , Data.Str(item.asString)).point[F]
-    case item: XSGYear                  => Data.singletonObj("xs:gYear"     , Data.Str(item.asString)).point[F]
-    case item: XSGYearMonth             => Data.singletonObj("xs:gYearMonth", Data.Str(item.asString)).point[F]
+    case item: XSGDay                   => Data.singletonObj("xs:gDay"      , Data._str(item.asString)).point[F]
+    case item: XSGMonth                 => Data.singletonObj("xs:gMonth"    , Data._str(item.asString)).point[F]
+    case item: XSGMonthDay              => Data.singletonObj("xs:gMonthDay" , Data._str(item.asString)).point[F]
+    case item: XSGYear                  => Data.singletonObj("xs:gYear"     , Data._str(item.asString)).point[F]
+    case item: XSGYearMonth             => Data.singletonObj("xs:gYearMonth", Data._str(item.asString)).point[F]
     case item: XSHexBinary              => bytesToData[F](item.asBinaryData)
     case item: XSInteger                => Data._int(item.asBigInteger).point[F]
     case item: XSQName                  => Data._str(item.asString).point[F]
     case item: XSString                 => Data._str(item.asString).point[F]
                                            // NB: This can be represented with org.threeten.bp.OffsetTime
-    case item: XSTime                   => Data.singletonObj("xs:time"      , Data.Str(item.asString)).point[F]
+    case item: XSTime                   => Data.singletonObj("xs:time"      , Data._str(item.asString)).point[F]
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
     case other                          => s"No Data representation for '$other'.".wrapNel.raiseError[F, Data]
   }
@@ -114,7 +114,7 @@ object xdmitem {
 
     el flatMap { e =>
       if (xml.qualifiedName(e) === xml.namespaces.ejsonEjson.shows)
-        data.fromXml[F](e)
+        data.decodeXml[F](e)
       else
         xml.toData(e).point[F]
     }
