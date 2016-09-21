@@ -170,7 +170,10 @@ object CoreMap {
     // case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       // case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 |+| m2)
     // }).right
-    case ProjectIndex(f1, f2) => InternalError("not implemented").left
+    case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Arr(list), Data.Int(index)) =>
+        if(index >= 0 && index < list.size) list(index.toInt) else undefined
+    }).right
     case ProjectField(fSrc, fField) => InternalError("not implemented").left
     case DeleteField(fSrc, fField) => InternalError("not implemented").left
     case DupMapKeys(f) => InternalError("not implemented").left
