@@ -213,6 +213,7 @@ object CoreMap {
     case _ => undefined
   }
 
+  // TODO other cases?
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
     case (Data.Int(a), Data.Dec(b)) => ???
@@ -223,6 +224,7 @@ object CoreMap {
     case _ => undefined
   }
 
+  // TODO other cases?
   private def power(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a ^ b)
     case (Data.Int(a), Data.Dec(b)) => ???
@@ -231,6 +233,7 @@ object CoreMap {
     case _ => undefined
   }
 
+  // TODO missing for obj, what about NA & Null ?
   private def eq(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Null, Data.Null) => Data.Bool(true) // is it really?
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a == b)
@@ -266,7 +269,6 @@ object CoreMap {
     case _ => Data.Bool(false)
   }
 
-  //  Numeric ⨿ Interval ⨿ Str ⨿ Temporal ⨿ Bool
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Bool(a < b)
     case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a < b)
@@ -329,23 +331,29 @@ object CoreMap {
 
   private def between(d1: Data, d2: Data, d3: Data): Data = (d1, d2, d3) match {
     case (Data.Int(a), Data.Int(b), Data.Int(c)) =>
-      Data.Bool(a < b && b < c)
+      Data.Bool(a <= b && b <= c)
     case (Data.Dec(a), Data.Dec(b), Data.Dec(c)) =>
-      Data.Bool(a < b && b < c)
+      Data.Bool(a <= b && b <= c)
     case (Data.Interval(a), Data.Interval(b), Data.Interval(c)) =>
-      Data.Bool(a.compareTo(b) < 0 && b.compareTo(c) < 0)
+      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
     case (Data.Str(a), Data.Str(b), Data.Str(c)) =>
-      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
     case (Data.Timestamp(a), Data.Timestamp(b), Data.Timestamp(c)) =>
-      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
     case (Data.Date(a), Data.Date(b), Data.Date(c)) =>
-      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
+      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
     case (Data.Time(a), Data.Time(b), Data.Time(c)) =>
-      Data.Bool(a.compareTo(b) < 0&& b.compareTo(c) < 0)
-    case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => Data.Bool(false) // TODO case?
+      Data.Bool(a.compareTo(b) <= 0 && b.compareTo(c) <= 0)
+    case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => (a,b,c) match {
+      case (false, false, true) => Data.Bool(true)
+      case (false, true, true) => Data.Bool(true)
+      case (true, true, true) => Data.Bool(true)
+      case _ => Data.Bool(false)
+    }
     case _ => undefined
   }
-  
+
+  // TODO reuse render from codec
   private def toStringFunc: Data => Data = {
     case Data.Null => Data.Str("null")
     case d: Data.Str => d
