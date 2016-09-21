@@ -66,6 +66,7 @@ object Dependencies {
   )
   def sparkcore = Seq(
     "io.netty"          %  "netty-all"  % nettyVersion,
+    "com.redhat.et"     %% "silex"      % "0.1.0",
     ("org.apache.spark" %% "spark-core" % "1.6.2")
       .exclude("commons-beanutils", "commons-beanutils-core")
       .exclude("commons-collections", "commons-collections")
