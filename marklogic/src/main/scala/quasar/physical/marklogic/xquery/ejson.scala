@@ -33,6 +33,12 @@ object ejson {
   val arrayEltN = ejs name ejsonArrayElt.local
   val typeAttrN = ejs name ejsonType.local
 
+  // <ejson:ejson ejson:type="null" />
+  def null_[F[_]: PrologW]: F[XQuery] =
+    (ejsonN.xs[F] |@|  typeAttrN.xs) { (ejsxs, tpexs) =>
+      element { ejsxs } { attribute { tpexs } { "null".xs } }
+    }
+
   // ejson:array-concat($arr1 as element(), $arr2 as element()) as element(ejson:ejson)
   def arrayConcat[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
     (ejs.name("array-concat").qn[F] |@| ejsonN.qn |@| arrayEltN.qn) { (fname, ename, aelt) =>

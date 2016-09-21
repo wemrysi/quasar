@@ -20,8 +20,9 @@ import quasar.Predef._
 import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp.ShowT
-import quasar.physical.marklogic.MonadError_
-import quasar.physical.marklogic.ejson.AsXQuery
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.{ErrorMessages, MonadError_}
+import quasar.physical.marklogic.ejson.EncodeXQuery
 import quasar.physical.marklogic.validation._
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
@@ -30,6 +31,7 @@ import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
+import scalaz.EitherT
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -39,7 +41,11 @@ object MapFuncPlanner {
   import expr.{if_, let_}, axes._
 
   def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
-    case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
+    case Constant(ejson) =>
+      type M[A] = EitherT[F, ErrorMessages, A]
+      ejson.cataM(EncodeXQuery[M, EJson].encodeXQuery).run.flatMap(_.fold(
+        msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
+        _.point[F]))
 
     // math
     case Negate(x) => (-x).point[F]
@@ -110,7 +116,7 @@ object MapFuncPlanner {
 
     // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
-      (freshVar[F] |@| ejson.arrayEltN.qn) { (i, arrElt) =>
+      (freshVar[F] |@| ejson.arrayEltN.qn[F]) { (i, arrElt) =>
         let_(i -> idx) return_ {
           arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
         }

@@ -16,6 +16,7 @@
 
 package quasar.physical.marklogic.fs
 
+import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml}
 import quasar.physical.marklogic.xml.SecureXML
 

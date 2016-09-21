@@ -18,6 +18,7 @@ package quasar.physical.marklogic.fs
 
 import quasar.Predef._
 import quasar.Data
+import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xml.namespaces._
 

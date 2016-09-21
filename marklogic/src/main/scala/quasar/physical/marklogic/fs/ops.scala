@@ -21,6 +21,7 @@ import quasar.Data
 import quasar.contrib.pathy._
 import quasar.fp.free.lift
 import quasar.fs._
+import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data.encodeXml
 import quasar.physical.marklogic.uuid._
 import quasar.physical.marklogic.xcc._
