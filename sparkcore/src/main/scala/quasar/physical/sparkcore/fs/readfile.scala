@@ -28,9 +28,8 @@ import quasar.fs._, FileSystemError._, PathError._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
-final case class SparkCursor(rdd: Option[RDD[Data]], pointer: Int)
+final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
 object readfile {
 
@@ -47,16 +46,14 @@ object readfile {
   def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s2: MonotonicSeq :<: S
   ): ReadFile ~> Free[S, ?] =
     flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](input: Input[S])(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S,
-    s3: Task :<: S
+    s2: MonotonicSeq :<: S
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
@@ -79,7 +76,7 @@ object readfile {
       rdd <- input.rddFrom(f, offset, limit)
       cur = SparkCursor(rdd.map{ raw =>
         DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }.some, 0)
+      }.zipWithIndex.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h
@@ -91,28 +88,25 @@ object readfile {
   }
 
   private def read[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
-    s1: Task :<: S
+    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
     // TODO arbitrary value, more or less a good starting point
     // but we should consider some measuring
-    val step = 10000
+    val step = 5000
 
     kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
         case SparkCursor(None, _) =>
           Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
         case SparkCursor(Some(rdd), p) =>
 
-        import com.redhat.et.silex.rdd.drop.implicits._
-
-        val collect: Free[S, FileSystemError \/ Vector[Data]] = lift(Task.delay {
-          rdd.drop(p).take(step).toVector.right[FileSystemError]
-        }).into[S]
+        val collect = rdd
+          .filter(d => d._2 >= p && d._2 < (p + step))
+          .map(_._1).collect.toVector.pure[EitherT[Free[S, ?], FileSystemError, ?]]
 
         for {
-          collected <- EitherT(collect)
-          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(Some(rdd), p + step)
+          collected <- collect
+          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(some(rdd), p + step)
           _ <- kvs.put(h, cur).liftM[FileSystemErrT]
         } yield collected
         
