@@ -36,6 +36,9 @@ class WorkflowBuilderSpec extends quasar.Qspec {
   val builder = WorkflowBuilder.Ops[WorkflowF]
   import builder._
 
+  private val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprCoreFp._
+
   val readZips = read(collection("db", "zips"))
   def pureInt(n: Int) = pure(Bson.Int32(n))
 
@@ -651,7 +654,7 @@ class WorkflowBuilderSpec extends quasar.Qspec {
           |│  ├─ CollectionBuilder(Root())
           |│  │  ├─ $ReadF(db; zips)
           |│  │  ╰─ Schema(None)
-          |│  ╰─ ExprOp(Fix($varF(DocField(BsonField.Name("pop")))))
+          |│  ╰─ ExprOpCore($varF(DocField(BsonField.Name("pop"))))
           |├─ By
           |│  ╰─ ValueBuilder(Int32(1))
           |╰─ Content

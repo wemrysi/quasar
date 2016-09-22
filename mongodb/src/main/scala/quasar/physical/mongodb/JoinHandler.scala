@@ -47,6 +47,9 @@ object JoinHandler {
   val LeftName: BsonField.Name = BsonField.Name("left")
   val RightName: BsonField.Name = BsonField.Name("right")
 
+  private val exprFp = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
+
   def fallback[WF[_], F[_]: Monad](
       first: JoinHandler[WF, OptionT[F, ?]],
       second: JoinHandler[WF, F]): JoinHandler[WF, F] =
@@ -62,7 +65,8 @@ object JoinHandler {
       C: Classify[WF],
       ev0: WorkflowOpCoreF :<: WF,
       ev1: WorkflowOp3_2F :<: WF,
-      ev2: Show[WorkflowBuilder[WF]])
+      ev2: Show[WorkflowBuilder[WF]],
+      ev3: ExprOpOps.Uni[ExprOpCoreF])
     : JoinHandler[WF, OptionT[WorkflowBuilder.M, ?]] = JoinHandler({ (tpe, left, right) =>
 
     val WB = WorkflowBuilder.Ops[WF]
@@ -197,7 +201,7 @@ object JoinHandler {
 
   /** Plan an arbitrary join using only "core" operators, which always means a map-reduce. */
   def mapReduce[WF[_]: Functor: Coalesce: Crush: Crystallize]
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]])
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOpCoreF])
     : JoinHandler[WF, WorkflowBuilder.M] = JoinHandler({ (tpe, left0, right0) =>
 
     val ops = Ops[WF]
@@ -231,7 +235,7 @@ object JoinHandler {
         reduce(groupBy(src, key))($push(_)),
         ListMap(
           rootField             -> \/-($$ROOT),
-          otherField            -> \/-($literal(Bson.Arr(Nil))),
+          otherField            -> \/-($literal(Bson.Arr())),
           BsonField.Name("_id") -> \/-($include()))),
         ι)
 
@@ -258,12 +262,12 @@ object JoinHandler {
 
     val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
 
-    def padEmpty(side: BsonField): Expression =
+    def padEmpty(side: BsonField): Fix[ExprOpCoreF] =
       $cond($eq($size($var(DocField(side))), $literal(Bson.Int32(0))),
-        $literal(Bson.Arr(List(Bson.Doc(ListMap())))),
+        $literal(Bson.Arr(List(Bson.Doc()))),
         $var(DocField(side)))
 
-    def buildProjection(l: Expression, r: Expression): FixOp[WF] =
+    def buildProjection(l: Fix[ExprOpCoreF], r: Fix[ExprOpCoreF]): FixOp[WF] =
       $project[WF](Reshape(ListMap(leftField -> \/-(l), rightField -> \/-(r)))).apply(_)
 
     // TODO exhaustive pattern match
@@ -336,7 +340,7 @@ object JoinHandler {
   //      `Workflow.crush`, when we actually have a task (whether aggregation or
   //       mapReduce) in hand, we would know for sure.
   private def preferMapReduce[WF[_]: Coalesce: Crush: Crystallize: Functor](wb: WorkflowBuilder[WF])
-    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]])
+    (implicit ev0: WorkflowOpCoreF :<: WF, ev1: Show[WorkflowBuilder[WF]], ev2: ExprOpOps.Uni[ExprOpCoreF])
     : Boolean = {
     // TODO: Get rid of this when we functorize WorkflowTask
     def checkTask(wt: workflowtask.WorkflowTask): Boolean = wt match {
