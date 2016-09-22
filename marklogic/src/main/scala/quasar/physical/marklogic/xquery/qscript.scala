@@ -78,7 +78,7 @@ object qscript {
       declare(fname)(
         $("uri") as SequenceType("xs:string"),
         $("include-id") as SequenceType("xs:boolean")
-      ).as(SequenceType(s"element()")) { (uri: XQuery, includeId: XQuery) =>
+      ).as(SequenceType(s"element()*")) { (uri: XQuery, includeId: XQuery) =>
         for {
           d     <- freshVar[F]
           c     <- freshVar[F]
@@ -87,8 +87,9 @@ object qscript {
           mkArr <- ejson.seqToArray[F].getApply
         } yield
           for_(d -> cts.search(fn.doc(), cts.directoryQuery(uri, "1".xs)))
-            .let_(c -> d.xqy `/` child.node())
-            .let_(b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
+            .let_(
+              c -> d.xqy `/` child.node(),
+              b -> (if_ (json.isObject(c.xqy)) then_ xform else_ c.xqy))
             .return_ { if_ (includeId) then_ mkArr(mkSeq_(fn.documentUri(d.xqy), b.xqy)) else_ b.xqy }
       }
     }.join

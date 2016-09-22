@@ -35,9 +35,10 @@ private[qscript] final class ShiftedReadPlanner[F[_]: NameGenerator: PrologW]
       val dirRepr = posixCodec.printPath(asDir)
 
       val includeId = idStatus match {
-        case IncludeId => "true".xqy
-        case ExcludeId => "false".xqy
+        case IncludeId => fn.True
+        case ExcludeId => fn.False
       }
+
       qscript.shiftedRead apply (dirRepr.xs, includeId)
   }
 }
