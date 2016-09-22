@@ -56,6 +56,7 @@ object Planner {
   implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] = unreachable
   implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] = unreachable
   implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] = unreachable
+  implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] = unreachable
 
   implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
     new Planner[Const[ShiftedRead, ?]] {
@@ -119,7 +120,7 @@ object Planner {
 
           val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
             case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-            case Data.Int(v) => InternalError(s"Unsuportted plan").left[Long]
+            case Data.Int(v) => InternalError(s"Unsupported plan").left[Long]
             case a => InternalError(s"$a is not a Long number").left[Long]
           })).liftM[StateT[?[_], SparkContext, ?]])
           (fromState |@| countEval)((rdd, count) =>
@@ -127,9 +128,45 @@ object Planner {
 
         case Drop(src, from, count) =>
           ???
-        case LeftShift(src, struct, repair) => StateT((sc: SparkContext) => {
-          EitherT((sc, src).right[PlannerError].point[Task])
-        })
+        case LeftShift(src, struct, repair) =>
+
+          val structFunc =
+            freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
+
+          def repairFunc: PlannerError \/ ((Data, Data) => Data) ={
+            val dd = freeCataM(repair)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
+              case LeftSide => ((x: Data) => x match {
+                case Data.Arr(elems) => elems(0)
+                case _ => Data.NA
+              }).right
+              case RightSide => ((x: Data) => x match {
+                case Data.Arr(elems) => elems(1)
+                case _ => Data.NA
+              }).right
+            }, CoreMap.change))
+
+            dd.map(df => (l, r) => df(Data.Arr(List(l, r))))
+          }
+
+          StateT((sc: SparkContext) =>
+            EitherT((for {
+              df <- structFunc
+              rf <- repairFunc
+              ls = (input: Data) => df(input) match {
+                case Data.Arr(list) => list.map(rf(input, _))
+                case Data.Obj(m) => m.values.map(rf(input, _))
+                case _ => List.empty[Data]
+              }
+            } yield {
+              src.flatMap(ls)
+            }).map((sc, _)).point[Task]))
+
+          // TODO util function that lifts EIther to StateT[EitherT[Task]]
+
+
+          // StateT((sc: SparkContext) => {
+          // EitherT((sc, src).right[PlannerError].point[Task])
+        // })
         case Union(src, lBranch, rBranch) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
@@ -153,11 +190,7 @@ object Planner {
     }
   
   // TODO: Remove this instance
-  implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] =
-    new Planner[ThetaJoin[T, ?]] {
-      type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = _ => ???
-    }
+
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
     implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
