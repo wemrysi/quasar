@@ -80,6 +80,9 @@ package object workflow {
   val IdName   = BsonField.Name(IdLabel)
   val IdVar    = DocVar.ROOT(IdName)
 
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOpCoreF] = ExprOpCoreF.fixpoint[Fix, ExprOpCoreF]
+  import exprFp._
+
   def task[F[_]: Functor](fop: Crystallized[F])(implicit C: Crush[F]): WorkflowTask =
     (finish(_, _)).tupled(fop.op.para(C.crush[Fix]))._2.transAna(normalize)
 
@@ -187,20 +190,20 @@ package object workflow {
     val prefix = prefixBase(base)
     PipelineOp(I.inj(op.wf.void).run.fold(
       op => (op match {
-        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(prefix)(op).pipeline
-        case op @ $SampleF(_, _)          => rewriteRefs3_2(prefix)(op).shapePreserving
+        case op @ $LookupF(_, _, _, _, _) => rewriteRefs3_2(prefix).apply(op).pipeline
+        case op @ $SampleF(_, _)          => rewriteRefs3_2(prefix).apply(op).shapePreserving
       }).fmap(ι, Inject[WorkflowOp3_2F, WorkflowF]),
       op => (op match {
-        case op @ $MatchF(_, _)           => rewriteRefs2_6(prefix)(op).shapePreserving
-        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(prefix)(op).pipeline
-        case op @ $RedactF(_, _)          => rewriteRefs2_6(prefix)(op).pipeline
-        case op @ $SkipF(_, _)            => rewriteRefs2_6(prefix)(op).shapePreserving
-        case op @ $LimitF(_, _)           => rewriteRefs2_6(prefix)(op).shapePreserving
-        case op @ $UnwindF(_, _)          => rewriteRefs2_6(prefix)(op).pipeline
-        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(prefix)(op).pipeline
-        case op @ $SortF(_, _)            => rewriteRefs2_6(prefix)(op).shapePreserving
-        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(prefix)(op).pipeline
-        case op @ $OutF(_, _)             => rewriteRefs2_6(prefix)(op).shapePreserving
+        case op @ $MatchF(_, _)           => rewriteRefs2_6(prefix).apply(op).shapePreserving
+        case op @ $ProjectF(_, _, _)      => rewriteRefs2_6(prefix).apply(op).pipeline
+        case op @ $RedactF(_, _)          => rewriteRefs2_6(prefix).apply(op).pipeline
+        case op @ $SkipF(_, _)            => rewriteRefs2_6(prefix).apply(op).shapePreserving
+        case op @ $LimitF(_, _)           => rewriteRefs2_6(prefix).apply(op).shapePreserving
+        case op @ $UnwindF(_, _)          => rewriteRefs2_6(prefix).apply(op).pipeline
+        case op @ $GroupF(_, _, _)        => rewriteRefs2_6(prefix).apply(op).pipeline
+        case op @ $SortF(_, _)            => rewriteRefs2_6(prefix).apply(op).shapePreserving
+        case op @ $GeoNearF(_, _, _, _, _, _, _, _, _, _) => rewriteRefs2_6(prefix).apply(op).pipeline
+        case op @ $OutF(_, _)             => rewriteRefs2_6(prefix).apply(op).shapePreserving
         case _ => scala.sys.error("never happens")
       }).fmap(ι, Inject[WorkflowOpCoreF, WorkflowF])))
   }
@@ -229,7 +232,8 @@ package object workflow {
   // explicitly implemented for each version's trait.
   // TODO: Make this a trait, and implement it for actual types, rather than all
   //       in here (already done for ExprOp and Reshape). (#438)
-  private [workflow] def rewriteRefs2_6(f: PartialFunction[DocVar, DocVar]) = new RewriteRefs[WorkflowOpCoreF](f) {
+  private [workflow] def rewriteRefs2_6(f: PartialFunction[DocVar, DocVar])
+      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) = new RewriteRefs[WorkflowOpCoreF](f) {
     def apply[A <: WorkflowOpCoreF[_]](op: A) = {
       (op match {
         case $ProjectF(src, shape, xId) =>
@@ -237,9 +241,9 @@ package object workflow {
         case $GroupF(src, grouped, by)  =>
           $GroupF(src,
             grouped.rewriteRefs(applyVar0),
-            by.bimap(_.rewriteRefs(applyVar0), rewriteExprRefs(_)(applyVar0)))
+            by.bimap(_.rewriteRefs(applyVar0), _.cata(exprOps.rewriteRefs(applyVar0))))
         case $MatchF(src, s)            => $MatchF(src, applySelector(s))
-        case $RedactF(src, e)           => $RedactF(src, rewriteExprRefs(e)(applyVar0))
+        case $RedactF(src, e)           => $RedactF(src, e.cata(exprOps.rewriteRefs(applyVar0)))
         case $UnwindF(src, f)           => $UnwindF(src, applyVar(f))
         case $SortF(src, l)             => $SortF(src, applyNel(l))
         case g: $GeoNearF[_]            =>
@@ -428,7 +432,7 @@ package object workflow {
                   }),
                   $ReduceF.reduceNOP,
                   // TODO: Get rid of this asInstanceOf!
-                  selection = Some(rewriteRefs2_6(prefixBase(base))(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[T[WorkflowOpCoreF]]]).selector)),
+                  selection = Some(rewriteRefs2_6(prefixBase(base)).apply(Functor[WorkflowOpCoreF].void(op).asInstanceOf[$MatchF[T[WorkflowOpCoreF]]]).selector)),
                 None))
           }
           pipeline($MatchF[T[WorkflowF]](src, selector).shapePreserving.fmap(ι, I)) match {
@@ -578,7 +582,7 @@ package object workflow {
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
   implicit def crystallizeWorkflowF[F[_]: Functor: Classify: Coalesce: Refs](
-    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF):
+    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF, ev2: ExprOpOps.Uni[ExprOpCoreF]):
       Crystallize[F] =
     new Crystallize[F] {
       // probable conversions

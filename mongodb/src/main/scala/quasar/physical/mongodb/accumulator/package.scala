@@ -18,27 +18,30 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression.DocVar
 
-import matryoshka.Recursive.ops._
+import matryoshka._, Recursive.ops._
 import scalaz._, Scalaz._
 
 package object accumulator {
 
-  type Accumulator = AccumOp[Expression]
+  type Accumulator = AccumOp[Fix[ExprOpCoreF]]
 
-  def rewriteGroupRefs(t: Accumulator)(applyVar: PartialFunction[DocVar, DocVar]) =
-    t.map(rewriteExprRefs(_)(applyVar))
+  def rewriteGroupRefs(t: Accumulator)(applyVar: PartialFunction[DocVar, DocVar])
+      (implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]): Accumulator =
+    t.map(_.cata(exprOps.rewriteRefs(applyVar)))
 
   val groupBsonƒ: AccumOp[Bson] => Bson = {
-    case $addToSet(value) => bsonDoc("$addToSet", value)
-    case $push(value)     => bsonDoc("$push", value)
-    case $first(value)    => bsonDoc("$first", value)
-    case $last(value)     => bsonDoc("$last", value)
-    case $max(value)      => bsonDoc("$max", value)
-    case $min(value)      => bsonDoc("$min", value)
-    case $avg(value)      => bsonDoc("$avg", value)
-    case $sum(value)      => bsonDoc("$sum", value)
+    case $addToSet(value) => Bson.Doc("$addToSet" -> value)
+    case $push(value)     => Bson.Doc("$push" -> value)
+    case $first(value)    => Bson.Doc("$first" -> value)
+    case $last(value)     => Bson.Doc("$last" -> value)
+    case $max(value)      => Bson.Doc("$max" -> value)
+    case $min(value)      => Bson.Doc("$min" -> value)
+    case $avg(value)      => Bson.Doc("$avg" -> value)
+    case $sum(value)      => Bson.Doc("$sum" -> value)
   }
 
-  def groupBson(g: Accumulator) = groupBsonƒ(g.map(_.cata(bsonƒ)))
+  def groupBson(g: Accumulator)(implicit exprOps: ExprOpOps.Uni[ExprOpCoreF]) =
+    groupBsonƒ(g.map(_.cata(exprOps.bson)))
 }
