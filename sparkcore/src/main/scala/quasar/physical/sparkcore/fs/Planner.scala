@@ -43,24 +43,25 @@ import scalaz.concurrent.Task
 object Planner {
   
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
-  
-  // NB: Shouldn’t need this once we convert to paths.
-  implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] =
-    new Planner[Const[DeadEnd, ?]] {
+
+  def unreachable[T[_[_]], F[_]]: Planner.Aux[T, F] =
+    new Planner[F] {
       type IT[G[_]] = T[G]
-      
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], Const[DeadEnd, ?], RDD[Data]] =
-        (qs: Const[DeadEnd, RDD[Data]]) =>
-      StateT((sc: SparkContext) => {
-        EitherT((sc, sc.parallelize(List(Data.Null: Data))).right[PlannerError].point[Task])
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], F, RDD[Data]] =
+        _ =>  StateT((sc: SparkContext) => {
+        EitherT(InternalError("unreachable").left[(SparkContext, RDD[Data])].point[Task])
       })
     }
 
-  implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] =
-    new Planner[Const[Read, ?]] {
+  implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] = unreachable
+  implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] = unreachable
+  implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] = unreachable
+
+  implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
+    new Planner[Const[ShiftedRead, ?]] {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]) =
-        (qs: Const[Read, RDD[Data]]) => {
+        (qs: Const[ShiftedRead, RDD[Data]]) => {
           StateT((sc: SparkContext) => {
             val filePath = qs.getConst.path
             EitherT(fromFile(sc, filePath).map { initRDD =>
@@ -72,13 +73,6 @@ object Planner {
             })
           })
         }
-    }
-
-  // TODO difference between this & read
-  implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
-    new Planner[Const[ShiftedRead, ?]] {
-      type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]) = ???
     }
 
   implicit def qscriptCore[T[_[_]]: Recursive: ShowT]:
@@ -145,13 +139,6 @@ object Planner {
     new Planner[ThetaJoin[T, ?]] {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ThetaJoin[T, ?], RDD[Data]] = _ => ???
-    }
-  
-  // TODO: Remove this instance
-  implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] =
-    new Planner[ProjectBucket[T, ?]] {
-      type IT[G[_]] = T[G]
-            def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], ProjectBucket[T, ?], RDD[Data]] = _ => ???
     }
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
