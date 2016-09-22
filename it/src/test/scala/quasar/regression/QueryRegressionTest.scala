@@ -89,7 +89,7 @@ abstract class QueryRegressionTest[S[_]](
   fileSystemShould { fs =>
     suiteName should {
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, fs.name, fs.testInterpM)
+        regressionExample(f, t, fs.name, fs.setupInterpM, fs.testInterpM)
       }
 
       step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
@@ -103,12 +103,13 @@ abstract class QueryRegressionTest[S[_]](
     loc: RFile,
     test: RegressionTest,
     backendName: BackendName,
+    setup: Run,
     run: Run
   ): Fragment = {
     def runTest: Result = {
       val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
 
-      (ensureTestData(loc, test, run) *> verifyResults(test.expected, data, run))
+      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run))
         .timed(5.minutes)
         .unsafePerformSync
     }
