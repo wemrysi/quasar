@@ -18,7 +18,7 @@ package quasar.physical.marklogic.qscript
 
 import quasar.Predef._
 import quasar.NameGenerator
-import quasar.contrib.pathy.APath
+import quasar.contrib.pathy.AFile
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
@@ -27,15 +27,18 @@ import matryoshka._
 import pathy.Path._
 import scalaz._
 
-private[qscript] final class ShiftedReadPathPlanner[F[_]: NameGenerator: PrologW]
-  extends MarkLogicPlanner[F, Const[ShiftedRead[APath], ?]] {
+private[qscript] final class ShiftedReadFilePlanner[F[_]: NameGenerator: PrologW]
+  extends MarkLogicPlanner[F, Const[ShiftedRead[AFile], ?]] {
 
-  val plan: AlgebraM[F, Const[ShiftedRead[APath], ?], XQuery] = {
-    case Const(ShiftedRead(absPath, idStatus)) =>
+  val plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], XQuery] = {
+    case Const(ShiftedRead(absFile, idStatus)) =>
+      val asDir = fileParent(absFile) </> dir(fileName(absFile).value)
+      val dirRepr = posixCodec.printPath(asDir)
+
       val includeId = idStatus match {
         case IncludeId => "true".xqy
         case ExcludeId => "false".xqy
       }
-      qscript.shiftedRead apply (posixCodec.printPath(absPath).xs, includeId)
+      qscript.shiftedRead apply (dirRepr.xs, includeId)
   }
 }

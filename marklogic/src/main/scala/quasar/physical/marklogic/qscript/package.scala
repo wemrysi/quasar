@@ -40,8 +40,8 @@ package object qscript {
     implicit def thetajoin[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]: MarkLogicPlanner[F, ThetaJoin[T, ?]] =
       new ThetaJoinPlanner[F, T]
 
-    implicit def constShiftedReadPath[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[APath], ?]] =
-      new ShiftedReadPathPlanner[F]
+    implicit def constShiftedReadFile[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[AFile], ?]] =
+      new ShiftedReadFilePlanner[F]
 
     implicit def constDeadEnd[F[_]: Applicative]: MarkLogicPlanner[F, Const[DeadEnd, ?]] =
       new UnreachablePlanner[F, Const[DeadEnd, ?]]
@@ -49,8 +49,8 @@ package object qscript {
     implicit def constRead[F[_]: Applicative, A]: MarkLogicPlanner[F, Const[Read[A], ?]] =
       new UnreachablePlanner[F, Const[Read[A], ?]]
 
-    implicit def constShiftedReadFile[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[AFile], ?]] =
-      new UnreachablePlanner[F, Const[ShiftedRead[AFile], ?]]
+    implicit def constShiftedReadPath[F[_]: NameGenerator: PrologW]: MarkLogicPlanner[F, Const[ShiftedRead[APath], ?]] =
+      new UnreachablePlanner[F, Const[ShiftedRead[APath], ?]]
 
     implicit def projectBucket[F[_]: Applicative, T[_[_]]]: MarkLogicPlanner[F, ProjectBucket[T, ?]] =
       new UnreachablePlanner[F, ProjectBucket[T, ?]]

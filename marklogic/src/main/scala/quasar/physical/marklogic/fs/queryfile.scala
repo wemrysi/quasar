@@ -32,7 +32,7 @@ import quasar.physical.marklogic.xcc._
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 
-import matryoshka._, Recursive.ops._, FunctorT.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._, TraverseT.nonInheritedOps._
 import scalaz._, Scalaz._, concurrent._
 
 object queryfile {
@@ -67,7 +67,8 @@ object queryfile {
       val listContents: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
+      type MLQScript0[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[APath], ?])#M[A]
+      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead[AFile], ?])#M[A]
 
       def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
         qs.cataM(MarkLogicPlanner[M, MLQScript].plan).run map {
@@ -76,7 +77,9 @@ object queryfile {
 
       val planning = for {
         qs  <- convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?], QScriptRead[Fix, ?]](listContents)(lp)
-        shifted = transFutu(qs)(ShiftRead[Fix, QScriptRead[Fix, ?], MLQScript].shiftRead(idPrism.reverseGet)((_: QScriptRead[Fix, Fix[QScriptRead[Fix, ?]]]))).transCata(optimize.applyAll)
+        shifted <- transFutu(qs)(ShiftRead[Fix, QScriptRead[Fix, ?], MLQScript0].shiftRead(idPrism.reverseGet)((_: QScriptRead[Fix, Fix[QScriptRead[Fix, ?]]])))
+          .transCataM(ExpandDirs[Fix, MLQScript0, MLQScript].expandDirs(idPrism.reverseGet, listContents))
+          .map(_.transCata(optimize.applyAll))
         mod <- plan(shifted).leftMap(mlerr => mlerr match {
           case InvalidQName(s) =>
             FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
