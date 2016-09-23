@@ -18,7 +18,7 @@ script:
   #        termination, but then it will forcibly terminate the process after
   #        the time limit, so this needs to be at least as long as the process
   #        takes.
-  - travis_wait 70 ./scripts/build $MONGO_RELEASE
+  - travis_wait 120 ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
 notifications:
   irc:
