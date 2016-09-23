@@ -179,7 +179,10 @@ object CoreMap {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => m(field)
       case _ => undefined
     }).right
-    case DeleteField(fSrc, fField) => InternalError("DeleteField not implemented").left
+    case DeleteField(fSrc, fField) =>  ((x: Data) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+      case _ => undefined
+    }).right
     case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
     case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
     case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
