@@ -90,11 +90,8 @@ object CoreMap {
       case Data.Bool(b) => Data.Bool(!b)
       case _ => undefined
     }).right
-    case Eq(f1, f2) => ((x: Data) => eq(f1(x), f2(x))).right
-    case Neq(f1, f2) => ((x: Data) => eq(f1(x), f2(x)) match {
-      case Data.Bool(b) => Data.Bool(!b)
-      case _ => undefined
-    }).right
+    case Eq(f1, f2) => ((x: Data) => Data.Bool(f1(x) === f2(x))).right
+    case Neq(f1, f2) => ((x: Data) => Data.Bool(f1(x) =/= f2(x))).right
     case Lt(f1, f2) => ((x: Data) => lt(f1(x), f2(x))).right
     case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
     case Gt(f1, f2) => ((x: Data) => gt(f1(x), f2(x))).right
@@ -248,42 +245,6 @@ object CoreMap {
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
     case _ => undefined
-  }
-
-  // TODO missing for obj, what about NA & Null ?
-  private def eq(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Null, Data.Null) => Data.Bool(true) // is it really?
-    case (Data.Str(a), Data.Str(b)) => Data.Bool(a == b)
-    case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a == b)
-    case (Data.Int(a), Data.Int(b)) => Data.Bool(a == b)
-    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a == b)
-    case (Data.Obj(a), Data.Obj(b)) => ??? // TODO
-    case (Data.Arr(a), Data.Arr(b)) => if(a.size != b.size) Data.Bool(false) else {
-      a.zip(b)
-        .map {
-        case (d1, d2) => eq(d1, d2)
-      }.fold(Data.Bool(true)){
-        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => undefined
-      }
-    }
-    case (Data.Set(a), Data.Set(b)) => if(a.size != b.size) Data.Bool(false) else {
-      a.zip(b)
-        .map {
-        case (d1, d2) => eq(d1, d2)
-      }.fold(Data.Bool(true)){
-        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => undefined
-      }
-    }
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a == b)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a == b)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a == b)
-    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a == b)
-    case (Data.Binary(a), Data.Binary(b)) => Data.Bool(a == b)
-    case (Data.Id(a), Data.Id(b)) => Data.Bool(a == b)
-    case (Data.NA, Data.NA) => Data.Bool(true) // is it really?
-    case _ => Data.Bool(false)
   }
 
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
