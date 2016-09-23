@@ -46,7 +46,6 @@ env:
   - MONGO_RELEASE=3_0
   - MONGO_RELEASE=3_0_RO
   - MONGO_RELEASE=3_2
-  - QUASAR_COUCHBASE='{"couchbase":{"connectionUri":"couchbase://0.0.0.0?username=Administrator&password=password"}}'
   - QUASAR_POSTGRESQL='{"postgresql":{"connectionUri":"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"}}'
 
   global:
