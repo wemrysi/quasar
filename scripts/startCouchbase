@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail # STRICT MODE
+IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
+set -x
+
+docker run -d --name cb -p 8091-8094:8091-8094 -p 11210:11210 arungupta/couchbase-server
+
+sleep 10
+
+# init
+
+CB='http://Administrator:password@0.0.0.0'
+
+curl -X POST $CB:8091/settings/indexes -d 'storageMode=memory_optimized'
+
+sleep 5
+
+curl -X POST $CB:8091/pools/default/buckets -d 'ramQuotaMB=250&name=quasar-test&authType=sasl'
+
+sleep 5
+
+curl -X POST $CB:8093/query -d 'statement=create primary index on `quasar-test`'

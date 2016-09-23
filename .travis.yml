@@ -1,16 +1,19 @@
 language: scala
 scala: 2.11.8 # but this setting isn't used when there's an explicit script
 jdk: oraclejdk8
+dist: trusty
 sudo: false
 addons:
   postgresql: 9.4
 services:
-  postgresql
+  - docker
+  - postgresql
 script:
   - export MONGO_LINUX="MONGO_${MONGO_RELEASE}_LINUX"
   - export MONGO_PORT="MONGO_${MONGO_RELEASE}_PORT"
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
+  - if [ $QUASAR_COUCHBASE ]; then ./scripts/startCouchbase; fi
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
   # FIXME: Need to improve compile times so we can remove `travis_wait`
   #        see https://docs.travis-ci.com/user/common-build-problems/#Build-times-out-because-no-output-was-received
@@ -43,6 +46,7 @@ env:
   - MONGO_RELEASE=3_0
   - MONGO_RELEASE=3_0_RO
   - MONGO_RELEASE=3_2
+  - QUASAR_COUCHBASE='{"couchbase":{"connectionUri":"couchbase://0.0.0.0?username=Administrator&password=password"}}'
   - QUASAR_POSTGRESQL='{"postgresql":{"connectionUri":"jdbc:postgresql://localhost/quasar-test?user=postgres&password=postgres"}}'
 
   global:
