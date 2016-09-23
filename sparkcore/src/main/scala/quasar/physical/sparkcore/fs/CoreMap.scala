@@ -24,6 +24,7 @@ import quasar.qscript._
 import quasar.Planner._
 import quasar.SKI._
 
+import scala.math
 import java.math.{BigDecimal => JBigDecimal}
 
 import org.threeten.bp.{Instant, ZoneOffset}
@@ -175,14 +176,14 @@ object CoreMap {
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
       case _ => undefined
     }).right
-    case ProjectField(fSrc, fField) => InternalError("not implemented").left
-    case DeleteField(fSrc, fField) => InternalError("not implemented").left
-    case DupMapKeys(f) => InternalError("not implemented").left
-    case DupArrayIndices(f) => InternalError("not implemented").left
-    case ZipMapKeys(f) => InternalError("not implemented").left
-    case ZipArrayIndices(f) => InternalError("not implemented").left
-    case Range(fFrom, fTo) => InternalError("not implemented").left
-    case Guard(f1, fPattern, f2,ff3) => InternalError("not implemented").left
+    case ProjectField(fSrc, fField) => InternalError("ProjectField not implemented").left
+    case DeleteField(fSrc, fField) => InternalError("DeleteField not implemented").left
+    case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
+    case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
+    case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
+    case ZipArrayIndices(f) => InternalError("ZipArrayIndices not implemented").left
+    case Range(fFrom, fTo) => InternalError("Range not implemented").left
+    case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
     case _ => InternalError("not implemented").left
   }
 
@@ -241,12 +242,11 @@ object CoreMap {
     case _ => undefined
   }
 
-  // TODO other cases?
   private def power(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Int(a), Data.Int(b)) => Data.Int(a ^ b)
-    case (Data.Int(a), Data.Dec(b)) => ???
-    case (Data.Dec(a), Data.Int(b)) => ???
-    case (Data.Dec(a), Data.Dec(b)) => ???
+    case (Data.Int(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
     case _ => undefined
   }
 
