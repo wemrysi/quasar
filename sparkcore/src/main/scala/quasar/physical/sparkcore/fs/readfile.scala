@@ -28,6 +28,7 @@ import quasar.fs._, FileSystemError._, PathError._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
 final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
@@ -46,14 +47,16 @@ object readfile {
   def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S
+    s2: MonotonicSeq :<: S,
+    s3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
     flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](input: Input[S])(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S
+    s2: MonotonicSeq :<: S,
+    s3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
@@ -88,7 +91,8 @@ object readfile {
   }
 
   private def read[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
+    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
+    s1: Task :<: S
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
     // TODO arbitrary value, more or less a good starting point
@@ -100,9 +104,11 @@ object readfile {
           Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
         case SparkCursor(Some(rdd), p) =>
 
-        val collect = rdd
-          .filter(d => d._2 >= p && d._2 < (p + step))
-          .map(_._1).collect.toVector.pure[EitherT[Free[S, ?], FileSystemError, ?]]
+        val collect = lift(Task.delay {
+          rdd
+            .filter(d => d._2 >= p && d._2 < (p + step))
+            .map(_._1).collect.toVector
+        }).into[S].liftM[FileSystemErrT]
 
         for {
           collected <- collect
