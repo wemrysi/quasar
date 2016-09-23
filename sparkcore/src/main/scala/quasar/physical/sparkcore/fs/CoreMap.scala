@@ -162,11 +162,14 @@ object CoreMap {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
       case _ => undefined
     }).right
-    case ConcatMaps(f1, f2) => InternalError("not implemented").left
-      // TODO
-    // case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      // case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 |+| m2)
-    // }).right
+    case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj{
+        m1.foldLeft(m2){
+          case (acc, (k, v)) => if(acc.isDefinedAt(k)) acc else acc + (k -> v)
+        }
+      }
+      case _ => undefined
+    }).right
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(list), Data.Int(index)) =>
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
