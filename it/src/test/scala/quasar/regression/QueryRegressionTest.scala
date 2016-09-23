@@ -37,7 +37,7 @@ import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import scalaz.stream.{merge => pmerge, _}
+import scalaz.stream._
 
 abstract class QueryRegressionTest[S[_]](
   fileSystems: Task[IList[FileSystemUT[S]]])(
@@ -88,10 +88,8 @@ abstract class QueryRegressionTest[S[_]](
 
   fileSystemShould { fs =>
     suiteName should {
-      step(prepareTestData(tests, fs.setupInterpM).unsafePerformSync)
-
       tests.toList foreach { case (f, t) =>
-        regressionExample(f, t, fs.name, fs.testInterpM)
+        regressionExample(f, t, fs.name, fs.setupInterpM, fs.testInterpM)
       }
 
       step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
@@ -105,17 +103,16 @@ abstract class QueryRegressionTest[S[_]](
     loc: RFile,
     test: RegressionTest,
     backendName: BackendName,
+    setup: Run,
     run: Run
   ): Fragment = {
-    def runTest = (for {
-      _    <- run(test.data.traverse[F,Result](
-                relFile => injectTask(resolveData(loc, relFile).fold(
-                          err => Task.fail(new RuntimeException(err)),
-                          Task.now)) >>=
-                        (p => verifyDataExists(dataFile(p)))))
-      data =  testQuery(DataDir </> fileParent(loc), test.query, test.variables)
-      res  <- verifyResults(test.expected, data, run)
-    } yield res).timed(5.minutes).unsafePerformSync
+    def runTest: Result = {
+      val data = testQuery(DataDir </> fileParent(loc), test.query, test.variables)
+
+      (ensureTestData(loc, test, setup) *> verifyResults(test.expected, data, run))
+        .timed(5.minutes)
+        .unsafePerformSync
+    }
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
       test.backends.get(backendName) match {
@@ -132,11 +129,19 @@ abstract class QueryRegressionTest[S[_]](
     }
   }
 
-  /** Verify that the given data file exists in the filesystem. */
-  def verifyDataExists(file: AFile): F[org.specs2.execute.Result] =
-    query.fileExists(file).map(exists =>
-      if (exists) org.specs2.execute.Success(s"data file exists: ${fileName(file).value}")
-      else org.specs2.execute.Failure(s"data file does not exist: ${fileName(file).value}"))
+  /** Ensures the data for the given test exists in the Quasar filesystem, inserting
+    * it if not. Returns whether any data was inserted.
+    */
+  def ensureTestData(testLoc: RFile, test: RegressionTest, run: Run): Task[Boolean] = {
+    def ensureTestFile(loc: RFile): Task[Boolean] =
+      run(query.fileExists(dataFile(loc))).ifM(
+        false.point[Task],
+        loadTestData(loc, run).as(true))
+
+    val locs: Set[RFile] = test.data.flatMap(resolveData(testLoc, _).toOption).toSet
+
+    Task.gatherUnordered(locs.toList map ensureTestFile) map (_ any ι)
+  }
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(
@@ -186,24 +191,20 @@ abstract class QueryRegressionTest[S[_]](
     f(parseTask).liftM[Process] flatMap (queryResults(_, Variables.fromMap(vars), loc))
   }
 
-  /** Loads all the test data needed by the given tests into the filesystem. */
-  def prepareTestData(tests: Map[RFile, RegressionTest], run: Run): Task[Unit] = {
+  /** Load the contents of the test data file into the filesytem under test at
+    * the same path, relative to the test `DataDir`.
+    *
+    * Any failures during loading will result in a failed `Task`.
+    */
+  def loadTestData(dataLoc: RFile, run: Run): Task[Unit] = {
     val throwFsError = rethrow[Task, FileSystemError]
 
-    val dataLoc: ((RFile, RegressionTest)) => Set[RFile] = {
-      case (f, t) =>
-        t.data.flatMap(resolveData(f, _).toOption).toSet
-    }
+    val load = write.createChunked(
+      dataFile(dataLoc),
+      testData(dataLoc).chunk(500).translate(injectTask)
+    ).translate[Task](throwFsError.compose[FsErr](runT(run)))
 
-    val loads: Process[Task, Process[Task, FileSystemError]] =
-      Process.emitAll(tests.toList.foldMap(dataLoc).toVector) map { file =>
-        write.createChunked(
-          dataFile(file),
-          testData(file).chunk(500).translate(injectTask)
-        ).translate[Task](throwFsError.compose[FsErr](runT(run)))
-      }
-
-    throwFsError(EitherT(pmerge.mergeN(loads).take(1).runLast.map(_ <\/ (()))))
+    throwFsError(EitherT(load.take(1).runLast map (_ <\/ (()))))
   }
 
   /** Returns a stream of `Data` representing the lines of the given data file. */

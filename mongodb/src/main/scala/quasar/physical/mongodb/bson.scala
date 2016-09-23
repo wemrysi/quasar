@@ -110,9 +110,15 @@ object Bson {
       codecRegistry: org.bson.codecs.configuration.CodecRegistry) =
       repr
   }
+  object Doc {
+    def apply(pairs: (String, Bson)*): Bson.Doc = Doc(ListMap(pairs: _*))
+  }
   final case class Arr(value: List[Bson]) extends Bson {
     def repr = new BsonArray((value ∘ (_.repr)).asJava)
     def toJs = Js.AnonElem(value ∘ (_.toJs))
+  }
+  object Arr {
+    def apply(elems: Bson*): Bson.Arr = Arr(elems.toList)
   }
   final case class ObjectId(value: ImmutableArray[Byte]) extends Bson {
     private def oid = new org.bson.types.ObjectId(value.toArray[Byte])
@@ -207,6 +213,8 @@ object Bson {
     def repr = new BsonMaxKey()
     def toJs = Js.Ident("MaxKey")
   }
+
+  implicit val equal: Equal[Bson] = Equal.equalA
 }
 
 sealed abstract class BsonType(val ordinal: Int)
