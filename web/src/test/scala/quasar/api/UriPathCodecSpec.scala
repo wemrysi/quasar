@@ -17,7 +17,6 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.api.PathUtils._
 import quasar.contrib.pathy._
 
 import org.http4s.dsl.{Path => HPath}
@@ -40,8 +39,8 @@ class UriPathCodecSpec extends quasar.Qspec {
     "%ag" -> "%25ag",
     "%AA" -> "%25AA",
     "%AG" -> "%25AG",
-    "."   -> "$dot$",
-    ".."  -> "$dotdot$",
+    "."   -> "%2E",
+    ".."  -> "%2E%2E",
     "..." -> "...",
     "/"   -> "%2F",
     " "   -> "%20",
@@ -97,16 +96,12 @@ class UriPathCodecSpec extends quasar.Qspec {
       }
 
       "absolute file" >> prop { path: AFile =>
-        !hasDot(path) ==> {
-          val hpath = HPath(codec.printPath(path))
-          AsFilePath.unapply(hpath) must_== Some(path)
-        }
+        val hpath = HPath(codec.printPath(path))
+        AsFilePath.unapply(hpath) must_== Some(path)
       }
       "absolute dir" >> prop { path: ADir =>
-        !hasDot(path) ==> {
-          val hpath = HPath(codec.printPath(path))
-          AsDirPath.unapply(hpath) must_== Some(path)
-        }
+        val hpath = HPath(codec.printPath(path))
+        AsDirPath.unapply(hpath) must_== Some(path)
       }
     }
   }
