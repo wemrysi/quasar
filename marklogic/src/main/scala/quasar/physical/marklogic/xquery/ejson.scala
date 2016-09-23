@@ -115,6 +115,17 @@ object ejson {
       }
     }
 
+  // ejson:object-concat($obj1 as element(), $obj2 as element()) as element()
+  def objectConcat[F[_]: PrologW]: F[FunctionDecl2] =
+    (ejs.name("object-concat").qn[F] |@| ejsonN.qn) { (fname, ename) =>
+      declare(fname)(
+        $("obj1") as SequenceType("element()"),
+        $("obj2") as SequenceType("element()")
+      ).as(SequenceType(s"element($ename)")) { (obj1: XQuery, obj2: XQuery) =>
+        mkObject[F] apply (mkSeq_(obj1 `/` child.element(), obj2 `/` child.element()))
+      }
+    }.join
+
   // ejson:seq-to-array($items as item()*) as element(ejson:ejson)
   def seqToArray[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
     (ejs.name("seq-to-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>

@@ -80,24 +80,32 @@ object MapFuncPlanner {
     case MakeArray(x) =>
       ejson.singletonArray[F] apply x
 
-    case MakeMap(k, v) => k match {
-      case XQuery.StringLit(s) =>
+    case MakeMap(k, v) =>
+      def withLitKey(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
           val qn = QName.local(NCName(ncname))
           ejson.singletonObject[F] apply (qn.xs, v)
         } getOrElse invalidQName(s)
 
-      case _ => ejson.singletonObject[F] apply (k, v)
-    }
+      k match {
+        // Makes numeric strings valid QNames by prepending an underscore
+        case XQuery.StringLit(IntegralNumber(s)) =>
+          withLitKey("_" + s)
+
+        case XQuery.StringLit(s) =>
+          withLitKey(s)
+
+        case _ => ejson.singletonObject[F] apply (k, v)
+      }
 
     case ConcatArrays(x, y) =>
       ejson.arrayConcat[F] apply (x, y)
 
-    case ProjectField(src, field) => field match {
-      case XQuery.Step(_) =>
-        (src `/` field).point[F]
+    case ConcatMaps(x, y) =>
+      ejson.objectConcat[F] apply (x, y)
 
-      case XQuery.StringLit(s) =>
+    case ProjectField(src, field) =>
+      def projectLit(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
           freshVar[F] map { m =>
             let_(m -> src) return_ {
@@ -106,13 +114,24 @@ object MapFuncPlanner {
           }
         } getOrElse invalidQName(s)
 
-      case _ =>
-        (freshVar[F] |@| freshVar[F]) { (m, k) =>
-          let_(m -> src, k -> field) return_ {
-            m.xqy `/` k.xqy
+      field match {
+        case XQuery.Step(_) =>
+          (src `/` field).point[F]
+
+        // Makes numeric strings valid QNames by prepending an underscore
+        case XQuery.StringLit(IntegralNumber(s)) =>
+          projectLit("_" + s)
+
+        case XQuery.StringLit(s) =>
+          projectLit(s)
+
+        case _ =>
+          (freshVar[F] |@| freshVar[F]) { (m, k) =>
+            let_(m -> src, k -> field) return_ {
+              m.xqy `/` k.xqy
+            }
           }
-        }
-    }
+      }
 
     // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
@@ -127,10 +146,17 @@ object MapFuncPlanner {
 
     case ZipMapKeys(m) => qscript.zipMapNodeKeys[F] apply m
 
+    // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
+    case Guard(_, _, cont, _) =>
+      s"(: GUARD CONT :)$cont".xqy.point[F]
+
     case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
 
   ////
+
+  // A string consisting only of digits.
+  private val IntegralNumber = "^(\\d+)$".r
 
   private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
     MonadError_[F, MarkLogicPlannerError].raiseError(
