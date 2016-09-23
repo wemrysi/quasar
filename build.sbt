@@ -306,6 +306,7 @@ lazy val couchbase = project
   .settings(name := "quasar-couchbase-internal")
   .dependsOn(connector % BothScopes)
   .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.couchbase)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project

@@ -83,6 +83,10 @@ object Dependencies {
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
     "org.spire-math"             %% "jawn-parser"         % jawnVersion
   )
+  val couchbase = Seq(
+    "com.couchbase.client" %  "java-client" % "2.3.2",
+    "org.http4s"           %% "http4s-core" % http4sVersion
+  )
   def web = Seq(
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
