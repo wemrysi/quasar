@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
-import quasar.fp._
 
 import java.io.File
 
@@ -177,9 +176,9 @@ package object api {
     PathCodec('/', escapeRel, unescapeRel)
   }
 
-  // NB: oddly, every path is prefixed with '/', except "".
+  // NB: HPath's own toString doesn't encode properly
   private def pathString(p: HPath) =
-    if (p.toString === "") "/" else p.toString
+    "/" + p.toList.map(uriEncodeUtf8).mkString("/")
 
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
