@@ -65,7 +65,7 @@ object qscript {
           kvArr   <- ejson.mkArray[F] apply mkSeq_(kelt, velt)
           kvEnt   <- ejson.mkObjectEntry[F] apply (n.xqy, kvArr)
           entries =  for_(c -> node `/` child.node())
-                     .let_(n -> fn.nodeName(c.xqy))
+                     .let_(n -> xs.string(fn.nodeName(c.xqy)))
                      .return_(kvEnt)
           zMap    <- ejson.mkObject[F] apply entries
         } yield zMap
