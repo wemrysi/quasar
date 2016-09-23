@@ -38,7 +38,7 @@ trait ShiftRead[F[_]] {
   def shiftRead[H[_]](GtoH: G ~> H): F >> H
 }
 
-object ShiftRead extends ShiftReadInstances {
+object ShiftRead {
   type FixFreeH[H[_], A] = H[Free[H, A]]
   type >>[-F[_], H[_]]   = F ~> FixFreeH[H, ?]
 
@@ -127,12 +127,25 @@ object ShiftRead extends ShiftReadInstances {
         def shiftRead[H[_]](GtoH: G ~> H) =
           λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](_.run.fold(I.shiftRead(GtoH)(_), J.shiftRead(GtoH)(_)))
       }
-}
 
-abstract class ShiftReadInstances {
-  implicit def inject[T[_[_]], F[_]: Functor, I[_]](implicit F: F :<: I): ShiftRead.Aux[T, F, I] =
+  def default[T[_[_]], F[_]: Functor, I[_]](implicit F: F :<: I):
+      ShiftRead.Aux[T, F, I] =
     new ShiftRead[F] {
       type G[A] = I[A]
       def shiftRead[H[_]](GtoH: G ~> H) = λ[F ~> FixFreeH[H, ?]](fa => GtoH(F inj (fa map Free.point)))
     }
+
+  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+      : ShiftRead.Aux[T, Const[DeadEnd, ?], F] =
+    default
+
+  implicit def shiftedRead[T[_[_]], F[_]]
+    (implicit SR: Const[ShiftedRead, ?] :<: F)
+      : ShiftRead.Aux[T, Const[ShiftedRead, ?], F] =
+    default
+
+  implicit def projectBucket[T[_[_]], F[_]]
+    (implicit PB: ProjectBucket[T, ?] :<: F)
+      : ShiftRead.Aux[T, ProjectBucket[T, ?], F] =
+    default
 }

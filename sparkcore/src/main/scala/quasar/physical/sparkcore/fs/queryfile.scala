@@ -18,23 +18,19 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.{PhaseResults, PhaseResultT, PhaseResult, LogicalPlan, Data}
-import quasar.fp.eitherT._
-import quasar.qscript._
-import quasar.fs.QueryFile
-import quasar.fs.QueryFile._
-import quasar.fs._
 import quasar.Planner._
-import quasar.fs.FileSystemError._
-import quasar.fp.free._
-import quasar.effect.Read
 import quasar.contrib.pathy._
-
+import quasar.effect.Read
+import quasar.fp._
+import quasar.fp.eitherT._
+import quasar.fp.free._
+import quasar.fs._, FileSystemError._, QueryFile._
+import quasar.qscript._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
 import matryoshka._, Recursive.ops._
-import scalaz._
-import Scalaz._
+import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object queryfile {
@@ -63,8 +59,8 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          val lc: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] = (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT]) 
-          val qs = (QueryFile.convertToQScript(lc.some)(lp)) >>=
+          val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] = (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT]) 
+          val qs = (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)) >>=
           (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
 
           qs.run.run
@@ -81,12 +77,12 @@ object queryfile {
 
   // f => EitherT(WriterT(f.map(_.run)))
 
-  private def executePlan[S[_]](input: Input, qs: Fix[QScriptTotal[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
+  private def executePlan[S[_]](input: Input, qs: Fix[QScriptRead[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptTotal[Fix, ?]]]
+    val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptRead[Fix, ?]]]
 
     read.asks { sc =>
       val sparkStuff: Task[PlannerError \/ RDD[Data]] =
