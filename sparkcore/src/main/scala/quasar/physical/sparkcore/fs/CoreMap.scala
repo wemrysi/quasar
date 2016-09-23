@@ -25,7 +25,6 @@ import quasar.Planner._
 import quasar.SKI._
 
 import scala.math
-import java.math.{BigDecimal => JBigDecimal}
 
 import org.threeten.bp.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}, Recursive.ops._
@@ -186,8 +185,8 @@ object CoreMap {
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) + b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) + b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(b))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
@@ -198,9 +197,9 @@ object CoreMap {
 
   private def subtract(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a - b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a - BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) - b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a - BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a - b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) - b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.minus(b))
     case (Data.Date(a), Data.Interval(b)) => Data.Date(a.minus(b))
     case (Data.Time(a), Data.Interval(b)) => Data.Time(a.minus(b))
@@ -210,9 +209,9 @@ object CoreMap {
 
   private def multiply(d1: Data, d2: Data): Data = (d1, d2)  match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a * b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a * BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) * b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a * BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a * b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) * b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
@@ -220,9 +219,9 @@ object CoreMap {
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a / b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a / b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) / b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
@@ -239,6 +238,7 @@ object CoreMap {
     case _ => undefined
   }
 
+  // TODO we loose precision here, consider using https://github.com/non/spire/
   private def power(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
