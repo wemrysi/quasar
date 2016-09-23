@@ -52,7 +52,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
 
   protected def count(src: Collection, cfg: Count) = {
     val qry =
-      cfg.query.fold(Bson.Doc(ListMap()))(_.bson)
+      cfg.query.fold(Bson.Doc())(_.bson)
 
     val countOpts = List(
       foldS(cfg.skip)((n, opts: CountOptions) => opts.skip(n.toInt)),

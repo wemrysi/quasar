@@ -29,11 +29,16 @@ package object workflowtask {
 
   type Pipeline = List[PipelineOp]
 
+  // NB: it's only safe to emit "core" expr ops here, but we always use the
+  // largest type here, so they're immediately injected into ExprOp.
+  private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
+  import exprCoreFp._
+
   val simplifyProject: WorkflowOpCoreF[Unit] => Option[PipelineF[WorkflowOpCoreF, Unit]] =
     {
       case $ProjectF(src, Reshape(cont), id) =>
         $ProjectF(src,
-          Reshape(cont.map {
+          Reshape[ExprOp](cont.map {
             case (k, \/-($var(DocField(v)))) if k == v => k -> $include().right
             case x                                     => x
           }),
@@ -75,7 +80,7 @@ package object workflowtask {
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape(names.map(_ -> $include().right).toListMap),
+                  Reshape[ExprOp](names.map(_ -> $include().right).toListMap),
                   ExcludeId).pipeline)))
 
         case None =>
@@ -84,7 +89,7 @@ package object workflowtask {
               src,
               pipeline :+
                 PipelineOp($ProjectF((),
-                  Reshape(ListMap(ExprName -> $var(base).right)),
+                  Reshape[ExprOp](ListMap(ExprName -> $var(base).right)),
                   ExcludeId).pipeline)))
       }
     case _ => (base, task)
