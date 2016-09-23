@@ -838,6 +838,7 @@ object MongoDbPlanner {
         case Avg        => groupExpr1($avg(_))
         case Min        => groupExpr1($min(_))
         case Max        => groupExpr1($max(_))
+        case UnshiftArray => groupExpr1($push(_))
         case Arbitrary  => groupExpr1($first(_))
 
         case ArrayLength =>

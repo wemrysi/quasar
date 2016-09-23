@@ -1,0 +1,1 @@
+- add support for `[ ...]` (`UnshiftArray`) to the old MongoDB connector
