@@ -195,9 +195,23 @@ object CoreMap {
       case Data.Arr(l) => Data.Arr((1 to l.size).map(Data.Int(_)).toList)
       case _ => undefined
     }).right
-    case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
-    case ZipArrayIndices(f) => InternalError("ZipArrayIndices not implemented").left
-    case Range(fFrom, fTo) => InternalError("Range not implemented").left
+    case ZipMapKeys(f) => (f >>> {
+      case Data.Obj(m) => Data.Obj {
+        m.foldLeft(m){
+          case (acc, (k, v)) => acc + (k -> Data.Arr(List(Data.Str(k), v)))
+        }
+      }
+      case _ => undefined
+    }).right
+    case ZipArrayIndices(f) => (f >>> {
+      case Data.Arr(l) => Data.Arr(l.zipWithIndex.map {
+        case (e, i) => Data.Arr(List(Data.Int(i), e))
+      })
+      case _ => undefined
+    }).right
+    case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
+      case (Data.Int(a), Data.Int(b)) if(a >= b) => Data.Set((a to b).map(Data.Int(_)).toList)
+    }).right
     case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
     case _ => InternalError("not implemented").left
   }
