@@ -44,7 +44,7 @@ object QueryFile {
       Order.orderBy(_.run)
   }
 
-  def optimizeEval
+  def convertAndNormalize
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT, QS[_]: Traverse: Normalizable]
     (lp: T[LogicalPlan])
     (eval: QS[T[QS]] => QS[T[QS]])
@@ -69,7 +69,7 @@ object QueryFile {
         .transCata(((_: EnvT[Ann[T], QS, T[QS]]).lower) ⋙ eval))
   }
 
-  def normalizeQScript
+  def simplifyAndNormalize
     [T[_[_]]: Recursive: Corecursive: EqualT: ShowT,
       IQS[_]: Functor,
       QS[_]: Traverse: Normalizable]
@@ -114,8 +114,8 @@ object QueryFile {
     val optimize = new Optimize[T]
 
     val qs =
-      optimizeEval[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
-        normalizeQScript[T, QScriptInternal[T, ?], QS]
+      convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)) ∘
+        simplifyAndNormalize[T, QScriptInternal[T, ?], QS]
 
     EitherT(Writer(
       qs.fold(
@@ -148,11 +148,11 @@ object QueryFile {
     val qs =
       merr.map(
         merr.bind(
-          optimizeEval[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).fold(
+          convertAndNormalize[T, QScriptInternal[T, ?]](lp)(optimize.applyAll).fold(
             perr => merr.raiseError(FileSystemError.planningFailed(lp.convertTo[Fix], perr)),
             merr.point(_)))(
           optimize.pathify[M, QScriptInternal[T, ?], InterimQS](listContents)))(
-        normalizeQScript[T, InterimQS, QS])
+        simplifyAndNormalize[T, InterimQS, QS])
 
     merr.bind(qs) { qs =>
       val renderedTree = qs.cata(transform.linearize).reverse.render
@@ -194,8 +194,8 @@ object QueryFile {
     * have any side effect on the filesystem, it should simply return useful
     * information to the user about how a given query would be evaluated on
     * this filesystem implementation.
-    * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunately not expressed in the types currently.
+    * The [[quasar.LogicalPlan]] is expected to only contain absolute paths even
+    * though that is unfortunately not expressed in the types currently.
     */
   final case class Explain(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ExecutionPlan)]
@@ -228,7 +228,7 @@ object QueryFile {
     val transforms = Transforms[F]
     import transforms._
 
-    /** Returns the path to the result of executing the given [[LogicalPlan]],
+    /** Returns the path to the result of executing the given `LogicalPlan`,
       * using the provided path if possible.
       *
       * Execution of certain plans may return a result file other than the
@@ -239,7 +239,7 @@ object QueryFile {
       EitherT(WriterT(lift(ExecutePlan(plan, out))): G[FileSystemError \/ AFile])
 
     /** Returns an enumerator of data resulting from evaluating the given
-      * [[LogicalPlan]].
+      * `LogicalPlan`.
       */
     def enumerate(plan: Fix[LogicalPlan]): EnumeratorT[Data, ExecM] = {
       import Iteratee._
@@ -263,7 +263,7 @@ object QueryFile {
     }
 
     /** Returns the stream of data resulting from evaluating the given
-      * [[LogicalPlan]].
+      * `LogicalPlan`.
       */
     def evaluate(plan: Fix[LogicalPlan]): Process[ExecM, Data] = {
       // TODO: use DataCursor.process for the appropriate cursor type
@@ -344,7 +344,7 @@ object QueryFile {
     val transforms = Transforms[F]
     import transforms._
 
-    /** Returns a handle to the results of evaluating the given [[LogicalPlan]]
+    /** Returns a handle to the results of evaluating the given `LogicalPlan`
       * that can be used to read chunks of result data.
       *
       * Care must be taken to `close` the returned handle in order to avoid

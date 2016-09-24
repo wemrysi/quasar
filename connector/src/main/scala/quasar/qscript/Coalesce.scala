@@ -24,7 +24,8 @@ import quasar.qscript.MapFuncs._
 import matryoshka._
 import scalaz._, Scalaz._
 
-/** This handles coalescing anything preceded by a QScriptCore node.
+/** This will apply any rewrites to IN when preceded by a [[QScriptCore]] node,
+  * where the resulting node is in `IN`.
   */
 trait Coalesce[IN[_]] {
   type IT[F[_]]
@@ -87,10 +88,7 @@ object Coalesce {
                 case LeftSide => None
                 case RightSide => elem.some
               } ∘ (Map(srcInner, _))
-            case _ =>
-              if (!shiftRepair.element(RightSide))
-                Map(src.embed, shiftRepair.as(SrcHole)).some
-              else None
+            case _ => None
           }
         // TODO: For Take and Drop, we should be able to pull _most_ of a Reduce repair function to after T/D
         case Take(src, from, count) => // Pull more work to _after_ limiting the dataset

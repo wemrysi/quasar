@@ -42,7 +42,7 @@ object FileSystemError {
     cause: Option[PhysicalError]
   ) extends FileSystemError
   final case class PathErr private (e: PathError)
-    extends FileSystemError
+      extends FileSystemError
   final case class PlanningFailed private (
     lp: Fix[LogicalPlan],
     err: PlannerError

@@ -56,6 +56,9 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
 class WorkflowSpec extends quasar.Qspec with TreeMatchers {
   import CollectionUtil._
 
+  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
+  import exprCoreFp._
+
   val readFoo = $read[WorkflowF](collection("db", "foo"))
 
   val cry = Crystallize[WorkflowF]

@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.workflow
 
 import quasar.Predef._
-import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.expression.DocVar
 import quasar.physical.mongodb.workflowtask.WorkflowTask
 
 import matryoshka._, FunctorT.ops._
