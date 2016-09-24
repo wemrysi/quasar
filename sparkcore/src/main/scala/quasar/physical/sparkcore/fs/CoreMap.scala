@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
+import quasar.qscript.MapFuncs
 import quasar.qscript.MapFuncs._
 import quasar.std.{DateLib, StringLib}
 import quasar.Data
@@ -107,7 +108,7 @@ object CoreMap {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => undefined
     }).right
-    case Coalesce(f1, f2) => ((x: Data) => f1(x) match {
+    case MapFuncs.Coalesce(f1, f2) => ((x: Data) => f1(x) match {
       case Data.Null => f2(x)
       case d => d
     }).right
@@ -162,18 +163,27 @@ object CoreMap {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
       case _ => undefined
     }).right
-    case ConcatMaps(f1, f2) => InternalError("not implemented").left
-      // TODO
-    // case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      // case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 |+| m2)
-    // }).right
+    case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj{
+        m1.foldLeft(m2){
+          case (acc, (k, v)) => if(acc.isDefinedAt(k)) acc else acc + (k -> v)
+        }
+      }
+      case _ => undefined
+    }).right
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(list), Data.Int(index)) =>
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
       case _ => undefined
     }).right
-    case ProjectField(fSrc, fField) => InternalError("ProjectField not implemented").left
-    case DeleteField(fSrc, fField) => InternalError("DeleteField not implemented").left
+    case ProjectField(fSrc, fField) => ((x: Data) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => m(field)
+      case _ => undefined
+    }).right
+    case DeleteField(fSrc, fField) =>  ((x: Data) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+      case _ => undefined
+    }).right
     case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
     case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
     case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
