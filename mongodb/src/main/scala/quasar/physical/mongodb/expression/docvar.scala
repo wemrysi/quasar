@@ -78,6 +78,11 @@ object DocVar {
     def apply(deref: Option[BsonField]) = DocVar(this, deref)
     def unapply(v: DocVar): Some[Option[BsonField]] = Some(v.deref)
   }
+  object Name {
+    implicit val equal: Equal[Name] = Equal.equalA
+  }
   val ROOT    = Name("ROOT")
   val CURRENT = Name("CURRENT")
+
+  implicit val equal: Equal[DocVar] = Equal.equalA
 }

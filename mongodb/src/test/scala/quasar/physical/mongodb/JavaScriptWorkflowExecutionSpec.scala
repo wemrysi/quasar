@@ -25,11 +25,15 @@ import quasar.qscript.SortDir
 
 import scala.collection.immutable.ListMap
 
+import matryoshka._
 import scalaz._
 import scalaz.syntax.either._
 
 class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
   import CollectionUtil._
+
+  private val exprFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
+  import exprFp._
 
   def toJS(wf: Workflow): WorkflowExecutionError \/ String =
     WorkflowExecutor.toJS(Crystallize[WorkflowF].crystallize(wf))

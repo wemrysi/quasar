@@ -64,17 +64,19 @@ object queryfile {
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", main.render))
 
-      val listContents: ConvertPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
+      val listContents: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?]] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      def plan(qs: Fix[QScriptTotal[Fix, ?]]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
-        qs.cataM(MarkLogicPlanner[M, QScriptTotal[Fix, ?]].plan).run map {
+      type MLQScript[A] = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+
+      def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
+        qs.cataM(MarkLogicPlanner[M, MLQScript].plan).run map {
           case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
         }
 
       val planning = for {
-        qs  <- convertToQScript(some(listContents))(lp)
-        shifted = transFutu(qs)(ShiftRead[Fix, QScriptTotal[Fix, ?], QScriptTotal[Fix, ?]].shiftRead(idPrism.reverseGet)((_: QScriptTotal[Fix, Fix[QScriptTotal[Fix, ?]]]))).transCata(optimize.applyAll)
+        qs  <- convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?], ?], ?], QScriptRead[Fix, ?]](listContents)(lp)
+        shifted = transFutu(qs)(ShiftRead[Fix, QScriptRead[Fix, ?], MLQScript].shiftRead(idPrism.reverseGet)((_: QScriptRead[Fix, Fix[QScriptRead[Fix, ?]]]))).transCata(optimize.applyAll)
         mod <- plan(shifted).leftMap(mlerr => mlerr match {
           case InvalidQName(s) =>
             FileSystemError.planningFailed(lp, QPlanner.UnsupportedPlan(
