@@ -40,27 +40,26 @@ import shapeless.{nat, Sized}
 
 // TODO: Could maybe require only Functor[F], once CoEnv exposes the proper
 //       instances
-class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: Traverse: Normalizable](
-  implicit DE: Const[DeadEnd, ?] :<: F,
-           QC: QScriptCore[T, ?] :<: F,
-           TJ: ThetaJoin[T, ?] :<: F,
-           PB: ProjectBucket[T, ?] :<: F,
-           // TODO: Remove this one once we have multi-sorted AST
-           FI: F :<: QScriptTotal[T, ?],
-           mergeable:  Mergeable.Aux[T, F],
-           eq:         Delay[Equal, F],
-           show:       Delay[Show, F]) {
+class Transform
+  [T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT,
+    F[_]: Traverse: Normalizable]
+  (implicit
+    C:  Coalesce.Aux[T, F, F],
+    DE: Const[DeadEnd, ?] :<: F,
+    QC: QScriptCore[T, ?] :<: F,
+    TJ: ThetaJoin[T, ?] :<: F,
+    PB: ProjectBucket[T, ?] :<: F,
+    // TODO: Remove this one once we have multi-sorted AST
+    FI: Injectable.Aux[F, QScriptTotal[T, ?]],
+    mergeable:  Mergeable.Aux[T, F],
+    eq:         Delay[Equal, F],
+    show:       Delay[Show, F]) {
 
   val prov = new Provenance[T]
 
   type Target[A] = EnvT[Ann[T], F, A]
   type TargetT = Target[T[Target]]
   type FreeEnv = Free[Target, Hole]
-
-  def DeadEndTarget(deadEnd: DeadEnd): TargetT =
-    EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](deadEnd))))
-
-  val RootTarget: TargetT = DeadEndTarget(Root)
 
   type Envs = List[Target[ExternallyManaged]]
 
@@ -77,6 +76,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     sides: ZipperSides,
     tails: ZipperTails)
 
+  // TODO: Convert to NEL
   def linearize[F[_]: Functor: Foldable]:
       Algebra[F, List[F[ExternallyManaged]]] =
     fl => fl.as[ExternallyManaged](Extern) :: fl.fold
@@ -94,7 +94,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
   def delinearizeTargets[F[_]: Functor, A]:
       ElgotCoalgebra[Hole \/ ?, Target, List[Target[A]]] = {
     case Nil    => SrcHole.left[Target[List[Target[A]]]]
-    case h :: t => h.map(κ(t)).right
+    case h :: t => h.as(t).right
   }
 
   val consZipped: Algebra[ListF[Target[ExternallyManaged], ?], ZipperAcc] = {
@@ -210,8 +210,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
       val tj = TJ.inj(ThetaJoin(
         src,
-        lBranch.mapSuspension(FI.compose(envtLowerNT)),
-        rBranch.mapSuspension(FI.compose(envtLowerNT)),
+        lBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
+        rBranch.mapSuspension(FI.inject.compose(envtLowerNT)),
         // FIXME: not quite right – e.g., if there is a reduction in a branch the
         //        condition won’t line up.
         condition,
@@ -495,8 +495,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         TJ.inj(ThetaJoin(
           commonSrc,
-          rebaseBranch(leftSide, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(rightSide, rMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(leftSide, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(rightSide, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
           cond,
           tpe,
           combine))))
@@ -512,7 +512,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
 
   def pathToProj(path: pathy.Path[_, _, _]): TargetT =
     pathy.Path.peel(path).fold[TargetT](
-      RootTarget) {
+      EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], DE.inj(Const[DeadEnd, T[Target]](Root))))) {
       case (p, n) =>
         ProjectTarget(pathToProj(p), StrLit(n.fold(_.value, _.value)))
     }
@@ -544,7 +544,7 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         EnvT((
           EmptyAnn[T],
           QC.inj(Map(
-            RootTarget.embed,
+            EnvT[Ann[T], F, T[Target]]((EmptyAnn[T], QC.inj(Unreferenced[T, T[Target]]()))).embed,
             Free.roll[MapFunc[T, ?], Hole](mf))))))
 
     case LogicalPlan.FreeF(name) =>
@@ -608,8 +608,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         QC.inj(Take(
           EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI),
-          Free.roll(right).mapSuspension(FI))))).right
+          Free.roll(left).mapSuspension(FI.inject),
+          Free.roll(right).mapSuspension(FI.inject))))).right
 
     case LogicalPlan.InvokeFUnapply(set.Drop, Sized(a1, a2)) =>
       val (src, buckets, lval, rval) = autojoin(a1, a2)
@@ -619,8 +619,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         Ann[T](buckets, HoleF[T]),
         QC.inj(Drop(
           EnvT((EmptyAnn[T], src)).embed,
-          Free.roll(left).mapSuspension(FI),
-          Free.roll(right).mapSuspension(FI))))).right
+          Free.roll(left).mapSuspension(FI.inject),
+          Free.roll(right).mapSuspension(FI.inject))))).right
 
     case LogicalPlan.InvokeFUnapply(set.OrderBy, Sized(a1, a2, a3)) =>
       val (src, bucketsSrc, ordering, buckets, directions) = autojoin3(a1, a2, a3)
@@ -699,8 +699,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
     case LogicalPlan.InvokeFUnapply(set.Union, Sized(a1, a2)) =>
       val (qs, buckets, lacc, racc) = useMerge(merge(a1, a2), (src, lfree, rfree) => {
         (QC.inj(Union(src,
-          lfree.mapSuspension(FI.compose(envtLowerNT)),
-          rfree.mapSuspension(FI.compose(envtLowerNT)))),
+          lfree.mapSuspension(FI.inject.compose(envtLowerNT)),
+          rfree.mapSuspension(FI.inject.compose(envtLowerNT)))),
           prov.unionProvenances(
             someAnn(lfree.resume, src).provenance,
             someAnn(rfree.resume, src).provenance),
@@ -716,8 +716,8 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         src.project.ask,
         TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
+          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
           EquiJF,
           Inner,
           Free.point(LeftSide))))).right
@@ -728,9 +728,9 @@ class Transform[T[_[_]]: Recursive: Corecursive: FunctorT: EqualT: ShowT, F[_]: 
         left.resume.fold(_.ask, κ(src.project.ask)),
         TJ.inj(ThetaJoin(
           src,
-          rebaseBranch(left, lMap).mapSuspension(FI.compose(envtLowerNT)),
-          rebaseBranch(right, rMap).mapSuspension(FI.compose(envtLowerNT)),
-          Free.roll(Constant(EJson.fromCommon[T].apply(ejson.Bool[T[EJson]](false)))),
+          rebaseBranch(left, lMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          rebaseBranch(right, rMap).mapSuspension(FI.inject.compose(envtLowerNT)),
+          Free.roll(Constant(CommonEJson.inj(ejson.Bool[T[EJson]](false)).embed)),
           LeftOuter,
           Free.point(LeftSide))))).right
 

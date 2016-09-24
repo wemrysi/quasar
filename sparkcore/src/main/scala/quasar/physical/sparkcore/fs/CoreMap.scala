@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
+import quasar.qscript.MapFuncs
 import quasar.qscript.MapFuncs._
 import quasar.std.{DateLib, StringLib}
 import quasar.Data
@@ -24,7 +25,7 @@ import quasar.qscript._
 import quasar.Planner._
 import quasar.SKI._
 
-import java.math.{BigDecimal => JBigDecimal}
+import scala.math
 
 import org.threeten.bp.{Instant, ZoneOffset}
 import matryoshka.{Hole => _, _}, Recursive.ops._
@@ -89,11 +90,8 @@ object CoreMap {
       case Data.Bool(b) => Data.Bool(!b)
       case _ => undefined
     }).right
-    case Eq(f1, f2) => ((x: Data) => eq(f1(x), f2(x))).right
-    case Neq(f1, f2) => ((x: Data) => eq(f1(x), f2(x)) match {
-      case Data.Bool(b) => Data.Bool(!b)
-      case _ => undefined
-    }).right
+    case Eq(f1, f2) => ((x: Data) => Data.Bool(f1(x) === f2(x))).right
+    case Neq(f1, f2) => ((x: Data) => Data.Bool(f1(x) =/= f2(x))).right
     case Lt(f1, f2) => ((x: Data) => lt(f1(x), f2(x))).right
     case Lte(f1, f2) => ((x: Data) => lte(f1(x), f2(x))).right
     case Gt(f1, f2) => ((x: Data) => gt(f1(x), f2(x))).right
@@ -110,7 +108,7 @@ object CoreMap {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => undefined
     }).right
-    case Coalesce(f1, f2) => ((x: Data) => f1(x) match {
+    case MapFuncs.Coalesce(f1, f2) => ((x: Data) => f1(x) match {
       case Data.Null => f2(x)
       case d => d
     }).right
@@ -165,31 +163,40 @@ object CoreMap {
       case (Data.Arr(l1), Data.Arr(l2)) => Data.Arr(l1 ++ l2)
       case _ => undefined
     }).right
-    case ConcatMaps(f1, f2) => InternalError("not implemented").left
-      // TODO
-    // case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
-      // case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj(m1 |+| m2)
-    // }).right
+    case ConcatMaps(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
+      case (Data.Obj(m1), Data.Obj(m2)) => Data.Obj{
+        m1.foldLeft(m2){
+          case (acc, (k, v)) => if(acc.isDefinedAt(k)) acc else acc + (k -> v)
+        }
+      }
+      case _ => undefined
+    }).right
     case ProjectIndex(f1, f2) => ((x: Data) => (f1(x), f2(x)) match {
       case (Data.Arr(list), Data.Int(index)) =>
         if(index >= 0 && index < list.size) list(index.toInt) else undefined
       case _ => undefined
     }).right
-    case ProjectField(fSrc, fField) => InternalError("not implemented").left
-    case DeleteField(fSrc, fField) => InternalError("not implemented").left
-    case DupMapKeys(f) => InternalError("not implemented").left
-    case DupArrayIndices(f) => InternalError("not implemented").left
-    case ZipMapKeys(f) => InternalError("not implemented").left
-    case ZipArrayIndices(f) => InternalError("not implemented").left
-    case Range(fFrom, fTo) => InternalError("not implemented").left
-    case Guard(f1, fPattern, f2,ff3) => InternalError("not implemented").left
+    case ProjectField(fSrc, fField) => ((x: Data) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => m(field)
+      case _ => undefined
+    }).right
+    case DeleteField(fSrc, fField) =>  ((x: Data) => (fSrc(x), fField(x)) match {
+      case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
+      case _ => undefined
+    }).right
+    case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
+    case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
+    case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
+    case ZipArrayIndices(f) => InternalError("ZipArrayIndices not implemented").left
+    case Range(fFrom, fTo) => InternalError("Range not implemented").left
+    case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
     case _ => InternalError("not implemented").left
   }
 
   private def add(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a + b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) + b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) + b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(b))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
     case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
@@ -200,9 +207,9 @@ object CoreMap {
 
   private def subtract(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a - b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a - BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) - b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a - BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a - b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) - b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.minus(b))
     case (Data.Date(a), Data.Interval(b)) => Data.Date(a.minus(b))
     case (Data.Time(a), Data.Interval(b)) => Data.Time(a.minus(b))
@@ -212,9 +219,9 @@ object CoreMap {
 
   private def multiply(d1: Data, d2: Data): Data = (d1, d2)  match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a * b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a * BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) * b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a * BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a * b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) * b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
@@ -222,9 +229,9 @@ object CoreMap {
 
   private def divide(d1: Data, d2: Data): Data = (d1, d2) match {
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a / b)
-    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(new JBigDecimal(b.bigInteger)))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(a / BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a / b)
-    case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(new JBigDecimal(a.bigInteger)) / b)
     case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
@@ -241,49 +248,13 @@ object CoreMap {
     case _ => undefined
   }
 
-  // TODO other cases?
+  // TODO we loose precision here, consider using https://github.com/non/spire/
   private def power(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Int(a), Data.Int(b)) => Data.Int(a ^ b)
-    case (Data.Int(a), Data.Dec(b)) => ???
-    case (Data.Dec(a), Data.Int(b)) => ???
-    case (Data.Dec(a), Data.Dec(b)) => ???
+    case (Data.Int(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Int(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Dec(a), Data.Int(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
+    case (Data.Dec(a), Data.Dec(b)) => Data.Dec(math.pow(a.toDouble, b.toDouble))
     case _ => undefined
-  }
-
-  // TODO missing for obj, what about NA & Null ?
-  private def eq(d1: Data, d2: Data): Data = (d1, d2) match {
-    case (Data.Null, Data.Null) => Data.Bool(true) // is it really?
-    case (Data.Str(a), Data.Str(b)) => Data.Bool(a == b)
-    case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a == b)
-    case (Data.Int(a), Data.Int(b)) => Data.Bool(a == b)
-    case (Data.Dec(a), Data.Dec(b)) => Data.Bool(a == b)
-    case (Data.Obj(a), Data.Obj(b)) => ??? // TODO
-    case (Data.Arr(a), Data.Arr(b)) => if(a.size != b.size) Data.Bool(false) else {
-      a.zip(b)
-        .map {
-        case (d1, d2) => eq(d1, d2)
-      }.fold(Data.Bool(true)){
-        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => undefined
-      }
-    }
-    case (Data.Set(a), Data.Set(b)) => if(a.size != b.size) Data.Bool(false) else {
-      a.zip(b)
-        .map {
-        case (d1, d2) => eq(d1, d2)
-      }.fold(Data.Bool(true)){
-        case (Data.Bool(b1), Data.Bool(b2)) => Data.Bool(b1 && b2)
-        case _ => undefined
-      }
-    }
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a == b)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a == b)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a == b)
-    case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a == b)
-    case (Data.Binary(a), Data.Binary(b)) => Data.Bool(a == b)
-    case (Data.Id(a), Data.Id(b)) => Data.Bool(a == b)
-    case (Data.NA, Data.NA) => Data.Bool(true) // is it really?
-    case _ => Data.Bool(false)
   }
 
   private def lt(d1: Data, d2: Data): Data = (d1, d2) match {
