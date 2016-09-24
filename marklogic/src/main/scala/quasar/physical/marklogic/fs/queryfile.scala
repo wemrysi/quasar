@@ -57,31 +57,34 @@ object queryfile {
       f: MainModule => ContentSourceIO[A]
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
-      type MlPlan[A] = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
-      type QPlan[A]  = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
-      type QST[A]    = QScriptTotal[Fix, A]
+      type MLQScript[A]      = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+      type MLPlan[A]         = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
+      type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
+      type QSR[A]            = QScriptRead[Fix, A]
 
       // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
       import WriterT.writerTMonad
       val optimize = new Optimize[Fix]
-      val transform = new Transform[Fix, QST]
 
       def phase(main: MainModule): PhaseResults =
         Vector(PhaseResult.Detail("XQuery", main.render))
 
-      val listContents: ConvertPath.ListContents[QPlan] =
+      val listContents: DiscoverPath.ListContents[QPlan] =
         adir => lift(ops.ls(adir)).into[S].liftM[PhaseResultT].liftM[FileSystemErrT]
 
-      def plan(qs: Fix[QScriptTotal[Fix, ?]]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
-        qs.cataM(MarkLogicPlanner[MlPlan, QScriptTotal[Fix, ?]].plan).run map {
+      def plan(qs: Fix[MLQScript]): MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], MainModule] =
+        qs.cataM(MarkLogicPlanner[MLPlan, MLQScript].plan).run map {
           case (prologs, xqy) => MainModule(Version.`1.0-ml`, prologs, xqy)
         }
 
+      val linearize: Algebra[MLQScript, List[MLQScript[ExternallyManaged]]] =
+        qsr => qsr.as[ExternallyManaged](Extern) :: Foldable[MLQScript].fold(qsr)
+
       val planning = for {
-        qs      <- convertToQScript(some(listContents))(lp)
-        shifted =  transFutu(qs)(ShiftRead[Fix, QST, QST].shiftRead(idPrism.reverseGet)(_: QST[Fix[QST]]))
+        qs      <- convertToQScriptRead[Fix, QPlan, QSR](listContents)(lp)
+        shifted =  transFutu(qs)(ShiftRead[Fix, QSR, MLQScript].shiftRead(idPrism.reverseGet)(_: QSR[Fix[QSR]]))
                      .transCata(optimize.applyAll)
-        shftdRT = shifted.cata(transform.linearize).reverse.render
+        shftdRT =  shifted.cata(linearize).reverse.render
         _       <- MonadTell[QPlan, PhaseResults].tell(Vector(
                      PhaseResult.Tree("QScript (ShiftRead)", shftdRT)))
         mod     <- plan(shifted).leftMap(mlerr => mlerr match {
@@ -99,6 +102,7 @@ object queryfile {
       planning.run.run
     }
 
+    // FIXME: Actually write-back to MarkLogic
     def exec(lp: Fix[LogicalPlan], out: AFile) =
       plannedLP(lp)(κ(out.point[ContentSourceIO]))
 

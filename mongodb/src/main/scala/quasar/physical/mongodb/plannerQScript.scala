@@ -29,7 +29,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.fs.listContents
 import quasar.physical.mongodb.planner.{FuncHandler, JoinHandler, JoinSource, InputFinder, Here, There}
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
 import javascript._
 
@@ -682,6 +682,8 @@ object MongoDbQScriptPlanner {
   object Planner {
     type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
+    def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
+
     implicit def shiftedRead[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
       new Planner[Const[ShiftedRead, ?]] {
         type IT[G[_]] = T[G]
@@ -921,9 +923,6 @@ object MongoDbQScriptPlanner {
     case x => x.right
   }
 
-  private type QScript0[T[_[_]], A] = Coproduct[Const[Read, ?], QScriptCore[T, ?], A]
-  type QScript[T[_[_]], A] = Coproduct[EquiJoin[T, ?], QScript0[T, ?], A]
-
   // TODO: Allow backends to provide a “Read” type to the typechecker, which
   //       represents the type of values that can be stored in a collection.
   //       E.g., for MongoDB, it would be `Map(String, Top)`. This will help us
@@ -963,6 +962,12 @@ object MongoDbQScriptPlanner {
     type F[A]           = PlanT[W, A]
     type M[A]           = GenT[F, A]
 
+    type MongoQScriptInterim[A] =
+      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[Read, ?])#M[A]
+
+    type MongoQScript[A] =
+      (QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead, ?])#M[A]
+
     def log[A: RenderTree](label: String)(ma: M[A]): M[A] =
       ma flatMap { a =>
         val result = PhaseResult.Tree(label, RenderTree[A].render(a))
@@ -975,22 +980,22 @@ object MongoDbQScriptPlanner {
     def liftError[A](ea: PlannerError \/ A): M[A] =
       EitherT(ea.leftMap(FileSystemError.planningFailed(lp.convertTo[Fix], _)).point[W]).liftM[GenT]
 
-    val P = scala.Predef.implicitly[Planner.Aux[T, QScriptTotal[T, ?]]]
+    val P = scala.Predef.implicitly[Planner.Aux[T, MongoQScript]]
 
     val lc = listContents andThen (ss => EitherT(ss.run.liftM[PhaseResultT]))
 
     (for {
-      qs  <- QueryFile.convertToQScript(some(lc))(lp).liftM[GenT]
+      qs  <- QueryFile.convertToQScriptRead[T, F, QScriptRead[T, ?]](lc)(lp).liftM[GenT]
       // TODO: also need to prefer projections over deletions
       // NB: right now this only outputs one phase, but it’d be cool if we could
       //     interleave phase building in the composed recursion scheme
       opt <- log("QScript (Mongo-specific)")(liftError(
-        qs.transCataM[PlannerError \/ ?, QScriptTotal[T, ?]](tf =>
-          (liftFGM(assumeReadType[T, QScriptTotal[T, ?]](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
-            liftFG(optimize.simplifyJoin[QScriptTotal[T, ?]])
+        qs.transCataM[PlannerError \/ ?, MongoQScriptInterim](tf =>
+          (liftFGM(assumeReadType[T, MongoQScriptInterim](Type.Obj(ListMap(), Some(Type.Top)))) ⋘
+            SimplifyJoin[T, QScriptRead[T, ?], MongoQScriptInterim].simplifyJoin(idPrism.reverseGet)
           ).apply(tf) ∘
-            Normalizable[QScriptTotal[T, ?]].normalize).map(transFutu(_)(ShiftRead[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].shiftRead(idPrism.reverseGet)(_: QScriptTotal[T, T[QScriptTotal[T, ?]]])) ∘
-            Normalizable[QScriptTotal[T, ?]].normalize)))
+            Normalizable[MongoQScriptInterim].normalize).map(transFutu(_)(ShiftRead[T, MongoQScriptInterim, MongoQScript].shiftRead(idPrism.reverseGet)(_)) ∘
+            Normalizable[MongoQScript].normalize)))
       wb  <- log("Workflow Builder")(swizzle(opt.cataM[StateT[OutputM, NameGen, ?], WorkflowBuilder[WF]](P.plan(joinHandler, funcHandler) ∘ (_ ∘ (_ ∘ normalize)))))
       wf1 <- log("Workflow (raw)")         (swizzle(WorkflowBuilder.build(wb)))
       wf2 <- log("Workflow (crystallized)")(Crystallize[WF].crystallize(wf1).point[M])
