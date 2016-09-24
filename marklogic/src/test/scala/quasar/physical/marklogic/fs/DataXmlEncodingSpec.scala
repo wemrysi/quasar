@@ -16,6 +16,8 @@
 
 package quasar.physical.marklogic.fs
 
+import quasar.Predef.List
+import quasar.Data
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data.{encodeXml, decodeXml}
 import quasar.physical.marklogic.xml.SecureXML
@@ -39,6 +41,19 @@ final class DataXmlEncodingSpec extends quasar.Qspec {
       } yield d
 
       rt must_= xd.data.right
+    }
+
+    "error when object key is not a valid QName" >> {
+      val k = "42 not qname"
+      val d = Data.singletonObj(k, Data.Str("foo"))
+
+      encodeXml[Result](d) must beLike {
+        case -\/(NonEmptyList(msg, _)) => msg must contain(k)
+      }
+    }
+
+    "error for Data.Set" >> {
+      encodeXml[Result](Data.Set(List(Data.Str("a")))) must be_-\/
     }
   }
 }
