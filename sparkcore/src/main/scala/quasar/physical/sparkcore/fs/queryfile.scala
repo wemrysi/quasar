@@ -129,7 +129,6 @@ object queryfile {
     }.join
   }
 
-
   // TODO for Q4.2016  - unify it with ReadFile
   final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
 
@@ -142,23 +141,17 @@ object queryfile {
 
     val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptRead[Fix, ?]]]
 
-
-    val temp: EitherT[Free[S, ?], PlannerError, ResultHandle] = for {
+    val open: Free[S, PlannerError \/ ResultHandle] = (for {
       h <- EitherT(ms.next map (ResultHandle(_).right[PlannerError]))
       rdd <- EitherT(read.asks { sc =>
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
       }.join)
       _ <- kvs.put(h, RddState(rdd.zipWithIndex.some, 0)).liftM[PlannerErrT]
-    } yield (h)
+    } yield (h)).run
 
-    val temp2: Free[S, PlannerError \/ ResultHandle] = temp.run
-
-    val temp3 =
-      temp2
-         .map(_.leftMap(planningFailed(lp, _)))
-         .map(mrh => EitherT(mrh.point[Writer[PhaseResults, ?]]))
-
-    temp3
+    open
+      .map(_.leftMap(planningFailed(lp, _)))
+      .map(mrh => EitherT(mrh.point[Writer[PhaseResults, ?]]))
   }
 
   private def more[S[_]](h: ResultHandle)(implicit
