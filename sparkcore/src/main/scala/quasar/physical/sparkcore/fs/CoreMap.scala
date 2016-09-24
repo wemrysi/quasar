@@ -183,8 +183,18 @@ object CoreMap {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
-    case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
+    case DupMapKeys(f) => (f >>> {
+      case Data.Obj(m) => Data.Obj {
+        m.foldLeft(m){
+          case (acc, (k, _)) => acc + (k -> Data.Str(k))
+        }
+      }
+      case _ => undefined
+    }).right
+    case DupArrayIndices(f) => (f >>> {
+      case Data.Arr(l) => Data.Arr((1 to l.size).map(Data.Int(_)).toList)
+      case _ => undefined
+    }).right
     case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
     case ZipArrayIndices(f) => InternalError("ZipArrayIndices not implemented").left
     case Range(fFrom, fTo) => InternalError("Range not implemented").left
