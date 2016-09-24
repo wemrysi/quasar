@@ -19,7 +19,8 @@ package quasar.physical.postgresql.fs
 import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.effect.MonotonicSeq
-import quasar.fp.{κ, free}, free._
+import quasar.fp.κ2
+import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.postgresql.common._
 
@@ -72,7 +73,7 @@ object managefile {
                      case _ =>
                        ().right[FileSystemError]
                    }).point[Free[S, ?]])
-      tblsToMv  =  scenario.fold(κ(srcTables), κ(List(src.table)))
+      tblsToMv  =  scenario.fold(κ2(srcTables), κ2(List(src.table)))
       _         <- lift(tblsToMv.traverse { srcTable =>
                      val dstTable = dst.table + srcTable.stripPrefix(src.table)
 

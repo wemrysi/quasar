@@ -103,6 +103,9 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
           })
     }
 
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
+
   implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
       RenderTree[Vector[A]] =
     new RenderTree[Vector[A]] {
@@ -322,9 +325,9 @@ trait SKI {
    NB: the argument is eager here, so use `_ => ...` instead if you need it to be thunked.
    */
   def κ[A, B](x: B): A => B                                 = _ => x
-  def κ[A, B, C](x: C): (A, B) => C                         = (_, _) => x
-  def κ[A, B, C, D](x: D): (A, B, C) => D                   = (_, _, _) => x
-  def κ[A, B, C, D, E, F, G](x: G): (A, B, C, D, E, F) => G = (_, _, _, _, _, _) => x
+  def κ2[A, B, C](x: C): (A, B) => C                         = (_, _) => x
+  def κ3[A, B, C, D](x: D): (A, B, C) => D                   = (_, _, _) => x
+  def κ6[A, B, C, D, E, F, G](x: G): (A, B, C, D, E, F) => G = (_, _, _, _, _, _) => x
 
   /** A shorter name for the identity function. */
   def ι[A]: A => A = x => x
@@ -612,7 +615,7 @@ package object fp
       T[F] =
     f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
-  def freeCata[F[_]: Traverse, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
+  def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =

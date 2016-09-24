@@ -28,6 +28,9 @@ import matryoshka._, Recursive.ops._, FunctorT.ops._
 import pathy.Path.{dir1, file1, rootDir}
 import scalaz._, Scalaz._, \&/._
 
+/** This extracts statically-known paths from QScript queries to make it easier
+  * for connectors to map queries to their own filesystems.
+  */
 trait DiscoverPath[IN[_]] {
   type IT[F[_]]
   type OUT[A]
@@ -49,7 +52,7 @@ object DiscoverPath extends DiscoverPathInstances {
 abstract class DiscoverPathInstances {
   type ListContents[M[_]] = ADir => M[Set[PathSegment]]
 
-  def union[T[_[_]]: Recursive: Corecursive, OUT[_]: Functor]
+  private def union[T[_[_]]: Recursive: Corecursive, OUT[_]: Functor]
     (elems: NonEmptyList[T[OUT]])
     (implicit
       QC: QScriptCore[T, ?] :<: OUT,
@@ -60,17 +63,17 @@ abstract class DiscoverPathInstances {
         elem.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))),
         acc.cata[Free[QScriptTotal[T, ?], Hole]](g => Free.roll(FI.inject(g))))).embed)
 
-  def makeRead[T[_[_]], F[_]](path: ADir)(implicit R: Const[Read[APath], ?] :<: F):
+  private def makeRead[T[_[_]], F[_]](path: ADir)(implicit R: Const[Read[APath], ?] :<: F):
       F[T[F]] =
     R.inj(Const[Read[APath], T[F]](Read(path)))
 
-  def wrapDir[T[_[_]]: Corecursive, F[_]: Functor]
+  private def wrapDir[T[_[_]]: Corecursive, F[_]: Functor]
     (name: String, d: F[T[F]])
     (implicit QC: QScriptCore[T, ?] :<: F)
       : F[T[F]] =
     QC.inj(Map(d.embed, Free.roll(MakeMap(StrLit(name), HoleF))))
 
-  def unionDirs[T[_[_]]: Corecursive, OUT[_]: Functor]
+  private def unionDirs[T[_[_]]: Corecursive, OUT[_]: Functor]
     (implicit R: Const[Read[APath], ?] :<: OUT, QC: QScriptCore[T, ?] :<: OUT)
       : List[ADir] => Option[NonEmptyList[T[OUT]]] =
     _ ∘ (makeRead[T, OUT](_).embed) match {
@@ -92,7 +95,8 @@ abstract class DiscoverPathInstances {
       _.point[M],
       (ds, qs) => unionDirs[T, OUT].apply(ds).fold(qs)(d => union(qs <:: d)).point[M])
 
-  def convertBranch[T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
+  private def convertBranch
+    [T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], branch: FreeQS[T])
     (f: ListContents[M])
     (implicit
@@ -108,7 +112,7 @@ abstract class DiscoverPathInstances {
       (unionAll[T, M, QScriptTotal[T, ?]](f).apply(_) ∘ (_.convertTo[Free[?[_], Hole]]))
 
 
-  def convertBranchingOp
+  private def convertBranchingOp
     [T[_[_]]: Recursive: Corecursive, M[_]: MonadFsErr, OUT[_]: Functor]
     (src: List[ADir] \&/ T[OUT], lb: FreeQS[T], rb: FreeQS[T], f: ListContents[M])
     (op: (T[OUT], FreeQS[T], FreeQS[T]) => OUT[T[OUT]])

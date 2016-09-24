@@ -9,7 +9,7 @@ object Dependencies {
   private val doobieVersion     = "0.3.0"
   private val http4sVersion     = "0.14.1a"
   private val jawnVersion       = "0.8.4"
-  private val jacksonVersion    = "2.8.1"
+  private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
   private val nettyVersion      = "4.1.3.Final"
   private val pathyVersion      = "0.2.1"
@@ -84,7 +84,6 @@ object Dependencies {
     "org.spire-math"             %% "jawn-parser"         % jawnVersion
   )
   def web = Seq(
-    "ch.qos.logback"  % "logback-classic"     %      "1.1.7",
     "org.scodec"     %% "scodec-scalaz"       %     "1.3.0a",
     "org.scodec"     %% "scodec-bits"         % scodecBitsVersion,
     "org.http4s"     %% "http4s-dsl"          %   http4sVersion,

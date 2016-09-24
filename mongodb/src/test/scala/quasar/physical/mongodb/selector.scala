@@ -28,17 +28,17 @@ class SelectorSpec extends quasar.Qspec  {
 
     "bson" should {
       "render simple expr" in {
-        Expr(Lt(10)).bson must_== Bson.Doc(ListMap("$lt" -> 10))
+        Expr(Lt(10)).bson must_== Bson.Doc("$lt" -> Bson.Int32(10))
       }
 
       "render $not expr" in {
-        NotExpr(Lt(10)).bson must_== Bson.Doc(ListMap("$not" -> Bson.Doc(ListMap("$lt" -> 10))))
+        NotExpr(Lt(10)).bson must_== Bson.Doc(ListMap("$not" -> Bson.Doc("$lt" -> Bson.Int32(10))))
       }
 
       "render simple selector" in {
         val sel = Doc(BsonField.Name("foo") -> Gt(10))
 
-        sel.bson must_== Bson.Doc(ListMap("foo" -> Bson.Doc(ListMap("$gt" -> 10))))
+        sel.bson must_== Bson.Doc(ListMap("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))))
       }
 
       "render simple selector with path" in {
@@ -46,7 +46,7 @@ class SelectorSpec extends quasar.Qspec  {
           BsonField.Name("foo") \ BsonField.Name("3") \ BsonField.Name("bar") -> Gt(10)
         )
 
-        sel.bson must_== Bson.Doc(ListMap("foo.3.bar" -> Bson.Doc(ListMap("$gt" -> 10))))
+        sel.bson must_== Bson.Doc("foo.3.bar" -> Bson.Doc("$gt" -> Bson.Int32(10)))
       }
 
       "render flattened $and" in {
@@ -58,16 +58,15 @@ class SelectorSpec extends quasar.Qspec  {
           )
         )
         cs.bson must_==
-          Bson.Doc(ListMap("$and" -> Bson.Arr(List(
-            Bson.Doc(ListMap("foo" -> Bson.Doc(ListMap("$gt" -> 10)))),
-            Bson.Doc(ListMap("foo" -> Bson.Doc(ListMap("$lt" -> 20)))),
-            Bson.Doc(ListMap("foo" -> Bson.Doc(ListMap("$ne" -> 15))))
-          ))))
+          Bson.Doc("$and" -> Bson.Arr(
+            Bson.Doc("foo" -> Bson.Doc("$gt" -> Bson.Int32(10))),
+            Bson.Doc("foo" -> Bson.Doc("$lt" -> Bson.Int32(20))),
+            Bson.Doc("foo" -> Bson.Doc("$ne" -> Bson.Int32(15)))))
       }
 
       "render not(eq(...))" in {
         val cond = NotExpr(Eq(10))
-        cond.bson must_== Bson.Doc(ListMap("$ne" -> 10))
+        cond.bson must_== Bson.Doc("$ne" -> Bson.Int32(10))
       }
     }
 

@@ -93,10 +93,10 @@ object ManageFile {
         extends MoveScenario
 
     val dirToDir: Prism[MoveScenario, (ADir, ADir)] =
-      Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ(none)))(DirToDir.tupled)
+      Prism((_: MoveScenario).fold((s, d) => (s, d).some, κ2(none)))(DirToDir.tupled)
 
     val fileToFile: Prism[MoveScenario, (AFile, AFile)] =
-      Prism((_: MoveScenario).fold(κ(none), (s, d) => (s, d).some))(FileToFile.tupled)
+      Prism((_: MoveScenario).fold(κ2(none), (s, d) => (s, d).some))(FileToFile.tupled)
   }
 
   final case class Move(scenario: MoveScenario, semantics: MoveSemantics)

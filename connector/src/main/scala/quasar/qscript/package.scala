@@ -27,7 +27,7 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
   * connectors, along with the operations for dealing with them.
-  * 
+  *
   * There are a few patterns that are worth noting:
   * - `(src: A, ..., lBranch: FreeQS[T], rBranch: FreeQS[T], ...)` – used in
   *   operations that combine multiple data sources (notably joins and unions).
@@ -40,6 +40,9 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
   *   of [[MapFunc]] that has a single “variable”, [[SrcHole]], which (usually)
   *   refers to the `src` parameter of that operation. [[JoinFunc]], [[FreeQS]],
   *   and the `repair` parameter to [[Reduce]] behave similarly.
+  * - We use the type parameter `QS[_]` to indicate QScript, as well as the type
+  *   parameters `IN[_]` and `OUT[_]` to indicate the input and output
+  *   coproducts in transformations where they can be different.
   */
 // NB: Here we no longer care about provenance. Backends can’t do anything with
 //     it, so we simply represent joins and crosses directly. This also means

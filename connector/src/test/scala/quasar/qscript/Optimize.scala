@@ -50,7 +50,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
        val query = LP.Constant(Data.Bool(true))
        val run = liftFG(opt.elideNopQC[QSI, QSI](idPrism.reverseGet))
 
-       QueryFile.optimizeEval[Fix, QSI](query)(run).toOption must
+       QueryFile.convertAndNormalize[Fix, QSI](query)(run).toOption must
          equal(chain(
            UnreferencedI,
            QCI.inj(Map((), BoolLit(true)))).some)
@@ -66,7 +66,7 @@ class QScriptOptimizeSpec extends quasar.Qspec with CompilerHelpers with QScript
 
       val query = lpRead("/foo")
 
-      QueryFile.optimizeEval(query)(run).toOption must
+      QueryFile.convertAndNormalize(query)(run).toOption must
       equal(chain(
         RootI,
         QCI.inj(LeftShift((),

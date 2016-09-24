@@ -21,37 +21,52 @@ import quasar.{Data, DataCodec}
 import quasar.contrib.pathy._
 import quasar.effect._
 import quasar.fp.ι
+import quasar.fp.free._
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._, FileSystemError._, PathError._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import scalaz._, Scalaz._
+import scalaz.concurrent.Task
 
-final case class SparkCursor(rdd: Option[RDD[Data]])
-
-final case class Input[S[_]](
-  rddFrom: AFile => Free[S, RDD[String]],
-  fileExists: AFile => Free[S, Boolean]
-)
+final case class SparkCursor(rdd: Option[RDD[(Data, Long)]], pointer: Int)
 
 object readfile {
 
+  type Offset = Natural
+  type Limit = Option[Positive]
+
+  final case class Input[S[_]](
+    rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[String]],
+    fileExists: AFile => Free[S, Boolean]
+  )
+
   import ReadFile.ReadHandle
+
+  def chrooted[S[_]](input: Input[S], prefix: ADir)(implicit
+    s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
+    s1: Read[SparkContext, ?] :<: S,
+    s2: MonotonicSeq :<: S,
+    s3: Task :<: S
+  ): ReadFile ~> Free[S, ?] =
+    flatMapSNT(interpret(input)) compose chroot.readFile[ReadFile](prefix)
 
   def interpret[S[_]](input: Input[S])(implicit
     s0: KeyValueStore[ReadHandle, SparkCursor, ?] :<: S,
     s1: Read[SparkContext, ?] :<: S,
-    s2: MonotonicSeq :<: S
+    s2: MonotonicSeq :<: S,
+    s3: Task :<: S
   ): ReadFile ~> Free[S, ?] =
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
-        case ReadFile.Open(f, _, _) => open[S](f, input)
+        case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
         case ReadFile.Read(h) => read[S](h)
         case ReadFile.Close(h) => close[S](h)
       }
   }
 
-  private def open[S[_]](f: AFile, input: Input[S])(implicit
+  private def open[S[_]](f: AFile, offset: Offset, limit: Limit, input: Input[S])(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Read[SparkContext, ?] :<: S,
     gen: MonotonicSeq.Ops[S]
@@ -61,10 +76,10 @@ object readfile {
       gen.next map (ReadHandle(f, _))
 
     def _open: Free[S, ReadHandle] = for {
-      rdd <- input.rddFrom(f)
+      rdd <- input.rddFrom(f, offset, limit)
       cur = SparkCursor(rdd.map{ raw =>
         DataCodec.parse(raw)(DataCodec.Precise).fold(error => Data.NA, ι)
-      }.some)
+      }.zipWithIndex.some, 0)
       h <- freshHandle
       _ <- kvs.put(h, cur)
     } yield h
@@ -76,18 +91,31 @@ object readfile {
   }
 
   private def read[S[_]](h: ReadHandle)(implicit
-    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S]
+    kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
+    s1: Task :<: S
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
+    // TODO arbitrary value, more or less a good starting point
+    // but we should consider some measuring
+    val step = 5000
+
     kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
-        case SparkCursor(None) =>
+        case SparkCursor(None, _) =>
           Vector.empty[Data].pure[EitherT[Free[S, ?], FileSystemError, ?]]
-        case SparkCursor(Some(rdd)) =>
+        case SparkCursor(Some(rdd), p) =>
 
-          val collect = rdd.collect.toVector.pure[EitherT[Free[S, ?], FileSystemError, ?]]
-          val clear = kvs.put(h, SparkCursor(None)).liftM[FileSystemErrT]
+        val collect = lift(Task.delay {
+          rdd
+            .filter(d => d._2 >= p && d._2 < (p + step))
+            .map(_._1).collect.toVector
+        }).into[S].liftM[FileSystemErrT]
 
-          collect <* clear
+        for {
+          collected <- collect
+          cur = if(collected.isEmpty) SparkCursor(None, 0) else SparkCursor(some(rdd), p + step)
+          _ <- kvs.put(h, cur).liftM[FileSystemErrT]
+        } yield collected
+        
     }.run
   }
 
