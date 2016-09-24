@@ -103,6 +103,9 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
           })
     }
 
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
+
   implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
       RenderTree[Vector[A]] =
     new RenderTree[Vector[A]] {
@@ -296,6 +299,19 @@ trait QFoldableOps {
   }
 }
 
+trait DebugOps {
+  final implicit class ToDebugOps[A](val self: A) {
+    /** Applies some operation to a value and returns the original value. Useful
+      * for things like adding debugging printlns in the middle of an
+      * expression.
+      */
+    final def <|(f: A => Unit): A = {
+      f(self)
+      self
+    }
+  }
+}
+
 trait SKI {
   // NB: Unicode has double-struck and bold versions of the letters, which might
   //     be more appropriate, but the code points are larger than 2 bytes, so
@@ -355,6 +371,7 @@ package object fp
     with JsonOps
     with ProcessOps
     with QFoldableOps
+    with DebugOps
     with SKI
     with StringOps
     with CatchableInstances {
@@ -598,7 +615,7 @@ package object fp
       T[F] =
     f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
-  def freeCata[F[_]: Traverse, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
+  def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =

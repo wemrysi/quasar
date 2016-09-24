@@ -12,7 +12,13 @@ script:
   - export MONGO_AUTH="MONGO_${MONGO_RELEASE}_AUTH"
   - ./scripts/installMongo mongodb-linux-x86_64-${!MONGO_LINUX} mongo ${!MONGO_PORT} ${!MONGO_AUTH}
   - psql -c 'CREATE DATABASE "quasar-test";' -U postgres
-  - ./scripts/build $MONGO_RELEASE
+  # FIXME: Need to improve compile times so we can remove `travis_wait`
+  #        see https://docs.travis-ci.com/user/common-build-problems/#Build-times-out-because-no-output-was-received
+  #        Those docs actually seem incorrect. This will prevent the no-output
+  #        termination, but then it will forcibly terminate the process after
+  #        the time limit, so this needs to be at least as long as the process
+  #        takes.
+  - travis_wait 120 ./scripts/build $MONGO_RELEASE
 after_success: ./scripts/afterSuccess
 notifications:
   irc:

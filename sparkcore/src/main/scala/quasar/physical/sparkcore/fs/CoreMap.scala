@@ -17,6 +17,7 @@
 package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
+import quasar.qscript.MapFuncs
 import quasar.qscript.MapFuncs._
 import quasar.std.{DateLib, StringLib}
 import quasar.Data
@@ -107,7 +108,7 @@ object CoreMap {
       case (Data.Bool(a), Data.Bool(b)) => Data.Bool(a || b)
       case _ => undefined
     }).right
-    case Coalesce(f1, f2) => ((x: Data) => f1(x) match {
+    case MapFuncs.Coalesce(f1, f2) => ((x: Data) => f1(x) match {
       case Data.Null => f2(x)
       case d => d
     }).right

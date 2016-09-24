@@ -17,444 +17,95 @@
 package quasar.physical.mongodb
 
 import quasar.Predef._
-import quasar.RenderTree
-import quasar.fp._
-import quasar._, Planner._
-import quasar.javascript._
+import quasar.{Type, RenderTree, Terminal}, Type.⨿
 import quasar.jscore, jscore.{JsCore, JsFn}
+import quasar.Planner.{PlannerError, UnsupportedJS}
 import quasar.physical.mongodb.javascript._
 
 import matryoshka._, Recursive.ops._
 import monocle.Prism
-import org.threeten.bp.Instant
 import scalaz._, Scalaz._
 
 package object expression {
-  /** Expression that can evaluated in the aggregation pipeline */
-  type Expression = Fix[ExprOp]
 
-  def $field(field: String, others: String*): Expression =
-    $var(DocField(others.map(BsonField.Name(_)).foldLeft[BsonField](BsonField.Name(field))(_ \ _)))
+  /** The type for expressions targeting MongoDB 2.6 specifically. */
+  type Expr2_6[A] = ExprOpCoreF[A]
+  /** The type for expressions targeting MongoDB 3.0 specifically. */
+  type Expr3_0[A] = Coproduct[ExprOp3_0F, ExprOpCoreF, A]
+  /** The type for expressions targeting MongoDB 3.2 specifically. */
+  type Expr3_2[A] = Coproduct[ExprOp3_2F, Expr3_0, A]
 
-  val $$ROOT = $var(DocVar.ROOT())
-  val $$CURRENT = $var(DocVar.CURRENT())
+  /** The type for expressions supporting the most advanced capabilities. */
+  type ExprOp[A] = Expr3_2[A]
 
   val DocField = Prism.partial[DocVar, BsonField] {
     case DocVar.ROOT(Some(tail)) => tail
   } (DocVar.ROOT(_))
 
-  def bsonDoc(op: String, rhs: Bson) = Bson.Doc(ListMap(op -> rhs))
-  private def bsonArr(op: String, elems: Bson*) =
-    bsonDoc(op, Bson.Arr(elems.toList))
-
-  val simplifyƒ: ExprOp[Expression] => Option[Expression] = {
-    case $condF($literal(Bson.Bool(true)),  c, _) => c.some
-    case $condF($literal(Bson.Bool(false)), _, a) => a.some
-    case $condF($literal(_),                _, _) => $literal(Bson.Null).some
-    case $ifNullF($literal(Bson.Null), r) => r.some
-    case $ifNullF($literal(e),         _) => $literal(e).some
-    case $notF($literal(Bson.Bool(b))) => $literal(Bson.Bool(!b)).some
-    case $notF($literal(_))            => $literal(Bson.Null).some
-    case _ => None
-  }
-
-  val bsonƒ: ExprOp[Bson] => Bson = {
-    case $includeF() => Bson.Bool(true)
-    case $varF(dv) => dv.bson
-    case $andF(first, second, others @ _*) =>
-      bsonArr("$and", first +: second +: others: _*)
-    case $orF(first, second, others @ _*) =>
-      bsonArr("$or", first +: second +: others: _*)
-    case $notF(value) => bsonDoc("$not", value)
-    case $setEqualsF(left, right) => bsonArr("$setEquals", left, right)
-    case $setIntersectionF(left, right) =>
-      bsonArr("$setIntersection", left, right)
-    case $setDifferenceF(left, right) => bsonArr("$setDifference", left, right)
-    case $setUnionF(left, right) => bsonArr("$setUnion", left, right)
-    case $setIsSubsetF(left, right) => bsonArr("$setIsSubset", left, right)
-    case $anyElementTrueF(value) => bsonDoc("$anyElementTrue", value)
-    case $allElementsTrueF(value) => bsonDoc("$allElementsTrue", value)
-    case $cmpF(left, right) => bsonArr("$cmp", left, right)
-    case $eqF(left, right) => bsonArr("$eq", left, right)
-    case $gtF(left, right) => bsonArr("$gt", left, right)
-    case $gteF(left, right) => bsonArr("$gte", left, right)
-    case $ltF(left, right) => bsonArr("$lt", left, right)
-    case $lteF(left, right) => bsonArr("$lte", left, right)
-    case $neqF(left, right) => bsonArr("$ne", left, right)
-    case $addF(left, right) => bsonArr("$add", left, right)
-    case $divideF(left, right) => bsonArr("$divide", left, right)
-    case $modF(left, right) => bsonArr("$mod", left, right)
-    case $multiplyF(left, right) => bsonArr("$multiply", left, right)
-    case $subtractF(left, right) => bsonArr("$subtract", left, right)
-    case $concatF(first, second, others @ _*) =>
-      bsonArr("$concat", first +: second +: others: _*)
-    case $strcasecmpF(left, right) => bsonArr("$strcasecmp", left, right)
-    case $substrF(value, start, count) =>
-      bsonArr("$substr", value, start, count)
-    case $toLowerF(value) => bsonDoc("$toLower", value)
-    case $toUpperF(value) => bsonDoc("$toUpper", value)
-    case $metaF() => bsonDoc("$meta", Bson.Text("textScore"))
-    case $sizeF(array) => bsonDoc("$size", array)
-    case $arrayMapF(input, as, in) =>
-      bsonDoc(
-        "$map",
-        Bson.Doc(ListMap(
-          "input" -> input,
-          "as"    -> Bson.Text(as.name),
-          "in"    -> in)))
-    case $letF(vars, in) =>
-      bsonDoc(
-        "$let",
-        Bson.Doc(ListMap(
-          "vars" -> Bson.Doc(vars.map(t => (t._1.name, t._2))),
-          "in"   -> in)))
-    case $literalF(value) => bsonDoc("$literal", value)
-    case $dayOfYearF(date) => bsonDoc("$dayOfYear", date)
-    case $dayOfMonthF(date) => bsonDoc("$dayOfMonth", date)
-    case $dayOfWeekF(date) => bsonDoc("$dayOfWeek", date)
-    case $yearF(date) => bsonDoc("$year", date)
-    case $monthF(date) => bsonDoc("$month", date)
-    case $weekF(date) => bsonDoc("$week", date)
-    case $hourF(date) => bsonDoc("$hour", date)
-    case $minuteF(date) => bsonDoc("$minute", date)
-    case $secondF(date) => bsonDoc("$second", date)
-    case $millisecondF(date) => bsonDoc("$millisecond", date)
-    case $condF(predicate, ifTrue, ifFalse) =>
-      bsonArr("$cond", predicate, ifTrue, ifFalse)
-    case $ifNullF(expr, replacement) => bsonArr("$ifNull", expr, replacement)
-  }
-
-  def rewriteExprRefs(t: Expression)(applyVar: PartialFunction[DocVar, DocVar]) =
-    t.cata[Expression] {
-      case $varF(f) => $var(applyVar.lift(f).getOrElse(f))
-      case x        => Fix(x)
-    }
-
-  implicit val ExprOpTraverse: Traverse[ExprOp] = new Traverse[ExprOp] {
-    def traverseImpl[G[_], A, B](fa: ExprOp[A])(f: A => G[B])(implicit G: Applicative[G]):
-        G[ExprOp[B]] =
-      fa match {
-        case $includeF()          => G.point($includeF())
-        case $varF(dv)            => G.point($varF(dv))
-        case $addF(l, r)          => (f(l) |@| f(r))($addF(_, _))
-        case $andF(a, b, cs @ _*) => (f(a) |@| f(b) |@| cs.toList.traverse(f))($andF(_, _, _: _*))
-        case $setEqualsF(l, r)       => (f(l) |@| f(r))($setEqualsF(_, _))
-        case $setIntersectionF(l, r) => (f(l) |@| f(r))($setIntersectionF(_, _))
-        case $setDifferenceF(l, r)   => (f(l) |@| f(r))($setDifferenceF(_, _))
-        case $setUnionF(l, r)        => (f(l) |@| f(r))($setUnionF(_, _))
-        case $setIsSubsetF(l, r)     => (f(l) |@| f(r))($setIsSubsetF(_, _))
-        case $anyElementTrueF(v)     => G.map(f(v))($anyElementTrueF(_))
-        case $allElementsTrueF(v)    => G.map(f(v))($allElementsTrueF(_))
-        case $arrayMapF(a, b, c)  => (f(a) |@| f(c))($arrayMapF(_, b, _))
-        case $cmpF(l, r)          => (f(l) |@| f(r))($cmpF(_, _))
-        case $concatF(a, b, cs @ _*) => (f(a) |@| f(b) |@| cs.toList.traverse(f))($concatF(_, _, _: _*))
-        case $condF(a, b, c)      => (f(a) |@| f(b) |@| f(c))($condF(_, _, _))
-        case $dayOfMonthF(a)      => G.map(f(a))($dayOfMonthF(_))
-        case $dayOfWeekF(a)       => G.map(f(a))($dayOfWeekF(_))
-        case $dayOfYearF(a)       => G.map(f(a))($dayOfYearF(_))
-        case $divideF(a, b)       => (f(a) |@| f(b))($divideF(_, _))
-        case $eqF(a, b)           => (f(a) |@| f(b))($eqF(_, _))
-        case $gtF(a, b)           => (f(a) |@| f(b))($gtF(_, _))
-        case $gteF(a, b)          => (f(a) |@| f(b))($gteF(_, _))
-        case $hourF(a)            => G.map(f(a))($hourF(_))
-        case $metaF()             => G.point($metaF())
-        case $sizeF(a)            => G.map(f(a))($sizeF(_))
-        case $ifNullF(a, b)       => (f(a) |@| f(b))($ifNullF(_, _))
-        case $letF(a, b)          =>
-          (Traverse[ListMap[DocVar.Name, ?]].sequence[G, B](a.map(t => t._1 -> f(t._2))) |@| f(b))($letF(_, _))
-        case $literalF(lit)       => G.point($literalF(lit))
-        case $ltF(a, b)           => (f(a) |@| f(b))($ltF(_, _))
-        case $lteF(a, b)          => (f(a) |@| f(b))($lteF(_, _))
-        case $millisecondF(a)     => G.map(f(a))($millisecondF(_))
-        case $minuteF(a)          => G.map(f(a))($minuteF(_))
-        case $modF(a, b)          => (f(a) |@| f(b))($modF(_, _))
-        case $monthF(a)           => G.map(f(a))($monthF(_))
-        case $multiplyF(a, b)     => (f(a) |@| f(b))($multiplyF(_, _))
-        case $neqF(a, b)          => (f(a) |@| f(b))($neqF(_, _))
-        case $notF(a)             => G.map(f(a))($notF(_))
-        case $orF(a, b, cs @ _*)  => (f(a) |@| f(b) |@| cs.toList.traverse(f))($orF(_, _, _: _*))
-        case $secondF(a)          => G.map(f(a))($secondF(_))
-        case $strcasecmpF(a, b)   => (f(a) |@| f(b))($strcasecmpF(_, _))
-        case $substrF(a, b, c)    => (f(a) |@| f(b) |@| f(c))($substrF(_, _, _))
-        case $subtractF(a, b)     => (f(a) |@| f(b))($subtractF(_, _))
-        case $toLowerF(a)         => G.map(f(a))($toLowerF(_))
-        case $toUpperF(a)         => G.map(f(a))($toUpperF(_))
-        case $weekF(a)            => G.map(f(a))($weekF(_))
-        case $yearF(a)            => G.map(f(a))($yearF(_))
-      }
-  }
-
-  // TODO: This should at least use Show.
-  implicit val ExprOpRenderTree: RenderTree[Expression] =
-    RenderTree.fromToString[Expression]("ExprOp")
-
-  /** "Literal" translation to JS. */
-  def toJsSimpleƒ(expr: ExprOp[JsFn]): PlannerError \/ JsFn = {
-    def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
-      \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
-    def expr2(x1: JsFn, x2: JsFn)(f: (JsCore, JsCore) => JsCore): PlannerError \/ JsFn =
-      \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)), x2(jscore.Ident(JsFn.defaultName)))))
-
-    def unop(op: jscore.UnaryOperator, x: JsFn) =
-      expr1(x)(x => jscore.UnOp(op, x))
-    def binop(op: jscore.BinaryOperator, l: JsFn, r: JsFn) =
-      expr2(l, r)((l, r) => jscore.BinOp(op, l, r))
-    def invoke(x: JsFn, name: String) =
-      expr1(x)(x => jscore.Call(jscore.Select(x, name), Nil))
-
-    def const(bson: Bson): PlannerError \/ JsCore = {
-      def js(l: Js.Lit) = \/-(jscore.Literal(l))
-      bson match {
-        case Bson.Int64(n)        => js(Js.num(n))
-        case Bson.Int32(n)        => js(Js.num(n.toLong))
-        case Bson.Dec(x)          => js(Js.num(x))
-        case Bson.Bool(v)         => js(Js.Bool(v))
-        case Bson.Text(v)         => js(Js.Str(v))
-        case Bson.Null            => js(Js.Null)
-        case Bson.Doc(values)     => values.map { case (k, v) => jscore.Name(k) -> const(v) }.sequenceU.map(jscore.Obj(_))
-        case Bson.Arr(values)     => values.toList.traverse(const(_)).map(jscore.Arr(_))
-        case o @ Bson.ObjectId(_) => \/-(toJsObjectId(o))
-        case d @ Bson.Date(_)     => \/-(toJsDate(d))
-        // TODO: implement the rest of these (see SD-451)
-        case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.toString))
-        case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.toString))
-        case Bson.Undefined       => \/-(jscore.ident("undefined"))
-
-        case _ => -\/(NonRepresentableInJS(bson.toString))
-      }
-    }
-
-    expr match {
-      case $includeF()             => -\/(NonRepresentableInJS(expr.toString))
-      case $varF(dv)               => \/-(dv.toJs)
-      case $addF(l, r)             => binop(jscore.Add, l, r)
-      case $andF(f, s, o @ _*)     =>
-        \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-          JsFn(JsFn.defaultName, jscore.BinOp(jscore.And, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-      case $condF(t, c, a)         =>
-        \/-(JsFn(JsFn.defaultName,
-            jscore.If(t(jscore.Ident(JsFn.defaultName)), c(jscore.Ident(JsFn.defaultName)), a(jscore.Ident(JsFn.defaultName)))))
-      case $divideF(l, r)          => binop(jscore.Div, l, r)
-      case $eqF(l, r)              => binop(jscore.Eq, l, r)
-      case $gtF(l, r)              => binop(jscore.Gt, l, r)
-      case $gteF(l, r)             => binop(jscore.Gte, l, r)
-      case $literalF(bson)         => const(bson).map(l => JsFn.const(l))
-      case $ltF(l, r)              => binop(jscore.Lt, l, r)
-      case $lteF(l, r)             => binop(jscore.Lte, l, r)
-      case $metaF()                => -\/(NonRepresentableInJS(expr.toString))
-      case $multiplyF(l, r)        => binop(jscore.Mult, l, r)
-      case $neqF(l, r)             => binop(jscore.Neq, l, r)
-      case $notF(a)                => unop(jscore.Not, a)
-      case $orF(f, s, o @ _*)      =>
-        \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-          JsFn(JsFn.defaultName, jscore.BinOp(jscore.Or, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-
-      case $concatF(f, s, o @ _*)  =>
-        \/-(NonEmptyList(f, s +: o: _*).foldLeft1((l, r) =>
-          JsFn(JsFn.defaultName, jscore.BinOp(jscore.Add, l(jscore.Ident(JsFn.defaultName)), r(jscore.Ident(JsFn.defaultName))))))
-      case $substrF(f, start, len) =>
-        \/-(JsFn(JsFn.defaultName,
-          jscore.Call(
-            jscore.Select(f(jscore.Ident(JsFn.defaultName)), "substr"),
-            List(start(jscore.Ident(JsFn.defaultName)), len(jscore.Ident(JsFn.defaultName))))))
-      case $subtractF(l, r)        => binop(jscore.Sub, l, r)
-      case $toLowerF(a)            => invoke(a, "toLowerCase")
-      case $toUpperF(a)            => invoke(a, "toUpperCase")
-
-      case $hourF(a)               => invoke(a, "getUTCHours")
-      case $minuteF(a)             => invoke(a, "getUTCMinutes")
-      case $secondF(a)             => invoke(a, "getUTCSeconds")
-      case $millisecondF(a)        => invoke(a, "getUTCMilliseconds")
-
-      // TODO: implement the rest of these and remove the catch-all (see SD-451)
-      case _                       => -\/(UnsupportedJS(expr.toString))
-    }
-  }
-
-  val minBinary = ImmutableArray.fromArray(scala.Array[Byte]())
-  val minInstant = Instant.ofEpochMilli(0)
-  val minOid =
-    ImmutableArray.fromArray(scala.Array[Byte](0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-
-  object Check {
-    def isNull(expr: Expression) = $eq($literal(Bson.Null), expr)
-    def isNumber(expr: Expression) =
-      $and(
-        $lt($literal(Bson.Null), expr),
-        $lt(expr, $literal(Bson.Text(""))))
-    def isString(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Text("")), expr),
-        $lt(expr, $literal(Bson.Doc(ListMap()))))
-    def isObject(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Doc(ListMap())), expr),
-        $lt(expr, $literal(Bson.Arr(Nil))))
-    def isArray(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Arr(Nil)), expr),
-        $lt(expr, $literal(Bson.Binary(minBinary))))
-    def isBinary(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Binary(minBinary)), expr),
-        $lt(expr, $literal(Bson.ObjectId(minOid))))
-    def isId(expr: Expression) =
-      $and(
-        $lte($literal(Bson.ObjectId(minOid)), expr),
-        $lt(expr, $literal(Bson.Bool(false))))
-    def isBoolean(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Bool(false)), expr),
-        $lte(expr, $literal(Bson.Bool(true))))
-    def isDate(expr: Expression) =
-      $and(
-        $lte($literal(Bson.Date(minInstant)), expr),
-        // TODO: in Mongo 3.0, we can have a tighter type check.
-        // $lt(expr, $literal(Bson.Timestamp(minInstant, 0)))))
-        $lt(expr, $literal(Bson.Regex("", ""))))
-  }
-
   // The following few cases are places where the ExprOp created from
   // the LogicalPlan needs special handling to behave the same when
   // converted to JS.
   // TODO: See SD-736 for the way forward.
-  private val translate: PartialFunction[Expression, PlannerError \/ JsFn] = {
-    // matches the pattern the planner generates for converting epoch time
-    // values to timestamps. Adding numbers to dates works in ExprOp, but not
-    // in Javacript.
-    case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli == 0 =>
-      toJs(r).map(r => JsFn(JsFn.defaultName, jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
+  def translate[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
+      I: ExprOpCoreF :<: EX,
+      ev0: Equal[T[EX]],
+      ev1: ExprOpOps.Uni[EX])
+      : PartialFunction[T[EX], PlannerError \/ JsFn] = {
+    def app(x: T[EX], tc: JsCore => JsCore): PlannerError \/ JsFn =
+      Recursive[T].para(x)(toJs[T, EX]).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
 
-    // typechecking in ExprOp involves abusing total ordering. This ordering
-    // doesn’t hold in JS, so we need to convert back to a typecheck. This
-    // checks for a (non-array) object.
-    case $and(f, s, o @ _*) =>
-      def app(x: Expression, tc: JsCore => JsCore): PlannerError \/ JsFn =
-        toJs(x).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
+    {
+      // matches the pattern the planner generates for converting epoch time
+      // values to timestamps. Adding numbers to dates works in ExprOp, but not
+      // in Javacript.
+      case $add($literal(Bson.Date(inst)), r) if inst.toEpochMilli ≟ 0 =>
+        Recursive[T].para(r)(toJs[T, EX])
+          .map(r => JsFn(JsFn.defaultName,
+            jscore.New(jscore.Name("Date"), List(r(jscore.Ident(JsFn.defaultName))))))
 
-      (f, s, o) match {
-        // MinKey
-        // Null
-        case (
-          $lt($literal(Bson.Null), f1),
-          $lt(f2, $literal(Bson.Text(""))),
-          Nil)
-            if f1 == f2 =>
-          app(f1, isAnyNumber)
-        case (
-          $lte($literal(Bson.Text("")), f1),
-          $lt(f2, $literal(Bson.Doc(m1))),
-          Nil)
-            if f1 == f2 && m1 == ListMap() =>
-          app(f1, isString)
-        case (
-          $lte($literal(Bson.Doc(m1)), f1),
-          $lt(f2, $literal(Bson.Binary(b1))),
-          Nil)
-            if f1 == f2 && b1 ≟ minBinary =>
-          app(f1, isObjectOrArray)
-        case (
-          $lte($literal(Bson.Doc(m1)), f1),
-          $lt(f2, $literal(Bson.Arr(Nil))),
-          Nil)
-            if f1 == f2 && m1 == ListMap() =>
-          app(f1, isObject)
-        case (
-          $lte($literal(Bson.Arr(Nil)), f1),
-          $lt(f2, $literal(Bson.Binary(b1))),
-          Nil)
-            if f1 == f2 && b1 ≟ minBinary =>
-          app(f1, isArray)
-        case (
-          $lte($literal(Bson.Binary(b1)), f1),
-          $lt(f2, $literal(Bson.ObjectId(oid))),
-          Nil)
-            if f1 == f2 && b1 ≟ minBinary && oid ≟ minOid =>
-          app(f1, isBinary)
-        case (
-          $lte($literal(Bson.Binary(b1)), f1),
-          $lt(f2, $literal(Bson.Regex("", ""))),
-          Nil)
-            if f1 == f2 && b1 ≟ minBinary =>
-          app(f1, x =>
+      case Check(expr, typ) => typ match {
+        case Type.Numeric   => app(expr, isAnyNumber)
+        case Type.Str       => app(expr, isString)
+        case Type.AnyObject => app(expr, isObject)
+        case Type.AnyArray  => app(expr, isArray)
+        case Type.Binary    => app(expr, isBinary)
+        case Type.Id        => app(expr, isObjectId)
+        case Type.Bool      => app(expr, isBoolean)
+        case Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
+            jscore.BinOp(jscore.Or,
+              isDate(x),
+              isTimestamp(x)))
+        case Type.Date      => app(expr, isDate)
+        case Type.Timestamp => app(expr, isTimestamp)
+        case Type.AnyObject ⨿ Type.AnyArray =>
+          app(expr, isObjectOrArray)
+        case Type.Binary ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
             jscore.binop(jscore.Or,
               isBinary(x),
               isObjectId(x),
               isBoolean(x),
               isDate(x),
               isTimestamp(x)))
-        case (
-          $lte($literal(Bson.ObjectId(oid)), f1),
-          $lt(f2, $literal(Bson.Bool(false))),
-          Nil)
-            if f1 == f2 && oid ≟ minOid =>
-          app(f1, isObjectId)
-        case (
-          $lte($literal(Bson.Bool(false)), f1),
-          $lte(f2, $literal(Bson.Bool(true))),
-          Nil)
-            if f1 == f2 =>
-          app(f1, isBoolean)
-        case (
-          $lte($literal(Bson.Date(i1)), f1),
-          $lt(f2, $literal(Bson.Timestamp(i2, 0))),
-          Nil)
-            if f1 == f2 && i1 == minInstant && i2 == minInstant =>
-          app(f1, isDate)
-        case (
-          $lte($literal(Bson.Timestamp(i, 0)), f1),
-          $lt(f2, $literal(Bson.Regex("", ""))),
-          Nil)
-            if f1 == f2 && i == minInstant =>
-          app(f1, isTimestamp)
-        case (
-          $lte($literal(Bson.Date(i)), f1),
-          $lt(f2, $literal(Bson.Regex("", ""))),
-          Nil)
-            if f1 == f2 && i == minInstant =>
-          app(f1, x =>
+        case Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
             jscore.BinOp(jscore.Or,
               isDate(x),
               isTimestamp(x)))
-        case (
-          $lte($literal(Bson.Bool(false)), f1),
-          $lt(f2, $literal(Bson.Regex("", ""))),
-          Nil)
-            if f1 == f2 =>
-          app(f1, x =>
+        case Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
             jscore.binop(jscore.Or,
               isDate(x),
               isTimestamp(x),
               isBoolean(x)))
-        case (
-          $lt($literal(Bson.Null), f1),
-          $lt(f2, $literal(Bson.Doc(m1))),
-          Nil)
-            if f1 == f2 && m1 == ListMap() =>
-          app(f1, x =>
+        case Type.Int ⨿ Type.Dec ⨿ Type.Str =>
+          app(expr, x =>
             jscore.binop(jscore.Or,
               isAnyNumber(x),
               isString(x)))
-        // Regex
-        // MaxKey
-        case _ =>
-          NonEmptyList(f, s +: o: _*).traverse[PlannerError \/ ?, JsFn](toJs).map(v =>
-            v.foldLeft1((l, r) => JsFn(JsFn.defaultName,
-              jscore.BinOp(jscore.And,
-                l(jscore.Ident(JsFn.defaultName)),
-                r(jscore.Ident(JsFn.defaultName))))))
-      }
-    case $or(f, s, o @ _*) =>
-      def app(x: Expression, tc: JsCore => JsCore): PlannerError \/ JsFn =
-        toJs(x).map(f => JsFn(JsFn.defaultName, tc(f(jscore.Ident(JsFn.defaultName)))))
-
-      (f, s, o) match {
-        case (
-          $lt(f0, $literal(Bson.Doc(m1))),
-          $and($lte($literal(Bson.ObjectId(oid)), f1), $lt(f2, $literal(Bson.Regex("", "")))),
-          Nil)
-            if f0 == f1 && f1 == f2 && m1 == ListMap() && oid ≟ minOid =>
-          app(f1, x =>
+        case Type.Null ⨿ Type.Numeric ⨿ Type.Str ⨿ Type.Id ⨿ Type.Bool ⨿ Type.Date ⨿ Type.Timestamp =>
+          app(expr, x =>
             jscore.binop(jscore.Or,
               isNull(x),
               isAnyNumber(x),
@@ -463,23 +114,27 @@ package object expression {
               isBoolean(x),
               isDate(x),
               isTimestamp(x)))
-        case _ =>
-          NonEmptyList(f, s +: o: _*).traverse[PlannerError \/ ?, JsFn](toJs).map(v =>
-            v.foldLeft1((l, r) => JsFn(JsFn.defaultName,
-              jscore.BinOp(jscore.Or,
-                l(jscore.Ident(JsFn.defaultName)),
-                r(jscore.Ident(JsFn.defaultName))))))
+        case _ => UnsupportedJS("type check not converted: " + typ).left
       }
+    }
   }
 
   /** "Idiomatic" translation to JS, accounting for patterns needing special
     * handling. */
-  def toJsƒ(t: ExprOp[(Fix[ExprOp], PlannerError \/ JsFn)]): PlannerError \/ JsFn = {
-    def expr = Fix(t.map(_._1))
-    def js = t.traverse(_._2)
-    translate.lift(expr).getOrElse(js.flatMap(toJsSimpleƒ))
-  }
+  def toJs[T[_[_]]: Corecursive: Recursive, EX[_]: Traverse](implicit
+      ev0: ExprOpCoreF :<: EX,
+      ev1: Equal[T[EX]],
+      ops: ExprOpOps.Uni[EX])
+      : GAlgebra[(T[EX], ?), EX, PlannerError \/ JsFn] =
+    { t =>
+      def expr = Traverse[EX].map(t)(_._1).embed
+      def js = Traverse[EX].traverse(t)(_._2)
+      translate[T, EX].lift(expr).getOrElse(js.flatMap(ops.toJsSimple))
+    }
 
-  def toJs(expr: Expression): PlannerError \/ JsFn =
-    expr.para[PlannerError \/ JsFn](toJsƒ)
+  // FIXME: no way to put this in anybody's companion where it will be found?
+  implicit def exprOpRenderTree[T[_[_]]: Recursive, EX[_]: Functor](implicit ops: ExprOpOps.Uni[EX]): RenderTree[T[EX]] =
+    new RenderTree[T[EX]] {
+      def render(v: T[EX]) = Terminal(List("ExprOp"), v.cata(ops.bson).toJs.pprint(0).some)
+    }
 }
