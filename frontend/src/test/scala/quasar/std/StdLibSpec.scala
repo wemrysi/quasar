@@ -197,6 +197,9 @@ abstract class StdLibSpec extends Qspec {
         }
 
         "dec" >> prop { (x: BigDecimal) =>
+          // TODO: re-parse and compare the resulting value approximately. It's
+          // not reasonable to expect a perfect match on formatted values,
+          // because of trailing zeros, round-off, and choive of notation.
           unary(ToString(_).embed, Data.Dec(x), Data.Str(x.toString))
         }
 

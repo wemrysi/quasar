@@ -43,7 +43,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N]): Result \/ Unit = func match {
+  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = func match {
     case StringLib.Length   => notHandled.left
     case StringLib.Integer  => notHandled.left
     case StringLib.Decimal  => notHandled.left

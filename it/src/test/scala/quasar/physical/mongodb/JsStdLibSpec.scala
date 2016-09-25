@@ -35,9 +35,11 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in JS")
 
   /** Identify constructs that are expected not to be implemented in JS. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N]): Result \/ Unit = func match {
-    case StringLib.Lower   => notHandled.left
-    case StringLib.Upper   => notHandled.left
+  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (StringLib.Lower, _)   => notHandled.left
+    case (StringLib.Upper, _)   => notHandled.left
+
+    case (StringLib.ToString, Data.Dec(_) :: Nil) => Skipped("Dec printing doesn't match precisely").left
 
     case _                  => ().right
   }
