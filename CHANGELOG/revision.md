@@ -1,1 +1,0 @@
-- Add Couchbase ReadFile, WriteFile, ManageFile, and QueryFile interpreters
