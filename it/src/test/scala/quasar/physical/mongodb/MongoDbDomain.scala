@@ -27,7 +27,7 @@ trait MongoDbDomain {
   val intDomain = arbitrary[Long].map(BigInt(_))
   val decDomain = arbitrary[Double].map(BigDecimal(_))
 
-  // NB: restricted to ASCII only because most functions are not well-defined
-  // for the rest (e.g. $toLower, $toUpper, $substr)
-  val stringDomain = Gen.listOf(Gen.choose('\u0000', '\u007f')).map(_.mkString)
+  // NB: restricted to printable ASCII only because most functions are not
+  // well-defined for the rest (e.g. $toLower, $toUpper, $substr)
+  val stringDomain = Gen.listOf(Gen.choose('\u0020', '\u007e')).map(_.mkString)
 }

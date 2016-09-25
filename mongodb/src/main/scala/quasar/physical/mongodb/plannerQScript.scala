@@ -384,7 +384,11 @@ object MongoDbQScriptPlanner {
             "test"),
           List(a1)).right
       case Substring(a1, a2, a3) =>
-        Call(Select(a1, "substr"), List(a2, a3)).right
+        If(BinOp(jscore.Lt, a2, Literal(Js.Num(0, false))),
+          Literal(Js.Str("")),
+          If(BinOp(jscore.Lt, a3, Literal(Js.Num(0, false))),
+            Call(Select(a1, "substr"), List(a2, Select(a1, "length"))),
+            Call(Select(a1, "substr"), List(a2, a3)))).right
       // case ToId(a1) => Call(ident("ObjectId"), List(a1)).right
 
       case MakeArray(a1) => unimplemented

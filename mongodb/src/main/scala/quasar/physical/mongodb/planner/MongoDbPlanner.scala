@@ -183,7 +183,11 @@ object MongoDbPlanner {
               Call(Select(array, "indexOf"), List(value))))
         case Substring =>
           Arity3((field, start, len) =>
-            Call(Select(field, "substr"), List(start, len)))
+            If(BinOp(jscore.Lt, start, Literal(Js.Num(0, false))),
+              Literal(Js.Str("")),
+              If(BinOp(jscore.Lt, len, Literal(Js.Num(0, false))),
+                Call(Select(field, "substr"), List(start, Select(field, "length"))),
+                Call(Select(field, "substr"), List(start, len)))))
         case Search =>
           Arity3((field, pattern, insen) =>
             Call(
