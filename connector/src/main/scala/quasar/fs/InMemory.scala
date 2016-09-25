@@ -75,17 +75,12 @@ object InMemory {
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
     def apply[A](rf: ReadFile[A]) = rf match {
       case ReadFile.Open(f, off, lim) =>
-        fileL(f).st flatMap {
-          case Some(_) =>
-            for {
-              i <- nextSeq
-              h =  ReadHandle(f, i)
-              _ <- readingL(h) := Reading(f, off, lim, 0).some
-            } yield h.right
-
-          case None =>
-            fsPathNotFound(f)
-        }
+        fileL(f).st *>
+        (for {
+          i <- nextSeq
+          h =  ReadHandle(f, i)
+          _ <- readingL(h) := Reading(f, off, lim, 0).some
+        } yield h.right)
 
       case ReadFile.Read(h) =>
         readingL(h) flatMap {
@@ -107,7 +102,7 @@ object InMemory {
                     .map(κ(xs.slice(rIdx, rIdx + rCount).right))
 
               case None =>
-                fsPathNotFound(f)
+                Vector.empty.right.point[InMemoryFs]
             }
 
           case None =>
