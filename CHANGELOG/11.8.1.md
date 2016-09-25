@@ -1,0 +1,2 @@
+- Lazily load regression test data when missing rather than eagerly at suite start.
+  - Add a 'run_' prefix to the random dir segment used for test data

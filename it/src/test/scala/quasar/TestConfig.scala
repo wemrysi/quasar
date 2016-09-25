@@ -107,7 +107,7 @@ object TestConfig {
       } yield FileSystemUT(n,
           embed(testRef.get.map(_._1)),
           embed(setupRef.get.map(_._1)),
-          p </> dir(s),
+          p </> dir("run_" + s),
           testRef.release *> setupRef.release)
     }
 
