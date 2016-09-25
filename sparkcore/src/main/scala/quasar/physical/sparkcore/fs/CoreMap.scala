@@ -185,21 +185,17 @@ object CoreMap {
       case _ => undefined
     }).right
     case DupMapKeys(f) => (f >>> {
-      case Data.Obj(m) => Data.Obj {
-        m.foldLeft(m){
-          case (acc, (k, _)) => acc + (k -> Data.Str(k))
-        }
-      }
+      case Data.Obj(m) => Data.Obj(ListMap(m.keys.toList.fproduct(Data.Str(_)): _*))
       case _ => undefined
     }).right
     case DupArrayIndices(f) => (f >>> {
-      case Data.Arr(l) => Data.Arr((1 to l.size).map(Data.Int(_)).toList)
+      case Data.Arr(l) => Data.Arr(l.indices.map(Data.Int(_)).toList)
       case _ => undefined
     }).right
     case ZipMapKeys(f) => (f >>> {
       case Data.Obj(m) => Data.Obj {
-        m.foldLeft(m){
-          case (acc, (k, v)) => acc + (k -> Data.Arr(List(Data.Str(k), v)))
+        m.map{
+          case (k, v) => (k, Data.Arr(List(Data.Str(k), v)))
         }
       }
       case _ => undefined
@@ -211,7 +207,7 @@ object CoreMap {
       case _ => undefined
     }).right
     case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
-      case (Data.Int(a), Data.Int(b)) if(a >= b) => Data.Set((a to b).map(Data.Int(_)).toList)
+      case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
     }).right
     case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
     case _ => InternalError("not implemented").left
