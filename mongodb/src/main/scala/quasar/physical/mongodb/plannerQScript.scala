@@ -236,10 +236,10 @@ object MongoDbQScriptPlanner {
         def pad3(x: JsCore) =
           Let(Name("x"), x,
             If(
-              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
+              BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
               BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
               If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
+                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
                 BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
                 ident("x"))))
         Let(Name("t"), a1,
