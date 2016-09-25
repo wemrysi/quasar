@@ -1,1 +1,1 @@
-- Implement 99% of all MapFuncs
+- Implement 99% of all MapFuncs for SparkCore
