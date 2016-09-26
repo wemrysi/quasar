@@ -184,11 +184,31 @@ object CoreMap {
       case (Data.Obj(m), Data.Str(field)) if m.isDefinedAt(field) => Data.Obj(m - field)
       case _ => undefined
     }).right
-    case DupMapKeys(f) => InternalError("DupMapKeys not implemented").left
-    case DupArrayIndices(f) => InternalError("DupArrayIndices not implemented").left
-    case ZipMapKeys(f) => InternalError("ZipMapKeys not implemented").left
-    case ZipArrayIndices(f) => InternalError("ZipArrayIndices not implemented").left
-    case Range(fFrom, fTo) => InternalError("Range not implemented").left
+    case DupMapKeys(f) => (f >>> {
+      case Data.Obj(m) => Data.Obj(ListMap(m.keys.toList.fproduct(Data.Str(_)): _*))
+      case _ => undefined
+    }).right
+    case DupArrayIndices(f) => (f >>> {
+      case Data.Arr(l) => Data.Arr(l.indices.map(Data.Int(_)).toList)
+      case _ => undefined
+    }).right
+    case ZipMapKeys(f) => (f >>> {
+      case Data.Obj(m) => Data.Obj {
+        m.map{
+          case (k, v) => (k, Data.Arr(List(Data.Str(k), v)))
+        }
+      }
+      case _ => undefined
+    }).right
+    case ZipArrayIndices(f) => (f >>> {
+      case Data.Arr(l) => Data.Arr(l.zipWithIndex.map {
+        case (e, i) => Data.Arr(List(Data.Int(i), e))
+      })
+      case _ => undefined
+    }).right
+    case Range(fFrom, fTo) => ((x: Data) => (fFrom(x), fTo(x)) match {
+      case (Data.Int(a), Data.Int(b)) if(a <= b) => Data.Set((a to b).map(Data.Int(_)).toList)
+    }).right
     case Guard(f1, fPattern, f2,ff3) => InternalError("Guard not implemented").left
     case _ => InternalError("not implemented").left
   }
