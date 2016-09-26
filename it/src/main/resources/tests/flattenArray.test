@@ -1,6 +1,6 @@
 {
     "name": "flatten array",
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips LIMIT 1",
     "predicate": "containsExactly",

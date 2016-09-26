@@ -2,7 +2,8 @@
     "name": "double flatten with intervening field",
     "backends": {
         "mongodb_read_only": "pending",
-        "postgresql":        "pending"
+        "postgresql":        "pending",
+        "marklogic":         "pending"
     },
     "data": "nested.data",
     "query": "select topObj{*}.botObj{*} from nested",

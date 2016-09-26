@@ -17,13 +17,14 @@
 package quasar.physical.mongodb.fs
 
 import quasar.Predef._
-import quasar.RenderTree.ops._
-import quasar._
+import quasar._, RenderTree.ops._
+import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.kleisli._
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb._, WorkflowExecutor.WorkflowCursor
+import quasar.physical.mongodb.planner.MongoDbPlanner
 
 import argonaut.JsonObject, JsonObject.{single => jSingle}
 import argonaut.JsonIdentity._

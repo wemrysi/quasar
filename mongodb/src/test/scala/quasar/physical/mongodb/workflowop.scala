@@ -24,7 +24,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
-import quasar.qscript._
+import quasar.qscript.SortDir
 
 import matryoshka.Fix
 import org.scalacheck._
@@ -55,6 +55,9 @@ class WorkflowFSpec extends org.specs2.scalaz.Spec {
 
 class WorkflowSpec extends quasar.Qspec with TreeMatchers {
   import CollectionUtil._
+
+  val exprCoreFp: ExprOpCoreF.fixpoint[Fix, ExprOp] = ExprOpCoreF.fixpoint[Fix, ExprOp]
+  import exprCoreFp._
 
   val readFoo = $read[WorkflowF](collection("db", "foo"))
 

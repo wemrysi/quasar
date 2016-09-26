@@ -88,11 +88,14 @@ object Main {
     ()
   }
 
-  type ReplEff[S[_], A]  = Coproduct[Repl.RunStateT, ReplEff0[S, ?], A]
-  type ReplEff0[S[_], A] = Coproduct[ConsoleIO, ReplEff1[S, ?], A]
-  type ReplEff1[S[_], A] = Coproduct[ReplFail, ReplEff2[S, ?], A]
-  type ReplEff2[S[_], A] = Coproduct[Timing, ReplEff3[S, ?], A]
-  type ReplEff3[S[_], A] = Coproduct[Task, S, A]
+  type ReplEff[S[_], A] = (
+        Repl.RunStateT
+    :\: ConsoleIO
+    :\: ReplFail
+    :\: Timing
+    :\: Task
+    :/: S
+  )#M[A]
 
   def repl[S[_]](
     fs: S ~> DriverEffM

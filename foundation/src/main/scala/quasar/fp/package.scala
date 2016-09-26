@@ -103,6 +103,9 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
           })
     }
 
+  implicit def ListMapEqual[A: Equal, B: Equal]: Equal[ListMap[A, B]] =
+    Equal.equalBy(_.toList)
+
   implicit def VectorRenderTree[A](implicit RA: RenderTree[A]):
       RenderTree[Vector[A]] =
     new RenderTree[Vector[A]] {
@@ -296,6 +299,19 @@ trait QFoldableOps {
   }
 }
 
+trait DebugOps {
+  final implicit class ToDebugOps[A](val self: A) {
+    /** Applies some operation to a value and returns the original value. Useful
+      * for things like adding debugging printlns in the middle of an
+      * expression.
+      */
+    final def <|(f: A => Unit): A = {
+      f(self)
+      self
+    }
+  }
+}
+
 trait SKI {
   // NB: Unicode has double-struck and bold versions of the letters, which might
   //     be more appropriate, but the code points are larger than 2 bytes, so
@@ -346,7 +362,6 @@ trait CoEnvInstances extends LowPriorityCoEnvImplicits {
 package object fp
     extends TreeInstances
     with ListMapInstances
-    with fp.EitherTInstances
     with OptionTInstances
     with StateTInstances
     with WriterTInstances
@@ -356,6 +371,7 @@ package object fp
     with JsonOps
     with ProcessOps
     with QFoldableOps
+    with DebugOps
     with SKI
     with StringOps
     with CatchableInstances {
@@ -599,7 +615,7 @@ package object fp
       T[F] =
     f(t).fold(ι, FunctorT[T].map(_)(_.map(transApoT(_)(f))))
 
-  def freeCata[F[_]: Traverse, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
+  def freeCata[F[_]: Functor, E, A](free: Free[F, E])(φ: Algebra[CoEnv[E, F, ?], A]): A =
     free.hylo(φ, CoEnv.freeIso[E, F].reverseGet)
 
   def freeCataM[M[_]: Monad, F[_]: Traverse, E, A](free: Free[F, E])(φ: AlgebraM[M, CoEnv[E, F, ?], A]): M[A] =
@@ -651,8 +667,33 @@ package object fp
       M[Free[G, B]] =
     free.toCoEnv[T].transCataM[M, CoEnv[B, G, ?]](f) ∘ (_.fromCoEnv)
 
+  def transFutu[T[_[_]]: FunctorT: Corecursive, F[_]: Functor, G[_]: Traverse]
+    (t: T[F])
+    (f: GCoalgebraicTransform[T, Free[G, ?], F, G]):
+      T[G] =
+    FunctorT[T].map(t)(f(_).copoint.map(freeCata(_)(interpret[G, T[F], T[G]](transFutu(_)(f), _.embed))))
+
+  def freeTransFutu[T[_[_]]: Recursive: Corecursive, F[_]: Functor, G[_]: Traverse, A, B]
+    (free: Free[F, A])
+    (f: CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[B, G, Free[CoEnv[B, G, ?], T[CoEnv[A, F, ?]]]])
+      : Free[G, B] =
+    transFutu(free.toCoEnv[T])(f).fromCoEnv
+
   def liftCo[T[_[_]], F[_], A](f: F[T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]]):
       CoEnv[A, F, T[CoEnv[A, F, ?]]] => CoEnv[A, F, T[CoEnv[A, F, ?]]] =
     co => co.run.fold(κ(co), f)
 
+  def idPrism[F[_]] = PrismNT[F, F](
+    new (F ~> (Option ∘ F)#λ) {
+      def apply[A](fa: F[A]): Option[F[A]] = Some(fa)
+    },
+    NaturalTransformation.refl)
+
+  def coenvPrism[F[_], A] = PrismNT[CoEnv[A, F, ?], F](
+    new (CoEnv[A, F, ?] ~> λ[α => Option[F[α]]]) {
+      def apply[B](coenv: CoEnv[A, F, B]): Option[F[B]] = coenv.run.toOption
+    },
+    new (F ~> CoEnv[A, F, ?]) {
+      def apply[B](fb: F[B]): CoEnv[A, F, B] = CoEnv(fb.right[A])
+    })
 }

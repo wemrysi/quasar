@@ -1,6 +1,6 @@
 {
     "name": "filter field in single-element set",
-    "backends": { "postgresql": "pending" },
+    "backends": { "postgresql": "pending", "marklogic": "pending" },
     "data": "zips.data",
     "query": "select * from zips where state in (\"MA\") and pop < 10",
     "predicate": "containsExactly",

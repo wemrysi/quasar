@@ -15,6 +15,10 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
+val BothScopes = "test->test;compile->compile"
+
+def isTravis: Boolean = sys.env contains "TRAVIS"
+
 // Exclusive execution settings
 lazy val ExclusiveTests = config("exclusive") extend Test
 
@@ -48,8 +52,8 @@ lazy val buildSettings = Seq(
     "JBoss repository" at "https://repository.jboss.org/nexus/content/repositories/",
     "Scalaz Bintray Repo" at "http://dl.bintray.com/scalaz/releases",
     "bintray/non" at "http://dl.bintray.com/non/maven"),
-  addCompilerPlugin("org.spire-math" %% "kind-projector"   % "0.8.0"),
-  addCompilerPlugin("org.scalamacros" % "paradise"         % "2.1.0" cross CrossVersion.full),
+  addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.0"),
+  addCompilerPlugin("org.scalamacros" %  "paradise"       % "2.1.0" cross CrossVersion.full),
 
   ScoverageKeys.coverageHighlighting := true,
 
@@ -64,6 +68,7 @@ lazy val buildSettings = Seq(
   scalacOptions in (Test, console) --= Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
+  scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,
     Wart.AsInstanceOf,
@@ -74,15 +79,11 @@ lazy val buildSettings = Seq(
     Wart.NoNeedForMonad,        // - see puffnfresh/wartremover#159
     Wart.Nothing,
     Wart.Overloading,
-    Wart.Product,               // _ these two are highly correlated
-    Wart.Serializable,          // /
     Wart.ToString),
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
   // Exclusive tests include only those tagged with 'exclusive'.
   testOptions in ExclusiveTests := Seq(Tests.Argument(Specs2, "include", "exclusive")),
-  // Tasks tagged with `ExclusiveTest` should be run exclusively.
-  concurrentRestrictions in Global := Seq(Tags.exclusive(ExclusiveTest)),
 
   console <<= console in Test, // console alias test:console
 
@@ -92,6 +93,20 @@ lazy val buildSettings = Seq(
     if ((createHeaders in Compile).value.nonEmpty)
       sys.error("headers not all present")
   })
+
+// In Travis, the processor count is reported as 32, but only ~2 cores are
+// actually available to run.
+concurrentRestrictions in Global := {
+  val maxTasks = 2
+  if (isTravis)
+    // Recreate the default rules with the task limit hard-coded:
+    Seq(Tags.limitAll(maxTasks), Tags.limit(Tags.ForkedTestGroup, 1))
+  else
+    (concurrentRestrictions in Global).value
+}
+
+// Tasks tagged with `ExclusiveTest` should be run exclusively.
+concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
 lazy val publishSettings = Seq(
   organizationName := "SlamData Inc.",
@@ -182,17 +197,22 @@ lazy val root = project.in(file("."))
         foundation,
 //     / / | | \ \
 //
-   ejson, effect, js,
+   ejson, effect, js, // NB: need to get dependencies to look like:
 //          |
-          core,
+         frontend,    //   frontend, connector,
+//          |               /    \  /     \
+           sql,       //  sql,  core,    marklogic, mongodb, ...
+//          |                \    |     /
+        connector,    //      interface,
 //      / / | \ \
-  mongodb, skeleton, postgresql, marklogic, sparkcore, macros, ygg,
+  core, marklogic, mongodb, postgresql, skeleton, sparkcore, macros, ygg,
 //      \ \ | / /
-          main,
+        interface,
 //        /  \
       repl,   web,
 //        \  /
            it)
+  .enablePlugins(AutomateHeaderPlugin)
 
 // common components
 
@@ -201,7 +221,7 @@ lazy val foundation = project
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(libraryDependencies ++= Dependencies.foundation,
-    isCIBuild := sys.env contains "TRAVIS",
+    isCIBuild := isTravis,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
     exclusiveTestTag := "exclusive",
     buildInfoKeys := Seq[BuildInfoKey](version, ScoverageKeys.coverageEnabled, isCIBuild, isIsolatedEnv, exclusiveTestTag),
@@ -228,7 +248,9 @@ lazy val js = project
 
 lazy val core = project
   .settings(name := "quasar-core-internal")
-  .dependsOn(ejson % BothScopes, effect % BothScopes, js % BothScopes)
+  .dependsOn(
+    frontend % BothScopes,
+    connector % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(
@@ -237,77 +259,114 @@ lazy val core = project
     ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val main = project
-  .settings(name := "quasar-main-internal")
-  .dependsOn(
-    mongodb,
-    skeleton,
-    macros,
-    ygg,
-    postgresql,
-    marklogic,
-    core % BothScopes)
+// frontends
+
+// TODO: This area is still tangled. It contains things that should be in `sql`,
+//       things that should be in `core`, and probably other things that should
+//       be elsewhere.
+lazy val frontend = project
+  .settings(name := "quasar-frontend-internal")
+  .dependsOn(foundation % BothScopes, ejson % BothScopes, js % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.main)
-  .settings(initialCommands in console := "import quasar._, main._, scalaz._, Scalaz._")
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
-def setup(p: Project): Project = (
-  p settings commonSettings enablePlugins AutomateHeaderPlugin
-)
+lazy val sql = project
+  .settings(name := "quasar-sql-internal")
+  .dependsOn(frontend % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.core)
+  .enablePlugins(AutomateHeaderPlugin)
 
-// filesystems (backends)
+// connectors
+
+def setup(p: Project): Project = p settings commonSettings enablePlugins AutomateHeaderPlugin
 lazy val macros = project |> setup |> Ygg.macros
 lazy val ygg    = project |> setup |> Ygg.ygg
 
-lazy val mongodb = project
-  .settings(name := "quasar-mongodb-internal")
-  .dependsOn(core % BothScopes)
+lazy val connector = project
+  .settings(name := "quasar-connector-internal")
+  .dependsOn(
+    macros, ygg,
+    ejson % BothScopes,
+    effect % BothScopes,
+    js % BothScopes,
+    frontend % BothScopes,
+    sql % BothScopes)
   .settings(commonSettings)
-  .settings(libraryDependencies ++= Dependencies.mongodb)
+  .settings(publishTestsSettings)
+  .settings(
+    libraryDependencies ++= Dependencies.core,
+    ScoverageKeys.coverageMinimum := 79,
+    ScoverageKeys.coverageFailOnMinimum := true)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val skeleton = project
-  .settings(name := "quasar-skeleton-internal")
-  .dependsOn(core % BothScopes, ygg % BothScopes, macros)
-  .settings(commonSettings)
-  .settings(scalacOptions ++= Seq("-language:_"))
-  .settings(initialCommands in console := "import quasar._, fs._, scalaz._, Scalaz._, physical._, skeleton._")
-  .settings(wartremoverWarnings in (Compile, compile) -= Wart.Null)
-  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val marklogic = project
   .settings(name := "quasar-marklogic-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(connector % BothScopes, marklogicValidation)
   .settings(commonSettings)
   .settings(resolvers += "MarkLogic" at "http://developer.marklogic.com/maven2")
   .settings(libraryDependencies ++= Dependencies.marklogic)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val marklogicValidation = project.in(file("marklogic-validation"))
+  .settings(name := "quasar-marklogic-validation-internal")
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.marklogicValidation)
+  // TODO: Disabled until a new release of sbt-headers with exclusion is available
+  //       as we don't want our headers applied to XMLChar.java
+  //.enablePlugins(AutomateHeaderPlugin)
+
+lazy val mongodb = project
+  .settings(name := "quasar-mongodb-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.mongodb)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val postgresql = project
   .settings(name := "quasar-postgresql-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.postgresql)
   .enablePlugins(AutomateHeaderPlugin)
 
+lazy val skeleton = project
+  .settings(name := "quasar-skeleton-internal")
+  .dependsOn(connector % BothScopes)
+  .settings(commonSettings)
+  .enablePlugins(AutomateHeaderPlugin)
+
 lazy val sparkcore = project
   .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(core % BothScopes)
+  .dependsOn(connector % BothScopes)
   .settings(commonSettings)
   .settings(libraryDependencies ++= Dependencies.sparkcore)
   .enablePlugins(AutomateHeaderPlugin)
 
-
-// frontends
-
-// TODO: Get SQL here
-
 // interfaces
+
+lazy val interface = project
+  .settings(name := "quasar-interface-internal")
+  .dependsOn(
+    core % BothScopes,
+    marklogic,
+    mongodb,
+    postgresql,
+    sparkcore,
+    skeleton)
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.interface)
+  .enablePlugins(AutomateHeaderPlugin)
 
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(main, foundation % BothScopes)
+  .dependsOn(interface, foundation % BothScopes)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(githubReleaseSettings)
@@ -319,7 +378,7 @@ lazy val repl = project
 
 lazy val web = project
   .settings(name := "quasar-web")
-  .dependsOn(main, core % BothScopes)
+  .dependsOn(interface, core % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(githubReleaseSettings)
