@@ -50,19 +50,19 @@ object data {
   }
 
   def encodeXml[F[_]: MonadErrMsgs](data: Data): F[Elem] = {
-    def typeAttr(tpe: EJsonType): Attribute =
-      Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe, Null)
+    def typeAttr(tpe: DataType): Attribute =
+      Attribute(ejsBinding.prefix, ejsonType.local.shows, tpe.shows, Null)
 
-    def ejsElem(name: QName, tpe: Option[EJsonType], ns: NamespaceBinding, children: Seq[Node]): Elem =
+    def ejsElem(name: QName, tpe: Option[DataType], ns: NamespaceBinding, children: Seq[Node]): Elem =
       Elem(name.prefix.map(_.shows).orNull, name.local.shows, tpe.cata(typeAttr, Null), ns, true, children: _*)
 
-    def innerElem(name: QName, tpe: EJsonType, children: Seq[Node]): Elem =
+    def innerElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, Some(tpe), TopScope, children)
 
     def innerStr(name: QName, str: String): Elem =
       ejsElem(name, None, TopScope, Text(str))
 
-    def rootElem(name: QName, tpe: EJsonType, children: Seq[Node]): Elem =
+    def rootElem(name: QName, tpe: DataType, children: Seq[Node]): Elem =
       ejsElem(name, Some(tpe), ejsBinding, children)
 
     def rootStr(name: QName, str: String): Elem =
@@ -70,7 +70,7 @@ object data {
 
     def encodeXml0(
       str: (QName, String) => Elem,
-      elem: (QName, EJsonType, Seq[Node]) => Elem,
+      elem: (QName, DataType, Seq[Node]) => Elem,
       loop: QName => Data => Validation[ErrorMessages, Elem]
     ): QName => Data => Validation[ErrorMessages, Elem] = {
       val mapEntryToXml: ((String, Data)) => ErrorMessages \/ Elem = {
@@ -81,24 +81,24 @@ object data {
       }
 
       elementName => {
-        case Data.Binary(bytes) => elem(elementName, "binary"   , Text(base64(bytes))          ).success
-        case Data.Bool(b)       => elem(elementName, "boolean"  , Text(b.fold("true", "false"))).success
-        case Data.Date(d)       => elem(elementName, "date"     , Text(localDate(d))           ).success
-        case Data.Dec(d)        => elem(elementName, "decimal"  , Text(d.toString)             ).success
-        case Data.Id(id)        => elem(elementName, "id"       , Text(id)                     ).success
-        case Data.Int(i)        => elem(elementName, "integer"  , Text(i.toString)             ).success
-        case Data.Interval(d)   => elem(elementName, "interval" , Text(duration(d))            ).success
-        case Data.NA            => elem(elementName, "na"       , Nil                          ).success
-        case Data.Null          => elem(elementName, "null"     , Nil                          ).success
-        case Data.Str(s)        => str(elementName              , s                            ).success
-        case Data.Time(t)       => elem(elementName, "time"     , Text(localTime(t))           ).success
-        case Data.Timestamp(ts) => elem(elementName, "timestamp", Text(instant(ts))            ).success
+        case Data.Binary(bytes) => elem(elementName, DT.Binary   , Text(base64(bytes))          ).success
+        case Data.Bool(b)       => elem(elementName, DT.Boolean  , Text(b.fold("true", "false"))).success
+        case Data.Date(d)       => elem(elementName, DT.Date     , Text(localDate(d))           ).success
+        case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
+        case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
+        case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
+        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(duration(d))            ).success
+        case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
+        case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
+        case Data.Str(s)        => str(elementName               , s                            ).success
+        case Data.Time(t)       => elem(elementName, DT.Time     , Text(localTime(t))           ).success
+        case Data.Timestamp(ts) => elem(elementName, DT.Timestamp, Text(instant(ts))            ).success
 
         case Data.Arr(elements) =>
-          elements traverse loop(ejsonArrayElt) map (elem(elementName, "array", _))
+          elements traverse loop(ejsonArrayElt) map (elem(elementName, DT.Array, _))
 
         case Data.Obj(entries)  =>
-          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, "object", _))
+          entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, DT.Object, _))
 
         case other              => s"No representation for '$other' in XML.".failureNel[Elem]
       }
@@ -113,67 +113,66 @@ object data {
 
   def decodeXml[F[_]: MonadErrMsgs](elem: Elem): F[Data] = {
     def decodeXml0: Node => Validation[ErrorMessages, Data] = {
-      case DataNode("array", children) =>
+      case DataNode(DT.Array, children) =>
         elements(children).toList traverse decodeXml0 map (Data._arr(_))
 
-      case DataNode("binary", Txt(b64)) =>
+      case DataNode(DT.Binary, Txt(b64)) =>
         base64.getOption(b64)
           .map(bytes => Data._binary(bytes))
           .toSuccessNel(s"Expected Base64-encoded binary data, found: $b64")
 
-      case DataNode("binary", Seq()   ) =>
+      case DataNode(DT.Binary, Seq()   ) =>
         Data._binary(ImmutableArray.fromArray(Array())).success
 
-      case DataNode("boolean", Txt("true"))  => Data._bool(true).success
-      case DataNode("boolean", Txt("false")) => Data._bool(false).success
+      case DataNode(DT.Boolean, Txt("true"))  => Data._bool(true).success
+      case DataNode(DT.Boolean, Txt("false")) => Data._bool(false).success
 
-      case DataNode("date", Txt(d)) =>
+      case DataNode(DT.Date, Txt(d)) =>
         localDate.getOption(d)
           .map(Data._date(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
 
-      case DataNode("decimal", Txt(d)) =>
+      case DataNode(DT.Decimal, Txt(d)) =>
         Validation.fromTryCatchNonFatal(BigDecimal(d))
           .map(Data._dec(_))
           .leftAs(s"Expected a decimal number, found: $d".wrapNel)
 
-      case DataNode("id", Txt(id)) => Data._id(id).success
-      case DataNode("id", Seq()  ) => Data._id("").success
+      case DataNode(DT.Id, Txt(id)) => Data._id(id).success
+      case DataNode(DT.Id, Seq()  ) => Data._id("").success
 
-      case DataNode("integer", Txt(n)) =>
+      case DataNode(DT.Integer, Txt(n)) =>
         Validation.fromTryCatchNonFatal(BigInt(n))
           .map(Data._int(_))
           .leftAs(s"Expected an integral number, found: $n".wrapNel)
 
-      case DataNode("interval", Txt(ivl)) =>
+      case DataNode(DT.Interval, Txt(ivl)) =>
         duration.getOption(ivl)
           .map(Data._interval(_))
           .toSuccessNel(s"Expected a duration in seconds, found: $ivl")
 
-      case DataNode("na", Seq()) => (Data.NA: Data).success
+      case DataNode(DT.NA, Seq()) => (Data.NA: Data).success
 
-      case DataNode("null", Seq()) => (Data.Null: Data).success
+      case DataNode(DT.Null, Seq()) => (Data.Null: Data).success
 
-      case DataNode("object", children) =>
+      case DataNode(DT.Object, children) =>
         elements(children).toList
           .traverse(el => decodeXml0(el) strengthL qualifiedName(el))
           .map(entries => Data._obj(ListMap(entries: _*)))
 
-      case DataNode("string", Txt(s)) => Data._str(s).success
-      case DataNode("string", Seq() ) => Data._str("").success
+      case DataNode(DT.String, Txt(s)) => Data._str(s).success
+      case DataNode(DT.String, Seq() ) => Data._str("").success
 
-      case DataNode("time", Txt(t)) =>
+      case DataNode(DT.Time, Txt(t)) =>
         localTime.getOption(t)
           .map(Data._time(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
 
-      case DataNode("timestamp", Txt(ts)) =>
+      case DataNode(DT.Timestamp, Txt(ts)) =>
         instant.getOption(ts)
           .map(Data._timestamp(_))
           .toSuccessNel(s"Expected an ISO-8601 formatted date-time, found: $ts")
 
-      case DataNode(tpe, _) => s"Unrecognized type: $tpe".failureNel
-      case other            => s"Unrecognized Data XML: $other.".failureNel
+      case other => s"Unrecognized Data XML: $other.".failureNel
     }
 
     decodeXml0(elem).fold(_.raiseError[F, Data], _.point[F])
@@ -181,15 +180,71 @@ object data {
 
   ////
 
-  private type EJsonType = String
+  private sealed abstract class DataType {
+    override def toString = Show[DataType].shows(this)
+  }
+
+  private object DataType {
+    case object Array     extends DataType
+    case object Binary    extends DataType
+    case object Boolean   extends DataType
+    case object Date      extends DataType
+    case object Decimal   extends DataType
+    case object Id        extends DataType
+    case object Integer   extends DataType
+    case object Interval  extends DataType
+    case object NA        extends DataType
+    case object Null      extends DataType
+    case object Object    extends DataType
+    case object String    extends DataType
+    case object Time      extends DataType
+    case object Timestamp extends DataType
+
+    val stringCodec = Prism.partial[String, DataType] {
+      case "array"     => Array
+      case "binary"    => Binary
+      case "boolean"   => Boolean
+      case "date"      => Date
+      case "decimal"   => Decimal
+      case "id"        => Id
+      case "integer"   => Integer
+      case "interval"  => Interval
+      case "na"        => NA
+      case "null"      => Null
+      case "object"    => Object
+      case "string"    => String
+      case "time"      => Time
+      case "timestamp" => Timestamp
+    } {
+      case Array       => "array"
+      case Binary      => "binary"
+      case Boolean     => "boolean"
+      case Date        => "date"
+      case Decimal     => "decimal"
+      case Id          => "id"
+      case Integer     => "integer"
+      case Interval    => "interval"
+      case NA          => "na"
+      case Null        => "null"
+      case Object      => "object"
+      case String      => "string"
+      case Time        => "time"
+      case Timestamp   => "timestamp"
+    }
+
+    implicit val show: Show[DataType] =
+      Show.shows(stringCodec(_))
+  }
+
+  private val DT = DataType
 
   private object DataNode {
-    def unapply(node: Node): Option[(EJsonType, Seq[Node])] = {
+    def unapply(node: Node): Option[(DataType, Seq[Node])] = {
       val tpe = node.attributes collectFirst {
         case PrefixedAttribute(p, n, Seq(Text(t)), _) if s"$p:$n" === ejsonType.shows => t
       } getOrElse "string"
 
-      Some((tpe, node.child))
+      DataType.stringCodec.getOption(tpe) strengthR node.child
     }
   }
 
