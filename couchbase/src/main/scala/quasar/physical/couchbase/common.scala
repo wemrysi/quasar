@@ -53,9 +53,19 @@ object common {
     val qStr = s"""SELECT meta(`${bucket.name}`).id, type FROM `${bucket.name}`
                    WHERE type LIKE "${prefix}%"""";
 
-    // TODO: improve query to avoid getString
     bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
       .map(r => DocIdType(r.value.getString("id"), r.value.getString("type")))
+  }
+
+  def existsWithPrefix[S[_]](
+    bucket: Bucket,
+    prefix: String
+  ): Task[Boolean] = Task.delay {
+    val qStr = s"""SELECT count(*) > 0 v FROM `${bucket.name}`
+                   WHERE type LIKE "${prefix}%""""
+
+    bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
+      .exists(_.value.getBoolean("v").booleanValue === true)
   }
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =

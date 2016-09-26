@@ -57,15 +57,14 @@ object managefile {
                        ().right
                    ).point[Free[S, ?]])
       bkt       <- EitherT(getBucket(src.bucket))
-      srcDocs   <- lift(docIdTypesWithTypePrefix(bkt, src.collection)).into.liftM[FileSystemErrT]
+      srcExists <- lift(existsWithPrefix(bkt, src.collection)).into.liftM[FileSystemErrT]
       _         <- EitherT((
-                     if (srcDocs.isEmpty)
+                     if (!srcExists)
                        FileSystemError.pathErr(PathError.pathNotFound(scenario.src)).left
                      else
                        ().right
                    ).point[Free[S, ?]])
-      dstDocs   <- lift(docIdTypesWithTypePrefix(bkt, dst.collection)).into.liftM[FileSystemErrT]
-      dstExists =  dstDocs.nonEmpty
+      dstExists <- lift(existsWithPrefix(bkt, dst.collection)).into.liftM[FileSystemErrT]
       _         <- EitherT((semantics match {
                     case MoveSemantics.FailIfExists if dstExists =>
                       FileSystemError.pathErr(PathError.pathExists(scenario.dst)).left
@@ -77,7 +76,7 @@ object managefile {
       _         <- dstExists.whenM(EitherT(delete(scenario.dst)))
       qStr      =  s"""update `${bkt.name}`
                        set type=("${dst.collection}" || REGEXP_REPLACE(type, "^${src.collection}", ""))
-                       where type like "${src.collection}%" returning type"""
+                       where type like "${src.collection}%""""
       _         <- lift(Task.delay(
                      bkt.query(n1qlQuery(qStr))
                    )).into.liftM[FileSystemErrT]
@@ -90,17 +89,19 @@ object managefile {
     context: Read.Ops[Context, S]
   ): Free[S, FileSystemError \/ Unit] =
     (for {
-      ctx    <- context.ask.liftM[FileSystemErrT]
-      bktCol <- EitherT(bucketCollectionFromPath(path).point[Free[S, ?]])
-      bkt    <- EitherT(getBucket(bktCol.bucket))
-      docIds <- lift(docIdTypesWithTypePrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
-      _      <- EitherT((
-                  if (docIds.isEmpty) FileSystemError.pathErr(PathError.pathNotFound(path)).left
-                  else ().right
-                ).point[Free[S, ?]])
-      _      <- lift(
-                  docIds.traverse(i => Task.delay(bkt.remove(i.id)))
-                ).into.liftM[FileSystemErrT]
+      ctx       <- context.ask.liftM[FileSystemErrT]
+      bktCol    <- EitherT(bucketCollectionFromPath(path).point[Free[S, ?]])
+      bkt       <- EitherT(getBucket(bktCol.bucket))
+      docsExist <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+      _         <- EitherT((
+                     if (!docsExist) FileSystemError.pathErr(PathError.pathNotFound(path)).left
+                     else ().right
+                   ).point[Free[S, ?]])
+      qStr      =  s"""delete from `${bktCol.bucket}`
+                       where type like "${bktCol.collection}%""""
+      _         <- lift(Task.delay(
+                     bkt.query(n1qlQuery(qStr))
+                   )).into.liftM[FileSystemErrT]
     } yield ()).run
 
   def tempFile[S[_]](

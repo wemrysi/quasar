@@ -63,7 +63,7 @@ object queryfile {
                   )).into.liftM[FileSystemErrT]
       bkts     <- bktNames.traverse(n => EitherT(getBucket(n)))
       bktCols  <- bkts.traverseM(bkt => lift(Task.delay(
-                    bkt.query(n1qlQuery(s"select type from `${bkt.name}`"))
+                    bkt.query(n1qlQuery(s"select distinct type from `${bkt.name}`"))
                       .allRows.asScala.toList.map(r =>
                         BucketCollection(bkt.name, new String(r.byteValue)))
                   )).into.liftM[FileSystemErrT])
