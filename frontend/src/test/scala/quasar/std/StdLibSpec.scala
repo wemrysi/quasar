@@ -21,6 +21,7 @@ import quasar.{Data, LogicalPlan, Qspec}, LogicalPlan._
 
 import matryoshka._
 import org.specs2.execute._
+import org.specs2.matcher._
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Instant, ZoneOffset}
 import scala.math.abs
@@ -65,6 +66,24 @@ trait StdLibTestRunner {
   * library implementation, of which there are one or more per backend.
   */
 abstract class StdLibSpec extends Qspec {
+  def closeTo(expected: Data): Matcher[Data] = new Matcher[Data] {
+    def isClose(x: BigDecimal, y: BigDecimal, err: Double): Boolean =
+      x == y || ((x - y)/y).abs.toDouble < err
+
+    def apply[S <: Data](s: Expectable[S]) = {
+      val v = s.value
+      (v, expected) match {
+        case (Data.Dec(x), Data.Dec(exp)) =>
+          result(isClose(x, exp, 1e-9),
+            s"$x is Dec and matches $exp",
+            s"$x is Dec but does not match $exp", s)
+        case _ =>
+          result(v == expected,
+            s"$v matches $expected",
+            s"$v does not match $expected", s)
+      }
+    }
+  }
 
   def tests(runner: StdLibTestRunner) = {
     import runner._

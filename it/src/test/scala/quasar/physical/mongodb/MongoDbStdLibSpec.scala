@@ -28,6 +28,7 @@ import WorkflowExecutor.WorkflowCursor
 
 import matryoshka._, Recursive.ops._
 import org.specs2.execute._
+import org.specs2.matcher._
 import org.specs2.main.ArgProperty
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -77,6 +78,19 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       prg((0 until args.length).toList.map(idx => LogicalPlan.Free(Symbol("arg" + idx))))
         .cataM[Result \/ ?, Unit](shortCircuitLP(args)).swap.toOption
 
+    final case class SingleResultCheckedMatcher(check: ValueCheck[Data]) extends OptionLikeCheckedMatcher[List, Data, Data](
+      "a single result",
+      {
+        case Data.Obj(m) :: Nil =>
+          m.toList match {
+            case (_, v) :: Nil => v.some
+            case _             => None
+          }
+        case _ => None
+      },
+      check)
+    def beSingleResult(t: ValueCheck[Data]) = SingleResultCheckedMatcher(t)
+
     def run(args: List[Data], prg: List[Fix[LogicalPlan]] => Fix[LogicalPlan], expected: Data): Result =
       check(args, prg).getOrElse(
         (for {
@@ -101,15 +115,14 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
           _     <- dropCollection(coll).run(setupClient)
         } yield {
-          rez must_= List(Data.Obj(ListMap(resultField.asText -> massage(expected))))
+          rez must beSingleResult(closeTo(massage(expected)))
         }).unsafePerformSync.toResult)
-
 
     val runner = new StdLibTestRunner with MongoDbDomain {
       def nullary(
         prg: Fix[LogicalPlan],
         expected: Data): Result =
-        run(Nil, { case Nil => prg; case _ => scala.sys.error("") }, expected)
+        run(Nil, κ(prg), expected)
 
       def unary(
         prg: Fix[LogicalPlan] => Fix[LogicalPlan],
