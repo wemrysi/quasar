@@ -63,8 +63,6 @@ class ReadFilesSpec extends FileSystemTest[FileSystem](FileSystemTest.allFsUT) {
   def deleteForReading(run: Run): FsTask[Unit] =
     runT(run)(manage.delete(readsPrefix))
 
-  // TODO: Reasonable for these tests at least? Would need Order[Data] to use ISet.
-  //       Could just use must_===?
   implicit val setDataEq = Equal.equalA[Set[Data]]
 
   fileSystemShould { fs =>
