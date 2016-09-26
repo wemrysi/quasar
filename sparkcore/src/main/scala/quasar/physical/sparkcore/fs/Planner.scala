@@ -110,17 +110,12 @@ object Planner {
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
 
-          // StateT[Task[Planner \/ A]]
-          // EitherT[Task, State[SC, A]]
-          // Task[PllE \/ State[SC, A]]
-
-
           val fromState = freeCataM(from)(interpretM(κ(srcState), algebraM))
           val countState = freeCataM(count)(interpretM(κ(srcState), algebraM))
 
           val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
             case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-            case Data.Int(v) => InternalError(s"Unsupported plan").left[Long]
+            case Data.Int(v) => InternalError(s"Provided Integer $a is not a Long").left[Long]
             case a => InternalError(s"$a is not a Long number").left[Long]
           })).liftM[StateT[?[_], SparkContext, ?]])
           (fromState |@| countEval)((rdd, count) =>
@@ -135,7 +130,7 @@ object Planner {
 
           val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
             case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-            case Data.Int(v) => InternalError(s"Unsupported plan").left[Long]
+            case Data.Int(v) => InternalError(s"Provided Integer $a is not a Long").left[Long]
             case a => InternalError(s"$a is not a Long number").left[Long]
           })).liftM[StateT[?[_], SparkContext, ?]])
           (fromState |@| countEval)((rdd, count) =>
