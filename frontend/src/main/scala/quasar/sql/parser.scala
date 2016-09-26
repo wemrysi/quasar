@@ -28,7 +28,7 @@ import scala.util.parsing.input.CharArrayReader.EofCh
 import matryoshka._, FunctorT.ops._
 import scalaz._, Scalaz._
 
-sealed trait DerefType[T[_[_]]]
+sealed trait DerefType[T[_[_]]] extends Product with Serializable
 final case class ObjectDeref[T[_[_]]](expr: T[Sql])      extends DerefType[T]
 final case class ArrayDeref[T[_[_]]](expr: T[Sql])       extends DerefType[T]
 final case class DimChange[T[_[_]]](unop: UnaryOperator) extends DerefType[T]
@@ -48,6 +48,10 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
       override def toString = ":" + chars
     }
 
+    // NB: `Token`, which we do not control, causes this.
+    @SuppressWarnings(Array(
+      "org.wartremover.warts.Product",
+      "org.wartremover.warts.Serializable"))
     override def token: Parser[Token] =
       variParser |
       numLitParser |

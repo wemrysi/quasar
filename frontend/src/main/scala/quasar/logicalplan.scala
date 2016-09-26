@@ -30,7 +30,7 @@ import scalaz._, Scalaz._, Validation.success, Validation.FlatMap._
 import shapeless.{:: => _, Id => _, _}
 import pathy.Path.posixCodec
 
-sealed trait LogicalPlan[A]
+sealed trait LogicalPlan[A] extends Product with Serializable
 object LogicalPlan {
   import quasar.std.StdLib._
   import structural._
