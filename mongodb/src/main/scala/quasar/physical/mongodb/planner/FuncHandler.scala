@@ -112,9 +112,16 @@ object FuncHandler {
   }
 
   def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
+    def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
     new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
-        None
+        val fp = ExprOp3_2F.fixpoint[Free[?[_], A], ExprOp3_2F]
+        import fp._
+
+        fa.some collect {
+          case Power(a1, a2) =>
+            $pow(hole(a1), hole(a2))
+        }
       }
     })
   }

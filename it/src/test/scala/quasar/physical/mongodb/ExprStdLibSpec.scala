@@ -43,15 +43,19 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   val notHandled = Skipped("not implemented in aggregation")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
-  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = func match {
-    case StringLib.Length   => notHandled.left
-    case StringLib.Integer  => notHandled.left
-    case StringLib.Decimal  => notHandled.left
-    case StringLib.ToString => notHandled.left
+  def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (StringLib.Length, _)   => notHandled.left
+    case (StringLib.Integer, _)  => notHandled.left
+    case (StringLib.Decimal, _)  => notHandled.left
+    case (StringLib.ToString, _) => notHandled.left
 
-    case DateLib.TimeOfDay if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
+    case (DateLib.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
-    case MathLib.Power if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (MathLib.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+
+    case (MathLib.Power, Data.Number(x) :: Data.Number(y) :: Nil)
+        if x == 0 && y < 0 =>
+      Skipped("Zero to a negative powere is a runtime error").left
 
     case _                  => ().right
   }
