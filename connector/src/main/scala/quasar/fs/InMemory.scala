@@ -75,7 +75,6 @@ object InMemory {
   val readFile: ReadFile ~> InMemoryFs = new (ReadFile ~> InMemoryFs) {
     def apply[A](rf: ReadFile[A]) = rf match {
       case ReadFile.Open(f, off, lim) =>
-        fileL(f).st *>
         (for {
           i <- nextSeq
           h =  ReadHandle(f, i)
