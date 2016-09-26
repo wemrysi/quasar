@@ -43,7 +43,8 @@ object queryfile {
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
     store: (RDD[Data], AFile) => Task[Unit],
     fileExists: AFile => Task[Boolean],
-    listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]]
+    listContents: ADir => EitherT[Task, FileSystemError, Set[PathSegment]],
+    readChunkSize: () => Int
   )
 
   type SparkContextRead[A] = Read[SparkContext, A]
@@ -80,7 +81,7 @@ object queryfile {
 
           qs.run.run
         }
-        case QueryFile.More(h) => more(h)
+        case QueryFile.More(h) => more(h, input.readChunkSize())
         case QueryFile.Close(h) => close(h)
         case _ => ???
       }
@@ -91,8 +92,6 @@ object queryfile {
     new Functor[(F ∘ G)#λ] {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
-
-  // f => EitherT(WriterT(f.map(_.run)))
 
   private def executePlan[S[_]](input: Input, qs: Fix[QScriptRead[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
@@ -138,12 +137,10 @@ object queryfile {
       .map(mrh => EitherT(mrh.point[Writer[PhaseResults, ?]]))
   }
 
-  private def more[S[_]](h: ResultHandle)(implicit
+  private def more[S[_]](h: ResultHandle, step: Int)(implicit
       s0: Task :<: S,
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S]
   ): Free[S, FileSystemError \/ Vector[Data]] = {
-
-    val step = 5000
 
     kvs.get(h).toRight(unknownResultHandle(h)).flatMap {
       case RddState(None, _) =>

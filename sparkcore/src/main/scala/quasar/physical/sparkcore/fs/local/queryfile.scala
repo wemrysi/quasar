@@ -69,5 +69,7 @@ object queryfile {
     } else pathErr(pathNotFound(d)).left[Set[PathSegment]]
   })
 
-  def input: Input = Input(fromFile _, store _, fileExists _, listContents _)
+  def readChunkSize: Int = 5000
+
+  def input: Input = Input(fromFile _, store _, fileExists _, listContents _, readChunkSize _)
 }

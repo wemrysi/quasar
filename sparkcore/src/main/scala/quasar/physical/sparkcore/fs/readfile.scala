@@ -39,7 +39,8 @@ object readfile {
 
   final case class Input[S[_]](
     rddFrom: (AFile, Offset, Limit)  => Free[S, RDD[String]],
-    fileExists: AFile => Free[S, Boolean]
+    fileExists: AFile => Free[S, Boolean],
+    readChunkSize: () => Int
   )
 
   import ReadFile.ReadHandle
@@ -61,7 +62,7 @@ object readfile {
     new (ReadFile ~> Free[S, ?]) {
       def apply[A](rf: ReadFile[A]) = rf match {
         case ReadFile.Open(f, offset, limit) => open[S](f, offset, limit, input)
-        case ReadFile.Read(h) => read[S](h)
+        case ReadFile.Read(h) => read[S](h, input.readChunkSize())
         case ReadFile.Close(h) => close[S](h)
       }
   }
@@ -90,14 +91,11 @@ object readfile {
     )
   }
 
-  private def read[S[_]](h: ReadHandle)(implicit
+  private def read[S[_]](h: ReadHandle, step: Int)(implicit
     kvs: KeyValueStore.Ops[ReadHandle, SparkCursor, S],
     s1: Task :<: S
   ): Free[S, FileSystemError \/ Vector[Data]] = {
 
-    // TODO arbitrary value, more or less a good starting point
-    // but we should consider some measuring
-    val step = 5000
 
     kvs.get(h).toRight(unknownReadHandle(h)).flatMap {
         case SparkCursor(None, _) =>
