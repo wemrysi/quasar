@@ -535,7 +535,7 @@ class Transform
       shiftValues(pathToProj(path).embed, ZipMapKeys(_)).right
 
     case LogicalPlan.ConstantF(data) =>
-      fromData(data).fold(
+      fromData(data).fold[PlannerError \/ MapFunc[T, FreeMap[T]]](
         {
           case Data.NA => Undefined[T, FreeMap[T]]().right
           case d => NonRepresentableData(d).left

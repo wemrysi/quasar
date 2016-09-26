@@ -28,7 +28,7 @@ import scodec.bits.{ByteVector}
 object Zip {
   // First construct a single Process of Ops which can be performed in
   // sequence to produce the entire archive.
-  private sealed trait Op
+  private sealed trait Op extends Product with Serializable
   private object Op {
     final case object Start                           extends Op
     final case class StartEntry(entry: jzip.ZipEntry) extends Op
@@ -76,12 +76,12 @@ object Zip {
     val ops: Process[F, Op] = {
       def fileOps(file: RelFile[Sandboxed], bytes: Process[F, ByteVector]) =
         Process.emit(Op.StartEntry(new jzip.ZipEntry(posixCodec.printPath(file)))) ++
-      bytes.map(Op.Chunk(_)) ++
-      Process.emit(Op.EndEntry)
+          bytes.map(Op.Chunk(_)) ++
+          Process.emit(Op.EndEntry)
 
       Process.emit(Op.Start) ++
-      Process.emitAll(files).flatMap((fileOps _).tupled) ++
-      Process.emit(Op.End)
+        Process.emitAll(files).flatMap((fileOps _).tupled) ++
+        Process.emit(Op.End)
     }
 
     // Fold the allocation of Buffer instances in to the processing
