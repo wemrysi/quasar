@@ -45,6 +45,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name)
 
   def is2_6(backend: BackendName): Boolean = backend == TestConfig.MONGO_2_6
+  def is3_2(backend: BackendName): Boolean = backend == TestConfig.MONGO_3_2
 
   MongoDbSpec.clientShould { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._

@@ -49,7 +49,9 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case StringLib.Decimal  => notHandled.left
     case StringLib.ToString => notHandled.left
 
-    case DateLib.TimeOfDay if is2_6(backend) => Skipped("not implemented for in aggregation on MongoDB 2.6").left
+    case DateLib.TimeOfDay if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
+
+    case MathLib.Power if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
     case _                  => ().right
   }

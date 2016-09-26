@@ -23,6 +23,7 @@ import matryoshka._
 import org.specs2.execute._
 import org.scalacheck.{Arbitrary, Gen}
 import org.threeten.bp.{Instant, ZoneOffset}
+import scala.math.abs
 
 trait StdLibTestRunner {
   def nullary(
@@ -71,6 +72,13 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+
+    def commute(
+        prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
+        arg1: Data, arg2: Data,
+        expected: Data): Result =
+      binary(prg, arg1, arg2, expected) and
+        binary(prg, arg2, arg1, expected)
 
     "StringLib" >> {
       import StringLib._
@@ -231,6 +239,152 @@ abstract class StdLibSpec extends Qspec {
           val expected = now.atZone(ZoneOffset.UTC).toLocalTime
           unary(TimeOfDay(_).embed, Data.Timestamp(now), Data.Time(expected))
         }
+      }
+    }
+
+    "MathLib" >> {
+      import MathLib._
+
+      // NB: testing only (32-bit) ints, to avoid overflowing 64-bit longs
+      // and the 53 bits of integer precision in a 64-bit double.
+
+      // TODO: BigDecimals (which can under/overflow)
+      // TODO: mixed BigInt/BigDecimal (which can explode)
+
+      "Add" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Add(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong + y.toLong))
+        }
+
+        "any doubles" >> prop { (x: Double, y: Double) =>
+          binary(Add(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x + y))
+        }
+
+        "mixed int/double" >> prop { (x: Int, y: Double) =>
+          commute(Add(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x + y))
+        }
+
+        // TODO: Timestamp + Interval, Date + Interval, Time + Interval
+      }
+
+      "Multiply" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Multiply(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong * y.toLong))
+        }
+
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Multiply(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x * y))
+        // }
+
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Multiply(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x * y))
+        // }
+
+        // TODO: Interval * Int
+      }
+
+      "Power" >> {
+        "Int to 0" >> prop { (x: BigInt) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(0), Data.Int(1))
+        }
+
+        "Dec to 0" >> prop { (x: BigDecimal) =>
+          binary(Power(_, _).embed, Data.Dec(x), Data.Int(0), Data.Int(1))
+        }
+
+        "Int to 1" >> prop { (x: BigInt) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "Dec to 1" >> prop { (x: BigDecimal) =>
+          binary(Power(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x))
+        }
+
+        "0 to Int" >> prop { (y: BigInt) =>
+          y != 0 ==>
+            binary(Power(_, _).embed, Data.Int(0), Data.Int(y), Data.Int(0))
+        }
+
+        "0 to Dec" >> prop { (y: BigDecimal) =>
+          y != 0 ==>
+            binary(Power(_, _).embed, Data.Int(0), Data.Dec(y), Data.Int(0))
+        }
+
+        "Int to small Int" >> prop { (x: Int) =>
+          binary(Power(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x.toLong * x.toLong))
+        }
+
+        // TODO: test as much of the domain as much sense
+      }
+
+      "Subtract" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          binary(Subtract(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong - y.toLong))
+        }
+
+        "any doubles" >> prop { (x: Double, y: Double) =>
+          binary(Subtract(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x - y))
+        }
+
+        "mixed int/double" >> prop { (x: Int, y: Double) =>
+          binary(Subtract(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x - y)) and
+            binary(Subtract(_, _).embed, Data.Dec(y), Data.Int(x), Data.Dec(y - x))
+        }
+
+        // TODO:
+        // Timestamp - Timestamp, Timestamp - Interval,
+        // Date - Date, Date - Interval,
+        // Time - Time, Time + Interval
+      }
+
+      "Divide" >> {
+        "any ints" >> prop { (x: Int, y: Int) =>
+          y != 0 ==>
+            binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong / y.toLong))
+        }
+
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Divide(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x / y))
+        // }
+
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Divide(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x / y))
+        // }
+
+        // TODO: Interval * Int
+      }
+
+      "Negate" >> {
+        "any Int" >> prop { (x: BigInt) =>
+          unary(Negate(_).embed, Data.Int(x), Data.Int(-x))
+        }
+
+        "any Dec" >> prop { (x: BigDecimal) =>
+          unary(Negate(_).embed, Data.Dec(x), Data.Dec(-x))
+        }
+
+        // TODO: Interval
+      }
+
+      "Modulo" >> {
+        "any int by 1" >> prop { (x: Int) =>
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+        }
+
+        "any positive ints" >> prop { (x0: Int, y0: Int) =>
+          val x = abs(x0)
+          val y = abs(y0)
+          (x > 0 && y > 1) ==>
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(BigInt(x) % BigInt(y)))
+        }
+
+        // "any doubles" >> prop { (x: Double, y: Double) =>
+        //   binary(Modulo(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x % y))
+        // }
+
+        // "mixed int/double" >> prop { (x: Int, y: Double) =>
+        //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
+        // }
       }
     }
   }
