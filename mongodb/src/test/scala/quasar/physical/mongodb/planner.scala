@@ -580,7 +580,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan simple js filter" in {
-      import javascript._
+      val mjs: javascript[Fix] = javascript[Fix]
+      import mjs._
 
       plan("select * from zips where length(city) < 4") must
       beWorkflow(chain[Workflow](
@@ -606,7 +607,8 @@ class PlannerSpec extends org.specs2.mutable.Specification with org.specs2.Scala
     }
 
     "plan filter with js and non-js" in {
-      import javascript._
+      val mjs: javascript[Fix] = javascript[Fix]
+      import mjs._
 
       plan("select * from zips where length(city) < 4 and pop < 20000") must
       beWorkflow(chain[Workflow](

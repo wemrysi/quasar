@@ -19,6 +19,7 @@ package quasar.std
 import quasar.Predef._
 import quasar.{Data, GenericFunc, LogicalPlan}, LogicalPlan._
 import quasar.fp._
+import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
 import org.specs2.execute._
@@ -29,7 +30,11 @@ import shapeless.Nat
 /** Test the typers and simplifiers defined in the std lib functions themselves.
   */
 class SimplifyStdLibSpec extends StdLibSpec {
+  val notHandled: Result \/ Unit = Skipped("not simplified").left
+
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
+    case (relations.Between, _) => notHandled
+
     case _ => ().right
   }
 

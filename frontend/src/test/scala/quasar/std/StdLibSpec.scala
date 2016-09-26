@@ -91,6 +91,12 @@ abstract class StdLibSpec extends Qspec {
     implicit val arbBigInt = Arbitrary[BigInt] { runner.intDomain }
     implicit val arbBigDecimal = Arbitrary[BigDecimal] { runner.decDomain }
     implicit val arbString = Arbitrary[String] { runner.stringDomain }
+    implicit val arbData = Arbitrary[Data] {
+      Gen.oneOf(
+        runner.intDomain.map(Data.Int(_)),
+        runner.decDomain.map(Data.Dec(_)),
+        runner.stringDomain.map(Data.Str(_)))
+    }
 
     def commute(
         prg: (Fix[LogicalPlan], Fix[LogicalPlan]) => Fix[LogicalPlan],
@@ -404,6 +410,290 @@ abstract class StdLibSpec extends Qspec {
         // "mixed int/double" >> prop { (x: Int, y: Double) =>
         //   commute(Modulo(_, _).embed, Data.Int(x), Data.Dec(y), Data.Dec(x % y))
         // }
+      }
+    }
+
+    "RelationsLib" >> {
+      import RelationsLib._
+
+      "Eq" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Eq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Eq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x == y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Eq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x == y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Eq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Eq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x == y))
+        }
+
+        "any value with self" >> prop { (x: Data) =>
+          binary(Eq(_, _).embed, x, x, Data.Bool(true))
+        }
+
+        "any non-numeric values with different types" >> prop { (x: Data, y: Data) =>
+          x.dataType != y.dataType ==>
+            binary(Eq(_, _).embed, x, y, Data.Bool(false))
+        }
+
+        // TODO: the rest of the types
+      }
+
+      "Neq" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Neq(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Neq(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x != y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Neq(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x != y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Neq(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Neq(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x != y))
+        }
+
+        "any value with self" >> prop { (x: Data) =>
+          binary(Neq(_, _).embed, x, x, Data.Bool(false))
+        }
+
+        "any non-numeric values with different types" >> prop { (x: Data, y: Data) =>
+          x.dataType != y.dataType ==>
+            binary(Neq(_, _).embed, x, y, Data.Bool(true))
+        }
+
+        // TODO: the rest of the types
+      }
+
+      "Lt" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Lt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Lt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x < y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Lt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x < y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Lt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Lt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x < y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Lte" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Lte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Lte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x <= y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Lte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x <= y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Lte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Lte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x <= y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Gt" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Gt(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(false))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Gt(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x > y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(false))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Gt(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x > y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Gt(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(false))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Gt(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x > y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Gte" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          binary(Gte(_, _).embed, Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any two Ints" >> prop { (x: BigInt, y: BigInt) =>
+          binary(Gte(_, _).embed, Data.Int(x), Data.Int(y), Data.Bool(x >= y))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any two Decs" >> prop { (x: BigDecimal, y: BigDecimal) =>
+          binary(Gte(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Bool(x >= y))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          binary(Gte(_, _).embed, Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any two Strs" >> prop { (x: String, y: String) =>
+          binary(Gte(_, _).embed, Data.Str(x), Data.Str(y), Data.Bool(x >= y))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      "Between" >> {
+        "any Int with self" >> prop { (x: BigInt) =>
+          ternary(Between(_, _, _).embed, Data.Int(x), Data.Int(x), Data.Int(x), Data.Bool(true))
+        }
+
+        "any three Ints" >> prop { (x1: BigInt, x2: BigInt, x3: BigInt) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Int(xs(0)), Data.Int(xs(1)), Data.Int(xs(2)), Data.Bool(true))
+        }
+
+        "any Dec with self" >> prop { (x: BigDecimal) =>
+          ternary(Between(_, _, _).embed, Data.Dec(x), Data.Dec(x), Data.Dec(x), Data.Bool(true))
+        }
+
+        "any three Decs" >> prop { (x1: BigDecimal, x2: BigDecimal, x3: BigDecimal) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Dec(xs(0)), Data.Dec(xs(1)), Data.Dec(xs(2)), Data.Bool(true))
+        }
+
+        "any Str with self" >> prop { (x: String) =>
+          ternary(Between(_, _, _).embed, Data.Str(x), Data.Str(x), Data.Str(x), Data.Bool(true))
+        }
+
+        "any three Strs" >> prop { (x1: String, x2: String, x3: String) =>
+          val xs = List(x1, x2, x3).sorted
+          ternary(Between(_, _, _).embed, Data.Str(xs(0)), Data.Str(xs(1)), Data.Str(xs(2)), Data.Bool(true))
+        }
+
+        // TODO: Timestamp, Interval, cross-type comparison
+      }
+
+      // TODO: can this be tested?
+      // "IfUndefined" >> {
+      // }
+
+      "And" >> {
+        "false, false" >> {
+          binary(And(_, _).embed, Data.Bool(false), Data.Bool(false), Data.Bool(false))
+        }
+
+        "false, true" >> {
+          commute(And(_, _).embed, Data.Bool(false), Data.Bool(true), Data.Bool(false))
+        }
+
+        "true, true" >> {
+          binary(And(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
+        }
+      }
+
+      "Or" >> {
+        "false, false" >> {
+          binary(Or(_, _).embed, Data.Bool(false), Data.Bool(false), Data.Bool(false))
+        }
+
+        "false, true" >> {
+          commute(Or(_, _).embed, Data.Bool(false), Data.Bool(true), Data.Bool(true))
+        }
+
+        "true, true" >> {
+          binary(Or(_, _).embed, Data.Bool(true), Data.Bool(true), Data.Bool(true))
+        }
+      }
+
+      "Not" >> {
+        "false" >> {
+          unary(Not(_).embed, Data.Bool(false), Data.Bool(true))
+        }
+
+        "true" >> {
+          unary(Not(_).embed, Data.Bool(true), Data.Bool(false))
+        }
+      }
+
+      "Cond" >> {
+        "true" >> prop { (x: Data, y: Data) =>
+          ternary(Cond(_, _, _).embed, Data.Bool(true), x, y, x)
+        }
+
+        "false" >> prop { (x: Data, y: Data) =>
+          ternary(Cond(_, _, _).embed, Data.Bool(false), x, y, y)
+        }
+      }
+
+      "Coalesce" >> {
+        "null" >> prop { (x: Data) =>
+          binary(Coalesce(_, _).embed, Data.Null, x, x)
+        }
+
+        "non-null" >> prop { (x: Data, y: Data) =>
+          x != Data.Null ==>
+            binary(Coalesce(_, _).embed, x, y, x)
+        }
       }
     }
   }

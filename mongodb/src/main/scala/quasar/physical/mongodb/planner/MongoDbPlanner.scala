@@ -27,7 +27,6 @@ import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.namegen._
 import quasar.physical.mongodb._
-import quasar.physical.mongodb.javascript._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{MapFunc, SortDir}
 import quasar.std.StdLib._
@@ -96,6 +95,9 @@ object MongoDbPlanner {
       And => _, Or => _, Not => _,
       _}
 
+    val mjs = quasar.physical.mongodb.javascript[Fix]
+    import mjs._
+
     val HasJs: Output => OutputM[PartialJs] =
       _ <+> \/-(({ case List(field) => field }, List(Here)))
 
@@ -151,88 +153,39 @@ object MongoDbPlanner {
       def makeSimpleUnop(op: UnaryOperator): Output =
         Arity1(UnOp(op, _))
 
-      func match {
-        case Constantly => Arity1(ι)
-        case Length =>
-          Arity1(expr => Call(ident("NumberLong"), List(Select(expr, "length"))))
-        case Add      => makeSimpleBinop(jscore.Add)
-        case Multiply => makeSimpleBinop(Mult)
-        case Subtract => makeSimpleBinop(Sub)
-        case Divide   => makeSimpleBinop(Div)
-        case Modulo   => makeSimpleBinop(Mod)
-        case Negate   => makeSimpleUnop(Neg)
+      ((func, args) match {
+        // NB: this one is missing from MapFunc.
+        case (ToId, _) => None
 
-        case Eq  => makeSimpleBinop(jscore.Eq)
-        case Neq => makeSimpleBinop(jscore.Neq)
-        case Lt  => makeSimpleBinop(jscore.Lt)
-        case Lte => makeSimpleBinop(jscore.Lte)
-        case Gt  => makeSimpleBinop(jscore.Gt)
-        case Gte => makeSimpleBinop(jscore.Gte)
-        case And => makeSimpleBinop(jscore.And)
-        case Or  => makeSimpleBinop(jscore.Or)
+        // NB: this would get mapped to the same MapFunc as string.Concat, which
+        // doesn't make sense here.
+        case (ArrayConcat, _) => None
+
+        case (func @ UnaryFunc(_, _, _, _, _, _, _, _), Sized(a1)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateUnaryMapping[Fix, UnaryArg](func)(UnaryArg._1)
+          JsFuncHandler(mf).map(exp => Arity1(exp.eval))
+        case (func @ BinaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateBinaryMapping[Fix, BinaryArg](func)(BinaryArg._1, BinaryArg._2)
+          JsFuncHandler(mf).map(exp => Arity2(exp.eval))
+        case (func @ TernaryFunc(_, _, _, _, _, _, _, _), Sized(a1, a2, a3)) if func.effect ≟ Mapping =>
+          val mf = MapFunc.translateTernaryMapping[Fix, TernaryArg](func)(TernaryArg._1, TernaryArg._2, TernaryArg._3)
+          JsFuncHandler(mf).map(exp => Arity3(exp.eval))
+        case _ => None
+      }).getOrElse(func match {
+        case Constantly => Arity1(ι)  // FIXME: this cannot possibly be right
+
         case Squash      => Arity1(v => v)
         case IfUndefined => Arity2((value, fallback) =>
           // TODO: Only evaluate `value` once.
           If(BinOp(jscore.Eq, value, ident("undefined")), fallback, value))
-        case Not => makeSimpleUnop(jscore.Not)
-        case Concat => makeSimpleBinop(jscore.Add)
         case In | Within =>
           Arity2((value, array) =>
             BinOp(jscore.Neq,
               Literal(Js.Num(-1, false)),
               Call(Select(array, "indexOf"), List(value))))
-        case Substring =>
-          Arity3((field, start, len) =>
-            If(BinOp(jscore.Lt, start, Literal(Js.Num(0, false))),
-              Literal(Js.Str("")),
-              If(BinOp(jscore.Lt, len, Literal(Js.Num(0, false))),
-                Call(Select(field, "substr"), List(start, Select(field, "length"))),
-                Call(Select(field, "substr"), List(start, len)))))
-        case Search =>
-          Arity3((field, pattern, insen) =>
-            Call(
-              Select(
-                New(Name("RegExp"), List(
-                  pattern,
-                  If(insen, Literal(Js.Str("im")), Literal(Js.Str("m"))))),
-                "test"),
-              List(field)))
-        case Null => Arity1(str => If(BinOp(jscore.Eq, str, Literal(Js.Str("null"))), Literal(Js.Null), ident("undefined")))
-        case Boolean => Arity1(str => If(BinOp(jscore.Eq, str, Literal(Js.Str("true"))), Literal(Js.Bool(true)), If(BinOp(jscore.Eq, str, Literal(Js.Str("false"))), Literal(Js.Bool(false)), ident("undefined"))))
-        case Integer => Arity1(str =>
-          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + intRegex + "$")))), "test"), List(str)),
-            Call(ident("NumberLong"), List(str)),
-            ident("undefined")))
-        case Decimal =>
-          Arity1(str =>
-            If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + floatRegex + "$")))), "test"), List(str)),
-              Call(ident("parseFloat"), List(str)),
-              ident("undefined")))
-        case Date => Arity1(str =>
-          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + dateRegex + "$")))), "test"), List(str)),
-            Call(ident("ISODate"), List(str)),
-            ident("undefined")))
-        case Time => Arity1(str =>
-          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + timeRegex + "$")))), "test"), List(str)),
-            str,
-            ident("undefined")))
-        case Timestamp => Arity1(str =>
-          If(Call(Select(Call(ident("RegExp"), List(Literal(Js.Str("^" + timestampRegex + "$")))), "test"), List(str)),
-            Call(ident("ISODate"), List(str)),
-            ident("undefined")))
-        case ToString => Arity1(value =>
-          If(isInt(value),
-            // NB: This is a terrible way to turn an int into a string, but the
-            //     only one that doesn’t involve converting to a decimal and
-            //     losing precision.
-            Call(Select(Call(ident("String"), List(value)), "replace"), List(
-              Call(ident("RegExp"), List(
-                Literal(Js.Str("[^-0-9]+")),
-                Literal(Js.Str("g")))),
-              Literal(Js.Str("")))),
-            If(binop(jscore.Or, isTimestamp(value), isDate(value)),
-              Call(Select(value, "toISOString"), Nil),
-              Call(ident("String"), List(value)))))
+
+        // TODO: when each of these is broken out as a separate Func, these will
+        // go to JsFuncHandler.
         case Extract =>
           args match {
             case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
@@ -294,45 +247,8 @@ object MongoDbPlanner {
             }.join
           }
 
-        case TimeOfDay    => {
-          def pad2(x: JsCore) =
-            Let(Name("x"), x,
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-                BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                ident("x")))
-          def pad3(x: JsCore) =
-            Let(Name("x"), x,
-              If(
-                BinOp(jscore.Lt, ident("x"), Literal(Js.Num(10, false))),
-                BinOp(jscore.Add, Literal(Js.Str("00")), ident("x")),
-                If(
-                  BinOp(jscore.Lt, ident("x"), Literal(Js.Num(100, false))),
-                  BinOp(jscore.Add, Literal(Js.Str("0")), ident("x")),
-                  ident("x"))))
-          Arity1(date =>
-            Let(Name("t"), date,
-              binop(jscore.Add,
-                pad2(Call(Select(ident("t"), "getUTCHours"), Nil)),
-                Literal(Js.Str(":")),
-                pad2(Call(Select(ident("t"), "getUTCMinutes"), Nil)),
-                Literal(Js.Str(":")),
-                pad2(Call(Select(ident("t"), "getUTCSeconds"), Nil)),
-                Literal(Js.Str(".")),
-                pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))))
-        }
-
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
-        case Between =>
-          Arity3((value, min, max) =>
-            makeSimpleCall(
-              "&&",
-              List(
-                makeSimpleCall("<=", List(min, value)),
-                makeSimpleCall("<=", List(value, max))))
-          )
-        case ObjectProject => Arity2(Access(_, _))
-        case ArrayProject  => Arity2(Access(_, _))
+
         case MakeObject => args match {
           case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
             case (field, (sel, inputs)) =>
@@ -350,7 +266,7 @@ object MongoDbPlanner {
         }
         case MakeArray => Arity1(x => Arr(List(x)))
         case _ => -\/(UnsupportedFunction(func.name, "in JS planner".some))
-      }
+      })
     }
 
     {

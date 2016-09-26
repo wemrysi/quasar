@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
-import quasar.std._
+import quasar.std.StdLib._
 import quasar.jscore._
 import quasar.physical.mongodb.planner.MongoDbPlanner
 import quasar.physical.mongodb.workflow._
@@ -36,15 +36,18 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in JS. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (StringLib.Lower, _)   => notHandled.left
-    case (StringLib.Upper, _)   => notHandled.left
+    case (string.Lower, _)   => notHandled.left
+    case (string.Upper, _)   => notHandled.left
 
-    case (StringLib.ToString, Data.Dec(_) :: Nil) =>
+    case (string.ToString, Data.Dec(_) :: Nil) =>
       Skipped("Dec printing doesn't match precisely").left
 
-    case (MathLib.Power, Data.Number(x) :: Data.Number(y) :: Nil)
+    case (math.Power, Data.Number(x) :: Data.Number(y) :: Nil)
         if x == 0 && y < 0 =>
       Skipped("Infinity is not translated properly?").left
+
+    case (relations.Cond, _) => notHandled.left
+    case (relations.Coalesce, _) => notHandled.left
 
     case _                  => ().right
   }

@@ -33,7 +33,6 @@ import quasar.physical.mongodb.planner.{FuncHandler, JoinHandler, JoinSource, In
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{Coalesce => _, _}
 import quasar.std.StdLib._ // TODO: remove this
-import javascript._
 
 import matryoshka.{Hole => _, _}, Recursive.ops._, TraverseT.ops._
 import matryoshka.patterns.CoEnv
@@ -201,6 +200,9 @@ object MongoDbQScriptPlanner {
       _}
 
     import MapFuncs._
+
+    val mjs = quasar.physical.mongodb.javascript[Fix]
+    import mjs._
 
     val unimplemented = InternalError("unimplemented").left
 

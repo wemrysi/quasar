@@ -22,7 +22,6 @@ import quasar.fp._
 import quasar.javascript._
 import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.{Bson, BsonField}
-import quasar.physical.mongodb.javascript._
 
 import matryoshka._
 import scalaz._, Scalaz._
@@ -293,6 +292,9 @@ object ExprOpCoreF {
     // FIXME: Define a proper `Show[ExprOpCoreF]` instance.
     @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOpCoreF, JsFn] = {
+      val mjs = quasar.physical.mongodb.javascript[Fix]
+      import mjs._
+
       def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
         \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
       def expr2(x1: JsFn, x2: JsFn)(f: (JsCore, JsCore) => JsCore): PlannerError \/ JsFn =
