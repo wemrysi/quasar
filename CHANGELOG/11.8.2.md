@@ -1,0 +1,1 @@
+- Implement more MapFuncs in CoreMap for SparkCore
