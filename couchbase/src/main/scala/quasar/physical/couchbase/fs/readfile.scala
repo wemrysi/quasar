@@ -76,17 +76,17 @@ object readfile {
   )(implicit
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
-    // TODO: Chunking?
-    if (cursor.result.hasNext) {
-      lift(Task.delay {
+    lift(Task.delay(
+      if (cursor.result.hasNext) {
         val jsonObjStr = cursor.result.next.toString
         DataCodec.parse(jsonObjStr).bimap(
           err => FileSystemError.readFailed(jsonObjStr, err.shows),
           d => (cursor, Vector(d)))
-      }).into
-    }
-    else
-      (cursor, Vector.empty[Data]).right.point[Free[S, ?]]
+      }
+      else {
+        (cursor, Vector.empty[Data]).right
+      }
+    )).into
 
   def close[S[_]](
     cursor: Cursor
