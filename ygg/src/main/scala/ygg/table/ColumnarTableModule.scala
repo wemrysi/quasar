@@ -547,7 +547,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                   /** The remainder of the stream to be operated upon. */
                                   tail: NeedSlices)
 
-      sealed trait NextStep[A, B]
+      sealed trait NextStep[A, B] extends Product with Serializable
       final case class SplitLeft[A, B](lpos: Int)  extends NextStep[A, B]
       final case class SplitRight[A, B](rpos: Int) extends NextStep[A, B]
       final case class NextCartesianLeft[A, B](left: SlicePosition[A],
@@ -568,7 +568,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                                        strr: SliceTransform1[RR],
                                        stbr: SliceTransform2[BR]) = {
 
-        sealed trait CogroupState
+        sealed trait CogroupState extends Product with Serializable
         final case class EndLeft(lr: LR, lhead: Slice, ltail: NeedSlices) extends CogroupState
         final case class Cogroup(lr: LR,
                            rr: RR,
@@ -579,7 +579,7 @@ trait ColumnarTableModule extends TableModule with SliceTransforms with IndicesM
                            rightEnd: Option[SlicePosition[RK]])
             extends CogroupState
         final case class EndRight(rr: RR, rhead: Slice, rtail: NeedSlices) extends CogroupState
-        case object CogroupDone                                             extends CogroupState
+        case object CogroupDone                                            extends CogroupState
 
         // step is the continuation function fed to uncons. It is called once for each emitted slice
         def step(state: CogroupState): M[Option[Slice -> CogroupState]] = {

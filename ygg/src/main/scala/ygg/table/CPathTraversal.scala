@@ -25,7 +25,7 @@ import scala.math.{ min, max }
   * Represents a way to traverse a list of CPaths in sorted order. This takes
   * into account mixes of homogeneous and heterogeneous arrays.
   */
-sealed trait CPathTraversal { self =>
+sealed trait CPathTraversal extends Product with Serializable { self =>
   import MaybeOrdering._
   import CPathTraversal._
 
@@ -233,7 +233,7 @@ object CPathTraversal {
     loop(ps.reverse, Done)
   }
 
-  private sealed trait CPathPosition
+  private sealed trait CPathPosition extends Product with Serializable
   private final case class CPathPoint(node: CPathNode)                                     extends CPathPosition
   private final case class CPathRange(nodes: Set[CPathNode], start: Int, end: Option[Int]) extends CPathPosition
 

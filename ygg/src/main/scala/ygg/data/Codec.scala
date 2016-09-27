@@ -162,8 +162,8 @@ object Codec {
     } yield bytes)
   }
 
-  private final val FALSE_VALUE = 0.toByte
-  private final val TRUE_VALUE  = 1.toByte
+  private val FALSE_VALUE = 0.toByte
+  private val TRUE_VALUE  = 1.toByte
 
   @tailrec
   def writePackedInt(n: Int, buf: ByteBuffer): Unit =
@@ -214,11 +214,18 @@ object Codec {
 
     def writeInit(c: C, buf: ByteBuffer): Option[S] = {
       val (a, b) = from(c)
-      (codecA.writeInit(a, buf) map (s => Left((s, b)))) orElse (codecB.writeInit(b, buf) map (x => Right(x)))
+      def l: Option[S] = codecA.writeInit(a, buf) map (s => Left(s -> b))
+      def r: Option[S] = codecB.writeInit(b, buf) map (x => Right(x))
+
+      l orElse r
     }
 
-    def writeMore(more: S, buf: ByteBuffer) = more match {
-      case Left((s, b)) => (codecA.writeMore(s, buf) map (s => Left((s, b)))) orElse (codecB.writeInit(b, buf) map (s => Right(s)))
+    def writeMore(more: S, buf: ByteBuffer): Option[S] = more match {
+      case Left((s, b)) =>
+        def l: Option[S] = codecA.writeMore(s, buf) map (s => Left(s -> b))
+        def r: Option[S] = codecB.writeInit(b, buf) map (s => Right(s))
+        l orElse r
+
       case Right(s)     => codecB.writeMore(s, buf) map (s => Right(s))
     }
 

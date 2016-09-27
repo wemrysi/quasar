@@ -40,12 +40,12 @@ trait CF2Like {
   def andThen(f1: CF1): CF2
 }
 
-sealed trait Definedness
+sealed trait Definedness extends Product with Serializable
 case object AnyDefined extends Definedness
 case object AllDefined extends Definedness
 
 object GroupingSpec {
-  sealed trait Alignment
+  sealed trait Alignment extends Product with Serializable
   case object Union        extends Alignment
   case object Intersection extends Alignment
 }
@@ -134,19 +134,19 @@ final case object InfiniteSize extends TableSize {
 }
 
 
-sealed trait SortOrder           extends AnyRef
+sealed trait SortOrder           extends Product with Serializable
 sealed trait DesiredSortOrder    extends SortOrder { def isAscending: Boolean }
 final case object SortAscending  extends DesiredSortOrder { val isAscending = true  }
 final case object SortDescending extends DesiredSortOrder { val isAscending = false }
 
-sealed trait JoinOrder
+sealed trait JoinOrder extends Product with Serializable
 final object JoinOrder {
   case object LeftOrder  extends JoinOrder
   case object RightOrder extends JoinOrder
   case object KeyOrder   extends JoinOrder
 }
 
-sealed trait CrossOrder
+sealed trait CrossOrder extends Product with Serializable
 final object CrossOrder {
   case object CrossLeft      extends CrossOrder
   case object CrossRight     extends CrossOrder
@@ -155,18 +155,18 @@ final object CrossOrder {
 }
 
 object aligns {
-  sealed trait AlignState
+  sealed trait AlignState extends Product with Serializable
   final case class RunLeft(rightRow: Int, rightKey: Slice, rightAuthority: Option[Slice]) extends AlignState
   final case class RunRight(leftRow: Int, leftKey: Slice, rightAuthority: Option[Slice])  extends AlignState
   final case class FindEqualAdvancingRight(leftRow: Int, leftKey: Slice)                  extends AlignState
   final case class FindEqualAdvancingLeft(rightRow: Int, rightKey: Slice)                 extends AlignState
 
-  sealed trait Span
+  sealed trait Span extends Product with Serializable
   final case object LeftSpan  extends Span
   final case object RightSpan extends Span
   final case object NoSpan    extends Span
 
-  sealed trait NextStep
+  sealed trait NextStep extends Product with Serializable
   final case class MoreLeft(span: Span, leq: BitSet, ridx: Int, req: BitSet)  extends NextStep
   final case class MoreRight(span: Span, lidx: Int, leq: BitSet, req: BitSet) extends NextStep
 }

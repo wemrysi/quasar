@@ -17,17 +17,9 @@
 package ygg.table
 
 import ygg._, common._, data._, json._, trans._
-// import ygg._, data._, json._, trans._
 import scalaz._, Scalaz._
 import ConcatHelpers._
 import scala.Predef.assert
-
-// import scala.Predef._
-// import common.{ ->, breakOut, List, abort, Int, Array, Boolean, Unit, Either, Left, Right, ::, Nil,
-//   YggScalaMapOpsCC, YggScalaMapOps, BitSetOperations
-// }
-// import scala.Predef.assert
-// import scala.Predef.{ List => _, Map => _, Set => _, _ }
 
 trait SliceTransforms extends TableModule
 
@@ -151,11 +143,12 @@ object SliceTransform {
               (rightNonNum mapValues (s => List(s)))
             )
 
-            val simplifiedGroupNonNum = groupedNonNum map {
-              case (_, Left3(column))                        => Left(column)
-              case (_, Right3(column))                       => Left(column)
-              case (_, Middle3((left :: Nil, right :: Nil))) => Right((left, right))
-              case (_, x)                                    => abort("Unexpected: " + x)
+            type ECCC = Either[Column, Column -> Column]
+            val simplifiedGroupNonNum: scSeq[ECCC] = groupedNonNum map {
+              case (_, Left3(column))                        => Left(column): ECCC
+              case (_, Right3(column))                       => Left(column): ECCC
+              case (_, Middle3((left :: Nil, right :: Nil))) => Right(left -> right): ECCC
+              case (_, x)                                    => abort("Unexpected: " + x): ECCC
             }
 
             class FuzzyEqColumn(left: Column, right: Column) extends BoolColumn {

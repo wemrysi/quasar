@@ -21,7 +21,7 @@ import scalaz._, Scalaz._, Ordering._
 import ygg.json._
 import ygg.macros.Spire._
 
-sealed trait RValue
+sealed trait RValue extends Product with Serializable
 final case class RObject(fields: Map[String, RValue]) extends RValue
 final case class RArray(elements: Vec[RValue]) extends RValue
 
@@ -55,7 +55,7 @@ sealed trait CNumericValue[A] extends CWrappedValue[A] {
     }
   )
 }
-sealed trait CType {
+sealed trait CType extends Product with Serializable {
   def typeIndex: Int = this match {
     case CUndefined    => 0
     case CBoolean      => 1
@@ -333,7 +333,7 @@ sealed abstract class CBoolean(val value: Boolean) extends CWrappedValue[Boolean
 case object CTrue  extends CBoolean(true)
 case object CFalse extends CBoolean(false)
 
-object CBoolean extends CValueType[Boolean] {
+case object CBoolean extends CValueType[Boolean] {
   def apply(value: Boolean)           = if (value) CTrue else CFalse
   def unapply(cbool: CBoolean)        = Some(cbool.value)
   def order(v1: Boolean, v2: Boolean) = booleanInstance.order(v1, v2)

@@ -19,7 +19,7 @@ package ygg.table
 import scalaz._, Scalaz._
 import ygg._, common._, json._
 
-sealed trait CPath {
+sealed trait CPath extends Product with Serializable {
   def nodes: Vec[CPathNode]
 }
 private[table] final case class CPathClass(nodes: Vec[CPathNode]) extends CPath {
@@ -59,7 +59,7 @@ object CPath {
     apply(parse0(PathPattern.split(properPath).toVector, Vec()).reverse: _*)
   }
 
-  trait CPathTree[A]
+  trait CPathTree[A] extends Product with Serializable
   final case class RootNode[A](children: Seq[CPathTree[A]])                     extends CPathTree[A]
   final case class FieldNode[A](field: CPathField, children: Seq[CPathTree[A]]) extends CPathTree[A]
   final case class IndexNode[A](index: CPathIndex, children: Seq[CPathTree[A]]) extends CPathTree[A]

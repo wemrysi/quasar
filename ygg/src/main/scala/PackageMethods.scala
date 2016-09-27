@@ -80,7 +80,7 @@ trait PackageMethods {
   def decimal(d: Float): BigDecimal                        = BigDecimal.decimal(d, UNLIMITED)
   def decimal(unscaledVal: BigInt, scale: Int): BigDecimal = BigDecimal(unscaledVal, scale, UNLIMITED)
 
-  private final val InputStreamBufferSize = 8192
+  private val InputStreamBufferSize = 8192
 
   def slurpString(in: InputStream): String = new String(slurp(in), Utf8Charset)
   def slurp(in: InputStream): Array[Byte]  = slurp(new BufferedInputStream(in))

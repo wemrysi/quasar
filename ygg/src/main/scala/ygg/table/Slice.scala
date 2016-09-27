@@ -609,10 +609,10 @@ class SliceOps(private val source: Slice) extends AnyVal {
           Right(acc0 + (path -> Set(col)))
 
         case (Left(acc), (ColumnRef(path, _), col)) =>
-          acc get path map { col0 =>
+          (acc get path).fold[GroupedCols](Left(acc + (path -> col))) { col0 =>
             val acc0 = acc.map { case (k, v) => (k, Set(v)) }
             Right(acc0 + (path         -> Set(col0, col)))
-          } getOrElse Left(acc + (path -> col))
+          }
 
         case (Right(acc), (ColumnRef(path, _), col)) =>
           Right(acc + (path -> (acc.getOrElse(path, Set.empty[Column]) + col)))

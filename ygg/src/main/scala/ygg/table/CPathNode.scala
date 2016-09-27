@@ -19,7 +19,7 @@ package ygg.table
 import ygg.common._
 import scalaz._, Scalaz._, Ordering._
 
-sealed trait CPathNode {
+sealed trait CPathNode extends Product with Serializable {
   def \(that: CPath): CPath     = CPath(this +: that.nodes)
   def \(that: CPathNode): CPath = CPath(Vec(this, that))
   final override def toString = this match {

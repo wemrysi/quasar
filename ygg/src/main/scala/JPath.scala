@@ -25,7 +25,7 @@ final case class JPath(nodes: Vec[JPathNode]) extends ToString {
   }
 }
 
-sealed abstract class JPathNode(val to_s: String) extends ToString
+sealed abstract class JPathNode(val to_s: String) extends ToString with Product with Serializable
 final case class JPathField(name: String)         extends JPathNode("." + name)
 final case class JPathIndex(index: Int)           extends JPathNode(s"[$index]")
 
