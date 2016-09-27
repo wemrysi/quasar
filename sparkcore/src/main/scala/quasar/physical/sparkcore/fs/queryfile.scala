@@ -20,6 +20,7 @@ import quasar.Predef._
 import quasar.PlannerErrT
 import quasar.{PhaseResults, PhaseResultT, PhaseResult, LogicalPlan, Data}
 import quasar.Planner._
+import quasar.RenderTree.ops._
 import quasar.fs.FileSystemError._
 import quasar.fp.free._
 import quasar.effect.{MonotonicSeq, Read, KeyValueStore}
@@ -33,11 +34,14 @@ import quasar.qscript._
 
 import org.apache.spark._
 import org.apache.spark.rdd._
-import matryoshka._, Recursive.ops._
+import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 object queryfile {
+
+  type SparkQScript[A] =
+     (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
@@ -62,21 +66,32 @@ object queryfile {
     s1: SparkContextRead :<: S,
     s2: MonotonicSeq :<: S,
     s3: KeyValueStore[ResultHandle, RddState, ?] :<: S
-  ): QueryFile ~> Free[S, ?] =
+  ): QueryFile ~> Free[S, ?] = {
+
+    val optimize = new Optimize[Fix]
+
+    def toQScript(lp: Fix[LogicalPlan]) = {
+      val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
+        (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
+      for {
+        qs <- (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)).map(transFutu(_)(ShiftRead[Fix, QScriptRead[Fix, ?], SparkQScript].shiftRead(idPrism.reverseGet)(_)).transCata(optimize.applyAll))
+        _ <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
+      } yield qs
+    }
+
     new (QueryFile ~> Free[S, ?]) {
       def apply[A](qf: QueryFile[A]) = qf match {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] = (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT]) 
-          val qs = (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)) >>=
+          
+          val qs = toQScript(lp) >>=
           (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
 
           qs.run.run
         }
         case QueryFile.EvaluatePlan(lp: Fix[LogicalPlan]) => {
-          val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] = (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
-          val qs = (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)) >>=
+          val qs = toQScript(lp) >>=
           (qs => EitherT(WriterT(evaluatePlan(input, qs, lp).map(_.run.run))))
 
           qs.run.run
@@ -85,7 +100,7 @@ object queryfile {
         case QueryFile.Close(h) => close(h)
         case _ => ???
       }
-    } 
+    }} 
 
   implicit def composedFunctor[F[_]: Functor, G[_]: Functor]:
       Functor[(F ∘ G)#λ] =
@@ -93,12 +108,12 @@ object queryfile {
       def map[A, B](fa: F[G[A]])(f: A => B) = fa ∘ (_ ∘ f)
     }
 
-  private def executePlan[S[_]](input: Input, qs: Fix[QScriptRead[Fix, ?]], out: AFile, lp: Fix[LogicalPlan]) (implicit
+  private def executePlan[S[_]](input: Input, qs: Fix[SparkQScript], out: AFile, lp: Fix[LogicalPlan]) (implicit
     s0: Task :<: S,
     read: Read.Ops[SparkContext, S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, AFile]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptRead[Fix, ?]]]
+    val total = scala.Predef.implicitly[Planner.Aux[Fix, SparkQScript]]
 
     read.asks { sc =>
       val sparkStuff: Task[PlannerError \/ RDD[Data]] =
@@ -115,26 +130,30 @@ object queryfile {
   // TODO for Q4.2016  - unify it with ReadFile
   final case class RddState(maybeRDD: Option[RDD[(Data, Long)]], pointer: Int)
 
-  private def evaluatePlan[S[_]](input: Input, qs: Fix[QScriptRead[Fix, ?]], lp: Fix[LogicalPlan])(implicit
+  private def evaluatePlan[S[_]](input: Input, qs: Fix[SparkQScript], lp: Fix[LogicalPlan])(implicit
       s0: Task :<: S,
       kvs: KeyValueStore.Ops[ResultHandle, RddState, S],
       read: Read.Ops[SparkContext, S],
       ms: MonotonicSeq.Ops[S]
   ): Free[S, EitherT[Writer[PhaseResults, ?], FileSystemError, ResultHandle]] = {
 
-    val total = scala.Predef.implicitly[Planner.Aux[Fix, QScriptRead[Fix, ?]]]
+    val total = scala.Predef.implicitly[Planner.Aux[Fix, SparkQScript]]
 
-    val open: Free[S, PlannerError \/ ResultHandle] = (for {
+    val open: Free[S, PlannerError \/ (ResultHandle, RDD[Data])] = (for {
       h <- EitherT(ms.next map (ResultHandle(_).right[PlannerError]))
       rdd <- EitherT(read.asks { sc =>
         lift(qs.cataM(total.plan(input.fromFile)).eval(sc).run).into[S]
       }.join)
       _ <- kvs.put(h, RddState(rdd.zipWithIndex.some, 0)).liftM[PlannerErrT]
-    } yield (h)).run
+    } yield (h, rdd)).run
 
     open
       .map(_.leftMap(planningFailed(lp, _)))
-      .map(mrh => EitherT(mrh.point[Writer[PhaseResults, ?]]))
+      .map {
+      disj => EitherT(disj.traverse {
+        case (rh, rdd) => Writer(Vector(PhaseResult.Detail("RDD", rdd.toDebugString)), rh)
+      })
+    }
   }
 
   private def more[S[_]](h: ResultHandle, step: Int)(implicit
