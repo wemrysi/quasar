@@ -18,6 +18,7 @@ package quasar.physical.sparkcore.fs
 
 import quasar.Predef._
 import quasar.fs._
+import quasar.fs.QueryFile.ResultHandle
 import quasar.fs.mount.FileSystemDef, FileSystemDef.DefErrT
 import quasar.physical.sparkcore.fs.{readfile => corereadfile}
 import quasar.physical.sparkcore.fs.{queryfile => corequeryfile}
@@ -35,9 +36,13 @@ import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
 package object local {
+
+  import corequeryfile.RddState
+
   val FsType = FileSystemType("sparklocal")
 
-  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], Read[SparkContext, ?], A]
+  type EffM1[A] = Coproduct[KeyValueStore[ResultHandle, RddState, ?], Read[SparkContext, ?], A]
+  type Eff0[A] = Coproduct[KeyValueStore[ReadHandle, SparkCursor, ?], EffM1, A]
   type Eff1[A] = Coproduct[KeyValueStore[WriteHandle, PrintWriter, ?], Eff0, A]
   type Eff2[A] = Coproduct[Task, Eff1, A]
   type Eff3[A] = Coproduct[PhysErr, Eff2, A]
@@ -55,16 +60,19 @@ package object local {
     }
 
     lift((TaskRef(0L) |@|
+      TaskRef(Map.empty[ResultHandle, RddState]) |@|
       TaskRef(Map.empty[ReadHandle, SparkCursor]) |@|
       TaskRef(Map.empty[WriteHandle, PrintWriter]) |@|
       genSc) {
-      (genState, sparkCursors, printWriters, sc) =>
+      // TODO better names!
+      (genState, rddStates, sparkCursors, printWriters, sc) =>
       val interpreter: Eff ~> S = (MonotonicSeq.fromTaskRef(genState) andThen injectNT[Task, S]) :+:
-        injectNT[PhysErr, S] :+:
-        injectNT[Task, S]  :+:
-        (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
-        (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
-        (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
+      injectNT[PhysErr, S] :+:
+      injectNT[Task, S]  :+:
+      (KeyValueStore.impl.fromTaskRef[WriteHandle, PrintWriter](printWriters) andThen injectNT[Task, S])  :+:
+      (KeyValueStore.impl.fromTaskRef[ReadHandle, SparkCursor](sparkCursors) andThen injectNT[Task, S]) :+:
+      (KeyValueStore.impl.fromTaskRef[ResultHandle, RddState](rddStates) andThen injectNT[Task, S]) :+:
+      (Read.constant[Task, SparkContext](sc) andThen injectNT[Task, S])
 
       SparkFSDef(mapSNT[Eff, S](interpreter), lift(Task.delay(sc.stop())).into[S])
     }).into[S]
