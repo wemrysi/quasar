@@ -24,7 +24,7 @@ import java.net.URI
 import scala.collection.JavaConverters._
 
 import com.marklogic.xcc.{Version => _, _}
-import com.marklogic.xcc.exceptions.RequestException
+import com.marklogic.xcc.exceptions.{RequestException, XQueryException}
 import com.marklogic.xcc.types.XdmItem
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -130,8 +130,16 @@ object SessionIO {
   private def defaultModule(query: XQuery): MainModule =
     MainModule(Version.`1.0-ml`, ISet.empty, query)
 
+  @SuppressWarnings(Array("org.wartremover.warts.Throw"))
   private def evaluateModule0(main: MainModule, options: RequestOptions): SessionIO[ResultSequence] =
-    SessionIO(s => s.submitRequest(s.newAdhocQuery(main.render, options)))
+    SessionIO { s =>
+      val xqy = main.render
+      try {
+        s.submitRequest(s.newAdhocQuery(xqy, options))
+      } catch {
+        case xqyErr: XQueryException => throw XQueryFailure(xqy, xqyErr)
+      }
+    }
 
   private def lift[A](f: Session => Task[A]): SessionIO[A] =
     new SessionIO(Kleisli(f))
