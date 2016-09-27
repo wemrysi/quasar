@@ -57,7 +57,6 @@ object MapFuncPlanner {
     case Power(b, e) => math.pow(b, e).point[F]
 
     // relations
-    // TODO: When to use value vs. general comparisons?
     case Not(x) => fn.not(x).point[F]
     case Eq(x, y) => (x eq y).point[F]
     case Neq(x, y) => (x ne y).point[F]
@@ -84,7 +83,7 @@ object MapFuncPlanner {
       def withLitKey(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
           val qn = QName.local(NCName(ncname))
-          ejson.singletonObject[F] apply (qn.xs, v)
+          ejson.singletonObject[F] apply (xs.QName(qn.xs), v)
         } getOrElse invalidQName(s)
 
       k match {

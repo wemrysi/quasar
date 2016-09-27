@@ -28,6 +28,9 @@ object xs {
   def integer(xqy: XQuery): XQuery =
     XQuery(s"xs:integer($xqy)")
 
+  def QName(xqy: XQuery): XQuery =
+    XQuery(s"xs:QName($xqy)")
+
   def string(xqy: XQuery): XQuery =
     XQuery(s"xs:string($xqy)")
 }

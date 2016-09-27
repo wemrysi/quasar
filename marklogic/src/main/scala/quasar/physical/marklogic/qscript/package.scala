@@ -20,7 +20,8 @@ import quasar.SKI.κ
 import quasar.NameGenerator
 import quasar.fp.{freeCataM, interpretM, ShowT}
 import quasar.qscript._
-import quasar.physical.marklogic.xquery.{PrologW, XQuery}
+import quasar.physical.marklogic.xquery.{ejson => ejsxqy, _}
+import quasar.physical.marklogic.xquery.syntax._
 
 import matryoshka.Recursive
 import scalaz._, Scalaz._
@@ -80,5 +81,49 @@ package object qscript {
   ): F[XQuery] = {
     import MarkLogicPlanner._
     freeCataM(fqs)(interpretM(κ(src.point[F]), Planner[F, QScriptTotal[T, ?], XQuery].plan))
+  }
+
+  def reduceFuncXQuery[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr](rf: ReduceFunc[FreeMap[T]]): F[XQuery] = {
+    import ReduceFuncs._
+    import expr.func
+
+    def applyReduction(extract: FreeMap[T], f: XQuery => F[XQuery]): F[XQuery] =
+      for {
+        x   <- freshVar[F]
+        seq <- freshVar[F]
+        v   <- mapFuncXQuery[T, F](extract, x.xqy)
+        bdy <- f(fn.map(func(x)(v), seq.xqy))
+      } yield func(seq)(bdy)
+
+    val liftK: (XQuery => XQuery) => (XQuery => F[XQuery]) =
+      f => x => f(x).point[F]
+
+    rf match {
+      case Avg(fm)              => applyReduction(fm, liftK(fn.avg))
+      case Count(fm)            => applyReduction(fm, liftK(fn.count(_)))
+      case Max(fm)              => applyReduction(fm, liftK(fn.max))
+      case Min(fm)              => applyReduction(fm, liftK(fn.min))
+      case Sum(fm)              => applyReduction(fm, liftK(fn.sum))
+
+      case Arbitrary(fm)        =>
+        for {
+          x   <- freshVar[F]
+          seq <- freshVar[F]
+          v   <- mapFuncXQuery[T, F](fm, x.xqy)
+        } yield func(seq)(fn.map(func(x)(v), fn.head(seq.xqy)))
+
+      case UnshiftArray(fm)     =>
+        ejsxqy.seqToArray[F] flatMap (f => applyReduction(fm, f(_)))
+
+      case UnshiftMap(kfm, vfm) =>
+        for {
+          x   <- freshVar[F]
+          k   <- mapFuncXQuery[T, F](kfm, x.xqy)
+          y   <- freshVar[F]
+          v   <- mapFuncXQuery[T, F](vfm, y.xqy)
+          seq <- freshVar[F]
+          m   <- ejsxqy.unshiftObject[F].apply(func(x)(k), func(y)(v), seq.xqy)
+        } yield func(seq)(m)
+    }
   }
 }

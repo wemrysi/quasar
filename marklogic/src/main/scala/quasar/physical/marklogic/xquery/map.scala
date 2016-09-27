@@ -18,12 +18,26 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 
-import scalaz.Foldable
+import scalaz.{Foldable, IList}
 
 object map {
   def entry(key: XQuery, value: XQuery): XQuery =
     XQuery(s"map:entry($key, $value)")
 
+  def get(map: XQuery, key: XQuery): XQuery =
+    XQuery(s"map:get($map, $key)")
+
+  def keys(map: XQuery): XQuery =
+    XQuery(s"map:keys($map)")
+
+  def map[F[_]: Foldable](maps: F[XQuery]): XQuery =
+    XQuery(s"map:map${mkSeq(maps)}")
+
+  def map(): XQuery = map(IList[XQuery]())
+
   def new_[F[_]: Foldable](entries: F[XQuery]): XQuery =
     XQuery(s"map:new${mkSeq(entries)}")
+
+  def put(map: XQuery, key: XQuery, value: XQuery): XQuery =
+    XQuery(s"map:put($map, $key, $value)")
 }

@@ -48,8 +48,16 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
       } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge
 
+    // TODO: Given we know all the possible reduction functions, can we bucket and reduce in a single pass? Similarly for the mapfunc inside the reducer.
+    // TODO: See about leveraging the cts:* aggregation functions when possible
     case Reduce(src, bucket, reducers, repair) =>
-      XQuery(s"((: REDUCE :)$src)").point[F]
+      for {
+        x    <- freshVar[F]
+        bckt <- mapFuncXQuery(bucket, x.xqy) map (func(x)(_))
+        rpr  <- planMapFunc(repair)(r => x.xqy((r.idx + 1).xqy)) map (func(x)(_))
+        fns  <- reducers traverse (reduceFuncXQuery[T, F](_))
+        red  <- qscript.reduce[F] apply (src, bckt, mkSeq(fns), rpr)
+      } yield red
 
     case Sort(src, bucket, order) =>
       for {

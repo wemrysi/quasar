@@ -25,7 +25,7 @@ import scalaz.syntax.monad._
 
 object ejson {
   import syntax._, expr.{attribute, element, func}, axes.child
-  import FunctionDecl.{FunctionDecl1, FunctionDecl2}
+  import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
 
@@ -108,7 +108,7 @@ object ejson {
   def mkObjectEntry[F[_]: PrologW]: F[FunctionDecl2] =
     ejs.name("make-object-entry").qn[F] map { fname =>
       declare(fname)(
-        $("key") as SequenceType("xs:string"),
+        $("key") as SequenceType("xs:QName"),
         $("value") as SequenceType.Top
       ).as(SequenceType(s"element()")) { (key, value) =>
         element { key } { value }
@@ -155,10 +155,30 @@ object ejson {
   def singletonObject[F[_]: PrologW]: F[FunctionDecl2] =
     (ejs.name("singleton-object").qn[F] |@| ejsonN.qn) { (fname, ename) =>
       declare(fname)(
-        $("key") as SequenceType("xs:string"),
+        $("key") as SequenceType("xs:QName"),
         $("value") as SequenceType.Top
       ).as(SequenceType(s"element($ename)")) { (key: XQuery, value: XQuery) =>
         mkObjectEntry[F].apply(key, value) flatMap (xqy => mkObject[F].apply(xqy))
+      }
+    }.join
+
+  // ejson:unshift-object(
+  //   $keyf as function(item()) as xs:string,
+  //   $valf as function(item()) as item()*,
+  //   $seq  as item()*
+  // ) as element(ejson:ejson)
+  def unshiftObject[F[_]: PrologW]: F[FunctionDecl3] =
+    (ejs.name("unshift-object").qn[F] |@| ejsonN.qn) { (fname, ename) =>
+      declare(fname)(
+        $("keyf") as SequenceType("function(item()) as xs:QName"),
+        $("valf") as SequenceType("function(item()) as item()*"),
+        $("seq")  as SequenceType("item()*")
+      ).as(SequenceType(s"element($ename)")) { (keyf: XQuery, valf: XQuery, seq: XQuery) =>
+        val x = "$x"
+        for {
+          entry <- mkObjectEntry[F].apply(keyf.fnapply(x.xqy), valf.fnapply(x.xqy))
+          obj   <- mkObject[F].apply(fn.map(func(x)(entry), seq))
+        } yield obj
       }
     }.join
 }

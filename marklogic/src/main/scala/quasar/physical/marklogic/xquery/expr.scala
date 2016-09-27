@@ -50,6 +50,9 @@ object expr {
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
 
+  def typeswitch(on: XQuery)(cases: TypeswitchCaseClause*): TypeswitchExpr =
+    TypeswitchExpr(on, cases.toList)
+
   final case class Flwor(
     tupleStreams: IList[(String, XQuery)],
     letDefs: IList[(String, XQuery)],
@@ -110,5 +113,30 @@ object expr {
   final case class IfThenExpr(cond: XQuery, whenTrue: XQuery) {
     def else_(whenFalse: XQuery): XQuery =
       XQuery(s"if ($cond) then $whenTrue else $whenFalse")
+  }
+
+  final case class TypeswitchExpr(on: XQuery, cases: List[TypeswitchCaseClause]) {
+    def default(xqy: XQuery): XQuery =
+      default(TypeswitchDefaultClause(None, xqy))
+
+    def default(binding: BindingName, f: XQuery => XQuery): XQuery =
+      default(TypeswitchDefaultClause(Some(binding), f(binding.xqy)))
+
+    def default(dc: TypeswitchDefaultClause): XQuery = {
+      val body = (cases.map(_.render) :+ dc.render).map("  " + _).mkString("\n")
+      XQuery(s"typeswitch($on)\n$body")
+    }
+  }
+
+  final case class TypeswitchCaseClause(matching: TypedBinding \/ SequenceType, result: XQuery) {
+    def render: String =
+      s"case ${matching.fold(_.render, _.toString)} return $result"
+  }
+
+  final case class TypeswitchDefaultClause(binding: Option[BindingName], result: XQuery) {
+    def render: String = {
+      val bind = binding.map(_.xqy.toString + " ")
+      s"default ${~bind}return $result"
+    }
   }
 }

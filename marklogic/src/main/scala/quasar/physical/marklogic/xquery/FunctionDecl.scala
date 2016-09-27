@@ -26,9 +26,12 @@ import scalaz.syntax.functor._
 
 sealed abstract class FunctionDecl {
   def name: QName
-  def parameters: NonEmptyList[FunctionParam]
+  def parameters: NonEmptyList[TypedBinding]
   def returnType: SequenceType
   def body: XQuery
+
+  def arity: Int =
+    parameters.length
 
   // TODO: Naming?
   def render: String = {
@@ -47,7 +50,7 @@ object FunctionDecl {
 
   final case class FunctionDecl1(
     name: QName,
-    param1: FunctionParam,
+    param1: TypedBinding,
     returnType: SequenceType,
     body: XQuery
   ) extends FunctionDecl {
@@ -56,8 +59,8 @@ object FunctionDecl {
 
   final case class FunctionDecl2(
     name: QName,
-    param1: FunctionParam,
-    param2: FunctionParam,
+    param1: TypedBinding,
+    param2: TypedBinding,
     returnType: SequenceType,
     body: XQuery
   ) extends FunctionDecl {
@@ -66,27 +69,42 @@ object FunctionDecl {
 
   final case class FunctionDecl3(
     name: QName,
-    param1: FunctionParam,
-    param2: FunctionParam,
-    param3: FunctionParam,
+    param1: TypedBinding,
+    param2: TypedBinding,
+    param3: TypedBinding,
     returnType: SequenceType,
     body: XQuery
   ) extends FunctionDecl {
     def parameters = NonEmptyList(param1, param2, param3)
   }
 
-  final case class FunctionDeclDsl(fname: QName) {
-    def apply(p1: FunctionParam): FunctionDecl1Dsl =
-      FunctionDecl1Dsl(fname, p1, SequenceType.Top)
-
-    def apply(p1: FunctionParam, p2: FunctionParam): FunctionDecl2Dsl =
-      FunctionDecl2Dsl(fname, p1, p2, SequenceType.Top)
-
-    def apply(p1: FunctionParam, p2: FunctionParam, p3: FunctionParam): FunctionDecl3Dsl =
-      FunctionDecl3Dsl(fname, p1, p2, p3, SequenceType.Top)
+  final case class FunctionDecl4(
+    name: QName,
+    param1: TypedBinding,
+    param2: TypedBinding,
+    param3: TypedBinding,
+    param4: TypedBinding,
+    returnType: SequenceType,
+    body: XQuery
+  ) extends FunctionDecl {
+    def parameters = NonEmptyList(param1, param2, param3, param4)
   }
 
-  final case class FunctionDecl1Dsl(fn: QName, p1: FunctionParam, rt: SequenceType) {
+  final case class FunctionDeclDsl(fname: QName) {
+    def apply(p1: TypedBinding): FunctionDecl1Dsl =
+      FunctionDecl1Dsl(fname, p1, SequenceType.Top)
+
+    def apply(p1: TypedBinding, p2: TypedBinding): FunctionDecl2Dsl =
+      FunctionDecl2Dsl(fname, p1, p2, SequenceType.Top)
+
+    def apply(p1: TypedBinding, p2: TypedBinding, p3: TypedBinding): FunctionDecl3Dsl =
+      FunctionDecl3Dsl(fname, p1, p2, p3, SequenceType.Top)
+
+    def apply(p1: TypedBinding, p2: TypedBinding, p3: TypedBinding, p4: TypedBinding): FunctionDecl4Dsl =
+      FunctionDecl4Dsl(fname, p1, p2, p3, p4, SequenceType.Top)
+  }
+
+  final case class FunctionDecl1Dsl(fn: QName, p1: TypedBinding, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl1Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: XQuery => F[XQuery]): F[FunctionDecl1] =
@@ -96,7 +114,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
-  final case class FunctionDecl2Dsl(fn: QName, p1: FunctionParam, p2: FunctionParam, rt: SequenceType) {
+  final case class FunctionDecl2Dsl(fn: QName, p1: TypedBinding, p2: TypedBinding, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl2Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery) => F[XQuery]): F[FunctionDecl2] =
@@ -106,13 +124,23 @@ object FunctionDecl {
       apply[Id](body)
   }
 
-  final case class FunctionDecl3Dsl(fn: QName, p1: FunctionParam, p2: FunctionParam, p3: FunctionParam, rt: SequenceType) {
+  final case class FunctionDecl3Dsl(fn: QName, p1: TypedBinding, p2: TypedBinding, p3: TypedBinding, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl3Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl3] =
       body(p1.name.xqy, p2.name.xqy, p3.name.xqy) map (FunctionDecl3(fn, p1, p2, p3, rt, _))
 
     def apply(body: (XQuery, XQuery, XQuery) => XQuery): FunctionDecl3 =
+      apply[Id](body)
+  }
+
+  final case class FunctionDecl4Dsl(fn: QName, p1: TypedBinding, p2: TypedBinding, p3: TypedBinding, p4: TypedBinding, rt: SequenceType) {
+    def as(rType: SequenceType): FunctionDecl4Dsl = copy(rt = rType)
+
+    def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl4] =
+      body(p1.name.xqy, p2.name.xqy, p3.name.xqy, p4.name.xqy) map (FunctionDecl4(fn, p1, p2, p3, p4, rt, _))
+
+    def apply(body: (XQuery, XQuery, XQuery, XQuery) => XQuery): FunctionDecl4 =
       apply[Id](body)
   }
 }
