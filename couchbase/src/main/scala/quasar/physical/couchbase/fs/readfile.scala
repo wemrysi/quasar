@@ -38,6 +38,7 @@ object readfile {
 
   implicit val codec = DataCodec.Precise
 
+  // TODO: result is impure
   final case class Cursor(bucket: Bucket, result: Iterator[JsonObject])
 
   def interpret[S[_]](
