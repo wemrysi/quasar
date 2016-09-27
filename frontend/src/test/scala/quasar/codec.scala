@@ -85,7 +85,7 @@ class DataCodecSpecs extends quasar.Qspec {
       // These types get lost on the way through rendering and re-parsing:
 
       "re-parse very large Int value as Dec" in {
-        DataCodec.render(LargeInt).flatMap(DataCodec.parse) must beRightDisjunction(Data.Dec(new java.math.BigDecimal(LargeInt.value.underlying)))
+        DataCodec.render(Data.Int(LargeInt)).flatMap(DataCodec.parse) must beRightDisjunction(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)))
       }
 
 
@@ -190,7 +190,7 @@ class DataCodecSpecs extends quasar.Qspec {
       // These types get lost on the way through rendering and re-parsing:
 
       "re-parse very large Int value as Dec" in {
-        DataCodec.render(LargeInt).flatMap(DataCodec.parse) must beRightDisjunction(Data.Dec(new java.math.BigDecimal(LargeInt.value.underlying)))
+        DataCodec.render(Data.Int(LargeInt)).flatMap(DataCodec.parse) must beRightDisjunction(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)))
       }
 
       "re-parse Binary as Str" in {

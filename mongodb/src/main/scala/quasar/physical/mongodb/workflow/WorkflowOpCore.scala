@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 
 /** Ops that are provided by all supported MongoDB versions (since 2.6), or are
   * internal to quasar and supported everywhere. */
-sealed abstract class WorkflowOpCoreF[+A]
+sealed abstract class WorkflowOpCoreF[+A] extends Product with Serializable
 
 final case class $PureF(value: Bson) extends WorkflowOpCoreF[Nothing]
 object $pure {

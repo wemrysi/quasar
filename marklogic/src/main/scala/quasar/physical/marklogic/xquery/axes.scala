@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
-import quasar.physical.marklogic.xquery.xml.QName
+import quasar.physical.marklogic.xml.QName
 
 import scalaz.syntax.show._
 
@@ -27,23 +27,23 @@ import scalaz.syntax.show._
   */
 object axes {
   // attribute::
-  val attribute: Axis = Axis("child")
+  val attribute: Axis = Axis("attribute")
 
   // child::
   val child: Axis = Axis("child")
 
   // descendant::
-  val descendant: Axis = Axis("child")
+  val descendant: Axis = Axis("descendant")
 
   final case class Axis(name: String) {
-    def apply(elementName: QName): XQuery =
-      xqy(elementName.shows)
+    def apply(name: QName): XQuery =
+      xqy(name.shows)
 
     val * : XQuery =
       xqy("*")
 
     def attribute(): XQuery =
-      xqy("element()")
+      xqy("attribute()")
 
     def element(): XQuery =
       xqy("element()")

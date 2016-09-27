@@ -81,7 +81,8 @@ object Dependencies {
     "com.fasterxml.jackson.core" %  "jackson-databind"    % jacksonVersion,
     "com.fasterxml.uuid"         %  "java-uuid-generator" % "3.1.4",
     "com.marklogic"              %  "marklogic-xcc"       % "8.0.5",
-    "org.spire-math"             %% "jawn-parser"         % jawnVersion
+    "org.spire-math"             %% "jawn-parser"         % jawnVersion,
+    "org.scala-lang.modules"     %% "scala-xml"           % "1.0.5"
   )
   val couchbase = Seq(
     "com.couchbase.client" %  "java-client" % "2.3.2",

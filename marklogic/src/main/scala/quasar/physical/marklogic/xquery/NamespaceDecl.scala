@@ -17,21 +17,22 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml._
+import quasar.physical.marklogic.xquery.syntax._
 
 import monocle.macros.Lenses
 import scalaz._
-import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 @Lenses
-final case class NamespaceDecl(prefix: xml.NSPrefix, uri: xml.NSUri) {
-  def render: String = s"declare namespace ${prefix.shows} = ${uri.xs.shows}"
+final case class NamespaceDecl(ns: Namespace) {
+  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
 }
 
 object NamespaceDecl {
   implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(ns => (ns.prefix, ns.uri))
+    Order.orderBy(_.ns)
 
   implicit val show: Show[NamespaceDecl] =
-    Show.shows(ns => s"NamespaceDecl(${ns.render})")
+    Show.shows(nd => s"NamespaceDecl(${nd.render})")
 }
