@@ -43,6 +43,9 @@ object Planner {
 
   type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
 
+  def unimplemented(what: String): SparkState[RDD[Data]] =
+    EitherT[Task, PlannerError, RDD[Data]](InternalError(s"unimplemented $what").left[RDD[Data]].point[Task]).liftM[StateT[?[_], SparkContext, ?]]
+
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
   private def unreachable[T[_[_]], F[_]](what: String): Planner.Aux[T, F] =
@@ -118,9 +121,9 @@ object Planner {
             }
           )
         case Reduce(src, bucket, reducers, repair) =>
-          ??? // select [sum(pop), max(pop)] from cities group by state
+          unimplemented("reduce")
         case Sort(src, bucket, order) =>
-          ???
+          unimplemented("sort")
         case Filter(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {
@@ -142,10 +145,10 @@ object Planner {
 
         case LeftShift(src, struct, repair) =>
 
-          val structFunc =
+          val structFunc: PlannerError \/ (Data => Data) =
             freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
 
-          def repairFunc: PlannerError \/ ((Data, Data) => Data) ={
+          def repairFunc: PlannerError \/ ((Data, Data) => Data) = {
             val dd = freeCataM(repair)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
               case LeftSide => ((x: Data) => x match {
                 case Data.Arr(elems) => elems(0)
@@ -192,11 +195,8 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = _ => ???      
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = _ => unimplemented("join")
     }
-  
-  // TODO: Remove this instance
-
   
   implicit def coproduct[T[_[_]]: Recursive: ShowT, F[_], G[_]](
     implicit F: Planner.Aux[T, F], G: Planner.Aux[T, G]):
