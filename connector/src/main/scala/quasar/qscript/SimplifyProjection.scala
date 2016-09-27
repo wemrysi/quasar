@@ -29,7 +29,7 @@ trait SimplifyProjection[F[_]] {
   def simplifyProjection: F ~> H
 }
 
-object SimplifyProjection extends SimplifyProjectionInstances {
+object SimplifyProjection {
   type Aux[F[_], G[_]] = SimplifyProjection[F] { type H[A] = G[A] }
 
   def apply[F[_], G[_]](implicit ev: SimplifyProjection.Aux[F, G]) = ev
@@ -112,13 +112,23 @@ object SimplifyProjection extends SimplifyProjectionInstances {
           fa.run.fold(I.simplifyProjection(_), J.simplifyProjection(_))
       }
     }
-}
 
-abstract class SimplifyProjectionInstances {
-  implicit def inject[F[_]: Traverse, G[_]](implicit F: F :<: G):
+  def default[F[_]: Traverse, G[_]](implicit F: F :<: G):
       SimplifyProjection.Aux[F, G] =
     new SimplifyProjection[F] {
       type H[A] = G[A]
       def simplifyProjection = F
     }
+
+  implicit def deadEnd[F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+      : SimplifyProjection.Aux[Const[DeadEnd, ?], F] =
+    default[Const[DeadEnd, ?], F]
+
+  implicit def read[F[_]](implicit R: Const[Read, ?] :<: F)
+      : SimplifyProjection.Aux[Const[Read, ?], F] =
+    default[Const[Read, ?], F]
+
+  implicit def shiftedRead[F[_]](implicit SR: Const[ShiftedRead, ?] :<: F)
+      : SimplifyProjection.Aux[Const[ShiftedRead, ?], F] =
+    default[Const[ShiftedRead, ?], F]
 }

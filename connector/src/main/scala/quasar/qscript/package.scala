@@ -26,7 +26,7 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 
 /** The various representations of an arbitrary query, as seen by the filesystem
   * connectors, along with the operations for dealing with them.
-  * 
+  *
   * There are a few patterns that are worth noting:
   * - `(src: A, ..., lBranch: FreeQS[T], rBranch: FreeQS[T], ...)` – used in
   *   operations that combine multiple data sources (notably joins and unions).
@@ -39,6 +39,9 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
   *   of [[MapFunc]] that has a single “variable”, [[SrcHole]], which (usually)
   *   refers to the `src` parameter of that operation. [[JoinFunc]], [[FreeQS]],
   *   and the `repair` parameter to [[Reduce]] behave similarly.
+  * - We use the type parameter `QS[_]` to indicate QScript, as well as the type
+  *   parameters `IN[_]` and `OUT[_]` to indicate the input and output
+  *   coproducts in transformations where they can be different.
   */
 // NB: Here we no longer care about provenance. Backends can’t do anything with
 //     it, so we simply represent joins and crosses directly. This also means
@@ -47,26 +50,22 @@ import scalaz.{NonEmptyList => NEL, _}, Scalaz._
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
-  private type CommonPathable[T[_[_]], A] =
-    Coproduct[Const[DeadEnd, ?], QScriptCore[T, ?], A]
-
-  /** Statically known path components potentially converted to Read.
-    */
-  type Pathable[T[_[_]], A] =
-    Coproduct[ProjectBucket[T, ?], CommonPathable[T, ?], A]
-
-  private type QScriptTotal0[T[_[_]], A] =
-    Coproduct[ThetaJoin[T, ?], Pathable[T, ?], A]
-  private type QScriptTotal1[T[_[_]], A] =
-    Coproduct[EquiJoin[T, ?], QScriptTotal0[T, ?], A]
-  private type QScriptTotal2[T[_[_]], A] =
-    Coproduct[Const[Read, ?], QScriptTotal1[T, ?], A]
-  /** This type is used for join branch-like structures. It’s an unfortunate
-    * consequence of not having mutually-recursive data structures. Once we do,
-    * this can go away.
+  /** This type is _only_ used for join branch-like structures. It’s an
+    * unfortunate consequence of not having mutually-recursive data structures.
+    * Once we do, this can go away. It should _not_ be used in other situations.
     */
   type QScriptTotal[T[_[_]], A] =
-    Coproduct[Const[ShiftedRead, ?], QScriptTotal2[T, ?], A]
+    (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\:
+      ThetaJoin[T, ?] :\: EquiJoin[T, ?] :\:
+      Const[ShiftedRead, ?] :\: Const [Read, ?] :/: Const[DeadEnd, ?])#M[A]
+
+  /** QScript that has not gone through Read conversion. */
+  type QScript[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
+
+  /** QScript that has gone through Read conversion. */
+  type QScriptRead[T[_[_]], A] =
+    (QScriptCore[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
 
   type FreeMap[T[_[_]]]  = Free[MapFunc[T, ?], Hole]
   type FreeQS[T[_[_]]]   = Free[QScriptTotal[T, ?], Hole]

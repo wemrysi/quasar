@@ -19,7 +19,7 @@ package quasar.physical.mongodb.planner
 import quasar.Predef._
 import quasar.physical.mongodb.Bson
 import quasar.physical.mongodb.expression._
-import quasar.qscript._, MapFuncs._
+import quasar.qscript.{Coalesce => _, _}, MapFuncs._
 
 import org.threeten.bp.Instant
 import matryoshka._

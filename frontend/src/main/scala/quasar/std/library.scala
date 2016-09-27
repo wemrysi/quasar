@@ -105,6 +105,6 @@ trait Library {
   def binaryFunctions: List[GenericFunc[nat._2]]
   def ternaryFunctions: List[GenericFunc[nat._3]]
 
-  def functions: List[GenericFunc[_]] =
-    unaryFunctions ++ binaryFunctions ++ ternaryFunctions
+  def functions =
+    (unaryFunctions: List[GenericFunc[_]]) ++ binaryFunctions ++ ternaryFunctions
 }

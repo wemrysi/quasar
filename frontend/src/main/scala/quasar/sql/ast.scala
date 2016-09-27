@@ -25,7 +25,7 @@ import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import pathy.Path._
 
-trait IsDistinct
+trait IsDistinct extends Product with Serializable
 final case object SelectDistinct extends IsDistinct
 final case object SelectAll extends IsDistinct
 
@@ -118,7 +118,7 @@ object Sql {
 @Lenses final case class NullLiteral[A] private[sql] () extends Sql[A]
 @Lenses final case class BoolLiteral[A] private[sql] (value: Boolean) extends Sql[A]
 
-sealed abstract class BinaryOperator(val sql: String) {
+sealed abstract class BinaryOperator(val sql: String) extends Product with Serializable {
   def apply[A](lhs: A, rhs: A): Sql[A] = binop(lhs, rhs, this)
 
   val name = "(" + sql + ")"
@@ -162,7 +162,8 @@ final case object IntersectAll extends BinaryOperator("intersect all")
 final case object Except       extends BinaryOperator("except")
 final case object UnshiftMap   extends BinaryOperator("{...}")
 
-sealed abstract class UnaryOperator(val sql: String) {
+sealed abstract class UnaryOperator(val sql: String)
+    extends Product with Serializable {
   def apply[A](expr: A): Sql[A] = unop(expr, this)
 
   val name = sql
@@ -194,7 +195,7 @@ final case object UnshiftArray        extends UnaryOperator("[...]")
 
 @Lenses final case class Case[A](cond: A, expr: A)
 
-sealed trait SqlRelation[A] {
+sealed trait SqlRelation[A] extends Product with Serializable {
   def namedRelations: Map[String, List[NamedRelation[A]]] = {
     def collect(n: SqlRelation[A]): List[(String, NamedRelation[A])] =
       n match {
@@ -256,12 +257,13 @@ sealed trait NamedRelation[A] extends SqlRelation[A] {
     extends SqlRelation[A]
 
 sealed abstract class JoinType(val sql: String)
+    extends Product with Serializable
 final case object LeftJoin extends JoinType("left join")
 final case object RightJoin extends JoinType("right join")
 final case object InnerJoin extends JoinType("inner join")
 final case object FullJoin extends JoinType("full join")
 
-sealed trait OrderType
+sealed trait OrderType extends Product with Serializable
 final case object ASC extends OrderType
 final case object DESC extends OrderType
 

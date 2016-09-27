@@ -3,7 +3,7 @@
 
     "backends": { "postgresql": "pending", "marklogic": "pending" },
 
-    "data": "zips.data",
+    "data": ["cars.data", "zips.data"],
 
     "query": "select (zips := select * from cars; select * from zips) from zips",
 

@@ -30,7 +30,7 @@ import org.threeten.bp.{Duration, Instant, LocalDate, LocalDateTime, LocalTime, 
 import scalaz._, Scalaz._
 import scodec.bits.ByteVector
 
-sealed trait Data {
+sealed trait Data extends Product with Serializable {
   def dataType: Type
   def toJs: Option[jscore.JsCore]
 }

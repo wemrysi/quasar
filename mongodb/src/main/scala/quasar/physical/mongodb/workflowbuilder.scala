@@ -32,7 +32,7 @@ import quasar.qscript.SortDir
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
 
-sealed trait WorkflowBuilderF[F[_], +A]
+sealed trait WorkflowBuilderF[F[_], +A] extends Product with Serializable
 
 object WorkflowBuilder {
   /** A partial description of a query that can be run on an instance of MongoDB */
@@ -144,7 +144,7 @@ object WorkflowBuilder {
       Fix[WorkflowBuilderF[F, ?]](new ArrayBuilderF(src, shape))
   }
 
-  sealed trait Contents[+A]
+  sealed trait Contents[+A] extends Product with Serializable
   sealed trait DocContents[+A] extends Contents[A]
   sealed trait ArrayContents[+A] extends Contents[A]
   object Contents {

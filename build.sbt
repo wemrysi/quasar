@@ -79,8 +79,6 @@ lazy val buildSettings = Seq(
     Wart.NoNeedForMonad,        // - see puffnfresh/wartremover#159
     Wart.Nothing,
     Wart.Overloading,
-    Wart.Product,               // _ these two are highly correlated
-    Wart.Serializable,          // /
     Wart.ToString),
   // Normal tests exclude those tagged in Specs2 with 'exclusive'.
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive")),
