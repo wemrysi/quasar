@@ -25,7 +25,7 @@ import scala.Any
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._, NonEmptyList.nels, Validation.{success, failureNel}
 
-sealed trait Type { self =>
+sealed trait Type extends Product with Serializable { self =>
   import Type._
 
   final def ⨯ (that: Type): Type =

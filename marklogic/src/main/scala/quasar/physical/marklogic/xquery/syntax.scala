@@ -18,7 +18,7 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.physical.marklogic.validation._
-import quasar.physical.marklogic.xquery.xml._
+import quasar.physical.marklogic.xml._
 
 import scala.math.Integral
 
@@ -26,16 +26,17 @@ import eu.timepit.refined.api.Refined
 import scalaz.{Functor, ISet}
 import scalaz.std.iterable._
 import scalaz.syntax.functor._
+import scalaz.syntax.show._
 
 object syntax {
   import FunctionDecl._
 
-  final case class NameBuilder(ns: NamespaceDecl, local: NCName) {
+  final case class NameBuilder(decl: NamespaceDecl, local: NCName) {
     def qn[F[_]](implicit F: PrologW[F]): F[QName] =
-      F.writer(ISet singleton Prolog.nsDecl(ns), ns.prefix(local))
+      F.writer(ISet singleton Prolog.nsDecl(decl), decl.ns(local))
 
     def xqy[F[_]: PrologW]: F[XQuery] =
-      xs map (fn.QName(ns.uri.xs, _))
+      xs map (fn.QName(decl.ns.uri.xs, _))
 
     def xs[F[_]: PrologW]: F[XQuery] =
       qn map (_.xs)
@@ -55,14 +56,24 @@ object syntax {
 
   final implicit class QNameOps(val qn: QName) extends scala.AnyVal {
     def apply(args: XQuery*): XQuery = XQuery(s"${qn}${mkSeq(args)}")
+    def xs: XQuery = qn.shows.xs
   }
 
   final implicit class QNameFOps[F[_]: Functor](val qnf: F[QName]) {
     def apply(args: XQuery*): F[XQuery] = qnf map (_(args: _*))
   }
 
+  final implicit class NCNameOps(val ncname: NCName) extends scala.AnyVal {
+    def xs: XQuery = ncname.value.get.xs
+  }
+
+  final implicit class NSUriOps(val uri: NSUri) extends scala.AnyVal {
+    def xs: XQuery = uri.value.get.xs
+  }
+
   final implicit class NamespaceDeclOps(val ns: NamespaceDecl) extends scala.AnyVal {
-    def name(local: String Refined IsNCName): NameBuilder = NameBuilder(ns, NCName(local))
+    def name(local: String Refined IsNCName): NameBuilder = name(NCName(local))
+    def name(local: NCName): NameBuilder = NameBuilder(ns, local)
   }
 
   final implicit class ModuleImportOps(val mod: ModuleImport) extends scala.AnyVal {

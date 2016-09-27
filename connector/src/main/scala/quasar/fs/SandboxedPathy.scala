@@ -32,9 +32,9 @@ object SandboxedPathy {
   implicit val dirNameEqual: Equal[DirName] = Equal.equalA
 
   def rootSubPath(depth: Int, p: APath): APath = {
-    val elems = flatten(none, none, none, DirName(_).some, FileName(_).some, p).toList.unite
-    val dirs = elems.collect { case e: DirName => e }
-    val file = elems.collect { case e: FileName => e }.headOption
+    val elems = flatten(none, none, none, DirName(_).left.some, FileName(_).right.some, p).toList.unite
+    val dirs = elems.collect { case -\/(e) => e }
+    val file = elems.collect { case \/-(e) => e }.headOption
 
     def dirsPath(dirs: List[DirName]) = dirs.foldLeft(rootDir){ case (a, e) => a </> dir1(e) }
 
@@ -55,7 +55,7 @@ object SandboxedPathy {
   def segAt[B,T,S](index: Int, path: pathy.Path[B,T,S]): Option[PathSegment] = {
     scala.Predef.require(index >= 0)
     val list =
-      pathy.Path.flatten(none, none, none, DirName(_).left.some,FileName(_).right.some,path).toIList.unite
+      pathy.Path.flatten(none, none, none, DirName(_).left.some,FileName(_).right.some, path).toIList.unite
     list.drop(index).headOption
   }
 
