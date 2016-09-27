@@ -44,19 +44,19 @@ object Planner {
   
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
-  def unreachable[T[_[_]], F[_]]: Planner.Aux[T, F] =
+  private def unreachable[T[_[_]], F[_]](what: String): Planner.Aux[T, F] =
     new Planner[F] {
       type IT[G[_]] = T[G]
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
-        EitherT(InternalError("unreachable").left[(SparkContext, RDD[Data])].point[Task])
+        EitherT(InternalError(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
     }
 
-  implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] = unreachable
-  implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] = unreachable
-  implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] = unreachable
-  implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] = unreachable
+  implicit def deadEnd[T[_[_]]]: Planner.Aux[T, Const[DeadEnd, ?]] = unreachable("deadEnd")
+  implicit def read[T[_[_]]]: Planner.Aux[T, Const[Read, ?]] = unreachable("read")
+  implicit def projectBucket[T[_[_]]]: Planner.Aux[T, ProjectBucket[T, ?]] = unreachable("projectBucket")
+  implicit def thetaJoin[T[_[_]]]: Planner.Aux[T, ThetaJoin[T, ?]] = unreachable("thetajoin")
 
   implicit def shiftedread[T[_[_]]]: Planner.Aux[T, Const[ShiftedRead, ?]] =
     new Planner[Const[ShiftedRead, ?]] {
@@ -80,6 +80,33 @@ object Planner {
       Planner.Aux[T, QScriptCore[T, ?]] =
     new Planner[QScriptCore[T, ?]] {
       type IT[G[_]] = T[G]
+
+      type Index = Long
+      type Count = Long
+
+      private def filterOut(
+        fromFile: (SparkContext, AFile) => Task[RDD[String]],
+        src: RDD[Data],
+        from: FreeQS[T],
+        count: FreeQS[T],
+        predicate: (Index, Count) => Boolean ):
+          StateT[EitherT[Task, PlannerError, ?], SparkContext, RDD[Data]] = {
+
+        val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
+        val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
+
+        val fromState = freeCataM(from)(interpretM(κ(srcState), algebraM))
+        val countState = freeCataM(count)(interpretM(κ(srcState), algebraM))
+
+        val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
+          case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
+          case Data.Int(v) => InternalError(s"Provided Integer $v is not a Long").left[Long]
+          case a => InternalError(s"$a is not a Long number").left[Long]
+        })).liftM[StateT[?[_], SparkContext, ?]])
+        (fromState |@| countEval)((rdd, count) =>
+          rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
+      }
+
       def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
@@ -107,34 +134,10 @@ object Planner {
             }
           )
         case Take(src, from, count) =>
-          val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-          val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
-
-          val fromState = freeCataM(from)(interpretM(κ(srcState), algebraM))
-          val countState = freeCataM(count)(interpretM(κ(srcState), algebraM))
-
-          val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
-            case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-            case Data.Int(v) => InternalError(s"Provided Integer $a is not a Long").left[Long]
-            case a => InternalError(s"$a is not a Long number").left[Long]
-          })).liftM[StateT[?[_], SparkContext, ?]])
-          (fromState |@| countEval)((rdd, count) =>
-            rdd.zipWithIndex.filter(_._2 < count).map(_._1))
-
+          filterOut(fromFile, src, from, count, (i: Index, c: Count) => i < c)
+          
         case Drop(src, from, count) =>
-          val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-          val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
-
-          val fromState = freeCataM(from)(interpretM(κ(srcState), algebraM))
-          val countState = freeCataM(count)(interpretM(κ(srcState), algebraM))
-
-          val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
-            case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
-            case Data.Int(v) => InternalError(s"Provided Integer $a is not a Long").left[Long]
-            case a => InternalError(s"$a is not a Long number").left[Long]
-          })).liftM[StateT[?[_], SparkContext, ?]])
-          (fromState |@| countEval)((rdd, count) =>
-            rdd.zipWithIndex.filter(_._2 >= count).map(_._1))
+          filterOut(fromFile, src, from, count, (i: Index, c: Count) => i >= c)
 
         case LeftShift(src, struct, repair) =>
 
@@ -169,12 +172,6 @@ object Planner {
               src.flatMap(ls)
             }).map((sc, _)).point[Task]))
 
-          // TODO util function that lifts EIther to StateT[EitherT[Task]]
-
-
-          // StateT((sc: SparkContext) => {
-          // EitherT((sc, src).right[PlannerError].point[Task])
-        // })
         case Union(src, lBranch, rBranch) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
           val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
