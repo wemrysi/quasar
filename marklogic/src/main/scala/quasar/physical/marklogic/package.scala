@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.physical.marklogic.xquery
+package quasar.physical
 
-import quasar.Predef._
-import quasar.physical.marklogic.xml._
-import quasar.physical.marklogic.xquery.syntax._
+import quasar.Predef.String
 
-import monocle.macros.Lenses
-import scalaz._
-import scalaz.syntax.show._
+import scalaz.{NonEmptyList, MonadError}
 
-@Lenses
-final case class NamespaceDecl(ns: Namespace) {
-  def render: String = s"declare namespace ${ns.prefix.shows} = ${ns.uri.xs.shows}"
-}
+package object marklogic {
+  type ErrorMessages = NonEmptyList[String]
 
-object NamespaceDecl {
-  implicit val order: Order[NamespaceDecl] =
-    Order.orderBy(_.ns)
+  type MonadErrMsgs[F[_]]  = MonadError[F, ErrorMessages]
 
-  implicit val show: Show[NamespaceDecl] =
-    Show.shows(nd => s"NamespaceDecl(${nd.render})")
+  object MonadErrMsgs {
+    def apply[F[_]](implicit F: MonadErrMsgs[F]): MonadErrMsgs[F] = F
+  }
+
+  type MonadErrMsgs_[F[_]] = MonadError_[F, ErrorMessages]
+
+  object MonadErrMsgs_ {
+    def apply[F[_]](implicit F: MonadErrMsgs_[F]): MonadErrMsgs_[F] = F
+  }
 }

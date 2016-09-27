@@ -29,6 +29,9 @@ import scalaz.syntax.std.boolean._
 
 @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
 object expr {
+  def attribute(name: XQuery)(content: XQuery): XQuery =
+    XQuery(s"attribute {$name} {$content}")
+
   def element(name: XQuery)(content: XQuery): XQuery =
     XQuery(s"element {$name} {$content}")
 

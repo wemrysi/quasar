@@ -55,6 +55,9 @@ object Data {
   val True = Bool(true)
   val False = Bool(false)
 
+  val _bool =
+    Prism.partial[Data, Boolean] { case Data.Bool(b) => b } (Data.Bool(_))
+
   sealed trait Number extends Data {
     override def equals(other: Any) = (this, other) match {
       case (Int(v1), Number(v2)) => BigDecimal(v1) == v2
@@ -92,10 +95,19 @@ object Data {
           .toListMap.sequence.map(jscore.Obj(_))
   }
 
+  val _obj =
+    Prism.partial[Data, ListMap[String, Data]] { case Data.Obj(m) => m } (Data.Obj(_))
+
+  def singletonObj(k: String, v: Data): Data =
+    Obj(ListMap(k -> v))
+
   final case class Arr(value: List[Data]) extends Data {
     def dataType = Type.Arr(value ∘ (Type.Const(_)))
     def toJs = value.traverse(_.toJs).map(jscore.Arr(_))
   }
+
+  val _arr =
+    Prism.partial[Data, List[Data]] { case Data.Arr(l) => l } (Data.Arr(_))
 
   final case class Set(value: List[Data]) extends Data {
     def dataType = value.foldLeft[Type](Type.Bottom)((acc, d) => Type.lub(acc, d.dataType))
@@ -106,6 +118,9 @@ object Data {
     def dataType = Type.Timestamp
     def toJs = jscore.Call(jscore.ident("ISODate"), List(jscore.Literal(Js.Str(value.toString)))).some
   }
+
+  val _timestamp =
+    Prism.partial[Data, Instant] { case Data.Timestamp(ts) => ts } (Data.Timestamp(_))
 
   final case class Date(value: LocalDate) extends Data {
     def dataType = Type.Date
@@ -128,6 +143,9 @@ object Data {
     def toJs = jscore.Literal(Js.Num(value.getSeconds*1000 + value.getNano*1e-6, true)).some
   }
 
+  val _interval =
+    Prism.partial[Data, Duration] { case Data.Interval(d) => d } (Data.Interval(_))
+
   final case class Binary(value: ImmutableArray[Byte]) extends Data {
     def dataType = Type.Binary
     def toJs = jscore.Call(jscore.ident("BinData"), List(
@@ -148,10 +166,16 @@ object Data {
     def apply(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
 
+  val _binary =
+    Prism.partial[Data, ImmutableArray[Byte]] { case Data.Binary(bs) => bs } (Data.Binary(_))
+
   final case class Id(value: String) extends Data {
     def dataType = Type.Id
     def toJs = jscore.Call(jscore.ident("ObjectId"), List(jscore.Literal(Js.Str(value)))).some
   }
+
+  val _id =
+    Prism.partial[Data, String] { case Data.Id(id) => id } (Data.Id(_))
 
   /**
    An object to represent any value that might come from a backend, but that

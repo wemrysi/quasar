@@ -62,7 +62,11 @@ sealed abstract class XQuery {
   def ge(other: XQuery): XQuery = XQuery(s"$this ge $other")
 
   // General Comparisons
-  def ===(other: XQuery): XQuery = XQuery(s"$this = $other")
+  def ===(other: XQuery): XQuery = this match {
+    case Step(s) => Step(s"$s = $other")
+    case xpr     => XQuery(s"$xpr = $other")
+  }
+
   def =/=(other: XQuery): XQuery = XQuery(s"$this != $other")
   def <(other: XQuery): XQuery = XQuery(s"$this < $other")
   def <=(other: XQuery): XQuery = XQuery(s"$this <= $other")

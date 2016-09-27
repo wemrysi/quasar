@@ -17,6 +17,7 @@
 package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
+import quasar.physical.marklogic.xml.QName
 
 import scalaz._, Id.Id
 import scalaz.std.tuple._
@@ -24,7 +25,7 @@ import scalaz.syntax.foldable._
 import scalaz.syntax.functor._
 
 sealed abstract class FunctionDecl {
-  def name: xml.QName
+  def name: QName
   def parameters: NonEmptyList[FunctionParam]
   def returnType: SequenceType
   def body: XQuery
@@ -45,7 +46,7 @@ object FunctionDecl {
     Show.shows(fd => s"FunctionDecl(${fd.name})")
 
   final case class FunctionDecl1(
-    name: xml.QName,
+    name: QName,
     param1: FunctionParam,
     returnType: SequenceType,
     body: XQuery
@@ -54,7 +55,7 @@ object FunctionDecl {
   }
 
   final case class FunctionDecl2(
-    name: xml.QName,
+    name: QName,
     param1: FunctionParam,
     param2: FunctionParam,
     returnType: SequenceType,
@@ -64,7 +65,7 @@ object FunctionDecl {
   }
 
   final case class FunctionDecl3(
-    name: xml.QName,
+    name: QName,
     param1: FunctionParam,
     param2: FunctionParam,
     param3: FunctionParam,
@@ -74,7 +75,7 @@ object FunctionDecl {
     def parameters = NonEmptyList(param1, param2, param3)
   }
 
-  final case class FunctionDeclDsl(fname: xml.QName) {
+  final case class FunctionDeclDsl(fname: QName) {
     def apply(p1: FunctionParam): FunctionDecl1Dsl =
       FunctionDecl1Dsl(fname, p1, SequenceType.Top)
 
@@ -85,7 +86,7 @@ object FunctionDecl {
       FunctionDecl3Dsl(fname, p1, p2, p3, SequenceType.Top)
   }
 
-  final case class FunctionDecl1Dsl(fn: xml.QName, p1: FunctionParam, rt: SequenceType) {
+  final case class FunctionDecl1Dsl(fn: QName, p1: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl1Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: XQuery => F[XQuery]): F[FunctionDecl1] =
@@ -95,7 +96,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
-  final case class FunctionDecl2Dsl(fn: xml.QName, p1: FunctionParam, p2: FunctionParam, rt: SequenceType) {
+  final case class FunctionDecl2Dsl(fn: QName, p1: FunctionParam, p2: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl2Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery) => F[XQuery]): F[FunctionDecl2] =
@@ -105,7 +106,7 @@ object FunctionDecl {
       apply[Id](body)
   }
 
-  final case class FunctionDecl3Dsl(fn: xml.QName, p1: FunctionParam, p2: FunctionParam, p3: FunctionParam, rt: SequenceType) {
+  final case class FunctionDecl3Dsl(fn: QName, p1: FunctionParam, p2: FunctionParam, p3: FunctionParam, rt: SequenceType) {
     def as(rType: SequenceType): FunctionDecl3Dsl = copy(rt = rType)
 
     def apply[F[_]: Functor](body: (XQuery, XQuery, XQuery) => F[XQuery]): F[FunctionDecl3] =

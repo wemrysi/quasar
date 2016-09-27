@@ -28,21 +28,18 @@ import scalaz._, Scalaz._
 
 private[qscript] final class ThetaJoinPlanner[F[_]: NameGenerator: PrologW: MonadPlanErr, T[_[_]]: Recursive: ShowT]
   extends MarkLogicPlanner[F, ThetaJoin[T, ?]] {
-  import expr.for_
+  import expr.{for_, let_}
 
   val plan: AlgebraM[F, ThetaJoin[T, ?], XQuery] = {
     case ThetaJoin(src, lBranch, rBranch, on, f, combine) =>
       for {
         l      <- freshVar[F]
         r      <- freshVar[F]
-        lhs    <- rebaseXQuery(lBranch, src)
-        rhs    <- rebaseXQuery(rBranch, src)
-        filter <- planMapFunc(on){ case LeftSide => l.xqy case RightSide => r.xqy }
-        body   <- planMapFunc(combine){ case LeftSide => l.xqy case RightSide => r.xqy }
-      } yield {
-        for_(l -> lhs, r -> rhs).
-        where_(filter).
-        return_(body)
-      }
+        s      <- freshVar[F]
+        lhs    <- rebaseXQuery(lBranch, s.xqy)
+        rhs    <- rebaseXQuery(rBranch, s.xqy)
+        filter <- planMapFunc(on)      { case LeftSide => l.xqy case RightSide => r.xqy }
+        body   <- planMapFunc(combine) { case LeftSide => l.xqy case RightSide => r.xqy }
+      } yield let_(s -> src) return_ (for_(l -> lhs, r -> rhs) where_ filter return_ body)
   }
 }

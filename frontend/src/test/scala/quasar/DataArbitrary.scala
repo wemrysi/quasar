@@ -27,15 +27,14 @@ trait DataArbitrary {
   implicit val dataArbitrary: Arbitrary[Data] = Arbitrary {
     Gen.oneOf(
       simpleData,
-      Gen.oneOf(
-        Gen.listOf(for { c <- Gen.alphaChar; d <- simpleData } yield c.toString -> d).map(t => Data.Obj(ListMap(t: _*))),
-        Gen.listOf(simpleData).map(Data.Arr(_)),
-        // Tricky cases:
-        Gen.const(Data.Obj(ListMap("$date" -> Data.Str("Jan 1")))),
-        SafeInt.map(x =>
-          Data.Obj(ListMap(
-            "$obj" -> Data.Obj(ListMap(
-              "$obj" -> Data.Int(x))))))))
+      genData(Gen.alphaChar.map(_.toString), Gen.alphaStr, defaultInt, defaultDec, defaultId),
+      // TODO: These belong in MongoDB tests somewhere.
+      // Tricky cases:
+      Gen.const(Data.Obj(ListMap("$date" -> Data.Str("Jan 1")))),
+      SafeInt.map(x =>
+        Data.Obj(ListMap(
+          "$obj" -> Data.Obj(ListMap(
+            "$obj" -> Data.Int(x)))))))
   }
 
   implicit def dataShrink(implicit l: Shrink[List[Data]], m: Shrink[ListMap[String, Data]]): Shrink[Data] = Shrink {
@@ -46,33 +45,69 @@ trait DataArbitrary {
 }
 
 object DataArbitrary extends DataArbitrary {
+  import Arbitrary.arbitrary
+
   // Too big for Long
-  val LargeInt = Data.Int(new java.math.BigInteger(Long.MaxValue.toString + "0"))
+  val LargeInt = BigInt(Long.MaxValue.toString + "0")
 
   /** Long value that can safely be represented in any possible backend
     * (including those using JavaScript.)
     */
   val SafeInt: Gen[Long] = Gen.choose(-1000L, 1000L)
 
-  val simpleData: Gen[Data] =
-    Gen.oneOf(
-      Gen.const(Data.Null),
-      Gen.const(Data.True),
-      Gen.const(Data.False),
-      Gen.alphaStr.map(Data.Str(_)),
-      SafeInt.map(Data.Int(_)),
-      Gen.choose(-1000.0, 1000.0).map(Data.Dec(_)),
-      Gen.const(Data.Timestamp(Instant.now)),  // TODO
-      SafeInt.map(ms => Data.Interval(Duration.ofMillis(ms))),
-      Gen.const(Data.Date(LocalDate.now)),
-      Gen.const(Data.Time(LocalTime.now)),
-      Gen.listOf(Arbitrary.arbitrary[Byte]).map(bs => Data.Binary(Array[Byte](bs: _*))),
-      // NB: a (nominally) valid MongoDB id, because we use this generator to test
-      //     BSON conversion, too
-      Gen.listOfN(24, Gen.oneOf(("0123456789abcdef": Seq[Char]))).map(ds => Data.Id(ds.mkString)),
-      Gen.const(Data.NA),
+  val defaultInt: Gen[BigInt] =
+    Gen.oneOf(SafeInt.map(BigInt(_)), Gen.const(LargeInt))
 
-      // Tricky cases:
-      Gen.const(DataArbitrary.LargeInt),
-      SafeInt.map(x => Data.Dec(x.toDouble))) // Looks like an Int, so needs special handling
+  // NB: Decimals that look like ints, may need special handling
+  val defaultDec: Gen[BigDecimal] =
+    Gen.oneOf(Gen.choose(-1000.0, 1000.0), SafeInt.map(_.toDouble)) map (BigDecimal(_))
+
+  // NB: a (nominally) valid MongoDB id, because we use this generator to test
+  //     BSON conversion, too
+  val defaultId = Gen.listOfN(24, Gen.oneOf[Char]("0123456789abcdef")) map (_.mkString)
+
+  // TODO: make this very conservative so as likely to work with as many backends as possible
+  val simpleData: Gen[Data] =
+    genAtomicData(Gen.alphaStr, defaultInt, defaultDec, defaultId)
+
+  def genData(objKeySrc: Gen[String], strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] = {
+    val atomic = genAtomicData(strSrc, intSrc, decSrc, idSrc)
+    Gen.oneOf(
+      atomic,
+      Gen.listOf(Gen.zip(objKeySrc, atomic)) map (xs => Data.Obj(ListMap(xs: _*))),
+      Gen.listOf(atomic)                     map (Data.Arr(_)))
+  }
+
+  /** Generator of atomic Data (everything but Obj and Arr). */
+  def genAtomicData(strSrc: Gen[String], intSrc: Gen[BigInt], decSrc: Gen[BigDecimal], idSrc: Gen[String]): Gen[Data] =
+    Gen.oneOf(
+      Gen                    const (Data.Null        ),
+      Gen                    const (Data.True        ),
+      Gen                    const (Data.False       ),
+      Gen                    const (Data.NA          ),
+      strSrc                 map   (Data.Str(_)      ),
+      intSrc                 map   (Data.Int(_)      ),
+      decSrc                 map   (Data.Dec(_)      ),
+      genInstant             map   (Data.Timestamp(_)),
+      genDuration            map   (Data.Interval(_) ),
+      genDate                map   (Data.Date(_)     ),
+      genTime                map   (Data.Time(_)     ),
+      arbitrary[Array[Byte]] map   (Data.Binary(_)   ),
+      idSrc                  map   (Data.Id(_)       ))
+
+  private def genInstant: Gen[Instant] =
+    Gen.zip(arbitrary[Int], Gen.choose[Long](0, 999)) map {
+      case (sec, millis) => Instant.ofEpochSecond(sec.toLong, millis * 1000000)
+    }
+
+  private def genDuration: Gen[Duration] =
+    Gen.zip(arbitrary[Int], Gen.choose[Long](0, 999)) map {
+      case (sec, millis) => Duration.ofSeconds(sec.toLong, millis * 1000000)
+    }
+
+  private def genDate: Gen[LocalDate] =
+    arbitrary[Int] map (d => LocalDate.ofEpochDay(d.toLong))
+
+  private def genTime: Gen[LocalTime] =
+    Gen.choose[Long](0, 24 * 60 * 60 - 1) map (LocalTime.ofSecondOfDay(_))
 }
