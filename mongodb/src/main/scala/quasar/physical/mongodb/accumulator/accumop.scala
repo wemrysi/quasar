@@ -17,11 +17,12 @@
 package quasar.physical.mongodb.accumulator
 
 import quasar.Predef._
-import quasar.RenderTree
+import quasar.{RenderTree, Terminal}
 import quasar.fp._
+import quasar.physical.mongodb.expression.ExprOpOps
 
 import matryoshka._
-import scalaz._
+import scalaz._, Scalaz._
 
 sealed trait AccumOp[A]
 object AccumOp {
@@ -79,8 +80,12 @@ object AccumOp {
     }
   }
 
-  implicit val renderTree: Delay[RenderTree, AccumOp] =
-    RenderTree.delayFromShow
+  implicit def renderTree[EX[_]: Functor](implicit exprOps: ExprOpOps.Uni[EX])
+      : RenderTree[AccumOp[Fix[EX]]] =
+    new RenderTree[AccumOp[Fix[EX]]] {
+      def render(v: AccumOp[Fix[EX]]) =
+        Terminal(List("AccumOp"), groupBson(v).toJs.pprint(0).some)
+    }
 }
 
 object $addToSet {

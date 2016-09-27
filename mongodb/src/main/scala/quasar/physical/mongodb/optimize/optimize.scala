@@ -19,15 +19,17 @@ package quasar.physical.mongodb
 import quasar.Predef._
 import quasar.jscore._
 import quasar.fp._
+import quasar.physical.mongodb.accumulator._
+import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.workflow._
 
 import matryoshka._, Recursive.ops._, FunctorT.ops._
 import scalaz._, Scalaz._
 
 package object optimize {
   object pipeline {
-    import quasar.physical.mongodb.accumulator._
-    import quasar.physical.mongodb.expression._
-    import quasar.physical.mongodb.workflow._
+    private val exprCoreFp = ExprOpCoreF.fixpoint[Fix, ExprOp]
+    import exprCoreFp._
 
     private def deleteUnusedFields0[F[_]: Functor: Refs](op: Fix[F], usedRefs: Option[Set[DocVar]])
       (implicit I: WorkflowOpCoreF :<: F): Fix[F] = {
@@ -86,7 +88,7 @@ package object optimize {
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case $group(src, Grouped(cont), id) =>
         val (newCont, proj) =
-          cont.foldLeft[(ListMap[BsonField.Name, Accumulator], ListMap[BsonField.Name, Reshape.Shape])](
+          cont.foldLeft[(ListMap[BsonField.Name, AccumOp[Fix[ExprOp]]], ListMap[BsonField.Name, Reshape.Shape[ExprOp]])](
             (ListMap(), ListMap())) {
             case ((newCont, proj), (k, v)) =>
               lazy val default =
@@ -188,7 +190,7 @@ package object optimize {
       if (reordered == wf) wf else reorderOps(reordered)
     }
 
-    def get0(leaves: List[BsonField.Name], rs: List[Reshape]): Option[Reshape.Shape] = {
+    def get0(leaves: List[BsonField.Name], rs: List[Reshape[ExprOp]]): Option[Reshape.Shape[ExprOp]] = {
       (leaves, rs) match {
         case (_, Nil) => $var(BsonField(leaves).map(DocVar.ROOT(_)).getOrElse(DocVar.ROOT())).right.some
 
@@ -203,17 +205,17 @@ package object optimize {
       }
     }
 
-    private def fixExpr(e: Expression, rs: List[Reshape]):
-        Option[Expression] =
-      e.cataM[Option, Expression] {
+    private def fixExpr(e: Fix[ExprOp], rs: List[Reshape[ExprOp]]):
+        Option[Fix[ExprOp]] =
+      e.cataM[Option, Fix[ExprOp]] {
         case $varF(ref) => get0(ref.path, rs).flatMap(_.toOption)
         case x          => Fix(x).some
       }
 
-    private def inlineProject0(r: Reshape, rs: List[Reshape]): Option[Reshape] =
+    private def inlineProject0(r: Reshape[ExprOp], rs: List[Reshape[ExprOp]]): Option[Reshape[ExprOp]] =
       inlineProject($ProjectF((), r, IgnoreId), rs)
 
-    def inlineProject[A](p: $ProjectF[A], rs: List[Reshape]): Option[Reshape] = {
+    def inlineProject[A](p: $ProjectF[A], rs: List[Reshape[ExprOp]]): Option[Reshape[ExprOp]] = {
       val map = p.getAll.map { case (k, v) =>
         k -> (v match {
           case $include() =>
@@ -223,7 +225,7 @@ package object optimize {
           case $var(d)    => get0(d.path, rs).map(_.right)
           case _          => fixExpr(v, rs).map(_.right.right)
         })
-      }.foldLeftM[Option, ListMap[BsonField, Reshape.Shape]](ListMap()) {
+      }.foldLeftM[Option, ListMap[BsonField, Reshape.Shape[ExprOp]]](ListMap()) {
         case (acc, (k, Some(\/-(v)))) => (acc + (k -> v)).some
         case (acc, (_, Some(-\/(_)))) => acc.some
         case (_,   (_, None))         => none
@@ -233,7 +235,7 @@ package object optimize {
     }
 
     /** Map from old grouped names to new names and mapping of expressions. */
-    def renameProjectGroup(r: Reshape, g: Grouped): Option[ListMap[BsonField.Name, List[BsonField.Name]]] = {
+    def renameProjectGroup(r: Reshape[ExprOp], g: Grouped[ExprOp]): Option[ListMap[BsonField.Name, List[BsonField.Name]]] = {
       val s = r.value.toList.traverse {
         case (newName, \/-($var(v))) =>
           v.path match {
@@ -250,7 +252,7 @@ package object optimize {
       s.map(multiListMap)
     }
 
-    def inlineProjectGroup(r: Reshape, g: Grouped): Option[Grouped] = {
+    def inlineProjectGroup(r: Reshape[ExprOp], g: Grouped[ExprOp]): Option[Grouped[ExprOp]] = {
       for {
         names   <- renameProjectGroup(r, g)
         values1 = names.flatMap {
@@ -259,7 +261,7 @@ package object optimize {
       } yield Grouped(values1)
     }
 
-    def inlineProjectUnwindGroup(r: Reshape, unwound: DocVar, g: Grouped): Option[(DocVar, Grouped)] = {
+    def inlineProjectUnwindGroup(r: Reshape[ExprOp], unwound: DocVar, g: Grouped[ExprOp]): Option[(DocVar, Grouped[ExprOp])] = {
       for {
         names    <- renameProjectGroup(r, g)
         unwound1 <- unwound.path match {
@@ -277,10 +279,10 @@ package object optimize {
 
     def inlineGroupProjects[F[_]: Functor](g: $GroupF[Fix[F]])
       (implicit I: WorkflowOpCoreF :<: F)
-      : Option[(Fix[F], Grouped, Reshape.Shape)] = {
-      def collectShapes: GAlgebra[(Fix[F], ?), F, (List[Reshape], Fix[F])] =
+      : Option[(Fix[F], Grouped[ExprOp], Reshape.Shape[ExprOp])] = {
+      def collectShapes: GAlgebra[(Fix[F], ?), F, (List[Reshape[ExprOp]], Fix[F])] =
         {
-          case $project(src, shape, _) => ((x: List[Reshape]) => shape :: x).first(src._2)
+          case $project(src, shape, _) => ((x: List[Reshape[ExprOp]]) => shape :: x).first(src._2)
           case x                       => (Nil, Fix(x.map(_._1)))
         }
 

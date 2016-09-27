@@ -20,6 +20,9 @@ import quasar.Predef._
 import quasar.{Data, LogicalPlan, PhaseResults}
 import quasar.contrib.pathy._
 import quasar.effect.{KeyValueStore, MonotonicSeq}
+import quasar.fs.PathError._
+import quasar.fs.ManageFile._
+import quasar.fs.ManageFile.MoveSemantics._
 import quasar.fp.free._
 import quasar.fp.numeric._
 
@@ -64,7 +67,33 @@ object impl {
         } yield ()).run.void
     }
 
-  def readFromDataCursor[S[_], F[_]: Functor, C](
+  def ensureMoveSemantics[F[_] : Monad] (
+    src: APath,
+    dst: APath,
+    fExists: APath => F[Boolean],
+    semantics: MoveSemantics): OptionT[F, FileSystemError] = {
+
+    OptionT[F, FileSystemError](
+      fExists(src).flatMap { srcExists =>
+        if(srcExists) {
+          semantics match {
+            case Overwrite => none.point[F]
+            case FailIfExists =>
+              fExists(dst).map { dstExists =>
+                if(dstExists) Some(PathErr(pathExists(dst))) else None
+              }
+            case FailIfMissing =>
+              fExists(dst).map { dstExists =>
+                if(!dstExists) Some(PathErr(pathNotFound(dst))) else None
+              }
+          }
+        }
+        else some(pathErr(pathNotFound(src))).point[F]
+      }
+    )
+  }
+
+   def readFromDataCursor[S[_], F[_]: Functor, C](
     open: (AFile, ReadOpts) => Free[S, FileSystemError \/ C]
   )(implicit
     C:  DataCursor[F, C],

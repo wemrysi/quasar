@@ -73,7 +73,7 @@ object WriteFile {
       Process.bracket(unsafe.open(dst))(closeHandle)(h => channel.lift(writeChunk(h)))
     }
 
-    /** Same as `append` but accepts chunked [[Data]]. */
+    /** Same as `append` but accepts chunked `Data`. */
     def appendChunked(dst: AFile, src: Process[F, Vector[Data]]): Process[M, FileSystemError] = {
       val accumPartialWrites =
         process1.id[FileSystemError]
@@ -110,7 +110,7 @@ object WriteFile {
       // NB: the handle will be closed even if `write` produces errors in its value
       unsafe.open(dst) flatMapF (h => unsafe.write(h, data) <* unsafe.close(h) map (_.right))
 
-    /** Same as `save` but accepts chunked [[Data]]. */
+    /** Same as `save` but accepts chunked `Data`. */
     def saveChunked(dst: AFile, src: Process[F, Vector[Data]])
                    (implicit MF: ManageFile.Ops[S])
                    : Process[M, FileSystemError] = {
@@ -140,7 +140,7 @@ object WriteFile {
       saveThese0(dst, data, MoveSemantics.Overwrite)
     }
 
-    /** Same as `create` but accepts chunked [[Data]]. */
+    /** Same as `create` but accepts chunked `Data`. */
     def createChunked(dst: AFile, src: Process[F, Vector[Data]])
                      (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                      : Process[M, FileSystemError] = {
@@ -168,7 +168,7 @@ object WriteFile {
         saveThese0(dst, data, MoveSemantics.FailIfExists))
     }
 
-    /** Same as `replace` but accepts chunked [[Data]]. */
+    /** Same as `replace` but accepts chunked `Data`. */
     def replaceChunked(dst: AFile, src: Process[F, Vector[Data]])
                       (implicit QF: QueryFile.Ops[S], MF: ManageFile.Ops[S])
                       : Process[M, FileSystemError] = {

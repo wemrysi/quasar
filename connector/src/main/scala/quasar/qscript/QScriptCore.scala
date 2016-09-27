@@ -216,7 +216,7 @@ object QScriptCore {
       Delay[RenderTree, QScriptCore[T, ?]] =
     RenderTree.delayFromShow
 
-  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT]:
+  implicit def mergeable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
       Mergeable.Aux[T, QScriptCore[T, ?]] =
     new Mergeable[QScriptCore[T, ?]] {
       type IT[F[_]] = T[F]
@@ -266,6 +266,52 @@ object QScriptCore {
                 rrep)
             }
 
+          case (EnvT((Ann(b1, _), LeftShift(_, struct1, repair1))),
+                EnvT((Ann(_,  _), LeftShift(_, struct2, repair2)))) =>
+            val (repair, repL, repR) = concat(repair1, repair2)
+
+            val lFunc: FreeMap[IT] =
+              normalizable[IT].normalizeMapFunc(struct1 >> left)
+            val rFunc: FreeMap[IT] =
+              normalizable[IT].normalizeMapFunc(struct2 >> right)
+
+            val proj0: FreeMap[IT] =
+              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](0)))
+            val proj1: FreeMap[IT] =
+              Free.roll(MapFuncs.ProjectIndex(HoleF[IT], MapFuncs.IntLit[IT, Hole](1)))
+
+            def constructMerge(
+              struct: FreeMap[IT],
+              projL: Option[FreeMap[IT]],
+              projR: Option[FreeMap[IT]]) =
+              SrcMerge[EnvT[Ann[T], QScriptCore[IT, ?], ExternallyManaged], FreeMap[IT]](
+                EnvT((
+                  Ann(b1, HoleF),
+                  LeftShift(Extern, struct, repair))),
+                projL.fold(repL)(repL >> _),
+                projR.fold(repR)(repR >> _)).some
+
+            (lFunc, rFunc) match {
+              case (lm, rm) if lm ≟ rm =>
+                constructMerge(lm, None, None)
+
+              case (lm, rm) =>
+                (lm.resume, rm.resume) match {
+                  case (-\/(l), -\/(zip @ MapFuncs.ZipMapKeys(r))) if Free.roll(l) ≟ r =>
+                    constructMerge(Free.roll(zip), Some(proj1), None)
+
+                  case (-\/(zip @ MapFuncs.ZipMapKeys(l)), -\/(r)) if l ≟ Free.roll(r) =>
+                    constructMerge(Free.roll(zip), None, Some(proj1))
+
+                  case (-\/(l), -\/(MapFuncs.DupMapKeys(r))) if Free.roll(l) ≟ r =>
+                    constructMerge(Free.roll(MapFuncs.ZipMapKeys(r)), Some(proj1), Some(proj0))
+
+                  case (-\/(MapFuncs.DupMapKeys(l)), -\/(r)) if l ≟ Free.roll(r) =>
+                    constructMerge(Free.roll(MapFuncs.ZipMapKeys(l)), Some(proj0), Some(proj1))
+
+                  case (_, _) => None
+                }
+            }
           case (_, _) => None
         }
     }

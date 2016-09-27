@@ -75,11 +75,15 @@ object DocVar {
   }
 
   object Name {
+    implicit val equal: Equal[Name] = Equal.equalA
+
     implicit val show: Show[Name] = Show.showFromToString
   }
 
   val ROOT    = Name("ROOT")
   val CURRENT = Name("CURRENT")
+
+  implicit val equal: Equal[DocVar] = Equal.equalA
 
   implicit val show: Show[DocVar] = Show.shows {
     case DocVar(DocVar.ROOT, None) => "DocVar.ROOT()"
