@@ -18,11 +18,11 @@ package ygg
 
 import quasar.Predef._
 import scala.util._
+import scala.AnyVal
 
 package object macros {
-  type ->[+A, +B] = (A, B)
-  type Vec[+A]    = scala.Vector[A]
-  val Vec         = scala.Vector
+  type Vec[+A] = scala.Vector[A]
+  val Vec      = scala.Vector
 
   def doTry[A](body: => A): Try[A] = Try(body)
 

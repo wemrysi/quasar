@@ -15,8 +15,6 @@ import sbt.TestFrameworks.Specs2
 import sbtrelease._, ReleaseStateTransformations._, Utilities._
 import scoverage._
 
-val BothScopes = "test->test;compile->compile"
-
 def isTravis: Boolean = sys.env contains "TRAVIS"
 
 // Exclusive execution settings
@@ -155,6 +153,8 @@ lazy val assemblySettings = Seq(
 // Build and publish a project, excluding its tests.
 lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
+def setup(p: Project): Project = p settings commonSettings enablePlugins AutomateHeaderPlugin
+
 // Include to also publish a project's tests
 lazy val publishTestsSettings = Seq(
   publishArtifact in (Test, packageBin) := true
@@ -187,12 +187,14 @@ lazy val isCIBuild        = settingKey[Boolean]("True when building in any autom
 lazy val isIsolatedEnv    = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag = settingKey[String]("Tag for exclusive execution tests")
 
+lazy val macros = project |> setup |> Ygg.macros
+
 lazy val root = project.in(file("."))
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(aggregate in assembly := false)
   .aggregate(
-        foundation,
+    foundation, macros,
 //     / / | | \ \
 //
         ejson, js,  // NB: need to get dependencies to look like:

@@ -36,6 +36,30 @@ sealed trait Data extends Product with Serializable {
 }
 
 object Data {
+  implicit object DataFacade extends jawn.SimpleFacade[Data] {
+    def jtrue(): Data                        = True
+    def jfalse(): Data                       = False
+    def jnull(): Data                        = Null
+    def jint(s: String): Data                = Int(BigInt(s))
+    def jnum(s: String): Data                = Dec(BigDecimal(s))
+    def jstring(s: String): Data             = Str(s)
+    def jarray(vs: List[Data]): Data         = Arr(vs)
+    def jobject(vs: Map[String, Data]): Data = Obj((ListMap.newBuilder[String, Data] ++= vs).result)
+  }
+  implicit object EJsonDataFacade extends jawn.SimpleFacade[EJson[Data]] {
+    type J = EJson[Data]
+    private implicit def dataToEjson[A](x: Data): J = toEJson[EJson].apply(x).run.fold[J](x => x, x => x)
+
+    def jtrue(): J                     = DataFacade.jtrue()
+    def jfalse(): J                    = DataFacade.jfalse()
+    def jnull(): J                     = DataFacade.jnull()
+    def jint(s: String): J             = DataFacade.jint(s)
+    def jnum(s: String): J             = DataFacade.jnum(s)
+    def jstring(s: String): J          = DataFacade.jstring(s)
+    def jarray(vs: List[J]): J         = DataFacade.jarray(vs map fromEJson)
+    def jobject(vs: Map[String, J]): J = DataFacade.jobject(vs mapValues fromEJson)
+  }
+
   final case object Null extends Data {
     def dataType = Type.Null
     def toJs = jscore.Literal(Js.Null).some

@@ -16,50 +16,30 @@
 
 package ygg.macros
 
-import quasar.Predef._
+import quasar._, Predef._, fp._
 import scala.collection.{ mutable => scm }
 import scala.reflect.macros.blackbox._
-import jawn._
-import java.nio.file._
+import jawn.{ Facade, FContext }
 import java.util.UUID
 import scala.Any
 
-abstract class TreeFacades[C <: Context](val c: C) {
-  outer =>
-
+class JsonMacroImpls(val c: Context) {
   import c.universe._
 
-  type M[X]
-  type JField = (Tree, Tree)
+  type MacroFacade = Facade[Tree]
+  type JMap        = Map[String, Tree]
 
-  trait Builder[A] {
-    def +=(x: A): Unit
-    def result: M[A]
-  }
-  def newBuilder[A](): Builder[A]
-  def stringKey(s: String): Tree
-
-  def jnull: Tree
-  def jbool(x: Boolean): Tree
-  def jnum(s: String): Tree
-  def jint(s: String): Tree
-  def jstring(s: String): Tree
-  def jarray(xs: M[Tree]): Tree
-  def jobject(xs: M[Tree]): Tree
-  def jfield(key: Tree, value: Tree): Tree
-
-  class TreeFacade(keyMap: Map[String, Tree], valueMap: Map[String, Tree]) extends Facade[Tree] {
+  class TreeFacade(prefix: Tree, keyMap: JMap, valueMap: JMap) extends Facade[Tree] {
+    def stringKey(s: String): Tree      = q"$s"
     def keyOrLiteral(k: String): Tree   = keyMap.getOrElse(k, stringKey(k))
     def valueOrLiteral(x: String): Tree = valueMap.getOrElse(x, jstring(x))
 
-    def jnull: Tree                = outer.jnull
-    def jfalse: Tree               = jbool(false)
-    def jtrue: Tree                = jbool(true)
-    def jnum(s: String): Tree      = outer.jnum(s)
-    def jint(s: String): Tree      = outer.jint(s)
-    def jstring(s: String): Tree   = outer.jstring(s)
-    def jarray(xs: M[Tree]): Tree  = outer.jarray(xs)
-    def jobject(xs: M[Tree]): Tree = outer.jobject(xs)
+    def jtrue(): Tree                 = q"$prefix.jtrue"
+    def jfalse(): Tree                = q"$prefix.jfalse"
+    def jnull: Tree                   = q"$prefix.jnull"
+    def jnum(s: String): Tree         = q"$prefix.jnum($s)"
+    def jint(s: String): Tree         = q"$prefix.jint($s)"
+    def jstring(s: String): Tree      = q"$prefix.jstring($s)"
 
     def singleContext(): FContext[Tree] = new FContext[Tree] {
       var value: Tree = _
@@ -69,61 +49,60 @@ abstract class TreeFacades[C <: Context](val c: C) {
       def finish: Tree         = value
       def isObj: Boolean       = false
     }
-
     def arrayContext(): FContext[Tree] = new FContext[Tree] {
-      val buf = newBuilder[Tree]()
+      val buf = List.newBuilder[Tree]
 
-      def add(v: Tree): Unit   = buf += v
+      def add(v: Tree): Unit   = ignore(buf += v)
       def add(s: String): Unit = add(valueOrLiteral(s))
-      def finish: Tree         = jarray(buf.result)
       def isObj: Boolean       = false
+      def finish: Tree         = q"""{
+        val fcontext = $prefix.arrayContext()
+        ${buf.result} foreach (fcontext add _)
+        fcontext.finish
+      }"""
     }
     def objectContext(): FContext[Tree] = new FContext[Tree] {
       var key: String = null
-      val buf         = newBuilder[Tree]()
+      val buf         = List.newBuilder[Tree -> Tree]
 
-      private def clearKey(body: Unit): Unit = key = null
+      private def pair(l: Tree, r: Tree): Tree -> Tree = l -> r
+      private def clearKey[A](body: A): Unit   = ignore(key = null)
+
       def add(arg: String): Unit = key match {
         case null => key = arg
-        case _    => clearKey( buf += jfield(keyOrLiteral(key), valueOrLiteral(arg)) )
+        case _    => clearKey(buf += (keyOrLiteral(key) -> valueOrLiteral(arg)))
       }
-      def add(arg: Tree): Unit = clearKey( buf += jfield(keyOrLiteral(key), arg) )
-      def finish: Tree         = jobject(buf.result)
+      def add(arg: Tree): Unit = clearKey(buf += (keyOrLiteral(key) -> arg))
       def isObj: Boolean       = true
+      def finish: Tree         = q"""{
+        val fcontext = $prefix.objectContext()
+        for ((k, v) <- ${buf.result}) {
+          fcontext add k
+          fcontext add v
+        }
+        fcontext.finish
+      }"""
     }
   }
-}
-
-class JsonMacros(val c: Context) {
-  import c.universe._
-
-  type MacroFacade = Facade[Tree]
-
-  def jsonInterpolatorImpl(args: c.Expr[Any]*): Tree     = JsonMacroSingle(args: _*)
-  def jsonManyInterpolatorImpl(args: c.Expr[Any]*): Tree = JsonMacroMany(args: _*)
 
   private def fail(msg: String): Nothing  = c.abort(c.enclosingPosition, msg)
   private def fail(t: Throwable): Nothing = fail("Exception during json interpolation: " + t.getMessage)
 
-  def parseFromPathImpl(path: c.Expr[String]): Tree = {
-    path.tree foreach (t => println("" + ((t, t.getClass))))
-
-    val jpath: Path = path.tree match {
-      case Literal(Constant(p: String)) => Paths get p
-      case _                            => fail("A StringContext part for the json interpolator is not a string")
+  object Args {
+    def unapply(t: Tree) = t match {
+      case Apply(Apply(qual, Apply(_, parts) :: Nil), implicitArg :: Nil) => Some((qual, parts, implicitArg))
+      case _                                                              => None
     }
-    val json = doTry(new String(Files readAllBytes jpath, "UTF-8")).toOption getOrElse ""
-    if (json.length == 0)
-      fail(s"No json found at $jpath")
-
-    JsonMacroSingle.parse(json, facades.create())
   }
 
   trait JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree
+    type M[X]
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): c.Expr[M[A]]
 
-    def apply(args: c.Expr[Any]*): Tree = c.prefix.tree match {
-      case Apply(_, Apply(_, parts) :: Nil) =>
+    def apply[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[M[A]] = c.prefix.tree match {
+      case Args(qual, parts, facade) =>
+        val A      = weakTypeOf[A]
+
         val stringParts = parts map {
           case Literal(Constant(part: String)) => part
           case _                               => fail("A StringContext part for the json interpolator is not a string")
@@ -136,7 +115,7 @@ class JsonMacros(val c: Context) {
           val tpe      = c.typecheck(arg.tree).tpe
           val uuid     = UUID.randomUUID.toString
           uuids        = uuids :+ uuid
-          values(uuid) = q"io.circe.Encoder[$tpe].apply($arg)"
+          values(uuid) = if (tpe =:= A) q"$arg" else q"quasar.JLift.liftJson[$tpe, $A]($arg)"
 
           if (tpe =:= typeOf[String])
             keys(uuid) = q"$arg"
@@ -147,42 +126,26 @@ class JsonMacros(val c: Context) {
 
         parse(
           ( for ((part, uuid) <- stringParts zip uuids) yield part + "\"" + uuid + "\"" ) mkString ("", "", stringParts.last),
-          facades.create(keys.toMap, values.toMap)
+          new TreeFacade(q"$facade", keys.toMap, values.toMap)
         )
 
-      case tree => fail("Unexpected tree shape for json interpolation macro: " + tree)
+      case tree =>
+        fail("Unexpected tree shape for json interpolation macro: " + tree.getClass + "\n" + showRaw(tree))
     }
   }
+
+
+  def singleImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[A]       = JsonMacroSingle[A](args: _*)
+  def manyImpl[A: c.WeakTypeTag](args: c.Expr[Any]*): c.Expr[Vector[A]] = JsonMacroMany[A](args: _*)
 
   object JsonMacroSingle extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree =
-      JParser.parse(json)(facade).fold(fail, x => x)
+    type M[X] = X
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): c.Expr[A] =
+      c.Expr[A](JParser.parse(json)(facade).fold(fail, x => x))
   }
   object JsonMacroMany extends JsonMacroBase {
-    def parse(json: String, facade: MacroFacade): Tree =
-      JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}")
-  }
-
-  object facades extends TreeFacades[c.type](c) {
-    type M[X] = List[X]
-
-    def create(): TreeFacade                                                   = create(Map(), Map())
-    def create(keys: Map[String, Tree], values: Map[String, Tree]): TreeFacade = new TreeFacade(keys, values)
-
-    def stringKey(s: String): Tree = q"$s"
-    def newBuilder[A]() = new Builder[A] {
-      val buf            = scm.ListBuffer[A]()
-      def +=(x: A): Unit = { buf += x ; () }
-      def result: M[A]   = buf.result
-    }
-
-    def jbool(x: Boolean)                    = if (x) q"ygg.json.JTrue" else q"ygg.json.JFalse"
-    def jnull: Tree                          = q"ygg.json.JNull"
-    def jnum(s: String): Tree                = q"ygg.json.JNum($s)"
-    def jint(s: String): Tree                = q"ygg.json.JNum($s)"
-    def jstring(s: String): Tree             = q"ygg.json.JString($s)"
-    def jarray(xs: List[Tree]): Tree         = q"ygg.json.JArray($xs)"
-    def jobject(xs: List[Tree]): Tree        = q"ygg.json.JObject($xs)"
-    def jfield(key: Tree, value: Tree): Tree = q"ygg.json.JField($key, $value)"
+    type M[X] = Vector[X]
+    def parse[A: c.WeakTypeTag](json: String, facade: MacroFacade): c.Expr[M[A]] =
+      c.Expr[Vector[A]](JParser.parseMany(json + "\n")(facade).fold(fail, x => q"${x.toVector}"))
   }
 }

@@ -27,6 +27,10 @@ import scalaz._
 package object ejson {
   def str[A] = Prism.partial[Common[A], String] { case Str(s) => s } (Str(_))
 
+  implicit class JLiftOps[A](value: A) {
+    def liftTo[J](implicit z1: JLift[A], z2: jawn.Facade[J]): J = z1.lift[J](value)
+  }
+
   /** For _strict_ JSON, you want something like `Obj[Mu[Json]]`.
     */
   type Json[A] = Coproduct[Obj, Common, A]
