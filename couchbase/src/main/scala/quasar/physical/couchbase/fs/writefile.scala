@@ -19,13 +19,12 @@ package quasar.physical.couchbase.fs
 import quasar.Predef._
 import quasar.contrib.pathy._
 import quasar.{Data, DataCodec}
-import quasar.effect.{KeyValueStore, MonotonicSeq, Read, UUID}
+import quasar.effect.{KeyValueStore, MonotonicSeq, Read}
 import quasar.fp.free._
 import quasar.fs._
 import quasar.physical.couchbase.common._
 
 import com.couchbase.client.java.Bucket
-import com.couchbase.client.java.document.JsonDocument
 import com.couchbase.client.java.document.json.JsonObject
 import com.couchbase.client.java.transcoder.JsonTranscoder
 import scalaz._, Scalaz._
@@ -43,7 +42,6 @@ object writefile {
     S0: KeyValueStore[WriteHandle, State, ?] :<: S,
     S1: MonotonicSeq :<: S,
     S2: Read[Context, ?] :<:  S,
-    S3: UUID :<: S,
     S4: Task :<: S
   ): WriteFile ~> Free[S, ?] = λ[WriteFile ~> Free[S, ?]] {
     case Open(file)     => open(file)
@@ -87,8 +85,7 @@ object writefile {
     chunk: Vector[Data]
   )(implicit
     S0: KeyValueStore[WriteHandle, State, ?] :<: S,
-    S1: Task :<: S,
-    uuid: UUID.Ops[S]
+    S1: Task :<: S
   ): Free[S, Vector[FileSystemError]] =
     (for {
       st   <- writeHandles.get(h).toRight(Vector(FileSystemError.unknownWriteHandle(h)))
@@ -102,12 +99,9 @@ object writefile {
                       .put("value", jsonTranscoder.stringToJsonObject(str))
                   }))
               ))).into)
-      docs <- data.traverse(d =>
-               uuid.randomUUID.map(k => JsonDocument.create(k.toString, d))
-              ).liftM[EitherT[?[_], Vector[FileSystemError], ?]]
-      _    <- lift(docs.traverse(d =>
-                Task.delay(st.bucket.insert(d))
-              )).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
+      _    <- lift(
+                insert(st.bucket, data)
+              ).into.liftM[EitherT[?[_], Vector[FileSystemError], ?]]
     } yield Vector.empty).merge
 
   def close[S[_]](

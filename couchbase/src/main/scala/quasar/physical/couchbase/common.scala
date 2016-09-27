@@ -26,8 +26,11 @@ import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.{Bucket, Cluster}
 import com.couchbase.client.java.cluster.ClusterManager
-import com.couchbase.client.java.query.{N1qlParams, N1qlQuery}
+import com.couchbase.client.java.document.json.JsonObject
+import com.couchbase.client.java.query.{Insert, N1qlParams, N1qlQuery}
 import com.couchbase.client.java.query.consistency.ScanConsistency
+import com.couchbase.client.java.query.dsl.Expression
+import com.couchbase.client.java.query.dsl.functions.MetaFunctions.uuid
 import pathy.Path, Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
@@ -67,6 +70,20 @@ object common {
     bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
       .exists(_.value.getBoolean("v").booleanValue === true)
   }
+
+  def insert(bucket: Bucket, objects: Vector[JsonObject]): Task[Unit] =
+    objects match {
+      case Vector(h, t @ _*) =>
+        Task.delay(bucket.query(N1qlQuery.simple(
+          t.foldLeft(
+            Insert.insertInto(Expression.i(bucket.name)).values(uuid(), h)
+          ){
+            case (a, d) => a.values(uuid(), d)
+          }
+        ))).void
+      case Vector() =>
+        Task.now(())
+    }
 
   def pathSegments(paths: List[List[String]]): Set[PathSegment] =
     paths.collect {

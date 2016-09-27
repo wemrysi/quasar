@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import quasar.Predef._
-import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read, UUID}
+import quasar.effect.{Failure, KeyValueStore, MonotonicSeq, Read}
 import quasar.fp._, free._
 import quasar.fs._, ReadFile.ReadHandle, WriteFile.WriteHandle
 import quasar.fs.mount.{ConnectionUri, FileSystemDef}, FileSystemDef.DefErrT
@@ -36,7 +36,6 @@ package object fs {
 
   type Eff[A] = (
     Task                                           :\:
-    UUID                                           :\:
     Read[Context, ?]                               :\:
     MonotonicSeq                                   :\:
     KeyValueStore[ReadHandle,  readfile.Cursor, ?] :/:
@@ -80,7 +79,6 @@ package object fs {
       (
         mapSNT(injectNT[Task, S] compose (
           reflNT[Task]                          :+:
-          UUID.toTask                           :+:
           Read.constant[Task, Context](cm._2)   :+:
           MonotonicSeq.fromTaskRef(i)           :+:
           KeyValueStore.impl.fromTaskRef(kvR)   :+:

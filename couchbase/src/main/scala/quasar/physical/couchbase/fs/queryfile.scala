@@ -18,7 +18,7 @@ package quasar.physical.couchbase.fs
 
 import quasar.Predef._
 import quasar.contrib.pathy._
-import quasar.effect.{Read, MonotonicSeq, UUID}
+import quasar.effect.{Read, MonotonicSeq}
 import quasar.fp._, free._
 import quasar.fs._
 import quasar.physical.couchbase.common._
@@ -38,7 +38,6 @@ object queryfile {
     implicit
     S0: Read[Context, ?] :<: S,
     S1: MonotonicSeq :<: S,
-    S2: UUID :<: S,
     S3: Task :<: S
   ): QueryFile ~> Free[S, ?] = λ[QueryFile ~> Free[S, ?]] {
     case ExecutePlan(lp, out) => ???
