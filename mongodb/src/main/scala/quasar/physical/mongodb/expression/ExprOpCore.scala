@@ -362,6 +362,12 @@ object ExprOpCoreF {
         case $toLowerF(a)            => invoke(a, "toLowerCase")
         case $toUpperF(a)            => invoke(a, "toUpperCase")
 
+        case $yearF(a)               => invoke(a, "getFullYear")
+        // case $dayOfYear(a)           => // TODO: no JS equivalent
+        case $monthF(a)              => invoke(a, "getMonth")
+        case $dayOfMonthF(a)         => invoke(a, "getDate")
+        // case $week(a)                => // TODO: no JS equivalent
+        case $dayOfWeekF(a)          => invoke(a, "getDay")
         case $hourF(a)               => invoke(a, "getUTCHours")
         case $minuteF(a)             => invoke(a, "getUTCMinutes")
         case $secondF(a)             => invoke(a, "getUTCSeconds")
