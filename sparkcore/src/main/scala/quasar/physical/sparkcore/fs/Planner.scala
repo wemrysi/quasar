@@ -36,18 +36,19 @@ import scalaz.concurrent.Task
 @typeclass trait Planner[F[_]] {
   type IT[G[_]]
 
-  def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], F, RDD[Data]]
-
+  def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[Planner.SparkState, F, RDD[Data]]
 }
 
 object Planner {
-  
+
+  type SparkState[A] = StateT[EitherT[Task, PlannerError, ?], SparkContext, A]
+
   type Aux[T[_[_]], F[_]] = Planner[F] { type IT[G[_]] = T[G] }
 
   private def unreachable[T[_[_]], F[_]](what: String): Planner.Aux[T, F] =
     new Planner[F] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], F, RDD[Data]] =
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, F, RDD[Data]] =
         _ =>  StateT((sc: SparkContext) => {
         EitherT(InternalError(s"unreachable $what").left[(SparkContext, RDD[Data])].point[Task])
       })
@@ -93,12 +94,12 @@ object Planner {
           StateT[EitherT[Task, PlannerError, ?], SparkContext, RDD[Data]] = {
 
         val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-        val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
+        val srcState = src.point[SparkState]
 
-        val fromState = freeCataM(from)(interpretM(κ(srcState), algebraM))
-        val countState = freeCataM(count)(interpretM(κ(srcState), algebraM))
+        val fromState: SparkState[RDD[Data]] = freeCataM(from)(interpretM(κ(srcState), algebraM))
+        val countState: SparkState[RDD[Data]] = freeCataM(count)(interpretM(κ(srcState), algebraM))
 
-        val countEval = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
+        val countEval: SparkState[Long] = countState >>= (rdd => EitherT(Task.delay(rdd.first match {
           case Data.Int(v) if v.isValidLong => v.toLong.right[PlannerError]
           case Data.Int(v) => InternalError(s"Provided Integer $v is not a Long").left[Long]
           case a => InternalError(s"$a is not a Long number").left[Long]
@@ -107,7 +108,7 @@ object Planner {
           rdd.zipWithIndex.filter(di => predicate(di._2, count)).map(_._1))
       }
 
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], QScriptCore[T, ?], RDD[Data]] = {
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, QScriptCore[T, ?], RDD[Data]] = {
         case qscript.Map(src, f) =>
           StateT((sc: SparkContext) =>
             EitherT {
@@ -174,7 +175,7 @@ object Planner {
 
         case Union(src, lBranch, rBranch) =>
           val algebraM = Planner[QScriptTotal[T, ?]].plan(fromFile)
-          val srcState = src.point[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?]]
+          val srcState = src.point[SparkState]
 
           for {
             left <- freeCataM(lBranch)(interpretM(κ(srcState), algebraM))
@@ -191,7 +192,7 @@ object Planner {
       Planner.Aux[T, EquiJoin[T, ?]] =
     new Planner[EquiJoin[T, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], EquiJoin[T, ?], RDD[Data]] = _ => ???      
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, EquiJoin[T, ?], RDD[Data]] = _ => ???      
     }
   
   // TODO: Remove this instance
@@ -202,6 +203,6 @@ object Planner {
       Planner.Aux[T, Coproduct[F, G, ?]] =
     new Planner[Coproduct[F, G, ?]] {
       type IT[G[_]] = T[G]
-      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[StateT[EitherT[Task, PlannerError, ?], SparkContext, ?], Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
+      def plan(fromFile: (SparkContext, AFile) => Task[RDD[String]]): AlgebraM[SparkState, Coproduct[F, G, ?], RDD[Data]] = _.run.fold(F.plan(fromFile), G.plan(fromFile))
     }
 }
