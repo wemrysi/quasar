@@ -21,10 +21,10 @@ import quasar.contrib.pathy._
 
 import org.http4s.dsl.{Path => HPath}
 import org.specs2.specification.core._
+import pathy.Path._
 import pathy.scalacheck.PathyArbitrary._
+import scalaz.Scalaz._
 
-/** This is largely copied from `pathy`. It would be nice to expose from a pathy
-  * a function to validate a `PathCodec`. */
 class UriPathCodecSpec extends quasar.Qspec {
   val codec = UriPathCodec
 
@@ -58,8 +58,8 @@ class UriPathCodecSpec extends quasar.Qspec {
   private def checkEncoding(pair: (String, String)): Fragment = {
     val (from, to) = pair
     val result = (
-         ((codec escape from) must_=== to)
-      && ((codec unescape to) must_=== from)
+         ((codec escape from) must_= to)
+      && ((codec unescape to) must_= from)
     )
     fragmentFactory.example(f"$from%-8s -> $to%-8s -> $from%-8s\n", result)
   }
@@ -67,16 +67,16 @@ class UriPathCodecSpec extends quasar.Qspec {
   "UriPathCodec" should {
     "print and parse again should produce same Path" >> {
       "absolute file" >> prop { path: AFile =>
-        codec.parseAbsFile(codec.printPath(path)) must_== Some(path)
+        codec.parseAbsFile(codec.printPath(path)) must_= Some(unsandbox(path))
       }
       "relative file" >> prop { path: RFile =>
-        codec.parseRelFile(codec.printPath(path)) must_== Some(path)
+        codec.parseRelFile(codec.printPath(path)) must_= Some(unsandbox(path))
       }
       "absolute dir" >> prop { path: ADir =>
-        codec.parseAbsDir(codec.printPath(path)) must_== Some(path)
+        codec.parseAbsDir(codec.printPath(path)) must_= Some(unsandbox(path))
       }
       "relative dir" >> prop { path: RDir =>
-        codec.parseRelDir(codec.printPath(path)) must_== Some(path)
+        codec.parseRelDir(codec.printPath(path)) must_= Some(unsandbox(path))
       }
     }
 
@@ -85,23 +85,23 @@ class UriPathCodecSpec extends quasar.Qspec {
         import pathy.Path._
         val path = rootDir </> file("a+b/c")
         val hpath = HPath(codec.printPath(path))
-        AsFilePath.unapply(hpath) must_== Some(path)
+        AsFilePath.unapply(hpath) must_= Some(path)
       }
 
       "absolute dir with plus" >> {
         import pathy.Path._
         val path = rootDir </> dir("a+b/c")
         val hpath = HPath(codec.printPath(path))
-        AsDirPath.unapply(hpath) must_== Some(path)
+        AsDirPath.unapply(hpath) must_= Some(path)
       }
 
       "absolute file" >> prop { path: AFile =>
         val hpath = HPath(codec.printPath(path))
-        AsFilePath.unapply(hpath) must_== Some(path)
+        AsFilePath.unapply(hpath) must_= Some(path)
       }
       "absolute dir" >> prop { path: ADir =>
         val hpath = HPath(codec.printPath(path))
-        AsDirPath.unapply(hpath) must_== Some(path)
+        AsDirPath.unapply(hpath) must_= Some(path)
       }
     }
   }
