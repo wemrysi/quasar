@@ -17,7 +17,6 @@
 package quasar.api
 
 import quasar.Predef._
-import quasar.api.PathUtils._
 import quasar.contrib.pathy.{ADir, AFile}
 
 import org.http4s.dsl.{Path => HPath}
@@ -28,16 +27,12 @@ class AsPathSpec extends quasar.Qspec {
   "AsPath" should {
     "decode any Path we can throw at it" >> {
       "AbsFile" >> prop { file: AFile =>
-        !hasDot(file) ==> {
-          val httpPath = HPath(UriPathCodec.printPath(file))
-          AsFilePath.unapply(httpPath) must_== Some(file)
-        }
+        val httpPath = HPath(UriPathCodec.printPath(file))
+        AsFilePath.unapply(httpPath) must_== Some(file)
       }
       "AbsDir" >> prop { dir : ADir =>
-        !hasDot(dir) ==> {
-          val httpPath = HPath(UriPathCodec.printPath(dir))
-          AsDirPath.unapply(httpPath) must_== Some(dir)
-        }
+        val httpPath = HPath(UriPathCodec.printPath(dir))
+        AsDirPath.unapply(httpPath) must_== Some(dir)
       }
     }
 

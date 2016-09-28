@@ -93,13 +93,13 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
       def render(v: List[A]) = NonTerminal(List("List"), None, v.map(RA.render))
     }
 
-  implicit def ListMapRenderTree[K, V](implicit RV: RenderTree[V]):
+  implicit def ListMapRenderTree[K: Show, V](implicit RV: RenderTree[V]):
       RenderTree[ListMap[K, V]] =
     new RenderTree[ListMap[K, V]] {
       def render(v: ListMap[K, V]) =
         NonTerminal("Map" :: Nil, None,
           v.toList.map { case (k, v) =>
-            NonTerminal("Key" :: "Map" :: Nil, Some(k.toString), RV.render(v) :: Nil)
+            NonTerminal("Key" :: "Map" :: Nil, Some(k.shows), RV.render(v) :: Nil)
           })
     }
 
@@ -113,13 +113,13 @@ sealed trait TreeInstances extends LowPriorityTreeInstances {
     }
 
   implicit val BooleanRenderTree: RenderTree[Boolean] =
-    RenderTree.fromToString[Boolean]("Boolean")
+    RenderTree.fromShow[Boolean]("Boolean")
   implicit val IntRenderTree: RenderTree[Int] =
-    RenderTree.fromToString[Int]("Int")
+    RenderTree.fromShow[Int]("Int")
   implicit val DoubleRenderTree: RenderTree[Double] =
-    RenderTree.fromToString[Double]("Double")
+    RenderTree.fromShow[Double]("Double")
   implicit val StringRenderTree: RenderTree[String] =
-    RenderTree.fromToString[String]("String")
+    RenderTree.fromShow[String]("String")
 
   implicit val SymbolEqual: Equal[Symbol] = Equal.equalA
 

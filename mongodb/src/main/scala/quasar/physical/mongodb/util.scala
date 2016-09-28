@@ -75,6 +75,8 @@ object util {
         .timed(defaultTimeoutMillis.toLong)(Strategy.DefaultTimeoutScheduler)
         .attempt flatMap {
           case -\/(tout: TimeoutException) =>
+            // NB: This is a java List of mongo objects – never going to have Show.
+            @SuppressWarnings(Array("org.wartremover.warts.ToString"))
             val hosts = aclient.getSettings.getClusterSettings.getHosts.toString
             Task.fail(new TimeoutException(s"Timed out attempting to connect to: $hosts"))
           case -\/(t) =>

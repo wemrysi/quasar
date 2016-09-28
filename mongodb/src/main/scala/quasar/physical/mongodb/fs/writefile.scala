@@ -107,7 +107,7 @@ object writefile {
 
   private def dataToDocument(d: Data): FileSystemError \/ Bson.Doc =
     BsonCodec.fromData(d)
-      .leftMap(err => writeFailed(d, err.toString))
+      .leftMap(err => writeFailed(d, err.shows))
       .flatMap {
         case doc @ Bson.Doc(_) => doc.right
         case otherwise         => writeFailed(d, "MongoDB is only able to store documents").left

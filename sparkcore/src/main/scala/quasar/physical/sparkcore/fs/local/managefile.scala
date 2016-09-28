@@ -17,25 +17,23 @@
 package quasar.physical.sparkcore.fs.local
 
 import quasar.Predef._
-import quasar.effect.Failure
-import quasar.fs._
-import quasar.fs.PathError._
-import quasar.fs.FileSystemError._
-import quasar.fp.free._
-import quasar.fs.ManageFile._
-import quasar.fs.ManageFile.MoveScenario._
-import quasar.fs.impl.ensureMoveSemantics
 import quasar.contrib.pathy._
+import quasar.effect.Failure
+import quasar.fp.free._
+import quasar.fs._,
+  FileSystemError._,
+  ManageFile._, ManageFile.MoveScenario._,
+  PathError._
+import quasar.fs.impl.ensureMoveSemantics
 
-import java.nio.file._
-import java.lang.Exception
 import java.io.FileNotFoundException
+import java.lang.Exception
+import java.nio.{file => nio}
 import scala.util.control.NonFatal
 
 import org.apache.commons.io.FileUtils
 import pathy.Path._
-import scalaz.{Failure => _, _}
-import Scalaz._
+import scalaz.{Failure => _, _}, Scalaz._
 import scalaz.concurrent.Task
 
 object managefile {
@@ -63,10 +61,12 @@ object managefile {
       }
     }
 
-  private def toNioPath(path: APath): Path =
-    Paths.get(posixCodec.unsafePrintPath(path))
+  private def toNioPath(path: APath): nio.Path =
+    nio.Paths.get(posixCodec.unsafePrintPath(path))
 
-  private def toAFile(path: Path): Option[AFile] = {
+  private def toAFile(path: nio.Path): Option[AFile] = {
+    // NB: This is `toString` on a Java object, so out of our hands.
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     val maybeUnboxed = posixCodec.parseAbsFile(path.toString)
     maybeUnboxed.map(sandboxAbs(_))
   }
@@ -74,7 +74,7 @@ object managefile {
   private def doesPathExist[S[_]](implicit
     s0: Task :<: S
   ): APath => Free[S, Boolean] = path => lift(Task.delay {
-    Files.exists(toNioPath(path))
+    nio.Files.exists(toNioPath(path))
   }).into[S]
 
   private def moveFile[S[_]](src: AFile, dst: AFile)(implicit
