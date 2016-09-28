@@ -116,6 +116,7 @@ object Planner {
           StateT((sc: SparkContext) =>
             EitherT {
               val maybeFunc =
+                // TODO extract to a single method for compile-time efficiency
                 freeCataM(f)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
               maybeFunc.map(df => (sc, src.map(df))).point[Task]
             }
