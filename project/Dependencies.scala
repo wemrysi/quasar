@@ -12,7 +12,7 @@ object Dependencies {
   private val jacksonVersion    = "2.4.4"
   private val monocleVersion    = "1.2.2"
   private val nettyVersion      = "4.1.3.Final"
-  private val pathyVersion      = "0.2.1"
+  private val pathyVersion      = "0.2.2"
   private val raptureVersion    = "2.0.0-M6"
   private val refinedVersion    = "0.5.0"
   private val scalazVersion     = "7.2.4"

@@ -36,7 +36,10 @@ trait Injectable[IN[_]] {
 object Injectable extends Injectable0 {
   type Aux[IN[_], F[_]] = Injectable[IN] { type OUT[A] = F[A] }
 
-  implicit def coproduct[F[_], G[_], H[_]]
+  /** Note: you'd like this to be implicit, but that makes implicit search
+    * quadratic, so instead this is provided so that you can manually construct
+    * instances where they're needed. */
+  def coproduct[F[_], G[_], H[_]]
     (implicit F: Injectable.Aux[F, H], G: Injectable.Aux[G, H])
       : Injectable.Aux[Coproduct[F, G, ?], H] =
     new Injectable[Coproduct[F, G, ?]] {

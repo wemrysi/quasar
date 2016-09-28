@@ -93,6 +93,13 @@ object QueryFile {
   private type QScriptInternal[T[_[_]], A] =
     (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[DeadEnd, ?])#M[A]
 
+  implicit def qScriptInternalToQscriptTotal[T[_[_]]]
+      : Injectable.Aux[QScriptInternal[T, ?], QScriptTotal[T, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+      Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
+        Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+          Injectable.inject[Const[DeadEnd, ?], QScriptTotal[T, ?]])))
+
   /** This is a stop-gap function that QScript-based backends should use until
     * LogicalPlan no longer needs to be exposed.
     */
@@ -143,6 +150,13 @@ object QueryFile {
     type InterimQS[A] =
       (QScriptCore[T, ?] :\: ProjectBucket[T, ?] :\: ThetaJoin[T, ?] :/: Const[Read, ?])#M[A]
 
+    implicit val interimQsToQscriptTotal
+        : Injectable.Aux[InterimQS, QScriptTotal[T, ?]] =
+      Injectable.coproduct(Injectable.inject[QScriptCore[T, ?], QScriptTotal[T, ?]],
+        Injectable.coproduct(Injectable.inject[ProjectBucket[T, ?], QScriptTotal[T, ?]],
+          Injectable.coproduct(Injectable.inject[ThetaJoin[T, ?], QScriptTotal[T, ?]],
+            Injectable.inject[Const[Read, ?], QScriptTotal[T, ?]])))
+
     val qs =
       merr.map(
         merr.bind(
@@ -159,19 +173,19 @@ object QueryFile {
   }
 
   /** The result of the query is stored in an output file
-    * instead of being returned to the user immidiately.
+    * instead of being returned to the user immediately.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class ExecutePlan(lp: Fix[LogicalPlan], out: AFile)
     extends QueryFile[(PhaseResults, FileSystemError \/ AFile)]
 
-  /** The result of the query is immidiately
+  /** The result of the query is immediately
     * streamed back to the client. This operation begins the streaming, in order
     * to continue the streaming, the client must make use of the `More` operation and
     * finally the `Close` operation in order to halt the streaming.
     * The `LogicalPlan` is expected to only contain absolute paths even though
-    * that is unfortunatly not expressed in the types currently.
+    * that is unfortunately not expressed in the types currently.
     */
   final case class EvaluatePlan(lp: Fix[LogicalPlan])
     extends QueryFile[(PhaseResults, FileSystemError \/ ResultHandle)]
