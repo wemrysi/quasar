@@ -178,6 +178,8 @@ package object api {
   }
 
   // NB: oddly, every path is prefixed with '/', except "".
+  // NB: no Show instance in HTTP4s
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   private def pathString(p: HPath) =
     if (p.toString === "") "/" else p.toString
 

@@ -120,13 +120,24 @@ private[sql] class SQLParser[T[_[_]]: Recursive: Corecursive]
     "[", "]", "[*]", "[:*]", "[*:]", "[_]", "[:_]", "[_:]", ":="))
 
   override def keyword(name: String): Parser[String] =
-    elem("keyword '" + name + "'", v => v.isInstanceOf[lexical.Identifier] && v.chars.toLowerCase == name) ^^ (κ(name))
+    elem(
+      "keyword '" + name + "'",
+      {
+        case lexical.Identifier(chars) => chars.toLowerCase == name
+        case _                         => false
+      }) ^^ (κ(name))
 
   override def ident: Parser[String] =
-    super.ident | elem("quotedIdent", _.isInstanceOf[lexical.QuotedIdentifier]) ^^ (_.chars)
+    super.ident |
+      elem(
+        "quotedIdent",
+        { case lexical.QuotedIdentifier(_) => true; case _ => false }) ^^ (_.chars)
 
   def op(op : String): Parser[String] =
-    if (lexical.delimiters.contains(op)) elem("operator '" + op + "'", v => v.chars == op && v.isInstanceOf[lexical.Keyword]) ^^ (_.chars)
+    if (lexical.delimiters.contains(op))
+      elem(
+        "operator '" + op + "'",
+        { case lexical.Keyword(chars) => chars == op; case _ => false }) ^^ (_.chars)
     else failure("You are trying to parse \""+op+"\" as an operator, but it is not contained in the operators list")
 
   def let_expr: Parser[T[Sql]] =

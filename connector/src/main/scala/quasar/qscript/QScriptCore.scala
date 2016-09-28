@@ -317,47 +317,35 @@ object QScriptCore {
     }
 
   // show is needed for debugging
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
-      Normalizable[QScriptCore[T, ?]] =
-    new Normalizable[QScriptCore[T, ?]] {
-      val opt = new Optimize[T]
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[QScriptCore[T, ?]] = {
+    type QTotal[A] = QScriptTotal[T, A]
+    type QCore[A]  = QScriptCore[T, A]
 
-      def normalize = new (QScriptCore[T, ?] ~> QScriptCore[T, ?]) {
-        def apply[A](qc: QScriptCore[T, A]) = qc match {
-          case Map(src, f) => Map(src, normalizeMapFunc(f))
-          case LeftShift(src, s, r) =>
-            LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
-          case Reduce(src, bucket, reducers, repair) =>
-            val normBuck = normalizeMapFunc(bucket)
-            Reduce(
-              src,
-              // NB: all single-bucket reductions should reduce on `null`
-              normBuck.resume.fold({
-                case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
-                case _                    => normBuck
-              }, κ(normBuck)),
-              reducers.map(_.map(normalizeMapFunc(_))),
-              normalizeMapFunc(repair))
-          case Sort(src, bucket, order) =>
-            Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
-          case Union(src, l, r) =>
-            Union(
-              src,
-              freeTransCata(l)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(r)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Filter(src, f) => Filter(src, normalizeMapFunc(f))
-          case Take(src, from, count) =>
-            Take(
-              src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Drop(src, from, count) =>
-            Drop(
-              src,
-              freeTransCata(from)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-              freeTransCata(count)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])))
-          case Unreferenced() => Unreferenced()
-        }
+    val opt = new Optimize[T]
+    def freeTC(free: FreeQS[T]): FreeQS[T] = freeTransCata[T, QTotal, QTotal, Hole, Hole](free)(liftCo(opt.applyToFreeQS[QTotal]))
+
+    new Normalizable[QCore] {
+      def normalize = λ[QCore ~> QCore] {
+        case Map(src, f)                           => Map(src, normalizeMapFunc(f))
+        case LeftShift(src, s, r)                  => LeftShift(src, normalizeMapFunc(s), normalizeMapFunc(r))
+        case Reduce(src, bucket, reducers, repair) =>
+          val normBuck = normalizeMapFunc(bucket)
+          Reduce(
+            src,
+            // NB: all single-bucket reductions should reduce on `null`
+            normBuck.resume.fold({
+              case MapFuncs.Constant(_) => MapFuncs.NullLit[T, Hole]()
+              case _                    => normBuck
+            }, κ(normBuck)),
+            reducers.map(_.map(normalizeMapFunc(_))),
+            normalizeMapFunc(repair))
+        case Sort(src, bucket, order) => Sort(src, normalizeMapFunc(bucket), order.map(_.leftMap(normalizeMapFunc(_))))
+        case Union(src, l, r)         => Union(src, freeTC(l), freeTC(r))
+        case Filter(src, f)           => Filter(src, normalizeMapFunc(f))
+        case Take(src, from, count)   => Take(src, freeTC(from), freeTC(count))
+        case Drop(src, from, count)   => Drop(src, freeTC(from), freeTC(count))
+        case Unreferenced()           => Unreferenced()
       }
     }
+  }
 }

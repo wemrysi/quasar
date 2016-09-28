@@ -290,6 +290,8 @@ object ExprOpCoreF {
       case $ifNullF(expr, replacement)   => Bson.Doc("$ifNull" -> Bson.Arr(expr, replacement))
     }
 
+    // FIXME: Define a proper `Show[ExprOpCoreF]` instance.
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOpCoreF, JsFn] = {
       def expr1(x1: JsFn)(f: JsCore => JsCore): PlannerError \/ JsFn =
         \/-(JsFn(JsFn.defaultName, f(x1(jscore.Ident(JsFn.defaultName)))))
@@ -317,11 +319,11 @@ object ExprOpCoreF {
           case o @ Bson.ObjectId(_) => \/-(toJsObjectId(o))
           case d @ Bson.Date(_)     => \/-(toJsDate(d))
           // TODO: implement the rest of these (see SD-451)
-          case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.toString))
-          case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.toString))
+          case Bson.Regex(_, _)     => -\/(UnsupportedJS(bson.shows))
+          case Bson.Symbol(_)       => -\/(UnsupportedJS(bson.shows))
           case Bson.Undefined       => \/-(jscore.ident("undefined"))
 
-          case _ => -\/(NonRepresentableInJS(bson.toString))
+          case _ => -\/(NonRepresentableInJS(bson.shows))
         }
       }
 
@@ -362,6 +364,12 @@ object ExprOpCoreF {
         case $toLowerF(a)            => invoke(a, "toLowerCase")
         case $toUpperF(a)            => invoke(a, "toUpperCase")
 
+        case $yearF(a)               => invoke(a, "getFullYear")
+        // case $dayOfYear(a)           => // TODO: no JS equivalent
+        case $monthF(a)              => invoke(a, "getMonth")
+        case $dayOfMonthF(a)         => invoke(a, "getDate")
+        // case $week(a)                => // TODO: no JS equivalent
+        case $dayOfWeekF(a)          => invoke(a, "getDay")
         case $hourF(a)               => invoke(a, "getUTCHours")
         case $minuteF(a)             => invoke(a, "getUTCMinutes")
         case $secondF(a)             => invoke(a, "getUTCSeconds")
