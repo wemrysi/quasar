@@ -16,18 +16,10 @@
 
 package quasar.api
 
-import quasar.Predef._
-import quasar.contrib.pathy.{APath}
+import quasar.contrib.pathy.APath
 
-import org.http4s.{Uri}
-import pathy.Path, Path._
-import scalaz._, Scalaz._
+import org.http4s.Uri
 
 object PathUtils {
-  // NB: these paths confuse the codec and don't seem important at the moment.
-  // See https://github.com/slamdata/scala-pathy/issues/23.
-  def hasDot(p: Path[_, _, _]): Boolean =
-    flatten(false, false, false, d => d == "." || d == "..", f => f == "." || f == "..", p).toList.contains(true)
-
   def pathUri(path: APath): Uri = Uri(path = UriPathCodec.printPath(path))
 }

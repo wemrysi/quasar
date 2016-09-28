@@ -20,7 +20,6 @@ import quasar.Predef._
 import quasar.api.ToQResponse.ops._
 import quasar.contrib.pathy._
 import quasar.effect.Failure
-import quasar.fp._
 
 import java.io.File
 
@@ -159,29 +158,22 @@ package object api {
   def uriEncodeUtf8(s: String): String = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
   def uriDecodeUtf8(s: String): String = java.net.URLDecoder.decode(s, "UTF-8")
 
-  val UriPathCodec = {
-    val $dot$    = "$dot$"
-    val $dotdot$ = "$dotdot$"
+  private val dotdot = "%2E%2E"
+  private val dot    = "%2E"
 
-    val escapeRel: String => String = {
-      case ".." => $dotdot$
-      case "."  => $dot$
-      case s    => uriEncodeUtf8(s)
-    }
-    val unescapeRel: String => String = {
-      case `$dotdot$` => ".."
-      case `$dot$`    => "."
-      case s          => uriDecodeUtf8(s)
-    }
-
-    PathCodec('/', escapeRel, unescapeRel)
+  private val escapeRel: String => String = {
+    case ".." => dotdot
+    case "."  => dot
+    case s    => uriEncodeUtf8(s)
   }
 
-  // NB: oddly, every path is prefixed with '/', except "".
-  // NB: no Show instance in HTTP4s
-  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
+  private val unescapeRel: String => String = uriDecodeUtf8
+
+  val UriPathCodec = PathCodec('/', escapeRel, unescapeRel)
+
+  // NB: HPath's own toString doesn't encode properly
   private def pathString(p: HPath) =
-    if (p.toString === "") "/" else p.toString
+    "/" + p.toList.map(escapeRel).mkString("/")
 
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
