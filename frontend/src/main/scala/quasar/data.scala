@@ -156,6 +156,10 @@ object Data {
 
     override def toString = "Binary(Array[Byte](" + value.mkString(", ") + "))"
 
+    /**
+      scala equality needs to remain for Spark to work
+      @see Planner.qscriptCore
+      */
     override def equals(that: Any): Boolean = that match {
       case Binary(value2) => value ≟ value2
       case _ => false

@@ -74,7 +74,7 @@ object ReduceIndex {
     extends QScriptCore[T, A]
 
 /** Performs a reduction over a dataset, with the dataset partitioned by the
-  * result of the MapFunc. So, rather than many-to-one, this is many-to-fewer.
+  * result of the bucket MapFunc. So, rather than many-to-one, this is many-to-fewer.
   *
   * `bucket` partitions the values into buckets based on the result of the
   * expression, `reducers` applies the provided reduction to each expression,
