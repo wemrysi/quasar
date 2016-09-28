@@ -43,6 +43,12 @@ object queryfile {
   type SparkQScript[A] =
      (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
 
+  // This is an exact copy from marklogic's queryfile.
+  implicit val sparkQScriptToQScriptTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
+    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
+      Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
+        Injectable.inject[Const[ShiftedRead, ?], QScriptTotal[Fix, ?]]))
+
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
     store: (RDD[Data], AFile) => Task[Unit],
@@ -70,11 +76,11 @@ object queryfile {
 
     val optimize = new Optimize[Fix]
 
-    def toQScript(lp: Fix[LogicalPlan]) = {
+    def toQScript(lp: Fix[LogicalPlan]): FileSystemErrT[PhaseResultT[Free[S, ?], ?], Fix[SparkQScript]] = {
       val lc: DiscoverPath.ListContents[FileSystemErrT[PhaseResultT[Free[S, ?],?],?]] =
         (adir: ADir) => EitherT(listContents(input, adir).liftM[PhaseResultT])
       for {
-        qs <- (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)).map(transFutu(_)(ShiftRead[Fix, QScriptRead[Fix, ?], SparkQScript].shiftRead(idPrism.reverseGet)(_)).transCata(optimize.applyAll))
+        qs <- (QueryFile.convertToQScriptRead[Fix, FileSystemErrT[PhaseResultT[Free[S, ?],?],?], QScriptRead[Fix, ?]](lc)(lp)).map(transFutu(_)(ShiftRead[Fix, QScriptRead[Fix, ?], SparkQScript].shiftRead(idPrism.reverseGet)(_)).transCata(optimize.applyAll[SparkQScript]))
         _ <- EitherT(WriterT[Free[S, ?], PhaseResults, FileSystemError \/ Unit]((Vector(PhaseResult.Tree("QScript (Spark)", qs.render) : PhaseResult), ().right[FileSystemError]).point[Free[S, ?]]))
       } yield qs
     }
@@ -84,7 +90,7 @@ object queryfile {
         case FileExists(f) => fileExists(input, f)
         case ListContents(dir) => listContents(input, dir)
         case QueryFile.ExecutePlan(lp: Fix[LogicalPlan], out: AFile) => {
-          
+
           val qs = toQScript(lp) >>=
           (qs => EitherT(WriterT(executePlan(input, qs, out, lp).map(_.run.run))))
 
@@ -100,7 +106,7 @@ object queryfile {
         case QueryFile.Close(h) => close(h)
         case _ => ???
       }
-    }} 
+    }}
 
   implicit def composedFunctor[F[_]: Functor, G[_]: Functor]:
       Functor[(F ∘ G)#λ] =
