@@ -293,10 +293,6 @@ object QueryFile {
     def ls(dir: ADir): M[Set[PathSegment]] =
       EitherT(lift(ListContents(dir)))
 
-    /** The children of the root directory. */
-    def ls: M[Set[PathSegment]] =
-      ls(rootDir)
-
     /** Returns all files in this directory and all of it's sub-directories
       * Fails if the directory does not exist.
       */

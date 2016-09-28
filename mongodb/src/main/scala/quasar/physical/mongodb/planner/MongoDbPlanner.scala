@@ -416,7 +416,7 @@ object MongoDbPlanner {
           case ConstantF(b) => BsonCodec.fromData(b).toOption
           case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Int(i))))) => Some(Bson.Int64(-i.toLong))
           case InvokeFUnapply(Negate, Sized(Fix(ConstantF(Data.Dec(x))))) => Some(Bson.Dec(-x.toDouble))
-          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId(str).toOption
+          case InvokeFUnapply(ToId, Sized(Fix(ConstantF(Data.Str(str))))) => Bson.ObjectId.fromString(str).toOption
           case _ => None
         }
     }

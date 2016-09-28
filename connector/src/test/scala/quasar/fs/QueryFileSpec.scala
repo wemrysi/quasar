@@ -76,7 +76,7 @@ class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
       "streams the results of evaluating the logical plan" >> prop { s: SingleFileMemState =>
         val query = LogicalPlan.Read(s.file)
         val state = s.state.copy(queryResps = Map(query -> s.contents))
-        val result = MemTask.runLog[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
+        val result = MemTask.runLogWE[FileSystemError, PhaseResults, Data](evaluate(query)).run.run.eval(state)
         result.unsafePerformSync._2.toEither must beRight(s.contents)
       }
     }

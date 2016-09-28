@@ -43,6 +43,10 @@ package object api {
 
   type ApiErrT[F[_], A] = EitherT[F, ApiError, A]
 
+  // Fill in the missing HTTP4s instance
+  implicit val caseInsensitiveStringEqual: Equal[CaseInsensitiveString] =
+    Equal.equalA
+
   /** Interpret a `Failure` effect into `ResponseOr` given evidence the
     * failure type can be converted to a `QResponse`.
     */
@@ -73,7 +77,7 @@ package object api {
     type HeaderT = Header
     val name = CaseInsensitiveString("Destination")
     override def matchHeader(header: Header): Option[HeaderT] = {
-      if (header.name == name) Some(header)
+      if (header.name ≟ name) Some(header)
       else None
     }
     override def parse(s: String): ParseResult[Header] =
@@ -84,7 +88,7 @@ package object api {
     type HeaderT = Header
     val name = CaseInsensitiveString("X-File-Name")
     override def matchHeader(header: Header): Option[HeaderT] = {
-      if (header.name == name) Some(header)
+      if (header.name ≟ name) Some(header)
       else None
     }
     override def parse(s: String): ParseResult[Header] =

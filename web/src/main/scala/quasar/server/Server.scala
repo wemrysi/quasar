@@ -56,14 +56,13 @@ object Server {
         .cata(_.point[MainTask], MainTask.raiseError("couldn't parse options"))
         .flatMap(fromCliOptions)
 
-    def fromCliOptions(opts: CliOptions): MainTask[QuasarConfig] = for {
-      content <- StaticContent.fromCliOptions("/files", opts)
-      redirect = content.map(_.loc)
-      cfgPath <- opts.config.fold(none[FsFile].point[MainTask])(cfg =>
-                    FsPath.parseSystemFile(cfg)
-                      .toRight(s"Invalid path to config file: $cfg")
-                      .map(some))
-    } yield QuasarConfig(content.toList, redirect, opts.port, cfgPath, opts.openClient)
+    def fromCliOptions(opts: CliOptions): MainTask[QuasarConfig] =
+      (StaticContent.fromCliOptions("/files", opts) ⊛
+        opts.config.fold(none[FsFile].point[MainTask])(cfg =>
+          FsPath.parseSystemFile(cfg)
+            .toRight(s"Invalid path to config file: $cfg")
+            .map(some))) ((content, cfgPath) =>
+        QuasarConfig(content.toList, content.map(_.loc), opts.port, cfgPath, opts.openClient))
   }
 
   /** Attempts to load the specified config file or one found at any of the
