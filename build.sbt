@@ -69,8 +69,10 @@ lazy val buildSettings = Seq(
     "-Yno-imports",
     "-Ywarn-unused-import"),
   scalacOptions in (Compile, doc) -= "-Xfatal-warnings",
-  // NB: `Wart.AsInstanceOf` is disabled in specific projects because it’s
-  //     triggered by GADT use. (see puffnfresh/wartremover#266)
+  // NB: Some warts are disabled in specific projects. Here’s why:
+  //   • AsInstanceOf   – puffnfresh/wartremover#266
+  //   • NoNeedForMonad – puffnfresh/wartremover#268
+  //   • others         – simply need to be reviewed & fixed
   wartremoverWarnings in (Compile, compile) ++= Warts.allBut(
     Wart.Any,                   // - see puffnfresh/wartremover#263
     Wart.ExplicitImplicitTypes, // - see puffnfresh/wartremover#226
@@ -222,7 +224,8 @@ lazy val foundation = project
     exclusiveTestTag := "exclusive",
     isCIBuild := isTravis,
     isIsolatedEnv := java.lang.Boolean.parseBoolean(java.lang.System.getProperty("isIsolatedEnv")),
-    libraryDependencies ++= Dependencies.foundation)
+    libraryDependencies ++= Dependencies.foundation,
+    wartremoverWarnings in (Compile, compile) -= Wart.NoNeedForMonad)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 lazy val ejson = project
@@ -237,7 +240,7 @@ lazy val effect = project
   .settings(commonSettings)
   .settings(wartremoverWarnings in (Compile, compile) --= Seq(
     Wart.AsInstanceOf,
-    Wart.NoNeedForMonad)) // see puffnfresh/wartremover#268
+    Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val js = project
@@ -276,7 +279,7 @@ lazy val frontend = project
     ScoverageKeys.coverageFailOnMinimum := true,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.Equals,
-      Wart.NoNeedForMonad)) // see puffnfresh/wartremover#268
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val sql = project
@@ -287,7 +290,7 @@ lazy val sql = project
     libraryDependencies ++= Dependencies.core,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.Equals,
-      Wart.NoNeedForMonad)) // see puffnfresh/wartremover#268
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 // connectors
@@ -306,7 +309,9 @@ lazy val connector = project
     libraryDependencies ++= Dependencies.core,
     ScoverageKeys.coverageMinimum := 79,
     ScoverageKeys.coverageFailOnMinimum := true,
-    wartremoverWarnings in (Compile, compile) -= Wart.AsInstanceOf)
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.AsInstanceOf,
+      Wart.NoNeedForMonad))
   .enablePlugins(AutomateHeaderPlugin)
 
 
@@ -319,6 +324,7 @@ lazy val marklogic = project
     libraryDependencies ++= Dependencies.marklogic,
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
+      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -339,6 +345,7 @@ lazy val mongodb = project
     wartremoverWarnings in (Compile, compile) --= Seq(
       Wart.AsInstanceOf,
       Wart.Equals,
+      Wart.NoNeedForMonad,
       Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -403,7 +410,9 @@ lazy val web = project
   .settings(
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web,
-    wartremoverWarnings in (Compile, compile) -= Wart.Overloading)
+    wartremoverWarnings in (Compile, compile) --= Seq(
+      Wart.NoNeedForMonad,
+      Wart.Overloading))
   .enablePlugins(AutomateHeaderPlugin)
 
 // integration tests
