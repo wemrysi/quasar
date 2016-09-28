@@ -109,7 +109,7 @@ object BsonCodec {
             extract(map.get("day_of_month"), Bson._int32))((y, m, d) =>
             LocalDate.of(y, m, d)))
           .map(date => Bson.Date(date.atStartOfDay.toInstant(ZoneOffset.UTC))) \/>
-          NonRepresentableEJson(value.toString + " is not a valid date")
+          NonRepresentableEJson(value.shows + " is not a valid date")
       case (EJsonType("_ejson.time"), Bson.Doc(map)) =>
         (extract(map.get("hour"), Bson._int32) ⊛
           extract(map.get("minute"), Bson._int32) ⊛
@@ -120,10 +120,10 @@ object BsonCodec {
               pad2(m) + ":" +
               pad2(s) + "." +
               pad3(n))) \/>
-        NonRepresentableEJson(value.toString + " is not a valid time")
+        NonRepresentableEJson(value.shows + " is not a valid time")
       case (EJsonType("_ejson.interval"), Bson.Doc(map)) =>
         extract(map.get("seconds"), Bson._dec).map(s => Bson.Dec(s * millisPerSec)) \/>
-          NonRepresentableEJson(value.toString + " is not a valid interval")
+          NonRepresentableEJson(value.shows + " is not a valid interval")
       case (EJsonType("_ejson.timestamp"), Bson.Doc(map)) =>
         (extract(map.get("year"), Bson._int32) ⊛
           extract(map.get("month"), Bson._int32) ⊛
@@ -133,7 +133,7 @@ object BsonCodec {
           extract(map.get("second"), Bson._int32) ⊛
           extract(map.get("nanosecond"), Bson._int32))((y, mo, d, h, mi, s, n) =>
           Bson.Date(LocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))) \/>
-          NonRepresentableEJson(value.toString + " is not a valid timestamp")
+          NonRepresentableEJson(value.shows + " is not a valid timestamp")
       case (_, _) => value.right
     }
   }

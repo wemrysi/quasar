@@ -103,7 +103,7 @@ object LogicalPlan {
               }
 
             case ReadF(file)                => Terminal("Read" :: nodeType, Some(posixCodec.printPath(file)))
-            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.toString))
+            case ConstantF(data)            => Terminal("Constant" :: nodeType, Some(data.shows))
             case InvokeFUnapply(func, args) => NonTerminal("Invoke" :: nodeType, Some(func.name), args.unsized.map(ra.render))
             case FreeF(name)                => Terminal("Free" :: nodeType, Some(name.toString))
             case LetF(ident, form, body)    => NonTerminal("Let" :: nodeType, Some(ident.toString), List(ra.render(form), ra.render(body)))

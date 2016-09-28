@@ -38,8 +38,10 @@ object SemanticAnalysis {
   object Synthetic {
     final case object SortKey extends Synthetic
 
-    implicit val SyntheticRenderTree: RenderTree[Synthetic] =
-      RenderTree.fromToString[Synthetic]("Synthetic")
+    implicit val show: Show[Synthetic] = Show.showFromToString
+
+    implicit val renderTree: RenderTree[Synthetic] =
+      RenderTree.fromShow[Synthetic]("Synthetic")
   }
 
   private val syntheticPrefix = "__sd__"
@@ -185,6 +187,7 @@ object SemanticAnalysis {
 
     // TODO: Implement Order for all sorts of types so we can get Equal (well,
     //       Order, even) defined properly for Provenance.
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     override def equals(that: scala.Any): Boolean = (this, that) match {
       case (x, y) if (x.eq(y.asInstanceOf[AnyRef])) => true
       case (Relation(v1), Relation(v2))             => v1 == v2

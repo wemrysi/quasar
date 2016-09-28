@@ -33,4 +33,6 @@ object IdHandling {
 
     def zero = IgnoreId
   }
+
+  implicit val show: Show[IdHandling] = Show.showFromToString
 }
