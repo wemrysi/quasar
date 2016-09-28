@@ -61,15 +61,6 @@ trait PathArbitrary {
 
   private def peel(dir: ADir): Option[(ADir, DirName)] =
     parentDir(dir).zip(dirName(dir)).headOption
-
-  private val genSegment: Gen[String] =
-    Gen.nonEmptyListOf(Gen.frequency(
-      100 -> Gen.alphaNumChar,
-      10 -> Gen.const('.'),
-      10 -> Gen.const('/'),
-      5 -> Arbitrary.arbitrary[Char]
-    )) map (_.mkString)
-
 }
 
 object PathArbitrary extends PathArbitrary
