@@ -149,16 +149,17 @@ object Planner {
             freeCataM(struct)(interpretM(κ(ι[Data].right[PlannerError]), CoreMap.change))
 
           def repairFunc: PlannerError \/ ((Data, Data) => Data) = {
-            val dd = freeCataM(repair)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
-              case LeftSide => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(0)
-                case _ => Data.NA
-              }).right
-              case RightSide => ((x: Data) => x match {
-                case Data.Arr(elems) => elems(1)
-                case _ => Data.NA
-              }).right
-            }, CoreMap.change))
+            val dd: PlannerError \/ (Data => Data) =
+              freeCataM(repair)(interpretM[PlannerError \/ ?, MapFunc[T, ?], JoinSide, Data => Data]({
+                case LeftSide => ((x: Data) => x match {
+                  case Data.Arr(elems) => elems(0)
+                  case _ => Data.NA
+                }).right
+                case RightSide => ((x: Data) => x match {
+                  case Data.Arr(elems) => elems(1)
+                  case _ => Data.NA
+                }).right
+              }, CoreMap.change))
 
             dd.map(df => (l, r) => df(Data.Arr(List(l, r))))
           }
