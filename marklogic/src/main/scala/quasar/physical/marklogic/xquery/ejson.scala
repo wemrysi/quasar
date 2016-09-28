@@ -18,96 +18,67 @@ package quasar.physical.marklogic.xquery
 
 import quasar.Predef._
 import quasar.NameGenerator
+import quasar.physical.marklogic.xml.namespaces._
 
 import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{element, for_, func}, axes._
+  import syntax._, expr.{attribute, element, func}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2}
 
-  val ejs = namespace("ejson", "http://quasar-analytics.org/ejson")
+  val ejs = NamespaceDecl(ejsonNs)
 
-  val arrayN    = ejs name "array"
-  val arrayEltN = ejs name "array-element"
-  val mapN      = ejs name "map"
-  val mapEntryN = ejs name "map-entry"
-  val mapKeyN   = ejs name "map-key"
-  val mapValueN = ejs name "map-value"
+  val ejsonN    = ejs name ejsonEjson.local
+  val arrayEltN = ejs name ejsonArrayElt.local
+  val typeAttrN = ejs name ejsonType.local
 
-  // ejson:array-concat($arr1 as element(ejson:array), $arr2 as element(ejson:array)) as element(ejson:array)
+  // <ejson:ejson ejson:type="null" />
+  def null_[F[_]: PrologW]: F[XQuery] =
+    (ejsonN.xs[F] |@|  typeAttrN.xs) { (ejsxs, tpexs) =>
+      element { ejsxs } { attribute { tpexs } { "null".xs } }
+    }
+
+  // ejson:array-concat($arr1 as element(), $arr2 as element()) as element(ejson:ejson)
   def arrayConcat[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
-    (ejs.name("array-concat").qn[F] |@| arrayN.qn |@| arrayEltN.qn) { (fname, aname, aelt) =>
+    (ejs.name("array-concat").qn[F] |@| ejsonN.qn |@| arrayEltN.qn) { (fname, ename, aelt) =>
       declare(fname)(
-        $("arr1") as SequenceType(s"element($aname)"),
-        $("arr2") as SequenceType(s"element($aname)")
-      ).as(SequenceType(s"element($aname)")) { (arr1: XQuery, arr2: XQuery) =>
+        $("arr1") as SequenceType(s"element()"),
+        $("arr2") as SequenceType(s"element()")
+      ).as(SequenceType(s"element($ename)")) { (arr1: XQuery, arr2: XQuery) =>
         mkArray[F] apply mkSeq_(arr1 `/` child(aelt), arr2 `/` child(aelt))
       }
     }.join
 
-  // ejson:array-left-shift($arr as element(ejson:array)) as item()*
-  def arrayLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("array-left-shift").qn[F] |@| arrayN.qn |@| arrayEltN.qn) { (fname, aname, aelt) =>
-      declare(fname)(
-        $("arr") as SequenceType(s"element($aname)")
-      ).as(SequenceType("item()*")) { arr =>
-        arr `/` child(aelt) `/` child.node()
-      }
-    }
-
   // ejson:is-array($node as node()) as xs:boolean
   def isArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("is-array").qn[F] |@| arrayN.xqy) { (fname, aname) =>
+    (ejs.name("is-array").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
       declare(fname)(
         $("node") as SequenceType("node()")
       ).as(SequenceType("xs:boolean")) { node =>
-        fn.nodeName(node) === aname
+        fn.not(fn.empty(node(axes.attribute(tname) === "array".xs)))
       }
     }
 
-  // ejson:is-map($node as node()) as xs:boolean
-  def isMap[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("is-map").qn[F] |@| mapN.xqy) { (fname, mname) =>
+  // ejson:is-object($node as node()) as xs:boolean
+  def isObject[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("is-object").qn[F] |@| typeAttrN.qn) { (fname, tname) =>
       declare(fname)(
         $("node") as SequenceType("node()")
       ).as(SequenceType("xs:boolean")) { node =>
-        fn.nodeName(node) === mname
+        fn.not(fn.empty(node(axes.attribute(tname) === "object".xs)))
       }
     }
 
-  // ejson:map-left-shift($map as element(ejson:map)) as item()*
-  def mapLeftShift[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("map-left-shift").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapValueN.qn) {
-      (fname, mname, mentry, mval) =>
-
-      declare(fname)(
-        $("map") as SequenceType(s"element($mname)")
-      ).as(SequenceType("item()*")) { m =>
-        m `/` child(mentry) `/` child(mval) `/` child.node()
-      }
-    }
-
-  // ejson:map-lookup($map as element(ejson:map), $key as item()*) as item()*
-  def mapLookup[F[_]: NameGenerator: PrologW]: F[FunctionDecl2] =
-    (ejs.name("map-lookup").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapKeyN.xqy |@| mapValueN.qn) {
-      (fname, mname, mentry, mkey, mval) =>
-
-      declare(fname)(
-        $("map") as SequenceType(s"element($mname)"),
-        $("key") as SequenceType.Top
-      ).as(SequenceType.Top) { (m, k) =>
-        m `/` child(mentry)(mkey === k) `/` child(mval) `/` child.node()
-      }
-    }
-
-  // ejson:make-array($elements as element(ejson:array-element)*) as element(ejson:array)
+  // ejson:make-array($elements as element(ejson:array-element)*) as element(ejson:ejson)
   def mkArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("make-array").qn[F] |@| arrayN.qn |@| arrayN.xs |@| arrayEltN.qn) { (fname, aname, arrxs, aelt) =>
+    (ejs.name("make-array").qn[F] |@| ejsonN.qn |@| ejsonN.xs |@| arrayEltN.qn |@| typeAttrN.xs) {
+      (fname, ename, ejsxs, aelt, tpexs) =>
+
       declare(fname)(
         $("elements") as SequenceType(s"element($aelt)*")
-      ).as(SequenceType(s"element($aname)")) { elts =>
-        element { arrxs } { elts }
+      ).as(SequenceType(s"element($ename)")) { elts =>
+        element { ejsxs } { mkSeq_(attribute { tpexs } { "array".xs }, elts) }
       }
     }
 
@@ -121,40 +92,46 @@ object ejson {
       }
     }
 
-  // ejson:make-map($entries as element(ejson:map-entry)*) as element(ejson:map)
-  def mkMap[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("make-map").qn[F] |@| mapN.qn |@| mapN.xs |@| mapEntryN.qn) { (fname, mname, mapxs, ment) =>
+  // ejson:make-object($entries as element()*) as element(ejson:ejson)
+  def mkObject[F[_]: PrologW]: F[FunctionDecl1] =
+    (ejs.name("make-object").qn[F] |@| ejsonN.qn |@| ejsonN.xs |@| typeAttrN.xs) {
+      (fname, ename, ejsxs, tpexs) =>
+
       declare(fname)(
-        $("entries") as SequenceType(s"element($ment)*")
-      ).as(SequenceType(s"element($mname)")) { entries =>
-        element { mapxs } { entries }
+        $("entries") as SequenceType(s"element()*")
+      ).as(SequenceType(s"element($ename)")) { entries =>
+        element { ejsxs } { mkSeq_(attribute { tpexs } { "object".xs }, entries) }
       }
     }
 
-  // ejson:make-map-entry($key as item()*, $value as item()*) as element(ejson:map-entry)
-  def mkMapEntry[F[_]: PrologW]: F[FunctionDecl2] =
-    (ejs.name("make-map-entry").qn[F] |@| mapEntryN.qn |@| mapEntryN.xs |@| mapKeyN.xs |@| mapValueN.xs) {
-      (fname, mentry, mentryxs, mkeyxs, mvalxs) =>
-
+  // ejson:make-object-entry($key as xs:string*, $value as item()*) as element()
+  def mkObjectEntry[F[_]: PrologW]: F[FunctionDecl2] =
+    ejs.name("make-object-entry").qn[F] map { fname =>
       declare(fname)(
-        $("key") as SequenceType.Top,
+        $("key") as SequenceType("xs:string"),
         $("value") as SequenceType.Top
-      ).as(SequenceType(s"element($mentry)")) { (key, value) =>
-        element { mentryxs } {
-          mkSeq_(
-            element { mkeyxs } { key },
-            element { mvalxs } { value }
-          )
-        }
+      ).as(SequenceType(s"element()")) { (key, value) =>
+        element { key } { value }
       }
     }
 
-  // ejson:seq-to-array($items as item()*) as element(ejson:array)
+  // ejson:object-concat($obj1 as element(), $obj2 as element()) as element()
+  def objectConcat[F[_]: PrologW]: F[FunctionDecl2] =
+    (ejs.name("object-concat").qn[F] |@| ejsonN.qn) { (fname, ename) =>
+      declare(fname)(
+        $("obj1") as SequenceType("element()"),
+        $("obj2") as SequenceType("element()")
+      ).as(SequenceType(s"element($ename)")) { (obj1: XQuery, obj2: XQuery) =>
+        mkObject[F] apply (mkSeq_(obj1 `/` child.element(), obj2 `/` child.element()))
+      }
+    }.join
+
+  // ejson:seq-to-array($items as item()*) as element(ejson:ejson)
   def seqToArray[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
-    (ejs.name("seq-to-array").qn[F] |@| arrayN.qn) { (fname, aname) =>
+    (ejs.name("seq-to-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
       declare(fname)(
         $("items") as SequenceType("item()*")
-      ).as(SequenceType(s"element($aname)")) { items: XQuery =>
+      ).as(SequenceType(s"element($ename)")) { items: XQuery =>
         val x = "$x"
 
         for {
@@ -164,53 +141,24 @@ object ejson {
       }
     }.join
 
-  // ejson:singleton-array($item as item()*) as element(ejson:array)
+  // ejson:singleton-array($item as item()*) as element(ejson:ejson)
   def singletonArray[F[_]: PrologW]: F[FunctionDecl1] =
-    (ejs.name("singleton-array").qn[F] |@| arrayN.qn) { (fname, aname) =>
+    (ejs.name("singleton-array").qn[F] |@| ejsonN.qn) { (fname, ename) =>
       declare(fname)(
         $("item") as SequenceType.Top
-      ).as(SequenceType(s"element($aname)")) { item: XQuery =>
+      ).as(SequenceType(s"element($ename)")) { item: XQuery =>
         mkArrayElt[F].apply(item) flatMap (xqy => mkArray[F].apply(xqy))
       }
     }.join
 
-  // ejson:singleton-map($key as item()*, $value as item()*) as element(ejson:map)
-  def singletonMap[F[_]: PrologW]: F[FunctionDecl2] =
-    (ejs.name("singleton-map").qn[F] |@| mapN.qn) { (fname, mname) =>
+  // ejson:singleton-object($key as xs:string, $value as item()*) as element(ejson:ejson)
+  def singletonObject[F[_]: PrologW]: F[FunctionDecl2] =
+    (ejs.name("singleton-object").qn[F] |@| ejsonN.qn) { (fname, ename) =>
       declare(fname)(
-        $("key") as SequenceType.Top,
+        $("key") as SequenceType("xs:string"),
         $("value") as SequenceType.Top
-      ).as(SequenceType(s"element($mname)")) { (key: XQuery, value: XQuery) =>
-        mkMapEntry[F].apply(key, value) flatMap (xqy => mkMap[F].apply(xqy))
-      }
-    }.join
-
-  // ejson:zip-map-keys($map as element(ejson:map)) as element(ejson:map)
-  def zipMapKeys[F[_]: NameGenerator: PrologW]: F[FunctionDecl1] =
-    (ejs.name("zip-map-keys").qn[F] |@| mapN.qn |@| mapEntryN.qn |@| mapKeyN.qn |@| mapValueN.qn) {
-      (fname, mname, mentry, mkey, mval) =>
-
-      val mapType = SequenceType(s"element($mname)")
-      val entry = "$entry"
-      val key   = "$key"
-      val value = "$value"
-
-      declare(fname)(
-        $("map") as mapType
-      ).as(mapType) { map: XQuery =>
-        for {
-          kelt <- mkArrayElt[F] apply key.xqy
-          velt <- mkArrayElt[F] apply value.xqy
-          arr  <- mkArray[F] apply mkSeq_(kelt, velt)
-          ment <- mkMapEntry[F] apply (key.xqy, arr)
-          ents =  for_(
-                    entry -> map `/` child(mentry))
-                  .let_(
-                    key   -> entry.xqy `/` child(mkey) `/` child.node(),
-                    value -> entry.xqy `/` child(mval) `/` child.node())
-                  .return_(ment)
-          zmap <- mkMap[F] apply ents
-        } yield zmap
+      ).as(SequenceType(s"element($ename)")) { (key: XQuery, value: XQuery) =>
+        mkObjectEntry[F].apply(key, value) flatMap (xqy => mkObject[F].apply(xqy))
       }
     }.join
 }

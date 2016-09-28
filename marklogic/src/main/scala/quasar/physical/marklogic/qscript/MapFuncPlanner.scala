@@ -20,16 +20,18 @@ import quasar.Predef._
 import quasar.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp.ShowT
-import quasar.physical.marklogic.MonadError_
-import quasar.physical.marklogic.ejson.AsXQuery
+import quasar.fp.eitherT._
+import quasar.physical.marklogic.{ErrorMessages, MonadError_}
+import quasar.physical.marklogic.ejson.EncodeXQuery
 import quasar.physical.marklogic.validation._
+import quasar.physical.marklogic.xml._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
-import quasar.physical.marklogic.xquery.xml.{NCName, QName}
 import quasar.qscript.{MapFunc, MapFuncs}, MapFuncs._
 
 import eu.timepit.refined.refineV
 import matryoshka._, Recursive.ops._
+import scalaz.EitherT
 import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.show._
@@ -39,7 +41,11 @@ object MapFuncPlanner {
   import expr.{if_, let_}, axes._
 
   def apply[T[_[_]]: Recursive: ShowT, F[_]: NameGenerator: PrologW: MonadPlanErr]: AlgebraM[F, MapFunc[T, ?], XQuery] = {
-    case Constant(ejson) => ejson.cata(AsXQuery[EJson].asXQuery).point[F]
+    case Constant(ejson) =>
+      type M[A] = EitherT[F, ErrorMessages, A]
+      ejson.cataM(EncodeXQuery[M, EJson].encodeXQuery).run.flatMap(_.fold(
+        msgs => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unrepresentableEJson(ejson.convertTo[Fix], msgs)),
+        _.point[F]))
 
     // math
     case Negate(x) => (-x).point[F]
@@ -74,76 +80,85 @@ object MapFuncPlanner {
     case MakeArray(x) =>
       ejson.singletonArray[F] apply x
 
-    // TODO: Could also just support string keys for now so we can stick with JSON? Or XML?
     case MakeMap(k, v) =>
-      ejson.singletonMap[F] apply (k, v)
+      def withLitKey(s: String): F[XQuery] =
+        refineV[IsNCName](s).disjunction map { ncname =>
+          val qn = QName.local(NCName(ncname))
+          ejson.singletonObject[F] apply (qn.xs, v)
+        } getOrElse invalidQName(s)
+
+      k match {
+        // Makes numeric strings valid QNames by prepending an underscore
+        case XQuery.StringLit(IntegralNumber(s)) =>
+          withLitKey("_" + s)
+
+        case XQuery.StringLit(s) =>
+          withLitKey(s)
+
+        case _ => ejson.singletonObject[F] apply (k, v)
+      }
 
     case ConcatArrays(x, y) =>
       ejson.arrayConcat[F] apply (x, y)
 
-    case ProjectField(src, field) => field match {
-      case XQuery.Step(_) =>
-        (src `/` field).point[F]
+    case ConcatMaps(x, y) =>
+      ejson.objectConcat[F] apply (x, y)
 
-      case XQuery.StringLit(s) =>
+    case ProjectField(src, field) =>
+      def projectLit(s: String): F[XQuery] =
         refineV[IsNCName](s).disjunction map { ncname =>
-          val qn = QName.local(NCName(ncname))
-
-          for {
-            m      <- freshVar[F]
-            lookup <- ejson.mapLookup[F] apply (m.xqy, qn.xs)
-            isMap  <- ejson.isMap[F] apply (m.xqy)
-          } yield {
+          freshVar[F] map { m =>
             let_(m -> src) return_ {
-              if_ (isMap)
-              .then_ { lookup }
-              .else_ { m.xqy `/` child(qn) }
+              m.xqy `/` child(QName.local(NCName(ncname)))
             }
           }
-        } getOrElse {
-          MonadError_[F, MarkLogicPlannerError].raiseError(
-            MarkLogicPlannerError.invalidQName(s))
-        }
+        } getOrElse invalidQName(s)
 
-      case _ =>
-        for {
-          m     <- freshVar[F]
-          k     <- freshVar[F]
-          v     <- ejson.mapLookup[F] apply (m.xqy, k.xqy)
-          isMap <- ejson.isMap[F] apply (m.xqy)
-        } yield {
-          let_(m -> src, k -> field) return_ {
-            if_ (isMap) then_ v else_ (m.xqy `/` k.xqy)
+      field match {
+        case XQuery.Step(_) =>
+          (src `/` field).point[F]
+
+        // Makes numeric strings valid QNames by prepending an underscore
+        case XQuery.StringLit(IntegralNumber(s)) =>
+          projectLit("_" + s)
+
+        case XQuery.StringLit(s) =>
+          projectLit(s)
+
+        case _ =>
+          (freshVar[F] |@| freshVar[F]) { (m, k) =>
+            let_(m -> src, k -> field) return_ {
+              m.xqy `/` k.xqy
+            }
           }
-        }
-    }
+      }
 
-    // TODO: What other types should this work with?
+    // TODO: If we don't specify the element type, this should work for any element
     case ProjectIndex(arr, idx) =>
-      (freshVar[F] |@| ejson.arrayEltN.qn) { (i, arrElt) =>
+      (freshVar[F] |@| ejson.arrayEltN.qn[F]) { (i, arrElt) =>
         let_(i -> idx) return_ {
           arr `/` child(arrElt)(i.xqy + 1.xqy) `/` child.node()
         }
       }
 
     // other
-    case Range(x, y) => (x to y).point[F]
+    case Range(x, y)   => (x to y).point[F]
 
-    case ZipMapKeys(m) =>
-      for {
-        src   <- freshVar[F]
-        zmk   <- ejson.zipMapKeys apply src.xqy
-        zmnk  <- qscript.zipMapNodeKeys apply src.xqy
-        isMap <- ejson.isMap apply (src.xqy)
-      } yield {
-        let_(src -> m) return_ {
-          // TODO: Should this be necessary?
-          if_(fn.empty(src.xqy))
-          .then_ { src.xqy }
-          .else_ { if_(isMap) then_ zmk else_ zmnk }
-        }
-      }
+    case ZipMapKeys(m) => qscript.zipMapNodeKeys[F] apply m
+
+    // FIXME: This isn't correct, just an interim impl to allow some queries to execute.
+    case Guard(_, _, cont, _) =>
+      s"(: GUARD CONT :)$cont".xqy.point[F]
 
     case mapFunc => s"(: ${mapFunc.shows} :)()".xqy.point[F]
   }
+
+  ////
+
+  // A string consisting only of digits.
+  private val IntegralNumber = "^(\\d+)$".r
+
+  private def invalidQName[F[_]: MonadPlanErr, A](s: String): F[A] =
+    MonadError_[F, MarkLogicPlannerError].raiseError(
+      MarkLogicPlannerError.invalidQName(s))
 }

@@ -216,7 +216,7 @@ sealed abstract class ToApiErrorInstances extends ToApiErrorInstances0 {
         fromMsg(
           InternalServerError withReason "Unsupported query plan.",
           err.message,
-          "term" := lp.toString
+          "term" := lp.void.shows
         ) :?+ ("reason" :?= hint)
       case FuncApply(fn, exp, act) =>
         fromMsg(

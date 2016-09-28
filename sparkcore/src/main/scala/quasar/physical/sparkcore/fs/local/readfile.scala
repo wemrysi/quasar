@@ -54,7 +54,11 @@ object readfile {
   def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] =
     injectFT[Task, S].apply(Task.delay(new File(posixCodec.unsafePrintPath(f)).exists()))
 
+  // TODO arbitrary value, more or less a good starting point
+  // but we should consider some measuring
+  def readChunkSize: Int = 5000
+
   def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f,off, lim) => rddFrom(f, off, lim), f => fileExists(f))
+    Input((f,off, lim) => rddFrom(f, off, lim), f => fileExists(f), readChunkSize _)
 
 }

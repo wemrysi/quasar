@@ -133,7 +133,8 @@ package object expression {
     }
 
   // FIXME: no way to put this in anybody's companion where it will be found?
-  implicit def exprOpRenderTree[T[_[_]]: Recursive, EX[_]: Functor](implicit ops: ExprOpOps.Uni[EX]): RenderTree[T[EX]] =
+  implicit def exprOpRenderTree[T[_[_]]: Recursive, EX[_]: Functor](implicit ops: ExprOpOps.Uni[EX]):
+      RenderTree[T[EX]] =
     new RenderTree[T[EX]] {
       def render(v: T[EX]) = Terminal(List("ExprOp"), v.cata(ops.bson).toJs.pprint(0).some)
     }

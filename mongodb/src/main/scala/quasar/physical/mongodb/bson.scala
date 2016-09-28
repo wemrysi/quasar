@@ -215,6 +215,8 @@ object Bson {
   }
 
   implicit val equal: Equal[Bson] = Equal.equalA
+
+  implicit val show: Show[Bson] = Show.showFromToString
 }
 
 sealed abstract class BsonType(val ordinal: Int)
@@ -318,11 +320,13 @@ object BsonField {
     def asText = Path(NonEmptyList(this)).asText
 
     def flatten = NonEmptyList(this)
-
-    override def toString = s"""BsonField.Name("$value")"""
   }
+
   object Name {
     implicit val equal: Equal[Name] = Equal.equalA
+
+    implicit val show: Show[Name] =
+      Show.shows(n => s"""BsonField.Name("${n.value}")""")
   }
 
   final case class Path(values: NonEmptyList[Name]) extends BsonField {
@@ -332,9 +336,12 @@ object BsonField {
       case (Name(value), 0) => value
       case (Name(value), _) => "." + value
     }).toList.mkString("")
-
-    override def toString = values.list.toList.mkString(" \\ ")
   }
 
   implicit val equal: Equal[BsonField] = Equal.equalA
+
+  implicit val show: Show[BsonField] = Show.shows {
+    case n @ Name(_)  => n.shows
+    case Path(values) => values.list.toList.mkString(" \\ ")
+  }
 }
