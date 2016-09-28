@@ -18,7 +18,8 @@ package quasar.std
 
 import quasar.Predef._
 import quasar.{Data, GenericFunc, LogicalPlan}, LogicalPlan._
-import quasar.fp._
+import quasar.RenderTree.ops._
+import quasar.fp.ski._
 import quasar.std.StdLib._
 
 import matryoshka._, Recursive.ops._
@@ -51,7 +52,7 @@ class SimplifyStdLibSpec extends StdLibSpec {
   def run(lp: Fix[LogicalPlan], expected: Data): Result =
     ensureCorrectTypes(lp).disjunction match {
       case  \/-(Fix(LogicalPlan.ConstantF(d))) => (d must closeTo(expected)).toResult
-      case  \/-(v) => Failure("not a constant", v.shows)
+      case  \/-(v) => Failure("not a constant", v.render.shows)
       case -\/ (err) => Failure("simplification failed", err.toString)
     }
 

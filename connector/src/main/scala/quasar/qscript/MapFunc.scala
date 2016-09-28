@@ -294,6 +294,24 @@ object MapFunc {
         case Now() => G.point(Now[T, B]())
 
         // unary
+        case ExtractCentury(a1) => f(a1) ∘ (ExtractCentury(_))
+        case ExtractDayOfMonth(a1) => f(a1) ∘ (ExtractDayOfMonth(_))
+        case ExtractDecade(a1) => f(a1) ∘ (ExtractDecade(_))
+        case ExtractDayOfWeek(a1) => f(a1) ∘ (ExtractDayOfWeek(_))
+        case ExtractDayOfYear(a1) => f(a1) ∘ (ExtractDayOfYear(_))
+        case ExtractEpoch(a1) => f(a1) ∘ (ExtractEpoch(_))
+        case ExtractHour(a1) => f(a1) ∘ (ExtractHour(_))
+        case ExtractIsoDayOfWeek(a1) => f(a1) ∘ (ExtractIsoDayOfWeek(_))
+        case ExtractIsoYear(a1) => f(a1) ∘ (ExtractIsoYear(_))
+        case ExtractMicroseconds(a1) => f(a1) ∘ (ExtractMicroseconds(_))
+        case ExtractMillenium(a1) => f(a1) ∘ (ExtractMillenium(_))
+        case ExtractMilliseconds(a1) => f(a1) ∘ (ExtractMilliseconds(_))
+        case ExtractMinute(a1) => f(a1) ∘ (ExtractMinute(_))
+        case ExtractMonth(a1) => f(a1) ∘ (ExtractMonth(_))
+        case ExtractQuarter(a1) => f(a1) ∘ (ExtractQuarter(_))
+        case ExtractSecond(a1) => f(a1) ∘ (ExtractSecond(_))
+        case ExtractWeek(a1) => f(a1) ∘ (ExtractWeek(_))
+        case ExtractYear(a1) => f(a1) ∘ (ExtractYear(_))
         case Date(a1) => f(a1) ∘ (Date(_))
         case Time(a1) => f(a1) ∘ (Time(_))
         case Timestamp(a1) => f(a1) ∘ (Timestamp(_))
@@ -317,7 +335,6 @@ object MapFunc {
         case ZipMapKeys(a1) => f(a1) ∘ (ZipMapKeys(_))
 
         // binary
-        case Extract(a1, a2) => (f(a1) ⊛ f(a2))(Extract(_, _))
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
         case Multiply(a1, a2) => (f(a1) ⊛ f(a2))(Multiply(_, _))
         case Subtract(a1, a2) => (f(a1) ⊛ f(a2))(Subtract(_, _))
@@ -361,6 +378,24 @@ object MapFunc {
         case (Now(), Now()) => true
 
         // unary
+        case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
+        case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
+        case (ExtractDecade(a1), ExtractDecade(a2)) => in.equal(a1, a2)
+        case (ExtractDayOfWeek(a1), ExtractDayOfWeek(a2)) => in.equal(a1, a2)
+        case (ExtractDayOfYear(a1), ExtractDayOfYear(a2)) => in.equal(a1, a2)
+        case (ExtractEpoch(a1), ExtractEpoch(a2)) => in.equal(a1, a2)
+        case (ExtractHour(a1), ExtractHour(a2)) => in.equal(a1, a2)
+        case (ExtractIsoDayOfWeek(a1), ExtractIsoDayOfWeek(a2)) => in.equal(a1, a2)
+        case (ExtractIsoYear(a1), ExtractIsoYear(a2)) => in.equal(a1, a2)
+        case (ExtractMicroseconds(a1), ExtractMicroseconds(a2)) => in.equal(a1, a2)
+        case (ExtractMillenium(a1), ExtractMillenium(a2)) => in.equal(a1, a2)
+        case (ExtractMilliseconds(a1), ExtractMilliseconds(a2)) => in.equal(a1, a2)
+        case (ExtractMinute(a1), ExtractMinute(a2)) => in.equal(a1, a2)
+        case (ExtractMonth(a1), ExtractMonth(a2)) => in.equal(a1, a2)
+        case (ExtractQuarter(a1), ExtractQuarter(a2)) => in.equal(a1, a2)
+        case (ExtractSecond(a1), ExtractSecond(a2)) => in.equal(a1, a2)
+        case (ExtractWeek(a1), ExtractWeek(a2)) => in.equal(a1, a2)
+        case (ExtractYear(a1), ExtractYear(a2)) => in.equal(a1, a2)
         case (Date(a1), Date(b1)) => in.equal(a1, b1)
         case (Time(a1), Time(b1)) => in.equal(a1, b1)
         case (Timestamp(a1), Timestamp(b1)) => in.equal(a1, b1)
@@ -383,7 +418,6 @@ object MapFunc {
         case (ZipArrayIndices(a1), ZipArrayIndices(b1)) => in.equal(a1, b1)
         case (ZipMapKeys(a1), ZipMapKeys(b1)) => in.equal(a1, b1)
 
-        case (Extract(a1, a2), Extract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Subtract(a1, a2), Subtract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -422,73 +456,118 @@ object MapFunc {
 
   implicit def show[T[_[_]]: ShowT]: Delay[Show, MapFunc[T, ?]] =
     new Delay[Show, MapFunc[T, ?]] {
-      def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = Show.show {
-        // nullary
-        case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
-        case Undefined() => Cord("Undefined()")
-        case Now() => Cord("Now()")
+      def apply[A](sh: Show[A]): Show[MapFunc[T, A]] = {
+        def shz(label: String, a: A*) =
+          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
 
-        // unary
-        case Date(a1) => Cord("Date(") ++ sh.show(a1) ++ Cord(")")
-        case Time(a1) => Cord("Time(") ++ sh.show(a1) ++ Cord(")")
-        case Timestamp(a1) => Cord("Timestamp(") ++ sh.show(a1) ++ Cord(")")
-        case Interval(a1) => Cord("Interval(") ++ sh.show(a1) ++ Cord(")")
-        case TimeOfDay(a1) => Cord("TimeOfDay(") ++ sh.show(a1) ++ Cord(")")
-        case ToTimestamp(a1) => Cord("ToTimestamp(") ++ sh.show(a1) ++ Cord(")")
-        case Negate(a1) => Cord("Negate(") ++ sh.show(a1) ++ Cord(")")
-        case Not(a1) => Cord("Not(") ++ sh.show(a1) ++ Cord(")")
-        case Length(a1) => Cord("Length(") ++ sh.show(a1) ++ Cord(")")
-        case Lower(a1) => Cord("Lower(") ++ sh.show(a1) ++ Cord(")")
-        case Upper(a1) => Cord("Upper(") ++ sh.show(a1) ++ Cord(")")
-        case Bool(a1) => Cord("Bool(") ++ sh.show(a1) ++ Cord(")")
-        case Integer(a1) => Cord("Integer(") ++ sh.show(a1) ++ Cord(")")
-        case Decimal(a1) => Cord("Decimal(") ++ sh.show(a1) ++ Cord(")")
-        case Null(a1) => Cord("Null(") ++ sh.show(a1) ++ Cord(")")
-        case ToString(a1) => Cord("ToString(") ++ sh.show(a1) ++ Cord(")")
-        case MakeArray(a1) => Cord("MakeArray(") ++ sh.show(a1) ++ Cord(")")
-        case DupArrayIndices(a1) => Cord("DupArrayIndices(") ++ sh.show(a1) ++ Cord(")")
-        case DupMapKeys(a1) => Cord("DupMapKeys(") ++ sh.show(a1) ++ Cord(")")
-        case ZipArrayIndices(a1) => Cord("ZipArrayIndices(") ++ sh.show(a1) ++ Cord(")")
-        case ZipMapKeys(a1) => Cord("ZipMapKeys(") ++ sh.show(a1) ++ Cord(")")
+        Show.show {
+          // nullary
+          case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
+          case Undefined() => Cord("Undefined()")
+          case Now() => Cord("Now()")
 
-        // binary
-        case Extract(a1, a2) => Cord("Extract(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Add(a1, a2) => Cord("Add(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Multiply(a1, a2) => Cord("Multiply(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Subtract(a1, a2) => Cord("Subtract(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Divide(a1, a2) => Cord("Divide(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Modulo(a1, a2) => Cord("Modulo(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Power(a1, a2) => Cord("Power(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Eq(a1, a2) => Cord("Eq(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Neq(a1, a2) => Cord("Neq(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Lt(a1, a2) => Cord("Lt(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Lte(a1, a2) => Cord("Lte(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Gt(a1, a2) => Cord("Gt(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Gte(a1, a2) => Cord("Gte(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case IfUndefined(a1, a2) => Cord("IfUndefined(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case And(a1, a2) => Cord("And(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Or(a1, a2) => Cord("Or(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Coalesce(a1, a2) => Cord("Coalesce(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Within(a1, a2) => Cord("Within(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case MakeMap(a1, a2) => Cord("MakeMap(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case ConcatMaps(a1, a2) => Cord("ConcatMaps(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case ProjectIndex(a1, a2) => Cord("ProjectIndex(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case ProjectField(a1, a2) => Cord("ProjectField(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case DeleteField(a1, a2) => Cord("DeleteField(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case ConcatArrays(a1, a2) => Cord("ConcatArrays(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
-        case Range(a1, a2) => Cord("Range(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2)  ++ Cord(")")
+          // unary
+          case ExtractCentury(a1) => shz("ExtractCentury", a1)
+          case ExtractDayOfMonth(a1) => shz("ExtractDayOfMonth", a1)
+          case ExtractDecade(a1) => shz("ExtractDecade", a1)
+          case ExtractDayOfWeek(a1) => shz("ExtractDayOfWeek", a1)
+          case ExtractDayOfYear(a1) => shz("ExtractDayOfYear", a1)
+          case ExtractEpoch(a1) => shz("ExtractEpoch", a1)
+          case ExtractHour(a1) => shz("ExtractHour", a1)
+          case ExtractIsoDayOfWeek(a1) => shz("ExtractIsoDayOfWeek", a1)
+          case ExtractIsoYear(a1) => shz("ExtractIsoYear", a1)
+          case ExtractMicroseconds(a1) => shz("ExtractMicroseconds", a1)
+          case ExtractMillenium(a1) => shz("ExtractMillenium", a1)
+          case ExtractMilliseconds(a1) => shz("ExtractMilliseconds", a1)
+          case ExtractMinute(a1) => shz("ExtractMinute", a1)
+          case ExtractMonth(a1) => shz("ExtractMonth", a1)
+          case ExtractQuarter(a1) => shz("ExtractQuarter", a1)
+          case ExtractSecond(a1) => shz("ExtractSecond", a1)
+          case ExtractWeek(a1) => shz("ExtractWeek", a1)
+          case ExtractYear(a1) => shz("ExtractYear", a1)
+          case Date(a1) => shz("Date", a1)
+          case Time(a1) => shz("Time", a1)
+          case Timestamp(a1) => shz("Timestamp", a1)
+          case Interval(a1) => shz("Interval", a1)
+          case TimeOfDay(a1) => shz("TimeOfDay", a1)
+          case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case Negate(a1) => shz("Negate", a1)
+          case Not(a1) => shz("Not", a1)
+          case Length(a1) => shz("Length", a1)
+          case Lower(a1) => shz("Lower", a1)
+          case Upper(a1) => shz("Upper", a1)
+          case Bool(a1) => shz("Bool", a1)
+          case Integer(a1) => shz("Integer", a1)
+          case Decimal(a1) => shz("Decimal", a1)
+          case Null(a1) => shz("Null", a1)
+          case ToString(a1) => shz("ToString", a1)
+          case MakeArray(a1) => shz("MakeArray", a1)
+          case DupArrayIndices(a1) => shz("DupArrayIndices", a1)
+          case DupMapKeys(a1) => shz("DupMapKeys", a1)
+          case ZipArrayIndices(a1) => shz("ZipArrayIndices", a1)
+          case ZipMapKeys(a1) => shz("ZipMapKeys", a1)
 
-        //  ternary
-        case Between(a1, a2, a3) => Cord("Between(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
-        case Cond(a1, a2, a3) => Cord("Cond(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
-        case Search(a1, a2, a3) => Cord("Search(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
-        case Substring(a1, a2, a3) => Cord("Substring(") ++ sh.show(a1) ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
-        case Guard(a1, tpe, a2, a3) => Cord("Guard(") ++ sh.show(a1) ++ Cord(", ") ++ tpe.show ++ Cord(", ") ++ sh.show(a2) ++ Cord(", ") ++ sh.show(a3) ++ Cord(")")
+          // binary
+          case Add(a1, a2) => shz("Add", a1, a2)
+          case Multiply(a1, a2) => shz("Multiply", a1, a2)
+          case Subtract(a1, a2) => shz("Subtract", a1, a2)
+          case Divide(a1, a2) => shz("Divide", a1, a2)
+          case Modulo(a1, a2) => shz("Modulo", a1, a2)
+          case Power(a1, a2) => shz("Power", a1, a2)
+          case Eq(a1, a2) => shz("Eq", a1, a2)
+          case Neq(a1, a2) => shz("Neq", a1, a2)
+          case Lt(a1, a2) => shz("Lt", a1, a2)
+          case Lte(a1, a2) => shz("Lte", a1, a2)
+          case Gt(a1, a2) => shz("Gt", a1, a2)
+          case Gte(a1, a2) => shz("Gte", a1, a2)
+          case IfUndefined(a1, a2) => shz("IfUndefined", a1, a2)
+          case And(a1, a2) => shz("And", a1, a2)
+          case Or(a1, a2) => shz("Or", a1, a2)
+          case Coalesce(a1, a2) => shz("Coalesce", a1, a2)
+          case Within(a1, a2) => shz("Within", a1, a2)
+          case MakeMap(a1, a2) => shz("MakeMap", a1, a2)
+          case ConcatMaps(a1, a2) => shz("ConcatMaps", a1, a2)
+          case ProjectIndex(a1, a2) => shz("ProjectIndex", a1, a2)
+          case ProjectField(a1, a2) => shz("ProjectField", a1, a2)
+          case DeleteField(a1, a2) => shz("DeleteField", a1, a2)
+          case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
+          case Range(a1, a2) => shz("Range", a1, a2)
+
+          //  ternary
+          case Between(a1, a2, a3) => shz("Between", a1, a2, a3)
+          case Cond(a1, a2, a3) => shz("Cond", a1, a2, a3)
+          case Search(a1, a2, a3) => shz("Search", a1, a2, a3)
+          case Substring(a1, a2, a3) => shz("Substring", a1, a2, a3)
+          case Guard(a1, tpe, a2, a3) =>
+            Cord("Guard(") ++
+              sh.show(a1) ++ Cord(", ") ++
+              tpe.show ++ Cord(", ") ++
+              sh.show(a2) ++ Cord(", ") ++
+              sh.show(a3) ++ Cord(")")
+        }
       }
     }
 
   def translateUnaryMapping[T[_[_]], A]: UnaryFunc => A => MapFunc[T, A] = {
     {
+      case date.ExtractCentury => ExtractCentury(_)
+      case date.ExtractDayOfMonth => ExtractDayOfMonth(_)
+      case date.ExtractDecade => ExtractDecade(_)
+      case date.ExtractDayOfWeek => ExtractDayOfWeek(_)
+      case date.ExtractDayOfYear => ExtractDayOfYear(_)
+      case date.ExtractEpoch => ExtractEpoch(_)
+      case date.ExtractHour => ExtractHour(_)
+      case date.ExtractIsoDayOfWeek => ExtractIsoDayOfWeek(_)
+      case date.ExtractIsoYear => ExtractIsoYear(_)
+      case date.ExtractMicroseconds => ExtractMicroseconds(_)
+      case date.ExtractMillenium => ExtractMillenium(_)
+      case date.ExtractMilliseconds => ExtractMilliseconds(_)
+      case date.ExtractMinute => ExtractMinute(_)
+      case date.ExtractMonth => ExtractMonth(_)
+      case date.ExtractQuarter => ExtractQuarter(_)
+      case date.ExtractSecond => ExtractSecond(_)
+      case date.ExtractWeek => ExtractWeek(_)
+      case date.ExtractYear => ExtractYear(_)
       case date.Date => Date(_)
       case date.Time => Time(_)
       case date.Timestamp => Timestamp(_)
@@ -514,7 +593,6 @@ object MapFunc {
       // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
       //     about the second. And it shouldn’t even have two in LP.
       case array.ArrayLength => (a, b) => Length(a)
-      case date.Extract => Extract(_, _)
       case math.Add => Add(_, _)
       case math.Multiply => Multiply(_, _)
       case math.Subtract => Subtract(_, _)
@@ -569,17 +647,33 @@ object MapFuncs {
   @Lenses final case class Length[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // date
+  // See https://www.postgresql.org/docs/9.2/static/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT
+  @Lenses final case class ExtractCentury[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractDayOfMonth[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractDecade[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractDayOfWeek[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractDayOfYear[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractEpoch[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractHour[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractIsoDayOfWeek[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractIsoYear[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMicroseconds[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMillenium[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMilliseconds[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMinute[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMonth[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractQuarter[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractSecond[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractWeek[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractYear[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Date[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Time[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** @see https://www.postgresql.org/docs/9.2/static/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT */
-  @Lenses final case class Extract[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
-
 
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]
