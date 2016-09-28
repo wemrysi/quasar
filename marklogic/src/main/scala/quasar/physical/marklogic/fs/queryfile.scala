@@ -58,6 +58,10 @@ object queryfile {
     ): Free[S, (PhaseResults, FileSystemError \/ A)] = {
       type PrologsT[F[_], A] = WriterT[F, Prologs, A]
       type MLQScript[A]      = (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
+      implicit val mlQScripToQScriptTotal: Injectable.Aux[MLQScript, QScriptTotal[Fix, ?]] =
+        Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
+          Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
+            Injectable.inject[Const[ShiftedRead, ?], QScriptTotal[Fix, ?]]))
       type MLPlan[A]         = PrologsT[MarkLogicPlanErrT[PhaseResultT[Free[S, ?], ?], ?], A]
       type QPlan[A]          = FileSystemErrT[PhaseResultT[Free[S, ?], ?], A]
       type QSR[A]            = QScriptRead[Fix, A]
