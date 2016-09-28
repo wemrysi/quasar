@@ -37,11 +37,9 @@ object QueryFile {
   final case class ResultHandle(run: Long) extends scala.AnyVal
 
   object ResultHandle {
-    implicit val resultHandleShow: Show[ResultHandle] =
-      Show.showFromToString
+    implicit val show: Show[ResultHandle] = Show.showFromToString
 
-    implicit val resultHandleOrder: Order[ResultHandle] =
-      Order.orderBy(_.run)
+    implicit val order: Order[ResultHandle] = Order.orderBy(_.run)
   }
 
   def convertAndNormalize
@@ -421,8 +419,8 @@ object QueryFile {
       def render(qf: QueryFile[A]) = qf match {
         case ExecutePlan(lp, out) => NonTerminal(List("ExecutePlan"), None, List(lp.render, out.render))
         case EvaluatePlan(lp)     => NonTerminal(List("EvaluatePlan"), None, List(lp.render))
-        case More(handle)         => Terminal(List("More"), handle.toString.some)
-        case Close(handle)        => Terminal(List("Close"), handle.toString.some)
+        case More(handle)         => Terminal(List("More"), handle.shows.some)
+        case Close(handle)        => Terminal(List("Close"), handle.shows.some)
         case Explain(lp)          => NonTerminal(List("Explain"), None, List(lp.render))
         case ListContents(dir)    => NonTerminal(List("ListContents"), None, List(dir.render))
         case FileExists(file)     => NonTerminal(List("FileExists"), None, List(file.render))

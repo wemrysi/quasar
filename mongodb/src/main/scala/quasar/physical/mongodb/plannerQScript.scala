@@ -888,13 +888,15 @@ object MongoDbQScriptPlanner {
     freeCataM(free)(
       interpretM[StateT[OutputM, NameGen, ?], QScriptTotal[T, ?], qscript.Hole, WorkflowBuilder[WF]](κ(StateT.stateT(src)), F.plan(joinHandler, funcHandler)))
 
+  // TODO: Need `Delay[Show, WorkflowBuilder]`
+  @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def HasLiteral[WF[_]]: WorkflowBuilder[WF] => OutputM[Bson] =
     wb => asLiteral(wb) \/> FuncApply("", "literal", wb.toString)
 
   def HasInt[WF[_]]: WorkflowBuilder[WF] => OutputM[Long] = HasLiteral(_) >>= {
     case Bson.Int32(v) => \/-(v.toLong)
     case Bson.Int64(v) => \/-(v)
-    case x => -\/(FuncApply("", "64-bit integer", x.toString))
+    case x => -\/(FuncApply("", "64-bit integer", x.shows))
   }
 
   // This is maybe worth putting in Matryoshka?

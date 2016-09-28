@@ -205,8 +205,8 @@ object Selector {
 
     override def toString = {
       val children = pairs.map {
-        case (field, Expr(expr)) => field.toString + " -> " + expr
-        case (field, notExpr @ NotExpr(_)) => field.toString + " -> " + notExpr
+        case (field, Expr(expr)) => field.shows + " -> " + expr
+        case (field, notExpr @ NotExpr(_)) => field.shows + " -> " + notExpr
       }
       "Selector.Doc(" + children.mkString(", ") + ")"
     }
@@ -270,7 +270,7 @@ object Selector {
       rest.foldLeft(first)(Nor(_, _))
   }
 
-  implicit val SelectorAndSemigroup: Semigroup[Selector] = new Semigroup[Selector] {
+  implicit val andSemigroup: Semigroup[Selector] = new Semigroup[Selector] {
     def append(s1: Selector, s2: => Selector): Selector = {
       def overlapping[A](s1: Set[A], s2: Set[A]) = !(s1 & s2).isEmpty
 
@@ -282,4 +282,6 @@ object Selector {
       }
     }
   }
+
+  implicit val show: Show[Selector] = Show.showFromToString
 }

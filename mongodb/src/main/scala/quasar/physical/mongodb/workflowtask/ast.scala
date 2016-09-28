@@ -91,14 +91,14 @@ object WorkflowTaskF {
 
         def render(task: WorkflowTaskF[A]) = task match {
           case PureTaskF(bson) => Terminal("PureTask" :: WorkflowTaskNodeType,
-            Some(bson.toString))
+            Some(bson.shows))
           case ReadTaskF(value) => RC.render(value).copy(nodeType = "ReadTask" :: WorkflowTaskNodeType)
 
           case QueryTaskF(source, query, skip, limit) =>
             val nt = "PipelineTask" :: WorkflowTaskNodeType
             NonTerminal(nt, (skip.shows + ", " + limit.shows).some,
               ra.render(source) ::
-                Terminal("Selector" :: nt, query.toString.some) ::
+                Terminal("Selector" :: nt, query.shows.some) ::
                 Nil)
 
           case PipelineTaskF(source, pipeline) =>
@@ -117,12 +117,12 @@ object WorkflowTaskF {
               selectorOpt.fold(Terminal("None" :: Nil, None))(RS.render(_)),
               sortOpt.fold(Terminal("None" :: Nil, None))(keys =>
                 NonTerminal("Sort" :: nt, None, keys.list.toList map { case (expr, ot) =>
-                  Terminal("Key" :: "Sort" :: nt, Some(expr.toString + " -> " + ot))
+                  Terminal("Key" :: "Sort" :: nt, Some(expr.shows + " -> " + ot))
                 })),
-              Terminal("Limit" :: nt, Some(limitOpt.toString)),
+              Terminal("Limit" :: nt, limitOpt ∘ (_.shows)),
               finalizerOpt.fold(Terminal("None" :: Nil, None))(RJ.render(_)),
               Terminal("Scope" :: nt, Some(scopeOpt.toString)),
-              Terminal("JsMode" :: nt, Some(jsModeOpt.toString))
+              Terminal("JsMode" :: nt, jsModeOpt ∘ (_.shows))
             ) ::: outAct.map(act => Terminal("Out" :: nt, Some(Action.bsonFieldName(act)))).toList)
 
           case FoldLeftTaskF(head, tail) =>

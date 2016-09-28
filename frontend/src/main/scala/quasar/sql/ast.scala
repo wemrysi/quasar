@@ -263,9 +263,17 @@ final case object RightJoin extends JoinType("right join")
 final case object InnerJoin extends JoinType("inner join")
 final case object FullJoin extends JoinType("full join")
 
+object JoinType {
+  implicit val show: Show[JoinType] = Show.showFromToString
+}
+
 sealed trait OrderType extends Product with Serializable
 final case object ASC extends OrderType
 final case object DESC extends OrderType
+
+object OrderType {
+  implicit val show: Show[OrderType] = Show.showFromToString
+}
 
 @Lenses final case class GroupBy[A](keys: List[A], having: Option[A])
 

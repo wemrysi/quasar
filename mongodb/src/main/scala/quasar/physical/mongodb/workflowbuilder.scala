@@ -827,6 +827,11 @@ object WorkflowBuilder {
       case Subset(_)   => DocVar.ROOT()
     }
   }
+
+  object Base {
+    implicit val show: Show[Base] = Show.showFromToString
+  }
+
   /** The content is already at $$ROOT. */
   final case class Root()                              extends Base
   /** The content is nested in a field under $$ROOT. */
@@ -1744,18 +1749,18 @@ object WorkflowBuilder {
 
       def render(v: WorkflowBuilder[F]) = v.unFix match {
         case CollectionBuilderF(graph, base, struct) =>
-          NonTerminal("CollectionBuilder" :: nodeType, Some(base.toString),
+          NonTerminal("CollectionBuilder" :: nodeType, Some(base.shows),
             graph.render ::
-              Terminal("Schema" :: "CollectionBuilder" :: nodeType, Some(struct.toString)) ::
+              Terminal("Schema" :: "CollectionBuilder" :: nodeType, struct ∘ (_.shows)) ::
               Nil)
         case spb @ ShapePreservingBuilderF(src, inputs, op) =>
           val nt = "ShapePreservingBuilder" :: nodeType
           NonTerminal(nt, None,
             render(src) ::
               (inputs.map(render) :+
-                Terminal("Op" :: nt, Some(spb.dummyOp.toString))))
+                Terminal("Op" :: nt, Some(spb.dummyOp.shows))))
         case ValueBuilderF(value) =>
-          Terminal("ValueBuilder" :: nodeType, Some(value.toString))
+          Terminal("ValueBuilder" :: nodeType, Some(value.shows))
         case ExprBuilderF(src, expr) =>
           NonTerminal("ExprBuilder" :: nodeType, None,
             render(src) :: expr.render :: Nil)

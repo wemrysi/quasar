@@ -67,6 +67,8 @@ object ExprOp3_0F {
           "date" -> date))
     }
 
+    // FIXME: Define a proper `Show[ExprOp3_0F]` instance.
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     def toJsSimple: AlgebraM[PlannerError \/ ?, ExprOp3_0F, JsFn] =
       // TODO: it's not clear that this will be needed prior to swtiching to the QScript backend
       expr => UnsupportedJS(expr.toString).left
