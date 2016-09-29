@@ -39,7 +39,7 @@ class FileSystemDefSpec extends QuasarSpecification {
 
   val failedDef =
     FileSystemDef(κ(Some(
-      connectionFailed("NOPE")
+      connectionFailed(new RuntimeException("NOPE"))
         .right[NonEmptyList[String]]
         .raiseError[DefId, DefinitionResult[Id]])))
 
