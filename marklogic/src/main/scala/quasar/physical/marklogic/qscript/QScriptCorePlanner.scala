@@ -40,13 +40,14 @@ private[qscript] final class QScriptCorePlanner[F[_]: NameGenerator: PrologW: Mo
 
     case LeftShift(src, struct, repair) =>
       for {
-        s       <- freshVar[F]
         l       <- freshVar[F]
+        v       <- freshVar[F]
+        rs      <- freshVar[F]
         r       <- freshVar[F]
-        extract <- mapFuncXQuery(struct, s.xqy)
-        lshift  <- qscript.nodeLeftShift[F] apply (l.xqy)
+        extract <- mapFuncXQuery(struct, l.xqy)
+        lshift  <- qscript.nodeLeftShift[F] apply (v.xqy)
         merge   <- mergeXQuery(repair, l.xqy, r.xqy)
-      } yield for_ (s -> src) let_ (l -> extract, r -> lshift) return_ merge
+      } yield for_ (l -> src) let_ (v -> extract, rs -> lshift) return_ fn.map(func(r)(merge), rs.xqy)
 
     // TODO: Given we know all the possible reduction functions, can we bucket and reduce in a single pass? Similarly for the mapfunc inside the reducer.
     // TODO: See about leveraging the cts:* aggregation functions when possible
