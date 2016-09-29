@@ -51,11 +51,8 @@ class NormalizableT[T[_[_]] : Recursive : Corecursive : EqualT : ShowT] extends 
       liftCo(opt.applyToFreeQS[QScriptTotal])
     )
   }
-  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] = {
-    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(
-      repeatedly(MapFunc.normalize[T, A]) compose orOriginal(MapFunc.foldConstant[T, A])
-    )
-  }
+  def freeMF[A](fm: Free[MapFunc, A]): Free[MapFunc, A] =
+    freeTransCata[T, MapFunc, MapFunc, A, A](fm)(MapFunc.normalize[T, A])
 
   def EquiJoin = new Normalizable[EquiJoin] {
     val normalize = λ[EndoK[EquiJoin]](ej =>

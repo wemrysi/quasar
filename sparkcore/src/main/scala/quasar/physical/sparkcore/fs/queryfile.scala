@@ -44,10 +44,10 @@ object queryfile {
      (QScriptCore[Fix, ?] :\: ThetaJoin[Fix, ?] :/: Const[ShiftedRead, ?])#M[A]
 
   // This is an exact copy from marklogic's queryfile.
-  implicit val sparkQScriptToQScriptTotal: Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
-    Injectable.coproduct(Injectable.inject[QScriptCore[Fix, ?], QScriptTotal[Fix, ?]],
-      Injectable.coproduct(Injectable.inject[ThetaJoin[Fix, ?], QScriptTotal[Fix, ?]],
-        Injectable.inject[Const[ShiftedRead, ?], QScriptTotal[Fix, ?]]))
+  implicit val sparkQScriptToQScriptTotal
+      : Injectable.Aux[SparkQScript, QScriptTotal[Fix, ?]] =
+    ::\::[QScriptCore[Fix, ?]](
+      ::/::[Fix, ThetaJoin[Fix, ?], Const[ShiftedRead, ?]])
 
   final case class Input(
     fromFile: (SparkContext, AFile) => Task[RDD[String]],
