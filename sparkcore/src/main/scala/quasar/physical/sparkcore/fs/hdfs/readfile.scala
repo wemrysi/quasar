@@ -23,26 +23,20 @@ import quasar.fp.free._
 import quasar.physical.sparkcore.fs.readfile.{Offset, Limit}
 import quasar.physical.sparkcore.fs.readfile.Input
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import java.net.URI;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
-import pathy.Path.posixCodec
+
 import scalaz._
 import scalaz.concurrent.Task
 
-class readfile(host: String, port: Int) {
+object readfile {
 
-  val prefix = s"hdfs://$host:$port"
-
-  def hdfsPath(f: AFile) = prefix + posixCodec.unsafePrintPath(f)
-
-  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)
+  def rddFrom[S[_]](f: AFile, offset: Offset, maybeLimit: Limit)(hdfsPathStr: AFile => String)
     (implicit read: Read.Ops[SparkContext, S]): Free[S, RDD[String]] =
     read.asks { sc =>
-      sc.textFile(hdfsPath(f))
+      sc.textFile(hdfsPathStr(f))
         .zipWithIndex()
         .filter {
         case (value, index) =>
@@ -57,20 +51,22 @@ class readfile(host: String, port: Int) {
       
     }
 
-  def fileExists[S[_]](f: AFile)(implicit s0: Task :<: S): Free[S, Boolean] =
+  def fileExists[S[_]](f: AFile)(hdfsPathStr: AFile => String, fileSystem: () => FileSystem)(
+    implicit s0: Task :<: S): Free[S, Boolean] =
     lift(Task.delay {
-      val conf: Configuration = new Configuration()
-      val uri: URI = new URI(hdfsPath(f));
-      val hdfs: FileSystem= FileSystem.get(uri, conf);
-      val path: Path = new Path(uri)
-      hdfs.exists(path)
+      fileSystem().exists(new Path(hdfsPathStr(f)))
     }).into[S]
 
   // TODO arbitrary value, more or less a good starting point
   // but we should consider some measuring
   def readChunkSize: Int = 5000
 
-  def input[S[_]](implicit read: Read.Ops[SparkContext, S], s0: Task :<: S) =
-    Input((f,off, lim) => rddFrom(f, off, lim), f => fileExists(f), readChunkSize _)
+  def input[S[_]](hdfsPathStr: AFile => String, fileSystem: () => FileSystem)(implicit
+    read: Read.Ops[SparkContext, S], s0: Task :<: S) =
+    Input(
+      (f,off, lim) => rddFrom(f, off, lim)(hdfsPathStr),
+      f => fileExists(f)(hdfsPathStr, fileSystem),
+      readChunkSize _
+    )
 
 }
