@@ -27,10 +27,8 @@ import quasar.physical.couchbase.common._
 
 import scala.collection.JavaConverters._
 
-import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.document.json.JsonObject
 import eu.timepit.refined.api.RefType.ops._
-import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -38,7 +36,7 @@ object readfile {
 
   implicit val codec = DataCodec.Precise
 
-  @Lenses final case class Cursor(bucket: Bucket, result: Vector[JsonObject])
+  final case class Cursor(result: Vector[JsonObject])
 
   def interpret[S[_]](
     implicit
@@ -71,7 +69,7 @@ object readfile {
                      .toVector
                      .map(_.value.getObject("value"))
                  )).into.liftM[FileSystemErrT]
-    } yield Cursor(bkt, qResult)).run
+    } yield Cursor(qResult)).run
 
   def read[S[_]](
     cursor: Cursor
@@ -79,11 +77,10 @@ object readfile {
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
     lift(Task.delay(
-      cursor.result.headOption.cata(
-        jObj => DataCodec.parse(jObj.toString).bimap(
-          err => FileSystemError.readFailed(jObj.toString, err.shows),
-          d => (Cursor.result.modify(_.tail)(cursor), Vector(d))),
-        (cursor, Vector.empty[Data]).right)
+      cursor.result.traverse(jObj =>
+        DataCodec.parse(jObj.toString).leftMap(err =>
+          FileSystemError.readFailed(jObj.toString, err.shows))
+      ).strengthL(Cursor(Vector.empty))
     )).into
 
   def close[S[_]](
