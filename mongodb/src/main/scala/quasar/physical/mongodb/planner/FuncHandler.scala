@@ -45,6 +45,10 @@ object FuncHandler {
         val fp = ExprOpCoreF.fixpoint[Free[?[_], A], ExprOpCoreF]
         import fp._
 
+        // TODO: use $trunc on 3.2+
+        def trunc(expr: Free[ExprOpCoreF, A]): Free[ExprOpCoreF, A] =
+          $subtract(expr, $mod(expr, $literal(Bson.Int32(1))))
+
         fa.some collect {
           case Add(a1, a2)           => $add(a1, a2)
           case Multiply(a1, a2)      => $multiply(a1, a2)
@@ -86,9 +90,9 @@ object FuncHandler {
                 $literal(Bson.Undefined)))
 
           case ExtractCentury(a1) =>
-            $divide($year(a1), $literal(Bson.Int32(100)))  // FIXME
+            trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
           case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
-          case ExtractDecade(a1) => $divide($year(a1), $literal(Bson.Int32(10)))
+          case ExtractDecade(a1) => trunc($divide($year(a1), $literal(Bson.Int32(10))))
           case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))
           case ExtractDayOfYear(a1) => $dayOfYear(a1)
           case ExtractEpoch(a1) =>
@@ -102,17 +106,26 @@ object FuncHandler {
               $add($dayOfWeek(a1), $literal(Bson.Int32(-1))))
           // TODO: case ExtractIsoYear(a1) =>
           case ExtractMicroseconds(a1) =>
-            $multiply($millisecond(a1), $literal(Bson.Int32(1000)))  // FIXME
+            $multiply(
+              $add(
+                $multiply($second(a1), $literal(Bson.Int32(1000))),
+                $millisecond(a1)),
+              $literal(Bson.Int32(1000)))
           case ExtractMillenium(a1) =>
-            $divide($year(a1), $literal(Bson.Int32(1000)))  // FIXME
-          case ExtractMilliseconds(a1) => $millisecond(a1)  // FIXME
+            trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
+          case ExtractMilliseconds(a1) =>
+            $add(
+              $multiply($second(a1), $literal(Bson.Int32(1000))),
+              $millisecond(a1))
           case ExtractMinute(a1) => $minute(a1)
           case ExtractMonth(a1) => $month(a1)
           case ExtractQuarter(a1) =>
-            $add(
+            // FIXME
+            trunc($add(
               $divide($dayOfYear(a1), $literal(Bson.Int32(92))),
-              $literal(Bson.Int32(1)))  // FIXME
-          case ExtractSecond(a1) => $second(a1)
+              $literal(Bson.Int32(1))))
+          case ExtractSecond(a1) =>
+            $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
           case ExtractWeek(a1) => $week(a1)
           case ExtractYear(a1) => $year(a1)
 
