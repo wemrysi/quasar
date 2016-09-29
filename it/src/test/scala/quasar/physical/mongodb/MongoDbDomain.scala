@@ -24,7 +24,7 @@ import org.scalacheck.{Arbitrary, Gen}, Arbitrary._
   * to behave properly. May be mixed in when implementing `StdLibTestRunner`.
 */
 trait MongoDbDomain {
-  val intDomain = arbitrary[Long].map(BigInt(_))
+  val intDomain = arbitrary[Long].filter(_ != Long.MinValue).map(BigInt(_))
   val decDomain = arbitrary[Double].map(BigDecimal(_))
 
   // NB: restricted to printable ASCII only because most functions are not
