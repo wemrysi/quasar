@@ -25,12 +25,12 @@ import quasar.fs._
 import quasar.fs.impl.ReadOpts
 import quasar.physical.couchbase.common._
 
-import scala.collection.Iterator
 import scala.collection.JavaConverters._
 
 import com.couchbase.client.java.Bucket
 import com.couchbase.client.java.document.json.JsonObject
 import eu.timepit.refined.api.RefType.ops._
+import monocle.macros.Lenses
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -38,8 +38,7 @@ object readfile {
 
   implicit val codec = DataCodec.Precise
 
-  // TODO: result is impure
-  final case class Cursor(bucket: Bucket, result: Iterator[JsonObject])
+  @Lenses final case class Cursor(bucket: Bucket, result: Vector[JsonObject])
 
   def interpret[S[_]](
     implicit
@@ -50,6 +49,7 @@ object readfile {
   ): ReadFile ~> Free[S, ?] =
     impl.read[S, Cursor](open, read, close)
 
+  // TODO: stream results
   def open[S[_]](
     file: AFile, readOpts: ReadOpts
   )(implicit
@@ -68,6 +68,7 @@ object readfile {
                    bkt.query(n1qlQuery(qStr))
                      .rows
                      .asScala
+                     .toVector
                      .map(_.value.getObject("value"))
                  )).into.liftM[FileSystemErrT]
     } yield Cursor(bkt, qResult)).run
@@ -78,15 +79,11 @@ object readfile {
     S0: Task :<: S
   ): Free[S, FileSystemError \/ (Cursor, Vector[Data])] =
     lift(Task.delay(
-      if (cursor.result.hasNext) {
-        val jsonObjStr = cursor.result.next.toString
-        DataCodec.parse(jsonObjStr).bimap(
-          err => FileSystemError.readFailed(jsonObjStr, err.shows),
-          d => (cursor, Vector(d)))
-      }
-      else {
-        (cursor, Vector.empty[Data]).right
-      }
+      cursor.result.headOption.cata(
+        jObj => DataCodec.parse(jObj.toString).bimap(
+          err => FileSystemError.readFailed(jObj.toString, err.shows),
+          d => (Cursor.result.modify(_.tail)(cursor), Vector(d))),
+        (cursor, Vector.empty[Data]).right)
     )).into
 
   def close[S[_]](
