@@ -23,13 +23,18 @@ import quasar.contrib.pathy.{APath, PathArbitrary}
 //     for scala collections.
 import scala.Predef._
 
-import org.scalacheck.Arbitrary, Arbitrary.arbitrary
+import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 
 trait MountingsConfigArbitrary {
   import MountConfigArbitrary._, PathArbitrary._
 
+  private def scaleSize[A](gen: Gen[A]): Gen[A] =
+    Gen.sized(size => Gen.resize(size/40 + 1, gen))
+
   implicit val mountingsConfigArbitrary: Arbitrary[MountingsConfig] =
-    Arbitrary(arbitrary[Map[APath, MountConfig]] map (MountingsConfig(_)))
+    // NB: this is a map, and MountConfig contains a map, so if the size isn't
+    // reigned in we get gigantic configs.
+    Arbitrary(scaleSize(arbitrary[Map[APath, MountConfig]]) map (MountingsConfig(_)))
 }
 
 object MountingsConfigArbitrary extends MountingsConfigArbitrary

@@ -57,6 +57,6 @@ class CoreConfigSpec extends ConfigSpec[CoreConfig] {
       val json = CoreConfig.codec.encode(cfg)
       val cfg2 = CoreConfig.codec.decode(json.hcursor)
       cfg2.result must beRight(cfg)
-    }.set(minTestsOk = 5)
+    }
   }
 }
