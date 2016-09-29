@@ -106,6 +106,7 @@ object queryfile {
       ctx    <- context.ask.liftM[FileSystemErrT]
       bktCol <- EitherT(bucketCollectionFromPath(file).point[Free[S, ?]])
       bkt    <- EitherT(getBucket(bktCol.bucket))
-    } yield bkt.exists(bktCol.collection)).exists(ι)
+      exists <- lift(existsWithPrefix(bkt, bktCol.collection)).into.liftM[FileSystemErrT]
+    } yield exists).exists(ι)
 
 }

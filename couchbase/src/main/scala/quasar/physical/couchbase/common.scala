@@ -65,7 +65,7 @@ object common {
     prefix: String
   ): Task[Boolean] = Task.delay {
     val qStr = s"""SELECT count(*) > 0 v FROM `${bucket.name}`
-                   WHERE type LIKE "${prefix}%""""
+                   WHERE type = "${prefix}" OR type like "${prefix}/%""""
 
     bucket.query(n1qlQuery(qStr)).allRows.asScala.toList
       .exists(_.value.getBoolean("v").booleanValue === true)
