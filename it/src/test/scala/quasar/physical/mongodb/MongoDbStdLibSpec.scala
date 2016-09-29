@@ -30,8 +30,9 @@ import matryoshka._, Recursive.ops._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.specs2.main.ArgProperty
+import scala.concurrent.duration._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 import shapeless.{Nat}
 
 /** Test the implementation of the standard library for one of MongoDb's
@@ -116,7 +117,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
           _     <- dropCollection(coll).run(setupClient)
         } yield {
           rez must beSingleResult(closeTo(massage(expected)))
-        }).unsafePerformSync.toResult)
+        }).timed(5.seconds)(Strategy.DefaultTimeoutScheduler).unsafePerformSync.toResult)
 
     val runner = new StdLibTestRunner with MongoDbDomain {
       def nullary(
