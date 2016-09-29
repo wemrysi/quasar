@@ -46,7 +46,6 @@ object MongoDbPlanner {
 
   import agg._
   import array._
-  import date._
   import identity._
   import math._
   import relations._
@@ -184,68 +183,68 @@ object MongoDbPlanner {
               Literal(Js.Num(-1, false)),
               Call(Select(array, "indexOf"), List(value))))
 
-        // TODO: when each of these is broken out as a separate Func, these will
-        // go to JsFuncHandler.
-        case Extract =>
-          args match {
-            case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
-              case (field, (sel, inputs)) => ((field match {
-                case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-                case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
-                case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-                // Note: MongoDB's Date's getDay (during filtering at least) seems to be monday=0 ... sunday=6,
-                // apparently in violation of the JavaScript convention.
-                case "dow"          =>
-                  \/-(x => If(BinOp(jscore.Eq,
-                    Call(Select(x, "getDay"), Nil),
-                    Literal(Js.Num(6, false))),
-                    Literal(Js.Num(0, false)),
-                    BinOp(jscore.Add,
-                      Call(Select(x, "getDay"), Nil),
-                      Literal(Js.Num(1, false)))))
-                // TODO: case "doy"          => \/- (???)
-                // TODO: epoch
-                case "hour"         => \/-(x => Call(Select(x, "getHours"), Nil))
-                case "isodow"       =>
-                  \/-(x => BinOp(jscore.Add,
-                    Call(Select(x, "getDay"), Nil),
-                    Literal(Js.Num(1, false))))
-                // TODO: isoyear
-                case "microseconds" =>
-                  \/-(x => BinOp(Mult,
-                    BinOp(jscore.Add,
-                      Call(Select(x, "getMilliseconds"), Nil),
-                      BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-                    Literal(Js.Num(1000, false))))
-                case "millennium"   => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-                case "milliseconds" =>
-                  \/-(x => BinOp(jscore.Add,
-                    Call(Select(x, "getMilliseconds"), Nil),
-                    BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-                case "minute"       => \/-(x => Call(Select(x, "getMinutes"), Nil))
-                case "month"        =>
-                  \/-(x => BinOp(jscore.Add,
-                    Call(Select(x, "getMonth"), Nil),
-                    Literal(Js.Num(1, false))))
-                case "quarter"      =>
-                  \/-(x => BinOp(jscore.Add,
-                    BinOp(BitOr,
-                      BinOp(Div,
-                        Call(Select(x, "getMonth"), Nil),
-                        Literal(Js.Num(3, false))),
-                      Literal(Js.Num(0, false))),
-                    Literal(Js.Num(1, false))))
-                case "second"       => \/-(x => Call(Select(x, "getSeconds"), Nil))
-                // TODO: timezone, timezone_hour, timezone_minute
-                // case "week"         => \/- (???)
-                case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
-
-                case _ => -\/(FuncApply(func.name, "valid time period", field))
-              }): PlannerError \/ (JsCore => JsCore)).map(x =>
-                ({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(sel(list)(Ident(JsFn.defaultName)))) },
-                  inputs.map(There(1, _))): PartialJs)
-            }.join
-          }
+        // // TODO: when each of these is broken out as a separate Func, these will
+        // // go to JsFuncHandler.
+        // case Extract =>
+        //   args match {
+        //     case Sized(a1, a2) => (HasStr(a1) |@| HasJs(a2)) {
+        //       case (field, (sel, inputs)) => ((field match {
+        //         case "century"      => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
+        //         case "day"          => \/-(x => Call(Select(x, "getDate"), Nil)) // (day of month)
+        //         case "decade"       => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
+        //         // Note: MongoDB's Date's getDay (during filtering at least) seems to be monday=0 ... sunday=6,
+        //         // apparently in violation of the JavaScript convention.
+        //         case "dow"          =>
+        //           \/-(x => If(BinOp(jscore.Eq,
+        //             Call(Select(x, "getDay"), Nil),
+        //             Literal(Js.Num(6, false))),
+        //             Literal(Js.Num(0, false)),
+        //             BinOp(jscore.Add,
+        //               Call(Select(x, "getDay"), Nil),
+        //               Literal(Js.Num(1, false)))))
+        //         // TODO: case "doy"          => \/- (???)
+        //         // TODO: epoch
+        //         case "hour"         => \/-(x => Call(Select(x, "getHours"), Nil))
+        //         case "isodow"       =>
+        //           \/-(x => BinOp(jscore.Add,
+        //             Call(Select(x, "getDay"), Nil),
+        //             Literal(Js.Num(1, false))))
+        //         // TODO: isoyear
+        //         case "microseconds" =>
+        //           \/-(x => BinOp(Mult,
+        //             BinOp(jscore.Add,
+        //               Call(Select(x, "getMilliseconds"), Nil),
+        //               BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
+        //             Literal(Js.Num(1000, false))))
+        //         case "millennium"   => \/-(x => BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
+        //         case "milliseconds" =>
+        //           \/-(x => BinOp(jscore.Add,
+        //             Call(Select(x, "getMilliseconds"), Nil),
+        //             BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
+        //         case "minute"       => \/-(x => Call(Select(x, "getMinutes"), Nil))
+        //         case "month"        =>
+        //           \/-(x => BinOp(jscore.Add,
+        //             Call(Select(x, "getMonth"), Nil),
+        //             Literal(Js.Num(1, false))))
+        //         case "quarter"      =>
+        //           \/-(x => BinOp(jscore.Add,
+        //             BinOp(BitOr,
+        //               BinOp(Div,
+        //                 Call(Select(x, "getMonth"), Nil),
+        //                 Literal(Js.Num(3, false))),
+        //               Literal(Js.Num(0, false))),
+        //             Literal(Js.Num(1, false))))
+        //         case "second"       => \/-(x => Call(Select(x, "getSeconds"), Nil))
+        //         // TODO: timezone, timezone_hour, timezone_minute
+        //         // case "week"         => \/- (???)
+        //         case "year"         => \/-(x => Call(Select(x, "getFullYear"), Nil))
+        //
+        //         case _ => -\/(FuncApply(func.name, "valid time period", field))
+        //       }): PlannerError \/ (JsCore => JsCore)).map(x =>
+        //         ({ case (list: List[JsFn]) => JsFn(JsFn.defaultName, x(sel(list)(Ident(JsFn.defaultName)))) },
+        //           inputs.map(There(1, _))): PartialJs)
+        //     }.join
+        //   }
 
         case ToId => Arity1(id => Call(ident("ObjectId"), List(id)))
 
@@ -767,48 +766,6 @@ object MongoDbPlanner {
           lift(Arity2(HasWorkflow, HasInt)).flatMap {
             case (p, 1)   => mapExpr(p)($size(_))
             case (_, dim) => fail(FuncApply(func.name, "lower array dimension", dim.toString))
-          }
-
-        // TODO: when each of these is broken out as a separate Func, these will
-        // go to the funcHandler.
-        case Extract   =>
-          lift(Arity2(HasText, HasWorkflow)).flatMap {
-            case (field, p) =>
-              field match {
-                case "century"      =>
-                  mapExpr(p)(v => $divide($year(v), $literal(Bson.Int32(100))))
-                case "day"          => mapExpr(p)($dayOfMonth(_))
-                case "decade"       =>
-                  mapExpr(p)(x => $divide($year(x), $literal(Bson.Int32(10))))
-                case "dow"          =>
-                  mapExpr(p)(x => $add($dayOfWeek(x), $literal(Bson.Int32(-1))))
-                case "doy"          => mapExpr(p)($dayOfYear(_))
-                // TODO: epoch
-                case "hour"         => mapExpr(p)($hour(_))
-                case "isodow"       => mapExpr(p)(x =>
-                  $cond($eq($dayOfWeek(x), $literal(Bson.Int32(1))),
-                    $literal(Bson.Int32(7)),
-                    $add($dayOfWeek(x), $literal(Bson.Int32(-1)))))
-                // TODO: isoyear
-                case "microseconds" =>
-                  mapExpr(p)(v =>
-                    $multiply($millisecond(v), $literal(Bson.Int32(1000))))
-                case "millennium"   =>
-                  mapExpr(p)(v => $divide($year(v), $literal(Bson.Int32(1000))))
-                case "milliseconds" => mapExpr(p)($millisecond(_))
-                case "minute"       => mapExpr(p)($minute(_))
-                case "month"        => mapExpr(p)($month(_))
-                case "quarter"      => // TODO: handle leap years
-                  mapExpr(p)(v =>
-                    $add(
-                      $divide($dayOfYear(v), $literal(Bson.Int32(92))),
-                      $literal(Bson.Int32(1))))
-                case "second"       => mapExpr(p)($second(_))
-                // TODO: timezone, timezone_hour, timezone_minute
-                case "week"         => mapExpr(p)($week(_))
-                case "year"         => mapExpr(p)($year(_))
-                case _              => fail(FuncApply(func.name, "valid time period", field))
-              }
           }
 
         // TODO: If we had the type available, this could be more efficient in

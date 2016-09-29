@@ -127,39 +127,6 @@ object MongoDbQScriptPlanner {
       case Timestamp(a1) => unimplemented
       case Interval(a1) => unimplemented
 
-      // TODO: when each of these is broken out as a separate Func, these will
-      // go to the funcHandler.
-      case Extract(Embed($literalF(Bson.Text(field))), a2) => field match {
-        case "century" => $divide($year(a2), $literal(Bson.Int32(100))).right
-        case "day" => $dayOfMonth(a2).right
-        case "decade" => $divide($year(a2), $literal(Bson.Int32(10))).right
-        case "dow" => $add($dayOfWeek(a2), $literal(Bson.Int32(-1))).right
-        case "doy" => $dayOfYear(a2).right
-        // TODO: epoch
-        case "hour" => $hour(a2).right
-        case "isodow" =>
-          $cond($eq($dayOfWeek(a2), $literal(Bson.Int32(1))),
-            $literal(Bson.Int32(7)),
-            $add($dayOfWeek(a2), $literal(Bson.Int32(-1)))).right
-        // TODO: isoyear
-        case "microseconds" =>
-          $multiply($millisecond(a2), $literal(Bson.Int32(1000))).right
-        case "millennium" =>
-          $divide($year(a2), $literal(Bson.Int32(1000))).right
-        case "milliseconds" => $millisecond(a2).right
-        case "minute"       => $minute(a2).right
-        case "month"        => $month(a2).right
-        case "quarter"      => // TODO: handle leap years
-          $add(
-            $divide($dayOfYear(a2), $literal(Bson.Int32(92))),
-            $literal(Bson.Int32(1))).right
-        case "second"       => $second(a2).right
-            // TODO: timezone, timezone_hour, timezone_minute
-        case "week"         => $week(a2).right
-        case "year"         => $year(a2).right
-        case _              =>
-          InternalError(field + " is not a valid time period").left
-      }
       case IfUndefined(a1, a2) => unimplemented
 
       case Within(a1, a2) => unimplemented
@@ -255,62 +222,62 @@ object MongoDbQScriptPlanner {
             pad3(Call(Select(ident("t"), "getUTCMilliseconds"), Nil)))).right
       }
       case ToTimestamp(a1) => unimplemented
-      // FIXME: Handle non-constant strings as well
-      case Extract(Literal(Js.Str(str)), x) =>
-        str match {
-          case "century"      => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
-          case "day"          => \/-(Call(Select(x, "getDate"), Nil)) // (day of month)
-          case "decade"       => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
-          // NB: MongoDB's Date's getDay (during filtering at least) seems to
-          //     be monday=0 ... sunday=6, apparently in violation of the
-          // JavaScript convention.
-          case "dow"          =>
-            \/-(If(BinOp(jscore.Eq,
-              Call(Select(x, "getDay"), Nil),
-              Literal(Js.Num(6, false))),
-              Literal(Js.Num(0, false)),
-              BinOp(jscore.Add,
-                Call(Select(x, "getDay"), Nil),
-                Literal(Js.Num(1, false)))))
-          // TODO: case "doy"          => \/- (unimplemented)
-          // TODO: epoch
-          case "hour"         => \/-(Call(Select(x, "getHours"), Nil))
-          case "isodow"       =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getDay"), Nil),
-              Literal(Js.Num(1, false))))
-          // TODO: isoyear
-          case "microseconds" =>
-            \/-(BinOp(Mult,
-              BinOp(jscore.Add,
-                Call(Select(x, "getMilliseconds"), Nil),
-                BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
-              Literal(Js.Num(1000, false))))
-          case "millennium"   => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
-          case "milliseconds" =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getMilliseconds"), Nil),
-              BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
-          case "minute"       => \/-(Call(Select(x, "getMinutes"), Nil))
-          case "month"        =>
-            \/-(BinOp(jscore.Add,
-              Call(Select(x, "getMonth"), Nil),
-              Literal(Js.Num(1, false))))
-          case "quarter"      =>
-            \/-(BinOp(jscore.Add,
-              BinOp(BitOr,
-                BinOp(Div,
-                  Call(Select(x, "getMonth"), Nil),
-                  Literal(Js.Num(3, false))),
-                Literal(Js.Num(0, false))),
-              Literal(Js.Num(1, false))))
-          case "second"       => \/-(Call(Select(x, "getSeconds"), Nil))
-          // TODO: timezone, timezone_hour, timezone_minute
-          // case "week"         => \/- (unimplemented)
-          case "year"         => \/-(Call(Select(x, "getFullYear"), Nil))
-
-          case _ => -\/(FuncApply("extract", "valid time period", str))
-        }
+      // // FIXME: Handle non-constant strings as well
+      // case Extract(Literal(Js.Str(str)), x) =>
+      //   str match {
+      //     case "century"      => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(100, false))))
+      //     case "day"          => \/-(Call(Select(x, "getDate"), Nil)) // (day of month)
+      //     case "decade"       => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(10, false))))
+      //     // NB: MongoDB's Date's getDay (during filtering at least) seems to
+      //     //     be monday=0 ... sunday=6, apparently in violation of the
+      //     // JavaScript convention.
+      //     case "dow"          =>
+      //       \/-(If(BinOp(jscore.Eq,
+      //         Call(Select(x, "getDay"), Nil),
+      //         Literal(Js.Num(6, false))),
+      //         Literal(Js.Num(0, false)),
+      //         BinOp(jscore.Add,
+      //           Call(Select(x, "getDay"), Nil),
+      //           Literal(Js.Num(1, false)))))
+      //     // TODO: case "doy"          => \/- (unimplemented)
+      //     // TODO: epoch
+      //     case "hour"         => \/-(Call(Select(x, "getHours"), Nil))
+      //     case "isodow"       =>
+      //       \/-(BinOp(jscore.Add,
+      //         Call(Select(x, "getDay"), Nil),
+      //         Literal(Js.Num(1, false))))
+      //     // TODO: isoyear
+      //     case "microseconds" =>
+      //       \/-(BinOp(Mult,
+      //         BinOp(jscore.Add,
+      //           Call(Select(x, "getMilliseconds"), Nil),
+      //           BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))),
+      //         Literal(Js.Num(1000, false))))
+      //     case "millennium"   => \/-(BinOp(Div, Call(Select(x, "getFullYear"), Nil), Literal(Js.Num(1000, false))))
+      //     case "milliseconds" =>
+      //       \/-(BinOp(jscore.Add,
+      //         Call(Select(x, "getMilliseconds"), Nil),
+      //         BinOp(Mult, Call(Select(x, "getSeconds"), Nil), Literal(Js.Num(1000, false)))))
+      //     case "minute"       => \/-(Call(Select(x, "getMinutes"), Nil))
+      //     case "month"        =>
+      //       \/-(BinOp(jscore.Add,
+      //         Call(Select(x, "getMonth"), Nil),
+      //         Literal(Js.Num(1, false))))
+      //     case "quarter"      =>
+      //       \/-(BinOp(jscore.Add,
+      //         BinOp(BitOr,
+      //           BinOp(Div,
+      //             Call(Select(x, "getMonth"), Nil),
+      //             Literal(Js.Num(3, false))),
+      //           Literal(Js.Num(0, false))),
+      //         Literal(Js.Num(1, false))))
+      //     case "second"       => \/-(Call(Select(x, "getSeconds"), Nil))
+      //     // TODO: timezone, timezone_hour, timezone_minute
+      //     // case "week"         => \/- (unimplemented)
+      //     case "year"         => \/-(Call(Select(x, "getFullYear"), Nil))
+      //
+      //     case _ => -\/(FuncApply("extract", "valid time period", str))
+      //   }
 
       case Negate(a1)       => UnOp(Neg, a1).right
       case Add(a1, a2)      => BinOp(jscore.Add, a1, a2).right
@@ -429,6 +396,8 @@ object MongoDbQScriptPlanner {
       case Range(_, _)        => unimplemented
       case ZipArrayIndices(_) => unimplemented
       case ZipMapKeys(_)      => unimplemented
+
+      case _ => unimplemented  // HACK
     }
   }
 

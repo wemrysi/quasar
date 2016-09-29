@@ -38,7 +38,7 @@ object FuncHandler {
   type M[F[_], A] = Option[Free[F, A]]
 
   def handleOpsCore[T[_[_]]]: FuncHandler[T, ExprOpCoreF] = {
-    def hole[D](d: D): Free[ExprOpCoreF, D] = Free.pure(d)
+    implicit def hole[D](d: D): Free[ExprOpCoreF, D] = Free.pure(d)
 
     new FuncHandler[T, ExprOpCoreF](new (MapFunc[T, ?] ~> M[ExprOpCoreF, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOpCoreF, A] = {
@@ -46,57 +46,88 @@ object FuncHandler {
         import fp._
 
         fa.some collect {
-          case Add(a1, a2)           => $add(hole(a1), hole(a2))
-          case Multiply(a1, a2)      => $multiply(hole(a1), hole(a2))
-          case Subtract(a1, a2)      => $subtract(hole(a1), hole(a2))
-          case Divide(a1, a2)        => $divide(hole(a1), hole(a2))
-          case Modulo(a1, a2)        => $mod(hole(a1), hole(a2))
-          case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), hole(a1))
+          case Add(a1, a2)           => $add(a1, a2)
+          case Multiply(a1, a2)      => $multiply(a1, a2)
+          case Subtract(a1, a2)      => $subtract(a1, a2)
+          case Divide(a1, a2)        => $divide(a1, a2)
+          case Modulo(a1, a2)        => $mod(a1, a2)
+          case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
 
-          case Eq(a1, a2)            => $eq(hole(a1), hole(a2))
-          case Neq(a1, a2)           => $neq(hole(a1), hole(a2))
-          case Lt(a1, a2)            => $lt(hole(a1), hole(a2))
-          case Lte(a1, a2)           => $lte(hole(a1), hole(a2))
-          case Gt(a1, a2)            => $gt(hole(a1), hole(a2))
-          case Gte(a1, a2)           => $gte(hole(a1), hole(a2))
+          case Eq(a1, a2)            => $eq(a1, a2)
+          case Neq(a1, a2)           => $neq(a1, a2)
+          case Lt(a1, a2)            => $lt(a1, a2)
+          case Lte(a1, a2)           => $lte(a1, a2)
+          case Gt(a1, a2)            => $gt(a1, a2)
+          case Gte(a1, a2)           => $gte(a1, a2)
 
-          case Coalesce(a1, a2)      => $ifNull(hole(a1), hole(a2))
+          case Coalesce(a1, a2)      => $ifNull(a1, a2)
 
-          case ConcatArrays(a1, a2)  => $concat(hole(a1), hole(a2))  // NB: this is valid for strings only
-          case Lower(a1)             => $toLower(hole(a1))
-          case Upper(a1)             => $toUpper(hole(a1))
-          case Substring(a1, a2, a3) => $substr(hole(a1), hole(a2), hole(a3))
+          case ConcatArrays(a1, a2)  => $concat(a1, a2)  // NB: this is valid for strings only
+          case Lower(a1)             => $toLower(a1)
+          case Upper(a1)             => $toUpper(a1)
+          case Substring(a1, a2, a3) => $substr(a1, a2, a3)
 
-          case Cond(a1, a2, a3)      => $cond(hole(a1), hole(a2), hole(a3))
+          case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
 
-          case Or(a1, a2)            => $or(hole(a1), hole(a2))
-          case And(a1, a2)           => $and(hole(a1), hole(a2))
-          case Not(a1)               => $not(hole(a1))
+          case Or(a1, a2)            => $or(a1, a2)
+          case And(a1, a2)           => $and(a1, a2)
+          case Not(a1)               => $not(a1)
 
           case Null(a1) =>
-            $cond($eq(hole(a1), $literal(Bson.Text("null"))),
+            $cond($eq(a1, $literal(Bson.Text("null"))),
               $literal(Bson.Null),
               $literal(Bson.Undefined))
 
           case Bool(a1) =>
-            $cond($eq(hole(a1), $literal(Bson.Text("true"))),
+            $cond($eq(a1, $literal(Bson.Text("true"))),
               $literal(Bson.Bool(true)),
-              $cond($eq(hole(a1), $literal(Bson.Text("false"))),
+              $cond($eq(a1, $literal(Bson.Text("false"))),
                 $literal(Bson.Bool(false)),
                 $literal(Bson.Undefined)))
 
-          case ToTimestamp(a1) =>
-            $add($literal(Bson.Date(Instant.ofEpochMilli(0))), hole(a1))
+          case ExtractCentury(a1) =>
+            $divide($year(a1), $literal(Bson.Int32(100)))  // FIXME
+          case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
+          case ExtractDecade(a1) => $divide($year(a1), $literal(Bson.Int32(10)))
+          case ExtractDayOfWeek(a1) => $add($dayOfWeek(a1), $literal(Bson.Int32(-1)))
+          case ExtractDayOfYear(a1) => $dayOfYear(a1)
+          case ExtractEpoch(a1) =>
+            $divide(
+              $subtract(a1, $literal(Bson.Date(Instant.ofEpochMilli(0)))),
+              $literal(Bson.Int32(1000)))
+          case ExtractHour(a1) => $hour(a1)
+          case ExtractIsoDayOfWeek(a1) =>
+            $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
+              $literal(Bson.Int32(7)),
+              $add($dayOfWeek(a1), $literal(Bson.Int32(-1))))
+          // TODO: case ExtractIsoYear(a1) =>
+          case ExtractMicroseconds(a1) =>
+            $multiply($millisecond(a1), $literal(Bson.Int32(1000)))  // FIXME
+          case ExtractMillenium(a1) =>
+            $divide($year(a1), $literal(Bson.Int32(1000)))  // FIXME
+          case ExtractMilliseconds(a1) => $millisecond(a1)  // FIXME
+          case ExtractMinute(a1) => $minute(a1)
+          case ExtractMonth(a1) => $month(a1)
+          case ExtractQuarter(a1) =>
+            $add(
+              $divide($dayOfYear(a1), $literal(Bson.Int32(92))),
+              $literal(Bson.Int32(1)))  // FIXME
+          case ExtractSecond(a1) => $second(a1)
+          case ExtractWeek(a1) => $week(a1)
+          case ExtractYear(a1) => $year(a1)
 
-          case Between(a1, a2, a3)   => $and($lte(hole(a2), hole(a1)),
-                                              $lte(hole(a1), hole(a3)))
+          case ToTimestamp(a1) =>
+            $add($literal(Bson.Date(Instant.ofEpochMilli(0))), a1)
+
+          case Between(a1, a2, a3)   => $and($lte(a2, a1),
+                                              $lte(a1, a3))
         }
       }
     })
   }
 
   def handleOps3_0[T[_[_]]]: FuncHandler[T, ExprOp3_0F] = {
-    def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
+    implicit def hole[D](d: D): Free[ExprOp3_0F, D] = Free.pure(d)
     new FuncHandler[T, ExprOp3_0F](new (MapFunc[T, ?] ~> M[ExprOp3_0F, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOp3_0F, A] = {
         val fp = ExprOp3_0F.fixpoint[Free[?[_], A], ExprOp3_0F]
@@ -105,14 +136,14 @@ object FuncHandler {
 
         fa.some collect {
           case TimeOfDay(a1) =>
-            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, hole(a1))
+            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, a1)
         }
       }
     })
   }
 
   def handleOps3_2[T[_[_]]]: FuncHandler[T, ExprOp3_2F] = {
-    def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
+    implicit def hole[D](d: D): Free[ExprOp3_2F, D] = Free.pure(d)
     new FuncHandler[T, ExprOp3_2F](new (MapFunc[T, ?] ~> M[ExprOp3_2F, ?]) {
       def apply[A](fa: MapFunc[T, A]): M[ExprOp3_2F, A] = {
         val fp = ExprOp3_2F.fixpoint[Free[?[_], A], ExprOp3_2F]
@@ -120,7 +151,7 @@ object FuncHandler {
 
         fa.some collect {
           case Power(a1, a2) =>
-            $pow(hole(a1), hole(a2))
+            $pow(a1, a2)
         }
       }
     })
