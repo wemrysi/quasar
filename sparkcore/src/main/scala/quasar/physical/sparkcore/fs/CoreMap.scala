@@ -368,10 +368,6 @@ object CoreMap {
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    // TODO how to handle obj and collections
-    case Data.Obj(v) => ???
-    case Data.Arr(v) => ???
-    case Data.Set(v) => ???
     case Data.Timestamp(v) => Data.Str(v.toString)
     case Data.Date(v) => Data.Str(v.toString)
     case Data.Time(v) => Data.Str(v.toString)

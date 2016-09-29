@@ -105,16 +105,6 @@ object ProjectBucket {
         p2: EnvT[Ann[IT], ProjectBucket[IT, ?], ExternallyManaged]) = None
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT]:
-      Normalizable[ProjectBucket[T, ?]] =
-    new Normalizable[ProjectBucket[T, ?]] {
-      def normalize = new (ProjectBucket[T, ?] ~> ProjectBucket[T, ?]) {
-        def apply[A](pb: ProjectBucket[T, A]) = pb match {
-          case BucketField(a, v, f) =>
-            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(f))
-          case BucketIndex(a, v, i) =>
-            BucketField(a, normalizeMapFunc(v), normalizeMapFunc(i))
-        }
-      }
-    }
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive : EqualT : ShowT]: Normalizable[ProjectBucket[T, ?]] =
+    TTypes.normalizable[T].ProjectBucket
 }

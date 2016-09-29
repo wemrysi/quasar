@@ -67,6 +67,8 @@ object ManageFile {
     val failIfMissing = Prism.partial[MoveSemantics, Unit] {
       case FailIfMissing => ()
     } (κ(FailIfMissing))
+
+    implicit val show: Show[MoveSemantics] = Show.showFromToString
   }
 
   sealed trait MoveScenario {
@@ -152,7 +154,7 @@ object ManageFile {
   implicit def renderTree[A]: RenderTree[ManageFile[A]] =
     new RenderTree[ManageFile[A]] {
       def render(mf: ManageFile[A]) = mf match {
-        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.toString.some,
+        case Move(scenario, semantics) => NonTerminal(List("Move"), semantics.shows.some,
           scenario.fold(
             (from, to) => List(from.render, to.render),
             (from, to) => List(from.render, to.render)))

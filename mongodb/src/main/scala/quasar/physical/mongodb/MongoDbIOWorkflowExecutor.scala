@@ -123,9 +123,9 @@ private[mongodb] object MongoDbIOWorkflowExecutor {
       def apply[A](m: MongoDbIO[A]) = EitherT(m.attemptMongo.run flatMap {
         case -\/(UnhandledFSError(ex)) => ex match {
           case _: MongoSocketOpenException =>
-            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+            connectionFailed(ex).left.point[MongoDbIO]
           case _: MongoSocketException =>
-            connectionFailed(ex.getMessage).left.point[MongoDbIO]
+            connectionFailed(ex).left.point[MongoDbIO]
           case _ =>
             if (ex.getMessage contains "Command failed with error 18: 'auth failed'")
               invalidCredentials(ex.getMessage).left.point[MongoDbIO]

@@ -156,11 +156,6 @@ object NonTerminal {
 object RenderTree extends RenderTreeInstances {
   import RenderTree.ops._
 
-  def fromToString[A](simpleType: String) = new RenderTree[A] {
-    val nodeType = simpleType :: Nil
-    def render(v: A) = Terminal(nodeType, Some(v.toString))
-  }
-
   def fromShow[A: Show](simpleType: String) = new RenderTree[A] {
     def render(v: A) = Terminal(List(simpleType), Some(v.shows))
   }

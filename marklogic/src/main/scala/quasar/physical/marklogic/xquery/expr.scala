@@ -24,6 +24,7 @@ import scalaz._
 import scalaz.std.string._
 import scalaz.std.iterable._
 import scalaz.syntax.foldable._
+import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 import scalaz.syntax.std.boolean._
 
@@ -135,7 +136,7 @@ object expr {
 
   final case class TypeswitchDefaultClause(binding: Option[BindingName], result: XQuery) {
     def render: String = {
-      val bind = binding.map(_.xqy.toString + " ")
+      val bind = binding.map(_.xqy.shows + " ")
       s"default ${~bind}return $result"
     }
   }

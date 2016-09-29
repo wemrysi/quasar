@@ -112,6 +112,7 @@ package object jscore {
   }
 
   implicit class JsCoreOps(expr: JsCore) {
+    // TODO: Turn this into an algebra, and implement `Show[JsCore]` with it.
     def toJs: Js.Expr = expr.simplify match {
       case Literal(value)      => value
       case Ident(name)         => Js.Ident(name.value)

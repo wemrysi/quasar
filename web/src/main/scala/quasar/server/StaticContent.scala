@@ -52,6 +52,8 @@ object StaticContent {
     *     a jar?
     */
   private val jarPath: Task[String] = Task.delay {
+    // NB: This is the “right” way to get a `java.net.JarURLconnection`.
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     def altPath(uri: URI) =
       uri.toURL.openConnection
         .asInstanceOf[JarURLConnection]
