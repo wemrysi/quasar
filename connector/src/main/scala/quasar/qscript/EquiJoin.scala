@@ -97,20 +97,6 @@ object EquiJoin {
         p2: EnvT[Ann[T], EquiJoin[IT, ?], ExternallyManaged]) = None
     }
 
-  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]:
-      Normalizable[EquiJoin[T, ?]] =
-    new Normalizable[EquiJoin[T, ?]] {
-      val opt = new Optimize[T]
-
-      def normalize = λ[EquiJoin[T, ?] ~> EquiJoin[T, ?]](ej =>
-        EquiJoin(
-          ej.src,
-          freeTransCata(ej.lBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-          freeTransCata(ej.rBranch)(liftCo(opt.applyToFreeQS[QScriptTotal[T, ?]])),
-          normalizeMapFunc(ej.lKey),
-          normalizeMapFunc(ej.rKey),
-          ej.f,
-          normalizeMapFunc(ej.combine))
-      )
-    }
+  implicit def normalizable[T[_[_]]: Recursive: Corecursive: EqualT: ShowT]: Normalizable[EquiJoin[T, ?]] =
+    TTypes.normalizable[T].EquiJoin
 }
