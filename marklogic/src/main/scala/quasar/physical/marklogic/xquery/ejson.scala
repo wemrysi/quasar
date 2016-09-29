@@ -24,7 +24,7 @@ import eu.timepit.refined.auto._
 import scalaz.syntax.monad._
 
 object ejson {
-  import syntax._, expr.{attribute, element, func}, axes.child
+  import syntax._, expr.{attribute, element, every, func, let_}, axes.child
   import FunctionDecl.{FunctionDecl1, FunctionDecl2, FunctionDecl3}
 
   val ejs = NamespaceDecl(ejsonNs)
@@ -122,7 +122,17 @@ object ejson {
         $("obj1") as SequenceType("element()"),
         $("obj2") as SequenceType("element()")
       ).as(SequenceType(s"element($ename)")) { (obj1: XQuery, obj2: XQuery) =>
-        mkObject[F] apply (mkSeq_(obj1 `/` child.element(), obj2 `/` child.element()))
+        val (xs, ys, names, e, n1, n2) = ("$xs", "$ys", "$names", "$e", "$n1", "$n2")
+
+        mkObject[F] apply {
+          let_(
+            xs    -> (obj2 `/` child.element()),
+            names -> fn.map("fn:node-name#1".xqy, xs.xqy),
+            ys    -> fn.filter(func(e) {
+                       every(n1 -> fn.nodeName(e.xqy), n2 -> names.xqy) satisfies (n1.xqy ne n2.xqy)
+                     }, obj1 `/` child.element()))
+          .return_(mkSeq_(xs.xqy, ys.xqy))
+        }
       }
     }.join
 

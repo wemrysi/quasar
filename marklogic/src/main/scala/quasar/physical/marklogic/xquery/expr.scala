@@ -39,6 +39,9 @@ object expr {
   val emptySeq: XQuery =
     XQuery("()")
 
+  def every(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
+    QuantifiedExpr(Quantifier.Every, NonEmptyList(ts, tss: _*))
+
   def for_(ts: (String, XQuery), tss: (String, XQuery)*): Flwor =
     Flwor(ts :: IList.fromList(tss.toList), IList.empty, None, IList.empty, false)
 
@@ -50,6 +53,9 @@ object expr {
 
   def let_(b: (String, XQuery), bs: (String, XQuery)*): Flwor =
     Flwor(IList.empty, b :: IList.fromList(bs.toList), None, IList.empty, false)
+
+  def some(ts: (String, XQuery), tss: (String, XQuery)*): QuantifiedExpr =
+    QuantifiedExpr(Quantifier.Some, NonEmptyList(ts, tss: _*))
 
   def typeswitch(on: XQuery)(cases: TypeswitchCaseClause*): TypeswitchExpr =
     TypeswitchExpr(on, cases.toList)
@@ -138,6 +144,25 @@ object expr {
     def render: String = {
       val bind = binding.map(_.xqy.shows + " ")
       s"default ${~bind}return $result"
+    }
+  }
+
+  sealed abstract class Quantifier {
+    override def toString = this match {
+      case Quantifier.Some  => "some"
+      case Quantifier.Every => "every"
+    }
+  }
+
+  object Quantifier {
+    case object Some  extends Quantifier
+    case object Every extends Quantifier
+  }
+
+  final case class QuantifiedExpr(quantifier: Quantifier, tupleStreams: NonEmptyList[(String, XQuery)]) {
+    def satisfies(xqy: XQuery): XQuery = {
+      val streams = tupleStreams map { case (v, seq) => s"$v in $seq" } intercalate (", ")
+      XQuery(s"$quantifier $streams satisfies $xqy")
     }
   }
 }
