@@ -36,6 +36,25 @@ class SimplifyStdLibSpec extends StdLibSpec {
   def shortCircuit[N <: Nat](func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     case (relations.Between, _) => notHandled
 
+    case (date.ExtractCentury, _) => notHandled
+    case (date.ExtractDayOfMonth, _) => notHandled
+    case (date.ExtractDecade, _) => notHandled
+    case (date.ExtractDayOfWeek, _) => notHandled
+    case (date.ExtractDayOfYear, _) => notHandled
+    case (date.ExtractEpoch, _) => notHandled
+    case (date.ExtractHour, _) => notHandled
+    case (date.ExtractIsoDayOfWeek, _) => notHandled
+    case (date.ExtractIsoYear, _) => notHandled
+    case (date.ExtractMicroseconds, _) => notHandled
+    case (date.ExtractMillenium, _) => notHandled
+    case (date.ExtractMilliseconds, _) => notHandled
+    case (date.ExtractMinute, _) => notHandled
+    case (date.ExtractMonth, _) => notHandled
+    case (date.ExtractQuarter, _) => notHandled
+    case (date.ExtractSecond, _) => notHandled
+    case (date.ExtractWeek, _) => notHandled
+    case (date.ExtractYear, _) => notHandled
+
     case _ => ().right
   }
 

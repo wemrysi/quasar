@@ -23,7 +23,7 @@ import matryoshka._
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.scalacheck.{Arbitrary, Gen}
-import org.threeten.bp.{Instant, ZoneOffset}
+import org.threeten.bp.{Instant, LocalDate, ZoneOffset}
 import scala.math.abs
 
 trait StdLibTestRunner {
@@ -73,10 +73,10 @@ abstract class StdLibSpec extends Qspec {
     def apply[S <: Data](s: Expectable[S]) = {
       val v = s.value
       (v, expected) match {
-        case (Data.Dec(x), Data.Dec(exp)) =>
+        case (Data.Number(x), Data.Number(exp)) =>
           result(isClose(x, exp, 1e-9),
-            s"$x is Dec and matches $exp",
-            s"$x is Dec but does not match $exp", s)
+            s"$x is a Number and matches $exp",
+            s"$x is a Number but does not match $exp", s)
         case _ =>
           result(v == expected,
             s"$v matches $expected",
@@ -258,6 +258,339 @@ abstract class StdLibSpec extends Qspec {
     "DateLib" >> {
       import DateLib._
 
+      "ExtractCentury" >> {
+        "0001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+        }
+
+        "2000-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(20))
+        }
+
+        "2001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(21))
+        }
+
+        "midnight 0001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "midnight 2000-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(20))
+        }
+
+        "midnight 2001-01-01" >> {
+          unary(ExtractCentury(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(21))
+        }
+      }
+
+      "ExtractDayOfMonth" >> {
+        "2016-01-01" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-02-29" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(29))
+        }
+
+        "midnight 2016-02-29" >> {
+          unary(ExtractDayOfMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(29))
+        }
+      }
+
+      "ExtractDecade" >> {
+        "1999-12-31" >> {
+          unary(ExtractDecade(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(199))
+        }
+
+        "midnight 1999-12-31" >> {
+          unary(ExtractDecade(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(199))
+        }
+      }
+
+      "ExtractDayOfWeek" >> {
+        "2016-09-28" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+        }
+
+        "midnight 2016-09-28" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+        }
+
+        "2016-10-02" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(0))
+        }
+
+        "midnight 2016-10-02" >> {
+          unary(ExtractDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(0))
+        }
+      }
+
+      "ExtractDayOfYear" >> {
+        "2016-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2016-03-01")), Data.Int(61))
+        }
+
+        "midnight 2016-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(61))
+        }
+
+        "2017-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Date(LocalDate.parse("2017-03-01")), Data.Int(60))
+        }
+
+        "midnight 2017-03-01" >> {
+          unary(ExtractDayOfYear(_).embed, Data.Timestamp(Instant.parse("2017-03-01T00:00:00.000Z")), Data.Int(60))
+        }
+      }
+
+      "ExtractEpoch" >> {
+        "2016-09-29" >> {
+          unary(ExtractEpoch(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(1475107200.0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractEpoch(_).embed, Data.Timestamp(Instant.parse("2016-09-29T12:34:56.789Z")), Data.Dec(1475152496.789))
+        }
+      }
+
+      "ExtractHour" >> {
+        "2016-09-29" >> {
+          unary(ExtractHour(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractHour(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(12))
+        }
+      }
+
+      "ExtractIsoDayOfWeek" >> {
+        "2016-09-28" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-09-28")), Data.Int(3))
+        }
+
+        "midnight 2016-09-28" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-09-28T00:00:00.000Z")), Data.Int(3))
+        }
+
+        "2016-10-02" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Date(LocalDate.parse("2016-10-02")), Data.Int(7))
+        }
+
+        "midnight 2016-10-02" >> {
+          unary(ExtractIsoDayOfWeek(_).embed, Data.Timestamp(Instant.parse("2016-10-02T00:00:00.000Z")), Data.Int(7))
+        }
+      }
+
+      "ExtractIsoYear" >> {
+        "2006-01-01" >> {
+          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-01")), Data.Int(2005))
+        }
+
+        "midnight 2006-01-01" >> {
+          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-01T00:00:00.000Z")), Data.Int(2005))
+        }
+
+        "2006-01-02" >> {
+          unary(ExtractIsoYear(_).embed, Data.Date(LocalDate.parse("2006-01-02")), Data.Int(2006))
+        }
+
+        "midnight 2006-01-02" >> {
+          unary(ExtractIsoYear(_).embed, Data.Timestamp(Instant.parse("2006-01-02T00:00:00.000Z")), Data.Int(2006))
+        }
+      }
+
+      "ExtractMicroseconds" >> {
+        "2016-09-29" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMicroseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e6))
+        }
+      }
+
+
+      "ExtractMillenium" >> {
+        "0001-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("0001-01-01")), Data.Int(1))
+        }
+
+        "2000-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("2000-01-01")), Data.Int(2))
+        }
+
+        "2001-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Date(LocalDate.parse("2001-01-01")), Data.Int(3))
+        }
+
+        "midnight 0001-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("0001-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "midnight 2000-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("2000-01-01T00:00:00.000Z")), Data.Int(2))
+        }
+
+        "midnight 2001-01-01" >> {
+          unary(ExtractMillenium(_).embed, Data.Timestamp(Instant.parse("2001-01-01T00:00:00.000Z")), Data.Int(3))
+        }
+      }
+
+      "ExtractMilliseconds" >> {
+        "2016-09-29" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMilliseconds(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789e3))
+        }
+      }
+
+      "ExtractMinute" >> {
+        "2016-09-29" >> {
+          unary(ExtractMinute(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Int(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Int(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractMinute(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Int(34))
+        }
+      }
+
+      "ExtractMonth" >> {
+        "2016-01-01" >> {
+          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(1))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-02-29" >> {
+          unary(ExtractMonth(_).embed, Data.Date(LocalDate.parse("2016-02-29")), Data.Int(2))
+        }
+
+        "midnight 2016-02-29" >> {
+          unary(ExtractMonth(_).embed, Data.Timestamp(Instant.parse("2016-02-29T00:00:00.000Z")), Data.Int(2))
+        }
+      }
+
+      "ExtractQuarter" >> {
+        "2016-10-03" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-10-03")), Data.Int(4))
+        }
+
+        "midnight 2016-10-03" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-10-03T00:00:00.000Z")), Data.Int(4))
+        }
+
+        "2016-03-31 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-03-31")), Data.Int(1))
+        }
+
+        "midnight 2016-03-31 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-03-31T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2016-04-01 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2016-04-01")), Data.Int(2))
+        }
+
+        "midnight 2016-04-01 (leap year)" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2016-04-01T00:00:00.000Z")), Data.Int(2))
+        }
+
+        "2017-03-31" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-03-31")), Data.Int(1))
+        }
+
+        "midnight 2017-03-31" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-03-31T00:00:00.000Z")), Data.Int(1))
+        }
+
+        "2017-04-01" >> {
+          unary(ExtractQuarter(_).embed, Data.Date(LocalDate.parse("2017-04-01")), Data.Int(2))
+        }
+
+        "midnight 2017-04-01" >> {
+          unary(ExtractQuarter(_).embed, Data.Timestamp(Instant.parse("2017-04-01T00:00:00.000Z")), Data.Int(2))
+        }
+      }
+
+      "ExtractSecond" >> {
+        "2016-09-29" >> {
+          unary(ExtractSecond(_).embed, Data.Date(LocalDate.parse("2016-09-29")), Data.Dec(0))
+        }
+
+        "midnight 2016-09-29" >> {
+          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T00:00:00.000Z")), Data.Dec(0))
+        }
+
+        "2016-09-29 12:34:56.789" >> {
+          unary(ExtractSecond(_).embed, Data.Timestamp(Instant.parse("2016-03-01T12:34:56.789Z")), Data.Dec(56.789))
+        }
+      }
+
+      "ExtractWeek" >> {
+        // NB: current implementation, which is not consistent with IsoYear
+
+        "2016-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2016-01-01")), Data.Int(0))
+        }
+
+        "midnight 2016-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2016-01-01T00:00:00.000Z")), Data.Int(0))
+        }
+
+        // These examples illustrate the "correct", ISO-compliant behavior:
+
+        "2001-02-16" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2001-02-16")), Data.Int(7))
+        }.pendingUntilFixed
+
+        "midnight 2016-10-03" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2001-02-16T00:00:00.000Z")), Data.Int(7))
+        }.pendingUntilFixed
+
+        "2005-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Date(LocalDate.parse("2005-01-01")), Data.Int(53))
+        }.pendingUntilFixed
+
+        "midnight 2005-01-01" >> {
+          unary(ExtractWeek(_).embed, Data.Timestamp(Instant.parse("2005-01-01T00:00:00.000Z")), Data.Int(53))
+        }.pendingUntilFixed
+      }
+
+      "ExtractYear" >> {
+        "1999-12-31" >> {
+          unary(ExtractYear(_).embed, Data.Date(LocalDate.parse("1999-12-31")), Data.Int(1999))
+        }
+
+        "midnight 1999-12-31" >> {
+          unary(ExtractYear(_).embed, Data.Timestamp(Instant.parse("1999-12-31T00:00:00.000Z")), Data.Int(1999))
+        }
+      }
+
       "TimeOfDay" >> {
         "timestamp" >> {
           val now = Instant.now
@@ -325,17 +658,18 @@ abstract class StdLibSpec extends Qspec {
           binary(Power(_, _).embed, Data.Dec(x), Data.Int(1), Data.Dec(x))
         }
 
-        "0 to Int" >> prop { (y: BigInt) =>
+        "0 to small positive int" >> prop { (y0: Int) =>
+          val y = abs(y0 % 10)
           y != 0 ==>
             binary(Power(_, _).embed, Data.Int(0), Data.Int(y), Data.Int(0))
         }
 
-        "0 to Dec" >> prop { (y: BigDecimal) =>
-          y != 0 ==>
-            binary(Power(_, _).embed, Data.Int(0), Data.Dec(y), Data.Int(0))
-        }
+        // "0 to Dec" >> prop { (y: BigDecimal) =>
+        //   y != 0 ==>
+        //     binary(Power(_, _).embed, Data.Int(0), Data.Dec(y), Data.Int(0))
+        // }
 
-        "Int to small Int" >> prop { (x: Int) =>
+        "Int squared" >> prop { (x: Int) =>
           binary(Power(_, _).embed, Data.Int(x), Data.Int(2), Data.Int(x.toLong * x.toLong))
         }
 
@@ -365,7 +699,7 @@ abstract class StdLibSpec extends Qspec {
       "Divide" >> {
         "any ints" >> prop { (x: Int, y: Int) =>
           y != 0 ==>
-            binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Int(x.toLong / y.toLong))
+            binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Dec(x.toDouble / y.toDouble))
         }
 
         // "any doubles" >> prop { (x: Double, y: Double) =>
@@ -393,7 +727,7 @@ abstract class StdLibSpec extends Qspec {
 
       "Modulo" >> {
         "any int by 1" >> prop { (x: Int) =>
-            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(x))
+            binary(Modulo(_, _).embed, Data.Int(x), Data.Int(1), Data.Int(0))
         }
 
         "any positive ints" >> prop { (x0: Int, y0: Int) =>
@@ -609,7 +943,7 @@ abstract class StdLibSpec extends Qspec {
 
         "any three Ints" >> prop { (x1: BigInt, x2: BigInt, x3: BigInt) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Int(xs(0)), Data.Int(xs(1)), Data.Int(xs(2)), Data.Bool(true))
+          ternary(Between(_, _, _).embed, Data.Int(xs(1)), Data.Int(xs(0)), Data.Int(xs(2)), Data.Bool(true))
         }
 
         "any Dec with self" >> prop { (x: BigDecimal) =>
@@ -618,7 +952,7 @@ abstract class StdLibSpec extends Qspec {
 
         "any three Decs" >> prop { (x1: BigDecimal, x2: BigDecimal, x3: BigDecimal) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Dec(xs(0)), Data.Dec(xs(1)), Data.Dec(xs(2)), Data.Bool(true))
+          ternary(Between(_, _, _).embed, Data.Dec(xs(1)), Data.Dec(xs(0)), Data.Dec(xs(2)), Data.Bool(true))
         }
 
         "any Str with self" >> prop { (x: String) =>
@@ -627,7 +961,7 @@ abstract class StdLibSpec extends Qspec {
 
         "any three Strs" >> prop { (x1: String, x2: String, x3: String) =>
           val xs = List(x1, x2, x3).sorted
-          ternary(Between(_, _, _).embed, Data.Str(xs(0)), Data.Str(xs(1)), Data.Str(xs(2)), Data.Bool(true))
+          ternary(Between(_, _, _).embed, Data.Str(xs(1)), Data.Str(xs(0)), Data.Str(xs(2)), Data.Bool(true))
         }
 
         // TODO: Timestamp, Interval, cross-type comparison

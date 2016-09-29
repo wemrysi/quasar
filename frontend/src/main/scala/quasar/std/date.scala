@@ -78,7 +78,7 @@ trait DateLib extends Library {
     "Pulls out the day of week (`dow`) subfield from a date/time value " +
     "(Sunday: 0 to Saturday: 7).")
   val ExtractDayOfYear    = extract("extract_day_of_year",
-    "Pulls out the day of year (`doy`) subfield from a date/time value.")
+    "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
   val ExtractEpoch        = extract("extract_epoch",
     "Pulls out the epoch subfield from a date/time value. For dates and " +
     "timestamps, this is the number of seconds since midnight, 1970-01-01. " +

@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import quasar.Predef._
 import quasar._, Planner.{PlannerError, InternalError}
-import quasar.std._
+import quasar.std.StdLib._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.DataCursor
@@ -44,18 +44,17 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
-    case (StringLib.Length, _)   => notHandled.left
-    case (StringLib.Integer, _)  => notHandled.left
-    case (StringLib.Decimal, _)  => notHandled.left
-    case (StringLib.ToString, _) => notHandled.left
+    case (string.Length, _)   => notHandled.left
+    case (string.Integer, _)  => notHandled.left
+    case (string.Decimal, _)  => notHandled.left
+    case (string.ToString, _) => notHandled.left
 
-    case (DateLib.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
+    case (date.ExtractIsoYear, _) => notHandled.left
+    case (date.ExtractQuarter, _) => Skipped("TODO").left
 
-    case (MathLib.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
+    case (date.TimeOfDay, _) if is2_6(backend) => Skipped("not implemented in aggregation on MongoDB 2.6").left
 
-    case (MathLib.Power, Data.Number(x) :: Data.Number(y) :: Nil)
-        if x == 0 && y < 0 =>
-      Skipped("Zero to a negative powere is a runtime error").left
+    case (math.Power, _) if !is3_2(backend) => Skipped("not implemented in aggregation on MongoDB < 3.2").left
 
     case _                  => ().right
   }
@@ -63,7 +62,7 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: Fix[LogicalPlan])
       : PlannerError \/ (Crystallized[WorkflowF], BsonField.Name) = {
     val wrapped =
-      Fix(StructuralLib.MakeObject(
+      Fix(structural.MakeObject(
         LogicalPlan.Constant(Data.Str("result")),
         lp))
 
